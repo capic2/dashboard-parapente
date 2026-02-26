@@ -93,7 +93,7 @@ Create a personal flying conditions dashboard optimized for your region that:
 - **Testing:** pytest, pytest-cov (>80% coverage target)
 
 **Frontend:**
-- **Framework:** React 18+ (hooks)
+- **Framework:** React 19+ (hooks + Server Components)
 - **Build Tool:** Vite (fast development)
 - **TanStack Suite:**
   - **@tanstack/react-router** — Modern type-safe routing

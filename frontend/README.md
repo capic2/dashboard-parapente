@@ -42,7 +42,10 @@ npm run build
 ## 🎨 Technology Stack
 
 **Core:**
-- **React 18** with Hooks
+- **React 19** with Hooks + Server Components
+  - React Compiler (automatic optimizations)
+  - React Actions (simplified async handling)
+  - Improved error boundaries
 - **Vite** for fast development
 - **Tailwind CSS** for styling
 
@@ -94,6 +97,37 @@ src/
 ├── App.jsx              # Root component with TanStack Router
 ├── main.jsx             # React entry point
 └── App.css              # Global styles
+```
+
+---
+
+## ⚡ React 19 Features
+
+### React Compiler
+- Automatic memoization (no need for useMemo/useCallback)
+- Better performance without manual optimization
+```jsx
+// React 19: No need for useMemo wrapper
+export function Dashboard() {
+  const expensiveValue = calculateComplexData()
+  // Compiler handles memoization automatically
+  return <div>{expensiveValue}</div>
+}
+```
+
+### React Actions
+- Simplified async form handling
+- Better error handling out of the box
+```jsx
+async function updateAlert(formData) {
+  const result = await API.patch(`/alerts/${id}`, formData)
+  return result
+}
+
+<form action={updateAlert}>
+  <input name="name" />
+  <button type="submit">Save</button>
+</form>
 ```
 
 ---
