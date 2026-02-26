@@ -26,14 +26,14 @@ backend/
 ### 1. Database Initialization (2 minutes)
 
 ```bash
-# Create database directory
-mkdir -p db/backups
+# From dashboard root directory:
+# Database directories already created in git
 
 # Initialize SQLite from schema
-sqlite3 db/dashboard.db < ../docs/PHASE-1-DESIGN/dashboard-schema-sqlite.sql
+sqlite3 backend/db/dashboard.db < docs/PHASE-1-DESIGN/dashboard-schema-sqlite.sql
 
 # Verify
-sqlite3 db/dashboard.db ".tables"
+sqlite3 backend/db/dashboard.db ".tables"
 # Output: sites, flights, weather_sources, weather_forecasts, alerts, ...
 ```
 

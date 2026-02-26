@@ -221,8 +221,11 @@ git push origin phase-2-backend
 
 ### Setup
 ```bash
-cd backend
-sqlite3 db/dashboard.db < ../docs/PHASE-1-DESIGN/dashboard-schema-sqlite.sql
+# Initialize database
+sqlite3 backend/db/dashboard.db < docs/PHASE-1-DESIGN/dashboard-schema-sqlite.sql
+
+# Verify
+sqlite3 backend/db/dashboard.db ".tables"
 ```
 
 ### Backup
