@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🪂 Dashboard Parapente - Mockup</title>
+  <title>🪂 Tableau de Bord Parapente</title>
   <style>
     * {
       margin: 0;
@@ -16,7 +16,7 @@
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: #333;
       min-height: 100vh;
-      padding: 20px;
+      padding: 12px;
     }
 
     .container {
@@ -28,29 +28,35 @@
     header {
       background: white;
       border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 20px;
+      padding: 16px;
+      margin-bottom: 16px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
     }
 
     header h1 {
-      font-size: 28px;
+      font-size: 24px;
       color: #667eea;
+      flex: 1;
+      min-width: 200px;
     }
 
     nav {
       display: flex;
-      gap: 15px;
+      gap: 8px;
+      flex-wrap: wrap;
     }
 
     nav a {
-      padding: 8px 16px;
+      padding: 8px 14px;
       border-radius: 6px;
       text-decoration: none;
       color: #666;
+      font-size: 14px;
       transition: all 0.3s;
     }
 
@@ -64,30 +70,30 @@
       color: white;
     }
 
-    /* Grid Layout */
-    .grid-1 {
+    /* Grid Layouts */
+    .grid-3 {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 15px;
-      margin-bottom: 20px;
+      gap: 12px;
+      margin-bottom: 16px;
     }
 
     .grid-2 {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 15px;
-      margin-bottom: 20px;
+      gap: 12px;
+      margin-bottom: 16px;
     }
 
     .grid-full {
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
 
     /* Card Styles */
     .card {
       background: white;
       border-radius: 12px;
-      padding: 20px;
+      padding: 16px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       transition: transform 0.3s, box-shadow 0.3s;
     }
@@ -98,22 +104,22 @@
     }
 
     .card h2 {
-      font-size: 16px;
+      font-size: 15px;
       color: #666;
-      margin-bottom: 15px;
+      margin-bottom: 14px;
       font-weight: 600;
     }
 
     .card h3 {
-      font-size: 18px;
+      font-size: 16px;
       color: #333;
       margin-bottom: 10px;
     }
 
-    /* Status Cards (Today at a Glance) */
+    /* Status Cards (Maintenant et demain) */
     .status-card {
       border-left: 4px solid #667eea;
-      padding: 20px;
+      padding: 16px;
     }
 
     .status-card.arguel {
@@ -129,7 +135,7 @@
     }
 
     .site-name {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 600;
       color: #333;
       margin-bottom: 10px;
@@ -185,6 +191,7 @@
 
     .stat-label {
       color: #999;
+      font-weight: 500;
     }
 
     .stat-value {
@@ -192,27 +199,83 @@
       color: #333;
     }
 
-    /* Forecast Section */
+    /* Hourly Weather Table */
+    .hourly-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    .hourly-table thead {
+      background: #f9fafb;
+      border-bottom: 2px solid #e5e7eb;
+    }
+
+    .hourly-table th {
+      padding: 8px;
+      text-align: center;
+      font-weight: 600;
+      color: #666;
+      font-size: 11px;
+    }
+
+    .hourly-table td {
+      padding: 8px;
+      text-align: center;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 12px;
+    }
+
+    .hourly-table tr:hover {
+      background: #f9fafb;
+    }
+
+    .hour-good {
+      background: #d1fae5;
+      color: #065f46;
+      font-weight: 600;
+    }
+
+    .hour-ok {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .hour-bad {
+      background: #fee2e2;
+      color: #7f1d1d;
+    }
+
+    /* 5-Day Forecast */
     .forecast-timeline {
       display: flex;
-      gap: 10px;
+      gap: 8px;
       overflow-x: auto;
       padding: 10px 0;
+      scroll-behavior: smooth;
     }
 
     .forecast-day {
-      flex: 0 0 120px;
+      flex: 0 0 100px;
       background: #f9fafb;
       border-radius: 8px;
       padding: 12px;
       text-align: center;
       border: 2px solid #e5e7eb;
+      cursor: pointer;
       transition: all 0.3s;
     }
 
     .forecast-day:hover {
       border-color: #667eea;
       background: white;
+    }
+
+    .forecast-day.active {
+      border-color: #667eea;
+      background: #eef2ff;
+      box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);
     }
 
     .forecast-day.best {
@@ -224,10 +287,11 @@
       font-weight: 600;
       color: #333;
       margin-bottom: 5px;
+      font-size: 13px;
     }
 
     .day-score {
-      font-size: 24px;
+      font-size: 22px;
       font-weight: bold;
       color: #667eea;
       margin-bottom: 5px;
@@ -238,11 +302,42 @@
       color: #666;
     }
 
+    /* Forecast Details Panel */
+    .forecast-details {
+      background: #f9fafb;
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 12px;
+      display: none;
+    }
+
+    .forecast-details.active {
+      display: block;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .forecast-details h3 {
+      color: #333;
+      margin-bottom: 12px;
+      font-size: 16px;
+    }
+
     /* Flights Table */
     .flights-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 14px;
+      font-size: 13px;
     }
 
     .flights-table thead {
@@ -251,14 +346,15 @@
     }
 
     .flights-table th {
-      padding: 12px;
+      padding: 10px;
       text-align: left;
       font-weight: 600;
       color: #666;
+      font-size: 12px;
     }
 
     .flights-table td {
-      padding: 12px;
+      padding: 10px;
       border-bottom: 1px solid #e5e7eb;
     }
 
@@ -282,13 +378,13 @@
     }
 
     .view-button {
-      padding: 6px 12px;
+      padding: 5px 10px;
       background: #667eea;
       color: white;
       border: none;
       border-radius: 4px;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 11px;
       transition: background 0.3s;
     }
 
@@ -300,27 +396,27 @@
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 15px;
-      margin-bottom: 15px;
+      gap: 12px;
+      margin-bottom: 12px;
     }
 
     .stat-box {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      padding: 20px;
+      padding: 16px;
       border-radius: 8px;
       text-align: center;
     }
 
     .stat-box h4 {
-      font-size: 12px;
+      font-size: 11px;
       opacity: 0.9;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       font-weight: 500;
     }
 
     .stat-box .value {
-      font-size: 28px;
+      font-size: 24px;
       font-weight: bold;
     }
 
@@ -328,13 +424,13 @@
     .chart-placeholder {
       background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
       border-radius: 8px;
-      height: 250px;
+      height: 200px;
       display: flex;
       align-items: center;
       justify-content: center;
       color: #999;
-      font-size: 14px;
-      margin-bottom: 15px;
+      font-size: 13px;
+      margin-bottom: 12px;
     }
 
     /* Alert Manager */
@@ -347,26 +443,27 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 10px;
     }
 
     .alert-info h4 {
       color: #333;
-      font-size: 14px;
-      margin-bottom: 4px;
+      font-size: 13px;
+      margin-bottom: 3px;
     }
 
     .alert-info p {
       color: #666;
-      font-size: 12px;
+      font-size: 11px;
     }
 
     .alert-actions {
       display: flex;
-      gap: 8px;
+      gap: 6px;
     }
 
     .btn-small {
-      padding: 6px 10px;
+      padding: 5px 10px;
       font-size: 11px;
       border: 1px solid #ddd;
       background: white;
@@ -384,11 +481,14 @@
       background: #667eea;
       color: white;
       border: none;
-      padding: 10px 20px;
+      padding: 10px 16px;
       border-radius: 6px;
       cursor: pointer;
       font-weight: 600;
+      font-size: 13px;
       transition: background 0.3s;
+      width: 100%;
+      margin-top: 8px;
     }
 
     .btn-add:hover {
@@ -399,20 +499,21 @@
     .sources-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 13px;
+      font-size: 12px;
     }
 
     .sources-table th {
-      padding: 12px;
+      padding: 10px;
       text-align: left;
       background: #f9fafb;
       font-weight: 600;
       color: #666;
       border-bottom: 2px solid #e5e7eb;
+      font-size: 11px;
     }
 
     .sources-table td {
-      padding: 12px;
+      padding: 10px;
       border-bottom: 1px solid #e5e7eb;
     }
 
@@ -424,7 +525,7 @@
       display: inline-block;
       padding: 4px 8px;
       border-radius: 4px;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
     }
 
@@ -446,15 +547,238 @@
     .status-badge {
       padding: 4px 8px;
       border-radius: 4px;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
       background: #d1fae5;
       color: #065f46;
     }
 
-    /* Responsive */
+    /* Spot Tabs */
+    .spot-tab {
+      padding: 8px 14px;
+      background: #f9fafb;
+      border: 2px solid #e5e7eb;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      color: #666;
+      transition: all 0.3s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .spot-tab:hover {
+      border-color: #667eea;
+      background: white;
+    }
+
+    .spot-tab.active {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+
+    .spot-tab.active:hover {
+      background: #5568d3;
+    }
+
+    /* Spot Content */
+    .spot-content {
+      display: none;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .spot-content.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+
+    /* Suggestions dropdown */
+    .spot-suggestion {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f0f0f0;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background 0.2s;
+    }
+
+    .spot-suggestion:hover {
+      background: #f9fafb;
+      color: #667eea;
+    }
+
+    .spot-suggestion-name {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .spot-suggestion-info {
+      font-size: 11px;
+      color: #999;
+      margin-top: 2px;
+    }
+
+    /* Modal/Panel pour preview spot */
+    .spot-preview-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .spot-preview-modal.active {
+      display: flex;
+      align-items: flex-end;
+    }
+
+    .spot-preview-content {
+      background: white;
+      border-radius: 16px 16px 0 0;
+      width: 100%;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 20px;
+      box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .spot-preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 12px;
+    }
+
+    .spot-preview-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #333;
+    }
+
+    .spot-preview-close {
+      font-size: 24px;
+      cursor: pointer;
+      color: #999;
+      transition: color 0.2s;
+      background: none;
+      border: none;
+      padding: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .spot-preview-close:hover {
+      color: #333;
+    }
+
+    .spot-preview-info {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+      padding: 12px;
+      background: #f9fafb;
+      border-radius: 8px;
+    }
+
+    .spot-preview-info-item {
+      flex: 1;
+      text-align: center;
+    }
+
+    .spot-preview-info-label {
+      font-size: 11px;
+      color: #999;
+      margin-bottom: 4px;
+    }
+
+    .spot-preview-info-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .spot-preview-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .spot-preview-actions button {
+      flex: 1;
+      padding: 12px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .btn-add-tab {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-add-tab:hover {
+      background: #5568d3;
+    }
+
+    .btn-close-modal {
+      background: #f0f0f0;
+      color: #666;
+    }
+
+    .btn-close-modal:hover {
+      background: #e0e0e0;
+    }
+
+    @media (max-width: 768px) {
+      .spot-preview-modal.active {
+        align-items: flex-end;
+      }
+
+      .spot-preview-content {
+        max-height: 90vh;
+        padding: 16px;
+      }
+
+      .spot-preview-title {
+        font-size: 16px;
+      }
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      color: white;
+      margin-top: 30px;
+      padding: 16px;
+      font-size: 11px;
+    }
+
+    /* RESPONSIVE DESIGN */
     @media (max-width: 1024px) {
-      .grid-1 {
+      .grid-3 {
         grid-template-columns: repeat(2, 1fr);
       }
 
@@ -468,14 +792,27 @@
 
       header {
         flex-direction: column;
-        gap: 15px;
-        align-items: flex-start;
+        gap: 10px;
+        align-items: stretch;
+      }
+
+      header h1 {
+        text-align: center;
+      }
+
+      nav {
+        justify-content: center;
       }
     }
 
-    @media (max-width: 640px) {
-      .grid-1 {
-        grid-template-columns: 1fr;
+    @media (max-width: 768px) {
+      body {
+        padding: 8px;
+      }
+
+      header {
+        padding: 12px;
+        margin-bottom: 12px;
       }
 
       header h1 {
@@ -484,21 +821,598 @@
 
       nav {
         width: 100%;
-        flex-wrap: wrap;
+      }
+
+      nav a {
+        flex: 1;
+        text-align: center;
+        padding: 6px 8px;
+        font-size: 12px;
+      }
+
+      .grid-3 {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .grid-2 {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .card {
+        padding: 12px;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+      }
+
+      .stat-box {
+        padding: 12px;
+      }
+
+      .stat-box .value {
+        font-size: 20px;
+      }
+
+      .hourly-table {
+        font-size: 11px;
+      }
+
+      .hourly-table th,
+      .hourly-table td {
+        padding: 6px 4px;
+        font-size: 10px;
+      }
+
+      .forecast-day {
+        flex: 0 0 90px;
+        padding: 10px 8px;
+      }
+
+      .day-name {
+        font-size: 12px;
+      }
+
+      .day-score {
+        font-size: 18px;
+      }
+
+      .flights-table {
+        font-size: 11px;
+      }
+
+      .flights-table th,
+      .flights-table td {
+        padding: 8px 6px;
+        font-size: 11px;
+      }
+
+      .view-button {
+        padding: 4px 8px;
+        font-size: 10px;
+      }
+
+      .score {
+        font-size: 28px;
+      }
+
+      .site-name {
+        font-size: 14px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 6px;
+      }
+
+      .container {
+        margin: 0 auto;
+      }
+
+      header {
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+
+      header h1 {
+        font-size: 18px;
+      }
+
+      nav a {
+        padding: 5px 6px;
+        font-size: 11px;
+      }
+
+      .card {
+        padding: 10px;
+        border-radius: 10px;
+      }
+
+      .card h2 {
+        font-size: 13px;
+        margin-bottom: 10px;
       }
 
       .stats-grid {
         grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .stat-box {
+        padding: 10px;
+      }
+
+      .stat-box h4 {
+        font-size: 10px;
+        margin-bottom: 6px;
+      }
+
+      .stat-box .value {
+        font-size: 20px;
+      }
+
+      .score {
+        font-size: 24px;
+      }
+
+      .site-name {
+        font-size: 13px;
+      }
+
+      .para-index {
+        margin-bottom: 8px;
+      }
+
+      .verdict {
+        padding: 3px 8px;
+        font-size: 10px;
+      }
+
+      .stat-row {
+        font-size: 12px;
+        margin: 4px 0;
+      }
+
+      .hourly-table {
+        font-size: 10px;
+      }
+
+      .hourly-table th,
+      .hourly-table td {
+        padding: 5px 3px;
+        font-size: 9px;
+      }
+
+      .forecast-day {
+        flex: 0 0 80px;
+        padding: 8px 6px;
+      }
+
+      .day-name {
+        font-size: 11px;
+      }
+
+      .day-score {
+        font-size: 16px;
+      }
+
+      .day-verdict {
+        font-size: 10px;
+      }
+
+      .flights-table {
+        font-size: 10px;
+      }
+
+      .flights-table th {
+        padding: 6px 4px;
+        font-size: 9px;
+      }
+
+      .flights-table td {
+        padding: 6px 4px;
+        font-size: 10px;
+      }
+
+      .view-button {
+        padding: 3px 6px;
+        font-size: 9px;
+      }
+
+      .chart-placeholder {
+        height: 150px;
+      }
+
+      .btn-add {
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+
+      .alert-actions {
+        gap: 4px;
+      }
+
+      .btn-small {
+        padding: 4px 8px;
+        font-size: 10px;
+      }
+
+      footer {
+        font-size: 10px;
+        margin-top: 20px;
+        padding: 12px;
       }
     }
 
-    /* Footer */
-    footer {
-      text-align: center;
-      color: white;
-      margin-top: 40px;
-      padding: 20px;
-      font-size: 12px;
+    /* iPhone SE / 375px */
+    @media (max-width: 375px) {
+      body {
+        padding: 4px;
+        font-size: 13px;
+      }
+
+      .container {
+        margin: 0;
+      }
+
+      header {
+        padding: 8px;
+        margin-bottom: 8px;
+        gap: 6px;
+      }
+
+      header h1 {
+        font-size: 16px;
+      }
+
+      nav {
+        gap: 4px;
+        width: 100%;
+      }
+
+      nav a {
+        flex: 1;
+        padding: 4px 4px;
+        font-size: 10px;
+        text-align: center;
+      }
+
+      .card {
+        padding: 8px;
+        margin-bottom: 8px;
+      }
+
+      .card h2 {
+        font-size: 12px;
+        margin-bottom: 8px;
+      }
+
+      .card h3 {
+        font-size: 13px;
+      }
+
+      .grid-3, .grid-2 {
+        gap: 8px;
+      }
+
+      .site-name {
+        font-size: 12px;
+      }
+
+      .score {
+        font-size: 22px;
+      }
+
+      .para-index {
+        margin-bottom: 6px;
+        gap: 6px;
+      }
+
+      .verdict {
+        padding: 2px 6px;
+        font-size: 9px;
+      }
+
+      .stat-row {
+        font-size: 11px;
+        margin: 3px 0;
+      }
+
+      .stat-label {
+        font-size: 11px;
+      }
+
+      .stat-value {
+        font-size: 11px;
+      }
+
+      .stats-grid {
+        gap: 6px;
+      }
+
+      .stat-box {
+        padding: 8px;
+      }
+
+      .stat-box h4 {
+        font-size: 9px;
+        margin-bottom: 4px;
+      }
+
+      .stat-box .value {
+        font-size: 18px;
+      }
+
+      .hourly-table {
+        font-size: 9px;
+      }
+
+      .hourly-table th,
+      .hourly-table td {
+        padding: 4px 2px;
+        font-size: 8px;
+      }
+
+      .forecast-day {
+        flex: 0 0 70px;
+        padding: 6px 4px;
+      }
+
+      .day-name {
+        font-size: 10px;
+      }
+
+      .day-score {
+        font-size: 14px;
+      }
+
+      .day-verdict {
+        font-size: 9px;
+      }
+
+      .forecast-details {
+        padding: 10px;
+        margin-top: 8px;
+      }
+
+      .forecast-details h3 {
+        font-size: 13px;
+        margin-bottom: 8px;
+      }
+
+      .flights-table {
+        font-size: 9px;
+      }
+
+      .flights-table th {
+        padding: 4px 3px;
+        font-size: 8px;
+      }
+
+      .flights-table td {
+        padding: 4px 3px;
+        font-size: 9px;
+      }
+
+      .view-button {
+        padding: 2px 4px;
+        font-size: 8px;
+      }
+
+      .chart-placeholder {
+        height: 120px;
+        font-size: 11px;
+      }
+
+      .btn-add {
+        padding: 6px 10px;
+        font-size: 11px;
+        margin-top: 6px;
+      }
+
+      .btn-small {
+        padding: 3px 6px;
+        font-size: 9px;
+      }
+
+      .alert-item {
+        padding: 8px;
+        margin-bottom: 8px;
+      }
+
+      .alert-info h4 {
+        font-size: 12px;
+        margin-bottom: 2px;
+      }
+
+      .alert-info p {
+        font-size: 10px;
+      }
+
+      .sources-table {
+        font-size: 9px;
+      }
+
+      .sources-table th {
+        padding: 6px 4px;
+        font-size: 8px;
+      }
+
+      .sources-table td {
+        padding: 6px 4px;
+        font-size: 9px;
+      }
+
+      .source-badge {
+        padding: 2px 4px;
+        font-size: 8px;
+      }
+
+      .status-badge {
+        padding: 2px 4px;
+        font-size: 8px;
+      }
+
+      footer {
+        font-size: 9px;
+        margin-top: 15px;
+        padding: 8px;
+      }
+    }
+
+    /* Très petits téléphones / 320px */
+    @media (max-width: 320px) {
+      body {
+        padding: 2px;
+        font-size: 12px;
+      }
+
+      header {
+        padding: 6px;
+        margin-bottom: 6px;
+      }
+
+      header h1 {
+        font-size: 14px;
+      }
+
+      nav a {
+        padding: 3px 3px;
+        font-size: 9px;
+      }
+
+      .card {
+        padding: 6px;
+        margin-bottom: 6px;
+        border-radius: 8px;
+      }
+
+      .card h2 {
+        font-size: 11px;
+        margin-bottom: 6px;
+      }
+
+      .grid-3, .grid-2 {
+        gap: 6px;
+      }
+
+      .site-name {
+        font-size: 11px;
+      }
+
+      .score {
+        font-size: 20px;
+      }
+
+      .verdict {
+        padding: 2px 4px;
+        font-size: 8px;
+      }
+
+      .stat-row {
+        font-size: 10px;
+        margin: 2px 0;
+      }
+
+      .stat-box {
+        padding: 6px;
+      }
+
+      .stat-box h4 {
+        font-size: 8px;
+        margin-bottom: 3px;
+      }
+
+      .stat-box .value {
+        font-size: 16px;
+      }
+
+      .hourly-table th,
+      .hourly-table td {
+        padding: 3px 1px;
+        font-size: 7px;
+      }
+
+      .forecast-day {
+        flex: 0 0 60px;
+        padding: 5px 3px;
+      }
+
+      .day-name {
+        font-size: 9px;
+      }
+
+      .day-score {
+        font-size: 13px;
+      }
+
+      .day-verdict {
+        font-size: 8px;
+      }
+
+      .forecast-details {
+        padding: 8px;
+        margin-top: 6px;
+      }
+
+      .forecast-details h3 {
+        font-size: 12px;
+      }
+
+      .flights-table th {
+        padding: 3px 2px;
+        font-size: 7px;
+      }
+
+      .flights-table td {
+        padding: 3px 2px;
+        font-size: 8px;
+      }
+
+      .view-button {
+        padding: 1px 3px;
+        font-size: 7px;
+      }
+
+      .chart-placeholder {
+        height: 100px;
+        font-size: 10px;
+      }
+
+      .btn-add {
+        padding: 5px 8px;
+        font-size: 10px;
+      }
+
+      .btn-small {
+        padding: 2px 4px;
+        font-size: 8px;
+      }
+
+      .alert-item {
+        padding: 6px;
+        margin-bottom: 6px;
+      }
+
+      .sources-table th {
+        padding: 4px 2px;
+        font-size: 7px;
+      }
+
+      .sources-table td {
+        padding: 4px 2px;
+        font-size: 8px;
+      }
+
+      footer {
+        font-size: 8px;
+        margin-top: 12px;
+        padding: 6px;
+      }
     }
   </style>
 </head>
@@ -506,17 +1420,17 @@
   <div class="container">
     <!-- Header -->
     <header>
-      <h1>🪂 Dashboard Parapente</h1>
+      <h1>🪂 Tableau de Bord Parapente</h1>
       <nav>
-        <a href="#" class="active">Dashboard</a>
-        <a href="#">Flights</a>
+        <a href="#" class="active">Accueil</a>
+        <a href="#">Vols</a>
         <a href="#">Stats</a>
-        <a href="#">Settings</a>
+        <a href="#">Paramètres</a>
       </nav>
     </header>
 
-    <!-- Section 1: Today at a Glance -->
-    <div class="grid-1">
+    <!-- Section 1: Conditions Actuelles (3 sites) -->
+    <div class="grid-3">
       <div class="card status-card arguel">
         <div class="site-name">Arguel</div>
         <div class="para-index">
@@ -578,41 +1492,531 @@
       </div>
     </div>
 
-    <!-- Section 2: 5-Day Forecast -->
+    <!-- Section 2: Météo Détaillée d'Aujourd'hui avec Recherche -->
     <div class="card grid-full">
-      <h2>📅 5-Day Forecast</h2>
+      <h2>🌡️ Météo Détaillée - Aujourd'hui</h2>
+      
+      <!-- Recherche de spots -->
+      <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #e5e7eb;">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end;">
+          <div style="flex: 1; min-width: 200px; position: relative;">
+            <label style="display: block; font-size: 12px; color: #666; margin-bottom: 4px; font-weight: 500;">
+              Ajouter un endroit de vol:
+            </label>
+            <input type="text" 
+              id="spotSearch" 
+              placeholder="Chercher un spot (ex: Chamonix, Vaujany...)" 
+              style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px;"
+              autocomplete="off">
+            <div id="spotSuggestions" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 6px 6px; max-height: 200px; overflow-y: auto; z-index: 10; display: none;">
+              <!-- Suggestions dynamiques -->
+            </div>
+          </div>
+          <button onclick="selectFirstSuggestion()" style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; white-space: nowrap;">
+            🔍 Chercher
+          </button>
+        </div>
+      </div>
+
+      <!-- Onglets dynamiques pour les spots -->
+      <div style="display: flex; gap: 8px; overflow-x: auto; margin-bottom: 16px; padding-bottom: 8px; scroll-behavior: smooth;" id="spotTabs">
+        <button class="spot-tab active" onclick="switchSpot('arguel')" style="min-width: 100px;">
+          Arguel
+          <span class="spot-remove" onclick="removeSpot('arguel', event)" style="display: none; margin-left: 6px; cursor: pointer;">✕</span>
+        </button>
+        <button class="spot-tab active" onclick="switchSpot('mont-poupet')" style="min-width: 120px;">
+          Mont Poupet
+          <span class="spot-remove" onclick="removeSpot('mont-poupet', event)" style="display: none; margin-left: 6px; cursor: pointer;">✕</span>
+        </button>
+        <button class="spot-tab active" onclick="switchSpot('la-cote')" style="min-width: 100px;">
+          La Côte
+          <span class="spot-remove" onclick="removeSpot('la-cote', event)" style="display: none; margin-left: 6px; cursor: pointer;">✕</span>
+        </button>
+      </div>
+      
+      <!-- Contenu des onglets -->
+      <div id="arguel-content" class="spot-content active">
+        <h3 style="margin-bottom: 12px; color: #333;">Arguel (427m)</h3>
+        <table class="hourly-table">
+          <thead>
+            <tr>
+              <th>Heure</th>
+              <th>Vent (km/h)</th>
+              <th>Rafales</th>
+              <th>Temp</th>
+              <th>Humidité</th>
+              <th>Verdict</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>08:00</td>
+              <td>3.2</td>
+              <td>5.1</td>
+              <td>8°C</td>
+              <td>72%</td>
+              <td><span class="hour-bad">❌ Faible</span></td>
+            </tr>
+            <tr>
+              <td>09:00</td>
+              <td>5.8</td>
+              <td>8.2</td>
+              <td>10°C</td>
+              <td>68%</td>
+              <td><span class="hour-ok">⚠️ Moyen</span></td>
+            </tr>
+            <tr>
+              <td>10:00</td>
+              <td>9.1</td>
+              <td>12.5</td>
+              <td>12°C</td>
+              <td>62%</td>
+              <td><span class="hour-ok">⚠️ Moyen</span></td>
+            </tr>
+            <tr>
+              <td>11:00</td>
+              <td>11.2</td>
+              <td>15.3</td>
+              <td>14°C</td>
+              <td>58%</td>
+              <td><span class="hour-good">✅ Bon</span></td>
+            </tr>
+            <tr>
+              <td>12:00</td>
+              <td>13.5</td>
+              <td>18.2</td>
+              <td>15°C</td>
+              <td>55%</td>
+              <td><span class="hour-good">✅ Bon</span></td>
+            </tr>
+            <tr>
+              <td>13:00</td>
+              <td>14.8</td>
+              <td>20.1</td>
+              <td>16°C</td>
+              <td>52%</td>
+              <td><span class="hour-good">✅ Bon</span></td>
+            </tr>
+            <tr>
+              <td>14:00</td>
+              <td>16.2</td>
+              <td>22.5</td>
+              <td>17°C</td>
+              <td>50%</td>
+              <td><span class="hour-ok">⚠️ Forte</span></td>
+            </tr>
+            <tr>
+              <td>15:00</td>
+              <td>15.9</td>
+              <td>21.8</td>
+              <td>17°C</td>
+              <td>51%</td>
+              <td><span class="hour-ok">⚠️ Moyen</span></td>
+            </tr>
+            <tr>
+              <td>16:00</td>
+              <td>14.1</td>
+              <td>19.5</td>
+              <td>16°C</td>
+              <td>53%</td>
+              <td><span class="hour-good">✅ Bon</span></td>
+            </tr>
+            <tr>
+              <td>17:00</td>
+              <td>11.8</td>
+              <td>16.2</td>
+              <td>15°C</td>
+              <td>56%</td>
+              <td><span class="hour-ok">⚠️ Moyen</span></td>
+            </tr>
+            <tr>
+              <td>18:00</td>
+              <td>8.5</td>
+              <td>12.3</td>
+              <td>12°C</td>
+              <td>62%</td>
+              <td><span class="hour-ok">⚠️ Moyen</span></td>
+            </tr>
+            <tr>
+              <td>19:00</td>
+              <td>4.2</td>
+              <td>6.8</td>
+              <td>9°C</td>
+              <td>70%</td>
+              <td><span class="hour-bad">❌ Faible</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Mont Poupet -->
+      <div id="mont-poupet-content" class="spot-content">
+        <h3 style="margin-bottom: 12px; color: #333;">Mont Poupet (842m)</h3>
+        <table class="hourly-table">
+          <thead>
+            <tr>
+              <th>Heure</th>
+              <th>Vent (km/h)</th>
+              <th>Rafales</th>
+              <th>Temp</th>
+              <th>Humidité</th>
+              <th>Verdict</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>08:00</td>
+              <td>2.8</td>
+              <td>4.5</td>
+              <td>6°C</td>
+              <td>75%</td>
+              <td><span class="hour-bad">❌ Faible</span></td>
+            </tr>
+            <tr>
+              <td>09:00</td>
+              <td>5.2</td>
+              <td>7.8</td>
+              <td>8°C</td>
+              <td>70%</td>
+              <td><span class="hour-ok">⚠️ Moyen</span></td>
+            </tr>
+            <tr>
+              <td>10:00</td>
+              <td>8.5</td>
+              <td>11.9</td>
+              <td>10°C</td>
+              <td>64%</td>
+              <td><span class="hour-ok">⚠️ Moyen</span></td>
+            </tr>
+            <tr>
+              <td>11:00</td>
+              <td>11.1</td>
+              <td>15.2</td>
+              <td>12°C</td>
+              <td>60%</td>
+              <td><span class="hour-good">✅ Bon</span></td>
+            </tr>
+            <tr>
+              <td>12:00</td>
+              <td>13.3</td>
+              <td>17.8</td>
+              <td>13°C</td>
+              <td>57%</td>
+              <td><span class="hour-good">✅ Bon</span></td>
+            </tr>
+            <tr>
+              <td>13:00</td>
+              <td>14.5</td>
+              <td>19.5</td>
+              <td>14°C</td>
+              <td>54%</td>
+              <td><span class="hour-good">✅ Bon</span></td>
+            </tr>
+            <tr>
+              <td>14:00</td>
+              <td>15.8</td>
+              <td>21.2</td>
+              <td>15°C</td>
+              <td>52%</td>
+              <td><span class="hour-ok">⚠️ Forte</span></td>
+            </tr>
+            <tr>
+              <td>15:00</td>
+              <td>15.5</td>
+              <td>20.8</td>
+              <td>15°C</td>
+              <td>53%</td>
+              <td><span class="hour-ok">⚠️ Moyen</span></td>
+            </tr>
+            <tr>
+              <td>16:00</td>
+              <td>13.8</td>
+              <td>18.5</td>
+              <td>14°C</td>
+              <td>55%</td>
+              <td><span class="hour-good">✅ Bon</span></td>
+            </tr>
+            <tr>
+              <td>17:00</td>
+              <td>11.5</td>
+              <td>15.8</td>
+              <td>13°C</td>
+              <td>58%</td>
+              <td><span class="hour-ok">⚠️ Moyen</span></td>
+            </tr>
+            <tr>
+              <td>18:00</td>
+              <td>8.2</td>
+              <td>11.8</td>
+              <td>10°C</td>
+              <td>64%</td>
+              <td><span class="hour-ok">⚠️ Moyen</span></td>
+            </tr>
+            <tr>
+              <td>19:00</td>
+              <td>3.8</td>
+              <td>6.2</td>
+              <td>7°C</td>
+              <td>72%</td>
+              <td><span class="hour-bad">❌ Faible</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- La Côte -->
+      <div id="la-cote-content" class="spot-content">
+        <h3 style="margin-bottom: 12px; color: #333;">La Côte (800m)</h3>
+        <table class="hourly-table">
+          <thead>
+            <tr>
+              <th>Heure</th>
+              <th>Vent (km/h)</th>
+              <th>Rafales</th>
+              <th>Temp</th>
+              <th>Humidité</th>
+              <th>Verdict</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>08:00</td>
+              <td>4.5</td>
+              <td>6.2</td>
+              <td>9°C</td>
+              <td>70%</td>
+              <td><span class="hour-bad">❌ Faible</span></td>
+            </tr>
+            <tr>
+              <td>09:00</td>
+              <td>7.2</td>
+              <td>9.8</td>
+              <td>11°C</td>
+              <td>66%</td>
+              <td><span class="hour-ok">⚠️ Moyen</span></td>
+            </tr>
+            <tr>
+              <td>10:00</td>
+              <td>10.5</td>
+              <td>14.1</td>
+              <td>13°C</td>
+              <td>60%</td>
+              <td><span class="hour-ok">⚠️ Moyen</span></td>
+            </tr>
+            <tr>
+              <td>11:00</td>
+              <td>13.0</td>
+              <td>17.5</td>
+              <td>15°C</td>
+              <td>56%</td>
+              <td><span class="hour-good">✅ Bon</span></td>
+            </tr>
+            <tr>
+              <td>12:00</td>
+              <td>14.8</td>
+              <td>19.8</td>
+              <td>16°C</td>
+              <td>53%</td>
+              <td><span class="hour-good">✅ Bon</span></td>
+            </tr>
+            <tr>
+              <td>13:00</td>
+              <td>15.5</td>
+              <td>20.8</td>
+              <td>17°C</td>
+              <td>50%</td>
+              <td><span class="hour-good">✅ Bon</span></td>
+            </tr>
+            <tr>
+              <td>14:00</td>
+              <td>16.9</td>
+              <td>22.5</td>
+              <td>18°C</td>
+              <td>48%</td>
+              <td><span class="hour-ok">⚠️ Forte</span></td>
+            </tr>
+            <tr>
+              <td>15:00</td>
+              <td>16.5</td>
+              <td>22.1</td>
+              <td>18°C</td>
+              <td>49%</td>
+              <td><span class="hour-ok">⚠️ Moyen</span></td>
+            </tr>
+            <tr>
+              <td>16:00</td>
+              <td>15.2</td>
+              <td>20.3</td>
+              <td>17°C</td>
+              <td>51%</td>
+              <td><span class="hour-good">✅ Bon</span></td>
+            </tr>
+            <tr>
+              <td>17:00</td>
+              <td>12.8</td>
+              <td>17.2</td>
+              <td>16°C</td>
+              <td>54%</td>
+              <td><span class="hour-ok">⚠️ Moyen</span></td>
+            </tr>
+            <tr>
+              <td>18:00</td>
+              <td>9.5</td>
+              <td>13.2</td>
+              <td>13°C</td>
+              <td>60%</td>
+              <td><span class="hour-ok">⚠️ Moyen</span></td>
+            </tr>
+            <tr>
+              <td>19:00</td>
+              <td>5.2</td>
+              <td>7.5</td>
+              <td>10°C</td>
+              <td>68%</td>
+              <td><span class="hour-bad">❌ Faible</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section 3: Prévisions 5 Jours (Sélectionnable) -->
+    <div class="card grid-full">
+      <h2>📅 Prévisions 5 Jours</h2>
+      <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Cliquez sur un jour pour voir les détails horaires</p>
       <div class="forecast-timeline">
-        <div class="forecast-day">
+        <div class="forecast-day active" onclick="showForecast(0)">
           <div class="day-name">Aujourd'hui</div>
           <div class="day-score">65</div>
           <div class="day-verdict">MOYEN</div>
         </div>
-        <div class="forecast-day best">
+        <div class="forecast-day best" onclick="showForecast(1)">
           <div class="day-name">Vendredi</div>
           <div class="day-score">88</div>
           <div class="day-verdict">BON ⭐</div>
         </div>
-        <div class="forecast-day">
+        <div class="forecast-day" onclick="showForecast(2)">
           <div class="day-name">Samedi</div>
           <div class="day-score">52</div>
           <div class="day-verdict">MOYEN</div>
         </div>
-        <div class="forecast-day">
+        <div class="forecast-day" onclick="showForecast(3)">
           <div class="day-name">Dimanche</div>
           <div class="day-score">35</div>
           <div class="day-verdict">LIMITE</div>
         </div>
-        <div class="forecast-day">
+        <div class="forecast-day" onclick="showForecast(4)">
           <div class="day-name">Lundi</div>
           <div class="day-score">70</div>
           <div class="day-verdict">MOYEN</div>
         </div>
       </div>
+
+      <!-- Détails du jour sélectionné -->
+      <div class="forecast-details active" id="forecast-0">
+        <h3>Aujourd'hui (Jeudi 26 Feb) - Score: 65/100 (MOYEN)</h3>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Vent moyen:</span>
+          <span class="stat-value">11.2 km/h</span>
+        </div>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Rafales max:</span>
+          <span class="stat-value">22.5 km/h</span>
+        </div>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Température:</span>
+          <span class="stat-value">8-17°C</span>
+        </div>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Meilleur créneau:</span>
+          <span class="stat-value">11h-13h (vent 11-14 km/h) ⭐</span>
+        </div>
+      </div>
+
+      <div class="forecast-details" id="forecast-1">
+        <h3>Vendredi 27 Feb - Score: 88/100 (BON) ⭐</h3>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Vent moyen:</span>
+          <span class="stat-value">9.8 km/h</span>
+        </div>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Rafales max:</span>
+          <span class="stat-value">14.2 km/h</span>
+        </div>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Température:</span>
+          <span class="stat-value">7-18°C</span>
+        </div>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Meilleur créneau:</span>
+          <span class="stat-value">Toute la journée 9h-17h ⭐⭐⭐</span>
+        </div>
+      </div>
+
+      <div class="forecast-details" id="forecast-2">
+        <h3>Samedi 28 Feb - Score: 52/100 (MOYEN)</h3>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Vent moyen:</span>
+          <span class="stat-value">12.5 km/h</span>
+        </div>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Rafales max:</span>
+          <span class="stat-value">18.9 km/h</span>
+        </div>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Température:</span>
+          <span class="stat-value">6-15°C</span>
+        </div>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Meilleur créneau:</span>
+          <span class="stat-value">10h-11h (avant renforcement)</span>
+        </div>
+      </div>
+
+      <div class="forecast-details" id="forecast-3">
+        <h3>Dimanche 1 Mar - Score: 35/100 (LIMITE)</h3>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Vent moyen:</span>
+          <span class="stat-value">16.8 km/h</span>
+        </div>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Rafales max:</span>
+          <span class="stat-value">24.5 km/h</span>
+        </div>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Température:</span>
+          <span class="stat-value">5-12°C</span>
+        </div>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Verdict:</span>
+          <span class="stat-value">⚠️ Trop venteux - Déconseillé</span>
+        </div>
+      </div>
+
+      <div class="forecast-details" id="forecast-4">
+        <h3>Lundi 2 Mar - Score: 70/100 (MOYEN)</h3>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Vent moyen:</span>
+          <span class="stat-value">10.5 km/h</span>
+        </div>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Rafales max:</span>
+          <span class="stat-value">15.8 km/h</span>
+        </div>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Température:</span>
+          <span class="stat-value">8-16°C</span>
+        </div>
+        <div class="stat-row" style="margin: 6px 0;">
+          <span class="stat-label">Meilleur créneau:</span>
+          <span class="stat-value">11h-15h</span>
+        </div>
+      </div>
     </div>
 
-    <!-- Section 3: Recent Flights -->
+    <!-- Section 4: Vols Récents -->
     <div class="card grid-full">
-      <h2>🛩️ Recent Flights</h2>
+      <h2>🛩️ Vols Récents</h2>
       <table class="flights-table">
         <thead>
           <tr>
@@ -627,145 +2031,502 @@
         </thead>
         <tbody>
           <tr>
-            <td class="flight-date">22 Feb 2026</td>
+            <td class="flight-date">22 Fév 2026</td>
             <td class="flight-site">Arguel</td>
             <td class="flight-stats">45 min</td>
             <td class="flight-stats">520 m</td>
             <td class="flight-stats">12.3 km</td>
             <td class="flight-stats">MOYEN (68)</td>
-            <td><button class="view-button">View 3D</button></td>
+            <td><button class="view-button">Voir 3D</button></td>
           </tr>
           <tr>
-            <td class="flight-date">19 Feb 2026</td>
+            <td class="flight-date">19 Fév 2026</td>
             <td class="flight-site">Mont Poupet</td>
             <td class="flight-stats">32 min</td>
             <td class="flight-stats">420 m</td>
             <td class="flight-stats">8.7 km</td>
             <td class="flight-stats">LIMITE (38)</td>
-            <td><button class="view-button">View 3D</button></td>
+            <td><button class="view-button">Voir 3D</button></td>
           </tr>
           <tr>
-            <td class="flight-date">15 Feb 2026</td>
+            <td class="flight-date">15 Fév 2026</td>
             <td class="flight-site">La Côte</td>
             <td class="flight-stats">58 min</td>
             <td class="flight-stats">650 m</td>
             <td class="flight-stats">18.2 km</td>
             <td class="flight-stats">BON (82)</td>
-            <td><button class="view-button">View 3D</button></td>
+            <td><button class="view-button">Voir 3D</button></td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Section 4: Learning Stats -->
+    <!-- Section 5: Statistiques & Alertes -->
     <div class="grid-2">
-      <div class="card grid-full">
-        <h2>📊 Learning Stats</h2>
+      <div class="card">
+        <h2>📊 Statistiques d'Apprentissage</h2>
         <div class="stats-grid">
           <div class="stat-box">
-            <h4>Total Flights</h4>
+            <h4>Vols Total</h4>
             <div class="value">6</div>
           </div>
           <div class="stat-box">
-            <h4>Total Hours</h4>
+            <h4>Heures Total</h4>
             <div class="value">4.5h</div>
           </div>
           <div class="stat-box">
-            <h4>Avg Altitude</h4>
+            <h4>Altitude Moy</h4>
             <div class="value">510m</div>
           </div>
           <div class="stat-box">
-            <h4>Total Distance</h4>
+            <h4>Distance Total</h4>
             <div class="value">67 km</div>
           </div>
         </div>
-        <h3>Improvement Trend</h3>
-        <div class="chart-placeholder">📈 Elevation Profile Chart</div>
+        <h3>Tendance d'Amélioration</h3>
+        <div class="chart-placeholder">📈 Graphique du Profil d'Altitude</div>
       </div>
 
-      <!-- Section 5: Alerts -->
       <div class="card">
-        <h2>🚨 Alerts</h2>
+        <h2>🚨 Alertes Météo</h2>
         <div class="alert-item">
           <div class="alert-info">
-            <h4>Wind > 15 km/h</h4>
-            <p>Arguel • Active</p>
+            <h4>Vent > 15 km/h</h4>
+            <p>Arguel • Actif</p>
           </div>
           <div class="alert-actions">
-            <button class="btn-small">Edit</button>
-            <button class="btn-small">Delete</button>
+            <button class="btn-small">Éditer</button>
+            <button class="btn-small">Supprimer</button>
           </div>
         </div>
         <div class="alert-item">
           <div class="alert-info">
-            <h4>Perfect Conditions</h4>
-            <p>La Côte • Active</p>
+            <h4>Conditions Parfaites</h4>
+            <p>La Côte • Actif</p>
           </div>
           <div class="alert-actions">
-            <button class="btn-small">Edit</button>
-            <button class="btn-small">Delete</button>
+            <button class="btn-small">Éditer</button>
+            <button class="btn-small">Supprimer</button>
           </div>
         </div>
-        <button class="btn-add">+ Create Alert</button>
+        <button class="btn-add">+ Créer Alerte</button>
       </div>
     </div>
 
-    <!-- Section 6: Weather Sources -->
+    <!-- Section 6: Sources Météo -->
     <div class="card grid-full">
-      <h2>🌤️ Weather Sources Comparison</h2>
+      <h2>🌤️ Comparaison des Sources Météo</h2>
       <table class="sources-table">
         <thead>
           <tr>
             <th>Source</th>
             <th>Type</th>
-            <th>Status</th>
-            <th>Accuracy</th>
-            <th>Last Update</th>
+            <th>Statut</th>
+            <th>Précision</th>
+            <th>Dernière MAJ</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td>Open-Meteo</td>
             <td><span class="source-badge api">API</span></td>
-            <td><span class="status-badge">✓ Active</span></td>
+            <td><span class="status-badge">✓ Actif</span></td>
             <td>92%</td>
-            <td>14:32 today</td>
+            <td>14:32 aujourd'hui</td>
           </tr>
           <tr>
             <td>WeatherAPI</td>
             <td><span class="source-badge api">API</span></td>
-            <td><span class="status-badge">✓ Active</span></td>
+            <td><span class="status-badge">✓ Actif</span></td>
             <td>88%</td>
-            <td>14:32 today</td>
+            <td>14:32 aujourd'hui</td>
           </tr>
           <tr>
             <td>Meteoblue</td>
             <td><span class="source-badge scraper">Scraper</span></td>
-            <td><span class="status-badge">✓ Active</span></td>
+            <td><span class="status-badge">✓ Actif</span></td>
             <td>95%</td>
-            <td>14:30 today</td>
+            <td>14:30 aujourd'hui</td>
           </tr>
           <tr>
             <td>Météo-parapente</td>
-            <td><span class="source-badge feed">Feed</span></td>
-            <td><span class="status-badge">✓ Active</span></td>
+            <td><span class="source-badge feed">Flux</span></td>
+            <td><span class="status-badge">✓ Actif</span></td>
             <td>85%</td>
-            <td>14:15 today</td>
+            <td>14:15 aujourd'hui</td>
           </tr>
           <tr>
             <td>Météociel</td>
             <td><span class="source-badge scraper">Scraper</span></td>
-            <td><span class="status-badge">✓ Active</span></td>
+            <td><span class="status-badge">✓ Actif</span></td>
             <td>89%</td>
-            <td>14:00 today</td>
+            <td>14:00 aujourd'hui</td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <footer>
-      <p>🪂 Dashboard Parapente • Phase 1 Design Complete • Launching May 10, 2026</p>
+      <p>🪂 Tableau de Bord Parapente • Phase 1 Design • Lancement le 10 mai 2026</p>
     </footer>
   </div>
+
+  <!-- Preview Modal pour spots de recherche -->
+  <div class="spot-preview-modal" id="spotPreviewModal">
+    <div class="spot-preview-content">
+      <div class="spot-preview-header">
+        <div>
+          <div class="spot-preview-title" id="previewTitle">Spot Parapente</div>
+          <div style="font-size: 12px; color: #999; margin-top: 4px;" id="previewInfo"></div>
+        </div>
+        <button class="spot-preview-close" onclick="closeSpotPreview()">✕</button>
+      </div>
+
+      <div class="spot-preview-info">
+        <div class="spot-preview-info-item">
+          <div class="spot-preview-info-label">Para-Index</div>
+          <div class="spot-preview-info-value" id="previewScore">65/100</div>
+        </div>
+        <div class="spot-preview-info-item">
+          <div class="spot-preview-info-label">Vent Moyen</div>
+          <div class="spot-preview-info-value" id="previewWind">12.5 km/h</div>
+        </div>
+        <div class="spot-preview-info-item">
+          <div class="spot-preview-info-label">Verdict</div>
+          <div class="spot-preview-info-value verdict moyen" id="previewVerdict">MOYEN</div>
+        </div>
+      </div>
+
+      <div style="margin: 16px 0;">
+        <h3 style="font-size: 14px; color: #333; margin-bottom: 10px;">Créneaux Volables</h3>
+        <div id="previewSlots" style="font-size: 13px; color: #666; line-height: 1.6;">
+          11h-13h (vent optimal 8-15 km/h)
+        </div>
+      </div>
+
+      <div style="margin: 16px 0;">
+        <h3 style="font-size: 14px; color: #333; margin-bottom: 10px;">Aperçu Horaire</h3>
+        <table class="hourly-table" id="previewTable" style="font-size: 12px; margin-top: 10px;">
+          <thead>
+            <tr>
+              <th>Heure</th>
+              <th>Vent</th>
+              <th>Rafales</th>
+              <th>Temp</th>
+              <th>Verdict</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Rempli par JavaScript -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="spot-preview-actions">
+        <button class="btn-add-tab" onclick="addSpotFromPreview()">
+          ✚ Ajouter aux onglets
+        </button>
+        <button class="btn-close-modal" onclick="closeSpotPreview()">
+          Fermer
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Base spots (cannot be removed)
+    const baseSpots = ['arguel', 'mont-poupet', 'la-cote'];
+    
+    // Extended spot database (for search)
+    const spotDatabase = [
+      // Région Besançon
+      { id: 'arguel', name: 'Arguel', altitude: '427m', region: 'Besançon' },
+      { id: 'mont-poupet', name: 'Mont Poupet', altitude: '842m', region: 'Besançon' },
+      { id: 'la-cote', name: 'La Côte', altitude: '800m', region: 'Besançon' },
+      // Alpes
+      { id: 'chamonix', name: 'Chamonix', altitude: '1000m', region: 'Alpes' },
+      { id: 'vaujany', name: 'Vaujany', altitude: '1300m', region: 'Alpes' },
+      { id: 'alpe-huez', name: 'Alpe d\'Huez', altitude: '1860m', region: 'Alpes' },
+      { id: 'les-gets', name: 'Les Gets', altitude: '1002m', region: 'Alpes' },
+      // Autres
+      { id: 'annecy', name: 'Annecy', altitude: '800m', region: 'Haute-Savoie' },
+      { id: 'mont-blanc', name: 'Mont-Blanc', altitude: '2000m', region: 'Alpes' },
+      { id: 'meribel', name: 'Méribel', altitude: '1400m', region: 'Alpes' },
+    ];
+
+    let activeSpots = ['arguel', 'mont-poupet', 'la-cote'];
+
+    // Search functionality
+    const spotSearch = document.getElementById('spotSearch');
+    const spotSuggestions = document.getElementById('spotSuggestions');
+
+    spotSearch.addEventListener('input', function() {
+      const query = this.value.toLowerCase().trim();
+      
+      if (query.length === 0) {
+        spotSuggestions.style.display = 'none';
+        return;
+      }
+
+      const filtered = spotDatabase.filter(spot => 
+        (spot.name.toLowerCase().includes(query) || 
+         spot.region.toLowerCase().includes(query)) &&
+        !activeSpots.includes(spot.id)
+      );
+
+      if (filtered.length === 0) {
+        spotSuggestions.style.display = 'none';
+        return;
+      }
+
+      spotSuggestions.innerHTML = filtered.map(spot => `
+        <div class="spot-suggestion" onclick="previewSpot('${spot.id}', '${spot.name}', '${spot.altitude}', '${spot.region}')">
+          <div class="spot-suggestion-name">${spot.name}</div>
+          <div class="spot-suggestion-info">${spot.altitude} • ${spot.region}</div>
+        </div>
+      `).join('');
+
+      spotSuggestions.style.display = 'block';
+    });
+
+    // Hide suggestions when clicking elsewhere
+    document.addEventListener('click', function(e) {
+      if (e.target !== spotSearch) {
+        spotSuggestions.style.display = 'none';
+      }
+    });
+
+    let previewingSpot = null;
+
+    // Données de sample pour la preview (en Phase 2, ce sera réel)
+    const spotWeatherData = {
+      'chamonix': { score: 78, wind: 10.5, verdict: 'BON', slots: '9h-16h (thermiques actives)', hourlyData: [
+        [8, 4.2, 6.1, 5], [9, 7.8, 10.5, 7], [10, 10.2, 14.3, 9], [11, 12.1, 16.5, 11], 
+        [12, 13.5, 18.2, 12], [13, 14.8, 20.1, 13], [14, 13.2, 17.5, 12], [15, 11.5, 15.2, 10]
+      ]},
+      'vaujany': { score: 82, wind: 9.8, verdict: 'BON', slots: '10h-17h (excellentes conditions)', hourlyData: [
+        [9, 5.2, 7.8, 8], [10, 8.5, 12.1, 10], [11, 11.2, 15.8, 12], [12, 13.8, 19.5, 13],
+        [13, 14.5, 20.8, 14], [14, 13.2, 18.5, 13], [15, 11.8, 16.2, 12], [16, 9.5, 13.1, 10]
+      ]},
+      'alpe-huez': { score: 65, wind: 14.2, verdict: 'MOYEN', slots: '11h-14h (rafales fortes après)', hourlyData: [
+        [10, 8.5, 12.3, 6], [11, 11.5, 15.8, 8], [12, 13.8, 18.5, 9], [13, 14.2, 19.5, 9],
+        [14, 16.5, 23.2, 8], [15, 17.2, 24.8, 7], [16, 15.8, 22.1, 6], [17, 13.1, 18.5, 5]
+      ]},
+      'annecy': { score: 72, wind: 11.3, verdict: 'MOYEN', slots: '10h-15h', hourlyData: [
+        [9, 6.2, 8.9, 9], [10, 9.5, 13.2, 11], [11, 11.8, 16.5, 12], [12, 12.5, 17.2, 13],
+        [13, 13.2, 18.1, 13], [14, 12.8, 17.5, 12], [15, 11.2, 15.3, 11], [16, 8.5, 11.8, 9]
+      ]},
+    };
+
+    function previewSpot(spotId, spotName, altitude, region) {
+      previewingSpot = { id: spotId, name: spotName, altitude: altitude, region: region };
+      spotSearch.value = '';
+      spotSuggestions.style.display = 'none';
+      
+      // Get weather data (default or from data)
+      const data = spotWeatherData[spotId] || { score: 68, wind: 11.5, verdict: 'MOYEN', slots: 'À vérifier', hourlyData: [] };
+      
+      // Update modal
+      document.getElementById('previewTitle').textContent = spotName;
+      document.getElementById('previewInfo').textContent = `${altitude} • ${region}`;
+      document.getElementById('previewScore').textContent = `${data.score}/100`;
+      document.getElementById('previewWind').textContent = `${data.wind} km/h`;
+      
+      const verdictEl = document.getElementById('previewVerdict');
+      verdictEl.textContent = data.verdict;
+      verdictEl.className = `spot-preview-info-value verdict ${data.verdict.toLowerCase()}`;
+      
+      document.getElementById('previewSlots').textContent = data.slots;
+      
+      // Populate hourly table
+      const tableBody = document.querySelector('#previewTable tbody');
+      tableBody.innerHTML = '';
+      
+      if (data.hourlyData.length > 0) {
+        data.hourlyData.forEach(([hour, wind, gusts, temp]) => {
+          const verdict = wind < 5 ? '❌ Faible' : wind > 15 ? '⚠️ Forte' : '✅ Bon';
+          const verdictClass = wind < 5 ? 'hour-bad' : wind > 15 ? 'hour-ok' : 'hour-good';
+          tableBody.innerHTML += `
+            <tr>
+              <td>${hour}:00</td>
+              <td>${wind.toFixed(1)}</td>
+              <td>${gusts.toFixed(1)}</td>
+              <td>${temp}°C</td>
+              <td><span class="${verdictClass}">${verdict}</span></td>
+            </tr>
+          `;
+        });
+      }
+      
+      // Show modal
+      document.getElementById('spotPreviewModal').classList.add('active');
+    }
+
+    function closeSpotPreview() {
+      document.getElementById('spotPreviewModal').classList.remove('active');
+      previewingSpot = null;
+      spotSearch.focus();
+    }
+
+    function addSpotFromPreview() {
+      if (!previewingSpot) return;
+      
+      const { id, name } = previewingSpot;
+      
+      if (activeSpots.includes(id)) {
+        alert('Ce spot est déjà dans vos onglets');
+        return;
+      }
+      
+      // Create the content div for the new spot
+      const contentDiv = document.createElement('div');
+      contentDiv.id = id + '-content';
+      contentDiv.className = 'spot-content';
+      contentDiv.innerHTML = `
+        <h3 style="margin-bottom: 12px; color: #333;">${name}</h3>
+        <p style="color: #666; font-size: 13px; text-align: center; padding: 20px;">
+          📊 Données météo pour ${name} (à implémenter dans Phase 2)
+        </p>
+      `;
+      
+      // Add to DOM
+      const weatherCard = document.querySelector('.card.grid-full');
+      weatherCard.appendChild(contentDiv);
+      
+      // Add to activeSpots
+      activeSpots.push(id);
+      
+      // Add tab
+      addSpotTab(id, name);
+      
+      // Close modal
+      closeSpotPreview();
+      
+      // Switch to new spot
+      switchSpot(id);
+    }
+
+    function addSpotTab(spotId, spotName) {
+      const tabsContainer = document.getElementById('spotTabs');
+      const tab = document.createElement('button');
+      tab.className = 'spot-tab';
+      tab.style.minWidth = (spotName.length * 8 + 40) + 'px';
+      tab.innerHTML = `
+        ${spotName}
+        <span class="spot-remove" style="margin-left: 6px; cursor: pointer;" onclick="removeSpot('${spotId}', event)">✕</span>
+      `;
+      tab.onclick = () => switchSpot(spotId);
+      tabsContainer.appendChild(tab);
+    }
+
+    function switchSpot(spotId) {
+      // Hide all content
+      document.querySelectorAll('.spot-content').forEach(content => {
+        content.classList.remove('active');
+      });
+      
+      // Deactivate all tabs
+      document.querySelectorAll('.spot-tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      
+      // Show selected content
+      const selectedContent = document.getElementById(spotId + '-content');
+      if (selectedContent) {
+        selectedContent.classList.add('active');
+      }
+      
+      // Activate selected tab
+      document.querySelectorAll('.spot-tab').forEach(tab => {
+        if (tab.textContent.toLowerCase().includes(spotId.replace('-', ' '))) {
+          tab.classList.add('active');
+        }
+      });
+    }
+
+    function removeSpot(spotId, event) {
+      event.stopPropagation();
+      
+      // Cannot remove base spots
+      if (baseSpots.includes(spotId)) {
+        alert('Les spots de base ne peuvent pas être supprimés');
+        return;
+      }
+      
+      // Remove from activeSpots
+      activeSpots = activeSpots.filter(id => id !== spotId);
+      
+      // Remove content
+      const content = document.getElementById(spotId + '-content');
+      if (content) content.remove();
+      
+      // Remove tab
+      const tabs = document.querySelectorAll('.spot-tab');
+      tabs.forEach(tab => {
+        if (tab.textContent.toLowerCase().includes(spotId.replace('-', ' '))) {
+          tab.remove();
+        }
+      });
+      
+      // Switch to first active spot
+      if (activeSpots.length > 0) {
+        switchSpot(activeSpots[0]);
+      }
+    }
+
+
+
+    // Allow Enter key to search
+    spotSearch.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        // Si y a une suggestion, prendre la première
+        const firstSuggestion = document.querySelector('.spot-suggestion');
+        if (firstSuggestion) {
+          firstSuggestion.click();
+        }
+      }
+    });
+
+    // Close modal when clicking outside
+    document.getElementById('spotPreviewModal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeSpotPreview();
+      }
+    });
+
+    function selectFirstSuggestion() {
+      const firstSuggestion = document.querySelector('.spot-suggestion');
+      if (firstSuggestion) {
+        firstSuggestion.click();
+      } else {
+        alert('Entrez un nom ou une région pour chercher un spot');
+      }
+    }
+
+    // Forecast functionality
+    function showForecast(index) {
+      // Hide all forecast details
+      for (let i = 0; i < 5; i++) {
+        const element = document.getElementById(`forecast-${i}`);
+        if (element) {
+          element.classList.remove('active');
+        }
+      }
+      
+      // Remove active class from all forecast days
+      document.querySelectorAll('.forecast-day').forEach(day => {
+        day.classList.remove('active');
+      });
+      
+      // Show selected forecast
+      const selectedForecast = document.getElementById(`forecast-${index}`);
+      if (selectedForecast) {
+        selectedForecast.classList.add('active');
+      }
+      
+      // Mark the clicked day as active
+      document.querySelectorAll('.forecast-day')[index].classList.add('active');
+    }
+  </script>
 </body>
 </html>

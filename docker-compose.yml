@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  dashboard-backend:
+    image: python:3.10-slim
+    container_name: dashboard-backend
+    working_dir: /app
+    volumes:
+      - ${PWD}/backend:/app
+      - dashboard-db:/app/db
+    ports:
+      - "8000:8000"
+    command: |
+      bash -c "pip install --no-cache-dir -r requirements.txt && 
+               python init_db.py && 
+               python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=sqlite:///db/dashboard.db
+    networks:
+      - dashboard-net
+    restart: unless-stopped
+
+  dashboard-frontend:
+    image: node:18-alpine
+    container_name: dashboard-frontend
+    working_dir: /app
+    volumes:
+      - ${PWD}/frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    command: sh -c "npm install && npm run dev"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    networks:
+      - dashboard-net
+    restart: unless-stopped
+
+volumes:
+  dashboard-db:
+    driver: local
+
+networks:
+  dashboard-net:
+    driver: bridge
