@@ -11,28 +11,33 @@
     "test:ui": "vitest --ui",
     "coverage": "vitest --coverage",
     "lint": "eslint src --fix",
-    "type-check": "vue-tsc --noEmit"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "vue": "^3.4.25",
-    "vue-router": "^4.2.5",
-    "pinia": "^2.1.6",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.1",
+    "zustand": "^4.4.7",
     "axios": "^1.6.5",
     "date-fns": "^3.0.0",
     "chart.js": "^4.4.1",
-    "vue-chartjs": "^5.3.1"
+    "react-chartjs-2": "^5.2.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^5.0.4",
+    "@vitejs/plugin-react": "^4.2.1",
     "vite": "^5.0.11",
-    "vue-tsc": "^1.8.27",
     "typescript": "^5.3.3",
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "@types/node": "^20.10.6",
     "vitest": "^1.2.2",
     "@vitest/ui": "^1.2.2",
-    "@vue/test-utils": "^2.4.3",
+    "@testing-library/react": "^14.1.2",
+    "@testing-library/jest-dom": "^6.1.5",
     "happy-dom": "^12.10.3",
     "eslint": "^8.56.0",
-    "eslint-plugin-vue": "^9.21.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
     "@typescript-eslint/parser": "^6.18.1",
     "@typescript-eslint/eslint-plugin": "^6.18.1"
   },

@@ -93,13 +93,14 @@ Create a personal flying conditions dashboard optimized for your region that:
 - **Testing:** pytest, pytest-cov (>80% coverage target)
 
 **Frontend:**
-- **Framework:** Vue 3 (composition API)
+- **Framework:** React 18+ (hooks)
 - **Build Tool:** Vite (fast development)
-- **State Management:** Pinia
+- **State Management:** Zustand (lightweight) or Redux Toolkit
 - **HTTP Client:** Axios
+- **Routing:** React Router v6
 - **Styling:** Tailwind CSS (responsive)
-- **Charting:** Chart.js + vue-chartjs
-- **Testing:** Vitest
+- **Charting:** Chart.js + react-chartjs-2
+- **Testing:** Vitest + React Testing Library
 
 **Infrastructure:**
 - **Database:** SQLite 3 (single local file)
@@ -360,7 +361,7 @@ sqlite3 backend/db/dashboard.db ".tables"
 
 ---
 
-## Frontend Structure
+## Frontend Structure (React 18)
 
 ### Dashboard Sections
 
@@ -401,32 +402,37 @@ sqlite3 backend/db/dashboard.db ".tables"
 - Data accuracy (RMSE vs actual)
 - Side-by-side comparison (Open-Meteo vs WeatherAPI vs Meteoblue, etc.)
 
-### Vue Components Structure
+### React Components Structure
 
 ```
 src/
 ├── components/
-│   ├── CurrentConditions.vue
-│   ├── Forecast7Day.vue
-│   ├── RecentFlights.vue
-│   ├── LearningStats.vue
-│   ├── AlertManager.vue
-│   ├── SourceComparison.vue
-│   └── Navigation.vue
-├── views/
-│   ├── Dashboard.vue
-│   ├── FlightHistory.vue
-│   ├── Settings.vue
-│   └── Admin.vue
+│   ├── CurrentConditions.jsx
+│   ├── Forecast7Day.jsx
+│   ├── RecentFlights.jsx
+│   ├── LearningStats.jsx
+│   ├── AlertManager.jsx
+│   ├── SourceComparison.jsx
+│   └── Navigation.jsx
+├── pages/
+│   ├── Dashboard.jsx
+│   ├── FlightHistory.jsx
+│   ├── Settings.jsx
+│   └── Admin.jsx
 ├── stores/
-│   ├── weather.ts
-│   ├── flights.ts
-│   ├── alerts.ts
-│   └── ui.ts
+│   ├── weatherStore.js     (Zustand)
+│   ├── flightsStore.js
+│   ├── alertsStore.js
+│   └── uiStore.js
+├── hooks/
+│   ├── useWeather.js
+│   ├── useFlights.js
+│   └── useAlerts.js
 ├── utils/
-│   ├── api.ts
-│   └── formatting.ts
-└── main.js
+│   ├── api.js
+│   └── formatting.js
+├── App.jsx
+└── main.jsx
 ```
 
 ---
@@ -1463,9 +1469,43 @@ curl http://localhost:8000/api/v1/sites
 
 **Technology:** FastAPI (auto-documentation)
 
-### Week 2: Vue.js Components (10-12 hours)
+### Week 2: React Components (10-12 hours)
 
 **Goal:** All 6 dashboard sections functional
+
+```jsx
+// Example structure with hooks and Zustand
+import React, { useEffect } from 'react'
+import { useWeatherStore } from '../stores/weatherStore'
+import { useWeather } from '../hooks/useWeather'
+
+export function Dashboard() {
+  const { conditions, setConditions } = useWeatherStore()
+  const { fetchConditions } = useWeather()
+  
+  useEffect(() => {
+    fetchConditions().then(data => setConditions(data))
+  }, [])
+  
+  return (
+    <div className="dashboard">
+      <CurrentConditions conditions={conditions} />
+      <Forecast7Day />
+      <RecentFlights />
+      {/* ... other sections */}
+    </div>
+  )
+}
+```
+
+**Components to implement:**
+- CurrentConditions (3 site cards with para-index)
+- Forecast7Day (timeline of best flying days)
+- RecentFlights (list + filters)
+- LearningStats (charts + metrics)
+- AlertManager (CRUD alerts)
+- SourceComparison (data accuracy)
+- Navigation (header + routes)
 
 ### Week 3: Deployment & Polish (10-12 hours)
 
@@ -1633,11 +1673,13 @@ tail -f backend/logs/dashboard.log
 - ✅ Type hints + validation (Pydantic)
 - ✅ Modern Python 3.10+ features
 
-**Why Vue 3 (not React)?**
-- ✅ Lighter weight
-- ✅ Easier to learn
-- ✅ Perfect for dashboard (not massive SPA)
-- ✅ Great component reusability
+**Why React (not Vue)?**
+- ✅ Larger ecosystem & community
+- ✅ More job market value
+- ✅ Excellent state management options (Zustand, Redux)
+- ✅ Great component libraries (Material-UI, Shadcn)
+- ✅ Strong TypeScript support
+- ✅ Perfect for dashboards with complex state
 
 ### B. Code Organization
 
