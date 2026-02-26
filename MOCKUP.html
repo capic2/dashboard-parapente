@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🪂 Dashboard Parapente - Mockup</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #333;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    header h1 {
+      font-size: 28px;
+      color: #667eea;
+    }
+
+    nav {
+      display: flex;
+      gap: 15px;
+    }
+
+    nav a {
+      padding: 8px 16px;
+      border-radius: 6px;
+      text-decoration: none;
+      color: #666;
+      transition: all 0.3s;
+    }
+
+    nav a:hover {
+      background: #f0f0f0;
+      color: #667eea;
+    }
+
+    nav a.active {
+      background: #667eea;
+      color: white;
+    }
+
+    /* Grid Layout */
+    .grid-1 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .grid-full {
+      margin-bottom: 20px;
+    }
+
+    /* Card Styles */
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .card h2 {
+      font-size: 16px;
+      color: #666;
+      margin-bottom: 15px;
+      font-weight: 600;
+    }
+
+    .card h3 {
+      font-size: 18px;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    /* Status Cards (Today at a Glance) */
+    .status-card {
+      border-left: 4px solid #667eea;
+      padding: 20px;
+    }
+
+    .status-card.arguel {
+      border-left-color: #10b981;
+    }
+
+    .status-card.mont-poupet {
+      border-left-color: #f59e0b;
+    }
+
+    .status-card.la-cote {
+      border-left-color: #3b82f6;
+    }
+
+    .site-name {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    .para-index {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .score {
+      font-size: 32px;
+      font-weight: bold;
+      color: #667eea;
+    }
+
+    .verdict {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .verdict.bon {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .verdict.moyen {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .verdict.limite {
+      background: #fed7aa;
+      color: #92400e;
+    }
+
+    .verdict.mauvais {
+      background: #fee2e2;
+      color: #7f1d1d;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin: 6px 0;
+      color: #666;
+    }
+
+    .stat-label {
+      color: #999;
+    }
+
+    .stat-value {
+      font-weight: 600;
+      color: #333;
+    }
+
+    /* Forecast Section */
+    .forecast-timeline {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 10px 0;
+    }
+
+    .forecast-day {
+      flex: 0 0 120px;
+      background: #f9fafb;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      border: 2px solid #e5e7eb;
+      transition: all 0.3s;
+    }
+
+    .forecast-day:hover {
+      border-color: #667eea;
+      background: white;
+    }
+
+    .forecast-day.best {
+      border-color: #10b981;
+      background: #f0fdf4;
+    }
+
+    .day-name {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 5px;
+    }
+
+    .day-score {
+      font-size: 24px;
+      font-weight: bold;
+      color: #667eea;
+      margin-bottom: 5px;
+    }
+
+    .day-verdict {
+      font-size: 11px;
+      color: #666;
+    }
+
+    /* Flights Table */
+    .flights-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .flights-table thead {
+      background: #f9fafb;
+      border-bottom: 2px solid #e5e7eb;
+    }
+
+    .flights-table th {
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      color: #666;
+    }
+
+    .flights-table td {
+      padding: 12px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .flights-table tr:hover {
+      background: #f9fafb;
+    }
+
+    .flight-date {
+      color: #333;
+      font-weight: 500;
+    }
+
+    .flight-site {
+      color: #667eea;
+      font-weight: 500;
+    }
+
+    .flight-stats {
+      color: #666;
+      font-size: 12px;
+    }
+
+    .view-button {
+      padding: 6px 12px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.3s;
+    }
+
+    .view-button:hover {
+      background: #5568d3;
+    }
+
+    /* Stats Section */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .stat-box {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-box h4 {
+      font-size: 12px;
+      opacity: 0.9;
+      margin-bottom: 10px;
+      font-weight: 500;
+    }
+
+    .stat-box .value {
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    /* Chart Placeholder */
+    .chart-placeholder {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      border-radius: 8px;
+      height: 250px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #999;
+      font-size: 14px;
+      margin-bottom: 15px;
+    }
+
+    /* Alert Manager */
+    .alert-item {
+      background: #f9fafb;
+      border-left: 4px solid #667eea;
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .alert-info h4 {
+      color: #333;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .alert-info p {
+      color: #666;
+      font-size: 12px;
+    }
+
+    .alert-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-small {
+      padding: 6px 10px;
+      font-size: 11px;
+      border: 1px solid #ddd;
+      background: white;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .btn-small:hover {
+      border-color: #667eea;
+      color: #667eea;
+    }
+
+    .btn-add {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.3s;
+    }
+
+    .btn-add:hover {
+      background: #5568d3;
+    }
+
+    /* Sources Comparison */
+    .sources-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .sources-table th {
+      padding: 12px;
+      text-align: left;
+      background: #f9fafb;
+      font-weight: 600;
+      color: #666;
+      border-bottom: 2px solid #e5e7eb;
+    }
+
+    .sources-table td {
+      padding: 12px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .sources-table tr:hover {
+      background: #f9fafb;
+    }
+
+    .source-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .source-badge.api {
+      background: #e0e7ff;
+      color: #4f46e5;
+    }
+
+    .source-badge.scraper {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .source-badge.feed {
+      background: #dbeafe;
+      color: #0c4a6e;
+    }
+
+    .status-badge {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .grid-1 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      header {
+        flex-direction: column;
+        gap: 15px;
+        align-items: flex-start;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .grid-1 {
+        grid-template-columns: 1fr;
+      }
+
+      header h1 {
+        font-size: 20px;
+      }
+
+      nav {
+        width: 100%;
+        flex-wrap: wrap;
+      }
+
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      color: white;
+      margin-top: 40px;
+      padding: 20px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <h1>🪂 Dashboard Parapente</h1>
+      <nav>
+        <a href="#" class="active">Dashboard</a>
+        <a href="#">Flights</a>
+        <a href="#">Stats</a>
+        <a href="#">Settings</a>
+      </nav>
+    </header>
+
+    <!-- Section 1: Today at a Glance -->
+    <div class="grid-1">
+      <div class="card status-card arguel">
+        <div class="site-name">Arguel</div>
+        <div class="para-index">
+          <div class="score">65</div>
+          <div class="verdict moyen">MOYEN</div>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Vent:</span>
+          <span class="stat-value">11.2 km/h</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Altitude:</span>
+          <span class="stat-value">427 m</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Meilleur créneau:</span>
+          <span class="stat-value">11h-12h</span>
+        </div>
+      </div>
+
+      <div class="card status-card mont-poupet">
+        <div class="site-name">Mont Poupet</div>
+        <div class="para-index">
+          <div class="score">40</div>
+          <div class="verdict limite">LIMITE</div>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Vent:</span>
+          <span class="stat-value">11.3 km/h</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Altitude:</span>
+          <span class="stat-value">842 m</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Meilleur créneau:</span>
+          <span class="stat-value">Aucun</span>
+        </div>
+      </div>
+
+      <div class="card status-card la-cote">
+        <div class="site-name">La Côte</div>
+        <div class="para-index">
+          <div class="score">75</div>
+          <div class="verdict moyen">MOYEN</div>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Vent:</span>
+          <span class="stat-value">13.9 km/h</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Altitude:</span>
+          <span class="stat-value">800 m</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Meilleur créneau:</span>
+          <span class="stat-value">11h</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: 5-Day Forecast -->
+    <div class="card grid-full">
+      <h2>📅 5-Day Forecast</h2>
+      <div class="forecast-timeline">
+        <div class="forecast-day">
+          <div class="day-name">Aujourd'hui</div>
+          <div class="day-score">65</div>
+          <div class="day-verdict">MOYEN</div>
+        </div>
+        <div class="forecast-day best">
+          <div class="day-name">Vendredi</div>
+          <div class="day-score">88</div>
+          <div class="day-verdict">BON ⭐</div>
+        </div>
+        <div class="forecast-day">
+          <div class="day-name">Samedi</div>
+          <div class="day-score">52</div>
+          <div class="day-verdict">MOYEN</div>
+        </div>
+        <div class="forecast-day">
+          <div class="day-name">Dimanche</div>
+          <div class="day-score">35</div>
+          <div class="day-verdict">LIMITE</div>
+        </div>
+        <div class="forecast-day">
+          <div class="day-name">Lundi</div>
+          <div class="day-score">70</div>
+          <div class="day-verdict">MOYEN</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: Recent Flights -->
+    <div class="card grid-full">
+      <h2>🛩️ Recent Flights</h2>
+      <table class="flights-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Spot</th>
+            <th>Durée</th>
+            <th>Altitude</th>
+            <th>Distance</th>
+            <th>Conditions</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="flight-date">22 Feb 2026</td>
+            <td class="flight-site">Arguel</td>
+            <td class="flight-stats">45 min</td>
+            <td class="flight-stats">520 m</td>
+            <td class="flight-stats">12.3 km</td>
+            <td class="flight-stats">MOYEN (68)</td>
+            <td><button class="view-button">View 3D</button></td>
+          </tr>
+          <tr>
+            <td class="flight-date">19 Feb 2026</td>
+            <td class="flight-site">Mont Poupet</td>
+            <td class="flight-stats">32 min</td>
+            <td class="flight-stats">420 m</td>
+            <td class="flight-stats">8.7 km</td>
+            <td class="flight-stats">LIMITE (38)</td>
+            <td><button class="view-button">View 3D</button></td>
+          </tr>
+          <tr>
+            <td class="flight-date">15 Feb 2026</td>
+            <td class="flight-site">La Côte</td>
+            <td class="flight-stats">58 min</td>
+            <td class="flight-stats">650 m</td>
+            <td class="flight-stats">18.2 km</td>
+            <td class="flight-stats">BON (82)</td>
+            <td><button class="view-button">View 3D</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Section 4: Learning Stats -->
+    <div class="grid-2">
+      <div class="card grid-full">
+        <h2>📊 Learning Stats</h2>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <h4>Total Flights</h4>
+            <div class="value">6</div>
+          </div>
+          <div class="stat-box">
+            <h4>Total Hours</h4>
+            <div class="value">4.5h</div>
+          </div>
+          <div class="stat-box">
+            <h4>Avg Altitude</h4>
+            <div class="value">510m</div>
+          </div>
+          <div class="stat-box">
+            <h4>Total Distance</h4>
+            <div class="value">67 km</div>
+          </div>
+        </div>
+        <h3>Improvement Trend</h3>
+        <div class="chart-placeholder">📈 Elevation Profile Chart</div>
+      </div>
+
+      <!-- Section 5: Alerts -->
+      <div class="card">
+        <h2>🚨 Alerts</h2>
+        <div class="alert-item">
+          <div class="alert-info">
+            <h4>Wind > 15 km/h</h4>
+            <p>Arguel • Active</p>
+          </div>
+          <div class="alert-actions">
+            <button class="btn-small">Edit</button>
+            <button class="btn-small">Delete</button>
+          </div>
+        </div>
+        <div class="alert-item">
+          <div class="alert-info">
+            <h4>Perfect Conditions</h4>
+            <p>La Côte • Active</p>
+          </div>
+          <div class="alert-actions">
+            <button class="btn-small">Edit</button>
+            <button class="btn-small">Delete</button>
+          </div>
+        </div>
+        <button class="btn-add">+ Create Alert</button>
+      </div>
+    </div>
+
+    <!-- Section 6: Weather Sources -->
+    <div class="card grid-full">
+      <h2>🌤️ Weather Sources Comparison</h2>
+      <table class="sources-table">
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Accuracy</th>
+            <th>Last Update</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Open-Meteo</td>
+            <td><span class="source-badge api">API</span></td>
+            <td><span class="status-badge">✓ Active</span></td>
+            <td>92%</td>
+            <td>14:32 today</td>
+          </tr>
+          <tr>
+            <td>WeatherAPI</td>
+            <td><span class="source-badge api">API</span></td>
+            <td><span class="status-badge">✓ Active</span></td>
+            <td>88%</td>
+            <td>14:32 today</td>
+          </tr>
+          <tr>
+            <td>Meteoblue</td>
+            <td><span class="source-badge scraper">Scraper</span></td>
+            <td><span class="status-badge">✓ Active</span></td>
+            <td>95%</td>
+            <td>14:30 today</td>
+          </tr>
+          <tr>
+            <td>Météo-parapente</td>
+            <td><span class="source-badge feed">Feed</span></td>
+            <td><span class="status-badge">✓ Active</span></td>
+            <td>85%</td>
+            <td>14:15 today</td>
+          </tr>
+          <tr>
+            <td>Météociel</td>
+            <td><span class="source-badge scraper">Scraper</span></td>
+            <td><span class="status-badge">✓ Active</span></td>
+            <td>89%</td>
+            <td>14:00 today</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <footer>
+      <p>🪂 Dashboard Parapente • Phase 1 Design Complete • Launching May 10, 2026</p>
+    </footer>
+  </div>
+</body>
+</html>
