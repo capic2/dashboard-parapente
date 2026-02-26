@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Parapente - Vue d'ensemble</title>
+  <style>
+    /* =================================================================
+       RESET & GLOBAL STYLES
+       ================================================================= */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      color: #333;
+      line-height: 1.6;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+
+    /* =================================================================
+       LAYOUT & CONTAINER
+       ================================================================= */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      margin-bottom: 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #2c5282;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .logo::before {
+      content: '🪂';
+      font-size: 1.8rem;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .user-name {
+      font-size: 0.95rem;
+      color: #666;
+    }
+
+    .btn {
+      padding: 0.6rem 1.2rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .btn-primary {
+      background: #2c5282;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #1e3a5f;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(44, 82, 130, 0.3);
+    }
+
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #2c5282;
+    }
+
+    .btn-secondary:hover {
+      background: #cbd5e0;
+    }
+
+    /* =================================================================
+       NAVIGATION
+       ================================================================= */
+    .nav {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+
+    .nav a {
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      color: #666;
+      text-decoration: none;
+      transition: all 0.3s;
+      font-size: 0.9rem;
+      border-left: 3px solid transparent;
+    }
+
+    .nav a:hover,
+    .nav a.active {
+      color: #2c5282;
+      background: #edf2f7;
+      border-left-color: #2c5282;
+    }
+
+    /* =================================================================
+       GRID SYSTEM
+       ================================================================= */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .grid-2 {
+      grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+    }
+
+    .grid-full {
+      grid-column: 1 / -1;
+    }
+
+    /* =================================================================
+       CARD COMPONENT
+       ================================================================= */
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      transition: all 0.3s ease;
+    }
+
+    .card:hover {
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+      transform: translateY(-2px);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .card-title {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #2c5282;
+    }
+
+    .card-badge {
+      background: #edf2f7;
+      color: #2c5282;
+      padding: 0.3rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .card-badge.good {
+      background: #c6f6d5;
+      color: #22543d;
+    }
+
+    .card-badge.warning {
+      background: #feebc8;
+      color: #7c2d12;
+    }
+
+    .card-badge.danger {
+      background: #fed7d7;
+      color: #742a2a;
+    }
+
+    /* =================================================================
+       SECTION 1: CURRENT CONDITIONS
+       ================================================================= */
+    .condition-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+
+    .condition-item {
+      background: #f7fafc;
+      padding: 1rem;
+      border-radius: 8px;
+      text-align: center;
+      border: 1px solid #e2e8f0;
+    }
+
+    .condition-label {
+      font-size: 0.85rem;
+      color: #718096;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .condition-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #2c5282;
+      margin-bottom: 0.25rem;
+    }
+
+    .condition-unit {
+      font-size: 0.85rem;
+      color: #718096;
+    }
+
+    /* Para-index specific styling */
+    .para-index-container {
+      position: relative;
+      width: 100%;
+      height: 24px;
+      background: linear-gradient(to right, #c53030 0%, #ed8936 33%, #38a169 66%, #2c5282 100%);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+
+    .para-index-value {
+      position: absolute;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      padding-left: 0.5rem;
+      color: white;
+      font-weight: 600;
+      font-size: 0.75rem;
+    }
+
+    /* Site selector */
+    .site-selector {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .site-btn {
+      padding: 0.6rem 1rem;
+      border: 2px solid #e2e8f0;
+      background: white;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-weight: 500;
+      color: #666;
+    }
+
+    .site-btn:hover,
+    .site-btn.active {
+      border-color: #2c5282;
+      color: #2c5282;
+      background: #edf2f7;
+    }
+
+    /* =================================================================
+       SECTION 2: 7-DAY FORECAST
+       ================================================================= */
+    .forecast-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 1rem;
+    }
+
+    .forecast-day {
+      background: #f7fafc;
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+      border: 1px solid #e2e8f0;
+      transition: all 0.3s;
+    }
+
+    .forecast-day:hover {
+      border-color: #2c5282;
+      background: #edf2f7;
+    }
+
+    .forecast-date {
+      font-weight: 600;
+      color: #2c5282;
+      font-size: 0.9rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .forecast-day-name {
+      font-size: 0.8rem;
+      color: #718096;
+      margin-bottom: 0.5rem;
+    }
+
+    .forecast-icon {
+      font-size: 2rem;
+      margin: 0.5rem 0;
+    }
+
+    .forecast-temp {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #2c5282;
+      margin: 0.5rem 0;
+    }
+
+    .forecast-wind {
+      font-size: 0.8rem;
+      color: #718096;
+      margin-bottom: 0.5rem;
+    }
+
+    .forecast-para {
+      background: #2c5282;
+      color: white;
+      padding: 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    /* =================================================================
+       SECTION 3: RECENT FLIGHTS
+       ================================================================= */
+    .flights-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .flight-item {
+      background: #f7fafc;
+      padding: 1rem;
+      border-radius: 8px;
+      border-left: 4px solid #2c5282;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.3s;
+    }
+
+    .flight-item:hover {
+      background: #edf2f7;
+      border-left-color: #1e3a5f;
+    }
+
+    .flight-info {
+      flex: 1;
+    }
+
+    .flight-title {
+      font-weight: 600;
+      color: #2c5282;
+      margin-bottom: 0.25rem;
+    }
+
+    .flight-meta {
+      display: flex;
+      gap: 1.5rem;
+      font-size: 0.85rem;
+      color: #718096;
+      flex-wrap: wrap;
+    }
+
+    .flight-stat {
+      display: flex;
+      gap: 0.25rem;
+    }
+
+    .flight-stat-label {
+      color: #a0aec0;
+      font-weight: 600;
+    }
+
+    .flight-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .flight-link {
+      padding: 0.4rem 0.8rem;
+      background: #2c5282;
+      color: white;
+      border-radius: 4px;
+      text-decoration: none;
+      font-size: 0.8rem;
+      transition: all 0.3s;
+    }
+
+    .flight-link:hover {
+      background: #1e3a5f;
+    }
+
+    /* =================================================================
+       SECTION 4: LEARNING STATS
+       ================================================================= */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+    }
+
+    .stat-box {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 1.5rem;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-box-value {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0.5rem 0;
+    }
+
+    .stat-box-label {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+
+    .stat-box-trend {
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .trend-up {
+      color: #c6f6d5;
+    }
+
+    .trend-down {
+      color: #fed7d7;
+    }
+
+    /* =================================================================
+       SECTION 5: ALERTS
+       ================================================================= */
+    .alerts-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .alert-item {
+      background: #f7fafc;
+      padding: 1rem;
+      border-radius: 8px;
+      border-left: 4px solid;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .alert-item.active {
+      border-left-color: #38a169;
+      background: #f0fff4;
+    }
+
+    .alert-item.inactive {
+      border-left-color: #cbd5e0;
+      opacity: 0.6;
+    }
+
+    .alert-item.warning {
+      border-left-color: #ed8936;
+      background: #fffaf0;
+    }
+
+    .alert-info {
+      flex: 1;
+    }
+
+    .alert-name {
+      font-weight: 600;
+      color: #2c5282;
+      margin-bottom: 0.25rem;
+    }
+
+    .alert-condition {
+      font-size: 0.85rem;
+      color: #718096;
+    }
+
+    .alert-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .alert-btn {
+      padding: 0.4rem 0.8rem;
+      background: white;
+      border: 1px solid #cbd5e0;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.3s;
+    }
+
+    .alert-btn:hover {
+      background: #edf2f7;
+      border-color: #2c5282;
+    }
+
+    /* =================================================================
+       SECTION 6: WEATHER SOURCES
+       ================================================================= */
+    .sources-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+
+    .source-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+      transition: all 0.3s;
+    }
+
+    .source-card:hover {
+      border-color: #2c5282;
+      background: #edf2f7;
+    }
+
+    .source-name {
+      font-weight: 600;
+      color: #2c5282;
+      margin-bottom: 0.5rem;
+    }
+
+    .source-status {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .source-status.active {
+      background: #c6f6d5;
+      color: #22543d;
+    }
+
+    .source-status.inactive {
+      background: #fed7d7;
+      color: #742a2a;
+    }
+
+    .source-meta {
+      font-size: 0.8rem;
+      color: #718096;
+      line-height: 1.5;
+    }
+
+    /* =================================================================
+       MODAL / OVERLAY
+       ================================================================= */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      padding: 2rem;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .modal-header {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      color: #2c5282;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: #718096;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: #2c5282;
+      font-size: 0.9rem;
+    }
+
+    .form-input,
+    .form-select {
+      width: 100%;
+      padding: 0.6rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      transition: all 0.3s;
+    }
+
+    .form-input:focus,
+    .form-select:focus {
+      outline: none;
+      border-color: #2c5282;
+      box-shadow: 0 0 0 3px rgba(44, 82, 130, 0.1);
+    }
+
+    /* =================================================================
+       RESPONSIVE
+       ================================================================= */
+    @media (max-width: 768px) {
+      body {
+        padding: 0.5rem;
+      }
+
+      header {
+        padding: 1rem;
+      }
+
+      .container {
+        padding: 0;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+
+      .condition-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .forecast-container {
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      }
+
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .flight-item {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .flight-actions {
+        width: 100%;
+        margin-top: 0.5rem;
+      }
+
+      .nav {
+        width: 100%;
+      }
+    }
+
+    /* =================================================================
+       UTILITY CLASSES
+       ================================================================= */
+    .text-center {
+      text-align: center;
+    }
+
+    .text-muted {
+      color: #718096;
+      font-size: 0.9rem;
+    }
+
+    .mt-1 { margin-top: 0.5rem; }
+    .mt-2 { margin-top: 1rem; }
+    .mb-1 { margin-bottom: 0.5rem; }
+    .mb-2 { margin-bottom: 1rem; }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .loading {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+  </style>
+</head>
+<body>
+  <!-- ===================================================================
+       HEADER
+       =================================================================== -->
+  <header>
+    <div class="logo">Dashboard Parapente</div>
+    <nav class="nav">
+      <a href="#dashboard" class="nav-link active">Vue d'ensemble</a>
+      <a href="#forecast" class="nav-link">Prévisions</a>
+      <a href="#flights" class="nav-link">Mes vols</a>
+      <a href="#stats" class="nav-link">Statistiques</a>
+      <a href="#alerts" class="nav-link">Alertes</a>
+      <a href="#settings" class="nav-link">Paramètres</a>
+    </nav>
+    <div class="user-info">
+      <span class="user-name">Vincent</span>
+      <button class="btn btn-secondary">⚙️ Paramètres</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- ===================================================================
+         SECTION 1: CURRENT CONDITIONS
+         =================================================================== -->
+    <section id="dashboard" class="grid grid-full">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Conditions actuelles</h2>
+          <div style="display: flex; gap: 0.5rem;">
+            <span class="card-badge good">✓ Actualisé</span>
+            <span class="text-muted" style="font-size: 0.8rem;">11:58 GMT+1</span>
+          </div>
+        </div>
+
+        <!-- Site Selector -->
+        <div class="site-selector">
+          <button class="site-btn active" data-site="arguel">🪂 Arguel (427m)</button>
+          <button class="site-btn" data-site="mont-poupet">⛰️ Mont Poupet (842m)</button>
+          <button class="site-btn" data-site="la-cote">🏔️ La Côte (800m)</button>
+        </div>
+
+        <!-- Current Conditions Grid -->
+        <div class="condition-grid">
+          <div class="condition-item">
+            <div class="condition-label">Température</div>
+            <div class="condition-value">12.5</div>
+            <div class="condition-unit">°C</div>
+          </div>
+          <div class="condition-item">
+            <div class="condition-label">Humidité</div>
+            <div class="condition-value">65</div>
+            <div class="condition-unit">%</div>
+          </div>
+          <div class="condition-item">
+            <div class="condition-label">Vitesse vent</div>
+            <div class="condition-value">15.0</div>
+            <div class="condition-unit">km/h</div>
+          </div>
+          <div class="condition-item">
+            <div class="condition-label">Direction vent</div>
+            <div class="condition-value">270°</div>
+            <div class="condition-unit">Ouest</div>
+          </div>
+          <div class="condition-item">
+            <div class="condition-label">Rafales</div>
+            <div class="condition-value">22.5</div>
+            <div class="condition-unit">km/h</div>
+          </div>
+          <div class="condition-item">
+            <div class="condition-label">Nuages</div>
+            <div class="condition-value">30</div>
+            <div class="condition-unit">%</div>
+          </div>
+          <div class="condition-item">
+            <div class="condition-label">Visibilité</div>
+            <div class="condition-value">10</div>
+            <div class="condition-unit">km</div>
+          </div>
+          <div class="condition-item">
+            <div class="condition-label">Pression</div>
+            <div class="condition-value">1013.2</div>
+            <div class="condition-unit">hPa</div>
+          </div>
+        </div>
+
+        <!-- Para-Index Indicator -->
+        <div style="margin-top: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+            <label style="font-weight: 600; color: #2c5282;">Indice Parapente (consensus)</label>
+            <span style="font-weight: 700; color: #2c5282;">62/100</span>
+          </div>
+          <div class="para-index-container">
+            <div class="para-index-value" style="width: 62%;"></div>
+          </div>
+          <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #718096;">
+            <strong>État:</strong> Conditions marginales - Procéder avec prudence
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         SECTION 2: 7-DAY FORECAST
+         =================================================================== -->
+    <section id="forecast" class="card">
+      <div class="card-header">
+        <h2 class="card-title">Prévisions 7 jours</h2>
+        <span class="card-badge">Arguel</span>
+      </div>
+
+      <div class="forecast-container">
+        <div class="forecast-day">
+          <div class="forecast-date">26 fév</div>
+          <div class="forecast-day-name">Jeudi</div>
+          <div class="forecast-icon">☁️</div>
+          <div class="forecast-temp">12°/14°</div>
+          <div class="forecast-wind">↑ 15 km/h</div>
+          <div class="forecast-para">62</div>
+        </div>
+        <div class="forecast-day">
+          <div class="forecast-date">27 fév</div>
+          <div class="forecast-day-name">Vendredi</div>
+          <div class="forecast-icon">🌤️</div>
+          <div class="forecast-temp">14°/16°</div>
+          <div class="forecast-wind">↑ 12 km/h</div>
+          <div class="forecast-para">72</div>
+        </div>
+        <div class="forecast-day">
+          <div class="forecast-date">28 fév</div>
+          <div class="forecast-day-name">Samedi</div>
+          <div class="forecast-icon">☀️</div>
+          <div class="forecast-temp">16°/18°</div>
+          <div class="forecast-wind">↑ 10 km/h</div>
+          <div class="forecast-para">78</div>
+        </div>
+        <div class="forecast-day">
+          <div class="forecast-date">1 mar</div>
+          <div class="forecast-day-name">Dimanche</div>
+          <div class="forecast-icon">☀️</div>
+          <div class="forecast-temp">17°/19°</div>
+          <div class="forecast-wind">↑ 8 km/h</div>
+          <div class="forecast-para">82</div>
+        </div>
+        <div class="forecast-day">
+          <div class="forecast-date">2 mar</div>
+          <div class="forecast-day-name">Lundi</div>
+          <div class="forecast-icon">🌦️</div>
+          <div class="forecast-temp">15°/17°</div>
+          <div class="forecast-wind">↑ 18 km/h</div>
+          <div class="forecast-para">68</div>
+        </div>
+        <div class="forecast-day">
+          <div class="forecast-date">3 mar</div>
+          <div class="forecast-day-name">Mardi</div>
+          <div class="forecast-icon">⛈️</div>
+          <div class="forecast-temp">12°/14°</div>
+          <div class="forecast-wind">↑ 25 km/h</div>
+          <div class="forecast-para">35</div>
+        </div>
+        <div class="forecast-day">
+          <div class="forecast-date">4 mar</div>
+          <div class="forecast-day-name">Mercredi</div>
+          <div class="forecast-icon">☁️</div>
+          <div class="forecast-temp">13°/15°</div>
+          <div class="forecast-wind">↑ 14 km/h</div>
+          <div class="forecast-para">58</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 1.5rem; padding: 1rem; background: #f0fff4; border-radius: 8px; border-left: 4px solid #38a169;">
+        <div style="font-weight: 600; color: #22543d; margin-bottom: 0.5rem;">✓ Meilleure journée</div>
+        <div style="color: #22543d; font-size: 0.9rem;">
+          <strong>Dimanche 1 mars</strong> — Indice 82 • Arguel • Conditions excellentes + Monte Poupet bonnes aussi
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         SECTION 3 & 4: TWO-COLUMN LAYOUT
+         =================================================================== -->
+    <div class="grid grid-2">
+      <!-- Recent Flights -->
+      <section id="flights" class="card">
+        <div class="card-header">
+          <h2 class="card-title">Mes 3 derniers vols</h2>
+          <button class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">+ Nouveau vol</button>
+        </div>
+
+        <div class="flights-list">
+          <div class="flight-item">
+            <div class="flight-info">
+              <div class="flight-title">Vol thermique soir</div>
+              <div class="flight-meta">
+                <div class="flight-stat">
+                  <span class="flight-stat-label">📍</span> Arguel
+                </div>
+                <div class="flight-stat">
+                  <span class="flight-stat-label">🕐</span> 45 min
+                </div>
+                <div class="flight-stat">
+                  <span class="flight-stat-label">⬆️</span> 850 m
+                </div>
+                <div class="flight-stat">
+                  <span class="flight-stat-label">📏</span> 12.3 km
+                </div>
+              </div>
+            </div>
+            <div class="flight-actions">
+              <a href="#" class="flight-link">Voir détails</a>
+            </div>
+          </div>
+
+          <div class="flight-item">
+            <div class="flight-info">
+              <div class="flight-title">Session Mont Poupet</div>
+              <div class="flight-meta">
+                <div class="flight-stat">
+                  <span class="flight-stat-label">📍</span> Mont Poupet
+                </div>
+                <div class="flight-stat">
+                  <span class="flight-stat-label">🕐</span> 62 min
+                </div>
+                <div class="flight-stat">
+                  <span class="flight-stat-label">⬆️</span> 950 m
+                </div>
+                <div class="flight-stat">
+                  <span class="flight-stat-label">📏</span> 18.5 km
+                </div>
+              </div>
+            </div>
+            <div class="flight-actions">
+              <a href="#" class="flight-link">Voir détails</a>
+            </div>
+          </div>
+
+          <div class="flight-item">
+            <div class="flight-info">
+              <div class="flight-title">Vol d'apprentissage</div>
+              <div class="flight-meta">
+                <div class="flight-stat">
+                  <span class="flight-stat-label">📍</span> La Côte
+                </div>
+                <div class="flight-stat">
+                  <span class="flight-stat-label">🕐</span> 28 min
+                </div>
+                <div class="flight-stat">
+                  <span class="flight-stat-label">⬆️</span> 650 m
+                </div>
+                <div class="flight-stat">
+                  <span class="flight-stat-label">📏</span> 5.2 km
+                </div>
+              </div>
+            </div>
+            <div class="flight-actions">
+              <a href="#" class="flight-link">Voir détails</a>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 1rem; text-align: center;">
+          <a href="#" style="color: #2c5282; text-decoration: none; font-weight: 600;">Voir tous les vols →</a>
+        </div>
+      </section>
+
+      <!-- Learning Statistics -->
+      <section id="stats" class="card">
+        <div class="card-header">
+          <h2 class="card-title">Statistiques apprentissage</h2>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-box" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div class="stat-box-label">Vols</div>
+            <div class="stat-box-value">6</div>
+            <div class="stat-box-trend">depuis février</div>
+          </div>
+          <div class="stat-box" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <div class="stat-box-label">Durée totale</div>
+            <div class="stat-box-value">4.5h</div>
+            <div class="stat-box-trend">270 minutes</div>
+          </div>
+          <div class="stat-box" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+            <div class="stat-box-label">Altitude max</div>
+            <div class="stat-box-value">950m</div>
+            <div class="stat-box-trend">Monte Poupet</div>
+          </div>
+          <div class="stat-box" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+            <div class="stat-box-label">Niveau</div>
+            <div class="stat-box-value">Débutant</div>
+            <div class="stat-box-trend trend-up">↑ S'améliore (72%)</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 1.5rem; background: #f7fafc; padding: 1rem; border-radius: 8px;">
+          <div style="font-weight: 600; color: #2c5282; margin-bottom: 0.5rem;">📊 Tendances</div>
+          <ul style="font-size: 0.9rem; color: #718096; line-height: 1.8;">
+            <li>✓ Vol moyen: 45 minutes (augmente régulièrement)</li>
+            <li>✓ Lieux: 3 sites explorés (Arguel, Mont Poupet, La Côte)</li>
+            <li>✓ Cohérence: Vol environ 2x par semaine</li>
+            <li>⚠️ À travailler: gestion thermiques légères</li>
+          </ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===================================================================
+         SECTION 5: ALERTS & NOTIFICATIONS
+         =================================================================== -->
+    <section id="alerts" class="card">
+      <div class="card-header">
+        <h2 class="card-title">Alertes configurées (3 actives)</h2>
+        <button class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">+ Nouvelle alerte</button>
+      </div>
+
+      <div class="alerts-list">
+        <div class="alert-item active">
+          <div class="alert-info">
+            <div class="alert-name">⚠️ Alerte vent fort</div>
+            <div class="alert-condition">Arguel • Si vitesse vent ≥ 25 km/h</div>
+            <div class="text-muted" style="margin-top: 0.25rem;">Déclenchée 3 fois • Dernière: hier 14:30</div>
+          </div>
+          <div class="alert-actions">
+            <button class="alert-btn">Modifier</button>
+            <button class="alert-btn">Supprimer</button>
+          </div>
+        </div>
+
+        <div class="alert-item active">
+          <div class="alert-info">
+            <div class="alert-name">✓ Bonnes conditions</div>
+            <div class="alert-condition">Tous sites • Si indice parapente ≥ 70</div>
+            <div class="text-muted" style="margin-top: 0.25rem;">Déclenchée 2 fois • Dernière: il y a 2 jours</div>
+          </div>
+          <div class="alert-actions">
+            <button class="alert-btn">Modifier</button>
+            <button class="alert-btn">Supprimer</button>
+          </div>
+        </div>
+
+        <div class="alert-item active warning">
+          <div class="alert-info">
+            <div class="alert-name">🌧️ Pluie prévue</div>
+            <div class="alert-condition">La Côte • Si probabilité pluie > 50%</div>
+            <div class="text-muted" style="margin-top: 0.25rem;">Jamais déclenchée</div>
+          </div>
+          <div class="alert-actions">
+            <button class="alert-btn">Modifier</button>
+            <button class="alert-btn">Supprimer</button>
+          </div>
+        </div>
+
+        <div class="alert-item inactive">
+          <div class="alert-info">
+            <div class="alert-name">Thermiques thermiques</div>
+            <div class="alert-condition">Mont Poupet • Si indice thermique ≥ 8</div>
+            <div class="text-muted" style="margin-top: 0.25rem;">Inactif (mode test)</div>
+          </div>
+          <div class="alert-actions">
+            <button class="alert-btn">Activer</button>
+            <button class="alert-btn">Supprimer</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         SECTION 6: WEATHER SOURCES STATUS
+         =================================================================== -->
+    <section id="sources" class="grid">
+      <div class="card grid-full">
+        <div class="card-header">
+          <h2 class="card-title">8 sources météo intégrées</h2>
+          <span class="text-muted">État de synchronisation</span>
+        </div>
+
+        <div class="sources-grid">
+          <div class="source-card">
+            <div class="source-name">Open-Meteo</div>
+            <div class="source-status active">✓ Actif</div>
+            <div class="source-meta">
+              <div>Mis à jour: 11:50</div>
+              <div>Prévisions: 7 j</div>
+              <div>API gratuit</div>
+            </div>
+          </div>
+
+          <div class="source-card">
+            <div class="source-name">WeatherAPI</div>
+            <div class="source-status active">✓ Actif</div>
+            <div class="source-meta">
+              <div>Mis à jour: 11:55</div>
+              <div>Prévisions: 7 j</div>
+              <div>API clé configurée</div>
+            </div>
+          </div>
+
+          <div class="source-card">
+            <div class="source-name">Meteoblue</div>
+            <div class="source-status active">✓ Actif</div>
+            <div class="source-meta">
+              <div>Mis à jour: 11:45</div>
+              <div>Scraping Playwright</div>
+              <div>Modèles multiples</div>
+            </div>
+          </div>
+
+          <div class="source-card">
+            <div class="source-name">Météo-parapente</div>
+            <div class="source-status active">✓ Actif</div>
+            <div class="source-meta">
+              <div>Mis à jour: 11:40</div>
+              <div>Parapente-spécifique</div>
+              <div>Scraping RSS</div>
+            </div>
+          </div>
+
+          <div class="source-card">
+            <div class="source-name">Météociel</div>
+            <div class="source-status active">✓ Actif</div>
+            <div class="source-meta">
+              <div>Mis à jour: 11:50</div>
+              <div>Données françaises</div>
+              <div>Scraping HTML</div>
+            </div>
+          </div>
+
+          <div class="source-card">
+            <div class="source-name">Parapente.net</div>
+            <div class="source-status inactive">⏸ Non implémenté</div>
+            <div class="source-meta">
+              <div>Phase 2</div>
+              <div>Forum français</div>
+              <div>Scraping nécessaire</div>
+            </div>
+          </div>
+
+          <div class="source-card">
+            <div class="source-name">Windy</div>
+            <div class="source-status inactive">⏸ Non implémenté</div>
+            <div class="source-meta">
+              <div>Phase 2</div>
+              <div>Visualisation vent</div>
+              <div>API key planning</div>
+            </div>
+          </div>
+
+          <div class="source-card">
+            <div class="source-name">Planète-Voile</div>
+            <div class="source-status inactive">⏸ Non implémenté</div>
+            <div class="source-meta">
+              <div>Phase 3</div>
+              <div>Conditions mer/vent</div>
+              <div>Scraping à définir</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 1.5rem; padding: 1rem; background: #edf2f7; border-radius: 8px;">
+          <div style="font-weight: 600; color: #2c5282; margin-bottom: 0.5rem;">Synchronisation automatique</div>
+          <div style="font-size: 0.9rem; color: #4a5568;">
+            Rafraîchissement automatique toutes les 30 minutes. Dernière sync: 11:55. Prochaine: 12:25
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         FOOTER
+         =================================================================== -->
+    <footer style="margin-top: 3rem; padding: 2rem; text-align: center; color: #718096; font-size: 0.9rem;">
+      <div>Dashboard Parapente v1.0 — Phase Design</div>
+      <div style="margin-top: 0.5rem;">
+        <a href="#" style="color: #2c5282; text-decoration: none; margin: 0 0.5rem;">API Docs</a> •
+        <a href="#" style="color: #2c5282; text-decoration: none; margin: 0 0.5rem;">GitHub</a> •
+        <a href="#" style="color: #2c5282; text-decoration: none; margin: 0 0.5rem;">Feedback</a>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ===================================================================
+       SIMPLE INTERACTIVITY SCRIPT
+       =================================================================== -->
+  <script>
+    // Site selector buttons
+    document.querySelectorAll('.site-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.site-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        console.log('Site sélectionné:', this.dataset.site);
+      });
+    });
+
+    // Navigation links
+    document.querySelectorAll('.nav a').forEach(link => {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
+        this.classList.add('active');
+        const target = this.getAttribute('href');
+        document.querySelector(target)?.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+
+    // Example: Alert button handlers (would be replaced by real API calls)
+    document.querySelectorAll('.alert-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        console.log('Bouton alerte cliqué:', this.textContent);
+      });
+    });
+
+    // Flight link handlers
+    document.querySelectorAll('.flight-link').forEach(link => {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        console.log('Vol cliqué');
+      });
+    });
+
+    console.log('Dashboard Parapente - Interactive Prototype Loaded');
+  </script>
+</body>
+</html>
