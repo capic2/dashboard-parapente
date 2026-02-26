@@ -16,5 +16,16 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    // Code splitting for TanStack Router routes
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'tanstack-router': ['@tanstack/react-router'],
+          'tanstack-query': ['@tanstack/react-query'],
+          'tanstack-table': ['@tanstack/react-table'],
+          'tanstack-form': ['@tanstack/react-form'],
+        },
+      },
+    },
   },
 })

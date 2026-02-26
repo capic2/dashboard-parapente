@@ -95,9 +95,13 @@ Create a personal flying conditions dashboard optimized for your region that:
 **Frontend:**
 - **Framework:** React 18+ (hooks)
 - **Build Tool:** Vite (fast development)
-- **State Management:** Zustand (lightweight) or Redux Toolkit
-- **HTTP Client:** Axios
-- **Routing:** React Router v6
+- **TanStack Suite:**
+  - **@tanstack/react-router** — Modern type-safe routing
+  - **@tanstack/react-query** — Data fetching, caching, sync
+  - **@tanstack/react-table** — Headless table (sorting, filtering, pagination)
+  - **@tanstack/react-form** — Type-safe forms with validation
+- **State Management:** Zustand (UI state only)
+- **HTTP Client:** Axios (wrapped in TanStack Query)
 - **Styling:** Tailwind CSS (responsive)
 - **Charting:** Chart.js + react-chartjs-2
 - **Testing:** Vitest + React Testing Library
@@ -402,38 +406,48 @@ sqlite3 backend/db/dashboard.db ".tables"
 - Data accuracy (RMSE vs actual)
 - Side-by-side comparison (Open-Meteo vs WeatherAPI vs Meteoblue, etc.)
 
-### React Components Structure
+### React Components Structure (with TanStack)
 
 ```
 src/
-├── components/
+├── components/           # Reusable components
 │   ├── CurrentConditions.jsx
 │   ├── Forecast7Day.jsx
-│   ├── RecentFlights.jsx
+│   ├── RecentFlights.jsx   (uses useFlightsTable)
 │   ├── LearningStats.jsx
-│   ├── AlertManager.jsx
-│   ├── SourceComparison.jsx
-│   └── Navigation.jsx
-├── pages/
-│   ├── Dashboard.jsx
-│   ├── FlightHistory.jsx
+│   ├── AlertManager.jsx    (uses useAlertForm)
+│   ├── SourceComparison.jsx (uses useWeatherSourcesTable)
+│   └── Navigation.jsx      (uses TanStack Router)
+│
+├── pages/                # Page-level components
+│   ├── Dashboard.jsx     (TanStack Router)
+│   ├── FlightHistory.jsx (TanStack Table)
 │   ├── Settings.jsx
 │   └── Admin.jsx
-├── stores/
-│   ├── weatherStore.js     (Zustand)
-│   ├── flightsStore.js
-│   ├── alertsStore.js
-│   └── uiStore.js
-├── hooks/
-│   ├── useWeather.js
-│   ├── useFlights.js
-│   └── useAlerts.js
+│
+├── hooks/                # TanStack hooks
+│   ├── useWeather.js          (TanStack Query)
+│   ├── useFlights.js          (TanStack Query + Mutations)
+│   ├── useAlerts.js           (TanStack Query + Mutations)
+│   ├── useAlertForm.js        (TanStack Form)
+│   └── useFlightsTable.js     (TanStack Table)
+│
+├── stores/               # UI state only
+│   └── weatherStore.js   (Zustand - for UI selection)
+│
 ├── utils/
-│   ├── api.js
-│   └── formatting.js
-├── App.jsx
-└── main.jsx
+│   └── api.js            (Axios instance)
+│
+├── App.jsx               # TanStack Router setup
+└── main.jsx              # React entry point
 ```
+
+**Data Flow:**
+1. **Data fetching** → TanStack Query hooks (automatic caching)
+2. **Data display** → TanStack Table hooks (sorting, filtering, pagination)
+3. **Forms** → TanStack Form hooks (validation, submission)
+4. **Navigation** → TanStack Router (type-safe routes)
+5. **UI state** → Zustand (lightweight, simple state)
 
 ---
 
@@ -1469,43 +1483,98 @@ curl http://localhost:8000/api/v1/sites
 
 **Technology:** FastAPI (auto-documentation)
 
-### Week 2: React Components (10-12 hours)
+### Week 2: React Components with TanStack (10-12 hours)
 
-**Goal:** All 6 dashboard sections functional
+**Goal:** All 6 dashboard sections functional with TanStack tools
 
 ```jsx
-// Example structure with hooks and Zustand
-import React, { useEffect } from 'react'
-import { useWeatherStore } from '../stores/weatherStore'
-import { useWeather } from '../hooks/useWeather'
+// Example: Dashboard with TanStack Query + Router
+import { useCurrentConditions, useSites } from '../hooks/useWeather'
+import { useFlightsTable } from '../hooks/useFlightsTable'
+import { useNavigate } from '@tanstack/react-router'
 
 export function Dashboard() {
-  const { conditions, setConditions } = useWeatherStore()
-  const { fetchConditions } = useWeather()
+  const navigate = useNavigate()
   
-  useEffect(() => {
-    fetchConditions().then(data => setConditions(data))
-  }, [])
+  // Data fetching with automatic caching
+  const { data: sites, isLoading } = useSites()
+  const { data: conditions } = useCurrentConditions()
+  
+  if (isLoading) return <div>Loading...</div>
   
   return (
     <div className="dashboard">
-      <CurrentConditions conditions={conditions} />
+      <CurrentConditions data={conditions} />
       <Forecast7Day />
       <RecentFlights />
-      {/* ... other sections */}
+      <LearningStats />
+      <AlertManager />
+      <SourceComparison />
     </div>
+  )
+}
+
+// Example: Flights table with TanStack Table
+export function FlightsList() {
+  const { table, isLoading } = useFlightsTable()
+  
+  return (
+    <div>
+      <table>
+        {/* TanStack Table renders here */}
+      </table>
+      <div className="pagination">
+        <button onClick={() => table.previousPage()}>Previous</button>
+        <span>Page {table.getState().pagination.pageIndex + 1}</span>
+        <button onClick={() => table.nextPage()}>Next</button>
+      </div>
+    </div>
+  )
+}
+
+// Example: Alert form with TanStack Form
+export function AlertForm({ alertId }) {
+  const { form, isLoading } = useAlertForm()
+  
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); form.handleSubmit() }}>
+      <form.Field name="name">
+        {(field) => (
+          <input
+            value={field.state.value}
+            onChange={(e) => field.setValue(e.target.value)}
+          />
+        )}
+      </form.Field>
+      <button type="submit" disabled={isLoading}>Save</button>
+    </form>
   )
 }
 ```
 
 **Components to implement:**
-- CurrentConditions (3 site cards with para-index)
-- Forecast7Day (timeline of best flying days)
-- RecentFlights (list + filters)
-- LearningStats (charts + metrics)
-- AlertManager (CRUD alerts)
-- SourceComparison (data accuracy)
-- Navigation (header + routes)
+- **CurrentConditions** — 3 site cards with para-index
+  - Uses: `useCurrentConditions` (TanStack Query)
+  
+- **Forecast7Day** — Timeline of best flying days
+  - Uses: `useForecast` (TanStack Query)
+  
+- **RecentFlights** — List with sorting, filtering, pagination
+  - Uses: `useFlightsTable` (TanStack Table) + `useFlights` (TanStack Query)
+  
+- **LearningStats** — Charts and metrics
+  - Uses: `useFlightStats`, `useSiteStats` (TanStack Query)
+  
+- **AlertManager** — Create/edit/delete alerts
+  - Uses: `useAlerts`, `useCreateAlert`, `useUpdateAlert` (TanStack Query + Mutations)
+  - Uses: `useAlertForm` (TanStack Form)
+  
+- **SourceComparison** — Data accuracy comparison table
+  - Uses: `useWeatherSourcesTable` (TanStack Table)
+  - Uses: `useWeatherSources` (TanStack Query)
+  
+- **Navigation** — Header with routing
+  - Uses: `useNavigate` (TanStack Router)
 
 ### Week 3: Deployment & Polish (10-12 hours)
 
@@ -1673,13 +1742,16 @@ tail -f backend/logs/dashboard.log
 - ✅ Type hints + validation (Pydantic)
 - ✅ Modern Python 3.10+ features
 
-**Why React (not Vue)?**
+**Why React + TanStack Suite?**
 - ✅ Larger ecosystem & community
 - ✅ More job market value
-- ✅ Excellent state management options (Zustand, Redux)
-- ✅ Great component libraries (Material-UI, Shadcn)
-- ✅ Strong TypeScript support
-- ✅ Perfect for dashboards with complex state
+- ✅ TanStack tools are industry-leading for specific problems:
+  - **TanStack Query** — Best data fetching library
+  - **TanStack Router** — Modern type-safe routing
+  - **TanStack Table** — Most flexible headless table
+  - **TanStack Form** — Enterprise-grade form handling
+- ✅ Zustand for lightweight UI state
+- ✅ Perfect for complex dashboards with rich interactions
 
 ### B. Code Organization
 
