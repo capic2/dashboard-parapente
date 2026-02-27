@@ -6,7 +6,7 @@ import cesium from 'vite-plugin-cesium';
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
-  plugins: [react(), tailwindcss(), cesium()],
+  plugins: [react(), tailwindcss(), cesium({ cesiumBuildRootPath: 'node_modules/cesium/Build' })],
   server: {
     host: '0.0.0.0',
     port: 5173,
