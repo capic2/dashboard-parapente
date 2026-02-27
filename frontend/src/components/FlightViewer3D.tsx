@@ -1,387 +1,322 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react'
-import { Viewer, Entity, PolylineGraphics } from 'resium'
-import { Cartesian3, Color, Viewer as CesiumViewer, HeadingPitchRange } from 'cesium'
-import { useFlightGPX, useFlightElevationProfile, useDownloadGPX } from '../hooks/useFlightGPX'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { GeoPoint } from '../types/flight'
+import React, { useCallback, useRef, useState, ChangeEvent } from 'react'
+import { CesiumComponentRef, Viewer } from 'resium'
+import {
+  ArcType,
+  CallbackProperty,
+  Cartesian3,
+  Cartographic,
+  Color,
+  ConstantPositionProperty,
+  Entity as CesiumEntity,
+  GpxDataSource,
+  JulianDate,
+  Rectangle,
+  Terrain,
+  Viewer as CesiumViewer,
+} from 'cesium'
+import { useFlightGPX } from '../hooks/useFlightGPX'
 
 export interface FlightViewer3DProps {
   flightId: string
   flightTitle?: string
-  showReplay?: boolean
-  showElevationChart?: boolean
 }
 
-/**
- * 3D Flight Viewer with Cesium + Resium
- * Displays track on 3D map, elevation profile, and replay controls
- */
+interface CesiumPositionPropertyInternal {
+  _property?: {
+    _times?: JulianDate[]
+  }
+}
+
 export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   flightId,
-  flightTitle,
-  showReplay = true,
-  showElevationChart = true,
+  flightTitle = 'Flight View',
 }) => {
-  const { data: gpxData, isLoading: gpxLoading, error: gpxError } = useFlightGPX(flightId)
-  const elevationProfile = useFlightElevationProfile(flightId)
-  const downloadGPX = useDownloadGPX()
-  const viewerRef = useRef<CesiumViewer | null>(null)
+  const { data: gpxData, isLoading, error } = useFlightGPX(flightId)
+  const viewerRef = useRef<CesiumComponentRef<CesiumViewer>>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [replaySpeed, setReplaySpeed] = useState(1)
 
-  const [replayDuration, setReplayDuration] = useState(30)
-  const [isReplaying, setIsReplaying] = useState(false)
-  const [replayIndex, setReplayIndex] = useState(0)
-  const replayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const allPositionsRef = useRef<Cartesian3[]>([])
+  const basePositionsRef = useRef<Cartesian3[]>([])
+  const timestampsRef = useRef<number[]>([])
+  const currentIndexRef = useRef(0)
+  const isPlayingRef = useRef(false)
+  const speedRef = useRef(1)
+  const realTimeStartRef = useRef<number>(0)
+  const gpxStartTimeRef = useRef<number>(0)
 
-  // Convert GPX coordinates to Cesium Cartesian3 positions
-  const positions = gpxData?.coordinates
-    ? gpxData.coordinates.map((point: GeoPoint) =>
-        Cartesian3.fromDegrees(point.lon, point.lat, point.elevation)
-      )
-    : []
+  const polylineEntityRef = useRef<CesiumEntity | null>(null)
+  const cursorEntityRef = useRef<CesiumEntity | null>(null)
+  const startEntityRef = useRef<CesiumEntity | null>(null)
+  const visiblePositionsRef = useRef<Cartesian3[]>([])
+  const cursorPositionPropertyRef = useRef<ConstantPositionProperty | null>(null)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Get current replay position
-  const currentReplayPosition =
-    gpxData?.coordinates && replayIndex < gpxData.coordinates.length
-      ? gpxData.coordinates[replayIndex]
-      : null
+  const extractTimestamps = useCallback((dataSource: GpxDataSource): number[] => {
+    const timestamps: number[] = []
 
-  const currentReplayCartesian = currentReplayPosition
-    ? Cartesian3.fromDegrees(
-        currentReplayPosition.lon,
-        currentReplayPosition.lat,
-        currentReplayPosition.elevation
-      )
-    : null
+    dataSource.entities.values.forEach((entity) => {
+      if (!entity.position) return
 
-  // Start replay animation
-  const handlePlayReplay = useCallback(() => {
+      const positionProperty = entity.position as unknown as CesiumPositionPropertyInternal
+
+      if (positionProperty._property?._times) {
+        positionProperty._property._times.forEach((julianDate) => {
+          timestamps.push(JulianDate.toDate(julianDate).getTime())
+        })
+      } else if (entity.availability) {
+        try {
+          const start = entity.availability.start
+          const stop = entity.availability.stop
+
+          if (start && stop) {
+            timestamps.push(JulianDate.toDate(start).getTime())
+            timestamps.push(JulianDate.toDate(stop).getTime())
+          }
+        } catch (e) {
+          console.warn('Could not extract timestamps', e)
+        }
+      }
+    })
+
+    return timestamps
+  }, [])
+
+  // Initialize viewer with GPX data
+  React.useEffect(() => {
     if (!gpxData?.coordinates || gpxData.coordinates.length === 0) return
 
-    setIsReplaying(true)
-    setReplayIndex(0)
+    const viewer = viewerRef.current?.cesiumElement
+    if (!viewer) return
 
-    const totalPoints = gpxData.coordinates.length
-    const intervalMs = (replayDuration * 1000) / totalPoints
+    try {
+      // Convert GPX coordinates to Cartesian3
+      const positions = gpxData.coordinates.map((point) =>
+        Cartesian3.fromDegrees(point.lon, point.lat, point.elevation)
+      )
 
-    if (replayIntervalRef.current) {
-      clearInterval(replayIntervalRef.current)
-    }
+      // Generate timestamps if not available
+      let timestamps = gpxData.timestamps || []
+      if (timestamps.length === 0 || timestamps.length !== positions.length) {
+        const avgSpeedKmh = 5
+        const avgSpeedMs = (avgSpeedKmh * 1000) / 3600
 
-    replayIntervalRef.current = setInterval(() => {
-      setReplayIndex((prev) => {
-        if (prev >= totalPoints - 1) {
-          if (replayIntervalRef.current) {
-            clearInterval(replayIntervalRef.current)
-            replayIntervalRef.current = null
-          }
-          setIsReplaying(false)
-          return 0
+        timestamps = [Date.now()]
+        for (let i = 1; i < positions.length; i++) {
+          const distance = Cartesian3.distance(positions[i - 1], positions[i])
+          const timeMs = (distance / avgSpeedMs) * 1000
+          timestamps.push(timestamps[i - 1] + timeMs)
         }
-        return prev + 1
-      })
-    }, intervalMs)
-  }, [gpxData, replayDuration])
+      }
 
-  // Stop replay
-  const handleStopReplay = useCallback(() => {
-    if (replayIntervalRef.current) {
-      clearInterval(replayIntervalRef.current)
-      replayIntervalRef.current = null
+      basePositionsRef.current = positions
+      allPositionsRef.current = positions
+      timestampsRef.current = timestamps
+      currentIndexRef.current = 0
+      visiblePositionsRef.current = [positions[0]]
+
+      // Clean old entities
+      if (polylineEntityRef.current) viewer.entities.remove(polylineEntityRef.current)
+      if (cursorEntityRef.current) viewer.entities.remove(cursorEntityRef.current)
+      if (startEntityRef.current) viewer.entities.remove(startEntityRef.current)
+
+      // Create polyline
+      polylineEntityRef.current = viewer.entities.add({
+        polyline: {
+          positions: new CallbackProperty(() => {
+            return visiblePositionsRef.current
+          }, false),
+          width: 5,
+          material: Color.RED,
+          clampToGround: false,
+          arcType: ArcType.NONE,
+        },
+      })
+
+      // Create cursor
+      cursorPositionPropertyRef.current = new ConstantPositionProperty(positions[0])
+
+      cursorEntityRef.current = viewer.entities.add({
+        position: cursorPositionPropertyRef.current,
+        point: {
+          pixelSize: 12,
+          color: Color.YELLOW,
+          outlineColor: Color.BLACK,
+          outlineWidth: 2,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      })
+
+      // Create start marker
+      startEntityRef.current = viewer.entities.add({
+        position: positions[0],
+        point: {
+          pixelSize: 10,
+          color: Color.GREEN,
+          outlineColor: Color.WHITE,
+          outlineWidth: 2,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      })
+
+      // Fly to track
+      viewer.camera.flyTo({
+        destination: Rectangle.fromCartesianArray(positions),
+        duration: 2,
+      })
+    } catch (err) {
+      console.error('Error loading GPX data:', err)
     }
-    setIsReplaying(false)
-    setReplayIndex(0)
+  }, [gpxData, extractTimestamps])
+
+  const play = useCallback(() => {
+    if (intervalRef.current || allPositionsRef.current.length === 0) return
+
+    isPlayingRef.current = true
+    setIsPlaying(true)
+
+    realTimeStartRef.current = Date.now()
+    gpxStartTimeRef.current = timestampsRef.current[currentIndexRef.current]
+
+    intervalRef.current = setInterval(() => {
+      if (currentIndexRef.current >= allPositionsRef.current.length - 1) {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current)
+          intervalRef.current = null
+        }
+        isPlayingRef.current = false
+        setIsPlaying(false)
+        return
+      }
+
+      const speed = speedRef.current
+      const elapsedRealTime = Date.now() - realTimeStartRef.current
+      const elapsedGpxTime = elapsedRealTime * speed
+      const targetGpxTime = gpxStartTimeRef.current + elapsedGpxTime
+
+      let targetIndex = currentIndexRef.current
+      for (let i = currentIndexRef.current; i < timestampsRef.current.length; i++) {
+        if (timestampsRef.current[i] <= targetGpxTime) {
+          targetIndex = i
+        } else {
+          break
+        }
+      }
+
+      if (targetIndex > currentIndexRef.current) {
+        currentIndexRef.current = targetIndex
+        visiblePositionsRef.current = allPositionsRef.current.slice(0, currentIndexRef.current + 1)
+
+        if (cursorPositionPropertyRef.current) {
+          cursorPositionPropertyRef.current.setValue(
+            allPositionsRef.current[currentIndexRef.current]
+          )
+        }
+      }
+    }, 16)
   }, [])
 
-  // Zoom to track when positions load
-  useEffect(() => {
-    if (viewerRef.current && positions.length > 0 && !isReplaying) {
-      const viewer = viewerRef.current
-      setTimeout(() => {
-        viewer.zoomTo(viewer.entities)
-      }, 100)
+  const pause = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
     }
-  }, [positions, isReplaying])
+    isPlayingRef.current = false
+    setIsPlaying(false)
+  }, [])
 
-  // Follow camera during replay
-  useEffect(() => {
-    if (viewerRef.current && isReplaying && currentReplayCartesian) {
-      const viewer = viewerRef.current
-      viewer.camera.lookAt(
-        currentReplayCartesian,
-        new HeadingPitchRange(0, -0.5, 1000)
-      )
-    }
-  }, [isReplaying, currentReplayCartesian, replayIndex])
+  const reset = useCallback(() => {
+    pause()
+    currentIndexRef.current = 0
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (replayIntervalRef.current) {
-        clearInterval(replayIntervalRef.current)
+    if (allPositionsRef.current.length > 0) {
+      visiblePositionsRef.current = [allPositionsRef.current[0]]
+
+      if (cursorPositionPropertyRef.current) {
+        cursorPositionPropertyRef.current.setValue(allPositionsRef.current[0])
       }
     }
-  }, [])
+  }, [pause])
 
-  // Handle download GPX
-  const handleDownload = async () => {
-    try {
-      await downloadGPX(flightId, `${flightTitle || 'flight'}.gpx`)
-    } catch (error) {
-      console.error('Download failed:', error)
+  const handleSpeedChange = (value: number) => {
+    setReplaySpeed(value)
+    speedRef.current = value
+
+    if (isPlayingRef.current) {
+      pause()
+      setTimeout(() => play(), 50)
     }
   }
 
-  // Chart data for elevation profile
-  const chartData = elevationProfile.data.map((point, index) => ({
-    index,
-    elevation: Math.round(point.elevation),
-    distance: (index / elevationProfile.data.length) * elevationProfile.totalDistance,
-  }))
+  if (isLoading) {
+    return <div className="text-center py-8">Chargement du vol...</div>
+  }
 
-  // Check if GPX is not available (404 error)
-  const isGPXNotAvailable = gpxError && (gpxError as any)?.response?.status === 404
+  if (error) {
+    return (
+      <div className="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-8 text-center">
+        <p className="text-lg font-bold text-yellow-800 mb-2">📍 Pas de tracé GPS disponible</p>
+        <p className="text-sm text-yellow-700">
+          Les données GPS ne sont pas disponibles pour ce vol.
+        </p>
+      </div>
+    )
+  }
+
+  if (!gpxData?.coordinates) {
+    return <div className="text-center py-8">Aucune donnée GPS disponible</div>
+  }
 
   return (
-    <div className="relative">
-      {/* GPX Not Available Message */}
-      {isGPXNotAvailable ? (
-        <div className="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-8 text-center">
-          <p className="text-lg font-bold text-yellow-800 mb-2">📍 Pas de tracé GPS disponible</p>
-          <p className="text-sm text-yellow-700">
-            Les données GPS ne sont pas disponibles pour ce vol. La carte 3D ne peut pas être
-            affichée.
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="bg-white p-4 rounded-t-xl border-b border-gray-200">
-            <h2 className="text-lg font-bold text-gray-900 mb-3">
-              🪂 {flightTitle || 'Flight View'}
-            </h2>
-            <div className="flex flex-wrap gap-3">
-              {showReplay && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <label className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-600">Replay Speed (s):</span>
-                    <input
-                      type="number"
-                      min="10"
-                      max="120"
-                      value={replayDuration}
-                      onChange={(e) => setReplayDuration(Number(e.target.value))}
-                      disabled={isReplaying}
-                      className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-600 disabled:bg-gray-100"
-                    />
-                  </label>
-                  <button
-                    onClick={handlePlayReplay}
-                    disabled={gpxLoading || isReplaying || !gpxData?.coordinates}
-                    className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isReplaying ? '⏸ Playing...' : '▶ Play Replay'}
-                  </button>
-                  {isReplaying && (
-                    <button
-                      onClick={handleStopReplay}
-                      className="px-4 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 transition-all"
-                    >
-                      ⏹ Stop
-                    </button>
-                  )}
-                </div>
-              )}
-              <button
-                onClick={handleDownload}
-                disabled={gpxLoading}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all disabled:opacity-50"
-              >
-                📥 Download GPX
-              </button>
-            </div>
-          </div>
+    <div className="relative w-full" style={{ height: '600px' }}>
+      {/* Controls */}
+      <div className="absolute top-4 left-4 z-10 bg-white p-4 rounded-lg shadow-lg max-w-xs">
+        <h3 className="text-lg font-bold mb-4">🪂 {flightTitle}</h3>
 
-          {/* 3D Viewer with Resium */}
-          <div className="w-full h-[600px] bg-gray-900">
-            <Viewer
-              full
-              ref={(e) => {
-                if (e?.cesiumElement) {
-                  viewerRef.current = e.cesiumElement
-                }
-              }}
-              animation={false}
-              timeline={false}
-              fullscreenButton={false}
-              vrButton={false}
-              sceneModePicker={false}
-              navigationHelpButton={false}
-              homeButton={false}
-              infoBox={false}
-              selectionIndicator={false}
-              baseLayerPicker={false}
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <button
+              onClick={() => (isPlayingRef.current ? pause() : play())}
+              className="flex-1 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700"
             >
-              {/* Flight Track Polyline */}
-              {positions.length > 0 && (
-                <Entity id="flight-polyline">
-                  <PolylineGraphics
-                    positions={positions}
-                    width={3}
-                    material={Color.CYAN.withAlpha(0.8)}
-                    clampToGround={false}
-                  />
-                </Entity>
-              )}
-
-              {/* Start Marker */}
-              {positions.length > 0 && (
-                <Entity
-                  id="flight-start-marker"
-                  position={positions[0]}
-                  point={{
-                    pixelSize: 10,
-                    color: Color.GREEN,
-                    outlineColor: Color.WHITE,
-                    outlineWidth: 2,
-                  }}
-                  label={{
-                    text: 'START',
-                    font: '12px sans-serif',
-                    fillColor: Color.WHITE,
-                    outlineColor: Color.BLACK,
-                    outlineWidth: 2,
-                    pixelOffset: { x: 0, y: -20 } as any,
-                  }}
-                />
-              )}
-
-              {/* End Marker */}
-              {positions.length > 0 && (
-                <Entity
-                  id="flight-end-marker"
-                  position={positions[positions.length - 1]}
-                  point={{
-                    pixelSize: 10,
-                    color: Color.RED,
-                    outlineColor: Color.WHITE,
-                    outlineWidth: 2,
-                  }}
-                  label={{
-                    text: 'END',
-                    font: '12px sans-serif',
-                    fillColor: Color.WHITE,
-                    outlineColor: Color.BLACK,
-                    outlineWidth: 2,
-                    pixelOffset: { x: 0, y: -20 } as any,
-                  }}
-                />
-              )}
-
-              {/* Replay Animation Point */}
-              {isReplaying && currentReplayCartesian && (
-                <Entity
-                  id="flight-replay-point"
-                  position={currentReplayCartesian}
-                  point={{
-                    pixelSize: 8,
-                    color: Color.YELLOW,
-                    outlineColor: Color.WHITE,
-                    outlineWidth: 2,
-                  }}
-                  label={{
-                    text: '🪂',
-                    font: '20px sans-serif',
-                    pixelOffset: { x: 0, y: -20 } as any,
-                  }}
-                />
-              )}
-            </Viewer>
+              {isPlaying ? '⏸ Pause' : '▶ Play'}
+            </button>
+            <button
+              onClick={reset}
+              className="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              ⏮ Reset
+            </button>
           </div>
 
-          {/* Loading State */}
-          {gpxLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-              <div className="text-white text-center">
-                <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-                <p>Loading GPX data...</p>
-              </div>
-            </div>
-          )}
+          <div>
+            <label className="block text-sm font-medium mb-1">Vitesse: {replaySpeed}x</label>
+            <input
+              type="range"
+              min="1"
+              max="32"
+              value={replaySpeed}
+              onChange={(e) => handleSpeedChange(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+        </div>
+      </div>
 
-          {/* Error State */}
-          {gpxError && !isGPXNotAvailable && (
-            <div className="absolute inset-0 flex items-center justify-center bg-red-500/10 backdrop-blur-sm">
-              <p className="text-red-700 font-semibold">⚠️ Failed to load flight data</p>
-            </div>
-          )}
-
-          {/* Stats Panel */}
-          {!gpxLoading && gpxData && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-gray-50">
-              <div className="flex flex-col">
-                <span className="text-xs text-gray-600">Max Altitude:</span>
-                <span className="text-lg font-bold text-gray-900">
-                  {elevationProfile.maxAltitude.toLocaleString()} m
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs text-gray-600">Elevation Gain:</span>
-                <span className="text-lg font-bold text-gray-900">
-                  {elevationProfile.elevationGain.toLocaleString()} m
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs text-gray-600">Distance:</span>
-                <span className="text-lg font-bold text-gray-900">
-                  {elevationProfile.totalDistance.toFixed(1)} km
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs text-gray-600">Duration:</span>
-                <span className="text-lg font-bold text-gray-900">
-                  {Math.floor(elevationProfile.duration / 3600)}h{' '}
-                  {Math.floor((elevationProfile.duration % 3600) / 60)}m
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Elevation Profile Chart */}
-          {showElevationChart && chartData.length > 0 && (
-            <div className="p-4 bg-white rounded-b-xl">
-              <h3 className="text-md font-semibold text-gray-900 mb-3">Elevation Profile</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="distance"
-                    label={{ value: 'Distance (km)', position: 'insideBottomRight', offset: -5 }}
-                  />
-                  <YAxis
-                    label={{
-                      value: 'Elevation (m)',
-                      angle: -90,
-                      position: 'insideLeft',
-                    }}
-                  />
-                  <Tooltip
-                    formatter={(value) => `${value} m`}
-                    labelFormatter={(label) => `${(label as number).toFixed(1)} km`}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="elevation"
-                    stroke="#8884d8"
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </>
-      )}
+      {/* Cesium Viewer */}
+      <Viewer
+        ref={viewerRef}
+        full
+        terrain={Terrain.fromWorldTerrain()}
+        animation={false}
+        timeline={false}
+        baseLayerPicker={false}
+        fullscreenButton={false}
+        navigationHelpButton={false}
+        sceneModePicker={false}
+        infoBox={false}
+        selectionIndicator={false}
+      />
     </div>
   )
 }
-
-export default FlightViewer3D
