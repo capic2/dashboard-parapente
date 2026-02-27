@@ -15,12 +15,12 @@ export const SiteSchema = z.object({
   latitude: z.number(),
   longitude: z.number(),
   elevation_m: z.number(),
-  description: z.string().optional(),
-  orientation: z.string().optional(),
-  difficulty_level: z.string().optional(),
-  is_active: z.boolean().default(true).optional(),
-  created_at: z.string(),
-  updated_at: z.string(),
+  description: z.string().catch(''),
+  orientation: z.string().catch(''),
+  difficulty_level: z.string().catch(''),
+  is_active: z.boolean().catch(true),
+  created_at: z.string().catch(''),
+  updated_at: z.string().catch(''),
 })
 
 export const FlightSchema = z.object({
@@ -42,19 +42,19 @@ export const FlightSchema = z.object({
 })
 
 export const FlightStatsSchema = z.object({
-  total_flights: z.number().default(0).optional(),
-  total_hours: z.number().default(0).optional(),
-  total_duration_minutes: z.number().default(0).optional(),
-  total_distance: z.number().default(0).optional(),
-  total_distance_km: z.number().default(0).optional(),
-  total_elevation_gain_m: z.number().default(0).optional(),
-  avg_duration: z.number().default(0).optional(),
-  avg_duration_minutes: z.number().default(0).optional(),
-  avg_distance_km: z.number().default(0).optional(),
-  max_altitude_m: z.number().default(0).optional(),
-  favorite_spot: z.string().optional(),
+  total_flights: z.number().catch(0),
+  total_hours: z.number().catch(0),
+  total_duration_minutes: z.number().catch(0),
+  total_distance: z.number().catch(0),
+  total_distance_km: z.number().catch(0),
+  total_elevation_gain_m: z.number().catch(0),
+  avg_duration: z.number().catch(0),
+  avg_duration_minutes: z.number().catch(0),
+  avg_distance_km: z.number().catch(0),
+  max_altitude_m: z.number().catch(0),
+  favorite_spot: z.string().nullable().default(''),
   favorite_site: SiteSchema.optional(),
-  last_flight_date: z.string().optional(),
+  last_flight_date: z.string().nullable().default(''),
 })
 
 export const AlertSchema = z.object({
@@ -66,10 +66,10 @@ export const AlertSchema = z.object({
   operator: z.enum(['>', '<', '=', 'between']),
   threshold_min: z.number(),
   threshold_max: z.number(),
-  is_active: z.boolean().default(true).optional(),
+  is_active: z.boolean().catch(true),
   notify_via: z.enum(['telegram', 'email', 'both']),
-  created_at: z.string(),
-  updated_at: z.string(),
+  created_at: z.string().catch(''),
+  updated_at: z.string().catch(''),
 })
 
 export const AlertHistorySchema = z.object({
@@ -125,9 +125,9 @@ export const WeatherSourceSchema = z.object({
   id: z.string(),
   name: z.string(),
   provider_type: z.enum(['meteo_france', 'open_meteo', 'windy', 'custom']),
-  is_active: z.boolean().default(true).optional(),
+  is_active: z.boolean().catch(true),
   api_config: z.record(z.string(), z.any()).optional(),
-  created_at: z.string(),
+  created_at: z.string().catch(''),
 })
 
 // ============================================================================
@@ -195,7 +195,7 @@ export const SlotSchema = z.object({
   start_hour: z.number(),
   end_hour: z.number(),
   verdict: z.string(),
-  reason: z.string().default('').optional(),
+  reason: z.string().catch(''),
 })
 
 export const MetricsSchema = z.object({
@@ -206,15 +206,17 @@ export const MetricsSchema = z.object({
 })
 
 export const BackendWeatherResponseSchema = z.object({
-  site_name: z.string().optional(),
-  para_index: z.number().optional(),
-  verdict: z.string().optional(),
-  explanation: z.string().optional(),
-  slots_summary: z.string().optional(),
+  site_id: z.string().catch(''),
+  site_name: z.string().catch(''),
+  day_index: z.number().catch(0),
+  para_index: z.number().catch(0),
+  verdict: z.string().catch(''),
+  explanation: z.string().catch(''),
+  slots_summary: z.string().catch(''),
   consensus: z.array(ConsensusHourSchema).optional(),
   slots: z.array(SlotSchema).optional(),
   metrics: MetricsSchema.optional(),
-})
+}).passthrough()
 
 // ============================================================================
 // API WRAPPER SCHEMA

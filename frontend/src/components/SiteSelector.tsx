@@ -36,9 +36,8 @@ export default function SiteSelector({ selectedSiteId, onSelectSite }: SiteSelec
     <div className="mb-4">
       <div className="flex gap-2 flex-wrap bg-white rounded-xl p-3 shadow-md">
         {sites.map((site: any) => {
-          // Use 'code' field for API calls (e.g., 'mont-poupet'), not 'id' (e.g., 'site-mont-poupet')
-          const siteCode = site.code || site.id;
-          const isActive = selectedSiteId === siteCode;
+          // Use 'id' field for API calls (e.g., 'site-mont-poupet')
+          const isActive = selectedSiteId === site.id;
           
           return (
             <button
@@ -54,7 +53,7 @@ export default function SiteSelector({ selectedSiteId, onSelectSite }: SiteSelec
                   : 'border-gray-200 bg-white hover:border-purple-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-purple-100'
                 }
               `}
-              onClick={() => onSelectSite(siteCode)}
+              onClick={() => onSelectSite(site.id)}
             >
               <span className={`text-sm sm:text-xs font-semibold ${isActive ? '' : 'text-gray-900'}`}>
                 {site.name}
