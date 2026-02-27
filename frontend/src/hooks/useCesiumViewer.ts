@@ -39,16 +39,16 @@ export const useCesiumViewer = () => {
       // Cesium.Ion.defaultAccessToken = process.env.VITE_CESIUM_ION_TOKEN || ''
 
       const viewer = new Cesium.Viewer('cesium-container', {
-        terrain: Cesium.Terrain.fromWorldTerrain(),
-        animation: true,
+        animation: false,
         timeline: false,
-        fullscreenButton: true,
+        fullscreenButton: false,
         vrButton: false,
-        sceneModePicker: true,
+        sceneModePicker: false,
         navigationHelpButton: false,
-        homeButton: true,
+        homeButton: false,
         infoBox: false,
         selectionIndicator: false,
+        baseLayerPicker: false,
       })
 
       viewerRef.current = viewer
