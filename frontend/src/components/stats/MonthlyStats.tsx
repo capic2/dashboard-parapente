@@ -3,7 +3,6 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { useFlights } from '../../hooks/useFlights';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import './Charts.css';
 
 export default function MonthlyStats() {
   const { data: flights = [], isLoading, error } = useFlights({ limit: 300 });
@@ -44,9 +43,9 @@ export default function MonthlyStats() {
 
   if (isLoading) {
     return (
-      <div className="chart-container">
-        <div className="chart-skeleton">
-          <div className="skeleton-title"></div>
+      <div className="bg-white rounded-xl p-4 shadow-md">
+        <div className="animate-pulse">
+          <div className="h-6 bg-gray-200 rounded mb-4 w-1/3"></div>
           <div className="skeleton-chart"></div>
         </div>
       </div>
@@ -63,7 +62,7 @@ export default function MonthlyStats() {
   }
 
   return (
-    <div className="chart-container">
+    <div className="bg-white rounded-xl p-4 shadow-md">
       <h3>📅 Statistiques Mensuelles</h3>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>

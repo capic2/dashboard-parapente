@@ -1,6 +1,4 @@
-
 import { useWeather } from '../hooks/useWeather';
-import './Forecast7Day.css';
 
 interface Forecast7DayProps {
   spotId: string;
@@ -8,10 +6,10 @@ interface Forecast7DayProps {
 
 const getVerdictClass = (verdict: string): string => {
   const v = verdict.toLowerCase();
-  if (v === 'bon') return 'verdict-bon';
-  if (v === 'moyen') return 'verdict-moyen';
-  if (v === 'limite') return 'verdict-limite';
-  return 'verdict-mauvais';
+  if (v === 'bon') return 'bg-green-100 text-green-800';
+  if (v === 'moyen') return 'bg-yellow-100 text-yellow-800';
+  if (v === 'limite') return 'bg-orange-100 text-orange-800';
+  return 'bg-red-100 text-red-900';
 };
 
 const getVerdictEmoji = (verdict: string): string => {
@@ -39,43 +37,50 @@ export default function Forecast7Day({ spotId }: Forecast7DayProps) {
 
   if (isLoading) {
     return (
-      <div className="card forecast-7day">
-        <h2>Prévisions 7 Jours</h2>
-        <div className="loading-state">Chargement...</div>
+      <div className="bg-white rounded-xl p-4 shadow-md">
+        <h2 className="text-sm text-gray-600 mb-3 font-semibold">Prévisions 7 Jours</h2>
+        <div className="py-5 text-center text-gray-500 text-sm">Chargement...</div>
       </div>
     );
   }
 
   if (error || !weather || !weather.daily_forecast) {
     return (
-      <div className="card forecast-7day">
-        <h2>Prévisions 7 Jours</h2>
-        <div className="error-state">Données non disponibles</div>
+      <div className="bg-white rounded-xl p-4 shadow-md">
+        <h2 className="text-sm text-gray-600 mb-3 font-semibold">Prévisions 7 Jours</h2>
+        <div className="py-5 text-center text-red-500 text-sm">Données non disponibles</div>
       </div>
     );
   }
 
   return (
-    <div className="card forecast-7day">
-      <h2>Prévisions 7 Jours</h2>
+    <div className="bg-white rounded-xl p-4 shadow-md">
+      <h2 className="text-sm text-gray-600 mb-3 font-semibold">Prévisions 7 Jours</h2>
       
-      <div className="forecast-grid">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
         {weather.daily_forecast.map((day, index) => (
-          <div key={index} className="forecast-day">
-            <div className="day-name">{formatDate(day.date)}</div>
-            <div className="day-para-index">
-              <span className="para-score">{day.para_index}</span>
-              <span className={`para-verdict ${getVerdictClass(day.verdict)}`}>
+          <div 
+            key={index} 
+            className="bg-gray-50 rounded-lg p-3 border-2 border-gray-200 transition-all hover:border-purple-600 hover:-translate-y-1 hover:shadow-md"
+          >
+            <div className="text-xs font-semibold text-gray-700 mb-2 text-center">
+              {formatDate(day.date)}
+            </div>
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <span className="text-2xl font-bold text-purple-600">{day.para_index}</span>
+              <span className={`text-xl ${getVerdictClass(day.verdict)} px-1.5 py-0.5 rounded-full`}>
                 {getVerdictEmoji(day.verdict)}
               </span>
             </div>
-            <div className="day-temp">
+            <div className="text-sm text-gray-700 font-medium text-center mb-1">
               {day.temp_min}° - {day.temp_max}°
             </div>
-            <div className="day-wind">
+            <div className="text-xs text-gray-600 text-center mb-1">
               💨 {day.wind_avg} km/h
             </div>
-            <div className="day-conditions">{day.conditions}</div>
+            <div className="text-xs text-gray-500 text-center truncate">
+              {day.conditions}
+            </div>
           </div>
         ))}
       </div>
