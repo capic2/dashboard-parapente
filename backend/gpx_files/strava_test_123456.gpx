@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Test" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>Test Flight Arguel</name>
+    <trkseg>
+      <trkpt lat="47.22356" lon="6.01842">
+        <ele>427</ele>
+        <time>2026-02-27T16:08:00+01:00</time>
+      </trkpt>
+      <trkpt lat="47.22400" lon="6.01900">
+        <ele>450</ele>
+        <time>2026-02-27T16:10:00+01:00</time>
+      </trkpt>
+      <trkpt lat="47.22450" lon="6.01950">
+        <ele>520</ele>
+        <time>2026-02-27T16:15:00+01:00</time>
+      </trkpt>
+      <trkpt lat="47.22500" lon="6.02000">
+        <ele>600</ele>
+        <time>2026-02-27T16:20:00+01:00</time>
+      </trkpt>
+      <trkpt lat="47.22480" lon="6.01980">
+        <ele>580</ele>
+        <time>2026-02-27T16:25:00+01:00</time>
+      </trkpt>
+      <trkpt lat="47.22400" lon="6.01900">
+        <ele>450</ele>
+        <time>2026-02-27T16:30:00+01:00</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>

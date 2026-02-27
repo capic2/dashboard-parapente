@@ -13,7 +13,6 @@ export default function Dashboard() {
   // Auto-select first site when loaded
   React.useEffect(() => {
     if (sites && sites.length > 0 && !selectedSiteId) {
-      console.log('✅ Auto-selecting first site:', sites[0]);
       // Use 'id' field for API calls (e.g., 'site-arguel')
       setSelectedSiteId(sites[0].id);
     }

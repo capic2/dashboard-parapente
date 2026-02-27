@@ -121,12 +121,10 @@ export const useFlightsTable = (filters: FlightFilters = {}) => {
 
   const handleViewFlight = (flightId: string): void => {
     // Navigate to flight detail
-    console.log('View flight:', flightId)
   }
 
   const handleEditFlight = (flightId: string): void => {
     // Open edit modal
-    console.log('Edit flight:', flightId)
   }
 
   return {

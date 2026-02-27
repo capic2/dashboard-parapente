@@ -86,23 +86,18 @@ def seed_flights():
         # Get existing sites
         sites = db.query(Site).all()
         if not sites:
-            print("❌ No sites found. Run init_db.py first to create sites.")
             return
         
-        print(f"✅ Found {len(sites)} sites")
         
         # Check if flights already exist
         existing_flights = db.query(Flight).count()
         if existing_flights > 0:
-            print(f"⚠️  Database already has {existing_flights} flights.")
             response = input("Delete and recreate? (y/N): ")
             if response.lower() != 'y':
-                print("Skipping flight creation.")
                 return
             # Delete existing flights
             db.query(Flight).delete()
             db.commit()
-            print("Deleted existing flights.")
         
         # Create sample flights
         flights_to_create = [
@@ -187,19 +182,14 @@ def seed_flights():
             
             db.add(flight)
             created_count += 1
-            print(f"✅ Created flight: {flight.title} ({flight.flight_date})")
         
         db.commit()
-        print(f"\n🎉 Successfully created {created_count} sample flights with GPX files!")
-        print(f"📁 GPX files stored in: {Path(__file__).parent / 'gpx_files'}")
         
     except Exception as e:
-        print(f"❌ Error: {e}")
         db.rollback()
     finally:
         db.close()
 
 
 if __name__ == "__main__":
-    print("🌱 Seeding database with sample flights...\n")
     seed_flights()

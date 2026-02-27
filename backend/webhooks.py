@@ -4,6 +4,8 @@ Strava Webhook Handler
 - Download GPX from Strava
 - Parse and store flight data
 - Send Telegram notifications
+
+✨ AMÉLIORATION: Utilise les données de l'API Strava directement (pas le GPX parsing)
 """
 
 from fastapi import APIRouter, Request, HTTPException, Depends
@@ -14,6 +16,8 @@ import uuid
 from datetime import datetime, date
 import logging
 import os
+from pathlib import Path
+from typing import Optional
 
 from database import get_db, SessionLocal
 from models import Flight, Site
@@ -123,86 +127,163 @@ async def strava_webhook_handler(
 
 async def process_strava_activity(activity_id: str):
     """
-    Process a Strava activity in the background
+    Process a Strava activity using API data directly
+    
+    ✨ NEW APPROACH:
+    - Use Strava API for: distance, elevation, time, location
+    - GPX only for: 3D map visualization + departure coordinates
     
     Steps:
-    1. Get activity details from Strava API
-    2. Download GPX
-    3. Parse GPX
-    4. Store in database
-    5. Send Telegram notification
+    1. Get activity details from Strava API (has ALL metadata!)
+    2. Extract location from activity.name or location_city
+    3. Parse start_date_local for datetime
+    4. Format name: "Lieu JJ-MM HHhMM"
+    5. Download GPX only for map + coordinates
+    6. Match site_id from coordinates or name
+    7. Store in database with API data
+    8. Send Telegram notification
     """
     db = SessionLocal()
     
     try:
-        logger.info(f"Processing Strava activity {activity_id}...")
+        logger.info(f"🪂 Processing Strava activity {activity_id}...")
         
-        # Step 1: Get activity details
+        # Step 1: Get activity details from API
         activity = await get_activity_details(activity_id)
         
         if not activity:
-            logger.error(f"Failed to get activity details for {activity_id}")
+            logger.error(f"❌ Failed to get activity details for {activity_id}")
             return
         
         # Check if it's a paragliding activity
         activity_type = activity.get("type", "")
-        if activity_type not in ["Flight", "Workout", "Ride"]:  # Strava sometimes uses these
-            logger.info(f"Activity {activity_id} is not a flight (type={activity_type}), ignoring")
+        if activity_type not in ["Flight", "Workout", "Ride"]:
+            logger.info(f"⚠️ Activity {activity_id} is not a flight (type={activity_type}), ignoring")
             return
         
         # Check if activity already exists
         existing = db.query(Flight).filter(Flight.strava_id == activity_id).first()
         
         if existing:
-            logger.info(f"Activity {activity_id} already exists, updating...")
+            logger.info(f"📝 Activity {activity_id} already exists, updating...")
         
-        # Step 2: Download GPX
-        gpx_content = await download_gpx(activity_id)
+        # Step 2: Extract data from API (NOT from GPX!)
         
-        if not gpx_content:
-            logger.error(f"Failed to download GPX for activity {activity_id}")
-            return
+        # Activity name (e.g. "Vol Arguel" or "Afternoon Workout")
+        activity_name = activity.get("name", "")
         
-        # Step 3: Parse GPX
-        gpx_data = parse_gpx(gpx_content)
+        # Location
+        location_city = activity.get("location_city", "")
+        location_country = activity.get("location_country", "")
         
-        if not gpx_data.get("success"):
-            logger.error(f"Failed to parse GPX for activity {activity_id}: {gpx_data.get('error')}")
-            return
+        # Extract location from name
+        location = extract_location_from_name(activity_name, location_city)
         
-        # Extract data
-        max_altitude = gpx_data.get("max_altitude_m")
-        elevation_gain = gpx_data.get("elevation_gain_m")
-        
-        # Get activity metadata
-        title = activity.get("name", f"Vol du {datetime.now().strftime('%Y-%m-%d')}")
-        start_date = activity.get("start_date_local", "")
-        
-        if start_date:
-            flight_date = datetime.fromisoformat(start_date.replace("Z", "")).date()
+        # Date/time from API
+        start_date_local = activity.get("start_date_local", "")
+        if start_date_local:
+            # Parse ISO format: "2025-09-27T17:08:00Z"
+            dt = datetime.fromisoformat(start_date_local.replace("Z", ""))
+            flight_date = dt.date()
+            departure_time = dt
         else:
-            flight_date = date.today()
+            dt = datetime.now()
+            flight_date = dt.date()
+            departure_time = None
         
-        duration_seconds = activity.get("elapsed_time", 0)
-        duration_minutes = duration_seconds // 60 if duration_seconds else None
-        
+        # Metrics from API
         distance_meters = activity.get("distance", 0)
         distance_km = round(distance_meters / 1000, 2) if distance_meters else None
         
-        # Step 4: Store in database
+        elapsed_time_seconds = activity.get("elapsed_time", 0)
+        duration_minutes = elapsed_time_seconds // 60 if elapsed_time_seconds else None
+        
+        # Elevation from API
+        elevation_gain_m = activity.get("total_elevation_gain")
+        if elevation_gain_m is not None:
+            elevation_gain_m = int(elevation_gain_m)
+        
+        # Max altitude from API
+        max_altitude_m = activity.get("elev_high")
+        if max_altitude_m is not None:
+            max_altitude_m = int(max_altitude_m)
+        
+        # Step 3: Download GPX for 3D map + coordinates
+        gpx_file_path = None
+        site_id = None
+        departure_lat = None
+        departure_lon = None
+        
+        gpx_content = await download_gpx(activity_id)
+        
+        if gpx_content:
+            # Save GPX to file for 3D visualization
+            gpx_dir = Path("db/gpx")
+            gpx_dir.mkdir(parents=True, exist_ok=True)
+            gpx_file_path = f"db/gpx/strava_{activity_id}.gpx"
+            
+            with open(gpx_file_path, "w") as f:
+                f.write(gpx_content)
+            
+            logger.info(f"✅ Saved GPX to {gpx_file_path}")
+            
+            # Parse GPX ONLY for departure coordinates (and max_altitude if missing)
+            gpx_data = parse_gpx(gpx_content)
+            if gpx_data.get("success"):
+                first_trackpoint = gpx_data.get("first_trackpoint", {})
+                departure_lat = first_trackpoint.get("lat")
+                departure_lon = first_trackpoint.get("lon")
+                
+                # Use GPX altitude if API didn't provide it
+                if max_altitude_m is None:
+                    max_altitude_m = gpx_data.get("max_altitude_m")
+                    logger.info(f"Using max_altitude from GPX: {max_altitude_m}m")
+                
+                # Use GPX elevation gain if API didn't provide it
+                if elevation_gain_m is None:
+                    elevation_gain_m = gpx_data.get("elevation_gain_m")
+                    logger.info(f"Using elevation_gain from GPX: {elevation_gain_m}m")
+        else:
+            logger.warning(f"⚠️ Could not download GPX for activity {activity_id}")
+        
+        # Step 4: Try to match site_id
+        if departure_lat and departure_lon:
+            # Match by coordinates
+            site_id = match_site_by_coordinates(db, departure_lat, departure_lon)
+            if site_id:
+                matched_site = db.query(Site).filter(Site.id == site_id).first()
+                if matched_site:
+                    location = matched_site.name
+        else:
+            # Match by name
+            site_id = match_site_by_name(db, location, location_city)
+            if site_id:
+                matched_site = db.query(Site).filter(Site.id == site_id).first()
+                if matched_site:
+                    location = matched_site.name
+        
+        # Step 5: Format flight name
+        # Format: "Lieu JJ-MM HHhMM" (ex: "Arguel 27-09 17h08")
+        flight_name = format_flight_name(location, dt)
+        
+        # Step 6: Store in database
         if existing:
             # Update existing flight
-            existing.title = title
+            existing.name = flight_name
+            existing.title = activity_name
+            existing.site_id = site_id
             existing.flight_date = flight_date
+            existing.departure_time = departure_time
             existing.duration_minutes = duration_minutes
-            existing.max_altitude_m = max_altitude
+            existing.max_altitude_m = max_altitude_m
             existing.distance_km = distance_km
-            existing.elevation_gain_m = elevation_gain
-            existing.gpx_max_altitude_m = max_altitude
-            existing.gpx_elevation_gain_m = elevation_gain
+            existing.elevation_gain_m = elevation_gain_m
+            existing.gpx_file_path = gpx_file_path
+            existing.gpx_max_altitude_m = max_altitude_m
+            existing.gpx_elevation_gain_m = elevation_gain_m
             existing.updated_at = datetime.now()
             
-            logger.info(f"✅ Updated flight {existing.id} from Strava activity {activity_id}")
+            logger.info(f"✅ Updated flight {existing.id}: {flight_name}")
             
             flight = existing
         else:
@@ -210,33 +291,181 @@ async def process_strava_activity(activity_id: str):
             flight = Flight(
                 id=str(uuid.uuid4()),
                 strava_id=activity_id,
-                title=title,
+                name=flight_name,
+                title=activity_name,
+                site_id=site_id,
                 flight_date=flight_date,
+                departure_time=departure_time,
                 duration_minutes=duration_minutes,
-                max_altitude_m=max_altitude,
+                max_altitude_m=max_altitude_m,
                 distance_km=distance_km,
-                elevation_gain_m=elevation_gain,
-                gpx_max_altitude_m=max_altitude,
-                gpx_elevation_gain_m=elevation_gain,
+                elevation_gain_m=elevation_gain_m,
+                gpx_file_path=gpx_file_path,
+                gpx_max_altitude_m=max_altitude_m,
+                gpx_elevation_gain_m=elevation_gain_m,
                 external_url=f"https://www.strava.com/activities/{activity_id}",
                 created_at=datetime.now()
             )
             
             db.add(flight)
             
-            logger.info(f"✅ Created flight {flight.id} from Strava activity {activity_id}")
+            logger.info(f"✅ Created flight {flight.id}: {flight_name}")
         
         db.commit()
         db.refresh(flight)
         
-        # Step 5: Send Telegram notification
+        # Step 7: Send Telegram notification
         await send_telegram_notification(flight, is_new=not existing)
         
     except Exception as e:
-        logger.error(f"Error processing Strava activity {activity_id}: {e}", exc_info=True)
+        logger.error(f"❌ Error processing Strava activity {activity_id}: {e}", exc_info=True)
         db.rollback()
     finally:
         db.close()
+
+
+def extract_location_from_name(activity_name: str, location_city: str) -> str:
+    """
+    Extract location from activity name
+    
+    Examples:
+    - "Vol Arguel" → "Arguel"
+    - "Afternoon Workout" → location_city
+    - "Morning Flight" → location_city
+    
+    Args:
+        activity_name: Strava activity name
+        location_city: City from Strava API
+    
+    Returns:
+        Extracted location name
+    """
+    if not activity_name:
+        return location_city or "Inconnu"
+    
+    # Remove common prefixes
+    name = activity_name.strip()
+    
+    prefixes = ["Vol ", "Flight ", "Morning ", "Afternoon ", "Evening ", "Workout "]
+    for prefix in prefixes:
+        if name.startswith(prefix):
+            name = name[len(prefix):].strip()
+            break
+    
+    # List of generic words that should not be used as location
+    generic_words = ["Workout", "Flight", "Run", "Ride", "Activity", "Exercise"]
+    
+    # If name is meaningful and not generic, use it; otherwise fall back to city
+    if name and len(name) > 2 and name not in generic_words:
+        return name
+    
+    return location_city or "Inconnu"
+
+
+def match_site_by_name(db: Session, location: str, location_city: str) -> Optional[str]:
+    """
+    Try to match a site based on location name
+    
+    Args:
+        db: Database session
+        location: Extracted location name
+        location_city: City from Strava API
+    
+    Returns:
+        Site ID if found, None otherwise
+    """
+    if not location and not location_city:
+        return None
+    
+    # Try exact match on site name
+    site = db.query(Site).filter(
+        Site.name.ilike(f"%{location}%")
+    ).first()
+    
+    if site:
+        logger.info(f"✅ Matched site by name: {site.name} (ID: {site.id})")
+        return site.id
+    
+    # Try match on city
+    if location_city:
+        site = db.query(Site).filter(
+            Site.name.ilike(f"%{location_city}%")
+        ).first()
+        
+        if site:
+            logger.info(f"✅ Matched site by city: {site.name} (ID: {site.id})")
+            return site.id
+    
+    logger.info(f"No site matched for location: {location}")
+    return None
+
+
+def match_site_by_coordinates(db: Session, lat: float, lon: float, threshold_km: float = 5.0) -> Optional[str]:
+    """
+    Match site by proximity to coordinates
+    
+    Args:
+        db: Database session
+        lat: Latitude
+        lon: Longitude
+        threshold_km: Max distance in km to consider a match
+    
+    Returns:
+        Site ID if found within threshold, None otherwise
+    """
+    from math import radians, cos, sin, asin, sqrt
+    
+    def haversine(lat1, lon1, lat2, lon2):
+        """Calculate distance between two points on Earth (in km)"""
+        lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+        c = 2 * asin(sqrt(a))
+        km = 6371 * c
+        return km
+    
+    sites = db.query(Site).filter(
+        Site.latitude.isnot(None),
+        Site.longitude.isnot(None)
+    ).all()
+    
+    closest_site = None
+    min_distance = float('inf')
+    
+    for site in sites:
+        distance = haversine(lat, lon, site.latitude, site.longitude)
+        if distance < min_distance:
+            min_distance = distance
+            closest_site = site
+    
+    if closest_site and min_distance <= threshold_km:
+        logger.info(f"✅ Matched site by coordinates: {closest_site.name} ({min_distance:.2f}km away)")
+        return closest_site.id
+    
+    logger.info(f"No site found within {threshold_km}km of ({lat}, {lon})")
+    return None
+
+
+def format_flight_name(location: str, dt: datetime) -> str:
+    """
+    Format flight name: "Lieu JJ-MM HHhMM"
+    
+    Examples:
+    - "Arguel 27-09 17h08"
+    - "La Côte 15-02 14h32"
+    
+    Args:
+        location: Location name
+        dt: Departure datetime
+    
+    Returns:
+        Formatted flight name
+    """
+    day = dt.strftime("%d-%m")
+    time = dt.strftime("%Hh%M")
+    
+    return f"{location} {day} {time}"
 
 
 async def send_telegram_notification(flight: Flight, is_new: bool = True):
@@ -258,7 +487,7 @@ async def send_telegram_notification(flight: Flight, is_new: bool = True):
         action = "🆕 NOUVEAU VOL" if is_new else "📝 VOL MIS À JOUR"
         
         message = f"{action}\n\n"
-        message += f"🪂 *{flight.title}*\n"
+        message += f"🪂 *{flight.name}*\n"  # Use formatted name!
         message += f"📅 {flight.flight_date.strftime('%d/%m/%Y')}\n"
         
         if flight.duration_minutes:

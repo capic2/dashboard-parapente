@@ -202,7 +202,6 @@ def generate_gpx_track(flight, site, gpx_path):
     with open(gpx_path, 'w') as f:
         f.write(gpx_content)
     
-    print(f"✓ Generated GPX: {gpx_path}")
     return gpx_path
 
 
@@ -216,7 +215,6 @@ def insert_sites(conn):
         existing = cursor.fetchone()
         
         if existing:
-            print(f"⚠ Site '{site_code}' already exists, skipping...")
             # Update SITES dict with existing ID
             SITES[site_code]['id'] = existing[0]
             continue
@@ -238,7 +236,6 @@ def insert_sites(conn):
             datetime.now().isoformat(),
             datetime.now().isoformat()
         ))
-        print(f"✓ Inserted site: {site_data['name']}")
     
     conn.commit()
 
@@ -292,7 +289,6 @@ def insert_flights(conn):
             datetime.now().isoformat()
         ))
         
-        print(f"✓ Inserted flight: {flight_data['title']} ({flight_data['date']})")
         inserted_count += 1
     
     conn.commit()
@@ -301,39 +297,26 @@ def insert_flights(conn):
 
 def main():
     """Main import process."""
-    print("=" * 60)
-    print("Paragliding Flight Log Import")
-    print("=" * 60)
     
     # Connect to database
     conn = sqlite3.connect(DB_PATH)
     
     try:
         # Step 1: Insert sites
-        print("\n[1/3] Inserting sites...")
         insert_sites(conn)
         
         # Step 2: Insert flights with GPX generation
-        print("\n[2/3] Importing flights and generating GPX tracks...")
         count = insert_flights(conn)
         
         # Step 3: Verify
-        print("\n[3/3] Verifying database...")
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM sites")
         sites_count = cursor.fetchone()[0]
         cursor.execute("SELECT COUNT(*) FROM flights")
         flights_count = cursor.fetchone()[0]
         
-        print(f"\n{'=' * 60}")
-        print(f"✅ Import complete!")
-        print(f"   • Sites: {sites_count}")
-        print(f"   • Flights: {flights_count}")
-        print(f"   • GPX files: {count} generated in {GPX_DIR}")
-        print(f"{'=' * 60}\n")
         
     except Exception as e:
-        print(f"\n❌ Error: {e}")
         conn.rollback()
         raise
     finally:
