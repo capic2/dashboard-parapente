@@ -29,7 +29,7 @@ def get_spots(db: Session = Depends(get_db)):
 @router.get("/spots/{spot_id}", response_model=SiteSchema)
 def get_spot(spot_id: str, db: Session = Depends(get_db)):
     """Get a specific spot"""
-    site = db.query(Site).filter(Site.code == spot_id).first()
+    site = db.query(Site).filter(Site.id == spot_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Spot not found")
     return site
@@ -42,10 +42,10 @@ async def get_weather(spot_id: str, day_index: int = 0, db: Session = Depends(ge
     Now returns normalized data + para_index
     
     Args:
-        spot_id: Site code (e.g., 'arguel')
+        spot_id: Site ID (e.g., 'site-arguel')
         day_index: 0=today, 1=tomorrow (default: 0)
     """
-    site = db.query(Site).filter(Site.code == spot_id).first()
+    site = db.query(Site).filter(Site.id == spot_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Spot not found")
     
