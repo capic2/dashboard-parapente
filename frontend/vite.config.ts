@@ -30,5 +30,9 @@ export default defineConfig({
         }
       }
     }
+  },
+  optimizeDeps: {
+    include: ['cesium'],
+    exclude: ['cesium/Build/Cesium/Widgets/widgets.css']
   }
 });
