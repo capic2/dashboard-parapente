@@ -1,6 +1,4 @@
-
 import { useWeather } from '../hooks/useWeather';
-import './HourlyForecast.css';
 
 interface HourlyForecastProps {
   spotId: string;
@@ -8,10 +6,10 @@ interface HourlyForecastProps {
 
 const getVerdictClass = (verdict: string): string => {
   const v = verdict.toLowerCase();
-  if (v === 'bon') return 'hour-good';
-  if (v === 'moyen') return 'hour-ok';
-  if (v === 'limite') return 'hour-ok';
-  return 'hour-bad';
+  if (v === 'bon') return 'bg-green-50 hover:bg-green-100';
+  if (v === 'moyen') return 'bg-yellow-50 hover:bg-yellow-100';
+  if (v === 'limite') return 'bg-orange-50 hover:bg-orange-100';
+  return 'bg-red-50 hover:bg-red-100';
 };
 
 export default function HourlyForecast({ spotId }: HourlyForecastProps) {
@@ -19,18 +17,18 @@ export default function HourlyForecast({ spotId }: HourlyForecastProps) {
 
   if (isLoading) {
     return (
-      <div className="card hourly-forecast">
-        <h2>Prévisions Horaires (11h-18h)</h2>
-        <div className="loading-state">Chargement...</div>
+      <div className="bg-white rounded-xl p-4 shadow-md">
+        <h2 className="text-sm text-gray-600 mb-3 font-semibold">Prévisions Horaires (11h-18h)</h2>
+        <div className="py-5 text-center text-gray-500 text-sm">Chargement...</div>
       </div>
     );
   }
 
   if (error || !weather || !weather.hourly_forecast) {
     return (
-      <div className="card hourly-forecast">
-        <h2>Prévisions Horaires (11h-18h)</h2>
-        <div className="error-state">Données non disponibles</div>
+      <div className="bg-white rounded-xl p-4 shadow-md">
+        <h2 className="text-sm text-gray-600 mb-3 font-semibold">Prévisions Horaires (11h-18h)</h2>
+        <div className="py-5 text-center text-red-500 text-sm">Données non disponibles</div>
       </div>
     );
   }
@@ -42,38 +40,38 @@ export default function HourlyForecast({ spotId }: HourlyForecastProps) {
   });
 
   return (
-    <div className="card hourly-forecast">
-      <h2>Prévisions Horaires (11h-18h)</h2>
+    <div className="bg-white rounded-xl p-4 shadow-md">
+      <h2 className="text-sm text-gray-600 mb-3 font-semibold">Prévisions Horaires (11h-18h)</h2>
       
-      <div className="hourly-table-container">
-        <table className="hourly-table">
+      <div className="overflow-x-auto -mx-4 px-4">
+        <table className="w-full min-w-[600px] text-sm">
           <thead>
-            <tr>
-              <th>Heure</th>
-              <th>Para-Index</th>
-              <th>Verdict</th>
-              <th>Temp</th>
-              <th>Vent</th>
-              <th>Direction</th>
+            <tr className="border-b-2 border-gray-200">
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">Heure</th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">Para-Index</th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">Verdict</th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">Temp</th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">Vent</th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">Direction</th>
             </tr>
           </thead>
           <tbody>
             {flyingHours.length > 0 ? (
               flyingHours.map((hour, index) => (
-                <tr key={index} className={getVerdictClass(hour.verdict)}>
-                  <td className="hour-cell">{hour.hour}</td>
-                  <td className="para-index-cell">
-                    <strong>{hour.para_index}/10</strong>
+                <tr key={index} className={`border-b border-gray-100 transition-colors ${getVerdictClass(hour.verdict)}`}>
+                  <td className="py-2.5 px-2 font-medium">{hour.hour}</td>
+                  <td className="py-2.5 px-2">
+                    <strong className="text-purple-600">{hour.para_index}/10</strong>
                   </td>
-                  <td className="verdict-cell">{hour.verdict}</td>
-                  <td>{hour.temp}°C</td>
-                  <td>{hour.wind} km/h</td>
-                  <td>{hour.direction}</td>
+                  <td className="py-2.5 px-2 font-medium capitalize">{hour.verdict}</td>
+                  <td className="py-2.5 px-2">{hour.temp}°C</td>
+                  <td className="py-2.5 px-2">{hour.wind} km/h</td>
+                  <td className="py-2.5 px-2">{hour.direction}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="no-data">
+                <td colSpan={6} className="py-8 text-center text-gray-500">
                   Aucune donnée horaire disponible
                 </td>
               </tr>

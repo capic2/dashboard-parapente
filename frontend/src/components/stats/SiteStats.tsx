@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { useFlights } from '../../hooks/useFlights';
 import type { Flight } from '../../types';
-import './Charts.css';
 
 const COLORS = ['#4a90e2', '#82ca9d', '#ffc658', '#ff8042', '#8884d8', '#a4de6c'];
 
@@ -58,9 +57,9 @@ export default function SiteStats() {
 
   if (isLoading) {
     return (
-      <div className="chart-container">
-        <div className="chart-skeleton">
-          <div className="skeleton-title"></div>
+      <div className="bg-white rounded-xl p-4 shadow-md">
+        <div className="animate-pulse">
+          <div className="h-6 bg-gray-200 rounded mb-4 w-1/3"></div>
           <div className="skeleton-chart"></div>
         </div>
       </div>
@@ -77,7 +76,7 @@ export default function SiteStats() {
   }
 
   return (
-    <div className="chart-container">
+    <div className="bg-white rounded-xl p-4 shadow-md">
       <h3>📍 Statistiques par Site</h3>
 
       {/* Pie Chart */}

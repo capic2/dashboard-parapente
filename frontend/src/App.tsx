@@ -7,7 +7,6 @@ import Dashboard from './pages/Dashboard'
 import FlightHistory from './pages/FlightHistory'
 import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
-import './App.css'
 
 // Create query client for TanStack Query
 const queryClient = new QueryClient({
@@ -23,10 +22,10 @@ const queryClient = new QueryClient({
 
 // Root layout with Header
 const RootLayout: React.FC = () => (
-  <div className="app">
-    <div className="container">
+  <div className="min-h-screen p-3 md:p-4 overflow-x-hidden">
+    <div className="max-w-7xl mx-auto">
       <Header />
-      <main className="main-content">
+      <main>
         <Outlet />
       </main>
     </div>
