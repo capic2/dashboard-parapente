@@ -27,6 +27,7 @@
     "react-dom": "^18.3.0",
     "recharts": "^3.7.0",
     "resium": "^1.17.0",
+    "zod": "^4.3.6",
     "zustand": "^4.4.7"
   },
   "devDependencies": {
