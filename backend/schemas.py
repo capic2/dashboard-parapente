@@ -10,15 +10,15 @@ class SiteBase(BaseModel):
     latitude: float
     longitude: float
     region: Optional[str] = None
-    country: str = "FR"
+    country: Optional[str] = "FR"
 
 class SiteCreate(SiteBase):
     pass
 
 class Site(SiteBase):
     id: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True
