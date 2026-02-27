@@ -1,0 +1,169 @@
+import type { Meta, StoryObj } from '@storybook/react';
+import { expect, fn } from 'vitest';
+import SiteSelector from './SiteSelector';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { http, HttpResponse } from 'msw';
+
+// Mock data for sites
+const mockSites = [
+  { 
+    id: 'site-arguel', 
+    name: 'Arguel', 
+    altitude: 427,
+    location: 'Besançon',
+    coordinates: { lat: 47.2, lng: 6.0 },
+    orientation: ['N', 'NE', 'E'],
+    difficulty: 'debutant' as const
+  },
+  { 
+    id: 'site-mont-poupet', 
+    name: 'Mont Poupet', 
+    altitude: 842,
+    location: 'Jura',
+    coordinates: { lat: 46.9, lng: 5.8 },
+    orientation: ['S', 'SW', 'W'],
+    difficulty: 'intermediaire' as const
+  },
+  { 
+    id: 'site-la-cote', 
+    name: 'La Côte', 
+    altitude: 800,
+    location: 'Pontarlier',
+    coordinates: { lat: 46.8, lng: 6.3 },
+    orientation: ['W', 'NW'],
+    difficulty: 'intermediaire' as const
+  },
+];
+
+// Create a fresh query client for each story
+const createQueryClient = () => new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+    },
+  },
+});
+
+// CSF Factory - meta export
+const meta = {
+  title: 'Components/SiteSelector',
+  component: SiteSelector,
+  parameters: {
+    layout: 'centered',
+    docs: {
+      description: {
+        component: 'Site selector component for choosing paragliding sites. Uses React Query for data fetching.',
+      },
+    },
+    msw: {
+      handlers: [
+        http.get('/api/spots', () => {
+          return HttpResponse.json({
+            sites: mockSites
+          });
+        }),
+      ],
+    },
+  },
+  tags: ['autodocs'],
+  decorators: [
+    (Story) => (
+      <QueryClientProvider client={createQueryClient()}>
+        <div style={{ width: '600px' }}>
+          <Story />
+        </div>
+      </QueryClientProvider>
+    ),
+  ],
+  argTypes: {
+    selectedSiteId: {
+      control: 'select',
+      options: mockSites.map(s => s.id),
+      description: 'Currently selected site ID',
+    },
+    onSelectSite: {
+      action: 'site-selected',
+      description: 'Callback when a site is selected',
+    },
+  },
+} satisfies Meta<typeof SiteSelector>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+// CSF Factory - Story exports
+
+/**
+ * Default story showing Arguel selected
+ */
+export const Default: Story = {
+  args: {
+    selectedSiteId: 'site-arguel',
+    onSelectSite: fn(),
+  },
+};
+
+/**
+ * Story showing Mont Poupet selected
+ * Demonstrates different site selection
+ */
+export const MontPoupetSelected: Story = {
+  args: {
+    selectedSiteId: 'site-mont-poupet',
+    onSelectSite: fn(),
+  },
+};
+
+/**
+ * Story showing La Côte selected
+ */
+export const LaCoteSelected: Story = {
+  args: {
+    selectedSiteId: 'site-la-cote',
+    onSelectSite: fn(),
+  },
+};
+
+// Loading state story
+export const Loading: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story: 'Loading state while fetching sites',
+      },
+    },
+  },
+  render: () => {
+    return (
+      <div className="mb-4">
+        <div className="flex gap-2 flex-wrap bg-white rounded-xl p-3 shadow-md">
+          <div className="flex-1 min-w-[120px] p-3 border-2 border-gray-300 rounded-lg bg-white cursor-not-allowed text-gray-400">
+            Chargement...
+          </div>
+        </div>
+      </div>
+    );
+  },
+};
+
+// Error state story
+export const Error: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story: 'Error state when failing to fetch sites',
+      },
+    },
+  },
+  render: () => {
+    return (
+      <div className="mb-4">
+        <div className="flex gap-2 flex-wrap bg-white rounded-xl p-3 shadow-md">
+          <div className="flex-1 min-w-[120px] p-3 border-2 border-gray-300 rounded-lg bg-white cursor-not-allowed text-gray-400">
+            Erreur de chargement
+          </div>
+        </div>
+      </div>
+    );
+  },
+};
