@@ -16,7 +16,6 @@ export default function MonthlyStats() {
 
     flights.forEach((flight) => {
       const monthKey = format(new Date(flight.flight_date), 'yyyy-MM');
-      const monthLabel = format(new Date(flight.flight_date), 'MMM yyyy', { locale: fr });
 
       if (!monthMap.has(monthKey)) {
         monthMap.set(monthKey, { count: 0, totalMinutes: 0 });
@@ -95,9 +94,10 @@ export default function MonthlyStats() {
               padding: '8px',
             }}
             labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
-            formatter={(value: number, name: string) => {
-              if (name === 'count') return [`${value} vol${value > 1 ? 's' : ''}`, 'Nombre de vols'];
-              return [`${value}h`, 'Heures de vol'];
+            formatter={(value: number | undefined, name: string | undefined) => {
+              const val = value || 0;
+              if (name === 'count') return [`${val} vol${val > 1 ? 's' : ''}`, 'Nombre de vols'];
+              return [`${val}h`, 'Heures de vol'];
             }}
             labelFormatter={(label, payload) => {
               if (payload && payload.length > 0) {
