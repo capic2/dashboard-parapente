@@ -1,23 +1,23 @@
 .stats-panel h2 {
   font-size: 15px;
   color: #666;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   font-weight: 600;
 }
 
 .stats-grid-panel {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
 }
 
 .stat-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
+  gap: 10px;
+  padding: 10px;
   background: #f9fafb;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 2px solid #e5e7eb;
   transition: all 0.3s;
 }
@@ -29,7 +29,7 @@
 }
 
 .stat-icon {
-  font-size: 28px;
+  font-size: 24px;
   line-height: 1;
   flex-shrink: 0;
 }
@@ -40,7 +40,7 @@
 }
 
 .stat-number {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: #1f2937;
   line-height: 1.2;
@@ -50,16 +50,24 @@
 }
 
 .stat-label {
-  font-size: 11px;
+  font-size: 10px;
   color: #6b7280;
   font-weight: 500;
   margin-top: 2px;
 }
 
-@media (max-width: 640px) {
+/* Tablet: 2 columns */
+@media (max-width: 1023px) {
   .stats-grid-panel {
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Mobile: 1 column */
+@media (max-width: 767px) {
+  .stats-grid-panel {
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 
   .stat-item {
@@ -67,11 +75,11 @@
   }
 
   .stat-icon {
-    font-size: 24px;
+    font-size: 22px;
   }
 
   .stat-number {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .stat-label {
