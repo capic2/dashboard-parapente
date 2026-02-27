@@ -31,7 +31,8 @@ export const useSites = () => {
     queryKey: ['sites'],
     queryFn: async () => {
       const { data } = await axios.get(`${API_BASE_URL}/spots`);
-      return data;
+      console.log('📍 Sites response:', data);
+      return data.sites; // Extract sites array from response
     },
     staleTime: 1000 * 60 * 30, // 30 minutes - sites don't change often
   });
