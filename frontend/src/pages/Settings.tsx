@@ -1,17 +1,508 @@
+import { useState, useEffect } from 'react';
+import { useSites } from '../hooks/useSites';
+
+// Site interface as returned by API
+interface ApiSite {
+  id: string;
+  name: string;
+  latitude?: number;
+  longitude?: number;
+  elevation_m?: number;
+  description?: string;
+  orientation?: string;
+  difficulty_level?: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Default settings structure
+interface AppSettings {
+  units: {
+    distance: 'km' | 'miles';
+    altitude: 'm' | 'ft';
+    speed: 'kmh' | 'mph';
+  };
+  language: 'fr' | 'en';
+  theme: 'light' | 'dark' | 'auto';
+  notifications: {
+    weather: boolean;
+    flights: boolean;
+    alerts: boolean;
+  };
+  favoriteSites: string[];
+}
+
+const DEFAULT_SETTINGS: AppSettings = {
+  units: {
+    distance: 'km',
+    altitude: 'm',
+    speed: 'kmh',
+  },
+  language: 'fr',
+  theme: 'light',
+  notifications: {
+    weather: true,
+    flights: true,
+    alerts: true,
+  },
+  favoriteSites: [],
+};
+
 export default function Settings() {
+  const { data: sites = [], isLoading: sitesLoading } = useSites();
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [saved, setSaved] = useState(false);
+  const [activeTab, setActiveTab] = useState<'general' | 'sites' | 'data'>('general');
+
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('paragliding-settings');
+    if (stored) {
+      try {
+        setSettings(JSON.parse(stored));
+      } catch (err) {
+        console.error('Failed to parse settings:', err);
+      }
+    }
+  }, []);
+
+  // Save settings to localStorage
+  const saveSettings = () => {
+    localStorage.setItem('paragliding-settings', JSON.stringify(settings));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  // Toggle favorite site
+  const toggleFavorite = (siteId: string) => {
+    setSettings((prev) => ({
+      ...prev,
+      favoriteSites: prev.favoriteSites.includes(siteId)
+        ? prev.favoriteSites.filter((id) => id !== siteId)
+        : [...prev.favoriteSites, siteId],
+    }));
+  };
+
+  // Export data
+  const exportData = () => {
+    const data = {
+      settings,
+      exportDate: new Date().toISOString(),
+      version: '1.0',
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `paragliding-settings-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Import data
+  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const imported = JSON.parse(e.target?.result as string);
+        if (imported.settings) {
+          setSettings(imported.settings);
+          saveSettings();
+          alert('✅ Paramètres importés avec succès !');
+        }
+      } catch (err) {
+        alert('❌ Erreur lors de l\'import : fichier invalide');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Clear all data
+  const clearData = () => {
+    if (window.confirm('⚠️ Êtes-vous sûr de vouloir réinitialiser tous les paramètres ?')) {
+      setSettings(DEFAULT_SETTINGS);
+      localStorage.removeItem('paragliding-settings');
+      alert('✅ Paramètres réinitialisés !');
+    }
+  };
+
   return (
-    <div className="py-4">
-      <div className="bg-white rounded-xl p-6 shadow-md max-w-2xl">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">⚙️ Paramètres</h1>
-        <p className="text-gray-600 mb-4">Cette page sera implémentée en Phase 4 - Semaine 2</p>
-        <p className="font-semibold text-gray-700 mb-2">Fonctionnalités prévues:</p>
-        <ul className="list-disc list-inside space-y-1 text-gray-600">
-          <li>Gestion des sites favoris</li>
-          <li>Configuration des alertes météo</li>
-          <li>Préférences d'affichage (unités, langue)</li>
-          <li>Synchronisation des données GPX</li>
-          <li>Export/Import de la configuration</li>
-        </ul>
+    <div>
+      <div className="mb-4 bg-white rounded-xl p-4 shadow-md">
+        <h1 className="text-xl font-bold text-gray-900">⚙️ Paramètres</h1>
+        <p className="text-sm text-gray-600 mt-1">Configuration de votre dashboard parapente</p>
+      </div>
+
+      {/* Tabs Navigation */}
+      <div className="bg-white rounded-xl shadow-md mb-4 p-2 flex gap-2">
+        <button
+          onClick={() => setActiveTab('general')}
+          className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
+            activeTab === 'general'
+              ? 'bg-purple-600 text-white shadow-md'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          🎛️ Général
+        </button>
+        <button
+          onClick={() => setActiveTab('sites')}
+          className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
+            activeTab === 'sites'
+              ? 'bg-purple-600 text-white shadow-md'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          📍 Sites Favoris
+        </button>
+        <button
+          onClick={() => setActiveTab('data')}
+          className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
+            activeTab === 'data'
+              ? 'bg-purple-600 text-white shadow-md'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          💾 Données
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="space-y-4">
+        {/* GENERAL TAB */}
+        {activeTab === 'general' && (
+          <>
+            {/* Units Section */}
+            <div className="bg-white rounded-xl p-6 shadow-md">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">📏 Unités de Mesure</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Distance</label>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, distance: 'km' } }))}
+                      className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                        settings.units.distance === 'km'
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Kilomètres (km)
+                    </button>
+                    <button
+                      onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, distance: 'miles' } }))}
+                      className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                        settings.units.distance === 'miles'
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Miles (mi)
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Altitude</label>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, altitude: 'm' } }))}
+                      className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                        settings.units.altitude === 'm'
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Mètres (m)
+                    </button>
+                    <button
+                      onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, altitude: 'ft' } }))}
+                      className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                        settings.units.altitude === 'ft'
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Pieds (ft)
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Vitesse</label>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, speed: 'kmh' } }))}
+                      className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                        settings.units.speed === 'kmh'
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      km/h
+                    </button>
+                    <button
+                      onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, speed: 'mph' } }))}
+                      className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                        settings.units.speed === 'mph'
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      mph
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Language & Theme Section */}
+            <div className="bg-white rounded-xl p-6 shadow-md">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">🌐 Langue & Thème</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Langue</label>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setSettings((prev) => ({ ...prev, language: 'fr' }))}
+                      className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                        settings.language === 'fr'
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      🇫🇷 Français
+                    </button>
+                    <button
+                      onClick={() => setSettings((prev) => ({ ...prev, language: 'en' }))}
+                      className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                        settings.language === 'en'
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      🇬🇧 English
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Thème</label>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setSettings((prev) => ({ ...prev, theme: 'light' }))}
+                      className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                        settings.theme === 'light'
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      ☀️ Clair
+                    </button>
+                    <button
+                      onClick={() => setSettings((prev) => ({ ...prev, theme: 'dark' }))}
+                      className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                        settings.theme === 'dark'
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      🌙 Sombre
+                    </button>
+                    <button
+                      onClick={() => setSettings((prev) => ({ ...prev, theme: 'auto' }))}
+                      className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                        settings.theme === 'auto'
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      🔄 Auto
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Notifications Section */}
+            <div className="bg-white rounded-xl p-6 shadow-md">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">🔔 Notifications</h2>
+              <div className="space-y-3">
+                <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all cursor-pointer">
+                  <span className="text-sm font-medium text-gray-700">Alertes météo</span>
+                  <input
+                    type="checkbox"
+                    checked={settings.notifications.weather}
+                    onChange={(e) =>
+                      setSettings((prev) => ({
+                        ...prev,
+                        notifications: { ...prev.notifications, weather: e.target.checked },
+                      }))
+                    }
+                    className="w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-600"
+                  />
+                </label>
+                <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all cursor-pointer">
+                  <span className="text-sm font-medium text-gray-700">Nouveaux vols</span>
+                  <input
+                    type="checkbox"
+                    checked={settings.notifications.flights}
+                    onChange={(e) =>
+                      setSettings((prev) => ({
+                        ...prev,
+                        notifications: { ...prev.notifications, flights: e.target.checked },
+                      }))
+                    }
+                    className="w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-600"
+                  />
+                </label>
+                <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all cursor-pointer">
+                  <span className="text-sm font-medium text-gray-700">Alertes personnalisées</span>
+                  <input
+                    type="checkbox"
+                    checked={settings.notifications.alerts}
+                    onChange={(e) =>
+                      setSettings((prev) => ({
+                        ...prev,
+                        notifications: { ...prev.notifications, alerts: e.target.checked },
+                      }))
+                    }
+                    className="w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-600"
+                  />
+                </label>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* SITES TAB */}
+        {activeTab === 'sites' && (
+          <div className="bg-white rounded-xl p-6 shadow-md">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">📍 Gérer vos Sites Favoris</h2>
+            {sitesLoading ? (
+              <div className="animate-pulse space-y-3">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-16 bg-gray-200 rounded-lg"></div>
+                ))}
+              </div>
+            ) : sites.length === 0 ? (
+              <p className="text-gray-600 text-center py-8">Aucun site disponible</p>
+            ) : (
+              <div className="space-y-3">
+                {(sites as unknown as ApiSite[]).map((site: ApiSite) => (
+                  <div
+                    key={site.id}
+                    className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
+                      settings.favoriteSites.includes(site.id)
+                        ? 'border-purple-600 bg-purple-50'
+                        : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900">{site.name}</h3>
+                      {(site.latitude && site.longitude && site.elevation_m) && (
+                        <div className="text-sm text-gray-600 mt-1">
+                          📍 {site.latitude.toFixed(4)}, {site.longitude.toFixed(4)} • ⛰️ {site.elevation_m}m
+                        </div>
+                      )}
+                      {site.description && (
+                        <p className="text-xs text-gray-500 mt-1">{site.description}</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => toggleFavorite(site.id)}
+                      className={`ml-4 px-4 py-2 rounded-lg font-medium transition-all ${
+                        settings.favoriteSites.includes(site.id)
+                          ? 'bg-purple-600 text-white hover:bg-purple-700'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      {settings.favoriteSites.includes(site.id) ? '⭐ Favori' : '☆ Ajouter'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+              💡 <strong>Astuce :</strong> Les sites favoris apparaîtront en priorité dans les sélecteurs
+            </div>
+          </div>
+        )}
+
+        {/* DATA TAB */}
+        {activeTab === 'data' && (
+          <div className="space-y-4">
+            {/* Export/Import Section */}
+            <div className="bg-white rounded-xl p-6 shadow-md">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">💾 Sauvegarde & Restauration</h2>
+              <div className="space-y-3">
+                <button
+                  onClick={exportData}
+                  className="w-full px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all flex items-center justify-center gap-2"
+                >
+                  <span>📥</span>
+                  Exporter mes paramètres
+                </button>
+                <label className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all flex items-center justify-center gap-2 cursor-pointer">
+                  <span>📤</span>
+                  Importer des paramètres
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={importData}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+              <div className="mt-4 p-3 bg-yellow-50 rounded-lg text-sm text-yellow-800">
+                ⚠️ L'import remplacera vos paramètres actuels
+              </div>
+            </div>
+
+            {/* Clear Data Section */}
+            <div className="bg-white rounded-xl p-6 shadow-md">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">🗑️ Réinitialisation</h2>
+              <button
+                onClick={clearData}
+                className="w-full px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"
+              >
+                Réinitialiser tous les paramètres
+              </button>
+              <div className="mt-4 p-3 bg-red-50 rounded-lg text-sm text-red-800">
+                ⚠️ Cette action est irréversible (sauf si vous avez exporté une sauvegarde)
+              </div>
+            </div>
+
+            {/* User Profile Placeholder */}
+            <div className="bg-white rounded-xl p-6 shadow-md">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">👤 Profil Utilisateur</h2>
+              <div className="p-8 bg-gray-50 rounded-lg text-center">
+                <p className="text-gray-600 mb-2">🚧 Fonctionnalité en développement</p>
+                <p className="text-sm text-gray-500">
+                  Bientôt : avatar, bio, statistiques personnelles, historique d'activité
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Save Button */}
+      <div className="mt-6 sticky bottom-4 z-10">
+        <button
+          onClick={saveSettings}
+          className={`w-full px-6 py-4 rounded-xl font-bold text-lg shadow-lg transition-all ${
+            saved
+              ? 'bg-green-600 text-white'
+              : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-xl'
+          }`}
+        >
+          {saved ? '✅ Paramètres sauvegardés !' : '💾 Sauvegarder les modifications'}
+        </button>
       </div>
     </div>
   );
