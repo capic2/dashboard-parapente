@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
-import axios from 'axios'
+import { useQuery, type UseQueryResult } from '@tanstack/react-query'
+import axios, { type AxiosInstance } from 'axios'
+import type { Site, WeatherConditions, ForecastDay, WeatherSource, WeatherData, ApiResponse } from '../types'
 
-const API = axios.create({
+const API: AxiosInstance = axios.create({
   baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
@@ -12,11 +13,11 @@ const API = axios.create({
  * Fetch all flying sites
  * Uses TanStack Query for automatic caching & refetching
  */
-export const useSites = () => {
+export const useSites = (): UseQueryResult<Site[], Error> => {
   return useQuery({
     queryKey: ['sites'],
     queryFn: async () => {
-      const response = await API.get('/sites')
+      const response = await API.get<ApiResponse<Site[]>>('/sites')
       return response.data.data
     },
     staleTime: 1000 * 60 * 60, // 1 hour (sites rarely change)
@@ -25,30 +26,28 @@ export const useSites = () => {
 
 /**
  * Fetch current weather conditions
- * @param {string} siteId - Site ID (optional, if omitted returns all sites)
  */
-export const useCurrentConditions = (siteId) => {
+export const useCurrentConditions = (siteId?: string): UseQueryResult<WeatherConditions | WeatherConditions[], Error> => {
   return useQuery({
     queryKey: ['weather', 'current', siteId],
     queryFn: async () => {
       const url = siteId ? `/weather/current/${siteId}` : '/weather/current'
-      const response = await API.get(url)
+      const response = await API.get<ApiResponse<WeatherConditions | WeatherConditions[]>>(url)
       return response.data.data
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
-    enabled: !!siteId || !siteId, // Always enabled (even for 'all sites')
   })
 }
 
 /**
  * Fetch 7-day forecast
- * @param {string} siteId - Site ID (required)
  */
-export const useForecast = (siteId) => {
+export const useForecast = (siteId: string | undefined): UseQueryResult<ForecastDay[], Error> => {
   return useQuery({
     queryKey: ['weather', 'forecast', siteId],
     queryFn: async () => {
-      const response = await API.get(`/weather/forecast/${siteId}`)
+      if (!siteId) throw new Error('Site ID is required')
+      const response = await API.get<ApiResponse<ForecastDay[]>>(`/weather/forecast/${siteId}`)
       return response.data.data
     },
     staleTime: 1000 * 60 * 30, // 30 minutes
@@ -59,11 +58,11 @@ export const useForecast = (siteId) => {
 /**
  * Fetch weather sources (data providers)
  */
-export const useWeatherSources = () => {
+export const useWeatherSources = (): UseQueryResult<WeatherSource[], Error> => {
   return useQuery({
     queryKey: ['weather', 'sources'],
     queryFn: async () => {
-      const response = await API.get('/weather/sources')
+      const response = await API.get<ApiResponse<WeatherSource[]>>('/weather/sources')
       return response.data.data
     },
     staleTime: 1000 * 60 * 60 * 24, // 24 hours (sources don't change often)
@@ -72,15 +71,19 @@ export const useWeatherSources = () => {
 
 /**
  * Fetch historical weather for a specific date range
- * @param {string} siteId - Site ID
- * @param {string} fromDate - From date (YYYY-MM-DD)
- * @param {string} toDate - To date (YYYY-MM-DD)
  */
-export const useWeatherHistory = (siteId, fromDate, toDate) => {
+export const useWeatherHistory = (
+  siteId: string | undefined,
+  fromDate: string | undefined,
+  toDate: string | undefined
+): UseQueryResult<WeatherConditions[], Error> => {
   return useQuery({
     queryKey: ['weather', 'history', siteId, fromDate, toDate],
     queryFn: async () => {
-      const response = await API.get(
+      if (!siteId || !fromDate || !toDate) {
+        throw new Error('Site ID, from date, and to date are required')
+      }
+      const response = await API.get<ApiResponse<WeatherConditions[]>>(
         `/weather/history/${siteId}?from_date=${fromDate}&to_date=${toDate}`
       )
       return response.data.data
@@ -92,14 +95,18 @@ export const useWeatherHistory = (siteId, fromDate, toDate) => {
 
 /**
  * Fetch weather data from specific source for comparison
- * @param {string} siteId - Site ID
- * @param {string} sourceId - Source ID
  */
-export const useWeatherBySource = (siteId, sourceId) => {
+export const useWeatherBySource = (
+  siteId: string | undefined,
+  sourceId: string | undefined
+): UseQueryResult<ForecastDay[], Error> => {
   return useQuery({
     queryKey: ['weather', 'source', siteId, sourceId],
     queryFn: async () => {
-      const response = await API.get(
+      if (!siteId || !sourceId) {
+        throw new Error('Site ID and source ID are required')
+      }
+      const response = await API.get<ApiResponse<ForecastDay[]>>(
         `/weather/forecast/${siteId}?source=${sourceId}`
       )
       return response.data.data
@@ -111,20 +118,14 @@ export const useWeatherBySource = (siteId, sourceId) => {
 
 /**
  * Main weather hook - combines current + forecast
- * @param {string} siteId - Site ID (spotId)
  */
-export const useWeather = (siteId) => {
+export const useWeather = (siteId: string | undefined): UseQueryResult<WeatherData, Error> => {
   return useQuery({
     queryKey: ['weather', 'combined', siteId],
     queryFn: async () => {
-      const [current, forecast] = await Promise.all([
-        API.get(siteId ? `/weather/current/${siteId}` : '/weather/current'),
-        siteId ? API.get(`/weather/forecast/${siteId}`) : Promise.resolve({ data: { data: null } })
-      ])
-      return {
-        current: current.data.data,
-        forecast: forecast.data.data,
-      }
+      if (!siteId) throw new Error('Site ID is required')
+      const response = await API.get<ApiResponse<WeatherData>>(`/weather/current/${siteId}`)
+      return response.data.data
     },
     staleTime: 1000 * 60 * 5,
     enabled: !!siteId,

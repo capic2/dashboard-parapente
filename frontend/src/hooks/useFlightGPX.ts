@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import axios from 'axios'
 import { GeoPoint } from './useCesiumViewer'
 
@@ -77,7 +77,7 @@ export const parseGPXFile = async (file: File): Promise<GeoPoint[]> => {
 
   let timestamp = 0
 
-  trkpts.forEach((trkpt, index) => {
+  trkpts.forEach((trkpt) => {
     const lat = parseFloat(trkpt.getAttribute('lat') || '0')
     const lon = parseFloat(trkpt.getAttribute('lon') || '0')
 
