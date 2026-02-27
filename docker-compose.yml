@@ -9,11 +9,8 @@ services:
       - ${PWD}/backend:/app
       - dashboard-db:/app/db
     ports:
-      - "8000:8000"
-    command: |
-      bash -c "pip install --no-cache-dir -r requirements.txt && 
-               python init_db.py && 
-               python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+      - "8001:8000"
+    command: bash /app/startup.sh
     environment:
       - PYTHONUNBUFFERED=1
       - DATABASE_URL=sqlite:///db/dashboard.db
