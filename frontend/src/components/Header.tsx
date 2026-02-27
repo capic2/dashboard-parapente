@@ -17,6 +17,9 @@ export default function Header({ title = '🪂 Tableau de Bord Parapente' }: Hea
         <Link to="/flights" className="nav-link">
           Vols
         </Link>
+        <Link to="/analytics" className="nav-link">
+          Analyses
+        </Link>
         <Link to="/settings" className="nav-link">
           Paramètres
         </Link>

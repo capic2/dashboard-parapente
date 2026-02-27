@@ -4,6 +4,7 @@ import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
 import Header from './components/Header'
 import Dashboard from './pages/Dashboard'
 import FlightHistory from './pages/FlightHistory'
+import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
 import './App.css'
 
@@ -48,6 +49,12 @@ const flightHistoryRoute = new Route({
   component: FlightHistory,
 })
 
+const analyticsRoute = new Route({
+  getParentRoute: () => rootRoute,
+  path: '/analytics',
+  component: Analytics,
+})
+
 const settingsRoute = new Route({
   getParentRoute: () => rootRoute,
   path: '/settings',
@@ -58,6 +65,7 @@ const settingsRoute = new Route({
 const routeTree = rootRoute.addChildren([
   dashboardRoute,
   flightHistoryRoute,
+  analyticsRoute,
   settingsRoute,
 ])
 
