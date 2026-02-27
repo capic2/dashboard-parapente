@@ -1,0 +1,51 @@
+[
+  {
+    "activity_id": 16394749726,
+    "filename": "strava_16394749726.gpx",
+    "filepath": "/home/capic/.openclaw/workspace/paragliding/dashboard/backend/db/gpx/strava_16394749726.gpx",
+    "date": "2025-11-08",
+    "name": "Afternoon Workout"
+  },
+  {
+    "activity_id": 16394022550,
+    "filename": "strava_16394022550.gpx",
+    "filepath": "/home/capic/.openclaw/workspace/paragliding/dashboard/backend/db/gpx/strava_16394022550.gpx",
+    "date": "2025-11-08",
+    "name": "Afternoon Workout"
+  },
+  {
+    "activity_id": 16118040828,
+    "filename": "strava_16118040828.gpx",
+    "filepath": "/home/capic/.openclaw/workspace/paragliding/dashboard/backend/db/gpx/strava_16118040828.gpx",
+    "date": "2025-10-12",
+    "name": "Afternoon Workout"
+  },
+  {
+    "activity_id": 15967079829,
+    "filename": "strava_15967079829.gpx",
+    "filepath": "/home/capic/.openclaw/workspace/paragliding/dashboard/backend/db/gpx/strava_15967079829.gpx",
+    "date": "2025-09-28",
+    "name": "Afternoon Workout"
+  },
+  {
+    "activity_id": 15965366307,
+    "filename": "strava_15965366307.gpx",
+    "filepath": "/home/capic/.openclaw/workspace/paragliding/dashboard/backend/db/gpx/strava_15965366307.gpx",
+    "date": "2025-09-28",
+    "name": "Afternoon Workout"
+  },
+  {
+    "activity_id": 15963566849,
+    "filename": "strava_15963566849.gpx",
+    "filepath": "/home/capic/.openclaw/workspace/paragliding/dashboard/backend/db/gpx/strava_15963566849.gpx",
+    "date": "2025-09-28",
+    "name": "Afternoon Run"
+  },
+  {
+    "activity_id": 15954552836,
+    "filename": "strava_15954552836.gpx",
+    "filepath": "/home/capic/.openclaw/workspace/paragliding/dashboard/backend/db/gpx/strava_15954552836.gpx",
+    "date": "2025-09-27",
+    "name": "Afternoon Workout"
+  }
+]
