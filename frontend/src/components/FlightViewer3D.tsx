@@ -56,8 +56,23 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     distance: (index / elevationProfile.data.length) * elevationProfile.totalDistance,
   }))
 
+  // Check if GPX is not available (404 error)
+  const isGPXNotAvailable = gpxError && 
+    (gpxError as any)?.response?.status === 404
+
   return (
     <div className="relative">
+      {/* GPX Not Available Message */}
+      {isGPXNotAvailable ? (
+        <div className="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-8 text-center">
+          <p className="text-lg font-bold text-yellow-800 mb-2">📍 Pas de tracé GPS disponible</p>
+          <p className="text-sm text-yellow-700">
+            Les données GPS ne sont pas disponibles pour ce vol. 
+            La carte 3D ne peut pas être affichée.
+          </p>
+        </div>
+      ) : (
+        <>
       <div className="bg-white p-4 rounded-t-xl border-b border-gray-200">
         <h2 className="text-lg font-bold text-gray-900 mb-3">🪂 {flightTitle || 'Flight View'}</h2>
         <div className="flex flex-wrap gap-3">
@@ -179,6 +194,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             </LineChart>
           </ResponsiveContainer>
         </div>
+      )}
+      </>
       )}
     </div>
   )
