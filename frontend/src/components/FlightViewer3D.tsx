@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
-import { Viewer, Entity, PolylineGraphics, CameraFlyTo } from 'resium'
-import { Cartesian3, Color, Viewer as CesiumViewer, ConstantPositionProperty } from 'cesium'
+import { Viewer, Entity, PolylineGraphics } from 'resium'
+import { Cartesian3, Color, Viewer as CesiumViewer, HeadingPitchRange } from 'cesium'
 import { useFlightGPX, useFlightElevationProfile, useDownloadGPX } from '../hooks/useFlightGPX'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
@@ -97,6 +97,27 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     setIsReplaying(false)
     setReplayIndex(0)
   }, [])
+
+  // Zoom to track when positions load
+  useEffect(() => {
+    if (viewerRef.current && positions.length > 0 && !isReplaying) {
+      const viewer = viewerRef.current
+      setTimeout(() => {
+        viewer.zoomTo(viewer.entities)
+      }, 100)
+    }
+  }, [positions, isReplaying])
+
+  // Follow camera during replay
+  useEffect(() => {
+    if (viewerRef.current && isReplaying && currentReplayCartesian) {
+      const viewer = viewerRef.current
+      viewer.camera.lookAt(
+        currentReplayCartesian,
+        new HeadingPitchRange(0, -0.5, 1000)
+      )
+    }
+  }, [isReplaying, currentReplayCartesian, replayIndex])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -276,32 +297,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                     text: '🪂',
                     font: '20px sans-serif',
                     pixelOffset: { x: 0, y: -20 } as any,
-                  }}
-                />
-              )}
-
-              {/* Camera Zoom to Track */}
-              {positions.length > 0 && !isReplaying && (
-                <CameraFlyTo
-                  destination={positions[Math.floor(positions.length / 2)]}
-                  duration={0}
-                  offset={{
-                    heading: 0,
-                    pitch: -0.5,
-                    range: 5000,
-                  }}
-                />
-              )}
-
-              {/* Camera Follow During Replay */}
-              {isReplaying && currentReplayCartesian && (
-                <CameraFlyTo
-                  destination={currentReplayCartesian}
-                  duration={0}
-                  offset={{
-                    heading: 0,
-                    pitch: -0.5,
-                    range: 1000,
                   }}
                 />
               )}
