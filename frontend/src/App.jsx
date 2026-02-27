@@ -1,7 +1,7 @@
 import React from 'react'
-import { RootRoute, Route, Router, RouterProvider } from '@tanstack/react-router'
+import { RootRoute, Route, Router, RouterProvider, Outlet } from '@tanstack/react-router'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
-import Navigation from './components/Navigation'
+import Header from './components/Header'
 import Dashboard from './pages/Dashboard'
 import FlightHistory from './pages/FlightHistory'
 import Settings from './pages/Settings'
@@ -13,17 +13,21 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
       gcTime: 1000 * 60 * 10, // 10 minutes (formerly cacheTime)
+      retry: 2,
+      refetchOnWindowFocus: false,
     },
   },
 })
 
-// Root layout
+// Root layout with Header
 const RootLayout = () => (
   <div className="app">
-    <Navigation />
-    <main className="main-content">
-      {/* Routes will be rendered here by TanStack Router */}
-    </main>
+    <div className="container">
+      <Header />
+      <main className="main-content">
+        <Outlet />
+      </main>
+    </div>
   </div>
 )
 
@@ -58,13 +62,6 @@ const routeTree = rootRoute.addChildren([
 ])
 
 const router = new Router({ routeTree })
-
-// Register router for type safety
-declare module '@tanstack/react-router' {
-  interface Register {
-    router: typeof router
-  }
-}
 
 // App component with providers
 export default function App() {

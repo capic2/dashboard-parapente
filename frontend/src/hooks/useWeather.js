@@ -108,3 +108,25 @@ export const useWeatherBySource = (siteId, sourceId) => {
     enabled: !!(siteId && sourceId),
   })
 }
+
+/**
+ * Main weather hook - combines current + forecast
+ * @param {string} siteId - Site ID (spotId)
+ */
+export const useWeather = (siteId) => {
+  return useQuery({
+    queryKey: ['weather', 'combined', siteId],
+    queryFn: async () => {
+      const [current, forecast] = await Promise.all([
+        API.get(siteId ? `/weather/current/${siteId}` : '/weather/current'),
+        siteId ? API.get(`/weather/forecast/${siteId}`) : Promise.resolve({ data: { data: null } })
+      ])
+      return {
+        current: current.data.data,
+        forecast: forecast.data.data,
+      }
+    },
+    staleTime: 1000 * 60 * 5,
+    enabled: !!siteId,
+  })
+}
