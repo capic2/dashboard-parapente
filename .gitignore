@@ -73,3 +73,6 @@ config.local.yaml
 secrets.json
 temp/
 cache/
+
+*storybook.log
+storybook-static
