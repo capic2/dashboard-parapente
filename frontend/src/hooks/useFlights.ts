@@ -42,7 +42,6 @@ export const useFlights = (filters: FlightFilters = {}): UseQueryResult<Flight[]
       const response = await API.get(
         `/flights${queryParams ? `?${queryParams}` : ''}`
       )
-      console.log('✈️ Flights response:', response.data)
       
       // Validate API response with Zod
       const validation = FlightsApiResponseSchema.safeParse(response.data)
@@ -89,7 +88,6 @@ export const useFlightStats = (): UseQueryResult<FlightStats, Error> => {
     queryKey: ['flights', 'stats'],
     queryFn: async () => {
       const response = await API.get('/flights/stats')
-      console.log('📊 Flight stats response:', response.data)
       
       // Validate API response with Zod
       const validation = FlightStatsSchema.safeParse(response.data)

@@ -27,9 +27,11 @@ class Flight(Base):
     id = Column(String, primary_key=True)
     strava_id = Column(String, unique=True, nullable=True)
     site_id = Column(String, ForeignKey("sites.id"), nullable=True)
-    title = Column(String)
+    name = Column(String)  # Format: "Lieu JJ-MM HHhMM"
+    title = Column(String)  # Legacy field
     description = Column(Text)
     flight_date = Column(Date, nullable=False)
+    departure_time = Column(DateTime, nullable=True)  # Datetime du premier trackpoint GPX
     duration_minutes = Column(Integer)
     max_altitude_m = Column(Integer)
     max_speed_kmh = Column(Float)

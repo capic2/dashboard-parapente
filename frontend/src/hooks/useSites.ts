@@ -32,7 +32,6 @@ export const useSites = () => {
     queryKey: ['sites'],
     queryFn: async () => {
       const { data } = await axios.get(`${API_BASE_URL}/spots`);
-      console.log('📍 Sites response:', data);
       
       // Validate API response with Zod
       const validation = SitesApiResponseSchema.safeParse(data);
