@@ -1,6 +1,12 @@
 import { useQuery, useMutation, useQueryClient, type UseQueryResult, type UseMutationResult } from '@tanstack/react-query'
 import axios, { type AxiosInstance } from 'axios'
 import type { Flight, FlightFilters, FlightStats, FlightFormData, ApiResponse, Site } from '../types'
+import {
+  FlightsApiResponseSchema,
+  FlightSchema,
+  FlightStatsSchema,
+  ApiResponseSchema,
+} from '../schemas'
 
 const API: AxiosInstance = axios.create({
   baseURL: '/api',
@@ -37,8 +43,15 @@ export const useFlights = (filters: FlightFilters = {}): UseQueryResult<Flight[]
         `/flights${queryParams ? `?${queryParams}` : ''}`
       )
       console.log('✈️ Flights response:', response.data)
-      // Backend returns { flights: [...] }, not wrapped in ApiResponse
-      return response.data.flights || []
+      
+      // Validate API response with Zod
+      const validation = FlightsApiResponseSchema.safeParse(response.data)
+      if (!validation.success) {
+        console.error('❌ Flights validation failed:', validation.error)
+        throw new Error(`Invalid flights data: ${validation.error.message}`)
+      }
+      
+      return validation.data.flights
     },
     staleTime: 1000 * 60 * 10, // 10 minutes
   })
@@ -53,7 +66,15 @@ export const useFlight = (flightId: string | undefined): UseQueryResult<Flight, 
     queryFn: async () => {
       if (!flightId) throw new Error('Flight ID is required')
       const response = await API.get<ApiResponse<Flight>>(`/flights/${flightId}`)
-      return response.data.data
+      
+      // Validate API response with Zod
+      const validation = ApiResponseSchema(FlightSchema).safeParse(response.data)
+      if (!validation.success) {
+        console.error('❌ Flight validation failed:', validation.error)
+        throw new Error(`Invalid flight data: ${validation.error.message}`)
+      }
+      
+      return validation.data.data
     },
     enabled: !!flightId,
     staleTime: 1000 * 60 * 30,
@@ -69,8 +90,15 @@ export const useFlightStats = (): UseQueryResult<FlightStats, Error> => {
     queryFn: async () => {
       const response = await API.get('/flights/stats')
       console.log('📊 Flight stats response:', response.data)
-      // Backend returns stats directly, not wrapped in ApiResponse
-      return response.data
+      
+      // Validate API response with Zod
+      const validation = FlightStatsSchema.safeParse(response.data)
+      if (!validation.success) {
+        console.error('❌ Flight stats validation failed:', validation.error)
+        throw new Error(`Invalid flight stats: ${validation.error.message}`)
+      }
+      
+      return validation.data
     },
     staleTime: 1000 * 60 * 60, // 1 hour
   })
@@ -101,7 +129,15 @@ export const useCreateFlight = (): UseMutationResult<Flight, Error, FlightFormDa
   return useMutation({
     mutationFn: async (flightData: FlightFormData) => {
       const response = await API.post<ApiResponse<Flight>>('/flights', flightData)
-      return response.data.data
+      
+      // Validate API response with Zod
+      const validation = ApiResponseSchema(FlightSchema).safeParse(response.data)
+      if (!validation.success) {
+        console.error('❌ Create flight validation failed:', validation.error)
+        throw new Error(`Invalid flight creation response: ${validation.error.message}`)
+      }
+      
+      return validation.data.data
     },
     onSuccess: () => {
       // Invalidate flights query to refetch
@@ -121,7 +157,15 @@ export const useUpdateFlight = (flightId: string | undefined): UseMutationResult
     mutationFn: async (flightData: FlightFormData) => {
       if (!flightId) throw new Error('Flight ID is required')
       const response = await API.patch<ApiResponse<Flight>>(`/flights/${flightId}`, flightData)
-      return response.data.data
+      
+      // Validate API response with Zod
+      const validation = ApiResponseSchema(FlightSchema).safeParse(response.data)
+      if (!validation.success) {
+        console.error('❌ Update flight validation failed:', validation.error)
+        throw new Error(`Invalid flight update response: ${validation.error.message}`)
+      }
+      
+      return validation.data.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['flights'] })

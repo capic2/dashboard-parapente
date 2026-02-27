@@ -1,6 +1,11 @@
 import { useQuery, useMutation, useQueryClient, type UseQueryResult, type UseMutationResult } from '@tanstack/react-query'
 import axios, { type AxiosInstance } from 'axios'
 import type { Alert, AlertHistory, AlertFormData, ApiResponse } from '../types'
+import {
+  AlertSchema,
+  AlertHistorySchema,
+  ApiResponseSchema,
+} from '../schemas'
 
 const API: AxiosInstance = axios.create({
   baseURL: '/api',
@@ -17,7 +22,15 @@ export const useAlerts = (): UseQueryResult<Alert[], Error> => {
     queryKey: ['alerts'],
     queryFn: async () => {
       const response = await API.get<ApiResponse<Alert[]>>('/alerts')
-      return response.data.data
+      
+      // Validate API response with Zod
+      const validation = ApiResponseSchema(AlertSchema.array()).safeParse(response.data)
+      if (!validation.success) {
+        console.error('❌ Alerts validation failed:', validation.error)
+        throw new Error(`Invalid alerts data: ${validation.error.message}`)
+      }
+      
+      return validation.data.data
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
   })
@@ -32,7 +45,15 @@ export const useAlert = (alertId: string | undefined): UseQueryResult<Alert, Err
     queryFn: async () => {
       if (!alertId) throw new Error('Alert ID is required')
       const response = await API.get<ApiResponse<Alert>>(`/alerts/${alertId}`)
-      return response.data.data
+      
+      // Validate API response with Zod
+      const validation = ApiResponseSchema(AlertSchema).safeParse(response.data)
+      if (!validation.success) {
+        console.error('❌ Alert validation failed:', validation.error)
+        throw new Error(`Invalid alert data: ${validation.error.message}`)
+      }
+      
+      return validation.data.data
     },
     enabled: !!alertId,
     staleTime: 1000 * 60 * 5,
@@ -47,7 +68,15 @@ export const useAlertHistory = (): UseQueryResult<AlertHistory[], Error> => {
     queryKey: ['alerts', 'history'],
     queryFn: async () => {
       const response = await API.get<ApiResponse<AlertHistory[]>>('/alerts/history')
-      return response.data.data
+      
+      // Validate API response with Zod
+      const validation = ApiResponseSchema(AlertHistorySchema.array()).safeParse(response.data)
+      if (!validation.success) {
+        console.error('❌ Alert history validation failed:', validation.error)
+        throw new Error(`Invalid alert history data: ${validation.error.message}`)
+      }
+      
+      return validation.data.data
     },
     staleTime: 1000 * 60 * 10,
   })
@@ -62,7 +91,15 @@ export const useCreateAlert = (): UseMutationResult<Alert, Error, AlertFormData>
   return useMutation({
     mutationFn: async (alertData: AlertFormData) => {
       const response = await API.post<ApiResponse<Alert>>('/alerts', alertData)
-      return response.data.data
+      
+      // Validate API response with Zod
+      const validation = ApiResponseSchema(AlertSchema).safeParse(response.data)
+      if (!validation.success) {
+        console.error('❌ Create alert validation failed:', validation.error)
+        throw new Error(`Invalid alert creation response: ${validation.error.message}`)
+      }
+      
+      return validation.data.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alerts'] })
@@ -80,7 +117,15 @@ export const useUpdateAlert = (alertId: string | undefined): UseMutationResult<A
     mutationFn: async (alertData: AlertFormData) => {
       if (!alertId) throw new Error('Alert ID is required')
       const response = await API.patch<ApiResponse<Alert>>(`/alerts/${alertId}`, alertData)
-      return response.data.data
+      
+      // Validate API response with Zod
+      const validation = ApiResponseSchema(AlertSchema).safeParse(response.data)
+      if (!validation.success) {
+        console.error('❌ Update alert validation failed:', validation.error)
+        throw new Error(`Invalid alert update response: ${validation.error.message}`)
+      }
+      
+      return validation.data.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alerts'] })

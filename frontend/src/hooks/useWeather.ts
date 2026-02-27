@@ -1,6 +1,15 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import axios, { type AxiosInstance } from 'axios'
 import type { Site, WeatherConditions, ForecastDay, WeatherSource, WeatherData, ApiResponse } from '../types'
+import {
+  SitesApiResponseSchema,
+  WeatherDataSchema,
+  ForecastDaySchema,
+  WeatherSourceSchema,
+  WeatherConditionsSchema,
+  BackendWeatherResponseSchema,
+  ApiResponseSchema,
+} from '../schemas'
 
 const API: AxiosInstance = axios.create({
   baseURL: '/api',
@@ -19,7 +28,15 @@ export const useSites = (): UseQueryResult<Site[], Error> => {
     queryFn: async () => {
       const response = await API.get('/spots') // Fixed: /sites -> /spots
       console.log('📍 Sites response:', response.data)
-      return response.data.sites // Extract sites array
+      
+      // Validate API response with Zod
+      const validation = SitesApiResponseSchema.safeParse(response.data)
+      if (!validation.success) {
+        console.error('❌ Sites API validation failed:', validation.error)
+        throw new Error(`Invalid sites data: ${validation.error.message}`)
+      }
+      
+      return validation.data.sites // Extract validated sites array
     },
     staleTime: 1000 * 60 * 60, // 1 hour (sites rarely change)
   })
@@ -35,7 +52,15 @@ export const useCurrentConditions = (siteId?: string): UseQueryResult<WeatherCon
       if (!siteId) throw new Error('Site ID is required')
       const response = await API.get(`/weather/${siteId}`) // Fixed: /weather/current/{id} -> /weather/{id}
       console.log(`🌤️ Weather response for ${siteId}:`, response.data)
-      return response.data // Backend returns weather data directly
+      
+      // Validate API response with Zod
+      const validation = BackendWeatherResponseSchema.safeParse(response.data)
+      if (!validation.success) {
+        console.error('❌ Current weather validation failed:', validation.error)
+        throw new Error(`Invalid weather data: ${validation.error.message}`)
+      }
+      
+      return validation.data as any // Backend returns weather data directly
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
     enabled: !!siteId,
@@ -45,14 +70,22 @@ export const useCurrentConditions = (siteId?: string): UseQueryResult<WeatherCon
 /**
  * Fetch 7-day forecast
  */
-export const useForecast = (siteId: string | undefined): UseQueryResult<ForecastDay[], Error> => {
+export const useForecast = (siteId: string | undefined): UseQueryResult<any[], Error> => {
   return useQuery({
     queryKey: ['weather', 'forecast', siteId],
     queryFn: async () => {
       if (!siteId) throw new Error('Site ID is required')
       const response = await API.get(`/weather/${siteId}`) // Fixed: /weather/forecast/{id} -> /weather/{id}
       console.log(`📅 Forecast response for ${siteId}:`, response.data)
-      return response.data.consensus || [] // Backend returns consensus hourly data
+      
+      // Validate API response with Zod
+      const validation = BackendWeatherResponseSchema.safeParse(response.data)
+      if (!validation.success) {
+        console.error('❌ Forecast validation failed:', validation.error)
+        throw new Error(`Invalid forecast data: ${validation.error.message}`)
+      }
+      
+      return validation.data.consensus || [] // Backend returns consensus hourly data
     },
     staleTime: 1000 * 60 * 30, // 30 minutes
     enabled: !!siteId,
@@ -67,7 +100,15 @@ export const useWeatherSources = (): UseQueryResult<WeatherSource[], Error> => {
     queryKey: ['weather', 'sources'],
     queryFn: async () => {
       const response = await API.get<ApiResponse<WeatherSource[]>>('/weather/sources')
-      return response.data.data
+      
+      // Validate API response with Zod
+      const validation = ApiResponseSchema(WeatherSourceSchema.array()).safeParse(response.data)
+      if (!validation.success) {
+        console.error('❌ Weather sources validation failed:', validation.error)
+        throw new Error(`Invalid weather sources: ${validation.error.message}`)
+      }
+      
+      return validation.data.data
     },
     staleTime: 1000 * 60 * 60 * 24, // 24 hours (sources don't change often)
   })
@@ -90,7 +131,15 @@ export const useWeatherHistory = (
       const response = await API.get<ApiResponse<WeatherConditions[]>>(
         `/weather/history/${siteId}?from_date=${fromDate}&to_date=${toDate}`
       )
-      return response.data.data
+      
+      // Validate API response with Zod
+      const validation = ApiResponseSchema(WeatherConditionsSchema.array()).safeParse(response.data)
+      if (!validation.success) {
+        console.error('❌ Weather history validation failed:', validation.error)
+        throw new Error(`Invalid weather history: ${validation.error.message}`)
+      }
+      
+      return validation.data.data
     },
     staleTime: 1000 * 60 * 60, // 1 hour
     enabled: !!(siteId && fromDate && toDate),
@@ -113,7 +162,15 @@ export const useWeatherBySource = (
       const response = await API.get<ApiResponse<ForecastDay[]>>(
         `/weather/forecast/${siteId}?source=${sourceId}`
       )
-      return response.data.data
+      
+      // Validate API response with Zod
+      const validation = ApiResponseSchema(ForecastDaySchema.array()).safeParse(response.data)
+      if (!validation.success) {
+        console.error('❌ Weather by source validation failed:', validation.error)
+        throw new Error(`Invalid weather by source: ${validation.error.message}`)
+      }
+      
+      return validation.data.data
     },
     staleTime: 1000 * 60 * 5,
     enabled: !!(siteId && sourceId),
@@ -135,6 +192,13 @@ export const useWeather = (siteId: string | undefined): UseQueryResult<WeatherDa
       const todayResponse = await API.get(`/weather/${siteId}?day_index=0`)
       console.log(`🌍 Today's weather for ${siteId}:`, todayResponse.data)
       
+      // Validate today's response with Zod
+      const todayValidation = BackendWeatherResponseSchema.safeParse(todayResponse.data)
+      if (!todayValidation.success) {
+        console.error('❌ Today weather validation failed:', todayValidation.error)
+        throw new Error(`Invalid today weather: ${todayValidation.error.message}`)
+      }
+      
       // Fetch 7 days in parallel
       const dailyPromises = Array.from({ length: 7 }, (_, i) => 
         API.get(`/weather/${siteId}?day_index=${i}`).catch(() => null)
@@ -142,11 +206,35 @@ export const useWeather = (siteId: string | undefined): UseQueryResult<WeatherDa
       const dailyResponses = await Promise.all(dailyPromises)
       console.log(`📅 7-day forecast responses:`, dailyResponses.map(r => r?.data))
       
-      const data = todayResponse.data
+      // Validate each daily response
+      const validatedDailyResponses = dailyResponses.map((response, index) => {
+        if (!response?.data) return null
+        const validation = BackendWeatherResponseSchema.safeParse(response.data)
+        if (!validation.success) {
+          console.warn(`⚠️ Day ${index} validation failed:`, validation.error)
+          return null
+        }
+        return { data: validation.data }
+      })
+      
+      const data = todayValidation.data
       
       // Transform backend structure to frontend WeatherData format
-      const currentHour = data.consensus?.[0] || {}
-      const metrics = data.metrics || {}
+      const currentHour = data.consensus?.[0] || {
+        hour: 0,
+        temperature: null,
+        wind_speed: null,
+        wind_gust: null,
+        wind_direction: null,
+        precipitation: null,
+        cloud_cover: null,
+      }
+      const metrics = data.metrics || {
+        avg_temp_c: null,
+        avg_wind_kmh: null,
+        max_gust_kmh: null,
+        total_rain_mm: null,
+      }
       
       // Helper to format wind direction
       const formatWindDirection = (deg: number | null): string => {
@@ -215,7 +303,7 @@ export const useWeather = (siteId: string | undefined): UseQueryResult<WeatherDa
       })
       
       // Transform daily responses to DailyForecastItem[]
-      const dailyForecast = dailyResponses
+      const dailyForecast = validatedDailyResponses
         .map((response, index) => {
           if (!response?.data) return null
           const dayData = response.data
@@ -258,7 +346,15 @@ export const useWeather = (siteId: string | undefined): UseQueryResult<WeatherDa
       }
       
       console.log('✅ Transformed weather data:', transformed)
-      return transformed
+      
+      // Validate transformed data with Zod
+      const transformedValidation = WeatherDataSchema.safeParse(transformed)
+      if (!transformedValidation.success) {
+        console.error('❌ Transformed weather validation failed:', transformedValidation.error)
+        throw new Error(`Invalid transformed weather: ${transformedValidation.error.message}`)
+      }
+      
+      return transformedValidation.data
     },
     staleTime: 1000 * 60 * 5,
     enabled: !!siteId,
