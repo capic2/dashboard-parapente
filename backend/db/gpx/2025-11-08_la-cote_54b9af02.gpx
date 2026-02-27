@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Paragliding Dashboard" 
+     xmlns="http://www.topografix.com/GPX/1/1"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>Vol final La Côte</name>
+    <desc>Dernier vol de la journée</desc>
+    <time>2025-11-08T14:00:00Z</time>
+  </metadata>
+  <trk>
+    <name>Vol final La Côte</name>
+    <type>Paragliding</type>
+    <trkseg>
+      <trkpt lat="47.189560" lon="6.045670">
+        <ele>800.0</ele>
+        <time>2025-11-08T14:00:00Z</time>
+      </trkpt>
+      <trkpt lat="47.189560" lon="6.045694">
+        <ele>800.0</ele>
+        <time>2025-11-08T14:00:30Z</time>
+      </trkpt>
+      <trkpt lat="47.189527" lon="6.045670">
+        <ele>800.0</ele>
+        <time>2025-11-08T14:01:00Z</time>
+      </trkpt>
+      <trkpt lat="47.189560" lon="6.045597">
+        <ele>800.0</ele>
+        <time>2025-11-08T14:01:30Z</time>
+      </trkpt>
+      <trkpt lat="47.189626" lon="6.045670">
+        <ele>800.0</ele>
+        <time>2025-11-08T14:02:00Z</time>
+      </trkpt>
+      <trkpt lat="47.189560" lon="6.045792">
+        <ele>800.0</ele>
+        <time>2025-11-08T14:02:30Z</time>
+      </trkpt>
+      <trkpt lat="47.189461" lon="6.045670">
+        <ele>800.0</ele>
+        <time>2025-11-08T14:03:00Z</time>
+      </trkpt>
+      <trkpt lat="47.189560" lon="6.045500">
+        <ele>800.0</ele>
+        <time>2025-11-08T14:03:30Z</time>
+      </trkpt>
+      <trkpt lat="47.189692" lon="6.045670">
+        <ele>800.0</ele>
+        <time>2025-11-08T14:04:00Z</time>
+      </trkpt>
+      <trkpt lat="47.189560" lon="6.045889">
+        <ele>800.0</ele>
+        <time>2025-11-08T14:04:30Z</time>
+      </trkpt>
+      <trkpt lat="47.189395" lon="6.045670">
+        <ele>800.0</ele>
+        <time>2025-11-08T14:05:00Z</time>
+      </trkpt>
+      <trkpt lat="47.189560" lon="6.045403">
+        <ele>800.0</ele>
+        <time>2025-11-08T14:05:30Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>

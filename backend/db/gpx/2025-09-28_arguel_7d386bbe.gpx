@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Paragliding Dashboard" 
+     xmlns="http://www.topografix.com/GPX/1/1"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>Vol matinal Arguel</name>
+    <desc>Deuxième vol d'apprentissage</desc>
+    <time>2025-09-28T14:00:00Z</time>
+  </metadata>
+  <trk>
+    <name>Vol matinal Arguel</name>
+    <type>Paragliding</type>
+    <trkseg>
+      <trkpt lat="47.223560" lon="6.018420">
+        <ele>427.0</ele>
+        <time>2025-09-28T14:00:00Z</time>
+      </trkpt>
+      <trkpt lat="47.223553" lon="6.018450">
+        <ele>427.9</ele>
+        <time>2025-09-28T14:00:30Z</time>
+      </trkpt>
+      <trkpt lat="47.223525" lon="6.018383">
+        <ele>428.7</ele>
+        <time>2025-09-28T14:01:00Z</time>
+      </trkpt>
+      <trkpt lat="47.223612" lon="6.018364">
+        <ele>429.6</ele>
+        <time>2025-09-28T14:01:30Z</time>
+      </trkpt>
+      <trkpt lat="47.223587" lon="6.018541">
+        <ele>430.4</ele>
+        <time>2025-09-28T14:02:00Z</time>
+      </trkpt>
+      <trkpt lat="47.223452" lon="6.018420">
+        <ele>431.3</ele>
+        <time>2025-09-28T14:02:30Z</time>
+      </trkpt>
+      <trkpt lat="47.223600" lon="6.018238">
+        <ele>432.1</ele>
+        <time>2025-09-28T14:03:00Z</time>
+      </trkpt>
+      <trkpt lat="47.223682" lon="6.018551">
+        <ele>433.0</ele>
+        <time>2025-09-28T14:03:30Z</time>
+      </trkpt>
+      <trkpt lat="47.223420" lon="6.018570">
+        <ele>431.0</ele>
+        <time>2025-09-28T14:04:00Z</time>
+      </trkpt>
+      <trkpt lat="47.223500" lon="6.018147">
+        <ele>429.0</ele>
+        <time>2025-09-28T14:04:30Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>
