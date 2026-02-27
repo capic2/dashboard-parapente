@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Paragliding Dashboard" 
+     xmlns="http://www.topografix.com/GPX/1/1"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>Vol test Mont Poupet</name>
+    <desc>Découverte du nouveau site</desc>
+    <time>2025-10-12T14:00:00Z</time>
+  </metadata>
+  <trk>
+    <name>Vol test Mont Poupet</name>
+    <type>Paragliding</type>
+    <trkseg>
+      <trkpt lat="47.164250" lon="5.992340">
+        <ele>842.0</ele>
+        <time>2025-10-12T14:00:00Z</time>
+      </trkpt>
+      <trkpt lat="47.164238" lon="5.992358">
+        <ele>842.0</ele>
+        <time>2025-10-12T14:00:30Z</time>
+      </trkpt>
+      <trkpt lat="47.164250" lon="5.992290">
+        <ele>842.0</ele>
+        <time>2025-10-12T14:01:00Z</time>
+      </trkpt>
+      <trkpt lat="47.164286" lon="5.992393">
+        <ele>842.0</ele>
+        <time>2025-10-12T14:01:30Z</time>
+      </trkpt>
+      <trkpt lat="47.164182" lon="5.992340">
+        <ele>842.0</ele>
+        <time>2025-10-12T14:02:00Z</time>
+      </trkpt>
+      <trkpt lat="47.164310" lon="5.992252">
+        <ele>842.0</ele>
+        <time>2025-10-12T14:02:30Z</time>
+      </trkpt>
+      <trkpt lat="47.164250" lon="5.992489">
+        <ele>842.0</ele>
+        <time>2025-10-12T14:03:00Z</time>
+      </trkpt>
+      <trkpt lat="47.164166" lon="5.992217">
+        <ele>842.0</ele>
+        <time>2025-10-12T14:03:30Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>
