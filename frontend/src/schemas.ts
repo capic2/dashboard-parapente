@@ -52,9 +52,9 @@ export const FlightStatsSchema = z.object({
   avg_duration_minutes: z.number().catch(0),
   avg_distance_km: z.number().catch(0),
   max_altitude_m: z.number().catch(0),
-  favorite_spot: z.string().optional(),
+  favorite_spot: z.string().nullable().optional(),
   favorite_site: SiteSchema.nullable(),
-  last_flight_date: z.string().optional(),
+  last_flight_date: z.string().nullable().optional(),
 })
 
 export const AlertSchema = z.object({
