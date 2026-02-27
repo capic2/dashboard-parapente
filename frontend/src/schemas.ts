@@ -18,7 +18,7 @@ export const SiteSchema = z.object({
   description: z.string().optional(),
   orientation: z.string().optional(),
   difficulty_level: z.string().optional(),
-  is_active: z.boolean(),
+  is_active: z.boolean().default(true).optional(),
   created_at: z.string(),
   updated_at: z.string(),
 })
@@ -66,7 +66,7 @@ export const AlertSchema = z.object({
   operator: z.enum(['>', '<', '=', 'between']),
   threshold_min: z.number(),
   threshold_max: z.number(),
-  is_active: z.boolean(),
+  is_active: z.boolean().default(true).optional(),
   notify_via: z.enum(['telegram', 'email', 'both']),
   created_at: z.string(),
   updated_at: z.string(),
@@ -125,7 +125,7 @@ export const WeatherSourceSchema = z.object({
   id: z.string(),
   name: z.string(),
   provider_type: z.enum(['meteo_france', 'open_meteo', 'windy', 'custom']),
-  is_active: z.boolean(),
+  is_active: z.boolean().default(true).optional(),
   api_config: z.record(z.string(), z.any()).optional(),
   created_at: z.string(),
 })
