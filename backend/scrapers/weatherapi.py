@@ -1,30 +1,52 @@
-"""WeatherAPI.com scraper"""
+"""WeatherAPI.com scraper with proper async support"""
 
-import requests
+import httpx
+import os
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 
-WEATHERAPI_KEY = "64cfa0092fa84c77940180226261802"
+# Load from environment, fallback to provided key
+WEATHERAPI_KEY = os.getenv("WEATHERAPI_KEY", "64cfa0092fa84c77940180226261802")
 
-async def fetch_weatherapi(lat: float, lon: float, days: int = 2) -> Dict:
-    """Fetch weather from WeatherAPI.com"""
+
+async def fetch_weatherapi(lat: float, lon: float, days: int = 2) -> Dict[str, any]:
+    """
+    Fetch weather forecast from WeatherAPI.com
+    
+    Args:
+        lat: Latitude coordinate
+        lon: Longitude coordinate
+        days: Number of forecast days (1-3)
+    
+    Returns:
+        Dict with success status, data, source, and timestamp
+    """
     try:
-        url = f"https://api.weatherapi.com/v1/forecast.json"
+        url = "https://api.weatherapi.com/v1/forecast.json"
         params = {
             "key": WEATHERAPI_KEY,
             "q": f"{lat},{lon}",
-            "days": days,
+            "days": min(days, 3),  # API limit is 3 days
             "aqi": "no",
             "alerts": "no"
         }
         
-        response = requests.get(url, params=params, timeout=10)
-        data = response.json()
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
         
         return {
             "success": True,
             "source": "weatherapi",
             "data": data,
+            "timestamp": datetime.now().isoformat()
+        }
+    except httpx.HTTPStatusError as e:
+        return {
+            "success": False,
+            "source": "weatherapi",
+            "error": f"HTTP {e.response.status_code}: {str(e)}",
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
@@ -35,12 +57,22 @@ async def fetch_weatherapi(lat: float, lon: float, days: int = 2) -> Dict:
             "timestamp": datetime.now().isoformat()
         }
 
-def extract_hourly_forecast(data: Dict, day_index: int = 0) -> List[Dict]:
-    """Extract hourly forecast for a specific day"""
+
+def extract_hourly_forecast(data: Dict[str, any], day_index: int = 0) -> List[Dict[str, any]]:
+    """
+    Extract hourly forecast for a specific day
+    
+    Args:
+        data: Raw response from fetch_weatherapi
+        day_index: Which day to extract (0=today, 1=tomorrow)
+    
+    Returns:
+        List of hourly forecast dicts
+    """
     if not data.get("success"):
         return []
     
-    forecast_days = data["data"].get("forecast", {}).get("forecastday", [])
+    forecast_days = data.get("data", {}).get("forecast", {}).get("forecastday", [])
     if day_index >= len(forecast_days):
         return []
     
@@ -49,13 +81,16 @@ def extract_hourly_forecast(data: Dict, day_index: int = 0) -> List[Dict]:
     
     forecasts = []
     for hour_data in hours:
+        time_str = hour_data.get("time", "")
+        hour = int(time_str.split()[1].split(":")[0]) if " " in time_str else 0
+        
         forecasts.append({
-            "time": hour_data["time"],
-            "hour": int(hour_data["time"].split(":")[0]),
-            "temperature": hour_data["temp_c"],
-            "wind_speed": hour_data["wind_kph"] * 0.278,  # Convert to m/s, then to km/h equivalent
-            "wind_gust": hour_data["gust_kph"] * 0.278,
-            "cloud_cover": hour_data["cloud"],
+            "time": time_str,
+            "hour": hour,
+            "temperature": hour_data.get("temp_c"),
+            "wind_speed": hour_data.get("wind_kph", 0) / 3.6,  # kph to m/s
+            "wind_gust": hour_data.get("gust_kph", 0) / 3.6,  # kph to m/s
+            "cloud_cover": hour_data.get("cloud"),
             "precipitation": hour_data.get("precip_mm", 0),
             "humidity": hour_data.get("humidity", 0),
         })
