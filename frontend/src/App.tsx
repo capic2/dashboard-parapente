@@ -2,6 +2,7 @@ import React from 'react'
 import { RootRoute, Route, Router, RouterProvider, Outlet } from '@tanstack/react-router'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
 import Header from './components/Header'
+import ErrorBoundary from './components/ErrorBoundary'
 import Dashboard from './pages/Dashboard'
 import FlightHistory from './pages/FlightHistory'
 import Analytics from './pages/Analytics'
@@ -81,9 +82,11 @@ declare module '@tanstack/react-router' {
 // App component with providers
 const App: React.FC = () => {
   return (
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    </ErrorBoundary>
   )
 }
 
