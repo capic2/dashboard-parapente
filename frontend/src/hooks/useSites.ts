@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
+import { SitesApiResponseSchema, SiteSchema } from '../schemas';
 
 interface Site {
   id: string;
@@ -32,7 +33,15 @@ export const useSites = () => {
     queryFn: async () => {
       const { data } = await axios.get(`${API_BASE_URL}/spots`);
       console.log('📍 Sites response:', data);
-      return data.sites; // Extract sites array from response
+      
+      // Validate API response with Zod
+      const validation = SitesApiResponseSchema.safeParse(data);
+      if (!validation.success) {
+        console.error('❌ Sites validation failed:', validation.error);
+        throw new Error(`Invalid sites data: ${validation.error.message}`);
+      }
+      
+      return validation.data.sites as any; // Extract validated sites array
     },
     staleTime: 1000 * 60 * 30, // 30 minutes - sites don't change often
   });
@@ -43,7 +52,15 @@ export const useSite = (siteId: string) => {
     queryKey: ['site', siteId],
     queryFn: async () => {
       const { data } = await axios.get(`${API_BASE_URL}/spots/${siteId}`);
-      return data;
+      
+      // Validate API response with Zod
+      const validation = SiteSchema.safeParse(data);
+      if (!validation.success) {
+        console.error('❌ Site validation failed:', validation.error);
+        throw new Error(`Invalid site data: ${validation.error.message}`);
+      }
+      
+      return validation.data as any;
     },
     enabled: !!siteId,
     staleTime: 1000 * 60 * 30,
@@ -57,7 +74,15 @@ export const useNearbySites = (lat: number, lng: number, radius = 50) => {
       const { data } = await axios.get(
         `${API_BASE_URL}/spots/nearby?lat=${lat}&lng=${lng}&radius=${radius}`
       );
-      return data;
+      
+      // Validate API response with Zod
+      const validation = SiteSchema.array().safeParse(data);
+      if (!validation.success) {
+        console.error('❌ Nearby sites validation failed:', validation.error);
+        throw new Error(`Invalid nearby sites data: ${validation.error.message}`);
+      }
+      
+      return validation.data as any;
     },
     enabled: !!lat && !!lng,
   });
