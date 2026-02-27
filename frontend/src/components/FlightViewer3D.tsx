@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import 'cesium/Build/Cesium/Widgets/widgets.css'
 import { useCesiumViewer } from '../hooks/useCesiumViewer'
 import { useFlightGPX, useFlightElevationProfile, useDownloadGPX } from '../hooks/useFlightGPX'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
