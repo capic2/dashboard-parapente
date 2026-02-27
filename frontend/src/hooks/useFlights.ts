@@ -33,10 +33,12 @@ export const useFlights = (filters: FlightFilters = {}): UseQueryResult<Flight[]
   return useQuery({
     queryKey: ['flights', filters],
     queryFn: async () => {
-      const response = await API.get<ApiResponse<Flight[]>>(
+      const response = await API.get(
         `/flights${queryParams ? `?${queryParams}` : ''}`
       )
-      return response.data.data
+      console.log('✈️ Flights response:', response.data)
+      // Backend returns { flights: [...] }, not wrapped in ApiResponse
+      return response.data.flights || []
     },
     staleTime: 1000 * 60 * 10, // 10 minutes
   })
@@ -65,8 +67,10 @@ export const useFlightStats = (): UseQueryResult<FlightStats, Error> => {
   return useQuery({
     queryKey: ['flights', 'stats'],
     queryFn: async () => {
-      const response = await API.get<ApiResponse<FlightStats>>('/flights/stats')
-      return response.data.data
+      const response = await API.get('/flights/stats')
+      console.log('📊 Flight stats response:', response.data)
+      // Backend returns stats directly, not wrapped in ApiResponse
+      return response.data
     },
     staleTime: 1000 * 60 * 60, // 1 hour
   })
