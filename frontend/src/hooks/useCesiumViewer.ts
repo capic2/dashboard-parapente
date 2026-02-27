@@ -76,6 +76,7 @@ export const useCesiumViewer = () => {
     )
 
     viewer.entities.add({
+      id: 'flight-polyline',
       polyline: {
         positions: positions,
         width: 3,
@@ -86,6 +87,7 @@ export const useCesiumViewer = () => {
 
     // Add markers at start and end
     viewer.entities.add({
+      id: 'flight-start-marker',
       position: positions[0],
       point: {
         pixelSize: 10,
@@ -104,6 +106,7 @@ export const useCesiumViewer = () => {
     })
 
     viewer.entities.add({
+      id: 'flight-end-marker',
       position: positions[positions.length - 1],
       point: {
         pixelSize: 10,
@@ -134,6 +137,7 @@ export const useCesiumViewer = () => {
     )
 
     viewer.entities.add({
+      id: 'flight-polyline-volume',
       polylineVolume: {
         positions: positions,
         shape: [new Cesium.Cartesian2(-15, -15), new Cesium.Cartesian2(15, 15)],
@@ -161,6 +165,7 @@ export const useCesiumViewer = () => {
 
       // Create animated entity
       const animatedPoint = viewer.entities.add({
+        id: 'flight-replay-point',
         position: Cesium.Cartesian3.fromDegrees(
           coords[0].lon,
           coords[0].lat,
