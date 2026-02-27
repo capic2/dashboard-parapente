@@ -21,7 +21,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   showReplay = true,
   showElevationChart = true,
 }) => {
-  const { viewerRef, isReady, isReplaying, addPolyline, playReplay, stopReplay, zoomToTrack } =
+  const { isReady, isReplaying, addPolyline, playReplay, stopReplay, zoomToTrack } =
     useCesiumViewer()
   const { data: gpxData, isLoading: gpxLoading, error: gpxError } = useFlightGPX(flightId)
   const elevationProfile = useFlightElevationProfile(flightId)
@@ -92,7 +92,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       </div>
 
       {/* 3D Viewer Container */}
-      <div id="cesium-container" className="cesium-container" ref={viewerRef} />
+      <div id="cesium-container" className="cesium-container" />
 
       {/* Loading State */}
       {gpxLoading && (
