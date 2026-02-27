@@ -2,10 +2,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import cesium from 'vite-plugin-cesium';
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), cesium()],
   server: {
     host: '0.0.0.0',
     port: 5173,
@@ -30,9 +31,5 @@ export default defineConfig({
         }
       }
     }
-  },
-  optimizeDeps: {
-    include: ['cesium'],
-    exclude: ['cesium/Build/Cesium/Widgets/widgets.css']
   }
 });
