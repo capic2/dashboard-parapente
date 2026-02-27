@@ -94,12 +94,11 @@ def get_flights(limit: int = 10, db: Session = Depends(get_db)):
     """Get recent flights"""
     flights = db.query(Flight).order_by(Flight.flight_date.desc()).limit(limit).all()
     
-    # Convert to dict and add user_id (hardcoded for single-user app)
+    # Convert to dict (user_id removed - not needed for single-user app)
     flights_data = []
     for flight in flights:
         flight_dict = {
             "id": flight.id,
-            "user_id": "user-1",  # Hardcoded user_id for single-user app
             "site_id": flight.site_id,
             "site_name": flight.site.name if flight.site else None,
             "title": flight.title,

@@ -192,7 +192,7 @@ def parse_gpx(gpx_content: str) -> Dict[str, Any]:
         gpx_content: GPX XML string
     
     Returns:
-        Dict with coordinates, elevation, max_altitude, elevation_gain
+        Dict with coordinates, elevation, max_altitude, elevation_gain, first_trackpoint
     """
     try:
         root = ET.fromstring(gpx_content)
@@ -209,14 +209,45 @@ def parse_gpx(gpx_content: str) -> Dict[str, Any]:
         
         coordinates = []
         elevations = []
+        first_time = None
+        first_lat = None
+        first_lon = None
+        first_ele = None
         
-        for trkpt in trackpoints:
+        for i, trkpt in enumerate(trackpoints):
             lat = float(trkpt.get("lat"))
             lon = float(trkpt.get("lon"))
             
-            # Get elevation
-            ele_elem = trkpt.find("gpx:ele", ns) or trkpt.find("ele")
-            ele = float(ele_elem.text) if ele_elem is not None else 0
+            # Get elevation - try with namespace first, then without, then from attribute
+            ele_elem = trkpt.find("gpx:ele", ns)
+            if ele_elem is None:
+                ele_elem = trkpt.find("ele")
+            if ele_elem is None:
+                # Try as direct child without namespace
+                for child in trkpt:
+                    if child.tag.endswith("ele"):
+                        ele_elem = child
+                        break
+            
+            ele = float(ele_elem.text) if ele_elem is not None and ele_elem.text else 0
+            
+            # Get time from first trackpoint
+            if i == 0:
+                time_elem = trkpt.find("gpx:time", ns)
+                if time_elem is None:
+                    time_elem = trkpt.find("time")
+                if time_elem is None:
+                    # Try as direct child without namespace
+                    for child in trkpt:
+                        if child.tag.endswith("time"):
+                            time_elem = child
+                            break
+                
+                if time_elem is not None and time_elem.text:
+                    first_time = time_elem.text
+                first_lat = lat
+                first_lon = lon
+                first_ele = ele
             
             coordinates.append({"lat": lat, "lon": lon})
             elevations.append(ele)
@@ -238,6 +269,18 @@ def parse_gpx(gpx_content: str) -> Dict[str, Any]:
             if diff > 0:
                 elevation_gain += diff
         
+        # Parse first trackpoint time (ISO format with timezone)
+        departure_time = None
+        if first_time:
+            try:
+                # Parse ISO datetime (e.g., "2024-02-27T16:08:00Z" or "2024-02-27T16:08:00+01:00")
+                if first_time.endswith("Z"):
+                    departure_time = datetime.fromisoformat(first_time.replace("Z", "+00:00"))
+                else:
+                    departure_time = datetime.fromisoformat(first_time)
+            except Exception as e:
+                logger.warning(f"Failed to parse GPX time '{first_time}': {e}")
+        
         return {
             "success": True,
             "coordinates": coordinates,
@@ -245,7 +288,13 @@ def parse_gpx(gpx_content: str) -> Dict[str, Any]:
             "max_altitude_m": max_altitude,
             "min_altitude_m": min_altitude,
             "elevation_gain_m": int(elevation_gain),
-            "num_points": len(coordinates)
+            "num_points": len(coordinates),
+            "first_trackpoint": {
+                "lat": first_lat,
+                "lon": first_lon,
+                "elevation": first_ele,
+                "time": departure_time  # datetime object or None
+            }
         }
     
     except Exception as e:
@@ -290,4 +339,94 @@ async def get_activity_details(activity_id: str) -> Optional[Dict[str, Any]]:
     
     except Exception as e:
         logger.error(f"Failed to get activity details for {activity_id}: {e}")
+        return None
+
+
+def save_gpx_file(gpx_content: str, activity_id: str) -> Optional[str]:
+    """
+    Save GPX content to file system
+    
+    Args:
+        gpx_content: GPX XML string
+        activity_id: Strava activity ID
+    
+    Returns:
+        File path (relative to backend root) or None on error
+    """
+    try:
+        # Create GPX directory if needed
+        gpx_dir = Path(__file__).parent / "db" / "gpx"
+        gpx_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save file
+        file_name = f"strava_{activity_id}.gpx"
+        file_path = gpx_dir / file_name
+        
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(gpx_content)
+        
+        # Return relative path from backend root
+        relative_path = f"db/gpx/{file_name}"
+        
+        logger.info(f"✅ Saved GPX to {relative_path}")
+        
+        return relative_path
+    
+    except Exception as e:
+        logger.error(f"Failed to save GPX file for activity {activity_id}: {e}")
+        return None
+
+
+def match_site_by_coordinates(lat: float, lon: float, sites: List[Dict[str, Any]]) -> Optional[str]:
+    """
+    Match a site based on GPS coordinates (using simple distance calculation)
+    
+    Args:
+        lat: Latitude of departure point
+        lon: Longitude of departure point
+        sites: List of site dicts with id, latitude, longitude, name
+    
+    Returns:
+        Site ID of closest site (within 5km) or None
+    """
+    import math
+    
+    def haversine_distance(lat1, lon1, lat2, lon2):
+        """Calculate distance in km between two GPS coordinates"""
+        R = 6371  # Earth radius in km
+        
+        dlat = math.radians(lat2 - lat1)
+        dlon = math.radians(lon2 - lon1)
+        
+        a = (math.sin(dlat / 2) ** 2 +
+             math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
+             math.sin(dlon / 2) ** 2)
+        
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        
+        return R * c
+    
+    # Find closest site
+    closest_site = None
+    min_distance = float('inf')
+    
+    for site in sites:
+        if not site.get("latitude") or not site.get("longitude"):
+            continue
+        
+        distance = haversine_distance(
+            lat, lon,
+            site["latitude"], site["longitude"]
+        )
+        
+        if distance < min_distance:
+            min_distance = distance
+            closest_site = site
+    
+    # Only match if within 5km (paragliding sites are usually close to departure)
+    if closest_site and min_distance <= 5.0:
+        logger.info(f"✅ Matched site '{closest_site['name']}' (distance: {min_distance:.2f}km)")
+        return closest_site["id"]
+    else:
+        logger.warning(f"No site match found (closest: {min_distance:.2f}km)")
         return None

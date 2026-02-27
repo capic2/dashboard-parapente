@@ -13,8 +13,6 @@ def init_db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     
     if not DB_PATH.exists():
-        print(f"❌ Database not found: {DB_PATH}")
-        print("   Run the application first to create the database schema.")
         return
     
     # Create connection
@@ -48,13 +46,10 @@ def init_db():
         # Verify
         cursor.execute('SELECT code, name, country FROM sites')
         sites = cursor.fetchall()
-        print(f"✅ Database initialized: {DB_PATH}")
-        print(f"✅ {len(sites)} sites in database:")
         for site in sites:
-            print(f"   - {site[0]}: {site[1]} ({site[2]})")
+            print(f"✓ Site: {site[1]} ({site[0]}) - {site[2]}")
         
     except Exception as e:
-        print(f"❌ Error: {e}")
         import traceback
         traceback.print_exc()
         conn.rollback()

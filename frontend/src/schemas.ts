@@ -25,7 +25,7 @@ export const SiteSchema = z.object({
 
 export const FlightSchema = z.object({
   id: z.string(),
-  user_id: z.string(),
+  user_id: z.string().optional(),
   site_id: z.string(),
   site_name: z.string().optional(),
   title: z.string(),
@@ -52,9 +52,9 @@ export const FlightStatsSchema = z.object({
   avg_duration_minutes: z.number().catch(0),
   avg_distance_km: z.number().catch(0),
   max_altitude_m: z.number().catch(0),
-  favorite_spot: z.union([z.string(), z.null(), z.undefined()]).transform(v => v ?? ''),
-  favorite_site: SiteSchema.optional(),
-  last_flight_date: z.union([z.string(), z.null(), z.undefined()]).transform(v => v ?? ''),
+  favorite_spot: z.string().optional(),
+  favorite_site: SiteSchema.nullable(),
+  last_flight_date: z.string().optional(),
 })
 
 export const AlertSchema = z.object({

@@ -27,7 +27,6 @@ export const useSites = (): UseQueryResult<Site[], Error> => {
     queryKey: ['sites'],
     queryFn: async () => {
       const response = await API.get('/spots') // Fixed: /sites -> /spots
-      console.log('📍 Sites response:', response.data)
       
       // Validate API response with Zod
       const validation = SitesApiResponseSchema.safeParse(response.data)
@@ -51,7 +50,6 @@ export const useCurrentConditions = (siteId?: string): UseQueryResult<WeatherCon
     queryFn: async () => {
       if (!siteId) throw new Error('Site ID is required')
       const response = await API.get(`/weather/${siteId}`) // Fixed: /weather/current/{id} -> /weather/{id}
-      console.log(`🌤️ Weather response for ${siteId}:`, response.data)
       
       // Validate API response with Zod
       const validation = BackendWeatherResponseSchema.safeParse(response.data)
@@ -76,7 +74,6 @@ export const useForecast = (siteId: string | undefined): UseQueryResult<any[], E
     queryFn: async () => {
       if (!siteId) throw new Error('Site ID is required')
       const response = await API.get(`/weather/${siteId}`) // Fixed: /weather/forecast/{id} -> /weather/{id}
-      console.log(`📅 Forecast response for ${siteId}:`, response.data)
       
       // Validate API response with Zod
       const validation = BackendWeatherResponseSchema.safeParse(response.data)
@@ -190,7 +187,6 @@ export const useWeather = (siteId: string | undefined): UseQueryResult<WeatherDa
       
       // Fetch today (day_index=0) first for current conditions
       const todayResponse = await API.get(`/weather/${siteId}?day_index=0`)
-      console.log(`🌍 Today's weather for ${siteId}:`, todayResponse.data)
       
       // Validate today's response with Zod
       const todayValidation = BackendWeatherResponseSchema.safeParse(todayResponse.data)
@@ -204,7 +200,6 @@ export const useWeather = (siteId: string | undefined): UseQueryResult<WeatherDa
         API.get(`/weather/${siteId}?day_index=${i}`).catch(() => null)
       )
       const dailyResponses = await Promise.all(dailyPromises)
-      console.log(`📅 7-day forecast responses:`, dailyResponses.map(r => r?.data))
       
       // Validate each daily response
       const validatedDailyResponses = dailyResponses.map((response, index) => {
@@ -345,7 +340,6 @@ export const useWeather = (siteId: string | undefined): UseQueryResult<WeatherDa
         daily_forecast: dailyForecast
       }
       
-      console.log('✅ Transformed weather data:', transformed)
       
       // Validate transformed data with Zod
       const transformedValidation = WeatherDataSchema.safeParse(transformed)
