@@ -8,9 +8,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://dashboard-backend:8000',
         changeOrigin: true,
-        rewrite: (path: string) => path.replace(/^\/api/, '/api/v1'),
       },
     },
   },
