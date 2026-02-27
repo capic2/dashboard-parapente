@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { useFlights, useUpdateFlight, useDeleteFlight } from '../hooks/useFlights';
 import type { Flight } from '../types';
 import FlightViewer3D from '../components/FlightViewer3D';
