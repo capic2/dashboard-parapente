@@ -3,19 +3,13 @@ import { Viewer, Entity, PolylineGraphics } from 'resium'
 import { Cartesian3, Color, Viewer as CesiumViewer, HeadingPitchRange } from 'cesium'
 import { useFlightGPX, useFlightElevationProfile, useDownloadGPX } from '../hooks/useFlightGPX'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { GeoPoint } from '../types/flight'
 
 export interface FlightViewer3DProps {
   flightId: string
   flightTitle?: string
   showReplay?: boolean
   showElevationChart?: boolean
-}
-
-export interface GeoPoint {
-  lat: number
-  lon: number
-  elevation: number
-  timestamp: number
 }
 
 /**

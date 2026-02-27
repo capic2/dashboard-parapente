@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import axios from 'axios'
-import { GeoPoint } from './useCesiumViewer'
+import { GeoPoint } from '../types/flight'
 
 const API = axios.create({
   baseURL: '/api',
