@@ -14,8 +14,8 @@ export default function Dashboard() {
   React.useEffect(() => {
     if (sites && sites.length > 0 && !selectedSiteId) {
       console.log('✅ Auto-selecting first site:', sites[0]);
-      // Use 'code' field for API calls, not 'id'
-      setSelectedSiteId((sites[0] as any).code || sites[0].id);
+      // Use 'id' field for API calls (e.g., 'site-arguel')
+      setSelectedSiteId(sites[0].id);
     }
   }, [sites, selectedSiteId]);
 
