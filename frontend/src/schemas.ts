@@ -42,16 +42,16 @@ export const FlightSchema = z.object({
 })
 
 export const FlightStatsSchema = z.object({
-  total_flights: z.number(),
-  total_hours: z.number(),
-  total_duration_minutes: z.number(),
-  total_distance: z.number(),
-  total_distance_km: z.number(),
-  total_elevation_gain_m: z.number(),
-  avg_duration: z.number(),
-  avg_duration_minutes: z.number(),
-  avg_distance_km: z.number(),
-  max_altitude_m: z.number(),
+  total_flights: z.number().default(0).optional(),
+  total_hours: z.number().default(0).optional(),
+  total_duration_minutes: z.number().default(0).optional(),
+  total_distance: z.number().default(0).optional(),
+  total_distance_km: z.number().default(0).optional(),
+  total_elevation_gain_m: z.number().default(0).optional(),
+  avg_duration: z.number().default(0).optional(),
+  avg_duration_minutes: z.number().default(0).optional(),
+  avg_distance_km: z.number().default(0).optional(),
+  max_altitude_m: z.number().default(0).optional(),
   favorite_spot: z.string().optional(),
   favorite_site: SiteSchema.optional(),
   last_flight_date: z.string().optional(),
@@ -195,7 +195,7 @@ export const SlotSchema = z.object({
   start_hour: z.number(),
   end_hour: z.number(),
   verdict: z.string(),
-  reason: z.string(),
+  reason: z.string().default('').optional(),
 })
 
 export const MetricsSchema = z.object({
