@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Paragliding Dashboard" 
+     xmlns="http://www.topografix.com/GPX/1/1"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>Vol de découverte Arguel</name>
+    <desc>Premier vol court, conditions calmes</desc>
+    <time>2025-09-27T14:00:00Z</time>
+  </metadata>
+  <trk>
+    <name>Vol de découverte Arguel</name>
+    <type>Paragliding</type>
+    <trkseg>
+      <trkpt lat="47.223560" lon="6.018420">
+        <ele>427.0</ele>
+        <time>2025-09-27T14:00:00Z</time>
+      </trkpt>
+      <trkpt lat="47.223554" lon="6.018445">
+        <ele>428.1</ele>
+        <time>2025-09-27T14:00:30Z</time>
+      </trkpt>
+      <trkpt lat="47.223531" lon="6.018389">
+        <ele>429.3</ele>
+        <time>2025-09-27T14:01:00Z</time>
+      </trkpt>
+      <trkpt lat="47.223604" lon="6.018373">
+        <ele>430.4</ele>
+        <time>2025-09-27T14:01:30Z</time>
+      </trkpt>
+      <trkpt lat="47.223582" lon="6.018521">
+        <ele>431.6</ele>
+        <time>2025-09-27T14:02:00Z</time>
+      </trkpt>
+      <trkpt lat="47.223470" lon="6.018420">
+        <ele>432.7</ele>
+        <time>2025-09-27T14:02:30Z</time>
+      </trkpt>
+      <trkpt lat="47.223593" lon="6.018269">
+        <ele>433.9</ele>
+        <time>2025-09-27T14:03:00Z</time>
+      </trkpt>
+      <trkpt lat="47.223662" lon="6.018529">
+        <ele>435.0</ele>
+        <time>2025-09-27T14:03:30Z</time>
+      </trkpt>
+      <trkpt lat="47.223443" lon="6.018545">
+        <ele>432.3</ele>
+        <time>2025-09-27T14:04:00Z</time>
+      </trkpt>
+      <trkpt lat="47.223510" lon="6.018193">
+        <ele>429.7</ele>
+        <time>2025-09-27T14:04:30Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>

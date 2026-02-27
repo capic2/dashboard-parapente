@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Paragliding Dashboard" 
+     xmlns="http://www.topografix.com/GPX/1/1"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>Vol thermique La Côte</name>
+    <desc>Belle ascendance d'après-midi</desc>
+    <time>2025-11-08T14:00:00Z</time>
+  </metadata>
+  <trk>
+    <name>Vol thermique La Côte</name>
+    <type>Paragliding</type>
+    <trkseg>
+      <trkpt lat="47.189560" lon="6.045670">
+        <ele>800.0</ele>
+        <time>2025-11-08T14:00:00Z</time>
+      </trkpt>
+      <trkpt lat="47.189572" lon="6.045691">
+        <ele>804.7</ele>
+        <time>2025-11-08T14:00:30Z</time>
+      </trkpt>
+      <trkpt lat="47.189555" lon="6.045725">
+        <ele>809.4</ele>
+        <time>2025-11-08T14:01:00Z</time>
+      </trkpt>
+      <trkpt lat="47.189512" lon="6.045715">
+        <ele>814.0</ele>
+        <time>2025-11-08T14:01:30Z</time>
+      </trkpt>
+      <trkpt lat="47.189488" lon="6.045639">
+        <ele>818.7</ele>
+        <time>2025-11-08T14:02:00Z</time>
+      </trkpt>
+      <trkpt lat="47.189521" lon="6.045544">
+        <ele>823.4</ele>
+        <time>2025-11-08T14:02:30Z</time>
+      </trkpt>
+      <trkpt lat="47.189607" lon="6.045519">
+        <ele>828.1</ele>
+        <time>2025-11-08T14:03:00Z</time>
+      </trkpt>
+      <trkpt lat="47.189687" lon="6.045615">
+        <ele>832.7</ele>
+        <time>2025-11-08T14:03:30Z</time>
+      </trkpt>
+      <trkpt lat="47.189687" lon="6.045790">
+        <ele>837.4</ele>
+        <time>2025-11-08T14:04:00Z</time>
+      </trkpt>
+      <trkpt lat="47.189584" lon="6.045917">
+        <ele>842.1</ele>
+        <time>2025-11-08T14:04:30Z</time>
+      </trkpt>
+      <trkpt lat="47.189437" lon="6.045879">
+        <ele>846.8</ele>
+        <time>2025-11-08T14:05:00Z</time>
+      </trkpt>
+      <trkpt lat="47.189353" lon="6.045670">
+        <ele>851.4</ele>
+        <time>2025-11-08T14:05:30Z</time>
+      </trkpt>
+      <trkpt lat="47.189412" lon="6.045419">
+        <ele>856.1</ele>
+        <time>2025-11-08T14:06:00Z</time>
+      </trkpt>
+      <trkpt lat="47.189595" lon="6.045313">
+        <ele>860.8</ele>
+        <time>2025-11-08T14:06:30Z</time>
+      </trkpt>
+      <trkpt lat="47.189782" lon="6.045460">
+        <ele>865.5</ele>
+        <time>2025-11-08T14:07:00Z</time>
+      </trkpt>
+      <trkpt lat="47.189831" lon="6.045787">
+        <ele>870.1</ele>
+        <time>2025-11-08T14:07:30Z</time>
+      </trkpt>
+      <trkpt lat="47.189685" lon="6.046073">
+        <ele>865.5</ele>
+        <time>2025-11-08T14:08:00Z</time>
+      </trkpt>
+      <trkpt lat="47.189427" lon="6.046099">
+        <ele>854.5</ele>
+        <time>2025-11-08T14:08:30Z</time>
+      </trkpt>
+      <trkpt lat="47.189235" lon="6.045811">
+        <ele>843.6</ele>
+        <time>2025-11-08T14:09:00Z</time>
+      </trkpt>
+      <trkpt lat="47.189259" lon="6.045385">
+        <ele>832.7</ele>
+        <time>2025-11-08T14:09:30Z</time>
+      </trkpt>
+      <trkpt lat="47.189506" lon="6.045121">
+        <ele>821.8</ele>
+        <time>2025-11-08T14:10:00Z</time>
+      </trkpt>
+      <trkpt lat="47.189819" lon="6.045230">
+        <ele>810.9</ele>
+        <time>2025-11-08T14:10:30Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>
