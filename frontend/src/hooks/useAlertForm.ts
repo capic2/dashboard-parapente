@@ -1,15 +1,16 @@
 import { useForm } from '@tanstack/react-form'
 import { useCreateAlert, useUpdateAlert } from './useAlerts'
+import type { Alert, AlertFormData } from '../types'
 
 /**
  * Hook for alert form management using TanStack Form
  * Handles validation, submission, and error handling
  */
-export const useAlertForm = (initialAlert = null) => {
+export const useAlertForm = (initialAlert: Alert | null = null) => {
   const createAlert = useCreateAlert()
   const updateAlert = useUpdateAlert(initialAlert?.id)
 
-  const form = useForm({
+  const form = useForm<AlertFormData>({
     defaultValues: {
       name: initialAlert?.name ?? '',
       site_id: initialAlert?.site_id ?? '',
@@ -20,18 +21,16 @@ export const useAlertForm = (initialAlert = null) => {
       is_active: initialAlert?.is_active ?? true,
       notify_via: initialAlert?.notify_via ?? 'telegram',
     },
-    onSubmit: async (values) => {
+    onSubmit: async ({ value }) => {
       try {
         if (initialAlert) {
-          await updateAlert.mutateAsync(values)
+          await updateAlert.mutateAsync(value)
         } else {
-          await createAlert.mutateAsync(values)
+          await createAlert.mutateAsync(value)
         }
       } catch (error) {
-        form.setFieldMeta('name', {
-          ...form.getFieldMeta('name'),
-          errors: [error.message],
-        })
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error('Form submission error:', errorMessage)
       }
     },
   })
@@ -46,17 +45,17 @@ export const useAlertForm = (initialAlert = null) => {
 /**
  * Hook for flight form management
  */
-export const useFlightForm = (initialFlight = null) => {
+export const useFlightForm = (initialFlight: Partial<Alert> | null = null) => {
   const form = useForm({
     defaultValues: {
-      title: initialFlight?.title ?? '',
+      title: initialFlight?.name ?? '',
       site_id: initialFlight?.site_id ?? '',
-      flight_date: initialFlight?.flight_date ?? new Date().toISOString().split('T')[0],
-      duration_minutes: initialFlight?.duration_minutes ?? 0,
-      max_altitude_m: initialFlight?.max_altitude_m ?? 0,
-      distance_km: initialFlight?.distance_km ?? 0,
-      elevation_gain_m: initialFlight?.elevation_gain_m ?? 0,
-      notes: initialFlight?.notes ?? '',
+      flight_date: new Date().toISOString().split('T')[0],
+      duration_minutes: 0,
+      max_altitude_m: 0,
+      distance_km: 0,
+      elevation_gain_m: 0,
+      notes: '',
     },
   })
 

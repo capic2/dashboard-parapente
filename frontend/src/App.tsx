@@ -20,7 +20,7 @@ const queryClient = new QueryClient({
 })
 
 // Root layout with Header
-const RootLayout = () => (
+const RootLayout: React.FC = () => (
   <div className="app">
     <div className="container">
       <Header />
@@ -63,11 +63,20 @@ const routeTree = rootRoute.addChildren([
 
 const router = new Router({ routeTree })
 
+// Ensure TypeScript knows about the router type
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: typeof router
+  }
+}
+
 // App component with providers
-export default function App() {
+const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
     </QueryClientProvider>
   )
 }
+
+export default App

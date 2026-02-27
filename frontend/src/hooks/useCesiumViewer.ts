@@ -28,9 +28,10 @@ export const useCesiumViewer = () => {
   const dataSourceRef = useRef<Cesium.DataSourceCollection | null>(null)
   const replayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Initialize Cesium viewer
+  // Initialize Cesium viewer when container ref is set
   useEffect(() => {
-    if (!viewerRef.current) return
+    const container = document.getElementById('cesium-container')
+    if (!container || viewerRef.current) return
 
     try {
       // Set Cesium token (optional but recommended)
@@ -41,7 +42,7 @@ export const useCesiumViewer = () => {
         animation: true,
         timeline: false,
         fullscreenButton: true,
-        vrButton: true,
+        vrButton: false,
         sceneModePicker: true,
         navigationHelpButton: false,
         homeButton: true,
@@ -52,6 +53,14 @@ export const useCesiumViewer = () => {
       setIsReady(true)
     } catch (error) {
       console.error('Failed to initialize Cesium viewer:', error)
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (viewerRef.current) {
+        viewerRef.current.destroy()
+        viewerRef.current = null
+      }
     }
   }, [])
 
@@ -124,11 +133,6 @@ export const useCesiumViewer = () => {
       Cesium.Cartesian3.fromDegrees(point.lon, point.lat, point.elevation)
     )
 
-    // Shape for the volume (small circle)
-    const shape = Cesium.Cartesian2.fromArray([
-      -15, -15, 15, -15, 15, 15, -15, 15,
-    ])
-
     viewer.entities.add({
       polylineVolume: {
         positions: positions,
@@ -184,15 +188,18 @@ export const useCesiumViewer = () => {
       replayIntervalRef.current = setInterval(() => {
         if (currentIndex < totalPoints) {
           const point = coords[currentIndex]
-          animatedPoint.position = Cesium.Cartesian3.fromDegrees(
+          const newPosition = Cesium.Cartesian3.fromDegrees(
             point.lon,
             point.lat,
             point.elevation
           )
+          
+          // Update position
+          animatedPoint.position = new Cesium.ConstantPositionProperty(newPosition)
 
           // Follow with camera
           viewer.camera.lookAt(
-            animatedPoint.position,
+            newPosition,
             new Cesium.Cartesian3(0, -1000, 800)
           )
 
@@ -247,7 +254,6 @@ export const useCesiumViewer = () => {
   }, [])
 
   return {
-    viewerRef,
     isReady,
     isReplaying,
     addPolyline,

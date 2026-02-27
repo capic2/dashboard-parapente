@@ -1,0 +1,117 @@
+.current-conditions {
+  border-left: 4px solid #667eea;
+}
+
+.current-conditions h2 {
+  font-size: 15px;
+  color: #666;
+  margin-bottom: 14px;
+  font-weight: 600;
+}
+
+.para-index {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.score {
+  font-size: 36px;
+  font-weight: bold;
+  color: #667eea;
+  line-height: 1;
+}
+
+.verdict {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.verdict-bon {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.verdict-moyen {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.verdict-limite {
+  background: #fed7aa;
+  color: #92400e;
+}
+
+.verdict-mauvais {
+  background: #fee2e2;
+  color: #7f1d1d;
+}
+
+.stats-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.stat-row:last-child {
+  border-bottom: none;
+}
+
+.stat-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-weight: 600;
+  color: #1f2937;
+  text-align: right;
+}
+
+.forecast-time {
+  margin-top: 12px;
+  font-size: 11px;
+  color: #9ca3af;
+  text-align: center;
+  padding-top: 8px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.loading-state,
+.error-state {
+  padding: 20px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.error-state {
+  color: #ef4444;
+}
+
+@media (max-width: 640px) {
+  .score {
+    font-size: 28px;
+  }
+
+  .verdict {
+    font-size: 11px;
+    padding: 5px 12px;
+  }
+
+  .stat-row {
+    font-size: 13px;
+  }
+}

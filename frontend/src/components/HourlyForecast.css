@@ -1,0 +1,126 @@
+.hourly-forecast {
+  grid-column: 1 / -1;
+}
+
+.hourly-forecast h2 {
+  font-size: 15px;
+  color: #666;
+  margin-bottom: 14px;
+  font-weight: 600;
+}
+
+.hourly-table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.hourly-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.hourly-table thead {
+  background: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+}
+
+.hourly-table th {
+  padding: 10px 8px;
+  text-align: center;
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.hourly-table td {
+  padding: 10px 8px;
+  text-align: center;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 13px;
+}
+
+.hourly-table tbody tr {
+  transition: background-color 0.2s;
+}
+
+.hourly-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.hour-cell {
+  font-weight: 600;
+  color: #374151;
+}
+
+.para-index-cell {
+  font-weight: 700;
+  color: #667eea;
+}
+
+.verdict-cell {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+.hour-good {
+  background: #d1fae5;
+}
+
+.hour-good:hover {
+  background: #a7f3d0 !important;
+}
+
+.hour-good .verdict-cell {
+  color: #065f46;
+}
+
+.hour-ok {
+  background: #fef3c7;
+}
+
+.hour-ok:hover {
+  background: #fde68a !important;
+}
+
+.hour-ok .verdict-cell {
+  color: #92400e;
+}
+
+.hour-bad {
+  background: #fee2e2;
+}
+
+.hour-bad:hover {
+  background: #fecaca !important;
+}
+
+.hour-bad .verdict-cell {
+  color: #7f1d1d;
+}
+
+.no-data {
+  text-align: center;
+  color: #9ca3af;
+  font-style: italic;
+  padding: 20px !important;
+}
+
+@media (max-width: 640px) {
+  .hourly-table {
+    font-size: 11px;
+  }
+
+  .hourly-table th,
+  .hourly-table td {
+    padding: 8px 6px;
+  }
+
+  .hourly-table th {
+    font-size: 10px;
+  }
+}
