@@ -60,7 +60,7 @@ export default function SiteStats() {
       <div className="bg-white rounded-xl p-4 shadow-md">
         <div className="animate-pulse">
           <div className="h-6 bg-gray-200 rounded mb-4 w-1/3"></div>
-          <div className="skeleton-chart"></div>
+          <div className="h-64 bg-gray-200 rounded"></div>
         </div>
       </div>
     );
@@ -68,16 +68,16 @@ export default function SiteStats() {
 
   if (error || !siteData.length) {
     return (
-      <div className="chart-container error">
-        <h3>📍 Statistiques par Site</h3>
-        <p className="chart-error">Pas de données disponibles</p>
+      <div className="bg-white rounded-xl p-4 shadow-md text-center">
+        <h3 className="text-lg font-bold text-gray-900 mb-4">📍 Statistiques par Site</h3>
+        <p className="text-red-600 text-sm">Pas de données disponibles</p>
       </div>
     );
   }
 
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
-      <h3>📍 Statistiques par Site</h3>
+      <h3 className="text-lg font-bold text-gray-900 mb-4">📍 Statistiques par Site</h3>
 
       {/* Pie Chart */}
       <ResponsiveContainer width="100%" height={300}>
@@ -102,28 +102,31 @@ export default function SiteStats() {
       </ResponsiveContainer>
 
       {/* Detailed Table */}
-      <div className="site-details-table">
-        <table>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full text-sm">
           <thead>
-            <tr>
-              <th>Site</th>
-              <th>Vols</th>
-              <th>%</th>
-              <th>Alt. moy.</th>
-              <th>Temps total</th>
+            <tr className="border-b-2 border-gray-200">
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">Site</th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">Vols</th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">%</th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">Alt. moy.</th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">Temps total</th>
             </tr>
           </thead>
           <tbody>
             {siteDetails.map((site, index) => (
-              <tr key={site.siteId}>
-                <td>
-                  <span className="site-color" style={{ backgroundColor: COLORS[index % COLORS.length] }}></span>
-                  {site.name}
+              <tr key={site.siteId} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                <td className="py-2 px-2 flex items-center gap-2">
+                  <span 
+                    className="w-3 h-3 rounded-full inline-block shrink-0" 
+                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                  ></span>
+                  <span className="font-medium">{site.name}</span>
                 </td>
-                <td>{site.count}</td>
-                <td>{site.percentage}%</td>
-                <td>{site.avgAltitude} m</td>
-                <td>
+                <td className="py-2 px-2">{site.count}</td>
+                <td className="py-2 px-2">{site.percentage}%</td>
+                <td className="py-2 px-2">{site.avgAltitude} m</td>
+                <td className="py-2 px-2">
                   {site.totalHours}h{site.totalMinutes}m
                 </td>
               </tr>

@@ -35,7 +35,7 @@ export default function ProgressChart() {
       <div className="bg-white rounded-xl p-4 shadow-md">
         <div className="animate-pulse">
           <div className="h-6 bg-gray-200 rounded mb-4 w-1/3"></div>
-          <div className="skeleton-chart"></div>
+          <div className="h-64 bg-gray-200 rounded"></div>
         </div>
       </div>
     );
@@ -43,16 +43,16 @@ export default function ProgressChart() {
 
   if (error || !chartData.length) {
     return (
-      <div className="chart-container error">
-        <h3>📈 Progression des Vols</h3>
-        <p className="chart-error">Pas de données disponibles</p>
+      <div className="bg-white rounded-xl p-4 shadow-md text-center">
+        <h3 className="text-lg font-bold text-gray-900 mb-4">📈 Progression des Vols</h3>
+        <p className="text-red-600 text-sm">Pas de données disponibles</p>
       </div>
     );
   }
 
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
-      <h3>📈 Progression des Vols</h3>
+      <h3 className="text-lg font-bold text-gray-900 mb-4">📈 Progression des Vols</h3>
       <ResponsiveContainer width="100%" height={300}>
         <AreaChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
           <defs>
