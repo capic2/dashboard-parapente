@@ -1,43 +1,62 @@
 #!/usr/bin/env python3
-"""Initialize SQLite database with schema"""
+"""Initialize SQLite database with default sites"""
 
 import sqlite3
 from pathlib import Path
+from datetime import datetime
 
 DB_PATH = Path(__file__).parent / "db" / "dashboard.db"
-SCHEMA_PATH = Path(__file__).parent.parent / "docs" / "PHASE-1-DESIGN" / "dashboard-schema-sqlite.sql"
 
 def init_db():
-    """Create database and tables from schema"""
+    """Insert default sites into existing database"""
     # Ensure db dir exists
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     
-    # Read schema
-    with open(SCHEMA_PATH, 'r') as f:
-        schema = f.read()
+    if not DB_PATH.exists():
+        print(f"❌ Database not found: {DB_PATH}")
+        print("   Run the application first to create the database schema.")
+        return
     
-    # Create connection and execute schema
+    # Create connection
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     try:
-        cursor.executescript(schema)
-        conn.commit()
-        print(f"✅ Database initialized: {DB_PATH}")
+        now = datetime.utcnow().isoformat()
         
-        # Insert default sites
+        # Insert default sites with all required fields
         cursor.execute("""
-            INSERT OR IGNORE INTO sites (id, code, name, elevation_m, latitude, longitude, region)
+            INSERT OR IGNORE INTO sites 
+            (id, code, name, elevation_m, latitude, longitude, region, country, created_at, updated_at)
             VALUES 
-                ('site-arguel', 'arguel', 'Arguel', 427, 47.012, 6.789, 'Besançon'),
-                ('site-mont-poupet', 'mont-poupet', 'Mont Poupet', 842, 47.015, 6.750, 'Besançon'),
-                ('site-la-cote', 'la-cote', 'La Côte', 800, 47.020, 6.770, 'Besançon')
-        """)
+                ('site-arguel', 'arguel', 'Arguel', 427, 47.012, 6.789, 'Besançon', 'FR', ?, ?),
+                ('site-mont-poupet', 'mont-poupet', 'Mont Poupet', 842, 47.015, 6.750, 'Besançon', 'FR', ?, ?),
+                ('site-la-cote', 'la-cote', 'La Côte', 800, 47.020, 6.770, 'Besançon', 'FR', ?, ?)
+        """, (now, now, now, now, now, now))
+        
+        # Update existing sites that might be missing required fields
+        cursor.execute("""
+            UPDATE sites 
+            SET country = 'FR', 
+                created_at = COALESCE(created_at, ?),
+                updated_at = COALESCE(updated_at, ?)
+            WHERE country IS NULL OR created_at IS NULL OR updated_at IS NULL
+        """, (now, now))
+        
         conn.commit()
-        print(f"✅ Default sites inserted")
+        
+        # Verify
+        cursor.execute('SELECT code, name, country FROM sites')
+        sites = cursor.fetchall()
+        print(f"✅ Database initialized: {DB_PATH}")
+        print(f"✅ {len(sites)} sites in database:")
+        for site in sites:
+            print(f"   - {site[0]}: {site[1]} ({site[2]})")
         
     except Exception as e:
         print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
         conn.rollback()
     finally:
         conn.close()
