@@ -1,13 +1,24 @@
-"""Open-Meteo weather API scraper"""
+"""Open-Meteo weather API scraper with async support"""
 
-import requests
+import httpx
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
-async def fetch_open_meteo(lat: float, lon: float, days: int = 2) -> Dict:
-    """Fetch weather from Open-Meteo API (free, no auth)"""
+
+async def fetch_open_meteo(lat: float, lon: float, days: int = 2) -> Dict[str, Any]:
+    """
+    Fetch weather from Open-Meteo API (free, no auth required)
+    
+    Args:
+        lat: Latitude coordinate
+        lon: Longitude coordinate
+        days: Number of forecast days (default: 2)
+    
+    Returns:
+        Dict with success status, data, source, and timestamp
+    """
     try:
-        url = f"https://api.open-meteo.com/v1/forecast"
+        url = "https://api.open-meteo.com/v1/forecast"
         params = {
             "latitude": lat,
             "longitude": lon,
@@ -17,13 +28,22 @@ async def fetch_open_meteo(lat: float, lon: float, days: int = 2) -> Dict:
             "forecast_days": days
         }
         
-        response = requests.get(url, params=params, timeout=10)
-        data = response.json()
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
         
         return {
             "success": True,
             "source": "open-meteo",
             "data": data,
+            "timestamp": datetime.now().isoformat()
+        }
+    except httpx.HTTPStatusError as e:
+        return {
+            "success": False,
+            "source": "open-meteo",
+            "error": f"HTTP {e.response.status_code}: {str(e)}",
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
@@ -34,13 +54,26 @@ async def fetch_open_meteo(lat: float, lon: float, days: int = 2) -> Dict:
             "timestamp": datetime.now().isoformat()
         }
 
-def extract_hourly_forecast(data: Dict, day_index: int = 0) -> List[Dict]:
-    """Extract hourly forecast for a specific day"""
+
+def extract_hourly_forecast(data: Dict[str, Any], day_index: int = 0) -> List[Dict[str, Any]]:
+    """
+    Extract hourly forecast for a specific day
+    
+    Args:
+        data: Raw response from fetch_open_meteo
+        day_index: Which day to extract (0=today, 1=tomorrow)
+    
+    Returns:
+        List of hourly forecast dicts
+    """
     if not data.get("success"):
         return []
     
-    hourly = data["data"].get("hourly", {})
+    hourly = data.get("data", {}).get("hourly", {})
     times = hourly.get("time", [])
+    
+    if not times:
+        return []
     
     forecasts = []
     start_day = datetime.fromisoformat(times[0]).replace(hour=0, minute=0, second=0)
@@ -49,16 +82,21 @@ def extract_hourly_forecast(data: Dict, day_index: int = 0) -> List[Dict]:
     for idx, time_str in enumerate(times):
         dt = datetime.fromisoformat(time_str)
         if dt.date() == target_day.date():
+            # Safely get values with defaults
+            cape_list = hourly.get("cape", [])
+            lifted_list = hourly.get("lifted_index", [])
+            
             forecasts.append({
                 "time": time_str,
                 "hour": dt.hour,
-                "temperature": hourly["temperature_2m"][idx],
-                "wind_speed": hourly["windspeed_10m"][idx],
-                "wind_gust": hourly["windgusts_10m"][idx],
-                "cloud_cover": hourly["cloudcover"][idx],
-                "precipitation": hourly["precipitation"][idx],
-                "cape": hourly.get("cape", [None])[idx] if idx < len(hourly.get("cape", [])) else None,
-                "lifted_index": hourly.get("lifted_index", [None])[idx] if idx < len(hourly.get("lifted_index", [])) else None,
+                "temperature": hourly.get("temperature_2m", [])[idx] if idx < len(hourly.get("temperature_2m", [])) else None,
+                "wind_speed": hourly.get("windspeed_10m", [])[idx] if idx < len(hourly.get("windspeed_10m", [])) else None,
+                "wind_gust": hourly.get("windgusts_10m", [])[idx] if idx < len(hourly.get("windgusts_10m", [])) else None,
+                "wind_direction": hourly.get("wind_direction_10m", [])[idx] if idx < len(hourly.get("wind_direction_10m", [])) else None,
+                "cloud_cover": hourly.get("cloudcover", [])[idx] if idx < len(hourly.get("cloudcover", [])) else None,
+                "precipitation": hourly.get("precipitation", [])[idx] if idx < len(hourly.get("precipitation", [])) else None,
+                "cape": cape_list[idx] if idx < len(cape_list) else None,
+                "lifted_index": lifted_list[idx] if idx < len(lifted_list) else None,
             })
     
     return forecasts
