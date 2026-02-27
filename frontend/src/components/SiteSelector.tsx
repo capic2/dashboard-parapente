@@ -33,16 +33,20 @@ export default function SiteSelector({ selectedSiteId, onSelectSite }: SiteSelec
   return (
     <div className="site-selector">
       <div className="site-tabs">
-        {sites.map((site) => (
-          <button
-            key={site.id}
-            className={`site-tab ${selectedSiteId === site.id ? 'active' : ''}`}
-            onClick={() => onSelectSite(site.id)}
-          >
-            <span className="site-tab-name">{site.name}</span>
-            <span className="site-tab-alt">{site.altitude}m</span>
-          </button>
-        ))}
+        {sites.map((site: any) => {
+          // Use 'code' field for API calls (e.g., 'mont-poupet'), not 'id' (e.g., 'site-mont-poupet')
+          const siteCode = site.code || site.id
+          return (
+            <button
+              key={site.id}
+              className={`site-tab ${selectedSiteId === siteCode ? 'active' : ''}`}
+              onClick={() => onSelectSite(siteCode)}
+            >
+              <span className="site-tab-name">{site.name}</span>
+              <span className="site-tab-alt">{site.altitude || site.elevation_m || '?'}m</span>
+            </button>
+          )
+        })}
       </div>
     </div>
   );

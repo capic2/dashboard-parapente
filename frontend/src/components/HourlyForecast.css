@@ -12,6 +12,7 @@
 .hourly-table-container {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  max-width: 100%;
 }
 
 .hourly-table {
