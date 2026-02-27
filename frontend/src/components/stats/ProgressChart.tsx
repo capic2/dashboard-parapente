@@ -81,9 +81,10 @@ export default function ProgressChart() {
               padding: '8px',
             }}
             labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
-            formatter={(value: number, name: string) => {
-              const hours = Math.floor(value / 60);
-              const mins = value % 60;
+            formatter={(value: number | undefined, name: string | undefined) => {
+              const val = value || 0;
+              const hours = Math.floor(val / 60);
+              const mins = val % 60;
               const label = name === 'duration' ? 'Durée' : 'Moyenne';
               return [`${hours}h ${mins}m`, label];
             }}

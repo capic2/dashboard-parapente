@@ -66,7 +66,7 @@ export default function AltitudeChart() {
               padding: '8px',
             }}
             labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
-            formatter={(value: number, name: string) => [`${value} m`, name === 'altitude' ? 'Altitude max' : name]}
+            formatter={(value: number | undefined, name: string | undefined) => [`${value || 0} m`, name === 'altitude' ? 'Altitude max' : (name || '')]}
             labelFormatter={(label, payload) => {
               if (payload && payload.length > 0) {
                 return payload[0].payload.fullDate;
