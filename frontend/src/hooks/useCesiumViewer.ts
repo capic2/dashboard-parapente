@@ -47,6 +47,8 @@ export const useCesiumViewer = () => {
         sceneModePicker: true,
         navigationHelpButton: false,
         homeButton: true,
+        infoBox: false,
+        selectionIndicator: false,
       })
 
       viewerRef.current = viewer
