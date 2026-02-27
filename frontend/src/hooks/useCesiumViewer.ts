@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
+import 'cesium/Build/Cesium/Widgets/widgets.css'
 import * as Cesium from 'cesium'
 
 export interface GeoPoint {
