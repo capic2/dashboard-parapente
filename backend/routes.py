@@ -93,7 +93,29 @@ async def get_weather_today(spot_id: str, db: Session = Depends(get_db)):
 def get_flights(limit: int = 10, db: Session = Depends(get_db)):
     """Get recent flights"""
     flights = db.query(Flight).order_by(Flight.flight_date.desc()).limit(limit).all()
-    return {"flights": flights}
+    
+    # Convert to dict and add user_id (hardcoded for single-user app)
+    flights_data = []
+    for flight in flights:
+        flight_dict = {
+            "id": flight.id,
+            "user_id": "user-1",  # Hardcoded user_id for single-user app
+            "site_id": flight.site_id,
+            "site_name": flight.site.name if flight.site else None,
+            "title": flight.title,
+            "flight_date": flight.flight_date.isoformat() if flight.flight_date else None,
+            "duration_minutes": flight.duration_minutes,
+            "max_altitude_m": flight.max_altitude_m,
+            "distance_km": flight.distance_km,
+            "elevation_gain_m": flight.elevation_gain_m,
+            "notes": flight.notes,
+            "gpx_file_path": flight.gpx_file_path,
+            "created_at": flight.created_at.isoformat() if flight.created_at else None,
+            "updated_at": flight.updated_at.isoformat() if flight.updated_at else None
+        }
+        flights_data.append(flight_dict)
+    
+    return {"flights": flights_data}
 
 @router.get("/flights/stats")
 def get_flight_stats(db: Session = Depends(get_db)):
@@ -104,17 +126,32 @@ def get_flight_stats(db: Session = Depends(get_db)):
         return {
             "total_flights": 0,
             "total_hours": 0,
+            "total_duration_minutes": 0,
             "total_distance": 0,
+            "total_distance_km": 0,
+            "total_elevation_gain_m": 0,
             "avg_duration": 0,
+            "avg_duration_minutes": 0,
+            "avg_distance_km": 0,
+            "max_altitude_m": 0,
             "favorite_spot": None,
+            "favorite_site": None,
             "last_flight_date": None
         }
     
+    # Calculate totals
     total_flights = len(flights)
     total_minutes = sum(f.duration_minutes or 0 for f in flights)
     total_hours = round(total_minutes / 60, 1)
     total_distance = sum(f.distance_km or 0 for f in flights)
+    total_elevation_gain = sum(f.elevation_gain_m or 0 for f in flights)
+    
+    # Calculate averages
     avg_duration = round(total_minutes / total_flights, 1) if total_flights > 0 else 0
+    avg_distance = round(total_distance / total_flights, 1) if total_flights > 0 else 0
+    
+    # Find max altitude across all flights
+    max_altitude = max((f.max_altitude_m or 0 for f in flights), default=0)
     
     # Find most common spot
     spot_counts = db.query(
@@ -131,9 +168,16 @@ def get_flight_stats(db: Session = Depends(get_db)):
     return {
         "total_flights": total_flights,
         "total_hours": total_hours,
+        "total_duration_minutes": total_minutes,
         "total_distance": round(total_distance, 1),
+        "total_distance_km": round(total_distance, 1),  # Same as total_distance
+        "total_elevation_gain_m": total_elevation_gain,
         "avg_duration": avg_duration,
+        "avg_duration_minutes": avg_duration,  # Same as avg_duration
+        "avg_distance_km": avg_distance,
+        "max_altitude_m": max_altitude,
         "favorite_spot": favorite_spot,
+        "favorite_site": None,  # TODO: Return full Site object if needed
         "last_flight_date": last_flight_date
     }
 
