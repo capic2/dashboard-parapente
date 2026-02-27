@@ -46,7 +46,7 @@ export default function MonthlyStats() {
       <div className="bg-white rounded-xl p-4 shadow-md">
         <div className="animate-pulse">
           <div className="h-6 bg-gray-200 rounded mb-4 w-1/3"></div>
-          <div className="skeleton-chart"></div>
+          <div className="h-64 bg-gray-200 rounded"></div>
         </div>
       </div>
     );
@@ -54,16 +54,16 @@ export default function MonthlyStats() {
 
   if (error || !chartData.length) {
     return (
-      <div className="chart-container error">
-        <h3>📅 Statistiques Mensuelles</h3>
-        <p className="chart-error">Pas de données disponibles</p>
+      <div className="bg-white rounded-xl p-4 shadow-md text-center">
+        <h3 className="text-lg font-bold text-gray-900 mb-4">📅 Statistiques Mensuelles</h3>
+        <p className="text-red-600 text-sm">Pas de données disponibles</p>
       </div>
     );
   }
 
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
-      <h3>📅 Statistiques Mensuelles</h3>
+      <h3 className="text-lg font-bold text-gray-900 mb-4">📅 Statistiques Mensuelles</h3>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
