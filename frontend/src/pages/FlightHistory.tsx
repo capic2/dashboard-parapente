@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useFlights, useUpdateFlight, useDeleteFlight } from '../hooks/useFlights';
 import type { Flight } from '../types';
 import FlightViewer3D from '../components/FlightViewer3D';
@@ -15,14 +15,14 @@ export default function FlightHistory() {
   const updateFlight = useUpdateFlight(selectedFlightId || undefined);
   const deleteFlight = useDeleteFlight(selectedFlightId || undefined);
 
-  const handleSelectFlight = (flight: Flight) => {
+  const handleSelectFlight = useCallback((flight: Flight) => {
     setSelectedFlightId(flight.id);
     setNotesText(flight.notes || '');
     setEditingNotes(false);
     setShowDeleteConfirm(false);
-  };
+  }, []);
 
-  const handleSaveNotes = async () => {
+  const handleSaveNotes = useCallback(async () => {
     if (!selectedFlight) return;
     
     try {
@@ -40,9 +40,9 @@ export default function FlightHistory() {
     } catch (err) {
       console.error('Failed to update notes:', err);
     }
-  };
+  }, [selectedFlight, updateFlight, notesText]);
 
-  const handleDeleteFlight = async () => {
+  const handleDeleteFlight = useCallback(async () => {
     if (!selectedFlightId) return;
 
     try {
@@ -52,7 +52,7 @@ export default function FlightHistory() {
     } catch (err) {
       console.error('Failed to delete flight:', err);
     }
-  };
+  }, [selectedFlightId, deleteFlight]);
 
   if (isLoading) {
     return (
