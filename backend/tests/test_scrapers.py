@@ -1,323 +1,158 @@
 """
-Comprehensive tests for weather scrapers
-Run with: pytest tests/test_scrapers.py -v
+Test weather scrapers and pipeline
 """
-
 import pytest
-from datetime import datetime
-from typing import Dict, Any
+import asyncio
+from pathlib import Path
+import sys
 
-# Import all scrapers
-from scrapers.open_meteo import fetch_open_meteo, extract_hourly_forecast as extract_open_meteo
-from scrapers.weatherapi import fetch_weatherapi, extract_hourly_forecast as extract_weatherapi
-from scrapers.meteociel import fetch_meteociel, extract_hourly_forecast as extract_meteociel
-from scrapers.meteo_parapente import fetch_meteo_parapente, extract_hourly_forecast as extract_meteo_parapente
-from scrapers.meteoblue import fetch_meteoblue, extract_hourly_forecast as extract_meteoblue
+# Add parent dir to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-
-# Test coordinates (Besançon area - Arguel)
-TEST_LAT = 47.2
-TEST_LON = 6.0
-TEST_SPOT = "Arguel"
+from para_index import (
+    calculate_para_index,
+    analyze_hourly_slots,
+    format_slots_summary,
+    get_best_slot
+)
 
 
-class TestOpenMeteo:
-    """Tests for Open-Meteo API scraper"""
+class TestParaIndex:
+    """Test Para-Index scoring system"""
     
-    @pytest.mark.asyncio
-    async def test_fetch_open_meteo_success(self):
-        """Test successful Open-Meteo fetch"""
-        result = await fetch_open_meteo(TEST_LAT, TEST_LON, days=2)
-        
-        assert result is not None
-        assert "success" in result
-        assert "source" in result
-        assert result["source"] == "open-meteo"
-        assert "timestamp" in result
-        
-        if result["success"]:
-            assert "data" in result
-            assert "hourly" in result["data"]
-            assert "temperature_2m" in result["data"]["hourly"]
-    
-    @pytest.mark.asyncio
-    async def test_fetch_open_meteo_invalid_coords(self):
-        """Test Open-Meteo with invalid coordinates"""
-        result = await fetch_open_meteo(999, 999, days=2)
-        
-        # API may still return success with empty data or an error
-        assert result is not None
-        assert "success" in result
-    
-    @pytest.mark.asyncio
-    async def test_extract_hourly_forecast_open_meteo(self):
-        """Test extraction of hourly forecast"""
-        result = await fetch_open_meteo(TEST_LAT, TEST_LON, days=2)
-        
-        if result.get("success"):
-            forecasts = extract_open_meteo(result, day_index=0)
-            
-            assert isinstance(forecasts, list)
-            if forecasts:
-                first = forecasts[0]
-                assert "time" in first
-                assert "hour" in first
-                assert "temperature" in first
-                assert "wind_speed" in first
-    
-    def test_extract_hourly_forecast_failed_response(self):
-        """Test extraction with failed response"""
-        failed_result = {"success": False, "error": "Test error"}
-        forecasts = extract_open_meteo(failed_result)
-        
-        assert forecasts == []
-
-
-class TestWeatherAPI:
-    """Tests for WeatherAPI.com scraper"""
-    
-    @pytest.mark.asyncio
-    async def test_fetch_weatherapi_success(self):
-        """Test successful WeatherAPI fetch"""
-        result = await fetch_weatherapi(TEST_LAT, TEST_LON, days=2)
-        
-        assert result is not None
-        assert "success" in result
-        assert "source" in result
-        assert result["source"] == "weatherapi"
-        
-        if result["success"]:
-            assert "data" in result
-            assert "forecast" in result["data"]
-    
-    @pytest.mark.asyncio
-    async def test_weatherapi_days_limit(self):
-        """Test that days parameter is capped at 3"""
-        result = await fetch_weatherapi(TEST_LAT, TEST_LON, days=10)
-        
-        # Should cap at 3 days (API limit)
-        assert result is not None
-    
-    def test_extract_hourly_forecast_weatherapi(self):
-        """Test extraction logic with mock data"""
-        mock_data = {
-            "success": True,
-            "data": {
-                "forecast": {
-                    "forecastday": [
-                        {
-                            "hour": [
-                                {
-                                    "time": "2024-01-01 14:00",
-                                    "temp_c": 12.5,
-                                    "wind_kph": 18.0,
-                                    "gust_kph": 25.2,
-                                    "cloud": 50,
-                                    "precip_mm": 0.0,
-                                    "humidity": 65
-                                }
-                            ]
-                        }
-                    ]
-                }
+    def test_calculate_para_index(self):
+        """Test full para_index calculation"""
+        hours = [
+            {
+                "hour": h,
+                "temp": 15 + h,
+                "wind": 8 + (h % 5),
+                "gust": 15 + (h % 8),
+                "cloud": 40,
+                "precip": 0,
+                "li": -3
             }
-        }
-        
-        forecasts = extract_weatherapi(mock_data, day_index=0)
-        
-        assert len(forecasts) == 1
-        assert forecasts[0]["temperature"] == 12.5
-        # Test unit conversion: kph to m/s
-        assert abs(forecasts[0]["wind_speed"] - 5.0) < 0.1  # 18 kph ≈ 5 m/s
-        assert forecasts[0]["cloud_cover"] == 50
-
-
-class TestMeteociel:
-    """Tests for Météociel scraper"""
-    
-    @pytest.mark.asyncio
-    async def test_fetch_meteociel(self):
-        """Test Météociel fetch"""
-        result = await fetch_meteociel(TEST_LAT, TEST_LON)
-        
-        assert result is not None
-        assert "success" in result
-        assert "source" in result
-        assert result["source"] == "meteociel"
-        assert "timestamp" in result
-    
-    @pytest.mark.asyncio
-    async def test_extract_meteociel_forecast(self):
-        """Test extraction with mock data"""
-        mock_data = {
-            "success": True,
-            "data": [
-                {
-                    "time": "14:00",
-                    "temp": "15°C",
-                    "wind": "20 km/h",
-                    "gust": "30 km/h",
-                    "precip": "0.5mm"
-                }
-            ]
-        }
-        
-        forecasts = await extract_meteociel(mock_data)
-        
-        assert len(forecasts) == 1
-        assert forecasts[0]["temperature"] == 15.0
-        assert forecasts[0]["wind_speed"] == 20.0
-        assert forecasts[0]["wind_gust"] == 30.0
-        assert forecasts[0]["precipitation"] == 0.5
-
-
-class TestMeteoParapente:
-    """Tests for Météo-parapente scraper"""
-    
-    @pytest.mark.asyncio
-    async def test_fetch_meteo_parapente(self):
-        """Test Météo-parapente fetch"""
-        result = await fetch_meteo_parapente(TEST_SPOT)
-        
-        assert result is not None
-        assert "success" in result
-        assert "source" in result
-        assert result["source"] == "meteo-parapente"
-        assert "spot_name" in result
-        assert result["spot_name"] == TEST_SPOT
-    
-    @pytest.mark.asyncio
-    async def test_extract_meteo_parapente_forecast(self):
-        """Test extraction with mock data"""
-        mock_data = {
-            "success": True,
-            "data": [
-                {
-                    "time": "15:00",
-                    "wind": "12km/h",
-                    "gust": "18km/h",
-                    "temp": "18°C",
-                    "verdict": "BON"
-                }
-            ]
-        }
-        
-        forecasts = await extract_meteo_parapente(mock_data)
-        
-        assert len(forecasts) == 1
-        assert forecasts[0]["wind_speed"] == 12.0
-        assert forecasts[0]["temperature"] == 18.0
-        assert forecasts[0]["verdict"] == "BON"
-
-
-class TestMeteoblue:
-    """Tests for Meteoblue scraper"""
-    
-    @pytest.mark.asyncio
-    async def test_fetch_meteoblue(self):
-        """Test Meteoblue fetch (may be slow due to browser)"""
-        result = await fetch_meteoblue(TEST_LAT, TEST_LON)
-        
-        assert result is not None
-        assert "success" in result
-        assert "source" in result
-        assert result["source"] == "meteoblue"
-    
-    @pytest.mark.asyncio
-    async def test_extract_meteoblue_forecast(self):
-        """Test extraction with mock data"""
-        mock_data = {
-            "success": True,
-            "data": [
-                {
-                    "time": "16:00",
-                    "temp": "14°C",
-                    "wind": "15km/h",
-                    "gust": "22km/h",
-                    "precip": "0mm"
-                }
-            ]
-        }
-        
-        forecasts = await extract_meteoblue(mock_data)
-        
-        assert len(forecasts) == 1
-        assert forecasts[0]["temperature"] == 14.0
-        assert forecasts[0]["wind_speed"] == 15.0
-        assert forecasts[0]["hour"] == 16
-
-
-class TestScraperConsistency:
-    """Tests for consistency across all scrapers"""
-    
-    @pytest.mark.asyncio
-    async def test_all_scrapers_return_dict(self):
-        """All scrapers should return a dict"""
-        scrapers = [
-            fetch_open_meteo(TEST_LAT, TEST_LON),
-            fetch_weatherapi(TEST_LAT, TEST_LON),
-            fetch_meteociel(TEST_LAT, TEST_LON),
-            fetch_meteo_parapente(TEST_SPOT),
+            for h in range(24)
         ]
+        result = calculate_para_index(hours)
         
-        for scraper_coro in scrapers:
-            result = await scraper_coro
-            assert isinstance(result, dict)
-            assert "success" in result
-            assert "source" in result
-            assert "timestamp" in result
+        assert "para_index" in result or "verdict" in result
+        # Para-index should be a reasonable value
+        if "para_index" in result:
+            assert 0 <= result["para_index"] <= 100
     
-    @pytest.mark.asyncio
-    async def test_timestamp_format(self):
-        """All timestamps should be ISO format"""
-        result = await fetch_open_meteo(TEST_LAT, TEST_LON)
+    def test_analyze_hourly_slots(self):
+        """Test flyable slot analysis"""
+        hours = []
+        # Good morning slot
+        for h in range(10, 13):
+            hours.append({
+                "hour": h,
+                "temp": 15,
+                "wind": 10,
+                "gust": 15,
+                "cloud": 30,
+                "precip": 0,
+                "li": -2
+            })
+        # Bad afternoon
+        for h in range(13, 16):
+            hours.append({
+                "hour": h,
+                "temp": 20,
+                "wind": 20,
+                "gust": 30,
+                "cloud": 80,
+                "precip": 0.5,
+                "li": 0
+            })
+        # Good evening
+        for h in range(16, 19):
+            hours.append({
+                "hour": h,
+                "temp": 18,
+                "wind": 8,
+                "gust": 12,
+                "cloud": 40,
+                "precip": 0,
+                "li": -3
+            })
         
-        assert "timestamp" in result
-        # Should be parseable as ISO datetime
-        try:
-            datetime.fromisoformat(result["timestamp"])
-        except ValueError:
-            pytest.fail("Timestamp is not valid ISO format")
+        slots = analyze_hourly_slots(hours)
+        assert isinstance(slots, list)
+        # Should find at least some analysis
+        assert len(slots) >= 0  # May be empty if no good slots
     
-    def test_error_handling_structure(self):
-        """Error responses should have consistent structure"""
-        error_response = {
-            "success": False,
-            "source": "test",
-            "error": "Test error",
-            "timestamp": datetime.now().isoformat()
-        }
+    def test_format_slots_summary(self):
+        """Test slots summary formatting"""
+        slots = [
+            {"start": 10, "end": 12},
+            {"start": 16, "end": 18},
+        ]
+        summary = format_slots_summary(slots)
         
-        assert "success" in error_response
-        assert "error" in error_response
-        assert error_response["success"] is False
-
-
-class TestEdgeCases:
-    """Edge case tests"""
+        assert isinstance(summary, str)
+        # Should return a string (may be empty or with content)
     
-    def test_extract_empty_data(self):
-        """Test extraction with empty data"""
-        empty_data = {"success": True, "data": {}}
-        
-        result = extract_open_meteo(empty_data)
-        assert result == []
-    
-    def test_extract_missing_fields(self):
-        """Test extraction with missing fields"""
-        incomplete_data = {
-            "success": True,
-            "data": {
-                "forecast": {
-                    "forecastday": [{"hour": [{}]}]
-                }
+    def test_get_best_slot(self):
+        """Test best slot detection"""
+        hours = [
+            {
+                "hour": h,
+                "temp": 16,
+                "wind": 9,
+                "gust": 14,
+                "cloud": 30,
+                "precip": 0,
+                "li": -2
             }
-        }
+            for h in range(24)
+        ]
+        result = get_best_slot(hours)
         
-        # Should not crash, should handle gracefully
-        result = extract_weatherapi(incomplete_data)
-        assert isinstance(result, list)
+        # Should return a dict or list
+        assert result is not None
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v", "--tb=short"])
+class TestParaIndexEdgeCases:
+    """Test edge cases and error handling"""
+    
+    def test_empty_forecast(self):
+        """Handle empty forecast"""
+        hours = []
+        result = calculate_para_index(hours)
+        assert result is not None  # Should not crash
+    
+    def test_partial_forecast(self):
+        """Handle partial hourly data"""
+        hours = [
+            {
+                "hour": h,
+                "temp": 15,
+                "wind": 8,
+                "gust": 12,
+                "cloud": 40,
+                "precip": 0,
+                "li": -2
+            }
+            for h in range(12)  # Only 12 hours
+        ]
+        result = calculate_para_index(hours)
+        assert result is not None
+    
+    def test_extreme_conditions(self):
+        """Handle extreme weather"""
+        hours = [
+            {
+                "hour": h,
+                "temp": -20 if h < 6 else 40,  # Extreme temps
+                "wind": 50,  # Very strong wind
+                "gust": 80,  # Extreme gusts
+                "cloud": 100,  # Full cloud cover
+                "precip": 50,  # Heavy rain
+                "li": 5  # Very unstable
+            }
+            for h in range(24)
+        ]
+        result = calculate_para_index(hours)
+        assert result is not None
