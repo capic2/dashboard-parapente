@@ -1,7 +1,7 @@
-import preview from '../../.storybook/preview';
+import type { Meta, StoryObj } from '@storybook/react';
 import Header from './Header';
 
-const meta = preview.meta({
+const meta: Meta<typeof Header> = {
   title: 'Components/Header',
   component: Header,
   parameters: {
@@ -14,30 +14,33 @@ const meta = preview.meta({
     },
   },
   tags: ['autodocs'],
-});
+};
+
+export default meta;
+type Story = StoryObj<typeof Header>;
 
 /**
  * Default header with title
  * Router is initialized at root path '/'
  */
-export const Default = meta.story({
+export const Default: Story = {
   args: {},
-});
+};
 
 /**
  * Header with custom title
  */
-export const CustomTitle = meta.story({
+export const CustomTitle: Story = {
   args: {
     title: '🪂 Mon Dashboard Personnalisé',
   },
-});
+};
 
 /**
  * Header with router initialized on /flights path
  * Demonstrates custom router configuration via parameters
  */
-export const OnFlightsPage = meta.story({
+export const OnFlightsPage: Story = {
   args: {},
   parameters: {
     router: {
@@ -45,12 +48,12 @@ export const OnFlightsPage = meta.story({
       routes: ['/flights'],
     },
   },
-});
+};
 
 /**
  * Header with router initialized on /analytics path
  */
-export const OnAnalyticsPage = meta.story({
+export const OnAnalyticsPage: Story = {
   args: {},
   parameters: {
     router: {
@@ -58,6 +61,4 @@ export const OnAnalyticsPage = meta.story({
       routes: ['/analytics'],
     },
   },
-});
-
-export default meta;
+};
