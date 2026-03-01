@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -11,21 +11,21 @@ import {
   type VisibilityState,
   type RowSelectionState,
   type Table,
-} from '@tanstack/react-table'
-import { useFlights } from './useFlights'
-import type { Flight, FlightFilters, WeatherSource } from '../types'
+} from '@tanstack/react-table';
+import { useFlights } from './useFlights';
+import type { Flight, FlightFilters, WeatherSource } from '../types';
 
 /**
  * TanStack Table hook for flights list with sorting, filtering, pagination
  */
 export const useFlightsTable = (filters: FlightFilters = {}) => {
-  const { data: flights = [], isLoading, error } = useFlights(filters)
+  const { data: flights = [], isLoading, error } = useFlights(filters);
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'flight_date', desc: true }, // Sort by date descending
-  ])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  ]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   // Define table columns
   const columns = useMemo<ColumnDef<Flight>[]>(
@@ -50,7 +50,8 @@ export const useFlightsTable = (filters: FlightFilters = {}) => {
       {
         accessorKey: 'flight_date',
         header: 'Date',
-        cell: (info) => new Date(info.getValue() as string).toLocaleDateString(),
+        cell: (info) =>
+          new Date(info.getValue() as string).toLocaleDateString(),
       },
       {
         accessorKey: 'title',
@@ -97,7 +98,7 @@ export const useFlightsTable = (filters: FlightFilters = {}) => {
       },
     ],
     []
-  )
+  );
 
   // Create table instance
   const table: Table<Flight> = useReactTable({
@@ -117,15 +118,15 @@ export const useFlightsTable = (filters: FlightFilters = {}) => {
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-  })
+  });
 
-  const handleViewFlight = (flightId: string): void => {
+  const handleViewFlight = (_flightId: string): void => {
     // Navigate to flight detail
-  }
+  };
 
-  const handleEditFlight = (flightId: string): void => {
+  const handleEditFlight = (_flightId: string): void => {
     // Open edit modal
-  }
+  };
 
   return {
     table,
@@ -137,14 +138,16 @@ export const useFlightsTable = (filters: FlightFilters = {}) => {
     previousPage: () => table.previousPage(),
     canNextPage: () => table.getCanNextPage(),
     canPreviousPage: () => table.getCanPreviousPage(),
-  }
-}
+  };
+};
 
 /**
  * TanStack Table hook for weather sources comparison
  */
-export const useWeatherSourcesTable = (sources: WeatherSource[] = []): Table<WeatherSource> => {
-  const [sorting, setSorting] = useState<SortingState>([])
+export const useWeatherSourcesTable = (
+  sources: WeatherSource[] = []
+): Table<WeatherSource> => {
+  const [sorting, setSorting] = useState<SortingState>([]);
 
   const columns = useMemo<ColumnDef<WeatherSource>[]>(
     () => [
@@ -173,7 +176,7 @@ export const useWeatherSourcesTable = (sources: WeatherSource[] = []): Table<Wea
       },
     ],
     []
-  )
+  );
 
   const table: Table<WeatherSource> = useReactTable({
     data: sources,
@@ -182,7 +185,7 @@ export const useWeatherSourcesTable = (sources: WeatherSource[] = []): Table<Wea
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-  })
+  });
 
-  return table
-}
+  return table;
+};

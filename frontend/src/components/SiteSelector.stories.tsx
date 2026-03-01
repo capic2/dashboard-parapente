@@ -1,48 +1,48 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { expect, fn } from 'vitest';
 import SiteSelector from './SiteSelector';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 
 // Mock data for sites
 const mockSites = [
-  { 
-    id: 'site-arguel', 
-    name: 'Arguel', 
+  {
+    id: 'site-arguel',
+    name: 'Arguel',
     altitude: 427,
     location: 'Besançon',
     coordinates: { lat: 47.2, lng: 6.0 },
     orientation: ['N', 'NE', 'E'],
-    difficulty: 'debutant' as const
+    difficulty: 'debutant' as const,
   },
-  { 
-    id: 'site-mont-poupet', 
-    name: 'Mont Poupet', 
+  {
+    id: 'site-mont-poupet',
+    name: 'Mont Poupet',
     altitude: 842,
     location: 'Jura',
     coordinates: { lat: 46.9, lng: 5.8 },
     orientation: ['S', 'SW', 'W'],
-    difficulty: 'intermediaire' as const
+    difficulty: 'intermediaire' as const,
   },
-  { 
-    id: 'site-la-cote', 
-    name: 'La Côte', 
+  {
+    id: 'site-la-cote',
+    name: 'La Côte',
     altitude: 800,
     location: 'Pontarlier',
     coordinates: { lat: 46.8, lng: 6.3 },
     orientation: ['W', 'NW'],
-    difficulty: 'intermediaire' as const
+    difficulty: 'intermediaire' as const,
   },
 ];
 
 // Create a fresh query client for each story
-const createQueryClient = () => new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: false,
+const createQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
     },
-  },
-});
+  });
 
 // CSF Factory - meta export
 const meta = {
@@ -52,14 +52,15 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'Site selector component for choosing paragliding sites. Uses React Query for data fetching.',
+        component:
+          'Site selector component for choosing paragliding sites. Uses React Query for data fetching.',
       },
     },
     msw: {
       handlers: [
         http.get('/api/spots', () => {
           return HttpResponse.json({
-            sites: mockSites
+            sites: mockSites,
           });
         }),
       ],
@@ -78,7 +79,7 @@ const meta = {
   argTypes: {
     selectedSiteId: {
       control: 'select',
-      options: mockSites.map(s => s.id),
+      options: mockSites.map((s) => s.id),
       description: 'Currently selected site ID',
     },
     onSelectSite: {
@@ -99,7 +100,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     selectedSiteId: 'site-arguel',
-    onSelectSite: fn(),
+    onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
   },
 };
 
@@ -110,7 +111,7 @@ export const Default: Story = {
 export const MontPoupetSelected: Story = {
   args: {
     selectedSiteId: 'site-mont-poupet',
-    onSelectSite: fn(),
+    onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
   },
 };
 
@@ -120,12 +121,16 @@ export const MontPoupetSelected: Story = {
 export const LaCoteSelected: Story = {
   args: {
     selectedSiteId: 'site-la-cote',
-    onSelectSite: fn(),
+    onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
   },
 };
 
 // Loading state story
 export const Loading: Story = {
+  args: {
+    selectedSiteId: '',
+    onSelectSite: () => {},
+  },
   parameters: {
     docs: {
       description: {
@@ -148,6 +153,10 @@ export const Loading: Story = {
 
 // Error state story
 export const Error: Story = {
+  args: {
+    selectedSiteId: '',
+    onSelectSite: () => {},
+  },
   parameters: {
     docs: {
       description: {
