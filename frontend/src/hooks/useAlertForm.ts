@@ -1,16 +1,16 @@
-import { useForm } from '@tanstack/react-form'
-import { useCreateAlert, useUpdateAlert } from './useAlerts'
-import type { Alert, AlertFormData } from '../types'
+import { useForm } from '@tanstack/react-form';
+import { useCreateAlert, useUpdateAlert } from './useAlerts';
+import type { Alert } from '../types';
 
 /**
  * Hook for alert form management using TanStack Form
  * Handles validation, submission, and error handling
  */
 export const useAlertForm = (initialAlert: Alert | null = null) => {
-  const createAlert = useCreateAlert()
-  const updateAlert = useUpdateAlert(initialAlert?.id)
+  const createAlert = useCreateAlert();
+  const updateAlert = useUpdateAlert(initialAlert?.id);
 
-  const form = useForm<AlertFormData>({
+  const form = useForm({
     defaultValues: {
       name: initialAlert?.name ?? '',
       site_id: initialAlert?.site_id ?? '',
@@ -24,23 +24,24 @@ export const useAlertForm = (initialAlert: Alert | null = null) => {
     onSubmit: async ({ value }) => {
       try {
         if (initialAlert) {
-          await updateAlert.mutateAsync(value)
+          await updateAlert.mutateAsync(value);
         } else {
-          await createAlert.mutateAsync(value)
+          await createAlert.mutateAsync(value);
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        console.error('Form submission error:', errorMessage)
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        console.error('Form submission error:', errorMessage);
       }
     },
-  })
+  });
 
   return {
     form,
     isLoading: createAlert.isPending || updateAlert.isPending,
     error: createAlert.error || updateAlert.error,
-  }
-}
+  };
+};
 
 /**
  * Hook for flight form management
@@ -57,7 +58,7 @@ export const useFlightForm = (initialFlight: Partial<Alert> | null = null) => {
       elevation_gain_m: 0,
       notes: '',
     },
-  })
+  });
 
-  return form
-}
+  return form;
+};

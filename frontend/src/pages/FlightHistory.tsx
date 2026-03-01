@@ -1,5 +1,9 @@
 import { useState, useCallback } from 'react';
-import { useFlights, useUpdateFlight, useDeleteFlight } from '../hooks/useFlights';
+import {
+  useFlights,
+  useUpdateFlight,
+  useDeleteFlight,
+} from '../hooks/useFlights';
 import type { Flight } from '../types';
 import FlightViewer3D from '../components/FlightViewer3D';
 
@@ -23,7 +27,7 @@ export default function FlightHistory() {
 
   const handleSaveNotes = useCallback(async () => {
     if (!selectedFlight) return;
-    
+
     try {
       await updateFlight.mutateAsync({
         title: selectedFlight.title,
@@ -69,8 +73,10 @@ export default function FlightHistory() {
       <div className="py-8">
         <div className="bg-white rounded-xl p-8 shadow-md text-center max-w-md mx-auto">
           <h2 className="text-xl font-bold text-red-600 mb-3">❌ Erreur</h2>
-          <p className="text-gray-700 mb-4">Impossible de charger l'historique des vols</p>
-          <button 
+          <p className="text-gray-700 mb-4">
+            Impossible de charger l'historique des vols
+          </p>
+          <button
             onClick={() => window.location.reload()}
             className="px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-all"
           >
@@ -84,9 +90,12 @@ export default function FlightHistory() {
   return (
     <div>
       <div className="mb-4 bg-white rounded-xl p-4 shadow-md">
-        <h1 className="text-xl font-bold text-gray-900">🪂 Historique des Vols</h1>
+        <h1 className="text-xl font-bold text-gray-900">
+          🪂 Historique des Vols
+        </h1>
         <div className="text-sm text-gray-600 mt-1">
-          {flights.length} vol{flights.length > 1 ? 's' : ''} enregistré{flights.length > 1 ? 's' : ''}
+          {flights.length} vol{flights.length > 1 ? 's' : ''} enregistré
+          {flights.length > 1 ? 's' : ''}
         </div>
       </div>
 
@@ -96,7 +105,9 @@ export default function FlightHistory() {
           {flights.length === 0 ? (
             <div className="bg-white rounded-xl p-8 shadow-md text-center">
               <p className="text-gray-700 font-medium">Aucun vol enregistré</p>
-              <p className="text-sm text-gray-500 mt-2">Les vols Strava apparaîtront automatiquement ici</p>
+              <p className="text-sm text-gray-500 mt-2">
+                Les vols Strava apparaîtront automatiquement ici
+              </p>
             </div>
           ) : (
             flights.map((flight: Flight) => (
@@ -110,7 +121,9 @@ export default function FlightHistory() {
                 onClick={() => handleSelectFlight(flight)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && handleSelectFlight(flight)}
+                onKeyDown={(e) =>
+                  e.key === 'Enter' && handleSelectFlight(flight)
+                }
                 aria-label={`Sélectionner vol du ${new Date(flight.flight_date).toLocaleDateString('fr-FR')}`}
               >
                 <div className="flex justify-between items-start mb-2">
@@ -129,7 +142,10 @@ export default function FlightHistory() {
                   {flight.duration_minutes && (
                     <div className="flex items-center gap-1">
                       <span aria-hidden="true">⏱️</span>
-                      <span>{Math.floor(flight.duration_minutes / 60)}h{flight.duration_minutes % 60}m</span>
+                      <span>
+                        {Math.floor(flight.duration_minutes / 60)}h
+                        {flight.duration_minutes % 60}m
+                      </span>
                     </div>
                   )}
                   {flight.distance_km && (
@@ -148,7 +164,9 @@ export default function FlightHistory() {
                 {flight.site_id && (
                   <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
                     <span aria-hidden="true">📍</span>
-                    <span className="truncate">{flight.site_name || flight.site_id}</span>
+                    <span className="truncate">
+                      {flight.site_name || flight.site_id}
+                    </span>
                   </div>
                 )}
               </div>
@@ -163,7 +181,9 @@ export default function FlightHistory() {
               {/* Flight Details */}
               <div className="bg-white rounded-xl p-4 shadow-md">
                 <div className="flex justify-between items-start mb-4">
-                  <h2 className="text-lg font-bold text-gray-900">{selectedFlight.title || 'Vol sans titre'}</h2>
+                  <h2 className="text-lg font-bold text-gray-900">
+                    {selectedFlight.title || 'Vol sans titre'}
+                  </h2>
                   <div className="flex gap-2">
                     <button
                       className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-all"
@@ -186,41 +206,60 @@ export default function FlightHistory() {
                   <div>
                     <span className="text-xs text-gray-600">📅 Date</span>
                     <span className="block text-sm font-medium text-gray-900 mt-1">
-                      {new Date(selectedFlight.flight_date).toLocaleDateString('fr-FR', {
-                        weekday: 'long',
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                      })}
+                      {new Date(selectedFlight.flight_date).toLocaleDateString(
+                        'fr-FR',
+                        {
+                          weekday: 'long',
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                        }
+                      )}
                     </span>
                   </div>
                   <div>
                     <span className="text-xs text-gray-600">📍 Site</span>
-                    <span className="block text-sm font-medium text-gray-900 mt-1">{selectedFlight.site_name || selectedFlight.site_id}</span>
+                    <span className="block text-sm font-medium text-gray-900 mt-1">
+                      {selectedFlight.site_name || selectedFlight.site_id}
+                    </span>
                   </div>
                   <div>
                     <span className="text-xs text-gray-600">⏱️ Durée</span>
                     <span className="block text-sm font-medium text-gray-900 mt-1">
-                      {Math.floor(selectedFlight.duration_minutes / 60)}h {selectedFlight.duration_minutes % 60}m
+                      {Math.floor(selectedFlight.duration_minutes / 60)}h{' '}
+                      {selectedFlight.duration_minutes % 60}m
                     </span>
                   </div>
                   <div>
                     <span className="text-xs text-gray-600">📏 Distance</span>
-                    <span className="block text-sm font-medium text-gray-900 mt-1">{selectedFlight.distance_km.toFixed(2)} km</span>
+                    <span className="block text-sm font-medium text-gray-900 mt-1">
+                      {selectedFlight.distance_km.toFixed(2)} km
+                    </span>
                   </div>
                   <div>
-                    <span className="text-xs text-gray-600">⛰️ Altitude max</span>
-                    <span className="block text-sm font-medium text-gray-900 mt-1">{selectedFlight.max_altitude_m} m</span>
+                    <span className="text-xs text-gray-600">
+                      ⛰️ Altitude max
+                    </span>
+                    <span className="block text-sm font-medium text-gray-900 mt-1">
+                      {selectedFlight.max_altitude_m} m
+                    </span>
                   </div>
                   <div>
                     <span className="text-xs text-gray-600">📈 Dénivelé</span>
-                    <span className="block text-sm font-medium text-gray-900 mt-1">{selectedFlight.elevation_gain_m} m</span>
+                    <span className="block text-sm font-medium text-gray-900 mt-1">
+                      {selectedFlight.elevation_gain_m} m
+                    </span>
                   </div>
                 </div>
 
                 {/* Notes Editor */}
                 <div>
-                  <label htmlFor="flight-notes" className="text-sm font-semibold text-gray-700 mb-2 block">📝 Notes</label>
+                  <label
+                    htmlFor="flight-notes"
+                    className="text-sm font-semibold text-gray-700 mb-2 block"
+                  >
+                    📝 Notes
+                  </label>
                   {editingNotes ? (
                     <div className="space-y-2">
                       <textarea
@@ -237,7 +276,9 @@ export default function FlightHistory() {
                           onClick={handleSaveNotes}
                           disabled={updateFlight.isPending}
                         >
-                          {updateFlight.isPending ? '⏳ Enregistrement...' : '✓ Enregistrer'}
+                          {updateFlight.isPending
+                            ? '⏳ Enregistrement...'
+                            : '✓ Enregistrer'}
                         </button>
                         <button
                           className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-all"
@@ -260,14 +301,18 @@ export default function FlightHistory() {
                 {/* Delete Confirmation */}
                 {showDeleteConfirm && (
                   <div className="mt-4 p-4 bg-red-50 border-2 border-red-200 rounded-lg">
-                    <p className="text-sm font-semibold text-red-700 mb-3">⚠️ Supprimer ce vol définitivement ?</p>
+                    <p className="text-sm font-semibold text-red-700 mb-3">
+                      ⚠️ Supprimer ce vol définitivement ?
+                    </p>
                     <div className="flex gap-2">
                       <button
                         className="px-4 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 transition-all disabled:opacity-50"
                         onClick={handleDeleteFlight}
                         disabled={deleteFlight.isPending}
                       >
-                        {deleteFlight.isPending ? '⏳ Suppression...' : '🗑️ Confirmer'}
+                        {deleteFlight.isPending
+                          ? '⏳ Suppression...'
+                          : '🗑️ Confirmer'}
                       </button>
                       <button
                         className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-all"
@@ -284,15 +329,19 @@ export default function FlightHistory() {
               <div className="bg-white rounded-xl shadow-md overflow-hidden">
                 <FlightViewer3D
                   flightId={selectedFlightId}
-                  flightTitle={selectedFlight.title || `Vol du ${new Date(selectedFlight.flight_date).toLocaleDateString('fr-FR')}`}
-                  showReplay={true}
-                  showElevationChart={true}
+                  flightTitle={
+                    selectedFlight.title ||
+                    `Vol du ${new Date(selectedFlight.flight_date).toLocaleDateString('fr-FR')}`
+                  }
                 />
               </div>
             </>
           ) : (
             <div className="bg-white rounded-xl p-12 shadow-md text-center">
-              <p className="text-gray-600">📍 Sélectionnez un vol pour visualiser les détails et la trajectoire 3D</p>
+              <p className="text-gray-600">
+                📍 Sélectionnez un vol pour visualiser les détails et la
+                trajectoire 3D
+              </p>
             </div>
           )}
         </div>
