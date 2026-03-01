@@ -63,16 +63,18 @@ def extract_hourly_forecast(data: Dict[str, any], day_index: int = 0) -> List[Di
     Extract hourly forecast for a specific day
     
     Args:
-        data: Raw response from fetch_weatherapi
+        data: Response from fetch_weatherapi (wrapper or raw API response)
         day_index: Which day to extract (0=today, 1=tomorrow)
     
     Returns:
         List of hourly forecast dicts
     """
-    if not data.get("success"):
+    # Handle both wrapper format and raw API response
+    raw_data = data.get("data") if isinstance(data, dict) and "data" in data else data
+    if not raw_data:
         return []
     
-    forecast_days = data.get("data", {}).get("forecast", {}).get("forecastday", [])
+    forecast_days = raw_data.get("forecast", {}).get("forecastday", [])
     if day_index >= len(forecast_days):
         return []
     
@@ -84,15 +86,18 @@ def extract_hourly_forecast(data: Dict[str, any], day_index: int = 0) -> List[Di
         time_str = hour_data.get("time", "")
         hour = int(time_str.split()[1].split(":")[0]) if " " in time_str else 0
         
+        wind_kph = hour_data.get("wind_kph")
+        gust_kph = hour_data.get("gust_kph")
+        
         forecasts.append({
             "time": time_str,
             "hour": hour,
             "temperature": hour_data.get("temp_c"),
-            "wind_speed": hour_data.get("wind_kph", 0) / 3.6,  # kph to m/s
-            "wind_gust": hour_data.get("gust_kph", 0) / 3.6,  # kph to m/s
+            "wind_speed": float(wind_kph) / 3.6 if wind_kph is not None else None,  # kph to m/s
+            "wind_gust": float(gust_kph) / 3.6 if gust_kph is not None else None,  # kph to m/s
             "cloud_cover": hour_data.get("cloud"),
-            "precipitation": hour_data.get("precip_mm", 0),
-            "humidity": hour_data.get("humidity", 0),
+            "precipitation": hour_data.get("precip_mm") or 0,
+            "humidity": hour_data.get("humidity"),
         })
     
     return forecasts

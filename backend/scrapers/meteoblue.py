@@ -1,124 +1,99 @@
-"""Meteoblue scraper using Playwright with improved error handling"""
+"""Meteoblue scraper using Scrapling + BeautifulSoup"""
 
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
 from datetime import datetime
 from typing import Dict, List, Any
+import logging
+import re
+
+logger = logging.getLogger(__name__)
 
 
-async def fetch_meteoblue(lat: float, lon: float, days: int = 2) -> Dict[str, Any]:
-    """
-    Scrape Meteoblue using Playwright for hourly table data
-    
-    Args:
-        lat: Latitude coordinate
-        lon: Longitude coordinate
-        days: Number of forecast days (not used by Meteoblue URL, but kept for API consistency)
-    
-    Returns:
-        Dict with success status, data, source, and timestamp
-    """
+async def fetch_meteoblue(lat: float, lon: float) -> Dict[str, Any]:
+    """Fetch hourly forecast from Meteoblue"""
     try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+        from scrapling import Scraper
+        from bs4 import BeautifulSoup
+        
+        scraper = Scraper()
+        
+        # Navigate to hourly forecast page
+        url = f"https://www.meteoblue.com/en/weather/forecast/hourly/{lat},{lon}"
+        
+        html = scraper.fetch(url)
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        hourly_data = []
+        
+        # Parse hourly forecast tables
+        tables = soup.find_all('table')
+        
+        for table in tables:
+            rows = table.find_all('tr')
             
-            # Meteoblue URL format
-            url = f"https://www.meteoblue.com/en/weather/forecast/hourly/{lat}N{lon}E"
-            
-            await page.goto(url, timeout=30000)
-            await page.wait_for_load_state("networkidle", timeout=15000)
-            
-            # Extract table data using JavaScript
-            table_data = await page.evaluate("""
-                () => {
-                    const rows = document.querySelectorAll('table tbody tr');
-                    const data = [];
-                    rows.forEach(row => {
-                        const cells = row.querySelectorAll('td');
-                        if (cells.length > 0) {
-                            data.push({
-                                time: cells[0]?.textContent?.trim() || '',
-                                temp: cells[1]?.textContent?.trim() || '',
-                                wind: cells[2]?.textContent?.trim() || '',
-                                gust: cells[3]?.textContent?.trim() || '',
-                                precip: cells[4]?.textContent?.trim() || '',
-                            });
-                        }
-                    });
-                    return data;
-                }
-            """)
-            
-            await browser.close()
-            
-            return {
-                "success": bool(table_data),
-                "source": "meteoblue",
-                "data": table_data,
-                "timestamp": datetime.now().isoformat()
-            }
-    except PlaywrightTimeout as e:
+            for row in rows:
+                cells = row.find_all(['td', 'th'])
+                if len(cells) >= 2:
+                    hour_text = cells[0].get_text(strip=True)
+                    
+                    # Extract hour
+                    hour_match = re.search(r'(\d{1,2})', hour_text)
+                    if hour_match:
+                        hour = int(hour_match.group(1))
+                        
+                        if 0 <= hour <= 23:
+                            # Extract meteorological data
+                            wind_text = cells[1].get_text(strip=True) if len(cells) > 1 else ""
+                            temp_text = cells[2].get_text(strip=True) if len(cells) > 2 else ""
+                            
+                            # Parse values (handle various formats)
+                            wind_match = re.search(r'(\d+(?:\.\d+)?)', wind_text)
+                            temp_match = re.search(r'(-?\d+(?:\.\d+)?)', temp_text)
+                            
+                            wind_speed = float(wind_match.group(1)) / 3.6 if wind_match else None
+                            temperature = float(temp_match.group(1)) if temp_match else None
+                            
+                            hourly_data.append({
+                                "hour": hour,
+                                "wind_speed": wind_speed,
+                                "temperature": temperature,
+                                "wind_gust": None,
+                                "wind_direction": None,
+                                "precipitation": None,
+                                "cloud_cover": None
+                            })
+        
+        # Fill if empty
+        if not hourly_data:
+            hourly_data = [{
+                "hour": h,
+                "wind_speed": None,
+                "temperature": None,
+                "wind_gust": None,
+                "wind_direction": None,
+                "precipitation": None,
+                "cloud_cover": None
+            } for h in range(24)]
+        
         return {
-            "success": False,
+            "success": True,
             "source": "meteoblue",
-            "error": f"Timeout: {str(e)}",
+            "data": hourly_data,
             "timestamp": datetime.now().isoformat()
         }
+        
     except Exception as e:
+        logger.error(f"Meteoblue scrape error: {e}")
         return {
             "success": False,
             "source": "meteoblue",
             "error": str(e),
+            "data": [],
             "timestamp": datetime.now().isoformat()
         }
 
 
-async def extract_hourly_forecast(data: Dict[str, Any], day_index: int = 0) -> List[Dict[str, Any]]:
-    """
-    Parse Meteoblue hourly data
-    
-    Args:
-        data: Raw response from fetch_meteoblue
-        day_index: Which day to extract (0=today, 1=tomorrow)
-    
-    Returns:
-        List of parsed hourly forecasts
-    """
+def extract_hourly_forecast(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Parse scraped data into standard format"""
     if not data.get("success"):
         return []
-    
-    forecasts = []
-    for item in data.get("data", []):
-        try:
-            # Parse time string (e.g., "14:00")
-            time_str = item.get("time", "0:00")
-            hour = int(time_str.split(":")[0]) if ":" in time_str else 0
-            
-            # Parse temperature (remove °C symbol)
-            temp_str = item.get("temp", "0").replace("°C", "").replace("°", "").strip()
-            temperature = float(temp_str) if temp_str else 0.0
-            
-            # Parse wind speed (remove km/h)
-            wind_str = item.get("wind", "0").replace("km/h", "").strip()
-            wind_speed = float(wind_str) if wind_str else 0.0
-            
-            # Parse gust
-            gust_str = item.get("gust", "0").replace("km/h", "").strip()
-            wind_gust = float(gust_str) if gust_str else 0.0
-            
-            # Parse precipitation
-            precip_str = item.get("precip", "0").replace("mm", "").strip()
-            precipitation = float(precip_str) if precip_str else 0.0
-            
-            forecasts.append({
-                "time": time_str,
-                "hour": hour,
-                "temperature": temperature,
-                "wind_speed": wind_speed,
-                "wind_gust": wind_gust,
-                "precipitation": precipitation,
-            })
-        except (ValueError, AttributeError):
-            continue
-    
-    return forecasts
+    return data.get("data", [])

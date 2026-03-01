@@ -147,7 +147,8 @@ export const HourlyForecastItemSchema = z.object({
   precipitation: z.number(),
   para_index: z.number(),
   verdict: z.string(),
-})
+  sources: z.record(z.string(), z.any()).optional(), // Per-source weather data
+}).passthrough() // Keep all extra fields
 
 export const DailyForecastItemSchema = z.object({
   date: z.string(),
@@ -183,13 +184,25 @@ export const WeatherDataSchema = z.object({
 
 export const ConsensusHourSchema = z.object({
   hour: z.number(),
+  num_sources: z.number().optional(),
   temperature: z.number().nullable(),
+  temperature_confidence: z.number().optional(),
   wind_speed: z.number().nullable(),
+  wind_confidence: z.number().optional(),
   wind_gust: z.number().nullable(),
+  gust_confidence: z.number().optional(),
   wind_direction: z.number().nullable(),
+  direction_confidence: z.number().optional(),
   precipitation: z.number().nullable(),
+  precipitation_confidence: z.number().optional(),
   cloud_cover: z.number().nullable(),
-})
+  cloud_confidence: z.number().optional(),
+  cape: z.number().nullable().optional(),
+  cape_confidence: z.number().optional(),
+  lifted_index: z.number().nullable().optional(),
+  li_confidence: z.number().optional(),
+  sources: z.record(z.string(), z.any()).optional(), // Per-source data for tooltip
+}).passthrough() // Keep all extra fields from API response
 
 export const SlotSchema = z.object({
   start_hour: z.number(),

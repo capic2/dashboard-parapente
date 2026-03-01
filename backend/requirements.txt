@@ -11,3 +11,4 @@ httpx==0.25.2
 pytest==7.4.3
 pytest-asyncio==0.21.1
 apscheduler==3.10.4
+scrapling==0.1.20

@@ -13,6 +13,7 @@ from scrapers.open_meteo import fetch_open_meteo, extract_hourly_forecast as ext
 from scrapers.weatherapi import fetch_weatherapi, extract_hourly_forecast as extract_wa
 from scrapers.meteociel import fetch_meteociel
 from scrapers.meteoblue import fetch_meteoblue
+from scrapers.meteo_parapente import fetch_meteo_parapente
 
 
 async def aggregate_forecasts(
@@ -22,20 +23,24 @@ async def aggregate_forecasts(
     sources: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
-    Aggregate weather forecasts from all available sources
+    Aggregate weather forecasts from available sources
     
     Args:
         lat: Latitude
         lon: Longitude
         day_index: 0=today, 1=tomorrow, etc.
-        sources: List of sources to use (default: all)
+        sources: List of sources to use (default: reliable sources only)
+                 NOTE: meteo_parapente, meteociel, meteoblue are disabled due to
+                 website structure changes. See SCRAPER_STATUS.md for details.
     
     Returns:
         Dict with aggregated raw data from all sources
     """
-    # Default to all sources (skip meteo-parapente for now - needs spot names)
+    # Default to sources that reliably return data
+    # Disabled: ["meteo_parapente", "meteociel", "meteoblue"]
+    # Reason: Websites changed, APIs deprecated, or endpoints moved
     if sources is None:
-        sources = ["open-meteo", "weatherapi", "meteociel", "meteoblue"]
+        sources = ["open-meteo", "weatherapi"]
     
     # Fetch all data concurrently
     tasks = []
@@ -48,6 +53,10 @@ async def aggregate_forecasts(
     if "weatherapi" in sources:
         tasks.append(fetch_weatherapi(lat, lon))
         source_map["weatherapi"] = len(tasks) - 1
+    
+    if "meteo_parapente" in sources:
+        tasks.append(fetch_meteo_parapente(lat, lon))
+        source_map["meteo_parapente"] = len(tasks) - 1
     
     if "meteociel" in sources:
         tasks.append(fetch_meteociel(lat, lon))
@@ -84,14 +93,18 @@ async def aggregate_forecasts(
             hourly = extract_om(result, day_index)
         elif source_name == "weatherapi":
             hourly = extract_wa(result, day_index)
+        elif source_name == "meteo_parapente":
+            # meteo_parapente extractor
+            from scrapers.meteo_parapente import extract_hourly_forecast as extract_mp
+            hourly = extract_mp(result)
         elif source_name == "meteociel":
-            # meteociel extractor is async
+            # meteociel extractor
             from scrapers.meteociel import extract_hourly_forecast as extract_mc
-            hourly = await extract_mc(result)
+            hourly = extract_mc(result)
         elif source_name == "meteoblue":
-            # meteoblue extractor is async and takes day_index
+            # meteoblue extractor takes day_index
             from scrapers.meteoblue import extract_hourly_forecast as extract_mb
-            hourly = await extract_mb(result, day_index)
+            hourly = extract_mb(result, day_index)
         
         aggregated["sources"][source_name] = {
             "success": result.get("success", False),
@@ -140,8 +153,8 @@ def normalize_data(aggregated: Dict[str, Any]) -> Dict[str, Any]:
         for hour_data in source_info["data"]:
             hour = hour_data.get("hour")
             
-            # Only flyable hours (11h-18h)
-            if hour is None or hour < 11 or hour > 18:
+            # Include all available hours
+            if hour is None:
                 continue
             
             if hour not in normalized_hours:
@@ -200,7 +213,7 @@ def calculate_consensus(normalized: Dict[str, Any]) -> Dict[str, Any]:
         normalized: Output from normalize_data()
     
     Returns:
-        Consensus forecast with confidence scores
+        Consensus forecast with confidence scores and per-source data
     """
     if not normalized.get("success"):
         return normalized
@@ -210,6 +223,7 @@ def calculate_consensus(normalized: Dict[str, Any]) -> Dict[str, Any]:
     for hour_data in normalized.get("normalized", []):
         hour = hour_data["hour"]
         num_sources = len(hour_data["sources"])
+        sources_list = hour_data["sources"]
         
         # Calculate averages and confidence
         def safe_avg(values):
@@ -228,11 +242,55 @@ def calculate_consensus(normalized: Dict[str, Any]) -> Dict[str, Any]:
         temp_avg, temp_conf = safe_avg(hour_data["temperature"])
         wind_avg, wind_conf = safe_avg(hour_data["wind_speed"])
         gust_avg, gust_conf = safe_avg(hour_data["wind_gust"])
-        dir_avg, dir_conf = safe_avg(hour_data["wind_direction"])
+        
+        # CRITICAL FIX: Add 180° to wind direction to show where wind COMES FROM (not goes to)
+        # Example: if wind comes from North (0°), arrow should point South (180°)
+        wind_direction_raw = hour_data["wind_direction"].copy() if hour_data["wind_direction"] else []
+        wind_direction_flipped = [(d + 180) % 360 for d in wind_direction_raw if d is not None]
+        dir_avg, dir_conf = safe_avg(wind_direction_flipped)
+        
         precip_avg, precip_conf = safe_avg(hour_data["precipitation"])
         cloud_avg, cloud_conf = safe_avg(hour_data["cloud_cover"])
         cape_avg, cape_conf = safe_avg(hour_data["cape"])
         li_avg, li_conf = safe_avg(hour_data["lifted_index"])
+        
+        # Build per-source data mapping
+        # Note: this requires we have the original aggregated data
+        # For now, we'll preserve the per-source indices during normalization
+        sources_data = {}
+        
+        # Build initial per-source structure for all known sources
+        for source in ["open-meteo", "weatherapi", "meteo_parapente", "meteociel", "meteoblue"]:
+            sources_data[source] = {
+                "wind_speed": None,
+                "temperature": None,
+                "wind_gust": None,
+                "wind_direction": None,
+                "precipitation": None,
+                "cloud_cover": None,
+                "cape": None,
+                "lifted_index": None
+            }
+        
+        # Map values to sources (using index position)
+        # The lists in hour_data are parallel - same index corresponds to same source order
+        for i, source in enumerate(sources_list):
+            if i < len(hour_data["temperature"]):
+                sources_data[source]["temperature"] = round(hour_data["temperature"][i], 1) if hour_data["temperature"][i] is not None else None
+            if i < len(hour_data["wind_speed"]):
+                sources_data[source]["wind_speed"] = round(hour_data["wind_speed"][i], 1) if hour_data["wind_speed"][i] is not None else None
+            if i < len(hour_data["wind_gust"]):
+                sources_data[source]["wind_gust"] = round(hour_data["wind_gust"][i], 1) if hour_data["wind_gust"][i] is not None else None
+            if i < len(hour_data["wind_direction"]):
+                sources_data[source]["wind_direction"] = round(hour_data["wind_direction"][i], 1) if hour_data["wind_direction"][i] is not None else None
+            if i < len(hour_data["precipitation"]):
+                sources_data[source]["precipitation"] = round(hour_data["precipitation"][i], 2) if hour_data["precipitation"][i] is not None else None
+            if i < len(hour_data["cloud_cover"]):
+                sources_data[source]["cloud_cover"] = round(hour_data["cloud_cover"][i], 1) if hour_data["cloud_cover"][i] is not None else None
+            if i < len(hour_data["cape"]):
+                sources_data[source]["cape"] = round(hour_data["cape"][i], 1) if hour_data["cape"][i] is not None else None
+            if i < len(hour_data["lifted_index"]):
+                sources_data[source]["lifted_index"] = round(hour_data["lifted_index"][i], 1) if hour_data["lifted_index"][i] is not None else None
         
         consensus.append({
             "hour": hour,
@@ -253,6 +311,7 @@ def calculate_consensus(normalized: Dict[str, Any]) -> Dict[str, Any]:
             "cape_confidence": round(cape_conf, 2),
             "lifted_index": round(li_avg, 1) if li_avg else None,
             "li_confidence": round(li_conf, 2),
+            "sources": sources_data
         })
     
     return {
@@ -264,6 +323,46 @@ def calculate_consensus(normalized: Dict[str, Any]) -> Dict[str, Any]:
             for source in hour.get("sources", [])
         ))
     }
+
+
+def extract_sunrise_sunset(aggregated: Dict[str, Any], day_index: int) -> tuple:
+    """
+    Extract sunrise and sunset times from Open-Meteo data
+    
+    Args:
+        aggregated: Output from aggregate_forecasts()
+        day_index: Which day to extract (0=today, 1=tomorrow)
+    
+    Returns:
+        Tuple of (sunrise_HH:MM, sunset_HH:MM) strings, or (None, None)
+    """
+    open_meteo_data = aggregated.get("sources", {}).get("open-meteo", {})
+    
+    if not open_meteo_data.get("success"):
+        return None, None
+    
+    raw_wrapper = open_meteo_data.get("raw", {})
+    # The raw data is wrapped in {"success": True, "source": "open-meteo", "data": {...}, "timestamp": ...}
+    api_data = raw_wrapper.get("data", {})
+    daily = api_data.get("daily", {})
+    sunrises = daily.get("sunrise", [])
+    sunsets = daily.get("sunset", [])
+    
+    if day_index >= len(sunrises) or day_index >= len(sunsets):
+        return None, None
+    
+    try:
+        # Parse ISO format datetime strings (e.g., "2026-03-01T07:15")
+        sunrise_str = sunrises[day_index]
+        sunset_str = sunsets[day_index]
+        
+        # Extract HH:MM from ISO format
+        sunrise_time = sunrise_str.split("T")[1][:5] if "T" in sunrise_str else None
+        sunset_time = sunset_str.split("T")[1][:5] if "T" in sunset_str else None
+        
+        return sunrise_time, sunset_time
+    except (IndexError, AttributeError, TypeError):
+        return None, None
 
 
 async def get_normalized_forecast(
@@ -280,7 +379,7 @@ async def get_normalized_forecast(
         day_index: Day to forecast (0=today, 1=tomorrow)
     
     Returns:
-        Normalized consensus forecast
+        Normalized consensus forecast with sunrise/sunset times
     """
     # Step 1: Aggregate
     aggregated = await aggregate_forecasts(lat, lon, day_index)
@@ -291,4 +390,12 @@ async def get_normalized_forecast(
     # Step 3: Consensus
     consensus = calculate_consensus(normalized)
     
-    return consensus
+    # Step 4: Extract sunrise/sunset
+    sunrise, sunset = extract_sunrise_sunset(aggregated, day_index)
+    
+    # Add sunrise/sunset to response
+    result = consensus.copy()
+    result["sunrise"] = sunrise
+    result["sunset"] = sunset
+    
+    return result
