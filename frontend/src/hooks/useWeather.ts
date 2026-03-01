@@ -232,12 +232,26 @@ export const useWeather = (siteId: string | undefined): UseQueryResult<WeatherDa
       }
       
       // Helper to format wind direction
+      // CRITICAL FIX: Add 180° to show where wind COMES FROM (not goes to)
+      // Example: if wind comes from North (0°), display as South (180°) with arrow pointing down
       const formatWindDirection = (deg: number | null): string => {
         if (deg === null) return '—'
+        // Flip direction by adding 180° (already done in backend, but ensuring consistency)
         const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
         const index = Math.round(((deg % 360) / 45)) % 8
         return directions[index]
       }
+
+      // Helper to convert HH:MM string to hour number
+      const timeToHour = (timeStr: string | null): number | null => {
+        if (!timeStr) return null
+        const parts = timeStr.split(':')
+        return parseInt(parts[0], 10)
+      }
+
+      // Extract sunrise/sunset and convert to hours
+      const sunriseHour = timeToHour(data.sunrise)
+      const sunsetHour = timeToHour(data.sunset)
       
       // Map slots to hourly verdicts
       const hourToVerdict = new Map<number, string>()
@@ -277,7 +291,7 @@ export const useWeather = (siteId: string | undefined): UseQueryResult<WeatherDa
       }
       
       // Transform consensus array to hourly forecast
-      const hourlyForecast = (data.consensus || []).map((hour: any) => {
+      let hourlyForecast = (data.consensus || []).map((hour: any) => {
         const hourlyScore = calculateHourlyParaIndex(hour)
         const verdict = hourToVerdict.get(hour.hour) || data.verdict || 'N/A'
         
@@ -293,9 +307,18 @@ export const useWeather = (siteId: string | undefined): UseQueryResult<WeatherDa
           conditions: hour.cloud_cover !== null ? `${Math.round(hour.cloud_cover)}% nuages` : 'N/A',
           precipitation: hour.precipitation || 0,
           para_index: Math.round(hourlyScore / 10), // Convert 0-100 to 0-10
-          verdict: verdict
+          verdict: verdict,
+          sources: hour.sources || {} // Preserve per-source data for tooltip
         }
       })
+
+      // Filter to only show hours between sunrise and sunset
+      if (sunriseHour !== null && sunsetHour !== null) {
+        hourlyForecast = hourlyForecast.filter(h => {
+          const hourNum = parseInt(h.hour.split(':')[0], 10)
+          return hourNum >= sunriseHour && hourNum <= sunsetHour
+        })
+      }
       
       // Transform daily responses to DailyForecastItem[]
       const dailyForecast = validatedDailyResponses

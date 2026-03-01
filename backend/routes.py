@@ -11,7 +11,7 @@ import uuid
 import asyncio
 import xml.etree.ElementTree as ET
 import math
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Sequence
 
 # Import weather_pipeline and para_index
 from weather_pipeline import get_normalized_forecast
@@ -36,43 +36,67 @@ def get_spot(spot_id: str, db: Session = Depends(get_db)):
 
 # Weather endpoints (UPDATED with pipeline + para_index)
 @router.get("/weather/{spot_id}")
-async def get_weather(spot_id: str, day_index: int = 0, db: Session = Depends(get_db)):
+async def get_weather(spot_id: str, day_index: int = 0, days: int = 1, db: Session = Depends(get_db)):
     """
     Get weather forecast for a spot (LIVE from all sources)
-    Now returns normalized data + para_index
+    Now returns normalized data + para_index + sunrise/sunset
     
     Args:
         spot_id: Site ID (e.g., 'site-arguel')
         day_index: 0=today, 1=tomorrow (default: 0)
+        days: Number of days to return (default: 1, backward compatible)
     """
     site = db.query(Site).filter(Site.id == spot_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Spot not found")
     
-    # Fetch live normalized forecast
-    consensus = await get_normalized_forecast(site.latitude, site.longitude, day_index)
+    # Fetch N days of data in parallel
+    tasks = []
+    for d in range(days):
+        tasks.append(get_normalized_forecast(site.latitude, site.longitude, day_index + d))
     
-    if not consensus.get("success"):
-        return {
-            "site_id": spot_id,
-            "site_name": site.name,
-            "error": consensus.get("error", "Failed to fetch weather data"),
-            "day_index": day_index
-        }
+    results = await asyncio.gather(*tasks)
     
-    # Calculate para_index
-    consensus_hours = consensus.get("consensus", [])
-    para_result = calculate_para_index(consensus_hours)
+    # Combine all days into single response
+    all_consensus = []
+    total_sources = 0
+    sunrise_time = None
+    sunset_time = None
+    
+    for day_result in results:
+        if day_result.get("success"):
+            all_consensus.extend(day_result.get("consensus", []))
+            total_sources = max(total_sources, day_result.get("total_sources", 0))
+            
+            # Extract sunrise/sunset from first day only
+            if not sunrise_time and day_result.get("sunrise"):
+                sunrise_time = day_result.get("sunrise")
+                sunset_time = day_result.get("sunset")
+        else:
+            # If any day fails, return error
+            return {
+                "site_id": spot_id,
+                "site_name": site.name,
+                "error": day_result.get("error", "Failed to fetch weather data"),
+                "day_index": day_index,
+                "days": days
+            }
+    
+    # Calculate para_index (using all days combined)
+    para_result = calculate_para_index(all_consensus)
     
     # Analyze hourly slots
-    slots = analyze_hourly_slots(consensus_hours)
+    slots = analyze_hourly_slots(all_consensus)
     slots_summary = format_slots_summary(slots)
     
     return {
         "site_id": spot_id,
         "site_name": site.name,
         "day_index": day_index,
-        "consensus": consensus_hours,
+        "days": days,
+        "sunrise": sunrise_time,
+        "sunset": sunset_time,
+        "consensus": all_consensus,
         "para_index": para_result["para_index"],
         "verdict": para_result["verdict"],
         "emoji": para_result["emoji"],
@@ -80,7 +104,7 @@ async def get_weather(spot_id: str, day_index: int = 0, db: Session = Depends(ge
         "metrics": para_result["metrics"],
         "slots": slots,
         "slots_summary": slots_summary,
-        "total_sources": consensus.get("total_sources", 0)
+        "total_sources": total_sources
     }
 
 @router.get("/weather/{spot_id}/today")

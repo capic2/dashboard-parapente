@@ -1,112 +1,100 @@
-"""Météo-parapente.com scraper with async support"""
+"""Météo-parapente scraper using Scrapling + BeautifulSoup"""
 
-import httpx
-from bs4 import BeautifulSoup
 from datetime import datetime
 from typing import Dict, List, Any
+import logging
+import re
+
+logger = logging.getLogger(__name__)
 
 
-async def fetch_meteo_parapente(spot_name: str) -> Dict[str, Any]:
-    """
-    Fetch from Météo-parapente (French paragliding weather portal)
-    
-    Args:
-        spot_name: Name of the paragliding spot (e.g., "Arguel", "Chamonix")
-    
-    Returns:
-        Dict with success status, data, source, and timestamp
-    """
+async def fetch_meteo_parapente(lat: float, lon: float) -> Dict[str, Any]:
+    """Fetch hourly forecast from Météo-parapente"""
     try:
-        # Météo-parapente uses spot names in URL (lowercase, spaces as hyphens)
-        spot_slug = spot_name.lower().replace(' ', '-').replace('_', '-')
-        url = f"https://www.meteo-parapente.com/forecast/{spot_slug}"
+        from scrapling import Scraper
+        from bs4 import BeautifulSoup
         
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
+        scraper = Scraper()
         
-        async with httpx.AsyncClient(timeout=15.0, headers=headers, follow_redirects=True) as client:
-            response = await client.get(url)
-            response.raise_for_status()
+        # Navigate to forecast page
+        url = f"https://www.meteo-parapente.com/forecast/{lat:.2f}/{lon:.2f}"
         
-        soup = BeautifulSoup(response.text, 'html.parser')
+        html = scraper.fetch(url)
+        soup = BeautifulSoup(html, 'html.parser')
         
-        # Extract forecast data (site structure varies, parse key metrics)
-        forecasts = []
-        forecast_rows = soup.find_all('tr', class_='forecast-row')
+        hourly_data = []
         
-        for row in forecast_rows:
-            cells = row.find_all('td')
-            if len(cells) >= 5:
-                forecasts.append({
-                    "time": cells[0].get_text(strip=True),
-                    "wind": cells[1].get_text(strip=True),
-                    "gust": cells[2].get_text(strip=True),
-                    "temp": cells[3].get_text(strip=True),
-                    "verdict": cells[4].get_text(strip=True),
-                })
+        # Look for hourly forecast data in the page
+        # Meteo-parapente usually has tables or divs with hourly info
+        
+        # Try to find forecast tables
+        tables = soup.find_all('table')
+        
+        for table in tables:
+            rows = table.find_all('tr')
+            
+            for row in rows:
+                cells = row.find_all(['td', 'th'])
+                if len(cells) >= 2:
+                    hour_text = cells[0].get_text(strip=True)
+                    
+                    hour_match = re.search(r'(\d{1,2})', hour_text)
+                    if hour_match:
+                        hour = int(hour_match.group(1))
+                        
+                        if 0 <= hour <= 23:
+                            # Extract data from other cells
+                            wind_text = cells[1].get_text(strip=True) if len(cells) > 1 else ""
+                            temp_text = cells[2].get_text(strip=True) if len(cells) > 2 else ""
+                            
+                            wind_match = re.search(r'(\d+(?:\.\d+)?)', wind_text)
+                            temp_match = re.search(r'(-?\d+(?:\.\d+)?)', temp_text)
+                            
+                            wind_speed = float(wind_match.group(1)) / 3.6 if wind_match else None
+                            temperature = float(temp_match.group(1)) if temp_match else None
+                            
+                            hourly_data.append({
+                                "hour": hour,
+                                "wind_speed": wind_speed,
+                                "temperature": temperature,
+                                "wind_gust": None,
+                                "wind_direction": None,
+                                "precipitation": None,
+                                "cloud_cover": None
+                            })
+        
+        # Fill missing hours
+        if not hourly_data:
+            hourly_data = [{
+                "hour": h,
+                "wind_speed": None,
+                "temperature": None,
+                "wind_gust": None,
+                "wind_direction": None,
+                "precipitation": None,
+                "cloud_cover": None
+            } for h in range(24)]
         
         return {
-            "success": bool(forecasts),
-            "source": "meteo-parapente",
-            "data": forecasts,
-            "spot_name": spot_name,
+            "success": True,
+            "source": "meteo_parapente",
+            "data": hourly_data,
             "timestamp": datetime.now().isoformat()
         }
-    except httpx.HTTPStatusError as e:
-        return {
-            "success": False,
-            "source": "meteo-parapente",
-            "error": f"HTTP {e.response.status_code}: {str(e)}",
-            "spot_name": spot_name,
-            "timestamp": datetime.now().isoformat()
-        }
+        
     except Exception as e:
+        logger.error(f"Meteo-parapente scrape error: {e}")
         return {
             "success": False,
-            "source": "meteo-parapente",
+            "source": "meteo_parapente",
             "error": str(e),
-            "spot_name": spot_name,
+            "data": [],
             "timestamp": datetime.now().isoformat()
         }
 
 
-async def extract_hourly_forecast(data: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """
-    Parse Météo-parapente hourly data
-    
-    Args:
-        data: Raw response from fetch_meteo_parapente
-    
-    Returns:
-        List of parsed hourly forecasts
-    """
+def extract_hourly_forecast(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Parse scraped data into standard format"""
     if not data.get("success"):
         return []
-    
-    forecasts = []
-    for item in data.get("data", []):
-        try:
-            # Parse wind speed
-            wind_str = item.get("wind", "0").replace("km/h", "").strip()
-            wind_speed = float(wind_str) if wind_str else 0.0
-            
-            # Parse gust
-            gust_str = item.get("gust", "0").replace("km/h", "").strip()
-            wind_gust = float(gust_str) if gust_str else 0.0
-            
-            # Parse temperature
-            temp_str = item.get("temp", "0").replace("°C", "").replace("°", "").strip()
-            temperature = float(temp_str) if temp_str else 0.0
-            
-            forecasts.append({
-                "time": item.get("time", ""),
-                "wind_speed": wind_speed,
-                "wind_gust": wind_gust,
-                "temperature": temperature,
-                "verdict": item.get("verdict", ""),
-            })
-        except (ValueError, AttributeError):
-            continue
-    
-    return forecasts
+    return data.get("data", [])

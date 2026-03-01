@@ -1,364 +1,281 @@
-# Frontend - Dashboard Parapente
+# Dashboard Parapente Frontend
 
-React 18 frontend with TanStack suite for advanced UI patterns.
+React 18 + TanStack Suite dashboard for paragliding weather forecasting and flight tracking.
 
----
+## 🎯 Features
 
-## 🚀 Setup (Phase 3, Week 2)
+- **Real-time Weather Data**: Multi-source consensus forecasts from OpenMeteo, WeatherAPI, and other providers
+- **Para-Index Scoring**: Dynamic 0-100 scoring system for flight conditions
+- **Site Management**: List of paragliding spots with weather integration
+- **Flight Tracking**: View and manage flight history from Strava integration
+- **Statistics Dashboard**: Flight metrics, trends, and analytics
+- **Responsive Design**: Mobile-first Tailwind CSS styling
+- **Type-Safe**: Full TypeScript support with Zod validation
 
-### 1. Install Dependencies
+## 📋 Tech Stack
+
+- **Frontend**: React 18 + TypeScript
+- **Routing**: TanStack Router
+- **State Management**: TanStack Query + Zustand
+- **Tables**: TanStack Table
+- **Styling**: Tailwind CSS 4
+- **Validation**: Zod schemas
+- **Testing**: Vitest + React Testing Library
+- **3D Maps**: Cesium.js (optional)
+- **Build**: Vite
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js ≥ 18
+- Backend API running at `http://localhost:8000` (or configured proxy)
+
+### Installation
 
 ```bash
-npm install
+cd frontend
+npm install --legacy-peer-deps
 ```
 
-### 2. Development Server
+### Development
 
 ```bash
 npm run dev
-# Open: http://localhost:5173
 ```
 
-### 3. Build for Production
+Access at `http://localhost:5173`
+
+### Build
 
 ```bash
 npm run build
-# Output: dist/
 ```
 
----
+### Environment Variables
 
-## 📊 Dashboard Sections
+Create `.env.local`:
 
-1. **Today at a Glance** — Current conditions for all sites
-2. **5-Day Forecast** — Timeline view of best flying days
-3. **Your Flights** — Strava history with weather context (TanStack Table)
-4. **Learning Stats** — Analytics & improvements
-5. **Alert Manager** — Create/manage weather alerts (TanStack Form)
-6. **Weather Sources** — Compare data accuracy (TanStack Table)
-
----
-
-## 🎨 Technology Stack
-
-**Core:**
-- **React 19** with Hooks + Server Components
-  - React Compiler (automatic optimizations)
-  - React Actions (simplified async handling)
-  - Improved error boundaries
-- **Vite** for fast development
-- **Tailwind CSS** for styling
-
-**TanStack Suite:**
-- **@tanstack/react-router** — Modern routing with type safety
-- **@tanstack/react-query** — Data fetching, caching, synchronization
-- **@tanstack/react-table** — Headless table library (sorting, filtering, pagination)
-- **@tanstack/react-form** — Type-safe form handling with validation
-
-**Others:**
-- **Zustand** for lightweight state management (UI state)
-- **Axios** for API calls (wrapped in TanStack Query)
-- **React ChartJS 2** for visualizations
-
----
+```
+VITE_ENABLE_MSW=false  # Disable MSW mocks (use real API)
+VITE_API_URL=http://localhost:8000  # Backend API URL
+```
 
 ## 📁 Project Structure
 
 ```
 src/
-├── components/           # Reusable React components
-│   ├── CurrentConditions.jsx
-│   ├── Forecast7Day.jsx
-│   ├── RecentFlights.jsx
-│   ├── LearningStats.jsx
-│   ├── AlertManager.jsx
-│   ├── SourceComparison.jsx
-│   └── Navigation.jsx
-│
-├── pages/               # Page-level components
-│   ├── Dashboard.jsx
-│   ├── FlightHistory.jsx
-│   ├── Settings.jsx
-│   └── Admin.jsx
-│
-├── hooks/               # Custom React hooks
-│   ├── useWeather.js    (TanStack Query hooks)
-│   ├── useFlights.js    (TanStack Query + Mutations)
-│   ├── useAlerts.js     (TanStack Query + Mutations)
-│   ├── useAlertForm.js  (TanStack Form)
-│   └── useFlightsTable.js (TanStack Table)
-│
-├── stores/              # Zustand stores (UI state only)
-│   └── weatherStore.js
-│
-├── utils/
-│   └── api.js           # Axios instance
-│
-├── App.jsx              # Root component with TanStack Router
-├── main.jsx             # React entry point
-└── App.css              # Global styles
+├── pages/
+│   ├── Dashboard.tsx          # Main weather dashboard
+│   ├── FlightHistory.tsx       # Flight list and viewer
+│   ├── Analytics.tsx           # Performance charts
+│   └── Settings.tsx            # User settings
+├── components/
+│   ├── SiteSelector.tsx        # Spot selector dropdown
+│   ├── CurrentConditions.tsx   # Current Para-Index card
+│   ├── HourlyForecast.tsx      # 11h-18h hourly table
+│   ├── Forecast7Day.tsx        # 7-day daily overview
+│   ├── StatsPanel.tsx          # Flight statistics
+│   ├── FlightViewer3D.tsx      # 3D flight map (Cesium)
+│   └── stories/                # Storybook components
+├── hooks/
+│   ├── useWeather.ts           # Weather data fetching
+│   ├── useSites.ts             # Paragliding spots
+│   ├── useFlights.ts           # Flight CRUD operations
+│   └── useFlightsTable.tsx      # Flight table state
+├── types/
+│   └── index.ts                # TypeScript interfaces
+├── schemas.ts                  # Zod validation schemas
+├── mocks/
+│   ├── handlers.ts             # MSW request handlers
+│   ├── data.ts                 # Mock data
+│   └── browser.ts              # MSW setup
+└── App.tsx                     # Router setup
 ```
 
----
+## 🔧 API Integration
 
-## ⚡ React 19 Features
+### Backend Endpoints
 
-### React Compiler
-- Automatic memoization (no need for useMemo/useCallback)
-- Better performance without manual optimization
-```jsx
-// React 19: No need for useMemo wrapper
-export function Dashboard() {
-  const expensiveValue = calculateComplexData()
-  // Compiler handles memoization automatically
-  return <div>{expensiveValue}</div>
+The frontend expects these endpoints from the backend:
+
+```
+GET  /api/spots                  # Get all paragliding spots
+GET  /api/spots/{spotId}         # Get specific spot
+GET  /api/weather/{spotId}       # Get weather (with para_index)
+GET  /api/flights                # Get flight list
+GET  /api/flights/{flightId}     # Get flight details
+GET  /api/flights/stats          # Get aggregate statistics
+POST /api/flights                # Create new flight
+PATCH /api/flights/{flightId}    # Update flight
+DELETE /api/flights/{flightId}   # Delete flight
+```
+
+### Proxy Configuration
+
+In development, Vite proxies `/api/*` requests to the backend:
+
+**vite.config.ts:**
+```typescript
+server: {
+  proxy: {
+    '/api': {
+      target: 'http://dashboard-backend:8000',  // Docker network
+      changeOrigin: true
+    }
+  }
 }
 ```
 
-### React Actions
-- Simplified async form handling
-- Better error handling out of the box
-```jsx
-async function updateAlert(formData) {
-  const result = await API.patch(`/alerts/${id}`, formData)
-  return result
-}
-
-<form action={updateAlert}>
-  <input name="name" />
-  <button type="submit">Save</button>
-</form>
+**Local development** (outside Docker):
+```typescript
+target: 'http://localhost:8001'  // Backend exposed port
 ```
 
----
+## 🎨 Component Guide
 
-## 🔌 TanStack Query (Data Fetching)
+### SiteSelector
+- **Props**: `selectedSiteId`, `onSelectSite`
+- **Hook**: `useSites()`
+- **Features**: Loading, error states, keyboard support
 
-Automatic caching, refetching, and state synchronization.
+### CurrentConditions
+- **Props**: `spotId`
+- **Hook**: `useWeather(spotId)`
+- **Display**: Para-Index (0-10), verdict, temp, wind, conditions
 
-```javascript
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { useFlights, useCreateFlight } from './hooks/useFlights'
+### HourlyForecast
+- **Props**: `spotId`
+- **Hook**: `useWeather(spotId)`
+- **Hours**: 11h-18h (flying window)
+- **Display**: Hourly table with wind, temp, para_index, verdict
 
-function FlightsList() {
-  // Automatic caching + background refetch
-  const { data: flights, isLoading } = useFlights()
-  
-  // Mutation with automatic cache invalidation
-  const { mutate: createFlight } = useCreateFlight()
-  
-  if (isLoading) return <div>Loading...</div>
-  
-  return (
-    <div>
-      {flights.map(flight => (
-        <div key={flight.id}>{flight.title}</div>
-      ))}
-    </div>
-  )
-}
-```
+### Forecast7Day
+- **Props**: `spotId`
+- **Hook**: `useWeather(spotId)`
+- **Display**: Daily cards with min/max temp, wind average, conditions
 
-**Benefits:**
-- ✅ Automatic caching (configurable staleTime)
-- ✅ Background refetching
-- ✅ Automatic garbage collection
-- ✅ Mutation + automatic cache invalidation
-- ✅ Pagination, infinite queries, optimistic updates
-
----
-
-## 📋 TanStack Table (Data Display)
-
-Headless table with sorting, filtering, pagination.
-
-```javascript
-import { useFlightsTable } from './hooks/useFlightsTable'
-
-function FlightsTable() {
-  const { table, isLoading } = useFlightsTable()
-  
-  return (
-    <table>
-      <thead>
-        {table.getHeaderGroups().map(headerGroup => (
-          <tr key={headerGroup.id}>
-            {headerGroup.headers.map(header => (
-              <th key={header.id} onClick={header.column.getToggleSortingHandler()}>
-                {header.isPlaceholder ? null : header.renderHeader()}
-              </th>
-            ))}
-          </tr>
-        ))}
-      </thead>
-      <tbody>
-        {table.getRowModel().rows.map(row => (
-          <tr key={row.id}>
-            {row.getVisibleCells().map(cell => (
-              <td key={cell.id}>{cell.renderCell()}</td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
-}
-```
-
-**Features:**
-- ✅ Sorting (multi-column)
-- ✅ Filtering
-- ✅ Pagination
-- ✅ Row selection
-- ✅ Column visibility
-- ✅ Fully headless (bring your own UI)
-
----
-
-## 🔑 TanStack Form (Forms)
-
-Type-safe form handling with validation.
-
-```javascript
-import { useAlertForm } from './hooks/useAlertForm'
-
-function AlertForm({ initialAlert }) {
-  const { form, isLoading } = useAlertForm(initialAlert)
-  
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        form.handleSubmit()
-      }}
-    >
-      <form.Field name="name">
-        {(field) => (
-          <div>
-            <label>{field.state.meta.name}</label>
-            <input
-              value={field.state.value}
-              onChange={(e) => field.setValue(e.target.value)}
-            />
-          </div>
-        )}
-      </form.Field>
-      
-      <button type="submit" disabled={isLoading}>
-        Save Alert
-      </button>
-    </form>
-  )
-}
-```
-
-**Benefits:**
-- ✅ Type-safe form state
-- ✅ Built-in validation
-- ✅ Array field support
-- ✅ Async validation
-- ✅ Array fields (dynamic forms)
-
----
-
-## 🧭 TanStack Router (Navigation)
-
-Type-safe routing with modern features.
-
-```javascript
-import { Router, RootRoute, Route } from '@tanstack/react-router'
-
-// Routes are defined in App.jsx
-const dashboardRoute = new Route({
-  getParentRoute: () => rootRoute,
-  path: '/',
-  component: Dashboard,
-})
-
-// Navigate from components
-import { useNavigate } from '@tanstack/react-router'
-
-function Navigation() {
-  const navigate = useNavigate()
-  
-  return (
-    <nav>
-      <button onClick={() => navigate({ to: '/' })}>Dashboard</button>
-      <button onClick={() => navigate({ to: '/flights' })}>Flights</button>
-    </nav>
-  )
-}
-```
-
-**Benefits:**
-- ✅ Type-safe routes & params
-- ✅ Route-level code splitting
-- ✅ Search params with validation
-- ✅ Loader functions (data fetching)
-- ✅ Error boundaries per route
-
----
-
-## 🗂️ Zustand (UI State)
-
-Lightweight state management for UI-only state.
-
-```javascript
-import { useWeatherStore } from './stores/weatherStore'
-
-function Dashboard() {
-  // UI state (separate from data fetching)
-  const { currentSite, setCurrentSite } = useWeatherStore()
-  
-  return (
-    <select value={currentSite} onChange={(e) => setCurrentSite(e.target.value)}>
-      <option>Select a site...</option>
-    </select>
-  )
-}
-```
-
-**When to use:**
-- ✅ UI state (selected site, filters, modal visibility)
-- ❌ NOT for data fetching (use TanStack Query instead)
-
----
+### StatsPanel
+- **Hook**: `useFlightStats()`
+- **Metrics**:
+  - Total flights, hours, distance
+  - Average duration, distance per flight
+  - Max altitude, favorite spot
+  - Last flight date
 
 ## 🧪 Testing
 
+### Run Tests
+
 ```bash
-npm run test           # Run tests
-npm run test:ui        # UI dashboard
-npm run coverage       # Coverage report
+npm run test                    # Run all tests
+npm run test:ui                # Interactive UI
+npm run coverage               # Coverage report
 ```
 
----
+### Storybook
 
-## 📚 Resources
+```bash
+npm run storybook              # Start Storybook on :6006
+npm run build-storybook        # Build for deployment
+```
 
-- **[TanStack Router](https://tanstack.com/router/latest)** — Modern routing
-- **[TanStack Query](https://tanstack.com/query/latest)** — Data fetching
-- **[TanStack Table](https://tanstack.com/table/latest)** — Headless table
-- **[TanStack Form](https://tanstack.com/form/latest)** — Type-safe forms
-- **[React Docs](https://react.dev/)** — React fundamentals
-- **[Vite](https://vitejs.dev/)** — Build tool
-- **[Tailwind CSS](https://tailwindcss.com/)** — Styling
+## ⚠️ Error Handling
 
----
+All components handle three states:
 
-## 🎯 Philosophy
+1. **Loading**: Skeleton placeholders
+2. **Error**: User-friendly error messages with retry buttons
+3. **Success**: Full data display
 
-Use **TanStack tools** for complex UI patterns:
-- Data fetching → TanStack Query
-- Tables/lists → TanStack Table
-- Routing → TanStack Router
-- Forms → TanStack Form
-- Simple UI state → Zustand
+### Validation
 
-This keeps the codebase focused and leverages the best tools for each job.
+Zod schemas validate all API responses:
 
----
+```typescript
+// In hooks
+const validation = WeatherDataSchema.safeParse(response.data)
+if (!validation.success) {
+  throw new Error(`Invalid weather data: ${validation.error.message}`)
+}
+```
 
-**Phase:** 3 Frontend (Starting March 28)  
-**Technology:** React 18 + TanStack Suite  
-**Estimated effort:** 40-50 hours
+## 📱 Responsive Design
+
+- **Mobile**: 320px (single column, full width)
+- **Tablet**: 768px (2-3 column grids)
+- **Desktop**: 1024px+ (full layout)
+
+Breakpoints:
+- `sm`: 640px
+- `md`: 768px
+- `lg`: 1024px
+- `xl`: 1280px
+
+## 🎯 Keyboard Shortcuts
+
+Currently implemented:
+- Site selector: Tab between spots, Enter to select
+- Future: Alt+R for reload, Alt+D for dark mode
+
+## 🐛 Known Issues & TODOs
+
+- [ ] Dark mode toggle (skeleton exists)
+- [ ] Flight path viewer 3D (Cesium component exists)
+- [ ] PWA offline support
+- [ ] Export to GeoJSON / GPX
+- [ ] Notifications for good flying days
+- [ ] Multi-language support (French > English)
+
+## 📊 Performance Optimization
+
+- TanStack Query with 5-minute stale time
+- Code splitting: separate chunks for TanStack libs
+- Image optimization with Vite
+- Lazy loading for routes
+
+## 🔒 Security
+
+- CORS configured for backend origin
+- Zod validation on all API responses
+- XSS protection via React's built-in escaping
+- No sensitive data in localStorage (future: auth tokens)
+
+## 🚢 Deployment
+
+### Docker
+
+```bash
+docker-compose up dashboard-frontend
+```
+
+Builds and runs on `localhost:5173`
+
+### Production Build
+
+```bash
+npm run build
+npm run preview  # Test production build locally
+```
+
+Output: `dist/` directory
+
+## 📚 Additional Resources
+
+- [TanStack Router Docs](https://tanstack.com/router/latest)
+- [TanStack Query Docs](https://tanstack.com/query/latest)
+- [Tailwind CSS Docs](https://tailwindcss.com)
+- [Vite Docs](https://vite.dev)
+- [Zod Docs](https://zod.dev)
+
+## 🤝 Contributing
+
+1. Run `npm run type-check` before commits
+2. Run `npm run lint` for code style
+3. Add tests for new features
+4. Update Storybook stories
+5. Update this README
+
+## 📝 License
+
+MIT
