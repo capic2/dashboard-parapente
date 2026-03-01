@@ -78,11 +78,10 @@ class TestFlightsEndpoints:
             id="flight-001",
             flight_date=datetime.now().date(),
             departure_time=datetime.now(),
-            landing_time=datetime.now() + timedelta(hours=1),
             duration_minutes=60,
             distance_km=10.5,
             max_altitude_m=1500,
-            site_name="Arguel",
+            name="Arguel 01-03 10h30",
             gpx_file_path=None
         )
         db_session.add(flight)
@@ -102,11 +101,10 @@ class TestFlightsEndpoints:
                 id=f"flight-{i:03d}",
                 flight_date=datetime.now().date(),
                 departure_time=datetime.now(),
-                landing_time=datetime.now() + timedelta(hours=1),
                 duration_minutes=60,
                 distance_km=10.0 + i,
                 max_altitude_m=1500,
-                site_name="Arguel"
+                name=f"Flight {i}"
             )
             db_session.add(flight)
         db_session.commit()
@@ -122,11 +120,10 @@ class TestFlightsEndpoints:
             id="flight-001",
             flight_date=datetime.now().date(),
             departure_time=datetime.now(),
-            landing_time=datetime.now() + timedelta(hours=1),
             duration_minutes=60,
             distance_km=10.5,
             max_altitude_m=1500,
-            site_name="Arguel"
+            name="Arguel 01-03 10h30"
         )
         db_session.add(flight)
         db_session.commit()
@@ -151,10 +148,11 @@ class TestWeatherEndpoints:
         """Get weather for existing site (may error if no data source available)"""
         site = Site(
             id="site-test",
+            code="TEST",
             name="Test Site",
             latitude=47.2,
             longitude=6.0,
-            altitude=427
+            elevation_m=427
         )
         db_session.add(site)
         db_session.commit()
