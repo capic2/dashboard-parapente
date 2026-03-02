@@ -68,9 +68,17 @@ SOURCES_CONFIG = {
         "note": "Requires major French cities with AROME coverage"
     },
     "meteoblue": {
-        "status": SourceStatus.DISABLED,
-        "reason": "API requires authentication, endpoint changed",
-        "base_url": "https://www.meteoblue.com",
+        "status": SourceStatus.ACTIVE,
+        "enabled": True,
+        "base_url": "https://my.meteoblue.com/packages",
+        "requires_api_key": True,
+        "free_tier_limit": 50,  # requests/day
+        "temporal_resolution": "1h",
+        "coverage": "24h/day",
+        "forecast_range": "7 days (168 hours)",
+        "model": "Meteoblue (multi-model ensemble)",
+        "provides": ["temperature", "wind_speed", "wind_direction", "precipitation", "cloud_cover", "humidity"],
+        "note": "Official API with free tier (50 req/day)"
     }
 }
 

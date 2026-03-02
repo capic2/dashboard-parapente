@@ -42,10 +42,9 @@ async def aggregate_forecasts(
         Dict with aggregated raw data from all sources
     """
     # Default to sources that reliably return data
-    # Disabled: ["meteoblue"] - Endpoint deprecated
-    # Active: ["open-meteo", "weatherapi", "meteo-parapente", "meteociel"] - All working!
+    # Active: ["open-meteo", "weatherapi", "meteo-parapente", "meteociel", "meteoblue"] - All working!
     if sources is None:
-        sources = ["open-meteo", "weatherapi", "meteo-parapente", "meteociel"]
+        sources = ["open-meteo", "weatherapi", "meteo-parapente", "meteociel", "meteoblue"]
     
     # Fetch all data concurrently
     tasks = []
@@ -76,7 +75,7 @@ async def aggregate_forecasts(
         source_map["meteociel"] = len(tasks) - 1
     
     if "meteoblue" in sources:
-        tasks.append(fetch_meteoblue(lat, lon))
+        tasks.append(fetch_meteoblue(lat, lon, city_name=site_name))
         source_map["meteoblue"] = len(tasks) - 1
     
     # Execute all fetches in parallel
