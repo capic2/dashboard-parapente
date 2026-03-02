@@ -7,6 +7,7 @@ import asyncio
 from typing import Dict, List, Any, Optional
 from datetime import datetime, date, timedelta
 import statistics
+import math
 
 # Import all scrapers
 from scrapers.open_meteo import fetch_open_meteo, extract_hourly_forecast as extract_om
@@ -20,7 +21,9 @@ async def aggregate_forecasts(
     lat: float, 
     lon: float, 
     day_index: int = 0,
-    sources: Optional[List[str]] = None
+    sources: Optional[List[str]] = None,
+    site_name: Optional[str] = None,
+    elevation_m: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Aggregate weather forecasts from available sources
@@ -32,15 +35,17 @@ async def aggregate_forecasts(
         sources: List of sources to use (default: reliable sources only)
                  NOTE: meteo_parapente, meteociel, meteoblue are disabled due to
                  website structure changes. See SCRAPER_STATUS.md for details.
+        site_name: Site name (required for meteo_parapente)
+        elevation_m: Site elevation in meters (required for meteo_parapente)
     
     Returns:
         Dict with aggregated raw data from all sources
     """
     # Default to sources that reliably return data
-    # Disabled: ["meteo_parapente", "meteociel", "meteoblue"]
-    # Reason: Websites changed, APIs deprecated, or endpoints moved
+    # Disabled: ["meteoblue"] - Endpoint deprecated
+    # Active: ["open-meteo", "weatherapi", "meteo-parapente", "meteociel"] - All working!
     if sources is None:
-        sources = ["open-meteo", "weatherapi"]
+        sources = ["open-meteo", "weatherapi", "meteo-parapente", "meteociel"]
     
     # Fetch all data concurrently
     tasks = []
@@ -54,12 +59,20 @@ async def aggregate_forecasts(
         tasks.append(fetch_weatherapi(lat, lon))
         source_map["weatherapi"] = len(tasks) - 1
     
-    if "meteo_parapente" in sources:
-        tasks.append(fetch_meteo_parapente(lat, lon))
-        source_map["meteo_parapente"] = len(tasks) - 1
+    if "meteo-parapente" in sources:
+        tasks.append(fetch_meteo_parapente(
+            lat, lon,
+            site_name=site_name,
+            elevation_m=elevation_m,
+            days=1  # Un jour par appel (pour compatibilité avec day_index)
+        ))
+        source_map["meteo-parapente"] = len(tasks) - 1
     
     if "meteociel" in sources:
-        tasks.append(fetch_meteociel(lat, lon))
+        tasks.append(fetch_meteociel(
+            lat, lon,
+            site_name=site_name
+        ))
         source_map["meteociel"] = len(tasks) - 1
     
     if "meteoblue" in sources:
@@ -93,14 +106,14 @@ async def aggregate_forecasts(
             hourly = extract_om(result, day_index)
         elif source_name == "weatherapi":
             hourly = extract_wa(result, day_index)
-        elif source_name == "meteo_parapente":
-            # meteo_parapente extractor
+        elif source_name == "meteo-parapente":
+            # meteo-parapente extractor
             from scrapers.meteo_parapente import extract_hourly_forecast as extract_mp
             hourly = extract_mp(result)
         elif source_name == "meteociel":
             # meteociel extractor
             from scrapers.meteociel import extract_hourly_forecast as extract_mc
-            hourly = extract_mc(result)
+            hourly = extract_mc(result, day_index)
         elif source_name == "meteoblue":
             # meteoblue extractor takes day_index
             from scrapers.meteoblue import extract_hourly_forecast as extract_mb
@@ -174,30 +187,16 @@ def normalize_data(aggregated: Dict[str, Any]) -> Dict[str, Any]:
             # Add source data
             normalized_hours[hour]["sources"].append(source)
             
-            # Collect values (with None checks)
-            if hour_data.get("temperature") is not None:
-                normalized_hours[hour]["temperature"].append(hour_data["temperature"])
-            
-            if hour_data.get("wind_speed") is not None:
-                normalized_hours[hour]["wind_speed"].append(hour_data["wind_speed"])
-            
-            if hour_data.get("wind_gust") is not None:
-                normalized_hours[hour]["wind_gust"].append(hour_data["wind_gust"])
-            
-            if hour_data.get("wind_direction") is not None:
-                normalized_hours[hour]["wind_direction"].append(hour_data["wind_direction"])
-            
-            if hour_data.get("precipitation") is not None:
-                normalized_hours[hour]["precipitation"].append(hour_data["precipitation"])
-            
-            if hour_data.get("cloud_cover") is not None:
-                normalized_hours[hour]["cloud_cover"].append(hour_data["cloud_cover"])
-            
-            if hour_data.get("cape") is not None:
-                normalized_hours[hour]["cape"].append(hour_data["cape"])
-            
-            if hour_data.get("lifted_index") is not None:
-                normalized_hours[hour]["lifted_index"].append(hour_data["lifted_index"])
+            # Collect values - ALWAYS append (even None) to maintain alignment with sources list
+            # This is critical for the mapping in calculate_consensus()
+            normalized_hours[hour]["temperature"].append(hour_data.get("temperature"))
+            normalized_hours[hour]["wind_speed"].append(hour_data.get("wind_speed"))
+            normalized_hours[hour]["wind_gust"].append(hour_data.get("wind_gust"))
+            normalized_hours[hour]["wind_direction"].append(hour_data.get("wind_direction"))
+            normalized_hours[hour]["precipitation"].append(hour_data.get("precipitation"))
+            normalized_hours[hour]["cloud_cover"].append(hour_data.get("cloud_cover"))
+            normalized_hours[hour]["cape"].append(hour_data.get("cape"))
+            normalized_hours[hour]["lifted_index"].append(hour_data.get("lifted_index"))
     
     return {
         "success": True,
@@ -227,27 +226,61 @@ def calculate_consensus(normalized: Dict[str, Any]) -> Dict[str, Any]:
         
         # Calculate averages and confidence
         def safe_avg(values):
-            if not values:
+            # Filter out None values
+            valid_values = [v for v in values if v is not None]
+            
+            if not valid_values:
                 return None, 0
-            avg = statistics.mean(values)
+            
+            avg = statistics.mean(valid_values)
             # Confidence based on number of sources and variance
-            if len(values) == 1:
+            if len(valid_values) == 1:
                 confidence = 0.5
             else:
                 # Higher confidence with more sources and lower variance
-                variance = statistics.variance(values) if len(values) > 1 else 0
-                confidence = min(1.0, (len(values) / 5) * (1 - min(variance / 100, 0.5)))
+                variance = statistics.variance(valid_values) if len(valid_values) > 1 else 0
+                confidence = min(1.0, (len(valid_values) / 5) * (1 - min(variance / 100, 0.5)))
             return avg, confidence
         
         temp_avg, temp_conf = safe_avg(hour_data["temperature"])
         wind_avg, wind_conf = safe_avg(hour_data["wind_speed"])
         gust_avg, gust_conf = safe_avg(hour_data["wind_gust"])
         
-        # CRITICAL FIX: Add 180° to wind direction to show where wind COMES FROM (not goes to)
-        # Example: if wind comes from North (0°), arrow should point South (180°)
+        # Calculate wind direction using vector averaging (correct for circular data)
+        # Cannot simply average degrees (e.g., avg of 350° and 10° should be 0°, not 180°)
         wind_direction_raw = hour_data["wind_direction"].copy() if hour_data["wind_direction"] else []
-        wind_direction_flipped = [(d + 180) % 360 for d in wind_direction_raw if d is not None]
-        dir_avg, dir_conf = safe_avg(wind_direction_flipped)
+        valid_directions = [d for d in wind_direction_raw if d is not None]
+        
+        if valid_directions:
+            # Convert to radians and calculate sin/cos components
+            sin_sum = sum(math.sin(math.radians(d)) for d in valid_directions)
+            cos_sum = sum(math.cos(math.radians(d)) for d in valid_directions)
+            
+            # Check if directions cancel out (e.g., E + W)
+            magnitude = math.sqrt(sin_sum**2 + cos_sum**2)
+            
+            if magnitude < 0.1:  # Directions effectively cancel out
+                dir_avg = None
+                dir_conf = 0
+            else:
+                # Calculate mean direction using atan2
+                dir_avg = math.degrees(math.atan2(sin_sum, cos_sum))
+                
+                # Normalize to 0-360
+                dir_avg = (dir_avg + 360) % 360
+                
+                # Apply 180° flip to show where wind COMES FROM (not goes to)
+                # Convention in paragliding: wind direction = origin of wind
+                dir_avg = (dir_avg + 180) % 360
+                
+                # Calculate confidence based on number of sources and vector magnitude
+                # magnitude close to 1.0 = all sources agree, close to 0 = sources disagree
+                source_factor = len(valid_directions) / 5
+                agreement_factor = magnitude / len(valid_directions)  # Normalize by count
+                dir_conf = min(1.0, source_factor * agreement_factor)
+        else:
+            dir_avg = None
+            dir_conf = 0
         
         precip_avg, precip_conf = safe_avg(hour_data["precipitation"])
         cloud_avg, cloud_conf = safe_avg(hour_data["cloud_cover"])
@@ -260,7 +293,7 @@ def calculate_consensus(normalized: Dict[str, Any]) -> Dict[str, Any]:
         sources_data = {}
         
         # Build initial per-source structure for all known sources
-        for source in ["open-meteo", "weatherapi", "meteo_parapente", "meteociel", "meteoblue"]:
+        for source in ["open-meteo", "weatherapi", "meteo-parapente", "meteociel", "meteoblue"]:
             sources_data[source] = {
                 "wind_speed": None,
                 "temperature": None,
@@ -368,7 +401,10 @@ def extract_sunrise_sunset(aggregated: Dict[str, Any], day_index: int) -> tuple:
 async def get_normalized_forecast(
     lat: float,
     lon: float,
-    day_index: int = 0
+    day_index: int = 0,
+    sources: Optional[List[str]] = None,
+    site_name: Optional[str] = None,
+    elevation_m: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Complete pipeline: fetch → normalize → consensus
@@ -377,12 +413,20 @@ async def get_normalized_forecast(
         lat: Latitude
         lon: Longitude
         day_index: Day to forecast (0=today, 1=tomorrow)
+        sources: List of sources to use (default: all active sources)
+        site_name: Site name (required for meteo_parapente)
+        elevation_m: Site elevation in meters (required for meteo_parapente)
     
     Returns:
         Normalized consensus forecast with sunrise/sunset times
     """
     # Step 1: Aggregate
-    aggregated = await aggregate_forecasts(lat, lon, day_index)
+    aggregated = await aggregate_forecasts(
+        lat, lon, day_index,
+        sources=sources,
+        site_name=site_name,
+        elevation_m=elevation_m
+    )
     
     # Step 2: Normalize
     normalized = normalize_data(aggregated)
