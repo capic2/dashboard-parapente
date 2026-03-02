@@ -7,9 +7,11 @@ export interface Site {
   longitude: number;
   elevation_m: number;
   description?: string;
-  orientation?: string;
+  orientation?: string;  // N, NW, W, S, etc. - wind direction the site faces
   difficulty_level?: string;
   is_active: boolean;
+  rating?: number;  // 0-6 rating from official spots database
+  linked_spot_id?: string;  // Link to paragliding_spots table
   created_at: string;
   updated_at: string;
 }
@@ -157,6 +159,7 @@ export interface HourlyForecastItem {
   precipitation: number;
   para_index: number;
   verdict: string;
+  sources?: Record<string, any>; // Per-source weather data for tooltips
 }
 
 export interface DailyForecastItem {
