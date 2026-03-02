@@ -1,0 +1,745 @@
+{
+  "fetch_result": {
+    "success": true,
+    "source": "meteo_parapente",
+    "data": {
+      "gridCoords": {
+        "domain": 2,
+        "sn": 605,
+        "we": 546,
+        "lat": 47.012,
+        "lon": 6.789,
+        "latDiff": 0,
+        "lonDiff": 0
+      },
+      "data": {
+        "04:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        },
+        "05:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        },
+        "06:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        },
+        "07:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        },
+        "08:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        },
+        "09:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        },
+        "10:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        },
+        "11:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        },
+        "12:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        },
+        "13:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        },
+        "14:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        },
+        "15:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        },
+        "16:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        },
+        "17:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        },
+        "18:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        },
+        "19:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        },
+        "20:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        },
+        "21:00": {
+          "z": [
+            0
+          ],
+          "umet": [
+            0
+          ],
+          "vmet": [
+            0
+          ],
+          "ths": [
+            0
+          ],
+          "thr": [
+            0
+          ],
+          "ter": 0,
+          "tc": [
+            0
+          ],
+          "td": [
+            0
+          ],
+          "pblh": 0,
+          "raintot": 0,
+          "cfracl": 0,
+          "cfracm": 0,
+          "cfrach": 0,
+          "cldfra": 0
+        }
+      },
+      "status": "ok",
+      "time": 1772371358
+    },
+    "error": null,
+    "timestamp": "2026-03-01T14:22:56.563984"
+  },
+  "hourly_forecast": [
+    {
+      "hour": 4,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    },
+    {
+      "hour": 5,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    },
+    {
+      "hour": 6,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    },
+    {
+      "hour": 7,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    },
+    {
+      "hour": 8,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    },
+    {
+      "hour": 9,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    },
+    {
+      "hour": 10,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    },
+    {
+      "hour": 11,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    },
+    {
+      "hour": 12,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    },
+    {
+      "hour": 13,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    },
+    {
+      "hour": 14,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    },
+    {
+      "hour": 15,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    },
+    {
+      "hour": 16,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    },
+    {
+      "hour": 17,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    },
+    {
+      "hour": 18,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    },
+    {
+      "hour": 19,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    },
+    {
+      "hour": 20,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    },
+    {
+      "hour": 21,
+      "wind_speed": 0.0,
+      "wind_direction": 0,
+      "wind_gust": null,
+      "temperature": null,
+      "precipitation": null,
+      "cloud_cover": null,
+      "altitude_used": 0
+    }
+  ]
+}
