@@ -70,15 +70,15 @@ SOURCES_CONFIG = {
     "meteoblue": {
         "status": SourceStatus.ACTIVE,
         "enabled": True,
-        "base_url": "https://my.meteoblue.com/packages",
-        "requires_api_key": True,
-        "free_tier_limit": 50,  # requests/day
+        "base_url": "https://www.meteoblue.com",
+        "requires_api_key": False,
+        "free_tier_limit": None,
         "temporal_resolution": "1h",
         "coverage": "24h/day",
         "forecast_range": "7 days (168 hours)",
         "model": "Meteoblue (multi-model ensemble)",
-        "provides": ["temperature", "wind_speed", "wind_direction", "precipitation", "cloud_cover", "humidity"],
-        "note": "Official API with free tier (50 req/day)"
+        "provides": ["temperature", "wind_speed", "wind_direction", "precipitation", "cloud_cover"],
+        "note": "Web scraping with Playwright (activates 1h toggle for 24h data)"
     }
 }
 
