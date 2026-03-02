@@ -259,7 +259,7 @@ class MeteocielScraper(BaseScraper):
                     temp = None
                     wind_speed = None
                     wind_gust = None
-                    precipitation = None
+                    precipitation = 0.0  # Default to 0.0: "--" means no rain (measurable zero)
                     humidity = None
                     
                     # Temperature (i+1, format: "X °C" or "-X °C")
@@ -270,7 +270,21 @@ class MeteocielScraper(BaseScraper):
                         if temp_match:
                             temp = float(temp_match.group(1))
                     
-                    # Skip felt temp (i+2) and wind icon (i+3)
+                    # Skip felt temp (i+2)
+                    
+                    # Wind direction icon (i+3) - extract from image title attribute
+                    wind_direction = None
+                    if i + 3 < len(all_cells):
+                        wind_icon_cell = all_cells[i + 3]
+                        # Find image with wind direction in title
+                        # Format example: "Sud-Sud-Est : 153 " → extract 153
+                        img = wind_icon_cell.find('img')
+                        if img:
+                            title = img.get('title', '')
+                            # Extract degrees from title (format: "Direction : XXX")
+                            direction_match = re.search(r':\s*(\d+)', title)
+                            if direction_match:
+                                wind_direction = float(direction_match.group(1))
                     
                     # Wind speed mean (i+4, km/h - convert to m/s)
                     if i + 4 < len(all_cells):
@@ -309,7 +323,7 @@ class MeteocielScraper(BaseScraper):
                         "temperature": temp,
                         "wind_speed": wind_speed,
                         "wind_gust": wind_gust,
-                        "wind_direction": None,  # Icon-based, not extractable
+                        "wind_direction": wind_direction,  # Extracted from image title attribute
                         "precipitation": precipitation,
                         "cloud_cover": None,  # Not provided by Meteociel
                         "humidity": humidity,

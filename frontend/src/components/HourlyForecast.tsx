@@ -279,7 +279,7 @@ const SourceDataTooltip = ({
           if (value === null || value === undefined) {
             return (
               <div key={sourceKey} className="text-xs text-gray-400">
-                <span className="font-semibold">{sourceName}:</span> —
+                <span className="font-semibold">{sourceName}:</span> (non dispo.)
               </div>
             );
           }
