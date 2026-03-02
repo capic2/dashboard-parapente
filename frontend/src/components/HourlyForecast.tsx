@@ -68,9 +68,8 @@ const formatWindDirectionFromDegrees = (deg: number | null): string => {
 };
 
 const formatWindDirectionWithDegrees = (deg: number | null): string => {
-  if (deg === null) return '—';
-  const cardinal = formatWindDirectionFromDegrees(deg);
-  return `${cardinal} (${Math.round(deg)}°)`;
+  // Now returns cardinal only (no degrees) per user request
+  return formatWindDirectionFromDegrees(deg);
 };
 
 const SOURCE_NAMES: Record<string, string> = {
