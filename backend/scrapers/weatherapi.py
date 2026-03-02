@@ -88,6 +88,7 @@ def extract_hourly_forecast(data: Dict[str, any], day_index: int = 0) -> List[Di
         
         wind_kph = hour_data.get("wind_kph")
         gust_kph = hour_data.get("gust_kph")
+        wind_deg = hour_data.get("wind_degree")
         
         forecasts.append({
             "time": time_str,
@@ -95,6 +96,7 @@ def extract_hourly_forecast(data: Dict[str, any], day_index: int = 0) -> List[Di
             "temperature": hour_data.get("temp_c"),
             "wind_speed": float(wind_kph) / 3.6 if wind_kph is not None else None,  # kph to m/s
             "wind_gust": float(gust_kph) / 3.6 if gust_kph is not None else None,  # kph to m/s
+            "wind_direction": float(wind_deg) if wind_deg is not None else None,  # degrees (0-360)
             "cloud_cover": hour_data.get("cloud"),
             "precipitation": hour_data.get("precip_mm") or 0,
             "humidity": hour_data.get("humidity"),
