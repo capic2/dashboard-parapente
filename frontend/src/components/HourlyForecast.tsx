@@ -1,26 +1,56 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWeather } from '../hooks/useWeather';
 
 interface HourlyForecastProps {
   spotId: string;
 }
 
-interface TooltipData {
-  hour: string;
-  sources: {
-    [key: string]: {
-      wind_speed: number | null;
-      temperature: number | null;
-      wind_gust?: number | null;
-      wind_direction?: number | null;
-      cloud_cover?: number | null;
-    }
-  };
-  consensus: {
-    wind_speed: number | null;
-    temperature: number | null;
-  };
+// ============================================================================
+// TYPES
+// ============================================================================
+
+type CellType = 'para-index' | 'verdict' | 'temperature' | 'wind' | 'direction' | 'precipitation' | 'cloud-cover';
+
+interface TooltipPosition {
+  x: number;
+  y: number;
 }
+
+interface BaseTooltipProps {
+  position: TooltipPosition;
+  hour: string;
+  onClose?: () => void;
+  isMobile?: boolean;
+}
+
+interface SourceDataTooltipProps extends BaseTooltipProps {
+  sources: Record<string, any>;
+  consensus: number | string | null;
+  unit: string;
+  fieldName: string;
+  label: string;
+  color: string;
+}
+
+interface ParaIndexTooltipProps extends BaseTooltipProps {
+  paraIndex: number;
+  wind: number;
+  gust: number;
+  precipitation: number;
+  temperature: number;
+}
+
+interface VerdictTooltipProps extends BaseTooltipProps {
+  verdict: string;
+  paraIndex: number;
+  wind: number;
+  gust: number;
+  precipitation: number;
+}
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
 
 const getVerdictClass = (verdict: string): string => {
   const v = verdict.toLowerCase();
@@ -30,94 +60,275 @@ const getVerdictClass = (verdict: string): string => {
   return 'bg-red-50 hover:bg-red-100';
 };
 
-// Helper to format wind direction from degrees
 const formatWindDirectionFromDegrees = (deg: number | null): string => {
-  if (deg === null) return '—'
-  const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
-  const index = Math.round(((deg % 360) / 45)) % 8
-  return directions[index]
+  if (deg === null) return '—';
+  const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const index = Math.round(((deg % 360) / 45)) % 8;
+  return directions[index];
 };
 
-const SourceTooltip = ({ data, position }: { data: TooltipData; position: { x: number; y: number } }) => {
-  const sourceNames: { [key: string]: string } = {
-    'open-meteo': 'Open-Meteo',
-    'weatherapi': 'WeatherAPI',
-    'meteo_parapente': 'Météo-parapente',
-    'meteociel': 'Meteociel',
-    'meteoblue': 'Meteoblue'
-  };
+const formatWindDirectionWithDegrees = (deg: number | null): string => {
+  if (deg === null) return '—';
+  const cardinal = formatWindDirectionFromDegrees(deg);
+  return `${cardinal} (${Math.round(deg)}°)`;
+};
 
-  const sourceOrder = ['open-meteo', 'weatherapi', 'meteo_parapente', 'meteociel', 'meteoblue'];
+const SOURCE_NAMES: Record<string, string> = {
+  'open-meteo': 'Open-Meteo',
+  'weatherapi': 'WeatherAPI',
+  'meteo-parapente': 'Météo-parapente',
+  'meteociel': 'Meteociel',
+  'meteoblue': 'Meteoblue'
+};
 
+const SOURCE_ORDER = ['open-meteo', 'weatherapi', 'meteo-parapente', 'meteociel', 'meteoblue'];
+
+// ============================================================================
+// TOOLTIP COMPONENTS
+// ============================================================================
+
+const ParaIndexTooltip = ({ position, hour, paraIndex, wind, gust, precipitation, temperature, onClose, isMobile }: ParaIndexTooltipProps) => {
   return (
     <div 
-      className="fixed bg-gray-900 text-white rounded-lg shadow-xl p-4 z-50 w-80 text-xs pointer-events-auto font-mono"
-      style={{
+      className={`
+        ${isMobile ? 'fixed bottom-0 left-0 right-0 mx-4 mb-4' : 'fixed'}
+        bg-white border-2 border-purple-500 rounded-lg shadow-xl p-4 z-50 text-sm
+      `}
+      style={isMobile ? {} : {
         left: `${position.x}px`,
         top: `${position.y - 10}px`,
-        transform: 'translateX(-50%) translateY(-100%)'
+        transform: 'translateX(-50%) translateY(-100%)',
+        maxWidth: '320px'
       }}
     >
-      <div className="font-bold mb-3 text-sm">Hour {data.hour}</div>
-      <div className="border-t border-gray-600 pt-3 pb-3 space-y-2">
-        {sourceOrder.map(sourceKey => {
-          const sourceData = data.sources[sourceKey];
-          const sourceName = sourceNames[sourceKey] || sourceKey;
-          
-          if (!sourceData) {
-            return (
-              <div key={sourceKey} className="text-gray-400">
-                <span className="font-semibold">{sourceName}:</span> (not available)
-              </div>
-            );
-          }
-
-          const windSpeed = sourceData.wind_speed;
-          const temp = sourceData.temperature;
-          const windGust = (sourceData as any).wind_gust;
-          const windDir = (sourceData as any).wind_direction;
-          const cloudCover = (sourceData as any).cloud_cover;
-          
-          const hasData = windSpeed !== null || temp !== null || windGust !== null || windDir !== null || cloudCover !== null;
-          
-          if (!hasData) {
-            return (
-              <div key={sourceKey} className="text-gray-400">
-                <span className="font-semibold">{sourceName}:</span> (no data)
-              </div>
-            );
-          }
-          
-          const parts = [];
-          if (windSpeed !== null) parts.push(`${windSpeed} km/h`);
-          if (temp !== null) parts.push(`${temp}°C`);
-          if (windDir !== null) parts.push(formatWindDirectionFromDegrees(windDir));
-          
-          return (
-            <div key={sourceKey}>
-              <span className="font-semibold">{sourceName}:</span> {parts.length > 0 ? parts.join(' | ') : '(no data)'}
-              {(windGust !== null || cloudCover !== null) && (
-                <div className="ml-4 text-gray-300">
-                  {windGust !== null && <div>Gust: {windGust} km/h</div>}
-                  {cloudCover !== null && <div>Cloud: {Math.round(cloudCover)}%</div>}
-                </div>
-              )}
-            </div>
-          );
-        })}
+      {onClose && (
+        <button 
+          onClick={onClose}
+          className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+        >
+          ✕
+        </button>
+      )}
+      <div className="font-bold mb-3 text-purple-700 flex items-center gap-2">
+        📊 Para-Index - {hour}
       </div>
-      <div className="border-t border-gray-600 pt-3 mt-3">
-        <span className="font-bold text-sm">Consensus:</span> {data.consensus.wind_speed !== null ? `${data.consensus.wind_speed} km/h` : '—'} | {data.consensus.temperature !== null ? `${data.consensus.temperature}°C` : '—'}
+      <div className="space-y-2 text-gray-700">
+        <div className="text-lg font-bold text-purple-600">{paraIndex}/10</div>
+        <div className="border-t border-gray-200 pt-2 mt-2">
+          <div className="text-xs font-semibold text-gray-500 mb-2">Métriques utilisées :</div>
+          <div className="space-y-1 text-xs">
+            <div>• Vent moyen : <strong>{wind.toFixed(1)} km/h</strong></div>
+            <div>• Rafales max : <strong>{gust.toFixed(1)} km/h</strong></div>
+            <div>• Précipitations : <strong>{precipitation.toFixed(1)} mm</strong></div>
+            <div>• Température : <strong>{temperature.toFixed(1)}°C</strong></div>
+          </div>
+        </div>
+        <div className="text-xs text-gray-500 mt-3">
+          Score calculé selon les conditions optimales de vol
+        </div>
       </div>
     </div>
   );
 };
 
+const VerdictTooltip = ({ position, hour, verdict, paraIndex, wind, gust, precipitation, onClose, isMobile }: VerdictTooltipProps) => {
+  const criteria = [
+    { 
+      label: 'Vent dans plage optimale (8-15 km/h)', 
+      met: wind >= 8 && wind <= 15 
+    },
+    { 
+      label: 'Vent pas trop faible (> 5 km/h)', 
+      met: wind > 5 
+    },
+    { 
+      label: 'Vent pas trop fort (< 20 km/h)', 
+      met: wind < 20 
+    },
+    { 
+      label: 'Rafales acceptables (< 25 km/h)', 
+      met: gust < 25 
+    },
+    { 
+      label: 'Pas de précipitations', 
+      met: precipitation < 0.5 
+    },
+  ];
+
+  return (
+    <div 
+      className={`
+        ${isMobile ? 'fixed bottom-0 left-0 right-0 mx-4 mb-4' : 'fixed'}
+        bg-white border-2 border-emerald-500 rounded-lg shadow-xl p-4 z-50 text-sm
+      `}
+      style={isMobile ? {} : {
+        left: `${position.x}px`,
+        top: `${position.y - 10}px`,
+        transform: 'translateX(-50%) translateY(-100%)',
+        maxWidth: '320px'
+      }}
+    >
+      {onClose && (
+        <button 
+          onClick={onClose}
+          className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+        >
+          ✕
+        </button>
+      )}
+      <div className="font-bold mb-3 text-emerald-700 flex items-center gap-2">
+        ✓ Verdict - {hour}
+      </div>
+      <div className="space-y-2 text-gray-700">
+        <div className="text-lg font-bold capitalize text-emerald-600">{verdict}</div>
+        <div className="text-xs text-gray-500">Para-Index : {paraIndex}/10</div>
+        <div className="border-t border-gray-200 pt-2 mt-2">
+          <div className="text-xs font-semibold text-gray-500 mb-2">Critères évalués :</div>
+          <div className="space-y-1 text-xs">
+            {criteria.map((criterion, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <span className={criterion.met ? 'text-green-500' : 'text-red-500'}>
+                  {criterion.met ? '✓' : '✗'}
+                </span>
+                <span className={criterion.met ? 'text-gray-700' : 'text-gray-500'}>
+                  {criterion.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SourceDataTooltip = ({ 
+  position, 
+  hour, 
+  sources, 
+  consensus, 
+  unit, 
+  fieldName, 
+  label, 
+  color,
+  onClose,
+  isMobile 
+}: SourceDataTooltipProps) => {
+  return (
+    <div 
+      className={`
+        ${isMobile ? 'fixed bottom-0 left-0 right-0 mx-4 mb-4' : 'fixed'}
+        bg-white border-2 rounded-lg shadow-xl p-4 z-50 text-sm
+      `}
+      style={isMobile ? {} : {
+        left: `${position.x}px`,
+        top: `${position.y - 10}px`,
+        transform: 'translateX(-50%) translateY(-100%)',
+        maxWidth: '320px',
+        borderColor: color
+      }}
+    >
+      {onClose && (
+        <button 
+          onClick={onClose}
+          className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+        >
+          ✕
+        </button>
+      )}
+      <div className="font-bold mb-3 text-gray-800 flex items-center gap-2">
+        {label} - {hour}
+      </div>
+      <div className="space-y-2">
+        {SOURCE_ORDER.map(sourceKey => {
+          const sourceData = sources[sourceKey];
+          const sourceName = SOURCE_NAMES[sourceKey] || sourceKey;
+          
+          if (!sourceData) {
+            return (
+              <div key={sourceKey} className="text-xs text-gray-400">
+                <span className="font-semibold">{sourceName}:</span> (non disponible)
+              </div>
+            );
+          }
+
+          let value = sourceData[fieldName];
+          
+          // Special handling for wind (show speed + gust)
+          if (fieldName === 'wind_speed' && value !== null && value !== undefined) {
+            const gust = sourceData['wind_gust'];
+            const displayValue = `${value.toFixed(1)} km/h`;
+            const gustValue = gust !== null && gust !== undefined ? ` (rafales: ${gust.toFixed(1)} km/h)` : '';
+            return (
+              <div key={sourceKey} className="text-xs text-gray-700">
+                <span className="font-semibold">{sourceName}:</span> {displayValue}{gustValue}
+              </div>
+            );
+          }
+          
+          // Special handling for wind direction (show cardinal + degrees)
+          if (fieldName === 'wind_direction' && value !== null && value !== undefined) {
+            const displayValue = formatWindDirectionWithDegrees(value);
+            return (
+              <div key={sourceKey} className="text-xs text-gray-700">
+                <span className="font-semibold">{sourceName}:</span> {displayValue}
+              </div>
+            );
+          }
+          
+          // General case
+          if (value === null || value === undefined) {
+            return (
+              <div key={sourceKey} className="text-xs text-gray-400">
+                <span className="font-semibold">{sourceName}:</span> —
+              </div>
+            );
+          }
+
+          const displayValue = typeof value === 'number' ? value.toFixed(1) : value;
+          
+          return (
+            <div key={sourceKey} className="text-xs text-gray-700">
+              <span className="font-semibold">{sourceName}:</span> {displayValue} {unit}
+            </div>
+          );
+        })}
+        
+        <div className="border-t border-gray-200 pt-2 mt-2">
+          <div className="text-xs font-bold text-gray-800">
+            Consensus : {consensus !== null && consensus !== undefined ? 
+              (typeof consensus === 'number' ? consensus.toFixed(1) : consensus) 
+              : '—'} {consensus !== null && consensus !== undefined ? unit : ''}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
 export default function HourlyForecast({ spotId }: HourlyForecastProps) {
   const { data: weather, isLoading, error } = useWeather(spotId);
-  const [hoveredHour, setHoveredHour] = useState<string | null>(null);
-  const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [activeTooltip, setActiveTooltip] = useState<{
+    type: CellType;
+    data: any;
+    position: TooltipPosition;
+  } | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile on mount and window resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   if (isLoading) {
     return (
@@ -137,52 +348,151 @@ export default function HourlyForecast({ spotId }: HourlyForecastProps) {
     );
   }
 
-  // Use all available hours (no filter)
   const flyingHours = weather.hourly_forecast;
 
-  const handleHourHover = (hour: any, event: React.MouseEvent) => {
+  const handleCellInteraction = (
+    cellType: CellType,
+    hourData: any,
+    event: React.MouseEvent
+  ) => {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const x = rect.left + rect.width / 2;
     const y = rect.top;
     
-    // Extract source data from the API response
-    const sources: { [key: string]: any } = {};
-    
-    // Initialize all sources
-    ['open-meteo', 'weatherapi', 'meteo_parapente', 'meteociel', 'meteoblue'].forEach(source => {
-      sources[source] = {
-        wind_speed: null,
-        temperature: null,
-        wind_gust: null,
-        wind_direction: null,
-        cloud_cover: null
-      };
+    setActiveTooltip({
+      type: cellType,
+      data: hourData,
+      position: { x, y }
     });
-    
-    // Populate with actual data if available
-    if (hour.sources) {
-      Object.entries(hour.sources).forEach(([sourceKey, sourceData]: [string, any]) => {
-        if (sources[sourceKey]) {
-          sources[sourceKey] = {
-            wind_speed: sourceData.wind_speed ?? null,
-            temperature: sourceData.temperature ?? null,
-            wind_gust: sourceData.wind_gust ?? null,
-            wind_direction: sourceData.wind_direction ?? null,
-            cloud_cover: sourceData.cloud_cover ?? null
-          };
-        }
-      });
+  };
+
+  const handleCloseTooltip = () => {
+    setActiveTooltip(null);
+  };
+
+  const renderTooltip = () => {
+    if (!activeTooltip) return null;
+
+    const { type, data, position } = activeTooltip;
+    const commonProps = {
+      position,
+      hour: data.hour,
+      onClose: isMobile ? handleCloseTooltip : undefined,
+      isMobile
+    };
+
+    switch (type) {
+      case 'para-index':
+        return (
+          <ParaIndexTooltip
+            {...commonProps}
+            paraIndex={data.para_index}
+            wind={data.wind_speed || 0}
+            gust={data.sources?.['open-meteo']?.wind_gust || data.sources?.['weatherapi']?.wind_gust || 0}
+            precipitation={data.precipitation || 0}
+            temperature={data.temperature || 0}
+          />
+        );
+
+      case 'verdict':
+        return (
+          <VerdictTooltip
+            {...commonProps}
+            verdict={data.verdict}
+            paraIndex={data.para_index}
+            wind={data.wind_speed || 0}
+            gust={data.sources?.['open-meteo']?.wind_gust || data.sources?.['weatherapi']?.wind_gust || 0}
+            precipitation={data.precipitation || 0}
+          />
+        );
+
+      case 'temperature':
+        return (
+          <SourceDataTooltip
+            {...commonProps}
+            sources={data.sources || {}}
+            consensus={data.temperature}
+            unit="°C"
+            fieldName="temperature"
+            label="🌡️ Température"
+            color="#dc2626"
+          />
+        );
+
+      case 'wind':
+        return (
+          <SourceDataTooltip
+            {...commonProps}
+            sources={data.sources || {}}
+            consensus={data.wind_speed}
+            unit="km/h"
+            fieldName="wind_speed"
+            label="💨 Vent"
+            color="#2563eb"
+          />
+        );
+
+      case 'direction':
+        return (
+          <SourceDataTooltip
+            {...commonProps}
+            sources={data.sources || {}}
+            consensus={formatWindDirectionWithDegrees(
+              data.sources?.['open-meteo']?.wind_direction || 
+              data.sources?.['weatherapi']?.wind_direction || 
+              null
+            )}
+            unit=""
+            fieldName="wind_direction"
+            label="🧭 Direction"
+            color="#7c3aed"
+          />
+        );
+
+      case 'precipitation':
+        return (
+          <SourceDataTooltip
+            {...commonProps}
+            sources={data.sources || {}}
+            consensus={data.precipitation}
+            unit="mm"
+            fieldName="precipitation"
+            label="🌧️ Précipitations"
+            color="#0891b2"
+          />
+        );
+
+      case 'cloud-cover':
+        return (
+          <SourceDataTooltip
+            {...commonProps}
+            sources={data.sources || {}}
+            consensus={data.sources?.['open-meteo']?.cloud_cover || 
+                      data.sources?.['weatherapi']?.cloud_cover || 
+                      null}
+            unit="%"
+            fieldName="cloud_cover"
+            label="☁️ Couverture nuageuse"
+            color="#64748b"
+          />
+        );
+
+      default:
+        return null;
     }
-    
-    setTooltipPos({ x, y });
-    setTooltipData({
-      hour: hour.hour,
-      sources,
-      consensus: {
-        wind_speed: hour.wind_speed ? parseFloat(String(hour.wind_speed)) : null,
-        temperature: hour.temperature ? parseFloat(String(hour.temperature)) : null
-      }
-    });
+  };
+
+  const cellEventHandlers = (cellType: CellType, hourData: any) => {
+    if (isMobile) {
+      return {
+        onClick: (e: React.MouseEvent) => handleCellInteraction(cellType, hourData, e)
+      };
+    } else {
+      return {
+        onMouseEnter: (e: React.MouseEvent) => handleCellInteraction(cellType, hourData, e),
+        onMouseLeave: handleCloseTooltip
+      };
+    }
   };
 
   return (
@@ -190,7 +500,7 @@ export default function HourlyForecast({ spotId }: HourlyForecastProps) {
       <h2 className="text-sm text-gray-600 mb-3 font-semibold">Prévisions Horaires</h2>
       
       <div className="overflow-x-auto -mx-4 px-4">
-        <table className="w-full min-w-[600px] text-sm">
+        <table className="w-full min-w-[800px] text-sm">
           <thead>
             <tr className="border-b-2 border-gray-200">
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Heure</th>
@@ -199,36 +509,83 @@ export default function HourlyForecast({ spotId }: HourlyForecastProps) {
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Temp</th>
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Vent</th>
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Direction</th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">Précip.</th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">Nuages</th>
             </tr>
           </thead>
           <tbody>
             {flyingHours.length > 0 ? (
-              flyingHours.map((hour, index) => (
-                <tr 
-                  key={index} 
-                  className={`border-b border-gray-100 transition-colors cursor-pointer ${getVerdictClass(hour.verdict)}`}
-                  onMouseEnter={(e) => {
-                    setHoveredHour(hour.hour);
-                    handleHourHover(hour, e);
-                  }}
-                  onMouseLeave={() => {
-                    setHoveredHour(null);
-                    setTooltipData(null);
-                  }}
-                >
-                  <td className="py-2.5 px-2 font-medium">{hour.hour}</td>
-                  <td className="py-2.5 px-2">
-                    <strong className="text-purple-600">{hour.para_index}/10</strong>
-                  </td>
-                  <td className="py-2.5 px-2 font-medium capitalize">{hour.verdict}</td>
-                  <td className="py-2.5 px-2">{hour.temp}°C</td>
-                  <td className="py-2.5 px-2">{hour.wind} km/h</td>
-                  <td className="py-2.5 px-2">{hour.direction}</td>
-                </tr>
-              ))
+              flyingHours.map((hour, index) => {
+                // Extract cloud cover from sources
+                const cloudCover = hour.sources?.['open-meteo']?.cloud_cover || 
+                                 hour.sources?.['weatherapi']?.cloud_cover || 
+                                 null;
+
+                return (
+                  <tr 
+                    key={index} 
+                    className={`border-b border-gray-100 ${getVerdictClass(hour.verdict)}`}
+                  >
+                    <td className="py-2.5 px-2 font-medium">{hour.hour}</td>
+                    
+                    <td 
+                      className="py-2.5 px-2 cursor-pointer hover:bg-purple-100 transition-colors"
+                      {...cellEventHandlers('para-index', hour)}
+                    >
+                      <strong className="text-purple-600">{hour.para_index}/10</strong>
+                    </td>
+                    
+                    <td 
+                      className="py-2.5 px-2 font-medium capitalize cursor-pointer hover:bg-emerald-100 transition-colors"
+                      {...cellEventHandlers('verdict', hour)}
+                    >
+                      {hour.verdict}
+                    </td>
+                    
+                    <td 
+                      className="py-2.5 px-2 cursor-pointer hover:bg-red-50 transition-colors"
+                      {...cellEventHandlers('temperature', hour)}
+                    >
+                      {hour.temp}°C
+                    </td>
+                    
+                    <td 
+                      className="py-2.5 px-2 cursor-pointer hover:bg-blue-50 transition-colors"
+                      {...cellEventHandlers('wind', hour)}
+                    >
+                      {hour.wind} km/h
+                    </td>
+                    
+                    <td 
+                      className="py-2.5 px-2 cursor-pointer hover:bg-violet-50 transition-colors"
+                      {...cellEventHandlers('direction', hour)}
+                    >
+                      {hour.direction}
+                    </td>
+                    
+                    <td 
+                      className="py-2.5 px-2 cursor-pointer hover:bg-cyan-50 transition-colors"
+                      {...cellEventHandlers('precipitation', hour)}
+                    >
+                      {hour.precipitation !== null && hour.precipitation !== undefined 
+                        ? `${hour.precipitation.toFixed(1)} mm` 
+                        : '—'}
+                    </td>
+                    
+                    <td 
+                      className="py-2.5 px-2 cursor-pointer hover:bg-slate-50 transition-colors"
+                      {...cellEventHandlers('cloud-cover', hour)}
+                    >
+                      {cloudCover !== null && cloudCover !== undefined 
+                        ? `${Math.round(cloudCover)}%` 
+                        : '—'}
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-gray-500">
+                <td colSpan={8} className="py-8 text-center text-gray-500">
                   Aucune donnée horaire disponible
                 </td>
               </tr>
@@ -237,10 +594,8 @@ export default function HourlyForecast({ spotId }: HourlyForecastProps) {
         </table>
       </div>
       
-      {/* Tooltip rendered outside table */}
-      {hoveredHour && tooltipData && (
-        <SourceTooltip data={tooltipData} position={tooltipPos} />
-      )}
+      {/* Render active tooltip */}
+      {renderTooltip()}
     </div>
   );
 }

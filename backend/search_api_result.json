@@ -1,0 +1,313 @@
+{
+  "geocoding": {
+    "version": "0.2",
+    "attribution": "http://pelias.mapzen.com/v1/attribution",
+    "query": {
+      "text": "Arguel",
+      "tokens": [
+        "Arguel"
+      ],
+      "size": 10,
+      "private": false,
+      "focus.point.lat": 47,
+      "focus.point.lon": 6,
+      "lang": {
+        "name": "English",
+        "iso6391": "en",
+        "iso6393": "eng",
+        "defaulted": true
+      }
+    },
+    "engine": {
+      "name": "Pelias",
+      "author": "Mapzen",
+      "version": "1.0"
+    },
+    "timestamp": 1772371401876
+  },
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.00182,
+          47.1982
+        ]
+      },
+      "properties": {
+        "id": "node:291414991",
+        "gid": "openstreetmap:venue:node:291414991",
+        "layer": "venue",
+        "source": "openstreetmap",
+        "source_id": "node:291414991",
+        "name": "Arguel",
+        "postalcode": "25720",
+        "distance": 22.035,
+        "accuracy": "point",
+        "country": "France",
+        "country_gid": "whosonfirst:country:85633147",
+        "country_a": "FRA",
+        "region": "Doubs",
+        "region_gid": "whosonfirst:region:85683239",
+        "locality": "Arguel",
+        "locality_gid": "whosonfirst:locality:1125810685",
+        "label": "Arguel, France"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.11084,
+          44.58274
+        ]
+      },
+      "properties": {
+        "id": "node:63627513",
+        "gid": "openstreetmap:venue:node:63627513",
+        "layer": "venue",
+        "source": "openstreetmap",
+        "source_id": "node:63627513",
+        "name": "Arguello",
+        "distance": 314.807,
+        "accuracy": "point",
+        "country": "Italy",
+        "country_gid": "whosonfirst:country:85633253",
+        "country_a": "ITA",
+        "region": "Cuneo",
+        "region_gid": "whosonfirst:region:85685187",
+        "localadmin": "Arguello",
+        "localadmin_gid": "whosonfirst:localadmin:404457859",
+        "label": "Arguello, Italy"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          1.801049,
+          49.866526
+        ]
+      },
+      "properties": {
+        "id": "node:1701303231",
+        "gid": "openstreetmap:venue:node:1701303231",
+        "layer": "venue",
+        "source": "openstreetmap",
+        "source_id": "node:1701303231",
+        "name": "Arguel",
+        "postalcode": "80140",
+        "distance": 445.002,
+        "accuracy": "point",
+        "country": "France",
+        "country_gid": "whosonfirst:country:85633147",
+        "country_a": "FRA",
+        "region": "Somme",
+        "region_gid": "whosonfirst:region:85683363",
+        "locality": "Arguel",
+        "locality_gid": "whosonfirst:locality:1125810661",
+        "label": "Arguel, France"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -98.149048,
+          26.214262
+        ]
+      },
+      "properties": {
+        "id": "node:151490378",
+        "gid": "openstreetmap:venue:node:151490378",
+        "layer": "venue",
+        "source": "openstreetmap",
+        "source_id": "node:151490378",
+        "name": "Arguello Colonia",
+        "distance": 8913.957,
+        "accuracy": "point",
+        "country": "United States",
+        "country_gid": "whosonfirst:country:85633793",
+        "country_a": "USA",
+        "region": "Texas",
+        "region_gid": "whosonfirst:region:85688753",
+        "region_a": "TX",
+        "locality": "San Juan",
+        "locality_gid": "whosonfirst:locality:101723479",
+        "label": "Arguello Colonia, San Juan, TX, USA"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -120.642948,
+          34.578318
+        ]
+      },
+      "properties": {
+        "id": "node:150943215",
+        "gid": "openstreetmap:venue:node:150943215",
+        "layer": "venue",
+        "source": "openstreetmap",
+        "source_id": "node:150943215",
+        "name": "Arguello",
+        "distance": 9520.206,
+        "accuracy": "point",
+        "country": "United States",
+        "country_gid": "whosonfirst:country:85633793",
+        "country_a": "USA",
+        "region": "California",
+        "region_gid": "whosonfirst:region:85688637",
+        "region_a": "CA",
+        "label": "Arguello, CA, USA"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -65.233266,
+          -32.300066
+        ]
+      },
+      "properties": {
+        "id": "node:198398487",
+        "gid": "openstreetmap:venue:node:198398487",
+        "layer": "venue",
+        "source": "openstreetmap",
+        "source_id": "node:198398487",
+        "name": "Los Arg\u00fcellos",
+        "distance": 11304.707,
+        "accuracy": "point",
+        "country": "Argentina",
+        "country_gid": "whosonfirst:country:85632505",
+        "country_a": "ARG",
+        "region": "San Luis",
+        "region_gid": "whosonfirst:region:85668029",
+        "county": "Junin",
+        "county_gid": "whosonfirst:county:421189001",
+        "label": "Los Arg\u00fcellos, Argentina"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -5.626353,
+          43.444032
+        ]
+      },
+      "properties": {
+        "id": "node:1242835826",
+        "gid": "openstreetmap:venue:node:1242835826",
+        "layer": "venue",
+        "source": "openstreetmap",
+        "source_id": "node:1242835826",
+        "name": "Cierra de Arg\u00fcelles",
+        "distance": 993.731,
+        "accuracy": "point",
+        "country": "Spain",
+        "country_gid": "whosonfirst:country:85633129",
+        "country_a": "ESP",
+        "region": "Asturias",
+        "region_gid": "whosonfirst:region:85682805",
+        "label": "Cierra de Arg\u00fcelles, Spain"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -4.64322,
+          43.123641
+        ]
+      },
+      "properties": {
+        "id": "node:1242930845",
+        "gid": "openstreetmap:venue:node:1242930845",
+        "layer": "venue",
+        "source": "openstreetmap",
+        "source_id": "node:1242930845",
+        "name": "Arguelda",
+        "distance": 941.385,
+        "accuracy": "point",
+        "country": "Spain",
+        "country_gid": "whosonfirst:country:85633129",
+        "country_a": "ESP",
+        "region": "Cantabria",
+        "region_gid": "whosonfirst:region:85682833",
+        "label": "Arguelda, Spain"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -77.45862,
+          1.151566
+        ]
+      },
+      "properties": {
+        "id": "node:703479304",
+        "gid": "openstreetmap:venue:node:703479304",
+        "layer": "venue",
+        "source": "openstreetmap",
+        "source_id": "node:703479304",
+        "name": "Hacienda Arguello",
+        "distance": 9419.617,
+        "accuracy": "point",
+        "country": "Colombia",
+        "country_gid": "whosonfirst:country:85632519",
+        "country_a": "COL",
+        "region": "Nari\u00f1o",
+        "region_gid": "whosonfirst:region:85670193",
+        "county": "Yacuanquer",
+        "county_gid": "whosonfirst:county:1108701085",
+        "label": "Hacienda Arguello, Colombia"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -2.431286,
+          38.334583
+        ]
+      },
+      "properties": {
+        "id": "node:1241943887",
+        "gid": "openstreetmap:venue:node:1241943887",
+        "layer": "venue",
+        "source": "openstreetmap",
+        "source_id": "node:1241943887",
+        "name": "Arguellite",
+        "distance": 1183.524,
+        "accuracy": "point",
+        "country": "Spain",
+        "country_gid": "whosonfirst:country:85633129",
+        "country_a": "ESP",
+        "region": "Albacete",
+        "region_gid": "whosonfirst:region:85682621",
+        "label": "Arguellite, Spain"
+      }
+    }
+  ],
+  "bbox": [
+    -120.642948,
+    -32.300066,
+    8.11084,
+    49.866526
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "site_name": "Arguel",
+  "elevation_m": 427,
+  "days_requested": 1,
+  "data": {
+    "days_data": [
+      null
+    ],
+    "selectors_found": {
+      "search_input": "input[type=\"text\"]",
+      "suggestion": "text=\"Arguel\""
+    },
+    "total_days": 1,
+    "success_count": 0
+  },
+  "timestamp": "2026-03-01T14:20:32.203888"
+}
