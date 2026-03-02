@@ -1,30 +1,32 @@
 """
-Meteoblue scraper using httpx + BeautifulSoup (simple web scraping)
+Meteoblue scraper using Playwright to activate 1h/3h toggle
 Site: https://www.meteoblue.com
-Scraping approach: Extract data from forecast table HTML
+Scraping approach: 
+1. Load page with Playwright
+2. Click toggle to switch to 1h view (24 hours)
+3. Extract data from forecast table HTML
 """
 
 import re
-import httpx
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 import logging
 from bs4 import BeautifulSoup
 
-from .base import BaseScraper, ScraperType
+from .base import PlaywrightScraper
 
 logger = logging.getLogger(__name__)
 
 
-class MeteoblueScraper(BaseScraper):
+class MeteoblueScraper(PlaywrightScraper):
     """
-    Meteoblue scraper using httpx + BeautifulSoup
+    Meteoblue scraper using Playwright to activate hourly view toggle
     
     Architecture:
-    - Extends BaseScraper base class
-    - Uses httpx to fetch HTML
+    - Extends PlaywrightScraper base class
+    - Uses Playwright to load page and click 1h/3h toggle
     - Uses BeautifulSoup to parse forecast tables
-    - Simpler approach than Playwright/Scrapling
+    - Extracts 24 hours of data at 1-hour intervals
     
     Data provided:
     - Temperature (°C)
@@ -34,7 +36,7 @@ class MeteoblueScraper(BaseScraper):
     - Cloud cover (%) - from text or inferred from picto
     - Relative humidity (%)
     
-    Forecast range: 7 days (hourly)
+    Forecast range: 7 days, 24 hours per day at 1h intervals
     """
     
     # City code cache
@@ -54,19 +56,20 @@ class MeteoblueScraper(BaseScraper):
         "W": 270, "WNW": 292, "NW": 315, "NNW": 337,
     }
     
-    def __init__(self, timeout: int = 30):
+    def __init__(self, timeout: int = 30, headless: bool = True):
         """
         Initialize Meteoblue scraper
         
         Args:
             timeout: Request timeout in seconds
+            headless: Run browser in headless mode
         """
         super().__init__(
             source_name="meteoblue",
-            scraper_type=ScraperType.API,  # Using HTTP
+            base_url="https://www.meteoblue.com",
+            headless=headless,
             timeout=timeout
         )
-        self.base_url = "https://www.meteoblue.com"
     
     def _get_city_code(self, city_name: str) -> Optional[str]:
         """Get Meteoblue city code"""
@@ -80,17 +83,18 @@ class MeteoblueScraper(BaseScraper):
         
         return None
     
-    async def fetch(self, lat: float, lon: float, **kwargs) -> Dict[str, Any]:
+    async def _scrape_page(self, page, lat: float, lon: float, **kwargs) -> List[Dict[str, Any]]:
         """
-        Fetch Meteoblue forecast
+        Scrape Meteoblue forecast using Playwright page
         
         Args:
+            page: Playwright Page object
             lat: Latitude
             lon: Longitude
             **kwargs: city_name, etc.
         
         Returns:
-            Response dict with success and data
+            List of hourly forecast dictionaries
         """
         city_name = kwargs.get("city_name", "location")
         
@@ -105,25 +109,45 @@ class MeteoblueScraper(BaseScraper):
         # Build URL - use "week" view for table data
         url = f"{self.base_url}/fr/meteo/semaine/{city_name}_france_{city_code}"
         
-        self.logger.info(f"Fetching Meteoblue: {url}")
+        self.logger.info(f"Fetching Meteoblue with Playwright: {url}")
         
+        # Navigate to page
+        await page.goto(url, wait_until="domcontentloaded")
+        
+        # Wait for forecast table to load (CSS class selector with dot for multiple classes)
+        await page.wait_for_selector('table.picto', timeout=10000)
+        
+        self.logger.info("Page loaded, looking for toggle")
+        
+        # Click the 1h/3h toggle to activate hourly view (24 hours)
+        # The toggle is: <input class="switch" type="checkbox"> inside <div id="switch">
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(url, follow_redirects=True)
-                response.raise_for_status()
-                
-                html = response.text
-                
-                # Parse HTML to extract forecast data
-                hourly_data = self._parse_html(html)
-                
-                self.logger.info(f"Meteoblue: Extracted {len(hourly_data)} hours")
-                
-                return self._build_response(success=True, data=hourly_data)
+            toggle_selector = '#switch input.switch'
+            await page.wait_for_selector(toggle_selector, timeout=5000)
+            
+            # Check if already in 1h mode (checkbox checked)
+            is_checked = await page.evaluate(f'document.querySelector("{toggle_selector}").checked')
+            
+            if not is_checked:
+                self.logger.info("Clicking toggle to activate 1h view")
+                await page.click(toggle_selector)
+                # Wait for table to update (AJAX request)
+                await page.wait_for_timeout(2000)
+            else:
+                self.logger.info("Already in 1h view")
                 
         except Exception as e:
-            self.logger.error(f"Meteoblue fetch error: {e}", exc_info=True)
-            return self._build_response(success=False, error=str(e))
+            self.logger.warning(f"Could not activate 1h toggle: {e}, continuing with default view")
+        
+        # Get updated HTML content
+        html = await page.content()
+        
+        # Parse HTML to extract forecast data
+        hourly_data = self._parse_html(html)
+        
+        self.logger.info(f"Meteoblue: Extracted {len(hourly_data)} hours")
+        
+        return hourly_data
     
     def _parse_html(self, html: str) -> List[Dict[str, Any]]:
         """
