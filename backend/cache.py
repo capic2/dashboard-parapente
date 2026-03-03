@@ -12,15 +12,15 @@ import redis.asyncio as redis
 logger = logging.getLogger(__name__)
 
 # Cache TTL configuration (in seconds)
-# Updated for polling system: 30min to stay fresh between hourly polls
+# Aligned with scheduler: 60min TTL matches hourly polling (no cache gaps)
 CACHE_TTL: Dict[str, int] = {
-    "open-meteo": 1800,       # 30 minutes (refreshed by scheduler)
-    "weatherapi": 1800,       # 30 minutes (refreshed by scheduler)
-    "meteo-parapente": 1800,  # 30 minutes (refreshed by scheduler)
-    "meteociel": 1800,        # 30 minutes (refreshed by scheduler)
-    "meteoblue": 1800,        # 30 minutes (refreshed by scheduler)
-    "forecast": 1800,         # 30 minutes (combined forecast)
-    "summary": 1800,          # 30 minutes (site summary)
+    "open-meteo": 3600,       # 60 minutes (refreshed hourly by scheduler)
+    "weatherapi": 3600,       # 60 minutes (refreshed hourly by scheduler)
+    "meteo-parapente": 3600,  # 60 minutes (refreshed hourly by scheduler)
+    "meteociel": 3600,        # 60 minutes (refreshed hourly by scheduler)
+    "meteoblue": 3600,        # 60 minutes (refreshed hourly by scheduler)
+    "forecast": 3600,         # 60 minutes (combined forecast, aligned with scheduler)
+    "summary": 3600,          # 60 minutes (site summary)
 }
 
 # Redis connection pool (singleton)
