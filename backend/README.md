@@ -51,7 +51,7 @@ pip install -r requirements.txt
 cp .env.example .env
 
 # Initialize database
-python -c "from database import Base, engine; Base.metadata.create_all(bind=engine)"
+python -c "from database import Base, engine; import models; Base.metadata.create_all(bind=engine)"
 python seed_sites.py
 
 # Start server
