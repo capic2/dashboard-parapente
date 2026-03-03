@@ -67,6 +67,11 @@ async def get_redis() -> Any:
             redis_host = os.getenv("REDIS_HOST", "localhost")
             redis_port = int(os.getenv("REDIS_PORT", "6379"))
             
+            # Debug: show what we're trying to connect to
+            logger.info(f"Environment: {environment}")
+            logger.info(f"USE_FAKE_REDIS: {os.getenv('USE_FAKE_REDIS', 'not set')}")
+            logger.info(f"REDIS_HOST: {os.getenv('REDIS_HOST', 'not set (defaulting to localhost)')}")
+            logger.info(f"REDIS_PORT: {os.getenv('REDIS_PORT', 'not set (defaulting to 6379)')}")
             logger.info(f"Connecting to Redis at {redis_host}:{redis_port}")
             
             _redis_pool = redis_module.Redis(
