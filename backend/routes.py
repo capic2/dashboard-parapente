@@ -444,6 +444,64 @@ def get_spots(db: Session = Depends(get_db)):
     sites = db.query(Site).all()
     return SpotsResponse(sites=sites)
 
+# ============================================================================
+# BEST SPOT RECOMMENDATION ENDPOINT
+# ============================================================================
+# IMPORTANT: This must be BEFORE /spots/{spot_id} to avoid route collision
+
+@router.get("/spots/best")
+async def get_best_spot(db: Session = Depends(get_db)):
+    """
+    Get the best flying spot for today based on Para-Index and wind conditions
+    
+    This endpoint:
+    1. Returns cached result if available (fast response)
+    2. Calculates from database if cache miss
+    3. Cache is automatically refreshed every hour by scheduler
+    
+    Returns:
+        Best spot with score, Para-Index, wind conditions, and reasoning
+        
+    Example response:
+        {
+            "site": {
+                "id": "site-arguel",
+                "code": "arguel",
+                "name": "Arguel",
+                "latitude": 47.2369,
+                "longitude": 6.0636,
+                "orientation": "W",
+                "rating": 4
+            },
+            "paraIndex": 75,
+            "windDirection": "W",
+            "windSpeed": 15.0,
+            "windFavorability": "good",
+            "score": 75.0,
+            "reason": "Excellentes conditions (Para-Index 75), vent favorable W 15km/h",
+            "verdict": "BON"
+        }
+    """
+    from best_spot import get_best_spot_cached
+    
+    try:
+        best_spot = await get_best_spot_cached(db)
+        
+        if not best_spot:
+            raise HTTPException(
+                status_code=404,
+                detail="No forecast data available for today. The scheduler may not have run yet."
+            )
+        
+        return best_spot
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting best spot: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to calculate best spot: {str(e)}")
+
+
 @router.get("/spots/{spot_id}", response_model=SiteSchema)
 def get_spot(spot_id: str, db: Session = Depends(get_db)):
     """Get a specific user-managed spot"""

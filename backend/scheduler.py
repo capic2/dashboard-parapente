@@ -214,6 +214,17 @@ async def scheduled_weather_fetch():
     # Log results
     success_count = sum(1 for r in results if r and not isinstance(r, Exception))
     logger.info(f"✅ Scheduled fetch completed: {success_count}/{len(tasks)} succeeded at {datetime.now()}")
+    
+    # Refresh best spot cache after weather data is updated
+    try:
+        from best_spot import refresh_best_spot_cache
+        db = SessionLocal()
+        try:
+            await refresh_best_spot_cache(db)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error refreshing best spot cache: {e}", exc_info=True)
 
 
 def start_scheduler():
