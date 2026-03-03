@@ -15,6 +15,12 @@ pip install --no-cache-dir -r requirements.txt 2>&1 | tail -3
 echo "✓ Dependencies installed"
 echo ""
 
+# Install Playwright browsers
+echo "🌐 Installing Playwright browsers..."
+python -m playwright install chromium --with-deps 2>&1 | tail -5
+echo "✓ Playwright browsers installed"
+echo ""
+
 # Ensure db directory exists
 echo "📁 Ensuring /app/db directory exists..."
 mkdir -p /app/db
