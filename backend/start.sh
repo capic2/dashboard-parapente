@@ -9,6 +9,7 @@ pip install --no-cache-dir -q fastapi uvicorn sqlalchemy pydantic python-dotenv 
 echo "🗄️ Creating database schema..."
 python -c "
 from database import Base, engine
+import models
 Base.metadata.create_all(bind=engine)
 print('✅ Schema created')
 "
