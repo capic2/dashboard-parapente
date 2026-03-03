@@ -124,6 +124,20 @@ dashboard-parapente/
 
 **Production uses real Redis** for persistence and multi-process caching.
 
+#### Cache Strategy
+
+**TTL (Time To Live):** 60 minutes  
+**Scheduler Interval:** Every hour (at :00)  
+**Synchronization:** Cache TTL matches polling interval to eliminate gaps
+
+**Why 60 minutes?**
+- Weather conditions change gradually (no 5-minute precision needed)
+- Aligned with hourly polling prevents cache misses
+- Reduces API calls to external providers
+- Instant responses for users (always cache hit)
+
+**Note:** In development with FakeRedis, cache is cleared on server restart.
+
 ### Common Development Tasks
 
 #### Run Tests
