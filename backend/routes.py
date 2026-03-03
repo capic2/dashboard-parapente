@@ -11,30 +11,487 @@ import uuid
 import asyncio
 import xml.etree.ElementTree as ET
 import math
+import logging
 from typing import List, Dict, Optional, Sequence
 
+logger = logging.getLogger(__name__)
+
 # Import weather_pipeline and para_index
-from weather_pipeline import get_normalized_forecast
+from weather_pipeline import get_normalized_forecast, get_daily_aggregate
 from para_index import calculate_para_index, analyze_hourly_slots, format_slots_summary
 
 router = APIRouter(prefix="/api", tags=["api"])
 
-# Sites endpoints
+# ============================================================================
+# PARAGLIDING SPOTS SEARCH ENDPOINTS (External database)
+# ============================================================================
+
+@router.post("/spots/sync")
+async def sync_paragliding_spots(
+    force: bool = False,
+    db: Session = Depends(get_db)
+):
+    """
+    Sync paragliding spots from OpenAIP and ParaglidingSpots.com
+    
+    Args:
+        force: If true, sync even if data is recent (default: false)
+    
+    Returns:
+        Sync statistics and status
+    
+    Example:
+        POST /api/spots/sync
+        POST /api/spots/sync?force=true
+    """
+    from spots import sync_to_database, get_sync_status
+    from datetime import datetime, timedelta
+    
+    # Check if sync is needed
+    status = get_sync_status(db)
+    
+    if not force and status.get('last_sync'):
+        # Parse last sync time
+        try:
+            last_sync = datetime.fromisoformat(status['last_sync'])
+            days_since_sync = (datetime.utcnow() - last_sync).days
+            
+            if days_since_sync < 7:
+                return {
+                    "success": True,
+                    "message": f"Data is recent (synced {days_since_sync} days ago). Use force=true to sync anyway.",
+                    "stats": status,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "synced": False
+                }
+        except (ValueError, TypeError):
+            pass
+    
+    # Perform sync
+    logger.info("Starting paragliding spots sync...")
+    stats = sync_to_database(db)
+    
+    if "error" in stats:
+        raise HTTPException(status_code=500, detail=f"Sync failed: {stats['error']}")
+    
+    return {
+        "success": True,
+        "message": f"Synced {stats['total']} spots ({stats['added']} new, {stats['updated']} updated)",
+        "stats": stats,
+        "timestamp": datetime.utcnow().isoformat(),
+        "synced": True
+    }
+
+
+@router.get("/spots/search")
+async def search_paragliding_spots(
+    city: Optional[str] = None,
+    lat: Optional[float] = None,
+    lon: Optional[float] = None,
+    radius_km: int = 50,
+    type: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Search for paragliding spots by city or coordinates.
+    
+    Must provide either 'city' OR both 'lat' and 'lon'.
+    
+    Args:
+        city: City name (e.g., "Besançon")
+        lat: Latitude (decimal degrees)
+        lon: Longitude (decimal degrees)
+        radius_km: Search radius in kilometers (default: 50)
+        type: Filter by spot type: "takeoff", "landing", or omit for both
+    
+    Returns:
+        List of spots with distances, sorted by proximity
+    
+    Examples:
+        GET /api/spots/search?city=Besançon&radius_km=50
+        GET /api/spots/search?lat=47.24&lon=6.02&radius_km=30&type=takeoff
+    """
+    from spots import search_by_city, search_by_coordinates
+    
+    # Validate parameters
+    if city and (lat is not None or lon is not None):
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either 'city' OR ('lat' AND 'lon'), not both"
+        )
+    
+    if not city and (lat is None or lon is None):
+        raise HTTPException(
+            status_code=400,
+            detail="Must provide either 'city' OR both 'lat' and 'lon'"
+        )
+    
+    # Validate type if provided
+    if type and type not in ["takeoff", "landing"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Type must be 'takeoff' or 'landing'"
+        )
+    
+    # Perform search
+    if city:
+        result = search_by_city(db, city, radius_km, type)
+    else:
+        result = search_by_coordinates(db, lat, lon, radius_km, type)
+    
+    # Check for geocoding error
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    
+    return result
+
+
+@router.get("/spots/status")
+async def get_spots_sync_status(db: Session = Depends(get_db)):
+    """
+    Get paragliding spots database status and statistics.
+    
+    Returns:
+        Statistics about synced spots and last sync time
+    
+    Example:
+        GET /api/spots/status
+    """
+    from spots import get_sync_status
+    
+    return get_sync_status(db)
+
+
+@router.get("/spots/search-with-weather")
+async def search_spots_with_weather(
+    city: Optional[str] = None,
+    lat: Optional[float] = None,
+    lon: Optional[float] = None,
+    radius_km: int = 50,
+    type: Optional[str] = None,
+    limit: int = 5,
+    db: Session = Depends(get_db)
+):
+    """
+    Search for paragliding spots AND get weather for each result.
+    
+    This is the ULTIMATE endpoint: find spots near you and immediately see
+    which ones have good conditions!
+    
+    Args:
+        city: City name (e.g., "Besançon")
+        lat: Latitude (decimal degrees)
+        lon: Longitude (decimal degrees)
+        radius_km: Search radius in kilometers (default: 50)
+        type: Filter by spot type: "takeoff", "landing", or omit for both
+        limit: Max number of spots to return with weather (default: 5, max: 10)
+    
+    Returns:
+        List of spots with their weather forecasts and para-index
+    
+    Example:
+        GET /api/spots/search-with-weather?city=Besançon&limit=3
+        GET /api/spots/search-with-weather?lat=47.24&lon=6.02&radius_km=30&type=takeoff
+    """
+    from spots import search_by_city, search_by_coordinates
+    
+    # Validate limit
+    if limit > 10:
+        limit = 10
+    elif limit < 1:
+        limit = 1
+    
+    # Validate parameters (same as regular search)
+    if city and (lat is not None or lon is not None):
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either 'city' OR ('lat' AND 'lon'), not both"
+        )
+    
+    if not city and (lat is None or lon is None):
+        raise HTTPException(
+            status_code=400,
+            detail="Must provide either 'city' OR both 'lat' and 'lon'"
+        )
+    
+    if type and type not in ["takeoff", "landing"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Type must be 'takeoff' or 'landing'"
+        )
+    
+    # Perform search
+    if city:
+        search_result = search_by_city(db, city, radius_km, type)
+    else:
+        search_result = search_by_coordinates(db, lat, lon, radius_km, type)
+    
+    # Check for geocoding error
+    if "error" in search_result:
+        raise HTTPException(status_code=404, detail=search_result["error"])
+    
+    # Get top N spots
+    spots = search_result['spots'][:limit]
+    
+    # Fetch weather for each spot in parallel
+    weather_tasks = []
+    for spot in spots:
+        weather_tasks.append(
+            get_normalized_forecast(
+                spot['latitude'],
+                spot['longitude'],
+                0,  # Today
+                site_name=spot['name'],
+                elevation_m=spot.get('elevation_m')
+            )
+        )
+    
+    weather_results = await asyncio.gather(*weather_tasks)
+    
+    # Combine spots with weather
+    spots_with_weather = []
+    for i, spot in enumerate(spots):
+        weather_data = weather_results[i]
+        
+        if weather_data.get("success"):
+            consensus = weather_data.get("consensus", [])
+            para_result = calculate_para_index(consensus)
+            slots = analyze_hourly_slots(consensus)
+            
+            spot_with_weather = {
+                **spot,  # All spot data (name, type, coords, etc.)
+                "weather": {
+                    "para_index": para_result.get("para_index"),
+                    "verdict": para_result.get("verdict"),
+                    "reasons": para_result.get("reasons"),
+                    "flyable_slots": slots,
+                    "sunrise": weather_data.get("sunrise"),
+                    "sunset": weather_data.get("sunset"),
+                    "total_sources": weather_data.get("total_sources", 0)
+                }
+            }
+        else:
+            # Weather fetch failed, include spot without weather
+            spot_with_weather = {
+                **spot,
+                "weather": {
+                    "error": weather_data.get("error", "Failed to fetch weather")
+                }
+            }
+        
+        spots_with_weather.append(spot_with_weather)
+    
+    return {
+        "query": search_result['query'],
+        "total_spots_found": search_result['total'],
+        "spots_with_weather": spots_with_weather,
+        "showing": len(spots_with_weather)
+    }
+
+
+@router.get("/spots/detail/{spot_id}")
+async def get_paragliding_spot_detail(
+    spot_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Get full details for a specific paragliding spot.
+    
+    Args:
+        spot_id: Spot ID (e.g., "openaip_...", "pgs_...", "merged_...")
+    
+    Returns:
+        Full spot details including metadata
+    
+    Example:
+        GET /api/spots/detail/openaip_6293a4af1234567
+    """
+    from spots import get_spot_by_id
+    
+    spot = get_spot_by_id(db, spot_id)
+    
+    if not spot:
+        raise HTTPException(status_code=404, detail=f"Spot not found: {spot_id}")
+    
+    return spot
+
+
+@router.get("/spots/weather/{spot_id}")
+async def get_spot_weather(
+    spot_id: str,
+    day_index: int = 0,
+    days: int = 1,
+    db: Session = Depends(get_db)
+):
+    """
+    Get weather forecast for ANY paragliding spot (from spots database).
+    
+    This endpoint allows you to get weather for any spot found via search,
+    not just your saved sites.
+    
+    Args:
+        spot_id: Paragliding spot ID (e.g., "merged_884e0213d9116315")
+        day_index: 0=today, 1=tomorrow (default: 0)
+        days: Number of days to return (default: 1)
+    
+    Returns:
+        Full weather forecast with para-index, consensus data, etc.
+    
+    Example:
+        GET /api/spots/weather/merged_884e0213d9116315?days=3
+    """
+    from spots import get_spot_by_id
+    
+    # Get spot from paragliding_spots table
+    spot = get_spot_by_id(db, spot_id)
+    
+    if not spot:
+        raise HTTPException(status_code=404, detail=f"Spot not found: {spot_id}")
+    
+    # Check if we have coordinates
+    if not spot.get('latitude') or not spot.get('longitude'):
+        raise HTTPException(status_code=400, detail="Spot has no coordinates")
+    
+    # Fetch weather data (same as regular weather endpoint)
+    tasks = []
+    for d in range(days):
+        tasks.append(get_normalized_forecast(
+            spot['latitude'],
+            spot['longitude'],
+            day_index + d,
+            site_name=spot['name'],
+            elevation_m=spot.get('elevation_m')
+        ))
+    
+    results = await asyncio.gather(*tasks)
+    
+    # Combine all days into single response
+    all_consensus = []
+    total_sources = 0
+    sunrise_time = None
+    sunset_time = None
+    
+    for day_result in results:
+        if day_result.get("success"):
+            all_consensus.extend(day_result.get("consensus", []))
+            total_sources = max(total_sources, day_result.get("total_sources", 0))
+            
+            if not sunrise_time and day_result.get("sunrise"):
+                sunrise_time = day_result.get("sunrise")
+                sunset_time = day_result.get("sunset")
+        else:
+            return {
+                "spot_id": spot_id,
+                "spot_name": spot['name'],
+                "error": day_result.get("error", "Failed to fetch weather data"),
+                "day_index": day_index,
+                "days": days
+            }
+    
+    # Calculate para_index
+    para_result = calculate_para_index(all_consensus)
+    
+    # Analyze hourly slots
+    slots = analyze_hourly_slots(all_consensus)
+    slots_summary = format_slots_summary(slots)
+    
+    # Build sources metadata
+    from scrapers.config import get_source_config
+    sources_metadata = {}
+    for source_name in ["open-meteo", "weatherapi", "meteo-parapente", "meteociel", "meteoblue"]:
+        config = get_source_config(source_name)
+        sources_metadata[source_name] = {
+            "name": config.get("name", source_name),
+            "temporal_resolution": config.get("temporal_resolution", "unknown"),
+            "coverage": config.get("coverage", "unknown"),
+            "forecast_range": config.get("forecast_range", "unknown"),
+            "model": config.get("model", "unknown")
+        }
+    
+    return {
+        "spot_id": spot_id,
+        "spot_name": spot['name'],
+        "spot_type": spot['type'],
+        "spot_orientation": spot.get('orientation'),
+        "spot_elevation_m": spot.get('elevation_m'),
+        "spot_rating": spot.get('rating'),
+        "coordinates": {
+            "latitude": spot['latitude'],
+            "longitude": spot['longitude']
+        },
+        "day_index": day_index,
+        "days": days,
+        "consensus": all_consensus,
+        "para_index": para_result.get("para_index"),
+        "verdict": para_result.get("verdict"),
+        "reasons": para_result.get("reasons"),
+        "flyable_slots": slots,
+        "slots_summary": slots_summary,
+        "total_sources": total_sources,
+        "sunrise": sunrise_time,
+        "sunset": sunset_time,
+        "sources_metadata": sources_metadata
+    }
+
+
+# ============================================================================
+# USER SITES ENDPOINTS (Original - for user-managed custom spots)
+# ============================================================================
+
 @router.get("/spots", response_model=SpotsResponse)
 def get_spots(db: Session = Depends(get_db)):
-    """Get all paragliding spots"""
+    """Get all user-managed paragliding spots"""
     sites = db.query(Site).all()
     return SpotsResponse(sites=sites)
 
 @router.get("/spots/{spot_id}", response_model=SiteSchema)
 def get_spot(spot_id: str, db: Session = Depends(get_db)):
-    """Get a specific spot"""
+    """Get a specific user-managed spot"""
     site = db.query(Site).filter(Site.id == spot_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Spot not found")
     return site
 
+
+# ============================================================================
+# ADMIN ENDPOINTS
+# ============================================================================
+
+@router.post("/admin/sites/link-to-spots")
+async def link_user_sites_to_spots(db: Session = Depends(get_db)):
+    """
+    Admin endpoint: Link existing user sites to external paragliding spots.
+    
+    This will:
+    - Find matching paragliding spots within 500m of each user site
+    - Link the site to the external spot for enhanced data
+    - Update site coordinates to precise GPS coordinates
+    - Update elevation from external data
+    
+    Returns:
+        Statistics about linked sites
+    
+    Example:
+        POST /api/admin/sites/link-to-spots
+    """
+    from spots.site_updater import link_sites_to_spots
+    
+    logger.info("Admin: Linking user sites to paragliding spots...")
+    stats = link_sites_to_spots(db)
+    
+    if "error" in stats:
+        raise HTTPException(status_code=500, detail=f"Linking failed: {stats['error']}")
+    
+    return {
+        "success": True,
+        "message": f"Linked {stats['linked']} of {stats['total_sites']} sites",
+        "stats": stats
+    }
+
+
+# ============================================================================
 # Weather endpoints (UPDATED with pipeline + para_index)
+# ============================================================================
 @router.get("/weather/{spot_id}")
 async def get_weather(spot_id: str, day_index: int = 0, days: int = 1, db: Session = Depends(get_db)):
     """
@@ -53,7 +510,13 @@ async def get_weather(spot_id: str, day_index: int = 0, days: int = 1, db: Sessi
     # Fetch N days of data in parallel
     tasks = []
     for d in range(days):
-        tasks.append(get_normalized_forecast(site.latitude, site.longitude, day_index + d))
+        tasks.append(get_normalized_forecast(
+            site.latitude,
+            site.longitude,
+            day_index + d,
+            site_name=site.name,
+            elevation_m=site.elevation_m
+        ))
     
     results = await asyncio.gather(*tasks)
     
@@ -82,12 +545,36 @@ async def get_weather(spot_id: str, day_index: int = 0, days: int = 1, db: Sessi
                 "days": days
             }
     
-    # Calculate para_index (using all days combined)
-    para_result = calculate_para_index(all_consensus)
+    # Filter to flyable hours (sunrise to sunset) before calculating para_index
+    flyable_consensus = all_consensus
+    if sunrise_time and sunset_time:
+        try:
+            sunrise_hour = int(sunrise_time.split(':')[0])
+            sunset_hour = int(sunset_time.split(':')[0])
+            flyable_consensus = [h for h in all_consensus if sunrise_hour <= h.get('hour', 0) <= sunset_hour]
+        except (ValueError, IndexError):
+            pass  # Keep all hours if parsing fails
     
-    # Analyze hourly slots
-    slots = analyze_hourly_slots(all_consensus)
+    # Calculate para_index (using only flyable hours)
+    para_result = calculate_para_index(flyable_consensus)
+    
+    # Analyze hourly slots (also only flyable hours)
+    slots = analyze_hourly_slots(flyable_consensus)
     slots_summary = format_slots_summary(slots)
+    
+    # Build sources metadata
+    from scrapers.config import get_source_config
+    sources_metadata = {}
+    for source_name in ["open-meteo", "weatherapi", "meteo-parapente", "meteociel", "meteoblue"]:
+        config = get_source_config(source_name)
+        if config and config.get("status").value == "active":
+            sources_metadata[source_name] = {
+                "temporal_resolution": config.get("temporal_resolution", "unknown"),
+                "coverage": config.get("coverage", "unknown"),
+                "forecast_range": config.get("forecast_range", "unknown"),
+                "model": config.get("model", "unknown"),
+                "available_fields": config.get("provides", [])
+            }
     
     return {
         "site_id": spot_id,
@@ -96,6 +583,7 @@ async def get_weather(spot_id: str, day_index: int = 0, days: int = 1, db: Sessi
         "days": days,
         "sunrise": sunrise_time,
         "sunset": sunset_time,
+        "sources_metadata": sources_metadata,  # ← New field with source metadata
         "consensus": all_consensus,
         "para_index": para_result["para_index"],
         "verdict": para_result["verdict"],
@@ -111,6 +599,174 @@ async def get_weather(spot_id: str, day_index: int = 0, days: int = 1, db: Sessi
 async def get_weather_today(spot_id: str, db: Session = Depends(get_db)):
     """Get today's weather forecast (day_index=0)"""
     return await get_weather(spot_id, day_index=0, db=db)
+
+@router.get("/weather/{spot_id}/summary")
+async def get_weather_summary(spot_id: str, day_index: int = 0, db: Session = Depends(get_db)):
+    """
+    Get lightweight weather summary for a site (optimized for site selector).
+    Returns only essential data: para_index, verdict, wind_avg.
+    
+    This endpoint is much faster than the full forecast endpoint as it:
+    - Returns minimal data (no hourly details, no consensus breakdown)
+    - Useful for site selector buttons to show quick status
+    """
+    # Get the site
+    site = db.query(Site).filter(Site.id == spot_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail=f"Site not found: {spot_id}")
+    
+    # Get forecast data using same pipeline as full endpoint
+    day_result = await get_normalized_forecast(
+        site.latitude,
+        site.longitude,
+        day_index,
+        site_name=site.name,
+        elevation_m=site.elevation_m
+    )
+    
+    if not day_result.get("success"):
+        raise HTTPException(
+            status_code=500,
+            detail=day_result.get("error", f"No forecast data available for {site.name}")
+        )
+    
+    # Get consensus data
+    consensus_data = day_result.get("consensus", [])
+    
+    # Filter to flyable hours if sunrise/sunset available
+    flyable_consensus = consensus_data
+    sunrise_time = day_result.get("sunrise")
+    sunset_time = day_result.get("sunset")
+    
+    if sunrise_time and sunset_time:
+        try:
+            sunrise_hour = int(sunrise_time.split(':')[0])
+            sunset_hour = int(sunset_time.split(':')[0])
+            flyable_consensus = [h for h in consensus_data if sunrise_hour <= h.get('hour', 0) <= sunset_hour]
+        except (ValueError, IndexError):
+            pass  # Keep all hours if parsing fails
+    
+    # Calculate para_index (using only flyable hours)
+    para_result = calculate_para_index(flyable_consensus)
+    
+    # Calculate average wind speed for the day (simplified metric)
+    wind_speeds = [h.get("wind_speed") for h in consensus_data if h.get("wind_speed") is not None]
+    wind_avg = round(sum(wind_speeds) / len(wind_speeds), 1) if wind_speeds else 0
+    
+    # Return lightweight summary
+    return {
+        "site_id": spot_id,
+        "site_name": site.name,
+        "day_index": day_index,
+        "para_index": para_result["para_index"],
+        "verdict": para_result["verdict"],
+        "emoji": para_result["emoji"],
+        "wind_avg": wind_avg,
+    }
+
+@router.get("/weather/{spot_id}/daily-summary")
+async def get_daily_summary(
+    spot_id: str, 
+    days: int = 7, 
+    db: Session = Depends(get_db)
+):
+    """
+    Get multi-day summary WITHOUT hourly details (MUCH FASTER).
+    
+    This endpoint is optimized for displaying 7-day forecast cards:
+    - Fetches all sources in parallel
+    - Returns ONLY daily aggregates (para_index, verdict, temps, wind_avg)
+    - Skips hourly consensus calculation → 2-3x faster than full forecast
+    - Used by Forecast7Day component for quick card display
+    
+    Args:
+        spot_id: Site ID (e.g., 'site-arguel')
+        days: Number of days to return (default: 7)
+    
+    Returns:
+        {
+            "site_id": "site-arguel",
+            "site_name": "Arguel",
+            "days": [
+                {
+                    "day_index": 0,
+                    "date": "2026-03-02",
+                    "para_index": 75,
+                    "verdict": "BON",
+                    "emoji": "🟢",
+                    "temp_min": 8,
+                    "temp_max": 15,
+                    "wind_avg": 18.5
+                },
+                ...
+            ]
+        }
+    """
+    # Get the site
+    site = db.query(Site).filter(Site.id == spot_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail=f"Site not found: {spot_id}")
+    
+    # Default wind limits for paragliding (if not set on site)
+    # Standard values: 10-30 km/h (2.8-8.3 m/s)
+    min_wind_ms = getattr(site, 'min_wind_ms', 2.8)  # 10 km/h
+    max_wind_ms = getattr(site, 'max_wind_ms', 8.3)  # 30 km/h
+    optimal_dirs = getattr(site, 'optimal_directions', 'N,NE,E,SE,S,SW,W,NW')  # All directions
+    
+    # Fetch all days in parallel
+    # Use ALL 5 sources (including Meteoblue) for full consistency with /weather endpoint
+    # This ensures para_index on 7-day cards EXACTLY matches the hourly view
+    # Note: Meteoblue adds 5-10s per day, but consistency is worth it
+    
+    tasks = []
+    for day_idx in range(days):
+        tasks.append(
+            get_daily_aggregate(
+                site.latitude,
+                site.longitude,
+                day_idx,
+                min_wind_ms,
+                max_wind_ms,
+                optimal_dirs,
+                sources=None,  # Use all 5 sources (default: open-meteo, weatherapi, meteo-parapente, meteociel, meteoblue)
+                site_name=site.name,
+                elevation_m=site.elevation_m
+            )
+        )
+    
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Format response
+    summary_days = []
+    for idx, day_result in enumerate(results):
+        # Skip failed days
+        if isinstance(day_result, Exception):
+            logger.warning(f"Day {idx} failed for {spot_id}: {day_result}")
+            continue
+        
+        if day_result:
+            summary_days.append({
+                "day_index": idx,
+                "date": day_result["date"],
+                "para_index": day_result["para_index"],
+                "verdict": day_result["verdict"],
+                "emoji": day_result["emoji"],
+                "temp_min": day_result["temp_min"],
+                "temp_max": day_result["temp_max"],
+                "wind_avg": day_result["wind_avg"],
+            })
+    
+    if not summary_days:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch daily summary for {site.name}"
+        )
+    
+    return {
+        "site_id": spot_id,
+        "site_name": site.name,
+        "days": summary_days
+    }
 
 # Flights endpoints
 @router.get("/flights")

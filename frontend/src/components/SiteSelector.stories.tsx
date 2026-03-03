@@ -8,29 +8,57 @@ const mockSites = [
   {
     id: 'site-arguel',
     name: 'Arguel',
-    altitude: 427,
-    location: 'Besançon',
-    coordinates: { lat: 47.2, lng: 6.0 },
-    orientation: ['N', 'NE', 'E'],
-    difficulty: 'debutant' as const,
+    elevation_m: 427,
+    latitude: 47.2,
+    longitude: 6.0,
+    orientation: 'N',
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
   },
   {
-    id: 'site-mont-poupet',
-    name: 'Mont Poupet',
-    altitude: 842,
-    location: 'Jura',
-    coordinates: { lat: 46.9, lng: 5.8 },
-    orientation: ['S', 'SW', 'W'],
-    difficulty: 'intermediaire' as const,
+    id: 'mont-poupet-nord',
+    name: 'Mont Poupet Nord',
+    elevation_m: 842,
+    latitude: 46.9,
+    longitude: 5.8,
+    orientation: 'N',
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+  },
+  {
+    id: 'mont-poupet-sud',
+    name: 'Mont Poupet Sud',
+    elevation_m: 842,
+    latitude: 46.9,
+    longitude: 5.8,
+    orientation: 'S',
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+  },
+  {
+    id: 'mont-poupet-ouest',
+    name: 'Mont Poupet Ouest',
+    elevation_m: 842,
+    latitude: 46.9,
+    longitude: 5.8,
+    orientation: 'W',
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
   },
   {
     id: 'site-la-cote',
     name: 'La Côte',
-    altitude: 800,
-    location: 'Pontarlier',
-    coordinates: { lat: 46.8, lng: 6.3 },
-    orientation: ['W', 'NW'],
-    difficulty: 'intermediaire' as const,
+    elevation_m: 800,
+    latitude: 46.8,
+    longitude: 6.3,
+    orientation: 'W',
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
   },
 ];
 
@@ -105,12 +133,12 @@ export const Default: Story = {
 };
 
 /**
- * Story showing Mont Poupet selected
- * Demonstrates different site selection
+ * Story showing Mont Poupet Nord selected
+ * Demonstrates multi-orientation site selection (dropdown)
  */
 export const MontPoupetSelected: Story = {
   args: {
-    selectedSiteId: 'site-mont-poupet',
+    selectedSiteId: 'mont-poupet-nord',
     onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
   },
 };
