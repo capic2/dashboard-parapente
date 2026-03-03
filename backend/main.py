@@ -24,6 +24,191 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+def initialize_database():
+    """
+    Initialize database: create schema and seed default sites
+    This ensures the database is always properly set up on startup
+    """
+    from database import Base, engine, DB_PATH
+    import models  # Import models to register them with Base
+    
+    logger.info("=" * 60)
+    logger.info("DATABASE INITIALIZATION")
+    logger.info("=" * 60)
+    
+    # Step 1: Create schema
+    logger.info("Creating database schema...")
+    try:
+        # Ensure db directory exists
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Create all tables
+        Base.metadata.create_all(bind=engine)
+        
+        # Verify database file
+        if DB_PATH.exists():
+            size = DB_PATH.stat().st_size
+            logger.info(f"✓ Database file exists: {DB_PATH} ({size:,} bytes)")
+        else:
+            logger.error(f"✗ Database file not created at {DB_PATH}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"✗ Error creating schema: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+    
+    # Step 2: Check if sites exist
+    logger.info("Checking for existing sites...")
+    try:
+        db = SessionLocal()
+        site_count = db.query(Site).count()
+        db.close()
+        
+        if site_count > 0:
+            logger.info(f"✓ Database already contains {site_count} sites - skipping seed")
+            return True
+            
+        logger.info("No sites found - seeding default sites...")
+        
+    except Exception as e:
+        logger.warning(f"Could not check sites: {e}")
+        logger.info("Attempting to seed sites anyway...")
+    
+    # Step 3: Seed sites
+    try:
+        from datetime import datetime
+        
+        sites_data = [
+            {
+                'id': 'site-arguel',
+                'code': 'arguel',
+                'name': 'Arguel',
+                'latitude': 47.1944,
+                'longitude': 5.9896,
+                'elevation_m': 462,
+                'region': 'Besançon',
+                'country': 'FR',
+                'rating': 3,
+                'orientation': 'NNW',
+                'linked_spot_id': 'merged_884e0213d9116315'
+            },
+            {
+                'id': 'site-mont-poupet-nord',
+                'code': 'mont-poupet-nord',
+                'name': 'Mont Poupet Nord',
+                'latitude': 46.9716,
+                'longitude': 5.8776,
+                'elevation_m': 795,
+                'region': 'Besançon',
+                'country': 'FR',
+                'rating': 4,
+                'orientation': 'N',
+                'linked_spot_id': 'merged_d370be468747c90a'
+            },
+            {
+                'id': 'site-mont-poupet-nw',
+                'code': 'mont-poupet-nw',
+                'name': 'Mont Poupet Nord-Ouest',
+                'latitude': 46.9701,
+                'longitude': 5.8742,
+                'elevation_m': 795,
+                'region': 'Besançon',
+                'country': 'FR',
+                'rating': 3,
+                'orientation': 'NW',
+                'linked_spot_id': 'merged_c30c861b49a65324'
+            },
+            {
+                'id': 'site-mont-poupet-ouest',
+                'code': 'mont-poupet-ouest',
+                'name': 'Mont Poupet Ouest',
+                'latitude': 46.9693,
+                'longitude': 5.8747,
+                'elevation_m': 795,
+                'region': 'Besançon',
+                'country': 'FR',
+                'rating': 4,
+                'orientation': 'W',
+                'linked_spot_id': 'merged_359e1153c44c269e'
+            },
+            {
+                'id': 'site-mont-poupet-sud',
+                'code': 'mont-poupet-sud',
+                'name': 'Mont Poupet Sud',
+                'latitude': 46.9691,
+                'longitude': 5.8762,
+                'elevation_m': 795,
+                'region': 'Besançon',
+                'country': 'FR',
+                'rating': 1,
+                'orientation': 'S',
+                'linked_spot_id': 'merged_60fbcc6724417e87'
+            },
+            {
+                'id': 'site-la-cote',
+                'code': 'la-cote',
+                'name': 'La Côte',
+                'latitude': 46.9424,
+                'longitude': 5.8438,
+                'elevation_m': 800,
+                'region': 'Besançon',
+                'country': 'FR',
+                'rating': 2,
+                'orientation': 'N',
+                'linked_spot_id': 'merged_d3836f8db6c839fa'
+            }
+        ]
+        
+        db = SessionLocal()
+        now = datetime.utcnow()
+        
+        for site_data in sites_data:
+            # Check if site already exists
+            existing = db.query(Site).filter(Site.id == site_data['id']).first()
+            if existing:
+                logger.info(f"⊙ Site already exists: {site_data['name']} ({site_data['code']})")
+                continue
+            
+            # Create new site
+            site = Site(
+                id=site_data['id'],
+                code=site_data['code'],
+                name=site_data['name'],
+                latitude=site_data['latitude'],
+                longitude=site_data['longitude'],
+                elevation_m=site_data['elevation_m'],
+                region=site_data['region'],
+                country=site_data['country'],
+                rating=site_data.get('rating'),
+                orientation=site_data.get('orientation'),
+                linked_spot_id=site_data.get('linked_spot_id'),
+                created_at=now,
+                updated_at=now
+            )
+            db.add(site)
+            logger.info(f"✓ Seeded: {site_data['name']} ({site_data['code']}) at {site_data['latitude']:.4f}, {site_data['longitude']:.4f}")
+        
+        db.commit()
+        
+        # Verify
+        final_count = db.query(Site).count()
+        db.close()
+        
+        logger.info(f"✓ Database now contains {final_count} sites")
+        logger.info("=" * 60)
+        logger.info("✅ DATABASE INITIALIZATION COMPLETE")
+        logger.info("=" * 60)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"✗ Error seeding sites: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def run_migrations():
     """
     Run database migrations
@@ -91,11 +276,11 @@ def run_migrations():
     conn.close()
     logger.info("✓ All migrations completed")
 
-# Run migrations first
-run_migrations()
+# Initialize database (create schema + seed sites)
+initialize_database()
 
-# Create tables (SQLAlchemy will handle new models)
-Base.metadata.create_all(bind=engine)
+# Run migrations (if any exist)
+run_migrations()
 
 
 async def initial_cache_warmup():
