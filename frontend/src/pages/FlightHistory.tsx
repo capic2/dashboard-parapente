@@ -78,7 +78,7 @@ export default function FlightHistory() {
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-all"
+            className="px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-all"
           >
             Réessayer
           </button>
@@ -115,8 +115,8 @@ export default function FlightHistory() {
                 key={flight.id}
                 className={`bg-white rounded-lg p-3 shadow-sm border-2 transition-all cursor-pointer ${
                   selectedFlightId === flight.id
-                    ? 'border-purple-600 shadow-md'
-                    : 'border-gray-200 hover:border-purple-400'
+                    ? 'border-sky-600 shadow-md'
+                    : 'border-gray-200 hover:border-sky-400'
                 }`}
                 onClick={() => handleSelectFlight(flight)}
                 role="button"
@@ -186,7 +186,7 @@ export default function FlightHistory() {
                   </h2>
                   <div className="flex gap-2">
                     <button
-                      className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-all"
+                      className="px-3 py-1.5 text-sm bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-all"
                       onClick={() => setEditingNotes(!editingNotes)}
                       aria-label="Éditer les notes"
                     >
@@ -268,7 +268,7 @@ export default function FlightHistory() {
                         onChange={(e) => setNotesText(e.target.value)}
                         placeholder="Conditions, sensations, points à améliorer..."
                         rows={4}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 resize-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600 resize-none"
                       />
                       <div className="flex gap-2">
                         <button

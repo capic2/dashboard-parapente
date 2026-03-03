@@ -3,13 +3,14 @@ import { useWeather } from '../hooks/useWeather';
 
 interface HourlyForecastProps {
   spotId: string;
+  dayIndex?: number;
 }
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type CellType = 'para-index' | 'verdict' | 'temperature' | 'wind' | 'direction' | 'precipitation' | 'cloud-cover';
+type CellType = 'para-index' | 'verdict' | 'temperature' | 'wind' | 'gust' | 'direction' | 'precipitation' | 'cloud-cover';
 
 interface TooltipPosition {
   x: number;
@@ -91,7 +92,7 @@ const ParaIndexTooltip = ({ position, hour, paraIndex, wind, gust, precipitation
     <div 
       className={`
         ${isMobile ? 'fixed bottom-0 left-0 right-0 mx-4 mb-4' : 'fixed'}
-        bg-white border-2 border-purple-500 rounded-lg shadow-xl p-4 z-50 text-sm
+        bg-white border-2 border-sky-500 rounded-lg shadow-xl p-4 z-50 text-sm
       `}
       style={isMobile ? {} : {
         left: `${position.x}px`,
@@ -108,11 +109,11 @@ const ParaIndexTooltip = ({ position, hour, paraIndex, wind, gust, precipitation
           ✕
         </button>
       )}
-      <div className="font-bold mb-3 text-purple-700 flex items-center gap-2">
+      <div className="font-bold mb-3 text-sky-700 flex items-center gap-2">
         📊 Para-Index - {hour}
       </div>
       <div className="space-y-2 text-gray-700">
-        <div className="text-lg font-bold text-purple-600">{paraIndex}/10</div>
+        <div className="text-lg font-bold text-sky-600">{paraIndex}/100</div>
         <div className="border-t border-gray-200 pt-2 mt-2">
           <div className="text-xs font-semibold text-gray-500 mb-2">Métriques utilisées :</div>
           <div className="space-y-1 text-xs">
@@ -180,7 +181,7 @@ const VerdictTooltip = ({ position, hour, verdict, paraIndex, wind, gust, precip
       </div>
       <div className="space-y-2 text-gray-700">
         <div className="text-lg font-bold capitalize text-emerald-600">{verdict}</div>
-        <div className="text-xs text-gray-500">Para-Index : {paraIndex}/10</div>
+        <div className="text-xs text-gray-500">Para-Index : {paraIndex}/100</div>
         <div className="border-t border-gray-200 pt-2 mt-2">
           <div className="text-xs font-semibold text-gray-500 mb-2">Critères évalués :</div>
           <div className="space-y-1 text-xs">
@@ -309,8 +310,8 @@ const SourceDataTooltip = ({
 // MAIN COMPONENT
 // ============================================================================
 
-export default function HourlyForecast({ spotId }: HourlyForecastProps) {
-  const { data: weather, isLoading, error } = useWeather(spotId);
+export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastProps) {
+  const { data: weather, isLoading, error } = useWeather(spotId, dayIndex);
   const [activeTooltip, setActiveTooltip] = useState<{
     type: CellType;
     data: any;
@@ -431,6 +432,19 @@ export default function HourlyForecast({ spotId }: HourlyForecastProps) {
           />
         );
 
+      case 'gust':
+        return (
+          <SourceDataTooltip
+            {...commonProps}
+            sources={data.sources || {}}
+            consensus={data.wind_gust}
+            unit="km/h"
+            fieldName="wind_gust"
+            label="💨 Rafales"
+            color="#dc2626"
+          />
+        );
+
       case 'direction':
         return (
           <SourceDataTooltip
@@ -507,6 +521,7 @@ export default function HourlyForecast({ spotId }: HourlyForecastProps) {
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Verdict</th>
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Temp</th>
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Vent</th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">Rafales</th>
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Direction</th>
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Précip.</th>
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Nuages</th>
@@ -520,6 +535,12 @@ export default function HourlyForecast({ spotId }: HourlyForecastProps) {
                                  hour.sources?.['weatherapi']?.cloud_cover || 
                                  null;
 
+                // Extract gust from sources
+                const gustValue = hour.wind_gust ?? 
+                                 hour.sources?.['open-meteo']?.wind_gust ?? 
+                                 hour.sources?.['weatherapi']?.wind_gust ?? 
+                                 null;
+
                 return (
                   <tr 
                     key={index} 
@@ -528,10 +549,10 @@ export default function HourlyForecast({ spotId }: HourlyForecastProps) {
                     <td className="py-2.5 px-2 font-medium">{hour.hour}</td>
                     
                     <td 
-                      className="py-2.5 px-2 cursor-pointer hover:bg-purple-100 transition-colors"
+                      className="py-2.5 px-2 cursor-pointer hover:bg-sky-100 transition-colors"
                       {...cellEventHandlers('para-index', hour)}
                     >
-                      <strong className="text-purple-600">{hour.para_index}/10</strong>
+                      <strong className="text-sky-600">{hour.para_index}/100</strong>
                     </td>
                     
                     <td 
@@ -553,6 +574,15 @@ export default function HourlyForecast({ spotId }: HourlyForecastProps) {
                       {...cellEventHandlers('wind', hour)}
                     >
                       {hour.wind} km/h
+                    </td>
+                    
+                    <td 
+                      className="py-2.5 px-2 cursor-pointer hover:bg-red-50 transition-colors"
+                      {...cellEventHandlers('gust', hour)}
+                    >
+                      {gustValue !== null && gustValue !== undefined 
+                        ? `${gustValue.toFixed(1)} km/h` 
+                        : '—'}
                     </td>
                     
                     <td 
@@ -584,7 +614,7 @@ export default function HourlyForecast({ spotId }: HourlyForecastProps) {
               })
             ) : (
               <tr>
-                <td colSpan={8} className="py-8 text-center text-gray-500">
+                <td colSpan={9} className="py-8 text-center text-gray-500">
                   Aucune donnée horaire disponible
                 </td>
               </tr>

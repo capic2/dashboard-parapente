@@ -45,14 +45,14 @@ export default function StatsDashboard() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {/* Total Flights */}
-      <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-purple-600">
+      <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
         <div className="text-3xl mb-2">🪂</div>
         <div className="text-2xl font-bold text-gray-900">{formattedStats.totalFlights}</div>
         <div className="text-sm text-gray-600">Vols</div>
       </div>
 
       {/* Total Hours */}
-      <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-purple-600">
+      <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
         <div className="text-3xl mb-2">⏱️</div>
         <div className="text-2xl font-bold text-gray-900">
           {formattedStats.totalHours}h{formattedStats.totalMinutes}m
@@ -61,14 +61,14 @@ export default function StatsDashboard() {
       </div>
 
       {/* Total Distance */}
-      <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-purple-600">
+      <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
         <div className="text-3xl mb-2">📏</div>
         <div className="text-2xl font-bold text-gray-900">{formattedStats.totalDistance} km</div>
         <div className="text-sm text-gray-600">Distance totale</div>
       </div>
 
       {/* Elevation Gain */}
-      <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-purple-600">
+      <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
         <div className="text-3xl mb-2">📈</div>
         <div className="text-2xl font-bold text-gray-900">{formattedStats.totalElevation} m</div>
         <div className="text-sm text-gray-600">Dénivelé total</div>
@@ -89,14 +89,14 @@ export default function StatsDashboard() {
       </div>
 
       {/* Max Altitude */}
-      <div className="bg-gradient-to-br from-purple-600 to-indigo-700 rounded-xl p-4 shadow-md hover:shadow-lg transition-all text-white">
+      <div className="bg-gradient-to-br from-sky-600 to-indigo-700 rounded-xl p-4 shadow-md hover:shadow-lg transition-all text-white">
         <div className="text-3xl mb-2">⛰️</div>
         <div className="text-2xl font-bold">{formattedStats.maxAltitude} m</div>
         <div className="text-sm opacity-90">Altitude max</div>
       </div>
 
       {/* Favorite Site */}
-      <div className="bg-gradient-to-br from-purple-600 to-indigo-700 rounded-xl p-4 shadow-md hover:shadow-lg transition-all text-white">
+      <div className="bg-gradient-to-br from-sky-600 to-indigo-700 rounded-xl p-4 shadow-md hover:shadow-lg transition-all text-white">
         <div className="text-3xl mb-2">📍</div>
         <div className="text-lg font-bold truncate">{formattedStats.favoriteSite}</div>
         <div className="text-sm opacity-90">Site favori</div>

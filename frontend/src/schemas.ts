@@ -11,16 +11,22 @@ import { z } from 'zod'
 
 export const SiteSchema = z.object({
   id: z.string(),
+  code: z.string().nullable().optional(),
   name: z.string(),
   latitude: z.number(),
   longitude: z.number(),
-  elevation_m: z.number(),
-  description: z.string().catch(''),
-  orientation: z.string().catch(''),
-  difficulty_level: z.string().catch(''),
-  is_active: z.union([z.boolean(), z.null(), z.undefined()]).transform(v => v ?? true),
-  created_at: z.string().catch(''),
-  updated_at: z.string().catch(''),
+  elevation_m: z.number().nullable().optional(),
+  region: z.string().nullable().optional(),
+  country: z.string().nullable().optional().default('FR'),
+  rating: z.number().nullable().optional(),
+  orientation: z.string().nullable().optional(),
+  linked_spot_id: z.string().nullable().optional(),
+  created_at: z.string().nullable().optional(),
+  updated_at: z.string().nullable().optional(),
+  // Legacy fields kept for backward compatibility
+  description: z.string().optional().catch(''),
+  difficulty_level: z.string().optional().catch(''),
+  is_active: z.boolean().optional().default(true),
 })
 
 export const FlightSchema = z.object({
@@ -141,6 +147,7 @@ export const HourlyForecastItemSchema = z.object({
   temperature: z.number(),
   wind: z.number(),
   wind_speed: z.number(),
+  wind_gust: z.number().optional(),
   direction: z.string(),
   wind_direction: z.string(),
   conditions: z.string(),

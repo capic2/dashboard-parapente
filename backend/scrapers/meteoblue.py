@@ -56,12 +56,12 @@ class MeteoblueScraper(PlaywrightScraper):
         "W": 270, "WNW": 292, "NW": 315, "NNW": 337,
     }
     
-    def __init__(self, timeout: int = 30, headless: bool = True):
+    def __init__(self, timeout: int = 15, headless: bool = True):
         """
         Initialize Meteoblue scraper
         
         Args:
-            timeout: Request timeout in seconds
+            timeout: Request timeout in seconds (default 15s, reduced from 30s)
             headless: Run browser in headless mode
         """
         super().__init__(
@@ -111,11 +111,11 @@ class MeteoblueScraper(PlaywrightScraper):
         
         self.logger.info(f"Fetching Meteoblue with Playwright: {url}")
         
-        # Navigate to page
-        await page.goto(url, wait_until="domcontentloaded")
+        # Navigate to page - use networkidle for faster load
+        await page.goto(url, wait_until="networkidle")
         
-        # Wait for forecast table to load (CSS class selector with dot for multiple classes)
-        await page.wait_for_selector('table.picto', timeout=10000)
+        # Wait for forecast table to load (any view - 1h or 3h)
+        await page.wait_for_selector('table.picto', timeout=5000)
         
         self.logger.info("Page loaded, looking for toggle")
         
@@ -123,16 +123,18 @@ class MeteoblueScraper(PlaywrightScraper):
         # The toggle is: <input class="switch" type="checkbox"> inside <div id="switch">
         try:
             toggle_selector = '#switch input.switch'
-            await page.wait_for_selector(toggle_selector, timeout=5000)
+            await page.wait_for_selector(toggle_selector, timeout=3000)
             
             # Check if already in 1h mode (checkbox checked)
             is_checked = await page.evaluate(f'document.querySelector("{toggle_selector}").checked')
             
             if not is_checked:
                 self.logger.info("Clicking toggle to activate 1h view")
-                await page.click(toggle_selector)
-                # Wait for table to update (AJAX request)
-                await page.wait_for_timeout(2000)
+                # Use JavaScript click (more reliable than Playwright click for hidden checkboxes)
+                await page.evaluate(f'document.querySelector("{toggle_selector}").click()')
+                # Wait for AJAX update (table classes don't change, just content)
+                # Reduced from 2000ms to 800ms - sufficient for table update
+                await page.wait_for_timeout(800)
             else:
                 self.logger.info("Already in 1h view")
                 

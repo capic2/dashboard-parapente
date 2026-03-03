@@ -1,29 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { SitesApiResponseSchema, SiteSchema } from '../schemas';
-
-interface Site {
-  id: string;
-  name: string;
-  location: string;
-  altitude: number;
-  coordinates: {
-    lat: number;
-    lng: number;
-  };
-  orientation: string[];
-  difficulty: 'debutant' | 'intermediaire' | 'avance';
-  description?: string;
-  conditions?: string;
-  takeoff_coordinates?: {
-    lat: number;
-    lng: number;
-  };
-  landing_coordinates?: {
-    lat: number;
-    lng: number;
-  };
-}
+import type { Site } from '../types';
 
 const API_BASE_URL = '/api';
 
