@@ -19,15 +19,14 @@ services:
       retries: 5
 
   dashboard-backend:
-    image: python:3.10-slim
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: dashboard-backend
-    working_dir: /app
     volumes:
-      - ./backend:/app
       - dashboard-db:/app/db
     ports:
       - "8001:8000"
-    command: bash /app/startup.sh
     environment:
       PYTHONUNBUFFERED: "1"
       DATABASE_URL: "sqlite:///db/dashboard.db"
