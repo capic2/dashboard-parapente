@@ -4,10 +4,13 @@ import CurrentConditions from '../components/CurrentConditions';
 import Forecast7Day from '../components/Forecast7Day';
 import HourlyForecast from '../components/HourlyForecast';
 import StatsPanel from '../components/StatsPanel';
+import { BestSpotSuggestion } from '../components/BestSpotSuggestion';
 import { useSites } from '../hooks/useSites';
+import { useBestSpotAPI } from '../hooks/useBestSpotAPI';
 
 export default function Dashboard() {
   const { data: sites, isLoading: sitesLoading, error } = useSites();
+  const { bestSpot, loading: bestSpotLoading, error: bestSpotError } = useBestSpotAPI();
   const [selectedSiteId, setSelectedSiteId] = useState<string>('');
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
   const [weatherDataMap] = useState<Map<string, any>>(new Map()); // Pas utilisé mais gardé pour SiteSelector
@@ -69,7 +72,14 @@ export default function Dashboard() {
 
   return (
     <div>
-      {/* OPTIMISATION: Best Spot Suggestion désactivé pour ne pas charger tous les sites */}
+      {/* Best Spot Suggestion - Loaded from backend API (cached) */}
+      {!bestSpotLoading && !bestSpotError && bestSpot && (
+        <BestSpotSuggestion 
+          bestSpot={bestSpot}
+          onSelectSite={setSelectedSiteId}
+          className="mb-4"
+        />
+      )}
       
       <SiteSelector 
         selectedSiteId={selectedSiteId}
