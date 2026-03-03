@@ -17,10 +17,10 @@ UVICORN_PID=$!
 echo "⏳ Waiting for schema creation..."
 sleep 5
 
-# Check if database exists
+# Check if database exists and seed sites
 if [ -f "/app/db/dashboard.db" ]; then
-    echo "✅ Database file exists, initializing sites..."
-    python init_db.py
+    echo "✅ Database file exists, seeding sites..."
+    python seed_sites.py
 else
     echo "⚠️  Database file not found, will retry on next startup"
 fi
