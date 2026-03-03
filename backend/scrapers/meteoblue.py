@@ -56,12 +56,12 @@ class MeteoblueScraper(PlaywrightScraper):
         "W": 270, "WNW": 292, "NW": 315, "NNW": 337,
     }
     
-    def __init__(self, timeout: int = 15, headless: bool = True):
+    def __init__(self, timeout: int = 20, headless: bool = True):
         """
         Initialize Meteoblue scraper
         
         Args:
-            timeout: Request timeout in seconds (default 15s, reduced from 30s)
+            timeout: Request timeout in seconds (default 20s - meteoblue is slow)
             headless: Run browser in headless mode
         """
         super().__init__(
@@ -111,11 +111,18 @@ class MeteoblueScraper(PlaywrightScraper):
         
         self.logger.info(f"Fetching Meteoblue with Playwright: {url}")
         
-        # Navigate to page - use networkidle for faster load
-        await page.goto(url, wait_until="networkidle")
+        # Navigate to page - use domcontentloaded for faster load (networkidle too slow)
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=10000)
+        except Exception as e:
+            self.logger.warning(f"Page load timeout, continuing anyway: {e}")
         
         # Wait for forecast table to load (any view - 1h or 3h)
-        await page.wait_for_selector('table.picto', timeout=5000)
+        try:
+            await page.wait_for_selector('table.picto', timeout=8000)
+        except Exception as e:
+            self.logger.error(f"Forecast table not found: {e}")
+            return []
         
         self.logger.info("Page loaded, looking for toggle")
         

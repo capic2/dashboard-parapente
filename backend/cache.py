@@ -5,9 +5,14 @@ import os
 import json
 import hashlib
 import logging
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, TYPE_CHECKING
 from functools import wraps
-import redis.asyncio as redis
+
+# Conditional import to avoid requiring redis in development
+if TYPE_CHECKING:
+    import redis.asyncio as redis
+else:
+    redis = None  # Will be imported dynamically when needed
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +29,10 @@ CACHE_TTL: Dict[str, int] = {
 }
 
 # Redis connection pool (singleton)
-_redis_pool: Optional[redis.Redis] = None
+_redis_pool: Optional[Any] = None
 
 
-async def get_redis() -> redis.Redis:
+async def get_redis() -> Any:
     """
     Get or create Redis connection pool.
     
@@ -48,19 +53,23 @@ async def get_redis() -> redis.Redis:
             try:
                 from fakeredis import FakeAsyncRedis
                 _redis_pool = FakeAsyncRedis(decode_responses=True)
-                logger.info("Using FakeRedis (in-memory mock) for development")
+                logger.info("✅ Using FakeRedis (in-memory mock) for development")
+                return _redis_pool  # Skip ping test for FakeRedis
             except ImportError:
                 logger.warning("fakeredis not installed, falling back to real Redis. Install with: pip install fakeredis")
                 use_fake_redis = False
         
         # Use real Redis in production or if fakeredis is disabled/unavailable
         if not use_fake_redis or environment not in ["development", "test"]:
+            # Import redis only when needed
+            import redis.asyncio as redis_module
+            
             redis_host = os.getenv("REDIS_HOST", "localhost")
             redis_port = int(os.getenv("REDIS_PORT", "6379"))
             
             logger.info(f"Connecting to Redis at {redis_host}:{redis_port}")
             
-            _redis_pool = redis.Redis(
+            _redis_pool = redis_module.Redis(
                 host=redis_host,
                 port=redis_port,
                 db=0,
@@ -68,15 +77,15 @@ async def get_redis() -> redis.Redis:
                 socket_connect_timeout=5,
                 socket_timeout=5,
             )
-        
-        # Test connection
-        try:
-            await _redis_pool.ping()
-            logger.info("Redis connection established successfully")
-        except Exception as e:
-            logger.error(f"Failed to connect to Redis: {e}")
-            _redis_pool = None
-            raise
+            
+            # Test connection for real Redis only
+            try:
+                await _redis_pool.ping()
+                logger.info("✅ Redis connection established successfully")
+            except Exception as e:
+                logger.error(f"Failed to connect to Redis: {e}")
+                _redis_pool = None
+                raise
     
     return _redis_pool
 
