@@ -78,14 +78,25 @@ async def get_redis() -> Any:
                 socket_timeout=5,
             )
             
-            # Test connection for real Redis only
-            try:
-                await _redis_pool.ping()
-                logger.info("✅ Redis connection established successfully")
-            except Exception as e:
-                logger.error(f"Failed to connect to Redis: {e}")
-                _redis_pool = None
-                raise
+            # Test connection for real Redis only with retries
+            max_retries = 3
+            retry_delay = 2  # seconds
+            
+            for attempt in range(max_retries):
+                try:
+                    await _redis_pool.ping()
+                    logger.info(f"✅ Redis connection established successfully at {redis_host}:{redis_port}")
+                    break
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Redis connection attempt {attempt + 1}/{max_retries} failed: {e}")
+                        logger.info(f"Retrying in {retry_delay} seconds...")
+                        import asyncio
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        logger.error(f"Failed to connect to Redis after {max_retries} attempts: {e}")
+                        _redis_pool = None
+                        raise
     
     return _redis_pool
 
