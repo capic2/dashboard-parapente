@@ -1,24 +1,12 @@
 #!/bin/bash
 # Startup script for dashboard backend
-# Simple startup - database initialization is handled by main.py
+# Dependencies and Playwright are pre-installed in Docker image
 
-set -e  # Exit on error
+set -e
 
 echo "=========================================="
 echo "🚀 DASHBOARD BACKEND STARTUP"
 echo "=========================================="
-echo ""
-
-# Install dependencies
-echo "📦 Installing Python dependencies..."
-pip install --no-cache-dir -r requirements.txt 2>&1 | tail -3
-echo "✓ Dependencies installed"
-echo ""
-
-# Install Playwright browsers
-echo "🌐 Installing Playwright browsers..."
-python -m playwright install chromium --with-deps 2>&1 | tail -5
-echo "✓ Playwright browsers installed"
 echo ""
 
 # Ensure db directory exists
