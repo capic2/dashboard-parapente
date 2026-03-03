@@ -40,8 +40,14 @@ fi
 
 # Initialize database
 if [ ! -f "db/dashboard.db" ]; then
-    echo "Creating database..."
-    python3 init_db.py
+    echo "Creating database schema..."
+    python3 -c "
+from database import Base, engine
+Base.metadata.create_all(bind=engine)
+print('✅ Schema created')
+"
+    echo "Seeding sites..."
+    python3 seed_sites.py
 fi
 
 # Seed flights

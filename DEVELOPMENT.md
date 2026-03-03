@@ -59,7 +59,7 @@ cp .env.example .env
 python -c "from database import Base, engine; Base.metadata.create_all(bind=engine)"
 
 # Seed with initial sites
-python init_db.py
+python seed_sites.py
 ```
 
 #### 4. Start Backend Server
@@ -184,7 +184,7 @@ sqlite3 backend/db/dashboard.db
 # Reset database
 rm backend/db/dashboard.db
 python -c "from database import Base, engine; Base.metadata.create_all(bind=engine)"
-python init_db.py
+python seed_sites.py
 ```
 
 ### Optional: Testing with Real Redis
@@ -314,7 +314,7 @@ cp .env.example .env
 python -c "from database import Base, engine; Base.metadata.create_all(bind=engine)"
 
 # Ajouter les sites initiaux
-python init_db.py
+python seed_sites.py
 ```
 
 #### 4. Démarrer le Serveur Backend
@@ -425,7 +425,7 @@ sqlite3 backend/db/dashboard.db
 # Réinitialiser la base de données
 rm backend/db/dashboard.db
 python -c "from database import Base, engine; Base.metadata.create_all(bind=engine)"
-python init_db.py
+python seed_sites.py
 ```
 
 ### Optionnel : Tester avec un Vrai Redis
