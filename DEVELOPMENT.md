@@ -56,7 +56,7 @@ cp .env.example .env
 
 ```bash
 # Create database schema
-python -c "from database import Base, engine; Base.metadata.create_all(bind=engine)"
+python -c "from database import Base, engine; import models; Base.metadata.create_all(bind=engine)"
 
 # Seed with initial sites
 python seed_sites.py
@@ -183,7 +183,7 @@ sqlite3 backend/db/dashboard.db
 
 # Reset database
 rm backend/db/dashboard.db
-python -c "from database import Base, engine; Base.metadata.create_all(bind=engine)"
+python -c "from database import Base, engine; import models; Base.metadata.create_all(bind=engine)"
 python seed_sites.py
 ```
 
@@ -311,7 +311,7 @@ cp .env.example .env
 
 ```bash
 # Créer le schéma de base de données
-python -c "from database import Base, engine; Base.metadata.create_all(bind=engine)"
+python -c "from database import Base, engine; import models; Base.metadata.create_all(bind=engine)"
 
 # Ajouter les sites initiaux
 python seed_sites.py
@@ -424,7 +424,7 @@ sqlite3 backend/db/dashboard.db
 
 # Réinitialiser la base de données
 rm backend/db/dashboard.db
-python -c "from database import Base, engine; Base.metadata.create_all(bind=engine)"
+python -c "from database import Base, engine; import models; Base.metadata.create_all(bind=engine)"
 python seed_sites.py
 ```
 
