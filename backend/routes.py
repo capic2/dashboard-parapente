@@ -515,6 +515,148 @@ def get_spot(spot_id: str, db: Session = Depends(get_db)):
 # ADMIN ENDPOINTS
 # ============================================================================
 
+@router.post("/admin/seed-sites")
+async def seed_sites_endpoint(db: Session = Depends(get_db)):
+    """
+    Admin endpoint: Seed database with default sites
+    
+    Creates or updates the 6 default flying sites:
+    - Arguel
+    - Mont Poupet Nord, Nord-Ouest, Ouest, Sud
+    - La Côte
+    
+    Returns:
+        Success status and list of created sites
+    """
+    from datetime import datetime
+    
+    try:
+        # Define the 6 sites with precise coordinates
+        sites_data = [
+            {
+                'id': 'site-arguel',
+                'code': 'arguel',
+                'name': 'Arguel',
+                'latitude': 47.1944,
+                'longitude': 5.9896,
+                'elevation_m': 462,
+                'region': 'Besançon',
+                'country': 'FR',
+                'rating': 3,
+                'orientation': 'NNW',
+                'linked_spot_id': 'merged_884e0213d9116315'
+            },
+            {
+                'id': 'site-mont-poupet-nord',
+                'code': 'mont-poupet-nord',
+                'name': 'Mont Poupet Nord',
+                'latitude': 46.9716,
+                'longitude': 5.8776,
+                'elevation_m': 795,
+                'region': 'Besançon',
+                'country': 'FR',
+                'rating': 4,
+                'orientation': 'N',
+                'linked_spot_id': 'merged_d370be468747c90a'
+            },
+            {
+                'id': 'site-mont-poupet-nw',
+                'code': 'mont-poupet-nw',
+                'name': 'Mont Poupet Nord-Ouest',
+                'latitude': 46.9701,
+                'longitude': 5.8742,
+                'elevation_m': 795,
+                'region': 'Besançon',
+                'country': 'FR',
+                'rating': 3,
+                'orientation': 'NW',
+                'linked_spot_id': 'merged_c30c861b49a65324'
+            },
+            {
+                'id': 'site-mont-poupet-ouest',
+                'code': 'mont-poupet-ouest',
+                'name': 'Mont Poupet Ouest',
+                'latitude': 46.9693,
+                'longitude': 5.8747,
+                'elevation_m': 795,
+                'region': 'Besançon',
+                'country': 'FR',
+                'rating': 4,
+                'orientation': 'W',
+                'linked_spot_id': 'merged_359e1153c44c269e'
+            },
+            {
+                'id': 'site-mont-poupet-sud',
+                'code': 'mont-poupet-sud',
+                'name': 'Mont Poupet Sud',
+                'latitude': 46.9691,
+                'longitude': 5.8762,
+                'elevation_m': 795,
+                'region': 'Besançon',
+                'country': 'FR',
+                'rating': 1,
+                'orientation': 'S',
+                'linked_spot_id': 'merged_60fbcc6724417e87'
+            },
+            {
+                'id': 'site-la-cote',
+                'code': 'la-cote',
+                'name': 'La Côte',
+                'latitude': 46.9424,
+                'longitude': 5.8438,
+                'elevation_m': 800,
+                'region': 'Besançon',
+                'country': 'FR',
+                'rating': 2,
+                'orientation': 'N',
+                'linked_spot_id': 'merged_d3836f8db6c839fa'
+            }
+        ]
+        
+        created_sites = []
+        now = datetime.utcnow()
+        
+        for site_data in sites_data:
+            # Check if site exists
+            existing = db.query(Site).filter(Site.id == site_data['id']).first()
+            
+            if existing:
+                # Update existing site
+                for key, value in site_data.items():
+                    if key != 'id':
+                        setattr(existing, key, value)
+                existing.updated_at = now
+                logger.info(f"Updated site: {site_data['name']}")
+            else:
+                # Create new site
+                site = Site(
+                    **site_data,
+                    created_at=now,
+                    updated_at=now
+                )
+                db.add(site)
+                logger.info(f"Created site: {site_data['name']}")
+            
+            created_sites.append(site_data['name'])
+        
+        db.commit()
+        
+        # Return count
+        total_sites = db.query(Site).count()
+        
+        return {
+            "success": True,
+            "message": f"Successfully seeded {len(created_sites)} sites",
+            "sites": created_sites,
+            "total_sites_in_db": total_sites
+        }
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error seeding sites: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to seed sites: {str(e)}")
+
+
 @router.post("/admin/sites/link-to-spots")
 async def link_user_sites_to_spots(db: Session = Depends(get_db)):
     """
