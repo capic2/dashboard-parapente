@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_SITES = [
     "site-arguel",
     "site-mont-poupet-ouest",
-    "site-mont-poupet-est",
+    "site-mont-poupet-nw",  # Nord-Ouest
     "site-mont-poupet-sud",
     "site-mont-poupet-nord",
     "site-la-cote"
