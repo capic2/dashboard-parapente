@@ -13,8 +13,8 @@ Base.metadata.create_all(bind=engine)
 print('✅ Schema created')
 "
 
-echo "🌱 Initializing sites..."
-python init_db.py
+echo "🌱 Seeding sites..."
+python seed_sites.py
 
 echo "🚀 Starting uvicorn..."
 exec python -m uvicorn main:app --host 0.0.0.0 --port 8000

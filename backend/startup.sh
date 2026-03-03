@@ -2,29 +2,26 @@
 # Startup script for dashboard backend
 # Ensures proper initialization order
 
+set -e
+
 echo "🚀 Starting Dashboard Backend..."
 
 # Install dependencies
 echo "📦 Installing Python dependencies..."
 pip install --no-cache-dir -r requirements.txt
 
-# Start uvicorn in background to create DB schema
+# Create database schema explicitly
 echo "🗄️  Creating database schema..."
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 &
-UVICORN_PID=$!
+python -c "
+from database import Base, engine
+Base.metadata.create_all(bind=engine)
+print('✅ Schema created')
+"
 
-# Wait for uvicorn to start and create schema
-echo "⏳ Waiting for schema creation..."
-sleep 5
+# Seed sites
+echo "🌱 Seeding sites..."
+python seed_sites.py
 
-# Check if database exists and seed sites
-if [ -f "/app/db/dashboard.db" ]; then
-    echo "✅ Database file exists, seeding sites..."
-    python seed_sites.py
-else
-    echo "⚠️  Database file not found, will retry on next startup"
-fi
-
-# Wait for background uvicorn
-echo "✅ Startup complete, uvicorn running..."
-wait $UVICORN_PID
+# Start uvicorn
+echo "🚀 Starting uvicorn..."
+exec python -m uvicorn main:app --host 0.0.0.0 --port 8000
