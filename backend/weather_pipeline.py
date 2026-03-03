@@ -15,6 +15,7 @@ from scrapers.weatherapi import fetch_weatherapi, extract_hourly_forecast as ext
 from scrapers.meteociel import fetch_meteociel
 from scrapers.meteoblue import fetch_meteoblue
 from scrapers.meteo_parapente import fetch_meteo_parapente
+from para_index import calculate_para_index
 
 
 async def aggregate_forecasts(
@@ -51,7 +52,7 @@ async def aggregate_forecasts(
     source_map = {}
     
     if "open-meteo" in sources:
-        tasks.append(fetch_open_meteo(lat, lon))
+        tasks.append(fetch_open_meteo(lat, lon, days=7))  # Fetch 7 days for sunrise/sunset
         source_map["open-meteo"] = len(tasks) - 1
     
     if "weatherapi" in sources:
@@ -406,7 +407,7 @@ async def get_normalized_forecast(
     elevation_m: Optional[int] = None
 ) -> Dict[str, Any]:
     """
-    Complete pipeline: fetch → normalize → consensus
+    Complete pipeline: fetch → normalize → consensus (with Redis cache)
     
     Args:
         lat: Latitude
@@ -419,6 +420,30 @@ async def get_normalized_forecast(
     Returns:
         Normalized consensus forecast with sunrise/sunset times
     """
+    import logging
+    from cache import get_cached, set_cached, CACHE_TTL, generate_cache_key
+    
+    logger = logging.getLogger(__name__)
+    
+    # Generate cache key based on location and day
+    cache_key = generate_cache_key(
+        "forecast",
+        lat=round(lat, 4),
+        lon=round(lon, 4),
+        day_index=day_index
+    )
+    
+    # Try cache first
+    try:
+        cached_result = await get_cached(cache_key)
+        if cached_result is not None:
+            logger.info(f"✅ Cache HIT for forecast: {cache_key}")
+            return cached_result
+    except Exception as e:
+        logger.warning(f"Cache get error: {e}, falling back to live fetch")
+    
+    logger.info(f"❌ Cache MISS for forecast: {cache_key}, fetching live...")
+    
     # Step 1: Aggregate
     aggregated = await aggregate_forecasts(
         lat, lon, day_index,
@@ -441,4 +466,166 @@ async def get_normalized_forecast(
     result["sunrise"] = sunrise
     result["sunset"] = sunset
     
+    # Cache result
+    try:
+        await set_cached(cache_key, result, CACHE_TTL["forecast"])
+        logger.info(f"💾 Cached forecast: {cache_key}")
+    except Exception as e:
+        logger.warning(f"Cache set error: {e}, continuing without cache")
+    
     return result
+
+
+async def get_daily_aggregate(
+    lat: float,
+    lon: float,
+    day_index: int,
+    min_wind: float,
+    max_wind: float,
+    optimal_directions: str,
+    sources: Optional[List[str]] = None,
+    site_name: Optional[str] = None,
+    elevation_m: Optional[int] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Get daily aggregate data (SIMPLIFIED - reuses get_normalized_forecast).
+    
+    This function extracts daily summary from the full forecast:
+    - Calls get_normalized_forecast (which already works)
+    - Extracts daily min/max temps and avg wind from consensus
+    - Calculates simplified para_index from daily averages
+    - Returns lightweight summary for 7-day cards
+    
+    Args:
+        lat: Latitude
+        lon: Longitude
+        day_index: Day to forecast (0=today, 1=tomorrow, etc.)
+        min_wind: Minimum acceptable wind speed (m/s)
+        max_wind: Maximum acceptable wind speed (m/s)
+        optimal_directions: Optimal wind directions (not used in simplified version)
+        sources: List of sources to use (default: all active)
+        site_name: Site name (for meteo_parapente)
+        elevation_m: Site elevation (for meteo_parapente)
+    
+    Returns:
+        Dict with daily summary or None if failed
+    """
+    # Reuse get_normalized_forecast (already working and tested)
+    forecast_result = await get_normalized_forecast(
+        lat, lon, day_index,
+        sources=sources,
+        site_name=site_name,
+        elevation_m=elevation_m
+    )
+    
+    if not forecast_result.get("success"):
+        return None
+    
+    consensus = forecast_result.get("consensus", [])
+    if not consensus:
+        return None
+    
+    # Calculate target date
+    target_date = (datetime.now() + timedelta(days=day_index)).strftime("%Y-%m-%d")
+    
+    # Filter to flyable hours BEFORE calculating para_index (same as /weather endpoint)
+    # This ensures consistency between daily-summary cards and hourly view
+    sunrise_time = forecast_result.get("sunrise")
+    sunset_time = forecast_result.get("sunset")
+    flyable_consensus = consensus
+    
+    if sunrise_time and sunset_time:
+        try:
+            sunrise_hour = int(sunrise_time.split(':')[0])
+            sunset_hour = int(sunset_time.split(':')[0])
+            flyable_consensus = [h for h in consensus if sunrise_hour <= h.get('hour', 0) <= sunset_hour]
+        except (ValueError, IndexError, AttributeError):
+            pass  # Keep all hours if parsing fails
+    
+    if not flyable_consensus:
+        return None
+    
+    # Extract daily aggregates from flyable hours only
+    temps = [h.get("temperature") for h in flyable_consensus if h.get("temperature") is not None]
+    winds = [h.get("wind_speed") for h in flyable_consensus if h.get("wind_speed") is not None]
+    precips = [h.get("precipitation") for h in flyable_consensus if h.get("precipitation") is not None]
+    
+    if not temps or not winds:
+        return None
+    
+    temp_min = round(min(temps))
+    temp_max = round(max(temps))
+    wind_avg = round(sum(winds) / len(winds), 1)
+    precip_total = round(sum(precips), 1) if precips else 0.0
+    
+    # Use the SAME para_index calculation as /weather endpoint for consistency
+    # Calculate on flyable hours only (same filtering as /weather)
+    para_result = calculate_para_index(flyable_consensus)
+    
+    para_index = para_result["para_index"]
+    verdict = para_result["verdict"]
+    emoji = para_result["emoji"]
+    
+    return {
+        "date": target_date,
+        "para_index": para_index,
+        "verdict": verdict,
+        "emoji": emoji,
+        "temp_min": temp_min,
+        "temp_max": temp_max,
+        "wind_avg": wind_avg,
+        "precip_total": precip_total,
+    }
+
+
+def calculate_daily_para_index(
+    wind_avg: float,
+    precip_total: float,
+    min_wind: float,
+    max_wind: float
+) -> int:
+    """
+    Calculate simplified para_index from daily averages.
+    
+    This is a simplified version that works with daily aggregates
+    instead of hourly consensus data.
+    
+    Args:
+        wind_avg: Average wind speed for the day (km/h)
+        precip_total: Total precipitation for the day (mm)
+        min_wind: Minimum acceptable wind (m/s) - convert to km/h
+        max_wind: Maximum acceptable wind (m/s) - convert to km/h
+    
+    Returns:
+        Para-flying index (0-100)
+    """
+    score = 50  # Base score
+    
+    # Convert min/max wind from m/s to km/h
+    min_wind_kmh = min_wind * 3.6
+    max_wind_kmh = max_wind * 3.6
+    
+    # Wind scoring (wider range since it's an average)
+    optimal_min = min_wind_kmh * 0.8  # 20% tolerance below
+    optimal_max = max_wind_kmh * 1.2  # 20% tolerance above
+    
+    if optimal_min <= wind_avg <= optimal_max:
+        score += 30  # Good wind conditions
+    elif wind_avg < optimal_min:
+        # Too light
+        deficit = (optimal_min - wind_avg) / optimal_min
+        score -= int(deficit * 30)
+    else:
+        # Too strong
+        excess = (wind_avg - optimal_max) / optimal_max
+        score -= int(excess * 40)
+    
+    # Precipitation penalty
+    if precip_total > 5:
+        score -= 40  # Heavy rain
+    elif precip_total > 2:
+        score -= 30  # Moderate rain
+    elif precip_total > 0.5:
+        score -= 15  # Light rain
+    
+    return max(0, min(100, score))

@@ -143,7 +143,7 @@ export default function Settings() {
           onClick={() => setActiveTab('general')}
           className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
             activeTab === 'general'
-              ? 'bg-purple-600 text-white shadow-md'
+              ? 'bg-sky-600 text-white shadow-md'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
@@ -153,7 +153,7 @@ export default function Settings() {
           onClick={() => setActiveTab('sites')}
           className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
             activeTab === 'sites'
-              ? 'bg-purple-600 text-white shadow-md'
+              ? 'bg-sky-600 text-white shadow-md'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
@@ -163,7 +163,7 @@ export default function Settings() {
           onClick={() => setActiveTab('data')}
           className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
             activeTab === 'data'
-              ? 'bg-purple-600 text-white shadow-md'
+              ? 'bg-sky-600 text-white shadow-md'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
@@ -187,7 +187,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, distance: 'km' } }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.distance === 'km'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -197,7 +197,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, distance: 'miles' } }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.distance === 'miles'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -213,7 +213,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, altitude: 'm' } }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.altitude === 'm'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -223,7 +223,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, altitude: 'ft' } }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.altitude === 'ft'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -239,7 +239,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, speed: 'kmh' } }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.speed === 'kmh'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -249,7 +249,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, speed: 'mph' } }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.speed === 'mph'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -271,7 +271,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, language: 'fr' }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.language === 'fr'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -281,7 +281,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, language: 'en' }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.language === 'en'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -297,7 +297,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, theme: 'light' }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.theme === 'light'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -307,7 +307,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, theme: 'dark' }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.theme === 'dark'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -317,7 +317,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, theme: 'auto' }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.theme === 'auto'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -343,7 +343,7 @@ export default function Settings() {
                         notifications: { ...prev.notifications, weather: e.target.checked },
                       }))
                     }
-                    className="w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-600"
+                    className="w-5 h-5 text-sky-600 rounded focus:ring-2 focus:ring-sky-600"
                   />
                 </label>
                 <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all cursor-pointer">
@@ -357,7 +357,7 @@ export default function Settings() {
                         notifications: { ...prev.notifications, flights: e.target.checked },
                       }))
                     }
-                    className="w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-600"
+                    className="w-5 h-5 text-sky-600 rounded focus:ring-2 focus:ring-sky-600"
                   />
                 </label>
                 <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all cursor-pointer">
@@ -371,7 +371,7 @@ export default function Settings() {
                         notifications: { ...prev.notifications, alerts: e.target.checked },
                       }))
                     }
-                    className="w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-600"
+                    className="w-5 h-5 text-sky-600 rounded focus:ring-2 focus:ring-sky-600"
                   />
                 </label>
               </div>
@@ -398,7 +398,7 @@ export default function Settings() {
                     key={site.id}
                     className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
                       settings.favoriteSites.includes(site.id)
-                        ? 'border-purple-600 bg-purple-50'
+                        ? 'border-sky-600 bg-sky-50'
                         : 'border-gray-200 bg-gray-50 hover:border-gray-300'
                     }`}
                   >
@@ -417,7 +417,7 @@ export default function Settings() {
                       onClick={() => toggleFavorite(site.id)}
                       className={`ml-4 px-4 py-2 rounded-lg font-medium transition-all ${
                         settings.favoriteSites.includes(site.id)
-                          ? 'bg-purple-600 text-white hover:bg-purple-700'
+                          ? 'bg-sky-600 text-white hover:bg-sky-700'
                           : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                       }`}
                     >
@@ -498,7 +498,7 @@ export default function Settings() {
           className={`w-full px-6 py-4 rounded-xl font-bold text-lg shadow-lg transition-all ${
             saved
               ? 'bg-green-600 text-white'
-              : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-xl'
+              : 'bg-sky-600 text-white hover:bg-sky-700 hover:shadow-xl'
           }`}
         >
           {saved ? '✅ Paramètres sauvegardés !' : '💾 Sauvegarder les modifications'}

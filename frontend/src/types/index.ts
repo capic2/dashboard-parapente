@@ -5,15 +5,18 @@ export interface Site {
   name: string;
   latitude: number;
   longitude: number;
-  elevation_m: number;
+  elevation_m?: number | null;
   description?: string;
-  orientation?: string;  // N, NW, W, S, etc. - wind direction the site faces
+  orientation?: string | null;  // N, NW, W, S, etc. - wind direction the site faces
   difficulty_level?: string;
   is_active: boolean;
-  rating?: number;  // 0-6 rating from official spots database
-  linked_spot_id?: string;  // Link to paragliding_spots table
-  created_at: string;
-  updated_at: string;
+  rating?: number | null;  // 0-6 rating from official spots database
+  linked_spot_id?: string | null;  // Link to paragliding_spots table
+  code?: string | null;
+  region?: string | null;
+  country?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 export interface Flight {
@@ -153,6 +156,7 @@ export interface HourlyForecastItem {
   temperature: number;
   wind: number;
   wind_speed: number;
+  wind_gust?: number;
   direction: string;
   wind_direction: string;
   conditions: string;

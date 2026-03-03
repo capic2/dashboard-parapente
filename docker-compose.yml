@@ -1,21 +1,51 @@
 version: '3.8'
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: dashboard-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    networks:
+      - dashboard-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   dashboard-backend:
     image: python:3.10-slim
     container_name: dashboard-backend
     working_dir: /app
     volumes:
-      - ${PWD}/backend:/app
+      - ./backend:/app
       - dashboard-db:/app/db
     ports:
       - "8001:8000"
     command: bash /app/startup.sh
     environment:
-      - PYTHONUNBUFFERED=1
-      - DATABASE_URL=sqlite:///db/dashboard.db
+      PYTHONUNBUFFERED: "1"
+      DATABASE_URL: "sqlite:///db/dashboard.db"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      ENVIRONMENT: "production"
+      USE_FAKE_REDIS: "false"
+      SCHEDULER_ENABLED: "true"
+      SCHEDULER_INTERVAL_MINUTES: "30"
+      LOG_LEVEL: "INFO"
+      WEATHERAPI_KEY: ""
+      METEOBLUE_API_KEY: ""
+      STRAVA_KEY: ""
     networks:
       - dashboard-net
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   dashboard-frontend:
@@ -23,19 +53,21 @@ services:
     container_name: dashboard-frontend
     working_dir: /app
     volumes:
-      - ${PWD}/frontend:/app
+      - ./frontend:/app
       - /app/node_modules
     ports:
       - "5173:5173"
     command: sh -c "npm install --legacy-peer-deps && npm run dev -- --host 0.0.0.0"
     environment:
-      - VITE_API_URL=http://localhost:8000
+      VITE_API_URL: "http://localhost:8000"
     networks:
       - dashboard-net
     restart: unless-stopped
 
 volumes:
   dashboard-db:
+    driver: local
+  redis-data:
     driver: local
 
 networks:

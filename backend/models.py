@@ -3,7 +3,38 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
 
+class ParaglidingSpot(Base):
+    """
+    External paragliding sites from OpenAIP and ParaglidingSpots.com
+    This is a comprehensive database of all known paragliding sites in France
+    """
+    __tablename__ = "paragliding_spots"
+    
+    id = Column(String, primary_key=True)  # Format: openaip_{hash} or pgs_{id} or merged_{hash}
+    name = Column(String, nullable=False)
+    type = Column(String, nullable=False)  # "takeoff", "landing", or "both"
+    latitude = Column(Float, nullable=False, index=True)
+    longitude = Column(Float, nullable=False, index=True)
+    elevation_m = Column(Integer)
+    orientation = Column(String)  # N, NNW, SE, etc.
+    rating = Column(Integer)  # 0-6 from ParaglidingSpots
+    country = Column(String, default="FR", index=True)
+    source = Column(String, nullable=False)  # "openaip", "paraglidingspots", or "merged"
+    openaip_id = Column(String, unique=True)
+    paraglidingspots_id = Column(Integer, unique=True)
+    raw_metadata = Column(Text)  # JSON string with original data
+    last_synced = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship to sites that link to this spot
+    linked_sites = relationship("Site", back_populates="linked_spot")
+
 class Site(Base):
+    """
+    User-managed sites (custom spots or favorites)
+    Can be linked to external ParaglidingSpot for enhanced data
+    """
     __tablename__ = "sites"
     
     id = Column(String, primary_key=True)
@@ -15,11 +46,16 @@ class Site(Base):
     description = Column(Text)
     region = Column(String)
     country = Column(String, default="FR")
+    site_type = Column(String, default="user_spot")  # "user_spot", "official_spot", "custom"
+    linked_spot_id = Column(String, ForeignKey("paragliding_spots.id"))  # Link to external spot data
+    rating = Column(Integer)  # 0-6 rating from official spots database
+    orientation = Column(String)  # N, NW, W, S, etc. - wind direction the site faces
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     flights = relationship("Flight", back_populates="site")
     weather_forecasts = relationship("WeatherForecast", back_populates="site")
+    linked_spot = relationship("ParaglidingSpot", back_populates="linked_sites")
 
 class Flight(Base):
     __tablename__ = "flights"

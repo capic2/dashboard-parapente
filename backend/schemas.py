@@ -1,12 +1,12 @@
 from pydantic import BaseModel
 from datetime import date, datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 # Sites
 class SiteBase(BaseModel):
-    code: str
+    code: Optional[str] = None  # Optional - some sites may not have a code
     name: str
-    elevation_m: int
+    elevation_m: Optional[int] = None  # Optional - can be populated from linked_spot data
     latitude: float
     longitude: float
     region: Optional[str] = None
@@ -17,6 +17,9 @@ class SiteCreate(SiteBase):
 
 class Site(SiteBase):
     id: str
+    rating: Optional[int] = None  # 0-6 rating from official spots
+    orientation: Optional[str] = None  # N, NW, W, S, etc.
+    linked_spot_id: Optional[str] = None  # Link to paragliding_spots table
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     
@@ -82,3 +85,45 @@ class WeatherResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     message: str
+
+# Paragliding Spots (external data from OpenAIP + ParaglidingSpots)
+class ParaglidingSpotBase(BaseModel):
+    id: str
+    name: str
+    type: str  # "takeoff", "landing", "both"
+    latitude: float
+    longitude: float
+    elevation_m: Optional[int] = None
+    orientation: Optional[str] = None
+    rating: Optional[int] = None
+    country: str = "FR"
+    source: str  # "openaip", "paraglidingspots", "merged"
+    
+    class Config:
+        from_attributes = True
+
+class ParaglidingSpotDetail(ParaglidingSpotBase):
+    """Full spot details including metadata"""
+    openaip_id: Optional[str] = None
+    paraglidingspots_id: Optional[int] = None
+    raw_metadata: Optional[str] = None
+    last_synced: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class ParaglidingSpotSearchResult(ParaglidingSpotBase):
+    """Spot with distance information (for search results)"""
+    distance_km: Optional[float] = None
+
+class SpotSearchResponse(BaseModel):
+    """Response for spot search queries"""
+    query: Dict[str, Any]
+    total: int
+    spots: List[ParaglidingSpotSearchResult]
+
+class SyncSpotsResponse(BaseModel):
+    """Response for sync operation"""
+    success: bool
+    stats: Dict[str, int]
+    message: str
+    timestamp: datetime
