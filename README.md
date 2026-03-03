@@ -59,7 +59,7 @@ python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
-python init_db.py
+python seed_sites.py
 python -m uvicorn main:app --reload
 
 # Frontend (Terminal 2)

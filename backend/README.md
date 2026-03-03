@@ -52,7 +52,7 @@ cp .env.example .env
 
 # Initialize database
 python -c "from database import Base, engine; Base.metadata.create_all(bind=engine)"
-python init_db.py
+python seed_sites.py
 
 # Start server
 python -m uvicorn main:app --reload
