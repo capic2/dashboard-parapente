@@ -196,6 +196,34 @@ environment:
 
 ### Redis Configuration
 
+#### Cache TTL Configuration
+
+**Production Cache Strategy:**
+- **TTL:** 60 minutes (3600 seconds)
+- **Polling:** Every hour via APScheduler
+- **Coverage:** Today + Tomorrow (most consulted days)
+- **On-demand:** Days 2-6 fetched as needed
+
+**Why this configuration?**
+1. **No cache gaps:** TTL matches refresh interval
+2. **Predictable performance:** Users always hit cache
+3. **API efficiency:** Only 6 sites × 2 days × hourly = 288 API calls/day
+4. **Cost optimization:** Minimal external API usage
+
+**Cache Keys Format:**
+```
+weather:forecast:{site_id}_{day_index}_{hash}
+TTL: 3600 seconds (1 hour)
+```
+
+**Monitoring Cache Health:**
+```bash
+# Check cache hit ratio
+docker exec -it dashboard-redis redis-cli INFO stats | grep keyspace
+
+# Expected: >95% hit rate
+```
+
 #### Basic Configuration (Current)
 
 ```yaml

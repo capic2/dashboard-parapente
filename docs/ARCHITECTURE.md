@@ -130,21 +130,43 @@ backend/
 
 **Development: FakeRedis**
 - In-memory Python implementation
+- TTL: 60 minutes
 - No server required
 - Perfect for single-process development
 - Data cleared on restart
 
 **Production: Redis**
 - Persistent key-value store
+- TTL: 60 minutes (aligned with scheduler)
 - Shared cache between processes
 - AOF + RDB persistence
 - LRU eviction policy
 
 **Cache Strategy:**
-- TTL: 30 minutes (weather data)
+- TTL: 60 minutes (weather data)
 - Cache warming on startup
 - Automatic invalidation
 - Keys format: `weather:{prefix}:{hash}`
+
+**Cache Synchronization:**
+```
+Scheduler (hourly at :00)
+        ↓
+Polls 6 sites × 2 days
+        ↓
+Writes to Redis with 60min TTL
+        ↓
+Users read from cache (instant)
+        ↓
+Cache expires at :00 (just before refresh)
+        ↓
+Scheduler refreshes → cycle repeats
+```
+
+**No Gap Design:**
+- Refresh happens before expiration
+- Users always get cached data
+- No expensive live scraping during user requests
 
 **Cached Data:**
 - Weather forecasts (per site, per day)
@@ -266,7 +288,7 @@ scheduler.add_job(
 2. Normalize data
 3. Calculate consensus
 4. Compute Para-Index
-5. Cache results (30min TTL)
+5. Cache results (60min TTL)
 6. Log metrics
 
 **Monitoring:**
@@ -363,7 +385,7 @@ TanStack Query checks cache
                         ├─► Normalize data
                         ├─► Calculate consensus
                         ├─► Compute Para-Index
-                        ├─► Cache in Redis (30min TTL)
+                        ├─► Cache in Redis (60min TTL)
                         └─► Return response
                                 │
                                 ▼
