@@ -407,11 +407,16 @@ export default function FlightHistory() {
                 {/* Date et heure */}
                 <div className="text-xs text-gray-500 mb-2">
                   <span className="font-medium">
-                    {new Date(flight.flight_date).toLocaleDateString('fr-FR', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
+                    {(() => {
+                      // Parse date comme date locale pour éviter les problèmes de timezone
+                      const [year, month, day] = flight.flight_date.split('-');
+                      const localDate = new Date(Number(year), Number(month) - 1, Number(day));
+                      return localDate.toLocaleDateString('fr-FR', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      });
+                    })()}
                   </span>
                   {flight.departure_time && (
                     <span className="ml-2">
@@ -563,15 +568,17 @@ export default function FlightHistory() {
                       />
                     ) : (
                       <span className="block text-sm font-medium text-gray-900 mt-1">
-                        {new Date(selectedFlight.flight_date).toLocaleDateString(
-                          'fr-FR',
-                          {
+                        {(() => {
+                          // Parse date comme date locale pour éviter les problèmes de timezone
+                          const [year, month, day] = selectedFlight.flight_date.split('-');
+                          const localDate = new Date(Number(year), Number(month) - 1, Number(day));
+                          return localDate.toLocaleDateString('fr-FR', {
                             weekday: 'long',
                             day: 'numeric',
                             month: 'long',
                             year: 'numeric',
-                          }
-                        )}
+                          });
+                        })()}
                       </span>
                     )}
                   </div>
