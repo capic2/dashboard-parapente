@@ -92,6 +92,42 @@ export const useFlightStats = (): UseQueryResult<FlightStats, Error> => {
 }
 
 /**
+ * Flight record for a specific metric
+ */
+interface FlightRecord {
+  value: number
+  flight_id: string
+  flight_name: string
+  date: string
+  site_name: string | null
+  site_id: string | null
+}
+
+/**
+ * Personal flight records (longest, highest, fastest, farthest)
+ */
+export interface FlightRecords {
+  longest_duration: FlightRecord | null
+  highest_altitude: FlightRecord | null
+  longest_distance: FlightRecord | null
+  max_speed: FlightRecord | null
+}
+
+/**
+ * Fetch personal flight records
+ */
+export const useFlightRecords = (): UseQueryResult<FlightRecords, Error> => {
+  return useQuery({
+    queryKey: ['flights', 'records'],
+    queryFn: async () => {
+      const data = await api.get('flights/records').json()
+      return data as FlightRecords
+    },
+    staleTime: 1000 * 60 * 60, // 1 hour - records don't change often
+  })
+}
+
+/**
  * Fetch statistics per site
  */
 export const useSiteStats = (siteId: string | undefined): UseQueryResult<SiteStats, Error> => {
