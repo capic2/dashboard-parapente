@@ -1336,7 +1336,13 @@ async def update_flight(
         db.commit()
         db.refresh(flight)
         logger.info(f"✅ Updated flight {flight_id}: {list(update_data.keys())}")
-        return flight
+        
+        # Return in the format expected by frontend (ApiResponseSchema)
+        return {
+            "data": flight,
+            "status": "success",
+            "message": "Flight updated successfully"
+        }
     except Exception as e:
         db.rollback()
         logger.error(f"Failed to update flight {flight_id}: {e}", exc_info=True)
