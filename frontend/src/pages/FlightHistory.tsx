@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { Flight } from '../types';
 import FlightViewer3D from '../components/FlightViewer3D';
 import { StravaSyncModal } from '../components/StravaSyncModal';
+import { CreateFlightModal } from '../components/CreateFlightModal';
 import { ToastContainer } from '../components/ui/Toast';
 import { useToast, useToastStore } from '../hooks/useToast';
 import { api } from '../lib/api';
@@ -22,6 +23,7 @@ export default function FlightHistory() {
   const [notesText, setNotesText] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showStravaSyncModal, setShowStravaSyncModal] = useState(false);
+  const [showCreateFlightModal, setShowCreateFlightModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedFlight = flights.find((f: Flight) => f.id === selectedFlightId);
@@ -213,6 +215,16 @@ export default function FlightHistory() {
           </div>
           
           <div className="flex gap-2">
+            {/* Bouton Créer un vol depuis GPX */}
+            {!selectionMode && (
+              <button 
+                onClick={() => setShowCreateFlightModal(true)}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all flex items-center gap-2"
+              >
+                📤 Créer un vol
+              </button>
+            )}
+            
             {/* Bouton Sync Strava */}
             {!selectionMode && (
               <button 
@@ -622,6 +634,15 @@ export default function FlightHistory() {
         isOpen={showStravaSyncModal}
         onClose={() => setShowStravaSyncModal(false)}
         onSyncComplete={() => {
+          queryClient.invalidateQueries({ queryKey: ['flights'] });
+        }}
+      />
+      
+      {/* Modal Créer un vol depuis GPX */}
+      <CreateFlightModal
+        isOpen={showCreateFlightModal}
+        onClose={() => setShowCreateFlightModal(false)}
+        onCreateComplete={() => {
           queryClient.invalidateQueries({ queryKey: ['flights'] });
         }}
       />
