@@ -10,12 +10,14 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 import logging
-import os
 from pathlib import Path
-from dotenv import load_dotenv
 
-# Load .env file early (before reading env vars)
-load_dotenv(override=False)
+# Import configuration from centralized config module
+from config import (
+    STRAVA_CLIENT_ID,
+    STRAVA_CLIENT_SECRET,
+    STRAVA_REFRESH_TOKEN,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,17 +29,6 @@ ACTIVITY_URL = "https://www.strava.com/api/v3/activities"
 _access_token = None
 _token_expires_at = None
 _refresh_token = None
-
-# Environment variables (loaded after load_dotenv())
-STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
-STRAVA_CLIENT_SECRET = os.getenv("STRAVA_CLIENT_SECRET")
-STRAVA_REFRESH_TOKEN = os.getenv("STRAVA_REFRESH_TOKEN")
-
-# Log configuration at module load
-if STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET and STRAVA_REFRESH_TOKEN:
-    logger.info(f"✅ Strava credentials loaded (Client ID: {STRAVA_CLIENT_ID})")
-else:
-    logger.warning(f"⚠️ Strava credentials incomplete: CLIENT_ID={bool(STRAVA_CLIENT_ID)}, CLIENT_SECRET={bool(STRAVA_CLIENT_SECRET)}, REFRESH_TOKEN={bool(STRAVA_REFRESH_TOKEN)}")
 
 
 async def refresh_access_token() -> Optional[str]:
