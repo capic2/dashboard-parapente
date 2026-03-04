@@ -345,6 +345,52 @@ app.add_middleware(
 app.include_router(router)
 app.include_router(webhooks_router)
 
+# ============================================
+# Serve Static Files (Frontend React SPA)
+# ============================================
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+STATIC_DIR = Path(__file__).parent / "static"
+
+if STATIC_DIR.exists():
+    logger.info(f"✓ Static directory found: {STATIC_DIR}")
+    
+    # Mount static assets (CSS, JS, images, etc.)
+    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+    
+    # Catch-all route for SPA (MUST be LAST route)
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """
+        Serve React SPA for all non-API routes
+        
+        Priority:
+        1. API routes (handled by routers above)
+        2. Static files (assets, favicon, etc.)
+        3. index.html (React Router SPA)
+        """
+        # Check if requesting a specific static file
+        file_path = STATIC_DIR / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        
+        # Serve index.html for all other routes (SPA client-side routing)
+        index_path = STATIC_DIR / "index.html"
+        if index_path.exists():
+            return FileResponse(index_path)
+        
+        # Fallback if frontend not built
+        return {
+            "error": "Frontend not built",
+            "message": "Build frontend first: cd frontend && npm run build",
+            "static_dir": str(STATIC_DIR),
+            "hint": "Or access API docs at /docs"
+        }
+else:
+    logger.warning(f"⚠️  Static directory not found: {STATIC_DIR}")
+    logger.warning("Frontend will not be served. Build frontend: cd frontend && npm run build")
+
 # Database
 DB_PATH = Path(__file__).parent / "db" / "dashboard.db"
 

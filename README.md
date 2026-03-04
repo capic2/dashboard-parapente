@@ -1,308 +1,209 @@
 # 🪂 Dashboard Parapente
 
-**Personal paragliding weather dashboard combining real-time conditions from multiple sources with flight analytics.**
+Tableau de bord météo personnel pour sites de parapente avec agrégation multi-sources et calcul de Para-Index.
 
-[![Status](https://img.shields.io/badge/status-production--ready-success)](https://github.com/yourusername/dashboard-parapente)
-[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![React](https://img.shields.io/badge/react-18-blue.svg)](https://reactjs.org/)
-[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
-
----
-
-## 🚀 Quick Links
-
-| Guide | Description |
-|-------|-------------|
-| **[📘 Development Guide](DEVELOPMENT.md)** | Start coding in 5 minutes with FakeRedis |
-| **[🚢 Deployment Guide](DEPLOYMENT.md)** | Production deployment with Portainer |
-| **[📖 User Guide](USER_GUIDE.md)** | How to use the dashboard |
-| **[🤝 Contributing](CONTRIBUTING.md)** | Join the project |
-| **[🏗️ Architecture](docs/ARCHITECTURE.md)** | Technical deep dive |
-| **[📡 API Reference](docs/API.md)** | REST API documentation |
+![Python](https://img.shields.io/badge/Python-3.13-blue?logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.135-green?logo=fastapi)
+![React](https://img.shields.io/badge/React-18.3-blue?logo=react)
+![Redis](https://img.shields.io/badge/Redis-8.6-red?logo=redis)
+![Docker](https://img.shields.io/badge/Docker-Compose%203.9-blue?logo=docker)
 
 ---
 
-## ✨ Features
+## 🚀 Stack Technique (Mars 2026)
 
-### Weather & Forecasting
-- **🌤️ Multi-Source Aggregation**: Data from 8 weather providers
-- **🎯 Para-Index Score**: 0-100 composite flying conditions
-- **📊 7-Day Forecast**: Hourly granularity with consensus algorithm
-- **🔄 Real-time Updates**: Automated polling every 30 minutes
-- **💨 Wind Analysis**: Direction matching with site orientation
+### Backend
+- **Python** 3.13 LTS (support jusqu'en 2028)
+- **FastAPI** 0.135 (framework async moderne)
+- **SQLAlchemy** 2.0.48 (ORM)
+- **Pydantic** 2.12 (validation données)
+- **Playwright** 1.58 (web scraping)
+- **Redis** 8.6 (cache ultra-rapide)
 
-### Flight Tracking
-- **✈️ Flight History**: Log and analyze your flights
-- **📈 Statistics Dashboard**: Total flights, hours, distance
-- **📍 Multi-Site Support**: Track multiple takeoff locations
-- **📄 GPX Export**: Download flight tracks
+### Frontend
+- **React** 18.3
+- **Node.js** 24 LTS (Krypton)
+- **Ky** 1.14 (HTTP client moderne)
+- **TanStack Router** 1.163 (routing)
+- **TanStack Query** 5.90 (data fetching)
+- **Tailwind CSS** 4.2
+- **Vite** 7.3
+- **Cesium** 1.139 (cartographie 3D)
 
-### Intelligence
-- **🏆 Best Spot Recommendation**: AI suggests optimal flying location
-- **🔔 Smart Alerts**: Notifications when conditions are perfect (coming soon)
-- **📉 Source Comparison**: See which provider is most accurate
+### Infrastructure
+- Docker multi-stage builds
+- Docker Compose 3.9
+- SQLite (base légère)
+- Nginx (reverse proxy)
+- Portainer (déploiement)
 
 ---
 
-## 🎯 Quick Start
+## ✨ Fonctionnalités
 
-### Development (Local)
+- **Météo multi-sources** : 5 sources agrégées (WeatherAPI, Meteoblue, etc.)
+- **Para-Index** : Score 0-100 de volabilité en temps réel
+- **6 sites pré-configurés** : Région Besançon (Arguel, Mont Poupet, La Côte)
+- **Refresh automatique** : Toutes les heures
+- **Cache Redis** : Performances optimales
+- **Intégrations** : Strava webhook, Telegram (optionnel)
+
+---
+
+## 🏃 Démarrage Rapide
+
+### Développement Local
 
 ```bash
-# Clone repository
-git clone <your-repo-url>
+# Cloner
+git clone https://github.com/capic2/dashboard-parapente.git
 cd dashboard-parapente
 
-# Backend (Terminal 1)
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env
-python seed_sites.py
-python -m uvicorn main:app --reload
+# Démarrer
+docker-compose up --build
 
-# Frontend (Terminal 2)
-cd frontend
-npm install
-npm run dev
+# Accès
+# - Application: http://localhost:8001
+# - API Docs: http://localhost:8001/docs
 ```
-
-**Visit:** http://localhost:5173
-
-**No Redis server needed!** FakeRedis is used automatically in development.
-
-📚 **Full guide:** [DEVELOPMENT.md](DEVELOPMENT.md)
 
 ### Production (Portainer)
 
-1. Import `docker-compose.yml` as a stack
-2. Set environment variables (API keys)
-3. Deploy
+1. **Portainer** → **Stacks** → **Add Stack**
+2. **Git Repository**: `https://github.com/capic2/dashboard-parapente`
+3. **Branch**: `main`
+4. **Compose path**: `docker-compose.yml`
+5. **Deploy the stack**
+6. Configurer Nginx (voir `NGINX_CONFIG.md`)
 
-**Redis server required** for production caching.
-
-📚 **Full guide:** [DEPLOYMENT.md](DEPLOYMENT.md)
+**Accès:** https://parapente.capic.ignorelist.com
 
 ---
 
-## 🏗️ Tech Stack
+## 📊 Architecture
 
-### Backend
-- **Python 3.10+** - Core language
-- **FastAPI** - REST API framework
-- **SQLAlchemy** - ORM
-- **Redis / FakeRedis** - Caching layer
-- **APScheduler** - Background jobs
+```
+Internet → Nginx (HTTPS) → Docker Network
+                              ├── Redis 8.6 (cache)
+                              └── Backend (FastAPI + React SPA)
+                                    └── SQLite (6 sites)
+```
+
+---
+
+## 🔧 Configuration
+
+### Variables d'Environnement
+
+Pré-configurées dans `docker-compose.yml`:
+
+```yaml
+ENVIRONMENT=production
+REDIS_HOST=redis
+WEATHERAPI_KEY=***
+METEOBLUE_API_KEY=***
+```
+
+### Sites Pré-Configurés
+
+6 sites région Besançon auto-initialisés:
+1. Arguel (462m, NNW)
+2. Mont Poupet Nord (795m, N)
+3. Mont Poupet Nord-Ouest (795m, NW)
+4. Mont Poupet Ouest (795m, W)
+5. Mont Poupet Sud (795m, S)
+6. La Côte (800m, N)
+
+---
+
+## 📡 API Endpoints
+
+- `GET /` - Status & version
+- `GET /api/sites` - Liste sites
+- `GET /api/weather/{site_id}` - Météo site
+- `GET /api/para-index/{site_id}` - Para-Index
+- `GET /docs` - Documentation API
+
+---
+
+## 🛠️ Développement
 
 ### Frontend
-- **React 18** - UI library
-- **TypeScript** - Type safety
-- **TanStack Query** - Data fetching
-- **Tailwind CSS** - Styling
-- **Vite** - Build tool
-
-### Infrastructure
-- **Docker** - Containerization
-- **Portainer** - Container management
-- **SQLite** - Database (upgradeable to PostgreSQL)
-- **Nginx** - Reverse proxy (optional)
-
----
-
-## 📸 Screenshots
-
-### Dashboard
-![Dashboard Overview](docs/images/dashboard-overview.png)
-*Main dashboard with Para-Index, current conditions, and 7-day forecast*
-
-### Site Selector
-![Site Selector](docs/images/site-selector.png)
-*Multi-orientation site selector with wind indicators*
-
-### Flight History
-![Flight History](docs/images/flight-history.png)
-*Flight log with statistics and altitude chart*
-
----
-
-## 🌍 Weather Sources
-
-Data aggregated from:
-
-1. **Open-Meteo** - Open-source weather API
-2. **WeatherAPI** - Global weather data
-3. **Meteoblue** - High-resolution forecasts
-4. **Météo-parapente** - Paragliding-specific
-5. **Météociel** - French regional data
-6. **Windy** - Wind visualization
-7. **Paragliding.net** - Community forecasts
-8. **Planète-voile** - Local conditions
-
-**Consensus algorithm** calculates median values across sources and flags outliers.
-
----
-
-## 📁 Project Structure
-
-```
-dashboard-parapente/
-├── backend/              # Python FastAPI backend
-│   ├── cache.py         # Redis/FakeRedis cache
-│   ├── main.py          # App entry point
-│   ├── routes.py        # API endpoints
-│   ├── scheduler.py     # Weather polling
-│   ├── weather_pipeline.py  # Data aggregation
-│   └── scrapers/        # Weather sources
-├── frontend/            # React TypeScript frontend
-│   ├── src/
-│   │   ├── components/  # UI components
-│   │   ├── pages/       # Page components
-│   │   ├── hooks/       # Custom hooks
-│   │   └── types/       # TypeScript types
-├── docs/                # Documentation
-│   ├── ARCHITECTURE.md  # Technical architecture
-│   ├── API.md          # API reference
-│   └── PHASE-1-DESIGN/ # Original design docs
-├── DEVELOPMENT.md       # Dev setup guide
-├── DEPLOYMENT.md        # Production deployment
-├── USER_GUIDE.md        # User manual
-└── CONTRIBUTING.md      # Contribution guidelines
-```
-
----
-
-## 🧪 Testing
 
 ```bash
-# Backend tests
-cd backend
-pytest
-
-# Frontend tests
 cd frontend
-npm run test
+npm install
+npm run dev  # http://localhost:5173
+```
 
-# Type checking
-npm run type-check
+### Backend
 
-# Linting
-flake8 .           # Python
-npm run lint       # TypeScript
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8001
 ```
 
 ---
 
-## 📊 Performance
+## 📝 Documentation
 
-| Metric | Development | Production |
-|--------|-------------|------------|
-| **API Response Time** | 10-50 ms | 20-100 ms |
-| **Cache Hit Rate** | 95%+ | 98%+ |
-| **Weather Refresh** | Every 30 min | Every 30 min |
-| **Concurrent Users** | 10+ | 100+ (scalable) |
+- **`NGINX_CONFIG.md`** : Configuration reverse proxy
+- **`.env.example`** : Variables disponibles
+- **`/docs`** : API Swagger UI
+- **`/redoc`** : API ReDoc
 
 ---
 
-## 🔐 Security
+## 🔄 Mises à Jour
 
-- ✅ API keys in environment variables (never committed)
-- ✅ HTTPS enforced in production
-- ✅ Input validation on all endpoints
-- ✅ CORS properly configured
-- ✅ Rate limiting enabled
-- ✅ SQL injection prevention (SQLAlchemy ORM)
-- ✅ XSS protection (React escaping)
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for security best practices.
+```bash
+git pull origin main
+docker-compose up --build -d
+docker-compose logs -f backend
+```
 
 ---
 
-## 🤝 Contributing
+## 🐛 Troubleshooting
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+### Database non initialisée
 
-- Code style guidelines
-- Testing requirements
-- Pull request process
-- Community guidelines
+```bash
+docker-compose down -v
+docker-compose up --build
+```
 
-**Quick contribution:**
-1. Fork the repo
-2. Create feature branch: `git checkout -b feature/amazing-feature`
-3. Commit changes: `git commit -m 'feat: add amazing feature'`
-4. Push: `git push origin feature/amazing-feature`
-5. Open Pull Request
+### Redis connection refused
 
----
+```bash
+docker-compose restart redis
+docker inspect parapente-redis | grep -A 10 Health
+```
 
-## 📝 Changelog
+### Frontend 404
 
-See [CHANGELOG.md](docs/archive/CHANGELOG.md) for version history.
-
-**Latest:** v1.0.0 (March 2026)
-- ✅ Complete weather aggregation system
-- ✅ Multi-source consensus algorithm
-- ✅ Para-Index calculation
-- ✅ Flight tracking
-- ✅ Multi-site support with orientations
-- ✅ FakeRedis for development
-- ✅ Production-ready deployment
+```bash
+docker-compose build --no-cache backend
+docker-compose up -d backend
+```
 
 ---
 
 ## 📄 License
 
-BSD-3-Clause License - see [LICENSE](LICENSE) file for details.
-
-**TLDR:** Free to use, modify, and distribute with attribution.
+**Private Project** - Tous droits réservés
 
 ---
 
-## 🙏 Acknowledgments
+## 👤 Auteur
 
-- Weather data providers (Open-Meteo, WeatherAPI, Meteoblue, etc.)
-- Paragliding community for domain expertise
-- FastAPI and React communities for excellent tooling
+Développé pour usage personnel - Région de Besançon, France
 
----
-
-## 📞 Support
-
-- **Documentation**: Check guides above (DEVELOPMENT.md, etc.)
-- **Issues**: [Open an issue](https://github.com/yourusername/dashboard-parapente/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/dashboard-parapente/discussions)
-- **Email**: your-email@example.com
+**Support:** Voir section Troubleshooting ci-dessus
 
 ---
 
-## 🗺️ Roadmap
-
-### ✅ Completed
-- Multi-source weather aggregation
-- Para-Index algorithm
-- Flight tracking
-- Multi-site support
-- Generic multi-orientation selector
-- FakeRedis development mode
-
-### 🚧 In Progress
-- User authentication
-- Alert system (Telegram notifications)
-
-### 📅 Planned
-- Mobile app (React Native)
-- Predictive analytics (best days to fly)
-- Real-time updates (WebSocket)
-- Community features (ratings, comments)
-- Flight planning tools
-
----
-
-**Built with ❤️ for the paragliding community | Safe flights! 🪂**
-
----
-
-**Last updated:** March 3, 2026  
 **Version:** 1.0.0  
-**Status:** Production Ready ✅
+**Dernière mise à jour:** Mars 2026  
+**Stack:** Python 3.13 + React 18 + Redis 8.6 + Ky
