@@ -1,14 +1,11 @@
 """WeatherAPI.com scraper with proper async support"""
 
 import httpx
-import os
 from datetime import datetime
 from typing import Dict, List, Optional
 
-# Load from environment (required)
-WEATHERAPI_KEY = os.getenv("WEATHERAPI_KEY")
-if not WEATHERAPI_KEY:
-    raise ValueError("WEATHERAPI_KEY environment variable is required")
+# Import configuration from centralized config module
+from config import WEATHERAPI_KEY
 
 
 async def fetch_weatherapi(lat: float, lon: float, days: int = 2) -> Dict[str, any]:
