@@ -152,6 +152,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       const timestamps = gpxData.coordinates.map((coord) => coord.timestamp);
 
+      // Debug: Check timestamps
+      console.log('🔍 DEBUG FlightViewer3D - Total coordinates:', gpxData.coordinates.length);
+      console.log('🔍 DEBUG FlightViewer3D - First 3 timestamps:', timestamps.slice(0, 3));
+      console.log('🔍 DEBUG FlightViewer3D - Last 3 timestamps:', timestamps.slice(-3));
+      console.log('🔍 DEBUG FlightViewer3D - All timestamps zero?', timestamps.every(t => t === 0));
+
       allPositionsRef.current = positions;
       timestampsRef.current = timestamps;
       currentIndexRef.current = 0;
