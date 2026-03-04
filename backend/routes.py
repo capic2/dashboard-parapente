@@ -1431,10 +1431,10 @@ async def create_flight_from_gpx(
     db: Session = Depends(get_db)
 ):
     """
-    Créer un nouveau vol depuis un fichier GPX
+    Créer un nouveau vol depuis un fichier GPX ou IGC
     
     Args:
-        gpx_file: Fichier GPX à uploader
+        gpx_file: Fichier GPX ou IGC à uploader
         site_id: ID du site (optionnel, peut être détecté automatiquement)
     
     Returns:
@@ -1445,14 +1445,28 @@ async def create_flight_from_gpx(
         }
     """
     try:
-        # 1. Lire et parser le GPX
-        gpx_content = await gpx_file.read()
-        gpx_str = gpx_content.decode("utf-8")
+        # 1. Lire le fichier
+        file_content = await gpx_file.read()
+        file_str = file_content.decode("utf-8")
         
-        # 2. Parser le GPX pour extraire les coordonnées
-        coordinates = parse_gpx_file_from_string(gpx_str)
+        # 2. Détecter le type de fichier et parser
+        filename = gpx_file.filename or ""
+        file_extension = filename.lower().split('.')[-1] if '.' in filename else ''
+        
+        # Détection automatique du format
+        is_igc = file_extension == 'igc' or file_str.strip().startswith(('A', 'H'))
+        
+        if is_igc:
+            print(f"🔍 DEBUG Detected IGC file: {filename}")
+            coordinates = parse_igc_file_from_string(file_str)
+            file_type = "igc"
+        else:
+            print(f"🔍 DEBUG Detected GPX file: {filename}")
+            coordinates = parse_gpx_file_from_string(file_str)
+            file_type = "gpx"
+        
         if not coordinates:
-            raise HTTPException(status_code=400, detail="Invalid GPX file: no trackpoints found")
+            raise HTTPException(status_code=400, detail=f"Invalid {file_type.upper()} file: no trackpoints found")
         
         # 3. Calculer les statistiques
         stats = calculate_gpx_stats(coordinates)
@@ -1521,15 +1535,15 @@ async def create_flight_from_gpx(
             updated_at=datetime.utcnow()
         )
         
-        # 6. Sauvegarder le fichier GPX
+        # 6. Sauvegarder le fichier (GPX ou IGC)
         gpx_dir = Path(__file__).parent / "db" / "gpx"
         gpx_dir.mkdir(parents=True, exist_ok=True)
         
-        file_name = f"manual_{flight_id}.gpx"
+        file_name = f"manual_{flight_id}.{file_type}"
         file_path = gpx_dir / file_name
         
         with open(file_path, "w", encoding="utf-8") as f:
-            f.write(gpx_str)
+            f.write(file_str)
         
         flight.gpx_file_path = f"db/gpx/{file_name}"
         
@@ -1538,7 +1552,7 @@ async def create_flight_from_gpx(
         db.commit()
         db.refresh(flight)
         
-        logger.info(f"✅ Created new flight from GPX: {flight.name} (ID: {flight_id})")
+        logger.info(f"✅ Created new flight from {file_type.upper()}: {flight.name} (ID: {flight_id})")
         
         # 8. Retourner le vol créé
         return {
@@ -1680,6 +1694,112 @@ def health_check():
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
+
+def parse_igc_file_from_string(igc_content: str) -> List[Dict]:
+    """
+    Parse IGC content from string and extract coordinates with timestamps
+    Returns list of {lat, lon, elevation, timestamp}
+    
+    IGC Format (B-records):
+    B1708554657050N00551183EA000000035044
+    B = record type
+    170855 = time (HHMMSS UTC)
+    4657050N = latitude (DDMMmmmN/S)
+    00551183E = longitude (DDDMMmmmE/W)
+    A = validity (A=3D fix, V=2D fix)
+    00000 = pressure altitude (meters)
+    00035 = GPS altitude (meters)
+    044 = optional extensions
+    
+    HFDTE = Date header: HFDTEDATE:DDMMYY,FF
+    """
+    coordinates = []
+    flight_date = None
+    
+    # Parse header to get date
+    for line in igc_content.split('\n'):
+        line = line.strip()
+        
+        # Parse date from HFDTE record
+        if line.startswith('HFDTE') or line.startswith('HFDTEDATE'):
+            # Format: HFDTEDATE:140825,03 or HFDTE140825
+            date_part = line.split(':')[-1] if ':' in line else line[5:]
+            date_str = date_part.split(',')[0]  # Remove flight number if present
+            
+            if len(date_str) >= 6:
+                day = int(date_str[0:2])
+                month = int(date_str[2:4])
+                year = int(date_str[4:6])
+                # IGC uses 2-digit year, assume 20XX for years < 50, else 19XX
+                year = 2000 + year if year < 50 else 1900 + year
+                flight_date = date(year, month, day)
+                print(f"🔍 DEBUG IGC - Found date: {flight_date}")
+        
+        # Parse B-records (GPS fixes)
+        elif line.startswith('B') and len(line) >= 35:
+            try:
+                # Time: HHMMSS
+                time_str = line[1:7]
+                hours = int(time_str[0:2])
+                minutes = int(time_str[2:4])
+                seconds = int(time_str[4:6])
+                
+                # Latitude: DDMMmmmN/S
+                lat_deg = int(line[7:9])
+                lat_min = int(line[9:11])
+                lat_min_dec = int(line[11:14])
+                lat_hem = line[14]
+                latitude = lat_deg + (lat_min + lat_min_dec / 1000.0) / 60.0
+                if lat_hem == 'S':
+                    latitude = -latitude
+                
+                # Longitude: DDDMMmmmE/W
+                lon_deg = int(line[15:18])
+                lon_min = int(line[18:20])
+                lon_min_dec = int(line[20:23])
+                lon_hem = line[23]
+                longitude = lon_deg + (lon_min + lon_min_dec / 1000.0) / 60.0
+                if lon_hem == 'W':
+                    longitude = -longitude
+                
+                # Validity (A=3D, V=2D) - position 24
+                # validity = line[24]
+                
+                # Altitude: pressure altitude (25-29) and GPS altitude (30-34)
+                # Use GPS altitude as primary
+                gps_alt = int(line[30:35])
+                
+                # Create timestamp from date + time
+                if flight_date:
+                    flight_datetime = datetime(
+                        flight_date.year, 
+                        flight_date.month, 
+                        flight_date.day,
+                        hours, minutes, seconds,
+                        tzinfo=ZoneInfo("UTC")
+                    )
+                    timestamp = int(flight_datetime.timestamp() * 1000)
+                else:
+                    timestamp = 0
+                
+                coordinates.append({
+                    "lat": latitude,
+                    "lon": longitude,
+                    "elevation": gps_alt,
+                    "timestamp": timestamp
+                })
+                
+            except (ValueError, IndexError) as e:
+                # Skip malformed B-records
+                print(f"⚠️ DEBUG IGC - Skipping malformed B-record: {e}")
+                continue
+    
+    print(f"🔍 DEBUG Parse IGC - Found {len(coordinates)} trackpoints")
+    if coordinates:
+        print(f"🔍 DEBUG First coord - lat:{coordinates[0]['lat']:.6f}, lon:{coordinates[0]['lon']:.6f}, ele:{coordinates[0]['elevation']}m")
+    
+    return coordinates
+
 
 def parse_gpx_file_from_string(gpx_content: str) -> List[Dict]:
     """
