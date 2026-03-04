@@ -11,10 +11,9 @@ from database import SessionLocal
 import logging
 import sqlite3
 import asyncio
-from dotenv import load_dotenv
 
-# Load environment variables from .env file (don't override existing env vars from Docker)
-load_dotenv(override=False)
+# Import configuration (loads environment variables automatically)
+import config
 
 # Configure logging
 logging.basicConfig(
