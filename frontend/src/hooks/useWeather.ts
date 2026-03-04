@@ -489,11 +489,16 @@ export const usePrefetch7Days = (siteId: string | undefined, currentDayIndex: nu
  * - Perfect for displaying forecast cards
  */
 export const useDailySummary = (siteId: string | undefined): UseQueryResult<any, Error> => {
+  console.log('[useDailySummary] Called with siteId:', siteId);
   return useQuery({
     queryKey: ['weather', 'daily-summary', siteId],
     queryFn: async () => {
+      console.log('[useDailySummary] queryFn executing for siteId:', siteId);
       if (!siteId) throw new Error('Site ID is required')
-      const data = await api.get(`/weather/${siteId}/daily-summary?days=7`).json()
+      const url = `weather/${siteId}/daily-summary?days=7`;
+      console.log('[useDailySummary] Fetching URL:', url);
+      const data = await api.get(url).json()
+      console.log('[useDailySummary] Received data:', data);
       
       // Validate response structure
       if (!data || !data.days) {
