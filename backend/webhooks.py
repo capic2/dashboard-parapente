@@ -22,6 +22,7 @@ from typing import Optional
 from database import get_db, SessionLocal
 from models import Flight, Site
 from strava import download_gpx, parse_gpx, get_activity_details
+from routes import calculate_max_speed, parse_gpx_file_from_string
 
 logger = logging.getLogger(__name__)
 
@@ -227,8 +228,10 @@ async def process_strava_activity(activity_id: str):
             
             logger.info(f"✅ Saved GPX to {gpx_file_path}")
             
-            # Parse GPX ONLY for departure coordinates (and max_altitude if missing)
+            # Parse GPX for coordinates and calculate stats
             gpx_data = parse_gpx(gpx_content)
+            max_speed_kmh = 0.0  # Default value
+            
             if gpx_data.get("success"):
                 first_trackpoint = gpx_data.get("first_trackpoint", {})
                 departure_lat = first_trackpoint.get("lat")
@@ -243,6 +246,16 @@ async def process_strava_activity(activity_id: str):
                 if elevation_gain_m is None:
                     elevation_gain_m = gpx_data.get("elevation_gain_m")
                     logger.info(f"Using elevation_gain from GPX: {elevation_gain_m}m")
+                
+                # Calculate max speed from full GPX coordinates
+                try:
+                    coordinates = parse_gpx_file_from_string(gpx_content)
+                    if coordinates and len(coordinates) > 1:
+                        max_speed_kmh = calculate_max_speed(coordinates)
+                        logger.info(f"Calculated max_speed from GPX: {max_speed_kmh} km/h")
+                except Exception as e:
+                    logger.warning(f"Failed to calculate max speed: {e}")
+                    max_speed_kmh = 0.0
         else:
             logger.warning(f"⚠️ Could not download GPX for activity {activity_id}")
         
@@ -276,6 +289,7 @@ async def process_strava_activity(activity_id: str):
             existing.departure_time = departure_time
             existing.duration_minutes = duration_minutes
             existing.max_altitude_m = max_altitude_m
+            existing.max_speed_kmh = max_speed_kmh
             existing.distance_km = distance_km
             existing.elevation_gain_m = elevation_gain_m
             existing.gpx_file_path = gpx_file_path
@@ -298,6 +312,7 @@ async def process_strava_activity(activity_id: str):
                 departure_time=departure_time,
                 duration_minutes=duration_minutes,
                 max_altitude_m=max_altitude_m,
+                max_speed_kmh=max_speed_kmh,
                 distance_km=distance_km,
                 elevation_gain_m=elevation_gain_m,
                 gpx_file_path=gpx_file_path,
