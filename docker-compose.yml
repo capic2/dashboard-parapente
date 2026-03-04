@@ -1,74 +1,84 @@
-version: '3.8'
+version: '3.9'
 
 services:
   redis:
-    image: redis:7-alpine
-    container_name: dashboard-redis
+    image: redis:8.6-alpine
+    container_name: parapente-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
-    networks:
-      - dashboard-net
-    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 3s
-      retries: 5
-
-  dashboard-backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: dashboard-backend
-    volumes:
-      - dashboard-db:/app/db
-    ports:
-      - "8001:8000"
-    environment:
-      PYTHONUNBUFFERED: "1"
-      DATABASE_URL: "sqlite:///db/dashboard.db"
-      REDIS_HOST: "redis"
-      REDIS_PORT: "6379"
-      ENVIRONMENT: "production"
-      USE_FAKE_REDIS: "false"
-      SCHEDULER_ENABLED: "true"
-      SCHEDULER_INTERVAL_MINUTES: "30"
-      LOG_LEVEL: "INFO"
-      WEATHERAPI_KEY: ""
-      METEOBLUE_API_KEY: ""
-      STRAVA_KEY: ""
+      retries: 3
+      start_period: 5s
     networks:
-      - dashboard-net
+      - parapente-network
+    labels:
+      - "com.docker.compose.project=dashboard-parapente"
+      - "com.docker.compose.service=redis"
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    image: parapente-backend:latest
+    container_name: parapente-backend
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      # Application
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      
+      # Redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      
+      # Weather API Keys
+      - WEATHERAPI_KEY=${WEATHERAPI_KEY}
+      - METEOBLUE_API_KEY=${METEOBLUE_API_KEY}
+      
+      # Optional: Strava (décommenter si nécessaire)
+      # - STRAVA_CLIENT_ID=
+      # - STRAVA_CLIENT_SECRET=
+      # - STRAVA_VERIFY_TOKEN=
+      
+      # Optional: Telegram (décommenter si nécessaire)
+      # - TELEGRAM_BOT_TOKEN=
+      # - TELEGRAM_CHAT_ID=
     depends_on:
       redis:
         condition: service_healthy
-    restart: unless-stopped
-
-  dashboard-frontend:
-    image: node:20-alpine
-    container_name: dashboard-frontend
-    working_dir: /app
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    ports:
-      - "5173:5173"
-    command: sh -c "npm install --legacy-peer-deps && npm run dev -- --host 0.0.0.0"
-    environment:
-      VITE_API_URL: "http://localhost:8000"
+      - ./backend/db:/app/db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     networks:
-      - dashboard-net
-    restart: unless-stopped
+      - parapente-network
+    labels:
+      - "com.docker.compose.project=dashboard-parapente"
+      - "com.docker.compose.service=backend"
 
 volumes:
-  dashboard-db:
-    driver: local
   redis-data:
     driver: local
+    labels:
+      - "com.docker.compose.project=dashboard-parapente"
 
 networks:
-  dashboard-net:
+  parapente-network:
     driver: bridge
+    labels:
+      - "com.docker.compose.project=dashboard-parapente"
