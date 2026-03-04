@@ -1,7 +1,23 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { SitesApiResponseSchema, SiteSchema } from '../schemas';
 import type { Site } from '../types';
+
+interface CreateSiteData {
+  name: string;
+  latitude: number;
+  longitude: number;
+  elevation_m?: number;
+  region?: string;
+  country?: string;
+}
+
+interface GeocodeResult {
+  name: string;
+  latitude: number;
+  longitude: number;
+  display_name: string;
+}
 
 export const useSites = () => {
   return useQuery<Site[]>({
@@ -60,5 +76,37 @@ export const useNearbySites = (lat: number, lng: number, radius = 50) => {
       return validation.data as any;
     },
     enabled: !!lat && !!lng,
+  });
+};
+
+/**
+ * Create a new site
+ */
+export const useCreateSite = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation<Site, Error, CreateSiteData>({
+    mutationFn: async (siteData: CreateSiteData) => {
+      const response = await api.post('spots', { json: siteData }).json();
+      return response as Site;
+    },
+    onSuccess: () => {
+      // Invalidate sites cache to refetch with new site
+      queryClient.invalidateQueries({ queryKey: ['sites'] });
+    },
+  });
+};
+
+/**
+ * Geocode a location name to coordinates
+ */
+export const useGeocode = () => {
+  return useMutation<GeocodeResult, Error, { query: string; country?: string }>({
+    mutationFn: async ({ query, country = 'FR' }) => {
+      const response = await api.get('spots/geocode', {
+        searchParams: { query, country }
+      }).json();
+      return response as GeocodeResult;
+    },
   });
 };
