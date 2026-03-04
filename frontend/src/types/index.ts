@@ -144,14 +144,19 @@ export interface AlertFormData {
 }
 
 export interface FlightFormData {
+  name?: string;
   title: string;
-  site_id: string;
+  site_id: string | null;
   flight_date: string;
+  departure_time?: string | null;
   duration_minutes: number;
   max_altitude_m: number;
+  max_speed_kmh?: number;
   distance_km: number;
   elevation_gain_m: number;
   notes?: string;
+  description?: string;
+  external_url?: string;
 }
 
 // API response wrapper

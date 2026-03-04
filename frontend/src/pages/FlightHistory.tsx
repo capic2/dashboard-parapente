@@ -6,10 +6,12 @@ import {
   useUploadGPXToFlight,
 } from '../hooks/useFlights';
 import { useQueryClient } from '@tanstack/react-query';
-import type { Flight } from '../types';
+import type { Flight, Site } from '../types';
 import FlightViewer3D from '../components/FlightViewer3D';
 import { StravaSyncModal } from '../components/StravaSyncModal';
 import { CreateFlightModal } from '../components/CreateFlightModal';
+import { CreateSiteModal } from '../components/CreateSiteModal';
+import { useSites } from '../hooks/useSites';
 import { ToastContainer } from '../components/ui/Toast';
 import { useToast, useToastStore } from '../hooks/useToast';
 import { api } from '../lib/api';
@@ -33,10 +35,13 @@ export default function FlightHistory() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showStravaSyncModal, setShowStravaSyncModal] = useState(false);
   const [showCreateFlightModal, setShowCreateFlightModal] = useState(false);
+  const [showCreateSiteModal, setShowCreateSiteModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // États pour les champs éditables
+  const [editedName, setEditedName] = useState('');
   const [editedTitle, setEditedTitle] = useState('');
+  const [editedSiteId, setEditedSiteId] = useState('');
   const [editedFlightDate, setEditedFlightDate] = useState('');
   const [editedDepartureTime, setEditedDepartureTime] = useState('');
   const [editedDuration, setEditedDuration] = useState(0);
@@ -50,6 +55,7 @@ export default function FlightHistory() {
   const updateFlight = useUpdateFlight(selectedFlightId || undefined);
   const deleteFlight = useDeleteFlight(selectedFlightId || undefined);
   const uploadGPXMutation = useUploadGPXToFlight(selectedFlightId || '');
+  const { data: sites = [] } = useSites();
   const queryClient = useQueryClient();
   const toast = useToast();
   const { toasts, removeToast } = useToastStore();
@@ -75,7 +81,9 @@ export default function FlightHistory() {
       setShowDeleteConfirm(false);
       
       // Initialiser les champs éditables
+      setEditedName(flight.name || '');
       setEditedTitle(flight.title || flight.name || '');
+      setEditedSiteId(flight.site_id || '');
       setEditedFlightDate(flight.flight_date);
       setEditedDepartureTime(flight.departure_time || '');
       setEditedDuration(flight.duration_minutes || 0);
@@ -124,8 +132,9 @@ export default function FlightHistory() {
 
     try {
       await updateFlight.mutateAsync({
+        name: editedName,
         title: editedTitle,
-        site_id: selectedFlight.site_id,
+        site_id: editedSiteId || null,
         flight_date: editedFlightDate,
         departure_time: editedDepartureTime || null,
         duration_minutes: editedDuration,
@@ -141,22 +150,28 @@ export default function FlightHistory() {
       console.error('Failed to update flight:', err);
       toast.error('Échec de la mise à jour');
     }
-  }, [selectedFlight, updateFlight, editedTitle, editedFlightDate, editedDepartureTime, 
-      editedDuration, editedDistance, editedMaxAltitude, editedElevationGain, 
+  }, [selectedFlight, updateFlight, editedName, editedTitle, editedSiteId, editedFlightDate, 
+      editedDepartureTime, editedDuration, editedDistance, editedMaxAltitude, editedElevationGain, 
       editedMaxSpeed, editedNotes, toast]);
+
+  const handleSiteCreated = useCallback((newSite: Site) => {
+    setEditedSiteId(newSite.id);
+    setShowCreateSiteModal(false);
+    toast.success(`Site "${newSite.name}" créé avec succès`);
+  }, [toast]);
 
   const handleSaveNotes = useCallback(async () => {
     if (!selectedFlight) return;
 
     try {
       await updateFlight.mutateAsync({
-        title: selectedFlight.title,
-        site_id: selectedFlight.site_id,
+        title: selectedFlight.title || '',
+        site_id: selectedFlight.site_id || null,
         flight_date: selectedFlight.flight_date,
-        duration_minutes: selectedFlight.duration_minutes,
-        max_altitude_m: selectedFlight.max_altitude_m,
-        distance_km: selectedFlight.distance_km,
-        elevation_gain_m: selectedFlight.elevation_gain_m,
+        duration_minutes: selectedFlight.duration_minutes || 0,
+        max_altitude_m: selectedFlight.max_altitude_m || 0,
+        distance_km: selectedFlight.distance_km || 0,
+        elevation_gain_m: selectedFlight.elevation_gain_m || 0,
         notes: notesText,
       });
       setEditingNotes(false);
@@ -472,15 +487,27 @@ export default function FlightHistory() {
               <div className="bg-white rounded-xl p-4 shadow-md">
                 <div className="flex justify-between items-start mb-4">
                   {editingMode ? (
-                    <div className="flex-1">
-                      <label className="text-xs text-gray-600">Titre du vol</label>
-                      <input
-                        type="text"
-                        value={editedTitle}
-                        onChange={(e) => setEditedTitle(e.target.value)}
-                        className="block w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
-                        placeholder="Titre du vol"
-                      />
+                    <div className="flex-1 space-y-2">
+                      <div>
+                        <label className="text-xs text-gray-600">Nom du vol (identifiant)</label>
+                        <input
+                          type="text"
+                          value={editedName}
+                          onChange={(e) => setEditedName(e.target.value)}
+                          className="block w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                          placeholder="Ex: Arguel 14-08 21h08"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600">Titre du vol</label>
+                        <input
+                          type="text"
+                          value={editedTitle}
+                          onChange={(e) => setEditedTitle(e.target.value)}
+                          className="block w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                          placeholder="Titre du vol"
+                        />
+                      </div>
                     </div>
                   ) : (
                     <h2 className="text-lg font-bold text-gray-900">
@@ -614,11 +641,35 @@ export default function FlightHistory() {
                   </div>
                   
                   {/* Site */}
-                  <div>
+                  <div className="col-span-2 md:col-span-3">
                     <span className="text-xs text-gray-600">📍 Site</span>
-                    <span className="block text-sm font-medium text-gray-900 mt-1">
-                      {selectedFlight.site_name || selectedFlight.site_id || 'Non spécifié'}
-                    </span>
+                    {editingMode ? (
+                      <div className="flex gap-2 mt-1">
+                        <select
+                          value={editedSiteId}
+                          onChange={(e) => setEditedSiteId(e.target.value)}
+                          className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                        >
+                          <option value="">Non spécifié</option>
+                          {sites.map((site: Site) => (
+                            <option key={site.id} value={site.id}>
+                              {site.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => setShowCreateSiteModal(true)}
+                          className="px-3 py-1 text-xs bg-green-500 text-white rounded-md hover:bg-green-600 whitespace-nowrap"
+                          title="Créer un nouveau site"
+                        >
+                          + Nouveau
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="block text-sm font-medium text-gray-900 mt-1">
+                        {selectedFlight.site_name || selectedFlight.site_id || 'Non spécifié'}
+                      </span>
+                    )}
                   </div>
                   
                   {/* Durée */}
@@ -866,6 +917,14 @@ export default function FlightHistory() {
         onCreateComplete={() => {
           queryClient.invalidateQueries({ queryKey: ['flights'] });
         }}
+      />
+      
+      {/* Modal Créer un site */}
+      <CreateSiteModal
+        isOpen={showCreateSiteModal}
+        onClose={() => setShowCreateSiteModal(false)}
+        onSiteCreated={handleSiteCreated}
+        flightId={selectedFlightId || undefined}
       />
       
       {/* Modal de confirmation suppression multiple */}

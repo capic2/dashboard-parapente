@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
 from models import Site, Flight, WeatherForecast
-from schemas import Site as SiteSchema, SpotsResponse, WeatherForecast as WeatherForecastSchema, WeatherResponse
+from schemas import Site as SiteSchema, SiteCreate, SpotsResponse, WeatherForecast as WeatherForecastSchema, WeatherResponse, FlightUpdate
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -83,6 +83,70 @@ async def sync_paragliding_spots(
         "synced": True
     }
 
+
+@router.get("/spots/geocode")
+async def geocode_location(
+    query: str,
+    country: str = "FR"
+):
+    """
+    Geocode a location name to coordinates
+    
+    Uses Nominatim (OpenStreetMap) API with rate limiting and caching
+    
+    Args:
+        query: Location name (city, village, address)
+        country: ISO country code (default: FR)
+    
+    Returns:
+        {
+            "name": str,
+            "latitude": float,
+            "longitude": float,
+            "display_name": str  # Full address from Nominatim
+        }
+    
+    Raises:
+        404: Location not found
+        500: Geocoding API error
+    """
+    from spots.geocoding import geocode_city
+    import requests
+    
+    # Use existing geocode_city function
+    result = geocode_city(query, country)
+    
+    if not result:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Location '{query}' not found"
+        )
+    
+    lat, lon = result
+    
+    # Get full address details from Nominatim for display
+    try:
+        url = "https://nominatim.openstreetmap.org/reverse"
+        params = {
+            "lat": lat,
+            "lon": lon,
+            "format": "json"
+        }
+        headers = {
+            "User-Agent": "DashboardParapente/0.2.0"
+        }
+        response = requests.get(url, params=params, headers=headers, timeout=5)
+        data = response.json()
+        display_name = data.get("display_name", query)
+    except:
+        display_name = query
+    
+    return {
+        "name": query,
+        "latitude": lat,
+        "longitude": lon,
+        "display_name": display_name
+    }
 
 @router.get("/spots/search")
 async def search_paragliding_spots(
@@ -444,6 +508,69 @@ def get_spots(db: Session = Depends(get_db)):
     """Get all user-managed paragliding spots"""
     sites = db.query(Site).all()
     return SpotsResponse(sites=sites)
+
+@router.post("/spots")
+async def create_site(
+    site_data: SiteCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new custom site
+    
+    Args:
+        site_data: Site information (name, latitude, longitude required)
+    
+    Returns:
+        Created site object
+    
+    Raises:
+        409: Site with same name already exists (returns existing site)
+        422: Validation error (missing required fields)
+    """
+    # Check if site with same name already exists
+    existing_site = db.query(Site).filter(
+        func.lower(Site.name) == site_data.name.lower()
+    ).first()
+    
+    if existing_site:
+        logger.info(f"Site '{site_data.name}' already exists, returning existing site")
+        # Return existing site instead of creating duplicate
+        return existing_site
+    
+    # Generate unique code from name
+    code_base = site_data.name.lower().replace(' ', '-').replace("'", '').replace('è', 'e').replace('é', 'e').replace('à', 'a')
+    code = code_base[:20]  # Limit to 20 chars
+    
+    # Ensure code is unique
+    counter = 1
+    original_code = code
+    while db.query(Site).filter(Site.code == code).first():
+        code = f"{original_code}-{counter}"
+        counter += 1
+    
+    # Create new site
+    new_site = Site(
+        id=str(uuid.uuid4()),
+        code=code,
+        name=site_data.name,
+        latitude=site_data.latitude,
+        longitude=site_data.longitude,
+        elevation_m=site_data.elevation_m,
+        region=site_data.region,
+        country=site_data.country or "FR",
+        site_type="user_spot"  # Mark as user-created
+    )
+    
+    try:
+        db.add(new_site)
+        db.commit()
+        db.refresh(new_site)
+        logger.info(f"✅ Created new site: {new_site.name} (ID: {new_site.id})")
+        return new_site
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to create site: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Site creation failed: {str(e)}")
 
 # ============================================================================
 # BEST SPOT RECOMMENDATION ENDPOINT
@@ -1161,6 +1288,59 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
     return flight
+
+@router.patch("/flights/{flight_id}")
+async def update_flight(
+    flight_id: str,
+    flight_data: FlightUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    Update flight details
+    
+    Args:
+        flight_id: ID of the flight to update
+        flight_data: Flight fields to update (all optional)
+    
+    Returns:
+        Updated flight object
+    
+    Raises:
+        404: Flight not found
+        404: Site not found (if site_id provided and doesn't exist)
+        422: Validation error
+    """
+    # 1. Verify flight exists
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    
+    # 2. If site_id is being updated, verify it exists
+    if flight_data.site_id is not None:
+        site = db.query(Site).filter(Site.id == flight_data.site_id).first()
+        if not site:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Site with ID '{flight_data.site_id}' not found"
+            )
+    
+    # 3. Update only provided fields (exclude_unset skips None values)
+    update_data = flight_data.dict(exclude_unset=True)
+    
+    for field, value in update_data.items():
+        setattr(flight, field, value)
+    
+    # 4. updated_at is handled automatically by SQLAlchemy
+    
+    try:
+        db.commit()
+        db.refresh(flight)
+        logger.info(f"✅ Updated flight {flight_id}: {list(update_data.keys())}")
+        return flight
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to update flight {flight_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
 
 @router.get("/flights/{flight_id}/gpx-data")
 def get_flight_gpx_data(flight_id: str, db: Session = Depends(get_db)):
