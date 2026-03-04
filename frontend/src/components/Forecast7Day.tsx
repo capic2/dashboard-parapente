@@ -39,9 +39,7 @@ export default function Forecast7Day({ spotId, selectedDayIndex = 0, onSelectDay
   // OPTIMISATION: Use daily summary instead of full weather data
   // This loads 7 days of aggregate data (para_index, temps, wind) WITHOUT hourly details
   // → 2-3x faster than loading full hourly forecasts
-  console.log('[Forecast7Day] DEBUG:', { spotId, selectedDayIndex });
   const { data: dailySummary, isLoading, error } = useDailySummary(spotId);
-  console.log('[Forecast7Day] useDailySummary result:', { dailySummary, isLoading, error });
   const queryClient = useQueryClient();
   
   // Prefetch full hourly data on hover for instant navigation
