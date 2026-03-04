@@ -7,6 +7,8 @@ const AltitudeChart = lazy(() => import('../components/stats/AltitudeChart'));
 const ProgressChart = lazy(() => import('../components/stats/ProgressChart'));
 const SiteStats = lazy(() => import('../components/stats/SiteStats'));
 const MonthlyStats = lazy(() => import('../components/stats/MonthlyStats'));
+const TimeOfDayChart = lazy(() => import('../components/stats/TimeOfDayChart'));
+const WeekdayChart = lazy(() => import('../components/stats/WeekdayChart'));
 
 // Loading fallback component
 function ChartSkeleton() {
@@ -60,6 +62,17 @@ export default function Analytics() {
 
             <Suspense fallback={<ChartSkeleton />}>
               <SiteStats />
+            </Suspense>
+          </div>
+
+          {/* Temporal Analysis - Time of Day & Weekday */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Suspense fallback={<ChartSkeleton />}>
+              <TimeOfDayChart />
+            </Suspense>
+
+            <Suspense fallback={<ChartSkeleton />}>
+              <WeekdayChart />
             </Suspense>
           </div>
         </section>
