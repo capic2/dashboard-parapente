@@ -90,7 +90,7 @@ export const useWeatherSources = (): UseQueryResult<WeatherSource[], Error> => {
   return useQuery({
     queryKey: ['weather', 'sources'],
     queryFn: async () => {
-      const response = await API.get<ApiResponse<WeatherSource[]>>('/weather/sources')
+      const data = await api.get('weather/sources').json()
       
       // Validate API response with Zod
       const validation = ApiResponseSchema(WeatherSourceSchema.array()).safeParse(data)
@@ -119,9 +119,9 @@ export const useWeatherHistory = (
       if (!siteId || !fromDate || !toDate) {
         throw new Error('Site ID, from date, and to date are required')
       }
-      const response = await API.get<ApiResponse<WeatherConditions[]>>(
-        `/weather/history/${siteId}?from_date=${fromDate}&to_date=${toDate}`
-      )
+      const data = await api.get(
+        `weather/history/${siteId}?from_date=${fromDate}&to_date=${toDate}`
+      ).json()
       
       // Validate API response with Zod
       const validation = ApiResponseSchema(WeatherConditionsSchema.array()).safeParse(data)
@@ -150,9 +150,9 @@ export const useWeatherBySource = (
       if (!siteId || !sourceId) {
         throw new Error('Site ID and source ID are required')
       }
-      const response = await API.get<ApiResponse<ForecastDay[]>>(
-        `/weather/forecast/${siteId}?source=${sourceId}`
-      )
+      const data = await api.get(
+        `weather/forecast/${siteId}?source=${sourceId}`
+      ).json()
       
       // Validate API response with Zod
       const validation = ApiResponseSchema(ForecastDaySchema.array()).safeParse(data)
@@ -177,10 +177,10 @@ export const createWeatherQueryFn = (siteId: string, dayIndex: number) => async 
       if (!siteId) throw new Error('Site ID is required')
       
       // Fetch selected day first for current conditions (IMMEDIATE)
-      const todayResponse = await API.get(`/weather/${siteId}?day_index=${dayIndex}`)
+      const todayResponse = await api.get(`weather/${siteId}?day_index=${dayIndex}`).json()
       
       // Validate today's response with Zod
-      const todayValidation = BackendWeatherResponseSchema.safeParse(todayResponse.data)
+      const todayValidation = BackendWeatherResponseSchema.safeParse(todayResponse)
       if (!todayValidation.success) {
         console.error('❌ Today weather validation failed:', todayValidation.error)
         throw new Error(`Invalid today weather: ${todayValidation.error.message}`)
