@@ -10,8 +10,7 @@
 
 import { useState, useEffect } from 'react';
 import type { BestSpotResult } from './useBestSpot';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+import { api } from '../lib/api';
 
 export interface ApiBestSpotResponse {
   site: {
@@ -45,19 +44,7 @@ export function useBestSpotAPI() {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`${API_BASE_URL}/api/spots/best`);
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            // No data available yet (scheduler hasn't run)
-            setError('Aucune donnée disponible. Le scheduler n\'a peut-être pas encore été exécuté.');
-            setBestSpot(null);
-            return;
-          }
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const data: ApiBestSpotResponse = await response.json();
+        const data: ApiBestSpotResponse = await api.get('spots/best').json();
 
         if (!mounted) return;
 
@@ -86,12 +73,23 @@ export function useBestSpotAPI() {
         };
 
         setBestSpot(result);
-      } catch (err) {
+      } catch (err: any) {
         if (!mounted) return;
         
-        const message = err instanceof Error ? err.message : 'Erreur inconnue';
-        console.error('Error fetching best spot:', err);
-        setError(message);
+        // Handle HTTPError from Ky
+        if (err.response) {
+          if (err.response.status === 404) {
+            setError('Aucune donnée disponible. Le scheduler n\'a peut-être pas encore été exécuté.');
+            setBestSpot(null);
+            return;
+          }
+          const message = `HTTP ${err.response.status}: ${err.response.statusText}`;
+          setError(message);
+        } else {
+          const message = err instanceof Error ? err.message : 'Erreur inconnue';
+          console.error('Error fetching best spot:', err);
+          setError(message);
+        }
         setBestSpot(null);
       } finally {
         if (mounted) {
