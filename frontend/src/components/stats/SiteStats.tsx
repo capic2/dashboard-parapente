@@ -1,12 +1,19 @@
 import { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { useFlights } from '../../hooks/useFlights';
+import { useFiltersStore } from '../../stores/filtersStore';
 import type { Flight } from '../../types';
 
 const COLORS = ['#4a90e2', '#82ca9d', '#ffc658', '#ff8042', '#8884d8', '#a4de6c'];
 
 export default function SiteStats() {
-  const { data: flights = [], isLoading, error } = useFlights({ limit: 200 });
+  const { filters } = useFiltersStore();
+  const { data: flights = [], isLoading, error } = useFlights({ 
+    limit: 200,
+    siteId: filters.siteId || undefined,
+    dateFrom: filters.dateFrom || undefined,
+    dateTo: filters.dateTo || undefined,
+  });
 
   const { siteData, siteDetails } = useMemo(() => {
     if (!flights.length) return { siteData: [], siteDetails: [] };

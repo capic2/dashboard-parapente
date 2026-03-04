@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import { FilterBar } from '../components/FilterBar';
 
 // Lazy load components for better performance
 const StatsDashboard = lazy(() => import('../components/stats/StatsDashboard'));
@@ -23,6 +24,9 @@ export default function Analytics() {
         <h1 className="text-xl font-bold text-gray-900">📊 Analyses et Statistiques</h1>
         <p className="text-sm text-gray-600 mt-1">Vue d'ensemble de votre progression en parapente</p>
       </div>
+
+      {/* Filtres dynamiques */}
+      <FilterBar />
 
       <div className="space-y-4">
         {/* Overview Stats Cards */}
