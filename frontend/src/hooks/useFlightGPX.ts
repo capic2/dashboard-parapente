@@ -1,13 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import axios from 'axios'
+import { api } from '../lib/api'
 import { GeoPoint } from '../types/flight'
-
-const API = axios.create({
-  baseURL: '/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
 
 export interface GPXData {
   coordinates: GeoPoint[]
@@ -27,8 +20,8 @@ export const useFlightGPX = (flightId: string) => {
   return useQuery<GPXData>({
     queryKey: ['flights', flightId, 'gpx'],
     queryFn: async () => {
-      const response = await API.get(`/flights/${flightId}/gpx-data`)
-      return response.data.data
+      const data: any = await api.get(`flights/${flightId}/gpx-data`).json()
+      return data.data
     },
     enabled: !!flightId,
     staleTime: 1000 * 60 * 60, // 1 hour
@@ -41,11 +34,9 @@ export const useFlightGPX = (flightId: string) => {
 export const useDownloadGPX = () => {
   return async (flightId: string, fileName?: string) => {
     try {
-      const response = await API.get(`/flights/${flightId}/gpx`, {
-        responseType: 'blob',
-      })
+      const blob = await api.get(`flights/${flightId}/gpx`).blob()
 
-      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
       link.setAttribute('download', fileName || `flight_${flightId}.gpx`)
