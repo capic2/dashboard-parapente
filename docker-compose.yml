@@ -35,27 +35,27 @@ services:
       - "8001:8001"
     environment:
       # Application
-      - ENVIRONMENT=production
-      - LOG_LEVEL=INFO
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
       
       # Redis
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - USE_FAKE_REDIS=false
+      - USE_FAKE_REDIS=${USE_FAKE_REDIS:-false}
       
-      # Weather API Keys
-      - WEATHERAPI_KEY=${WEATHERAPI_KEY:-***REMOVED***}
-      - METEOBLUE_API_KEY=${METEOBLUE_API_KEY:-***REMOVED***}
+      # Weather API Keys (set in Portainer)
+      - WEATHERAPI_KEY=${WEATHERAPI_KEY}
+      - METEOBLUE_API_KEY=${METEOBLUE_API_KEY}
       
-      # Strava OAuth
-      - STRAVA_CLIENT_ID=${STRAVA_CLIENT_ID:-73115}
-      - STRAVA_CLIENT_SECRET=${STRAVA_CLIENT_SECRET:-***REMOVED***}
-      - STRAVA_REFRESH_TOKEN=${STRAVA_REFRESH_TOKEN:-***REMOVED***}
-      - STRAVA_ACCESS_TOKEN=${STRAVA_ACCESS_TOKEN:-***REMOVED***}
+      # Strava OAuth (set in Portainer)
+      - STRAVA_CLIENT_ID=${STRAVA_CLIENT_ID}
+      - STRAVA_CLIENT_SECRET=${STRAVA_CLIENT_SECRET}
+      - STRAVA_REFRESH_TOKEN=${STRAVA_REFRESH_TOKEN}
+      - STRAVA_ACCESS_TOKEN=${STRAVA_ACCESS_TOKEN}
       
       # Scheduler
-      - SCHEDULER_ENABLED=true
-      - SCHEDULER_INTERVAL_MINUTES=30
+      - SCHEDULER_ENABLED=${SCHEDULER_ENABLED:-true}
+      - SCHEDULER_INTERVAL_MINUTES=${SCHEDULER_INTERVAL_MINUTES:-30}
     depends_on:
       redis:
         condition: service_healthy
