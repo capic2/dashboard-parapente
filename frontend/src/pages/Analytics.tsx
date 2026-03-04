@@ -10,6 +10,7 @@ const MonthlyStats = lazy(() => import('../components/stats/MonthlyStats'));
 const TimeOfDayChart = lazy(() => import('../components/stats/TimeOfDayChart'));
 const WeekdayChart = lazy(() => import('../components/stats/WeekdayChart'));
 const RecordsDashboard = lazy(() => import('../components/stats/RecordsDashboard'));
+const AchievementsBadges = lazy(() => import('../components/stats/AchievementsBadges'));
 
 // Loading fallback component
 function ChartSkeleton() {
@@ -43,6 +44,13 @@ export default function Analytics() {
         <section>
           <Suspense fallback={<ChartSkeleton />}>
             <RecordsDashboard />
+          </Suspense>
+        </section>
+
+        {/* Achievements */}
+        <section>
+          <Suspense fallback={<ChartSkeleton />}>
+            <AchievementsBadges />
           </Suspense>
         </section>
 
