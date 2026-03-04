@@ -27,12 +27,24 @@ export default function FlightHistory() {
   const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null);
   const [selectedFlightIds, setSelectedFlightIds] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
+  const [editingMode, setEditingMode] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showStravaSyncModal, setShowStravaSyncModal] = useState(false);
   const [showCreateFlightModal, setShowCreateFlightModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // États pour les champs éditables
+  const [editedTitle, setEditedTitle] = useState('');
+  const [editedFlightDate, setEditedFlightDate] = useState('');
+  const [editedDepartureTime, setEditedDepartureTime] = useState('');
+  const [editedDuration, setEditedDuration] = useState(0);
+  const [editedDistance, setEditedDistance] = useState(0);
+  const [editedMaxAltitude, setEditedMaxAltitude] = useState(0);
+  const [editedElevationGain, setEditedElevationGain] = useState(0);
+  const [editedMaxSpeed, setEditedMaxSpeed] = useState(0);
+  const [editedNotes, setEditedNotes] = useState('');
 
   const selectedFlight = flights.find((f: Flight) => f.id === selectedFlightId);
   const updateFlight = useUpdateFlight(selectedFlightId || undefined);
@@ -59,7 +71,19 @@ export default function FlightHistory() {
       setSelectedFlightId(flight.id);
       setNotesText(flight.notes || '');
       setEditingNotes(false);
+      setEditingMode(false);
       setShowDeleteConfirm(false);
+      
+      // Initialiser les champs éditables
+      setEditedTitle(flight.title || flight.name || '');
+      setEditedFlightDate(flight.flight_date);
+      setEditedDepartureTime(flight.departure_time || '');
+      setEditedDuration(flight.duration_minutes || 0);
+      setEditedDistance(flight.distance_km || 0);
+      setEditedMaxAltitude(flight.max_altitude_m || 0);
+      setEditedElevationGain(flight.elevation_gain_m || 0);
+      setEditedMaxSpeed(flight.max_speed_kmh || 0);
+      setEditedNotes(flight.notes || '');
     }
   }, [selectionMode]);
 
@@ -76,6 +100,50 @@ export default function FlightHistory() {
   const handleDeselectAll = useCallback(() => {
     setSelectedFlightIds(new Set());
   }, []);
+
+  const handleEnterEditMode = useCallback(() => {
+    if (!selectedFlight) return;
+    setEditingMode(true);
+    setEditedTitle(selectedFlight.title || selectedFlight.name || '');
+    setEditedFlightDate(selectedFlight.flight_date);
+    setEditedDepartureTime(selectedFlight.departure_time || '');
+    setEditedDuration(selectedFlight.duration_minutes || 0);
+    setEditedDistance(selectedFlight.distance_km || 0);
+    setEditedMaxAltitude(selectedFlight.max_altitude_m || 0);
+    setEditedElevationGain(selectedFlight.elevation_gain_m || 0);
+    setEditedMaxSpeed(selectedFlight.max_speed_kmh || 0);
+    setEditedNotes(selectedFlight.notes || '');
+  }, [selectedFlight]);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingMode(false);
+  }, []);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!selectedFlight) return;
+
+    try {
+      await updateFlight.mutateAsync({
+        title: editedTitle,
+        site_id: selectedFlight.site_id,
+        flight_date: editedFlightDate,
+        departure_time: editedDepartureTime || null,
+        duration_minutes: editedDuration,
+        max_altitude_m: editedMaxAltitude,
+        distance_km: editedDistance,
+        elevation_gain_m: editedElevationGain,
+        max_speed_kmh: editedMaxSpeed,
+        notes: editedNotes,
+      });
+      setEditingMode(false);
+      toast.success('Vol mis à jour avec succès');
+    } catch (err) {
+      console.error('Failed to update flight:', err);
+      toast.error('Échec de la mise à jour');
+    }
+  }, [selectedFlight, updateFlight, editedTitle, editedFlightDate, editedDepartureTime, 
+      editedDuration, editedDistance, editedMaxAltitude, editedElevationGain, 
+      editedMaxSpeed, editedNotes, toast]);
 
   const handleSaveNotes = useCallback(async () => {
     if (!selectedFlight) return;
@@ -398,44 +466,78 @@ export default function FlightHistory() {
               {/* Flight Details */}
               <div className="bg-white rounded-xl p-4 shadow-md">
                 <div className="flex justify-between items-start mb-4">
-                  <h2 className="text-lg font-bold text-gray-900">
-                    {selectedFlight.title || 'Vol sans titre'}
-                  </h2>
-                  <div className="flex gap-2">
-                    <button
-                      className="px-3 py-1.5 text-sm bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-all"
-                      onClick={() => setEditingNotes(!editingNotes)}
-                      aria-label="Éditer les notes"
-                    >
-                      ✏️ Modifier
-                    </button>
-                    
-                    {/* Bouton Upload GPX */}
-                    <button
-                      className={`px-3 py-1.5 text-sm rounded-md transition-all ${
-                        selectedFlight.gpx_file_path
-                          ? 'bg-green-600 text-white hover:bg-green-700'
-                          : 'bg-orange-600 text-white hover:bg-orange-700'
-                      }`}
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploadGPXMutation.isPending}
-                    >
-                      {uploadGPXMutation.isPending ? (
-                        <>⏳ Upload...</>
-                      ) : selectedFlight.gpx_file_path ? (
-                        <>🔄 Remplacer GPX</>
-                      ) : (
-                        <>📎 Ajouter GPX</>
-                      )}
-                    </button>
-                    
-                    <button
-                      className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 transition-all"
-                      onClick={() => setShowDeleteConfirm(true)}
-                      aria-label="Supprimer le vol"
-                    >
-                      🗑️ Supprimer
-                    </button>
+                  {editingMode ? (
+                    <div className="flex-1">
+                      <label className="text-xs text-gray-600">Titre du vol</label>
+                      <input
+                        type="text"
+                        value={editedTitle}
+                        onChange={(e) => setEditedTitle(e.target.value)}
+                        className="block w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                        placeholder="Titre du vol"
+                      />
+                    </div>
+                  ) : (
+                    <h2 className="text-lg font-bold text-gray-900">
+                      {selectedFlight.title || 'Vol sans titre'}
+                    </h2>
+                  )}
+                  
+                  <div className="flex gap-2 ml-4">
+                    {editingMode ? (
+                      <>
+                        <button
+                          className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-all disabled:opacity-50"
+                          onClick={handleSaveEdit}
+                          disabled={updateFlight.isPending}
+                        >
+                          {updateFlight.isPending ? '⏳ Enregistrement...' : '✓ Enregistrer'}
+                        </button>
+                        <button
+                          className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-all"
+                          onClick={handleCancelEdit}
+                        >
+                          ✖ Annuler
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          className="px-3 py-1.5 text-sm bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-all"
+                          onClick={handleEnterEditMode}
+                          aria-label="Éditer le vol"
+                        >
+                          ✏️ Modifier
+                        </button>
+                        
+                        {/* Bouton Upload GPX */}
+                        <button
+                          className={`px-3 py-1.5 text-sm rounded-md transition-all ${
+                            selectedFlight.gpx_file_path
+                              ? 'bg-green-600 text-white hover:bg-green-700'
+                              : 'bg-orange-600 text-white hover:bg-orange-700'
+                          }`}
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploadGPXMutation.isPending}
+                        >
+                          {uploadGPXMutation.isPending ? (
+                            <>⏳ Upload...</>
+                          ) : selectedFlight.gpx_file_path ? (
+                            <>🔄 Remplacer GPX</>
+                          ) : (
+                            <>📎 Ajouter GPX</>
+                          )}
+                        </button>
+                        
+                        <button
+                          className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 transition-all"
+                          onClick={() => setShowDeleteConfirm(true)}
+                          aria-label="Supprimer le vol"
+                        >
+                          🗑️ Supprimer
+                        </button>
+                      </>
+                    )}
                   </div>
                   
                   {/* Input file caché */}
@@ -449,71 +551,166 @@ export default function FlightHistory() {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                  {/* Date */}
                   <div>
                     <span className="text-xs text-gray-600">📅 Date</span>
-                    <span className="block text-sm font-medium text-gray-900 mt-1">
-                      {new Date(selectedFlight.flight_date).toLocaleDateString(
-                        'fr-FR',
-                        {
-                          weekday: 'long',
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                        }
-                      )}
-                    </span>
+                    {editingMode ? (
+                      <input
+                        type="date"
+                        value={editedFlightDate}
+                        onChange={(e) => setEditedFlightDate(e.target.value)}
+                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                      />
+                    ) : (
+                      <span className="block text-sm font-medium text-gray-900 mt-1">
+                        {new Date(selectedFlight.flight_date).toLocaleDateString(
+                          'fr-FR',
+                          {
+                            weekday: 'long',
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                          }
+                        )}
+                      </span>
+                    )}
                   </div>
                   
-                  {selectedFlight.departure_time && (
-                    <div>
-                      <span className="text-xs text-gray-600">🕐 Heure de départ</span>
+                  {/* Heure de départ */}
+                  <div>
+                    <span className="text-xs text-gray-600">🕐 Heure de départ</span>
+                    {editingMode ? (
+                      <input
+                        type="time"
+                        value={editedDepartureTime ? new Date(editedDepartureTime).toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'}) : ''}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            const [hours, minutes] = e.target.value.split(':');
+                            const newDateTime = new Date(editedFlightDate);
+                            newDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                            setEditedDepartureTime(newDateTime.toISOString());
+                          } else {
+                            setEditedDepartureTime('');
+                          }
+                        }}
+                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                      />
+                    ) : (
                       <span className="block text-sm font-medium text-gray-900 mt-1">
-                        {new Date(selectedFlight.departure_time).toLocaleTimeString('fr-FR', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {selectedFlight.departure_time ? 
+                          new Date(selectedFlight.departure_time).toLocaleTimeString('fr-FR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          }) : 'N/A'}
                       </span>
-                    </div>
-                  )}
+                    )}
+                  </div>
                   
+                  {/* Site */}
                   <div>
                     <span className="text-xs text-gray-600">📍 Site</span>
                     <span className="block text-sm font-medium text-gray-900 mt-1">
                       {selectedFlight.site_name || selectedFlight.site_id || 'Non spécifié'}
                     </span>
                   </div>
+                  
+                  {/* Durée */}
                   <div>
-                    <span className="text-xs text-gray-600">⏱️ Durée</span>
-                    <span className="block text-sm font-medium text-gray-900 mt-1">
-                      {selectedFlight.duration_minutes ? (
-                        <>
-                          {Math.floor(selectedFlight.duration_minutes / 60)}h{' '}
-                          {selectedFlight.duration_minutes % 60}m
-                        </>
-                      ) : (
-                        'N/A'
-                      )}
-                    </span>
+                    <span className="text-xs text-gray-600">⏱️ Durée (min)</span>
+                    {editingMode ? (
+                      <input
+                        type="number"
+                        value={editedDuration}
+                        onChange={(e) => setEditedDuration(Number(e.target.value))}
+                        min="0"
+                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                      />
+                    ) : (
+                      <span className="block text-sm font-medium text-gray-900 mt-1">
+                        {selectedFlight.duration_minutes ? (
+                          <>
+                            {Math.floor(selectedFlight.duration_minutes / 60)}h{' '}
+                            {selectedFlight.duration_minutes % 60}m
+                          </>
+                        ) : (
+                          'N/A'
+                        )}
+                      </span>
+                    )}
                   </div>
+                  
+                  {/* Distance */}
                   <div>
-                    <span className="text-xs text-gray-600">📏 Distance</span>
-                    <span className="block text-sm font-medium text-gray-900 mt-1">
-                      {selectedFlight.distance_km.toFixed(2)} km
-                    </span>
+                    <span className="text-xs text-gray-600">📏 Distance (km)</span>
+                    {editingMode ? (
+                      <input
+                        type="number"
+                        value={editedDistance}
+                        onChange={(e) => setEditedDistance(Number(e.target.value))}
+                        min="0"
+                        step="0.1"
+                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                      />
+                    ) : (
+                      <span className="block text-sm font-medium text-gray-900 mt-1">
+                        {selectedFlight.distance_km?.toFixed(2)} km
+                      </span>
+                    )}
                   </div>
+                  
+                  {/* Altitude max */}
                   <div>
-                    <span className="text-xs text-gray-600">
-                      ⛰️ Altitude max
-                    </span>
-                    <span className="block text-sm font-medium text-gray-900 mt-1">
-                      {selectedFlight.max_altitude_m} m
-                    </span>
+                    <span className="text-xs text-gray-600">⛰️ Altitude max (m)</span>
+                    {editingMode ? (
+                      <input
+                        type="number"
+                        value={editedMaxAltitude}
+                        onChange={(e) => setEditedMaxAltitude(Number(e.target.value))}
+                        min="0"
+                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                      />
+                    ) : (
+                      <span className="block text-sm font-medium text-gray-900 mt-1">
+                        {selectedFlight.max_altitude_m} m
+                      </span>
+                    )}
                   </div>
+                  
+                  {/* Dénivelé */}
                   <div>
-                    <span className="text-xs text-gray-600">📈 Dénivelé</span>
-                    <span className="block text-sm font-medium text-gray-900 mt-1">
-                      {selectedFlight.elevation_gain_m} m
-                    </span>
+                    <span className="text-xs text-gray-600">📈 Dénivelé (m)</span>
+                    {editingMode ? (
+                      <input
+                        type="number"
+                        value={editedElevationGain}
+                        onChange={(e) => setEditedElevationGain(Number(e.target.value))}
+                        min="0"
+                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                      />
+                    ) : (
+                      <span className="block text-sm font-medium text-gray-900 mt-1">
+                        {selectedFlight.elevation_gain_m} m
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Vitesse max */}
+                  <div>
+                    <span className="text-xs text-gray-600">🏃 Vitesse max (km/h)</span>
+                    {editingMode ? (
+                      <input
+                        type="number"
+                        value={editedMaxSpeed}
+                        onChange={(e) => setEditedMaxSpeed(Number(e.target.value))}
+                        min="0"
+                        step="0.1"
+                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                      />
+                    ) : (
+                      <span className="block text-sm font-medium text-gray-900 mt-1">
+                        {selectedFlight.max_speed_kmh?.toFixed(2)} km/h
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -525,7 +722,16 @@ export default function FlightHistory() {
                   >
                     📝 Notes
                   </label>
-                  {editingNotes ? (
+                  {editingMode ? (
+                    <textarea
+                      id="flight-notes"
+                      value={editedNotes}
+                      onChange={(e) => setEditedNotes(e.target.value)}
+                      placeholder="Conditions, sensations, points à améliorer..."
+                      rows={4}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600 resize-none"
+                    />
+                  ) : editingNotes ? (
                     <div className="space-y-2">
                       <textarea
                         id="flight-notes"
