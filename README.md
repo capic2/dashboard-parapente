@@ -41,12 +41,32 @@ Tableau de bord météo personnel pour sites de parapente avec agrégation multi
 
 ## ✨ Fonctionnalités
 
+### 🌤️ Météo & Prévisions
 - **Météo multi-sources** : 5 sources agrégées (WeatherAPI, Meteoblue, etc.)
 - **Para-Index** : Score 0-100 de volabilité en temps réel
 - **6 sites pré-configurés** : Région Besançon (Arguel, Mont Poupet, La Côte)
 - **Refresh automatique** : Toutes les heures
 - **Cache Redis** : Performances optimales
-- **Intégrations** : Strava webhook, Telegram (optionnel)
+
+### 📊 Analytics & Statistiques (Mars 2026)
+- **Filtres dynamiques** : Filtrer par site et plage de dates avec persistence
+- **Dashboard records** : 4 records personnels (durée, altitude, distance, vitesse)
+- **Analyses temporelles** :
+  - Heures de vol préférées (matin/après-midi/soirée/nuit)
+  - Jours de semaine préférés (Lun-Dim)
+- **Progression** :
+  - Graphique altitude par vol
+  - Graphique durée avec moyenne glissante (10 vols)
+  - Stats mensuelles (nb vols + heures)
+  - Répartition par site (pie chart)
+- **Gamification** : 11 badges d'achievements avec progression
+  - Milestones de vols (1, 5, 20, 50, 100)
+  - Heures de vol (10h, 50h, 100h)
+  - Altitude (1000m, 2000m, 3000m)
+
+### 🔗 Intégrations
+- **Strava** : Sync automatique des vols avec GPX
+- **Telegram** : Alertes météo (optionnel)
 
 ---
 
