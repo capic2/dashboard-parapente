@@ -87,7 +87,9 @@ export function useBestSpotAPI() {
           setError(message);
         } else {
           const message = err instanceof Error ? err.message : 'Erreur inconnue';
-          console.error('Error fetching best spot:', err);
+          if (import.meta.env.DEV) {
+            console.error('Error fetching best spot:', err);
+          }
           setError(message);
         }
         setBestSpot(null);
