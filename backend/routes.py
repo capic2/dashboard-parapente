@@ -1367,7 +1367,13 @@ def get_flight_gpx_data(flight_id: str, db: Session = Depends(get_db)):
     
     # Parse GPX file
     try:
+        print(f"🔍 DEBUG API - Parsing GPX for flight {flight_id}: {gpx_path}")
         coordinates = parse_gpx_file(gpx_path)
+        print(f"🔍 DEBUG API - Parsed {len(coordinates)} coordinates")
+        if coordinates:
+            print(f"🔍 DEBUG API - First timestamp: {coordinates[0]['timestamp']}")
+            print(f"🔍 DEBUG API - Last timestamp: {coordinates[-1]['timestamp']}")
+        
         stats = calculate_gpx_stats(coordinates)
         
         return {
@@ -2040,7 +2046,9 @@ def parse_gpx_file_from_string(gpx_content: str) -> List[Dict]:
         })
     
     if coordinates:
-        print(f"🔍 DEBUG First coord - ele:{coordinates[0]['elevation']}m, ts:{coordinates[0]['timestamp']}")
+        print(f"🔍 DEBUG GPX Parse - ele:{coordinates[0]['elevation']}m, ts:{coordinates[0]['timestamp']}")
+        all_zero = all(c["timestamp"] == 0 for c in coordinates)
+        print(f"🔍 DEBUG GPX Parse - All timestamps zero: {all_zero}")
     
     return coordinates
 
