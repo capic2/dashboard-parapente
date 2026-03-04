@@ -33,6 +33,8 @@ services:
     restart: unless-stopped
     ports:
       - "8001:8001"
+    env_file:
+      - .env
     environment:
       # Application
       - ENVIRONMENT=production
@@ -41,19 +43,6 @@ services:
       # Redis
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      
-      # Weather API Keys
-      - WEATHERAPI_KEY=***REMOVED***
-      - METEOBLUE_API_KEY=***REMOVED***
-      
-      # Optional: Strava (décommenter si nécessaire)
-      # - STRAVA_CLIENT_ID=
-      # - STRAVA_CLIENT_SECRET=
-      # - STRAVA_VERIFY_TOKEN=
-      
-      # Optional: Telegram (décommenter si nécessaire)
-      # - TELEGRAM_BOT_TOKEN=
-      # - TELEGRAM_CHAT_ID=
     depends_on:
       redis:
         condition: service_healthy

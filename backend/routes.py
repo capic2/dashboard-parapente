@@ -970,9 +970,41 @@ async def get_daily_summary(
 
 # Flights endpoints
 @router.get("/flights")
-def get_flights(limit: int = 10, db: Session = Depends(get_db)):
-    """Get recent flights"""
-    flights = db.query(Flight).order_by(Flight.flight_date.desc()).limit(limit).all()
+def get_flights(
+    limit: int = 10,
+    site_id: Optional[str] = None,
+    date_from: Optional[str] = None,  # YYYY-MM-DD
+    date_to: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Get flights with optional filters
+    
+    Args:
+        limit: Maximum number of flights to return
+        site_id: Filter by site ID
+        date_from: Filter flights from this date (inclusive, format: YYYY-MM-DD)
+        date_to: Filter flights until this date (inclusive, format: YYYY-MM-DD)
+    """
+    query = db.query(Flight)
+    
+    # Apply filters
+    if site_id:
+        query = query.filter(Flight.site_id == site_id)
+    if date_from:
+        try:
+            from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
+            query = query.filter(Flight.flight_date >= from_date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid date_from format: {date_from}. Use YYYY-MM-DD")
+    if date_to:
+        try:
+            to_date = datetime.strptime(date_to, "%Y-%m-%d").date()
+            query = query.filter(Flight.flight_date <= to_date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid date_to format: {date_to}. Use YYYY-MM-DD")
+    
+    flights = query.order_by(Flight.flight_date.desc()).limit(limit).all()
     
     # Convert to dict (user_id removed - not needed for single-user app)
     flights_data = []
@@ -1064,6 +1096,61 @@ def get_flight_stats(db: Session = Depends(get_db)):
         "favorite_spot": favorite_spot,
         "favorite_site": None,  # TODO: Return full Site object if needed
         "last_flight_date": last_flight_date
+    }
+
+@router.get("/flights/records")
+def get_flight_records(db: Session = Depends(get_db)):
+    """
+    Get personal flight records (longest duration, highest altitude, longest distance, max speed)
+    
+    Returns:
+        {
+            "longest_duration": { "value": 120, "flight_id": "...", "date": "2025-11-15", "site_name": "Annecy" },
+            "highest_altitude": { ... },
+            "longest_distance": { ... },
+            "max_speed": { ... }
+        }
+    """
+    flights = db.query(Flight).all()
+    
+    if not flights:
+        return {
+            "longest_duration": None,
+            "highest_altitude": None,
+            "longest_distance": None,
+            "max_speed": None
+        }
+    
+    # Filter out None values and find records
+    flights_with_duration = [f for f in flights if f.duration_minutes is not None]
+    flights_with_altitude = [f for f in flights if f.max_altitude_m is not None]
+    flights_with_distance = [f for f in flights if f.distance_km is not None]
+    flights_with_speed = [f for f in flights if f.max_speed_kmh is not None and f.max_speed_kmh > 0]
+    
+    # Find records
+    longest = max(flights_with_duration, key=lambda f: f.duration_minutes) if flights_with_duration else None
+    highest = max(flights_with_altitude, key=lambda f: f.max_altitude_m) if flights_with_altitude else None
+    farthest = max(flights_with_distance, key=lambda f: f.distance_km) if flights_with_distance else None
+    fastest = max(flights_with_speed, key=lambda f: f.max_speed_kmh) if flights_with_speed else None
+    
+    def format_record(flight, value_key):
+        """Helper to format a record entry"""
+        if not flight:
+            return None
+        return {
+            "value": getattr(flight, value_key),
+            "flight_id": flight.id,
+            "flight_name": flight.name or flight.title,
+            "date": flight.flight_date.isoformat() if flight.flight_date else None,
+            "site_name": flight.site.name if flight.site else None,
+            "site_id": flight.site_id
+        }
+    
+    return {
+        "longest_duration": format_record(longest, "duration_minutes"),
+        "highest_altitude": format_record(highest, "max_altitude_m"),
+        "longest_distance": format_record(farthest, "distance_km"),
+        "max_speed": format_record(fastest, "max_speed_kmh")
     }
 
 @router.get("/flights/{flight_id}")
@@ -1495,6 +1582,46 @@ def parse_gpx_file(gpx_path: Path) -> List[Dict]:
     return coordinates
 
 
+def calculate_max_speed(coordinates: List[Dict]) -> float:
+    """
+    Calculate maximum speed in km/h from GPX coordinates
+    
+    Args:
+        coordinates: List of dicts with keys: lat, lon, timestamp
+    
+    Returns:
+        Maximum speed in km/h
+    """
+    if len(coordinates) < 2:
+        return 0.0
+    
+    max_speed = 0.0
+    
+    for i in range(1, len(coordinates)):
+        # Skip if no valid timestamps
+        if coordinates[i]["timestamp"] == 0 or coordinates[i-1]["timestamp"] == 0:
+            continue
+        
+        # Calculate distance in km
+        distance_km = haversine_distance(
+            coordinates[i-1]["lat"], coordinates[i-1]["lon"],
+            coordinates[i]["lat"], coordinates[i]["lon"]
+        )
+        
+        # Calculate time in hours
+        time_ms = coordinates[i]["timestamp"] - coordinates[i-1]["timestamp"]
+        time_hours = time_ms / (1000 * 3600)
+        
+        # Calculate speed (avoid division by zero)
+        if time_hours > 0:
+            speed_kmh = distance_km / time_hours
+            # Filter out unrealistic speeds (>150 km/h for paragliding)
+            if speed_kmh < 150:
+                max_speed = max(max_speed, speed_kmh)
+    
+    return round(max_speed, 2)
+
+
 def calculate_gpx_stats(coordinates: List[Dict]) -> Dict:
     """
     Calculate statistics from GPX coordinates
@@ -1506,7 +1633,8 @@ def calculate_gpx_stats(coordinates: List[Dict]) -> Dict:
             "elevation_gain_m": 0,
             "elevation_loss_m": 0,
             "total_distance_km": 0,
-            "flight_duration_seconds": 0
+            "flight_duration_seconds": 0,
+            "max_speed_kmh": 0
         }
     
     elevations = [c["elevation"] for c in coordinates]
@@ -1540,13 +1668,17 @@ def calculate_gpx_stats(coordinates: List[Dict]) -> Dict:
         # Estimate: assume 30 km/h average speed
         duration_seconds = (total_distance / 30) * 3600 if total_distance > 0 else 0
     
+    # Calculate max speed
+    max_speed = calculate_max_speed(coordinates)
+    
     return {
         "max_altitude_m": round(max_alt),
         "min_altitude_m": round(min_alt),
         "elevation_gain_m": round(elevation_gain),
         "elevation_loss_m": round(elevation_loss),
         "total_distance_km": round(total_distance, 2),
-        "flight_duration_seconds": round(duration_seconds)
+        "flight_duration_seconds": round(duration_seconds),
+        "max_speed_kmh": max_speed
     }
 
 
