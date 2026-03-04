@@ -169,4 +169,91 @@ export const handlers = [
       day_index: 0,
     });
   }),
+
+  // POST /api/flights/sync-strava - Synchronize Strava flights
+  ...createHandler('post', '/flights/sync-strava', async ({ request }) => {
+    const body = await request.json() as { date_from: string; date_to: string };
+    
+    // Simulate sync delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // Mock response: import 2 new flights, skip 3 duplicates, 0 failed
+    return HttpResponse.json({
+      success: true,
+      imported: 2,
+      skipped: 3,
+      failed: 0,
+      flights: [
+        {
+          id: 'mock-strava-1',
+          site_name: 'Arguel',
+          title: 'Vol Strava importé 1',
+          flight_date: body.date_from,
+          strava_id: '99999999',
+        },
+        {
+          id: 'mock-strava-2',
+          site_name: 'La Côte',
+          title: 'Vol Strava importé 2',
+          flight_date: body.date_to,
+          strava_id: '88888888',
+        },
+      ],
+    });
+  }),
+
+  // POST /api/flights/:flightId/upload-gpx - Upload GPX to existing flight
+  ...createHandler('post', '/flights/:flightId/upload-gpx', async ({ params, request }) => {
+    const { flightId } = params;
+    
+    // Find the flight
+    const flight = flights.find((f) => f.id === flightId);
+    if (!flight) {
+      return new HttpResponse(null, {
+        status: 404,
+        statusText: 'Flight not found',
+      });
+    }
+
+    // Simulate upload delay
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    // Mock successful upload
+    const mockGpxPath = `db/gpx/manual_${flightId}.gpx`;
+    
+    // Update flight in mock data (in-memory only for this session)
+    flight.gpx_file_path = mockGpxPath;
+    
+    return HttpResponse.json({
+      success: true,
+      flight_id: flightId,
+      gpx_file_path: mockGpxPath,
+      message: 'GPX file uploaded successfully',
+    });
+  }),
+
+  // DELETE /api/flights/:flightId - Delete a flight
+  ...createHandler('delete', '/flights/:flightId', async ({ params }) => {
+    const { flightId } = params;
+    
+    // Find the flight
+    const flightIndex = flights.findIndex((f) => f.id === flightId);
+    if (flightIndex === -1) {
+      return new HttpResponse(null, {
+        status: 404,
+        statusText: 'Flight not found',
+      });
+    }
+
+    // Simulate deletion delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Remove flight from mock data (in-memory only for this session)
+    const deletedFlight = flights.splice(flightIndex, 1)[0];
+    
+    return HttpResponse.json({
+      success: true,
+      message: `Flight '${deletedFlight.title}' deleted successfully`,
+    });
+  }),
 ];

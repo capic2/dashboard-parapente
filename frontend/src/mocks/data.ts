@@ -160,6 +160,26 @@ export const flights = [
     created_at: '2025-09-27T17:30:00Z',
     updated_at: '2025-09-27T17:30:00Z',
   },
+  {
+    id: 'no-gpx-flight-1',
+    site_id: 'site-mont-poupet',
+    site_name: 'Mont Poupet',
+    title: 'Mont Poupet 15-09 14h30 (sans GPX)',
+    name: 'Mont Poupet 15-09 14h30',
+    flight_date: '2025-09-15',
+    departure_time: '2025-09-15T14:30:00Z',
+    duration_minutes: 12,
+    max_altitude_m: 850,
+    distance_km: 5.2,
+    elevation_gain_m: 35,
+    gpx_file_path: null,
+    strava_id: null,
+    notes: 'Vol manuel sans GPX - idéal pour tester l\'upload',
+    description: null,
+    external_url: null,
+    created_at: '2025-09-15T15:00:00Z',
+    updated_at: '2025-09-15T15:00:00Z',
+  },
 ];
 
 // Mock GPX data pour chaque vol

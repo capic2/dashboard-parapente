@@ -27,10 +27,12 @@ src/mocks/
 - `GET /api/spots/:spotId` → Détails d'un site spécifique
 
 ### Vols (Flights)
-- `GET /api/flights?limit=10` → Liste des vols récents (6 vols mockés)
+- `GET /api/flights?limit=10` → Liste des vols récents (7 vols mockés, dont 1 sans GPX)
 - `GET /api/flights/:flightId` → Détails d'un vol
 - `GET /api/flights/:flightId/gpx-data` → Coordonnées GPX d'un vol (pour Cesium 3D)
 - `GET /api/flights/stats` → Statistiques agrégées
+- `POST /api/flights/sync-strava` → **NOUVEAU** Synchroniser les vols Strava (mock: 2 importés, 3 ignorés)
+- `POST /api/flights/:flightId/upload-gpx` → **NOUVEAU** Uploader un GPX sur un vol existant
 
 ### Météo (Weather)
 - `GET /api/weather/:spotId?day_index=0` → Prévisions météo pour un site
@@ -83,18 +85,25 @@ Pour changer les données mockées :
 
 ## 🚀 Activation/Désactivation
 
-### Désactiver MSW temporairement
+### Basculer entre mocks et API réelle
+
+Modifier le fichier `.env` à la racine du frontend :
+
+```bash
+# Utiliser les mocks MSW
+VITE_ENABLE_MSW=true
+
+# Utiliser l'API réelle (backend sur localhost:8001)
+VITE_ENABLE_MSW=false
+```
+
+Redémarrer le serveur Vite après modification.
+
+### Désactiver MSW temporairement (dans le code)
 
 Dans `src/main.tsx`, commenter l'import et l'appel :
 ```typescript
 // await enableMocking() // ← Commenter cette ligne
-```
-
-### Activer MSW en production (pas recommandé)
-
-Changer la condition dans `main.tsx` :
-```typescript
-if (import.meta.env.DEV) { // ← Enlever cette condition
 ```
 
 ⚠️ **Attention** : MSW ne devrait être utilisé qu'en développement ou pour les tests.

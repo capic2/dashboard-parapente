@@ -979,16 +979,22 @@ def get_flights(limit: int = 10, db: Session = Depends(get_db)):
     for flight in flights:
         flight_dict = {
             "id": flight.id,
+            "strava_id": flight.strava_id,
             "site_id": flight.site_id,
             "site_name": flight.site.name if flight.site else None,
+            "name": flight.name,
             "title": flight.title,
+            "description": flight.description,
             "flight_date": flight.flight_date.isoformat() if flight.flight_date else None,
+            "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
             "duration_minutes": flight.duration_minutes,
             "max_altitude_m": flight.max_altitude_m,
+            "max_speed_kmh": flight.max_speed_kmh,
             "distance_km": flight.distance_km,
             "elevation_gain_m": flight.elevation_gain_m,
             "notes": flight.notes,
             "gpx_file_path": flight.gpx_file_path,
+            "external_url": flight.external_url,
             "created_at": flight.created_at.isoformat() if flight.created_at else None,
             "updated_at": flight.updated_at.isoformat() if flight.updated_at else None
         }
@@ -1208,17 +1214,30 @@ async def sync_strava_activities(
                     logger.warning(f"No GPX available for activity {strava_id}")
                 
                 # 6. Extraire données de l'activité Strava
+                start_date_local = activity.get("start_date_local", "")
+                
+                # Date du vol (YYYY-MM-DD)
                 activity_date = datetime.strptime(
-                    activity["start_date_local"].split("T")[0],
+                    start_date_local.split("T")[0],
                     "%Y-%m-%d"
                 ).date()
+                
+                # Heure de départ (datetime complet)
+                departure_time = None
+                if start_date_local:
+                    try:
+                        departure_time = datetime.fromisoformat(start_date_local.replace("Z", "+00:00"))
+                    except Exception as e:
+                        logger.warning(f"Failed to parse departure_time for {strava_id}: {e}")
                 
                 # 7. Créer Flight
                 flight = Flight(
                     id=str(uuid.uuid4()),
                     strava_id=strava_id,
                     title=activity.get("name", f"Vol {activity_date}"),
+                    name=activity.get("name", f"Vol {activity_date}"),
                     flight_date=activity_date,
+                    departure_time=departure_time,
                     duration_minutes=int(activity.get("moving_time", 0) / 60),
                     max_altitude_m=int(activity.get("elev_high", 0)) if activity.get("elev_high") else None,
                     distance_km=round(activity.get("distance", 0) / 1000, 2),
@@ -1315,6 +1334,51 @@ async def upload_gpx_to_flight(
         logger.error(f"Failed to upload GPX to flight {flight_id}: {e}", exc_info=True)
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+
+@router.delete("/flights/{flight_id}")
+async def delete_flight(
+    flight_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Supprimer un vol
+    
+    Args:
+        flight_id: ID du vol à supprimer
+    
+    Returns:
+        {"success": true, "message": "Flight deleted"}
+    """
+    # 1. Vérifier que le vol existe
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    
+    try:
+        # 2. Supprimer le fichier GPX si présent
+        if flight.gpx_file_path:
+            gpx_path = Path(__file__).parent / flight.gpx_file_path
+            if gpx_path.exists():
+                gpx_path.unlink()
+                logger.info(f"Deleted GPX file: {flight.gpx_file_path}")
+        
+        # 3. Supprimer le vol de la base
+        flight_title = flight.title
+        db.delete(flight)
+        db.commit()
+        
+        logger.info(f"✅ Deleted flight: {flight_title} (ID: {flight_id})")
+        
+        return {
+            "success": True,
+            "message": f"Flight '{flight_title}' deleted successfully"
+        }
+    
+    except Exception as e:
+        logger.error(f"Failed to delete flight {flight_id}: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
 
 
 # Alerts endpoints

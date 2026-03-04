@@ -1,41 +1,6 @@
 // Core domain types
-
-export interface Site {
-  id: string;
-  name: string;
-  latitude: number;
-  longitude: number;
-  elevation_m?: number | null;
-  description?: string;
-  orientation?: string | null;  // N, NW, W, S, etc. - wind direction the site faces
-  difficulty_level?: string;
-  is_active: boolean;
-  rating?: number | null;  // 0-6 rating from official spots database
-  linked_spot_id?: string | null;  // Link to paragliding_spots table
-  code?: string | null;
-  region?: string | null;
-  country?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-}
-
-export interface Flight {
-  id: string;
-  user_id?: string;
-  site_id: string;
-  site_name?: string;
-  title: string;
-  flight_date: string;
-  duration_minutes: number;
-  max_altitude_m: number;
-  distance_km: number;
-  elevation_gain_m: number;
-  notes?: string | null;
-  gpx_file_path?: string | null;
-  site?: Site;
-  created_at: string;
-  updated_at: string;
-}
+// Re-export types from Zod schemas to ensure consistency between validation and types
+export type { Site, Flight, FlightStats } from '../schemas'
 
 export interface FlightFilters {
   siteId?: string;
@@ -44,21 +9,7 @@ export interface FlightFilters {
   limit?: number;
 }
 
-export interface FlightStats {
-  total_flights: number;
-  total_hours: number;
-  total_duration_minutes: number;
-  total_distance: number;
-  total_distance_km: number;
-  total_elevation_gain_m: number;
-  avg_duration: number;
-  avg_duration_minutes: number;
-  avg_distance_km: number;
-  max_altitude_m: number;
-  favorite_spot?: string | null;
-  favorite_site?: Site | null;
-  last_flight_date?: string | null;
-}
+
 
 export interface Alert {
   id: string;

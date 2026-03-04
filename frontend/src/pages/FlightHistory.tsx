@@ -11,10 +11,13 @@ import FlightViewer3D from '../components/FlightViewer3D';
 import { StravaSyncModal } from '../components/StravaSyncModal';
 import { ToastContainer } from '../components/ui/Toast';
 import { useToast, useToastStore } from '../hooks/useToast';
+import { api } from '../lib/api';
 
 export default function FlightHistory() {
   const { data: flights = [], isLoading, error } = useFlights({ limit: 50 });
   const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null);
+  const [selectedFlightIds, setSelectedFlightIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -30,10 +33,38 @@ export default function FlightHistory() {
   const { toasts, removeToast } = useToastStore();
 
   const handleSelectFlight = useCallback((flight: Flight) => {
-    setSelectedFlightId(flight.id);
-    setNotesText(flight.notes || '');
-    setEditingNotes(false);
-    setShowDeleteConfirm(false);
+    if (selectionMode) {
+      // Mode sélection multiple : toggle la sélection
+      setSelectedFlightIds(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(flight.id)) {
+          newSet.delete(flight.id);
+        } else {
+          newSet.add(flight.id);
+        }
+        return newSet;
+      });
+    } else {
+      // Mode normal : afficher les détails
+      setSelectedFlightId(flight.id);
+      setNotesText(flight.notes || '');
+      setEditingNotes(false);
+      setShowDeleteConfirm(false);
+    }
+  }, [selectionMode]);
+
+  const handleToggleSelectionMode = useCallback(() => {
+    setSelectionMode(prev => !prev);
+    setSelectedFlightIds(new Set());
+    setSelectedFlightId(null);
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    setSelectedFlightIds(new Set(flights.map((f: Flight) => f.id)));
+  }, [flights]);
+
+  const handleDeselectAll = useCallback(() => {
+    setSelectedFlightIds(new Set());
   }, []);
 
   const handleSaveNotes = useCallback(async () => {
@@ -57,16 +88,51 @@ export default function FlightHistory() {
   }, [selectedFlight, updateFlight, notesText]);
 
   const handleDeleteFlight = useCallback(async () => {
-    if (!selectedFlightId) return;
+    if (selectionMode && selectedFlightIds.size > 0) {
+      // Suppression multiple
+      try {
+        let successCount = 0;
+        let failCount = 0;
 
-    try {
-      await deleteFlight.mutateAsync();
-      setSelectedFlightId(null);
-      setShowDeleteConfirm(false);
-    } catch (err) {
-      console.error('Failed to delete flight:', err);
+        for (const flightId of selectedFlightIds) {
+          try {
+            await api.delete(`flights/${flightId}`);
+            successCount++;
+          } catch (err) {
+            console.error(`Failed to delete flight ${flightId}:`, err);
+            failCount++;
+          }
+        }
+
+        // Invalider le cache
+        queryClient.invalidateQueries({ queryKey: ['flights'] });
+        queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] });
+
+        if (failCount === 0) {
+          toast.success(`${successCount} vol${successCount > 1 ? 's' : ''} supprimé${successCount > 1 ? 's' : ''} avec succès`);
+        } else {
+          toast.error(`${successCount} réussi${successCount > 1 ? 's' : ''}, ${failCount} échec${failCount > 1 ? 's' : ''}`);
+        }
+
+        setSelectedFlightIds(new Set());
+        setShowDeleteConfirm(false);
+      } catch (err) {
+        console.error('Failed to delete flights:', err);
+        toast.error('Échec de la suppression');
+      }
+    } else if (selectedFlightId) {
+      // Suppression simple
+      try {
+        await deleteFlight.mutateAsync();
+        toast.success('Vol supprimé avec succès');
+        setSelectedFlightId(null);
+        setShowDeleteConfirm(false);
+      } catch (err) {
+        console.error('Failed to delete flight:', err);
+        toast.error(`Échec de la suppression: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+      }
     }
-  }, [selectedFlightId, deleteFlight]);
+  }, [selectedFlightId, selectedFlightIds, selectionMode, deleteFlight, toast, queryClient]);
 
   const handleGPXUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -127,25 +193,74 @@ export default function FlightHistory() {
       <ToastContainer toasts={toasts} onClose={removeToast} />
       
       <div className="mb-4 bg-white rounded-xl p-4 shadow-md">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center mb-3">
           <div>
             <h1 className="text-xl font-bold text-gray-900">
               🪂 Historique des Vols
             </h1>
             <div className="text-sm text-gray-600 mt-1">
-              {flights.length} vol{flights.length > 1 ? 's' : ''} enregistré
-              {flights.length > 1 ? 's' : ''}
+              {selectionMode && selectedFlightIds.size > 0 ? (
+                <span className="text-sky-600 font-semibold">
+                  {selectedFlightIds.size} vol{selectedFlightIds.size > 1 ? 's' : ''} sélectionné{selectedFlightIds.size > 1 ? 's' : ''}
+                </span>
+              ) : (
+                <>
+                  {flights.length} vol{flights.length > 1 ? 's' : ''} enregistré
+                  {flights.length > 1 ? 's' : ''}
+                </>
+              )}
             </div>
           </div>
           
-          {/* Bouton Sync Strava */}
-          <button 
-            onClick={() => setShowStravaSyncModal(true)}
-            className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-all flex items-center gap-2"
-          >
-            🔄 Sync Strava
-          </button>
+          <div className="flex gap-2">
+            {/* Bouton Sync Strava */}
+            {!selectionMode && (
+              <button 
+                onClick={() => setShowStravaSyncModal(true)}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-all flex items-center gap-2"
+              >
+                🔄 Sync Strava
+              </button>
+            )}
+            
+            {/* Bouton Mode Sélection */}
+            <button 
+              onClick={handleToggleSelectionMode}
+              className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+                selectionMode 
+                  ? 'bg-gray-600 text-white hover:bg-gray-700' 
+                  : 'bg-sky-600 text-white hover:bg-sky-700'
+              }`}
+            >
+              {selectionMode ? '✖️ Annuler' : '☑️ Sélectionner'}
+            </button>
+          </div>
         </div>
+        
+        {/* Actions de sélection multiple */}
+        {selectionMode && (
+          <div className="flex gap-2 pt-3 border-t border-gray-200">
+            <button 
+              onClick={handleSelectAll}
+              className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
+            >
+              Tout sélectionner
+            </button>
+            <button 
+              onClick={handleDeselectAll}
+              className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
+            >
+              Tout désélectionner
+            </button>
+            <button 
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={selectedFlightIds.size === 0}
+              className="ml-auto px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed"
+            >
+              🗑️ Supprimer ({selectedFlightIds.size})
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -163,7 +278,9 @@ export default function FlightHistory() {
               <div
                 key={flight.id}
                 className={`bg-white rounded-lg p-3 shadow-sm border-2 transition-all cursor-pointer ${
-                  selectedFlightId === flight.id
+                  selectionMode && selectedFlightIds.has(flight.id)
+                    ? 'border-sky-600 shadow-md bg-sky-50'
+                    : selectedFlightId === flight.id
                     ? 'border-sky-600 shadow-md'
                     : 'border-gray-200 hover:border-sky-400'
                 }`}
@@ -176,25 +293,48 @@ export default function FlightHistory() {
                 aria-label={`Sélectionner vol du ${new Date(flight.flight_date).toLocaleDateString('fr-FR')}`}
               >
                 <div className="flex justify-between items-start mb-2">
+                  {/* Checkbox en mode sélection */}
+                  {selectionMode && (
+                    <input
+                      type="checkbox"
+                      checked={selectedFlightIds.has(flight.id)}
+                      onChange={() => handleSelectFlight(flight)}
+                      className="mr-2 mt-1 w-4 h-4 text-sky-600 rounded focus:ring-sky-500"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  )}
+                  
                   <h3 className="font-semibold text-sm text-gray-900 truncate flex-1">
                     {flight.title || 'Vol sans titre'}
                   </h3>
                   
                   {/* Badge GPX manquant */}
-                  {!flight.gpx_file_path && (
+                  {!flight.gpx_file_path && !selectionMode && (
                     <span className="ml-2 px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full shrink-0">
                       📎 GPX manquant
                     </span>
                   )}
-                  
-                  <span className="text-xs text-gray-500 ml-2 shrink-0">
+                </div>
+                
+                {/* Date et heure */}
+                <div className="text-xs text-gray-500 mb-2">
+                  <span className="font-medium">
                     {new Date(flight.flight_date).toLocaleDateString('fr-FR', {
                       day: '2-digit',
                       month: 'short',
                       year: 'numeric',
                     })}
                   </span>
+                  {flight.departure_time && (
+                    <span className="ml-2">
+                      à {new Date(flight.departure_time).toLocaleTimeString('fr-FR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  )}
                 </div>
+                
                 <div className="flex flex-wrap gap-2 text-xs text-gray-600">
                   {flight.duration_minutes && (
                     <div className="flex items-center gap-1">
@@ -303,17 +443,36 @@ export default function FlightHistory() {
                       )}
                     </span>
                   </div>
+                  
+                  {selectedFlight.departure_time && (
+                    <div>
+                      <span className="text-xs text-gray-600">🕐 Heure de départ</span>
+                      <span className="block text-sm font-medium text-gray-900 mt-1">
+                        {new Date(selectedFlight.departure_time).toLocaleTimeString('fr-FR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  
                   <div>
                     <span className="text-xs text-gray-600">📍 Site</span>
                     <span className="block text-sm font-medium text-gray-900 mt-1">
-                      {selectedFlight.site_name || selectedFlight.site_id}
+                      {selectedFlight.site_name || selectedFlight.site_id || 'Non spécifié'}
                     </span>
                   </div>
                   <div>
                     <span className="text-xs text-gray-600">⏱️ Durée</span>
                     <span className="block text-sm font-medium text-gray-900 mt-1">
-                      {Math.floor(selectedFlight.duration_minutes / 60)}h{' '}
-                      {selectedFlight.duration_minutes % 60}m
+                      {selectedFlight.duration_minutes ? (
+                        <>
+                          {Math.floor(selectedFlight.duration_minutes / 60)}h{' '}
+                          {selectedFlight.duration_minutes % 60}m
+                        </>
+                      ) : (
+                        'N/A'
+                      )}
                     </span>
                   </div>
                   <div>
@@ -410,7 +569,7 @@ export default function FlightHistory() {
                 </div>
 
                 {/* Delete Confirmation */}
-                {showDeleteConfirm && (
+                {showDeleteConfirm && !selectionMode && (
                   <div className="mt-4 p-4 bg-red-50 border-2 border-red-200 rounded-lg">
                     <p className="text-sm font-semibold text-red-700 mb-3">
                       ⚠️ Supprimer ce vol définitivement ?
@@ -466,6 +625,38 @@ export default function FlightHistory() {
           queryClient.invalidateQueries({ queryKey: ['flights'] });
         }}
       />
+      
+      {/* Modal de confirmation suppression multiple */}
+      {showDeleteConfirm && selectionMode && selectedFlightIds.size > 0 && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 shadow-xl max-w-md w-full mx-4">
+            <h3 className="text-lg font-bold text-red-600 mb-3">
+              ⚠️ Confirmer la suppression
+            </h3>
+            <p className="text-gray-700 mb-4">
+              Vous êtes sur le point de supprimer définitivement{' '}
+              <span className="font-bold text-red-600">
+                {selectedFlightIds.size} vol{selectedFlightIds.size > 1 ? 's' : ''}
+              </span>
+              . Cette action est irréversible.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleDeleteFlight}
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all"
+              >
+                🗑️ Supprimer {selectedFlightIds.size} vol{selectedFlightIds.size > 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
