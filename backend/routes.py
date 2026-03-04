@@ -6,6 +6,7 @@ from database import get_db
 from models import Site, Flight, WeatherForecast
 from schemas import Site as SiteSchema, SpotsResponse, WeatherForecast as WeatherForecastSchema, WeatherResponse
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from pathlib import Path
 import uuid
 import asyncio
@@ -1481,18 +1482,28 @@ async def create_flight_from_gpx(
         # 5. Créer le vol
         flight_id = str(uuid.uuid4())
         
-        # Extraire la date depuis le GPX (premier trackpoint)
+        # Extraire la date et heure depuis le GPX (premier trackpoint)
         flight_date = date.today()  # Default
         departure_time = None
+        flight_name = f"Vol du {flight_date.strftime('%d/%m/%Y')}"  # Default
         
         if stats.get("first_trackpoint") and stats["first_trackpoint"].get("time"):
-            departure_datetime = stats["first_trackpoint"]["time"]
-            if isinstance(departure_datetime, datetime):
-                flight_date = departure_datetime.date()
-                departure_time = departure_datetime
-        
-        # Nom du vol par défaut
-        flight_name = f"Vol du {flight_date.strftime('%d/%m/%Y')}"
+            # Le timestamp du GPX est en UTC, on le convertit en heure locale française
+            departure_datetime_utc = stats["first_trackpoint"]["time"]
+            if isinstance(departure_datetime_utc, datetime):
+                # Convertir UTC -> Europe/Paris (UTC+1 ou UTC+2 selon DST)
+                paris_tz = ZoneInfo("Europe/Paris")
+                if departure_datetime_utc.tzinfo is None:
+                    # Si le datetime est naive (sans timezone), on suppose UTC
+                    departure_datetime_utc = departure_datetime_utc.replace(tzinfo=ZoneInfo("UTC"))
+                
+                departure_time = departure_datetime_utc.astimezone(paris_tz)
+                flight_date = departure_time.date()
+                
+                # Nom du vol avec date ET heure
+                flight_name = f"Vol du {flight_date.strftime('%d/%m/%Y')} à {departure_time.strftime('%H:%M')}"
+                
+                print(f"🔍 DEBUG Date/Time - UTC: {departure_datetime_utc}, Local: {departure_time}, Name: {flight_name}")
         
         flight = Flight(
             id=flight_id,
@@ -1679,28 +1690,38 @@ def parse_gpx_file_from_string(gpx_content: str) -> List[Dict]:
     
     # Handle GPX namespace
     ns = {'gpx': 'http://www.topografix.com/GPX/1/1'}
-    if not root.tag.endswith('gpx'):
-        # Try without namespace
-        ns = {}
     
     coordinates = []
     
-    # Find all track points
-    for trkpt in root.findall('.//gpx:trkpt', ns) or root.findall('.//trkpt'):
+    # Find all track points - try with namespace first, then without
+    trkpts = root.findall('.//gpx:trkpt', ns)
+    if not trkpts:
+        trkpts = root.findall('.//trkpt')
+        ns = {}  # No namespace
+    
+    print(f"🔍 DEBUG Parse GPX - Found {len(trkpts)} trackpoints")
+    
+    for trkpt in trkpts:
         lat = float(trkpt.get('lat', 0))
         lon = float(trkpt.get('lon', 0))
         
-        # Get elevation
-        ele_elem = trkpt.find('gpx:ele', ns) or trkpt.find('ele')
+        # Get elevation - try with namespace first, then without
+        ele_elem = trkpt.find('gpx:ele', ns) if ns else None
+        if ele_elem is None:
+            ele_elem = trkpt.find('ele')
         elevation = float(ele_elem.text) if ele_elem is not None and ele_elem.text else 0
         
-        # Get timestamp
-        time_elem = trkpt.find('gpx:time', ns) or trkpt.find('time')
+        # Get timestamp - try with namespace first, then without
+        time_elem = trkpt.find('gpx:time', ns) if ns else None
+        if time_elem is None:
+            time_elem = trkpt.find('time')
+            
         if time_elem is not None and time_elem.text:
             try:
                 dt = datetime.fromisoformat(time_elem.text.replace('Z', '+00:00'))
                 timestamp = int(dt.timestamp() * 1000)  # milliseconds
-            except:
+            except Exception as e:
+                print(f"⚠️ DEBUG Parse time failed: {e}")
                 timestamp = 0
         else:
             timestamp = 0
@@ -1711,6 +1732,9 @@ def parse_gpx_file_from_string(gpx_content: str) -> List[Dict]:
             "elevation": elevation,
             "timestamp": timestamp
         })
+    
+    if coordinates:
+        print(f"🔍 DEBUG First coord - ele:{coordinates[0]['elevation']}m, ts:{coordinates[0]['timestamp']}")
     
     return coordinates
 
@@ -1813,12 +1837,19 @@ def calculate_gpx_stats(coordinates: List[Dict]) -> Dict:
             "elevation_loss_m": 0,
             "total_distance_km": 0,
             "flight_duration_seconds": 0,
-            "max_speed_kmh": 0
+            "max_speed_kmh": 0,
+            "first_trackpoint": None,
+            "last_trackpoint": None
         }
     
     elevations = [c["elevation"] for c in coordinates]
     max_alt = max(elevations)
     min_alt = min(elevations)
+    
+    # Debug logging for altitude
+    print(f"🔍 DEBUG Altitude - Points: {len(coordinates)}, Min: {min_alt}m, Max: {max_alt}m")
+    print(f"🔍 DEBUG First point elevation: {coordinates[0]['elevation']}m")
+    print(f"🔍 DEBUG Last point elevation: {coordinates[-1]['elevation']}m")
     
     # Calculate elevation gain/loss
     elevation_gain = 0
@@ -1850,6 +1881,29 @@ def calculate_gpx_stats(coordinates: List[Dict]) -> Dict:
     # Calculate max speed
     max_speed = calculate_max_speed(coordinates)
     
+    # Extract first and last trackpoints with datetime objects
+    first_trackpoint = None
+    last_trackpoint = None
+    
+    if coordinates[0]["timestamp"] > 0:
+        first_trackpoint = {
+            "time": datetime.fromtimestamp(coordinates[0]["timestamp"] / 1000),
+            "lat": coordinates[0]["lat"],
+            "lon": coordinates[0]["lon"],
+            "elevation": coordinates[0]["elevation"]
+        }
+    
+    if coordinates[-1]["timestamp"] > 0:
+        last_trackpoint = {
+            "time": datetime.fromtimestamp(coordinates[-1]["timestamp"] / 1000),
+            "lat": coordinates[-1]["lat"],
+            "lon": coordinates[-1]["lon"],
+            "elevation": coordinates[-1]["elevation"]
+        }
+    
+    print(f"🔍 DEBUG First trackpoint time: {first_trackpoint['time'] if first_trackpoint else 'None'}")
+    print(f"🔍 DEBUG Last trackpoint time: {last_trackpoint['time'] if last_trackpoint else 'None'}")
+    
     return {
         "max_altitude_m": round(max_alt),
         "min_altitude_m": round(min_alt),
@@ -1857,7 +1911,9 @@ def calculate_gpx_stats(coordinates: List[Dict]) -> Dict:
         "elevation_loss_m": round(elevation_loss),
         "total_distance_km": round(total_distance, 2),
         "flight_duration_seconds": round(duration_seconds),
-        "max_speed_kmh": max_speed
+        "max_speed_kmh": max_speed,
+        "first_trackpoint": first_trackpoint,
+        "last_trackpoint": last_trackpoint
     }
 
 

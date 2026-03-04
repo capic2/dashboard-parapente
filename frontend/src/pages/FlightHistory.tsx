@@ -15,7 +15,15 @@ import { useToast, useToastStore } from '../hooks/useToast';
 import { api } from '../lib/api';
 
 export default function FlightHistory() {
-  const { data: flights = [], isLoading, error } = useFlights({ limit: 50 });
+  const { data: flightsRaw = [], isLoading, error } = useFlights({ limit: 50 });
+  
+  // Trier les vols par date (plus récent en premier) côté frontend en backup du tri backend
+  const flights = [...flightsRaw].sort((a, b) => {
+    const dateA = new Date(a.flight_date);
+    const dateB = new Date(b.flight_date);
+    return dateB.getTime() - dateA.getTime();
+  });
+  
   const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null);
   const [selectedFlightIds, setSelectedFlightIds] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
