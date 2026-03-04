@@ -19,8 +19,9 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (!file.name.toLowerCase().endsWith('.gpx')) {
-        toast.error('Veuillez sélectionner un fichier GPX valide');
+      const fileName = file.name.toLowerCase();
+      if (!fileName.endsWith('.gpx') && !fileName.endsWith('.igc')) {
+        toast.error('Veuillez sélectionner un fichier GPX ou IGC valide');
         return;
       }
       setSelectedFile(file);
@@ -60,23 +61,23 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="📤 Créer un vol depuis GPX" size="md">
+    <Modal isOpen={isOpen} onClose={handleClose} title="📤 Créer un vol depuis GPX/IGC" size="md">
       <div className="space-y-4">
         <p className="text-sm text-gray-600">
-          Uploadez un fichier GPX pour créer automatiquement un nouveau vol.
+          Uploadez un fichier GPX ou IGC pour créer automatiquement un nouveau vol.
           Les statistiques (durée, altitude, distance, vitesse) seront extraites du fichier.
         </p>
         
         {/* File Input */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-700">
-            Fichier GPX
+            Fichier GPX ou IGC
           </label>
           <div className="flex items-center gap-3">
             <input
               ref={fileInputRef}
               type="file"
-              accept=".gpx"
+              accept=".gpx,.igc"
               onChange={handleFileChange}
               disabled={isPending}
               className="block w-full text-sm text-gray-500
