@@ -1423,6 +1423,140 @@ async def upload_gpx_to_flight(
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
+@router.post("/flights/create-from-gpx")
+async def create_flight_from_gpx(
+    gpx_file: UploadFile = File(...),
+    site_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Créer un nouveau vol depuis un fichier GPX
+    
+    Args:
+        gpx_file: Fichier GPX à uploader
+        site_id: ID du site (optionnel, peut être détecté automatiquement)
+    
+    Returns:
+        {
+            "success": true,
+            "flight_id": "...",
+            "flight": {...}
+        }
+    """
+    try:
+        # 1. Lire et parser le GPX
+        gpx_content = await gpx_file.read()
+        gpx_str = gpx_content.decode("utf-8")
+        
+        # 2. Parser le GPX pour extraire les coordonnées
+        coordinates = parse_gpx_file_from_string(gpx_str)
+        if not coordinates:
+            raise HTTPException(status_code=400, detail="Invalid GPX file: no trackpoints found")
+        
+        # 3. Calculer les statistiques
+        stats = calculate_gpx_stats(coordinates)
+        
+        # 4. Déterminer le site si pas fourni
+        if not site_id and coordinates:
+            # Essayer de matcher le site par coordonnées GPS du premier point
+            sites = db.query(Site).all()
+            sites_data = [
+                {
+                    "id": s.id,
+                    "name": s.name,
+                    "latitude": s.latitude,
+                    "longitude": s.longitude
+                }
+                for s in sites if s.latitude and s.longitude
+            ]
+            
+            first_coord = coordinates[0]
+            from strava import match_site_by_coordinates
+            site_id = match_site_by_coordinates(
+                first_coord["lat"],
+                first_coord["lon"],
+                sites_data
+            )
+        
+        # 5. Créer le vol
+        flight_id = str(uuid.uuid4())
+        
+        # Extraire la date depuis le GPX (premier trackpoint)
+        flight_date = date.today()  # Default
+        departure_time = None
+        
+        if stats.get("first_trackpoint") and stats["first_trackpoint"].get("time"):
+            departure_datetime = stats["first_trackpoint"]["time"]
+            if isinstance(departure_datetime, datetime):
+                flight_date = departure_datetime.date()
+                departure_time = departure_datetime
+        
+        # Nom du vol par défaut
+        flight_name = f"Vol du {flight_date.strftime('%d/%m/%Y')}"
+        
+        flight = Flight(
+            id=flight_id,
+            site_id=site_id,
+            name=flight_name,
+            title=flight_name,
+            flight_date=flight_date,
+            departure_time=departure_time,
+            duration_minutes=int(stats.get("flight_duration_seconds", 0) / 60) if stats.get("flight_duration_seconds") else None,
+            max_altitude_m=stats.get("max_altitude_m"),
+            distance_km=stats.get("total_distance_km"),
+            elevation_gain_m=stats.get("elevation_gain_m"),
+            max_speed_kmh=stats.get("max_speed_kmh", 0),
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        
+        # 6. Sauvegarder le fichier GPX
+        gpx_dir = Path(__file__).parent / "db" / "gpx"
+        gpx_dir.mkdir(parents=True, exist_ok=True)
+        
+        file_name = f"manual_{flight_id}.gpx"
+        file_path = gpx_dir / file_name
+        
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(gpx_str)
+        
+        flight.gpx_file_path = f"db/gpx/{file_name}"
+        
+        # 7. Enregistrer en base
+        db.add(flight)
+        db.commit()
+        db.refresh(flight)
+        
+        logger.info(f"✅ Created new flight from GPX: {flight.name} (ID: {flight_id})")
+        
+        # 8. Retourner le vol créé
+        return {
+            "success": True,
+            "flight_id": flight.id,
+            "flight": {
+                "id": flight.id,
+                "name": flight.name,
+                "title": flight.title,
+                "flight_date": flight.flight_date.isoformat(),
+                "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
+                "duration_minutes": flight.duration_minutes,
+                "max_altitude_m": flight.max_altitude_m,
+                "distance_km": flight.distance_km,
+                "elevation_gain_m": flight.elevation_gain_m,
+                "max_speed_kmh": flight.max_speed_kmh,
+                "site_id": flight.site_id,
+                "gpx_file_path": flight.gpx_file_path
+            }
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to create flight from GPX: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create flight: {str(e)}")
+
+
 @router.delete("/flights/{flight_id}")
 async def delete_flight(
     flight_id: str,
@@ -1535,6 +1669,51 @@ def health_check():
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
+
+def parse_gpx_file_from_string(gpx_content: str) -> List[Dict]:
+    """
+    Parse GPX content from string and extract coordinates with timestamps
+    Returns list of {lat, lon, elevation, timestamp}
+    """
+    root = ET.fromstring(gpx_content)
+    
+    # Handle GPX namespace
+    ns = {'gpx': 'http://www.topografix.com/GPX/1/1'}
+    if not root.tag.endswith('gpx'):
+        # Try without namespace
+        ns = {}
+    
+    coordinates = []
+    
+    # Find all track points
+    for trkpt in root.findall('.//gpx:trkpt', ns) or root.findall('.//trkpt'):
+        lat = float(trkpt.get('lat', 0))
+        lon = float(trkpt.get('lon', 0))
+        
+        # Get elevation
+        ele_elem = trkpt.find('gpx:ele', ns) or trkpt.find('ele')
+        elevation = float(ele_elem.text) if ele_elem is not None and ele_elem.text else 0
+        
+        # Get timestamp
+        time_elem = trkpt.find('gpx:time', ns) or trkpt.find('time')
+        if time_elem is not None and time_elem.text:
+            try:
+                dt = datetime.fromisoformat(time_elem.text.replace('Z', '+00:00'))
+                timestamp = int(dt.timestamp() * 1000)  # milliseconds
+            except:
+                timestamp = 0
+        else:
+            timestamp = 0
+        
+        coordinates.append({
+            "lat": lat,
+            "lon": lon,
+            "elevation": elevation,
+            "timestamp": timestamp
+        })
+    
+    return coordinates
+
 
 def parse_gpx_file(gpx_path: Path) -> List[Dict]:
     """

@@ -245,6 +245,34 @@ export function useStravaSyncMutation() {
 }
 
 /**
+ * Créer un nouveau vol à partir d'un fichier GPX
+ * Parse le GPX, extrait les stats et crée le vol automatiquement
+ */
+export function useCreateFlightFromGPX() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (formData: FormData) => {
+      // Ky supporte FormData directement
+      const data = await api.post('flights/create-from-gpx', { 
+        body: formData 
+      }).json<{
+        success: boolean;
+        flight: Flight;
+        message: string;
+      }>();
+      return data;
+    },
+    onSuccess: () => {
+      // Invalider le cache pour rafraîchir la liste et les stats
+      queryClient.invalidateQueries({ queryKey: ['flights'] });
+      queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] });
+      queryClient.invalidateQueries({ queryKey: ['flights', 'records'] });
+    }
+  });
+}
+
+/**
  * Uploader un GPX sur un vol existant (pour visualisation Cesium)
  * Ne modifie pas les stats du vol, juste ajoute le fichier
  */
