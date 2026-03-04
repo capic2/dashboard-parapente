@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from datetime import date, datetime
 from typing import Optional, List, Dict, Any
 
@@ -42,6 +42,43 @@ class FlightBase(BaseModel):
 class FlightCreate(FlightBase):
     site_id: Optional[str] = None
     strava_id: Optional[str] = None
+
+class FlightUpdate(BaseModel):
+    """Schema for updating flight details - all fields optional for PATCH"""
+    name: Optional[str] = None
+    title: Optional[str] = None
+    site_id: Optional[str] = None
+    flight_date: Optional[date] = None
+    departure_time: Optional[datetime] = None
+    duration_minutes: Optional[int] = None
+    max_altitude_m: Optional[int] = None
+    max_speed_kmh: Optional[float] = None
+    distance_km: Optional[float] = None
+    elevation_gain_m: Optional[int] = None
+    notes: Optional[str] = None
+    description: Optional[str] = None
+    external_url: Optional[str] = None
+    
+    @validator('duration_minutes', 'max_altitude_m', 'elevation_gain_m')
+    def positive_values(cls, v):
+        """Validate that numeric values are positive"""
+        if v is not None and v < 0:
+            raise ValueError('Value must be positive or zero')
+        return v
+    
+    @validator('distance_km', 'max_speed_kmh')
+    def positive_floats(cls, v):
+        """Validate that float values are positive"""
+        if v is not None and v < 0:
+            raise ValueError('Value must be positive or zero')
+        return v
+    
+    @validator('flight_date')
+    def date_not_future(cls, v):
+        """Validate that flight date is not in the future"""
+        if v and v > date.today():
+            raise ValueError('Flight date cannot be in the future')
+        return v
 
 class Flight(FlightBase):
     id: str
