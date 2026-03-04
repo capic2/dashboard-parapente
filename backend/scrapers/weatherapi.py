@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 # Load from environment, fallback to provided key
-WEATHERAPI_KEY = os.getenv("WEATHERAPI_KEY", "${WEATHERAPI_KEY}")
+WEATHERAPI_KEY = os.getenv("WEATHERAPI_KEY", "***REMOVED***")
 
 
 async def fetch_weatherapi(lat: float, lon: float, days: int = 2) -> Dict[str, any]:

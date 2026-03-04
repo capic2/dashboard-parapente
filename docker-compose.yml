@@ -43,8 +43,8 @@ services:
       - REDIS_PORT=6379
       
       # Weather API Keys
-      - WEATHERAPI_KEY=${WEATHERAPI_KEY}
-      - METEOBLUE_API_KEY=${METEOBLUE_API_KEY}
+      - WEATHERAPI_KEY=***REMOVED***
+      - METEOBLUE_API_KEY=***REMOVED***
       
       # Optional: Strava (décommenter si nécessaire)
       # - STRAVA_CLIENT_ID=

@@ -1,504 +1,276 @@
-# 🚀 Development Guide / Guide de Développement
+# Guide de Développement - Dashboard Parapente
 
-> **Quick start for local development using FakeRedis (no Redis server needed!)**  
-> **Démarrage rapide pour le développement local avec FakeRedis (pas besoin de serveur Redis !)**
+## 🚀 Démarrage rapide
+
+### Option 1 : Mode Mock (MSW) - Recommandé pour le frontend seul
+
+**Avantages :**
+- Pas besoin de lancer le backend
+- Données cohérentes et prévisibles
+- Rapide à démarrer
+- Idéal pour travailler sur l'UI/UX
+
+**Démarrage :**
+
+1. Configurer le frontend pour utiliser MSW :
+   ```bash
+   cd frontend
+   # Créer/modifier .env
+   echo "VITE_ENABLE_MSW=true" > .env
+   ```
+
+2. Lancer le frontend :
+   ```bash
+   npm run dev
+   ```
+
+3. Ouvrir http://localhost:5173
+
+**Données disponibles :**
+- 3 sites (Arguel, Mont Poupet, La Côte)
+- 7 vols (dont 1 sans GPX pour tester l'upload)
+- Météo mockée pour chaque site
+- Sync Strava mockée (retourne 2 importés, 3 ignorés)
 
 ---
 
-## 🇬🇧 English Version
+### Option 2 : Mode API réelle - Pour tester le backend
 
-### Prerequisites
+**Avantages :**
+- Teste l'intégration complète frontend/backend
+- Utilise la vraie base de données SQLite
+- Teste les vraies API Strava (avec credentials)
+- Idéal pour tester les nouvelles fonctionnalités backend
 
-Before you begin, ensure you have:
+**Démarrage :**
 
-- **Python 3.10+** installed
-- **Node.js 18+** and npm installed
-- **Git** for version control
-- A terminal/command prompt
+1. Configurer le backend (.env déjà configuré) :
+   ```bash
+   cd backend
+   cat .env  # Vérifier que ENVIRONMENT=development et USE_FAKE_REDIS=true
+   ```
 
-Optional (for testing with real Redis):
-- **Docker** (if you want to test with a real Redis server)
+2. Lancer le backend :
+   ```bash
+   cd backend
+   source venv/bin/activate
+   uvicorn main:app --reload --port 8001
+   ```
 
-### Quick Start (5 minutes)
+3. Configurer le frontend pour utiliser l'API réelle :
+   ```bash
+   cd frontend
+   echo "VITE_ENABLE_MSW=false" > .env
+   echo "VITE_API_URL=http://localhost:8001/api" >> .env
+   ```
 
-#### 1. Clone the Repository
+4. Lancer le frontend :
+   ```bash
+   npm run dev
+   ```
 
-```bash
-git clone <your-repo-url>
-cd dashboard-parapente
-```
+5. Ouvrir http://localhost:5173 (ou 5174)
 
-#### 2. Backend Setup
+**URLs :**
+- Frontend : http://localhost:5173
+- Backend API : http://localhost:8001
+- API Docs (Swagger) : http://localhost:8001/docs
 
-```bash
-cd backend
+---
 
-# Create virtual environment
-python -m venv venv
+## 🧪 Tester les nouvelles fonctionnalités
 
-# Activate it (Linux/Mac)
-source venv/bin/activate
-# Or on Windows:
-# venv\Scripts\activate
+### 1️⃣ Synchronisation Strava
 
-# Install dependencies (includes fakeredis)
-pip install -r requirements.txt
+**Prérequis :** API réelle avec credentials Strava configurés
 
-# Copy environment template
-cp .env.example .env
+**Test :**
+1. Aller sur "Historique des vols"
+2. Cliquer sur "🔄 Sync Strava"
+3. Sélectionner une période (ex: 90 derniers jours)
+4. Cliquer "Synchroniser"
+5. Vérifier le résumé (X importés, Y ignorés)
 
-# Edit .env if needed (defaults work fine for dev)
-# ENVIRONMENT=development  ← Already set
-# USE_FAKE_REDIS=true      ← Already set (uses in-memory cache)
-```
+**Avec mocks :** Retourne toujours "2 importés, 3 ignorés, 0 échecs"
 
-#### 3. Initialize Database
+---
 
-```bash
-# Create database schema
-python -c "from database import Base, engine; import models; Base.metadata.create_all(bind=engine)"
+### 2️⃣ Upload GPX
 
-# Seed with initial sites
-python seed_sites.py
-```
+**Test avec mocks :**
+1. Chercher le vol "Mont Poupet 15-09 14h30 (sans GPX)" avec badge orange
+2. Cliquer dessus pour voir les détails
+3. Cliquer "📎 Ajouter GPX"
+4. Sélectionner n'importe quel fichier GPX
+5. Vérifier que le badge passe au vert ✅
 
-#### 4. Start Backend Server
+**Test avec API réelle :**
+1. Trouver un vol sans GPX (ou créer un vol manuel)
+2. Upload un vrai fichier GPX
+3. Vérifier dans `backend/db/gpx/` que le fichier a été sauvegardé
+4. Vérifier que la visualisation 3D fonctionne dans Cesium
 
-```bash
-# Start with auto-reload
-python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
+---
 
-You should see:
-```
-INFO:     Using FakeRedis (in-memory mock) for development
-INFO:     Uvicorn running on http://0.0.0.0:8000
-```
-
-✅ **Backend is ready!** Test it: `curl http://localhost:8000/api/sites`
-
-#### 5. Frontend Setup (New Terminal)
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Start dev server
-npm run dev
-```
-
-Frontend will be available at: **http://localhost:5173**
-
-### Project Structure
+## 📂 Structure du projet
 
 ```
 dashboard-parapente/
-├── backend/              # Python FastAPI backend
-│   ├── cache.py         # Redis/FakeRedis cache layer
-│   ├── main.py          # FastAPI app entry point
-│   ├── routes.py        # API endpoints
-│   ├── models.py        # SQLAlchemy ORM models
-│   ├── scheduler.py     # Weather data polling (APScheduler)
-│   ├── weather_pipeline.py  # Data aggregation & consensus
-│   └── scrapers/        # Weather source scrapers
-├── frontend/            # React + TypeScript frontend
-│   ├── src/
-│   │   ├── components/  # Reusable UI components
-│   │   ├── pages/       # Page components
-│   │   ├── hooks/       # Custom React hooks
-│   │   └── types/       # TypeScript definitions
-└── docs/               # Documentation
+├── backend/
+│   ├── venv/                    # Virtual environment Python
+│   ├── .env                     # Config backend (ENVIRONMENT=development, credentials Strava)
+│   ├── main.py                  # Point d'entrée FastAPI
+│   ├── routes.py                # Endpoints API (dont sync-strava et upload-gpx)
+│   ├── strava.py                # Fonctions Strava (get_activities_by_period)
+│   ├── cache.py                 # Redis/FakeRedis
+│   └── db/
+│       ├── dashboard.db         # Base SQLite
+│       └── gpx/                 # Fichiers GPX uploadés
+│
+└── frontend/
+    ├── .env                     # Config frontend (VITE_ENABLE_MSW, VITE_API_URL)
+    ├── src/
+    │   ├── mocks/               # MSW (Mock Service Worker)
+    │   │   ├── handlers.ts      # Handlers API mockés
+    │   │   ├── data.ts          # Données mockées
+    │   │   └── README.md        # Doc MSW
+    │   ├── components/
+    │   │   ├── ui/              # Composants UI réutilisables
+    │   │   │   ├── Modal.tsx
+    │   │   │   ├── DatePicker.tsx
+    │   │   │   └── Toast.tsx
+    │   │   └── StravaSyncModal.tsx
+    │   ├── hooks/
+    │   │   ├── useFlights.ts    # Hooks React Query (dont useStravaSyncMutation)
+    │   │   └── useToast.ts      # Hook Zustand pour les toasts
+    │   └── pages/
+    │       └── FlightHistory.tsx # Page avec sync Strava et upload GPX
+    └── public/
+        └── mockServiceWorker.js # Service Worker MSW
 ```
-
-### How It Works: FakeRedis in Development
-
-**FakeRedis** is an in-memory implementation of Redis that requires no server:
-
-- ✅ **Automatic**: When `ENVIRONMENT=development`, FakeRedis is used by default
-- ✅ **Fast**: All cache operations happen in Python memory
-- ✅ **Isolated**: Each process has its own cache (perfect for single-process dev)
-- ⚠️ **Ephemeral**: Cache is cleared when you restart the server
-- ⚠️ **Single-process**: Not shared between multiple workers
-
-**Production uses real Redis** for persistence and multi-process caching.
-
-#### Cache Strategy
-
-**TTL (Time To Live):** 60 minutes  
-**Scheduler Interval:** Every hour (at :00)  
-**Synchronization:** Cache TTL matches polling interval to eliminate gaps
-
-**Why 60 minutes?**
-- Weather conditions change gradually (no 5-minute precision needed)
-- Aligned with hourly polling prevents cache misses
-- Reduces API calls to external providers
-- Instant responses for users (always cache hit)
-
-**Note:** In development with FakeRedis, cache is cleared on server restart.
-
-### Common Development Tasks
-
-#### Run Tests
-
-```bash
-# Backend tests
-cd backend
-pytest
-
-# Frontend tests
-cd frontend
-npm run test
-
-# Type checking (TypeScript)
-npm run type-check
-```
-
-#### View Storybook (UI Components)
-
-```bash
-cd frontend
-npm run storybook
-# Opens at http://localhost:6006
-```
-
-#### Check Code Quality
-
-```bash
-# Python linting
-cd backend
-flake8 .
-
-# TypeScript/React linting
-cd frontend
-npm run lint
-```
-
-#### Database Management
-
-```bash
-# View database
-sqlite3 backend/db/dashboard.db
-
-# Reset database
-rm backend/db/dashboard.db
-python -c "from database import Base, engine; import models; Base.metadata.create_all(bind=engine)"
-python seed_sites.py
-```
-
-### Optional: Testing with Real Redis
-
-If you want to test with a real Redis server (closer to production):
-
-#### Option A: Using Docker Compose
-
-```bash
-# Start only Redis
-docker-compose up redis
-
-# In another terminal, configure backend
-cd backend
-# Edit .env:
-# USE_FAKE_REDIS=false
-# REDIS_HOST=localhost
-# REDIS_PORT=6379
-
-# Restart backend
-python -m uvicorn main:app --reload
-```
-
-#### Option B: Local Redis Installation
-
-```bash
-# Ubuntu/Debian
-sudo apt install redis-server
-sudo systemctl start redis-server
-
-# macOS
-brew install redis
-brew services start redis
-
-# Then configure backend .env as above
-```
-
-### Troubleshooting
-
-#### "ModuleNotFoundError: No module named 'fakeredis'"
-
-```bash
-cd backend
-pip install fakeredis
-```
-
-#### "Failed to connect to Redis"
-
-Check your `.env` file:
-- For development: `ENVIRONMENT=development` and `USE_FAKE_REDIS=true`
-- FakeRedis doesn't require a server connection
-
-#### "Port 8000 already in use"
-
-```bash
-# Find and kill the process
-lsof -ti:8000 | xargs kill -9
-# Or use a different port
-python -m uvicorn main:app --reload --port 8001
-```
-
-#### Frontend can't reach backend API
-
-- Ensure backend is running on `http://localhost:8000`
-- Check `frontend/.env`: `VITE_API_URL=http://localhost:8000`
-- Check browser console for CORS errors
-
-### Next Steps
-
-- 📖 Read [USER_GUIDE.md](USER_GUIDE.md) to understand the dashboard features
-- 🚢 See [DEPLOYMENT.md](DEPLOYMENT.md) for production deployment
-- 🤝 Check [CONTRIBUTING.md](CONTRIBUTING.md) to contribute code
 
 ---
 
-## 🇫🇷 Version Française
+## 🛠️ Commandes utiles
 
-### Prérequis
-
-Avant de commencer, assurez-vous d'avoir :
-
-- **Python 3.10+** installé
-- **Node.js 18+** et npm installés
-- **Git** pour le contrôle de version
-- Un terminal/invite de commandes
-
-Optionnel (pour tester avec un vrai Redis) :
-- **Docker** (si vous voulez tester avec un vrai serveur Redis)
-
-### Démarrage Rapide (5 minutes)
-
-#### 1. Cloner le Dépôt
+### Backend
 
 ```bash
-git clone <url-de-votre-repo>
-cd dashboard-parapente
+# Activer venv
+cd backend && source venv/bin/activate
+
+# Lancer en dev (avec auto-reload)
+uvicorn main:app --reload --port 8001
+
+# Voir les logs
+tail -f logs/dashboard.log
+
+# Tester un endpoint
+curl http://localhost:8001/
+curl http://localhost:8001/api/flights
 ```
 
-#### 2. Configuration Backend
+### Frontend
 
 ```bash
-cd backend
-
-# Créer l'environnement virtuel
-python -m venv venv
-
-# L'activer (Linux/Mac)
-source venv/bin/activate
-# Ou sous Windows :
-# venv\Scripts\activate
-
-# Installer les dépendances (inclut fakeredis)
-pip install -r requirements.txt
-
-# Copier le template d'environnement
-cp .env.example .env
-
-# Éditer .env si besoin (les valeurs par défaut fonctionnent)
-# ENVIRONMENT=development  ← Déjà configuré
-# USE_FAKE_REDIS=true      ← Déjà configuré (cache en mémoire)
-```
-
-#### 3. Initialiser la Base de Données
-
-```bash
-# Créer le schéma de base de données
-python -c "from database import Base, engine; import models; Base.metadata.create_all(bind=engine)"
-
-# Ajouter les sites initiaux
-python seed_sites.py
-```
-
-#### 4. Démarrer le Serveur Backend
-
-```bash
-# Démarrer avec rechargement automatique
-python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Vous devriez voir :
-```
-INFO:     Using FakeRedis (in-memory mock) for development
-INFO:     Uvicorn running on http://0.0.0.0:8000
-```
-
-✅ **Le backend est prêt !** Testez-le : `curl http://localhost:8000/api/sites`
-
-#### 5. Configuration Frontend (Nouveau Terminal)
-
-```bash
-cd frontend
-
 # Installer les dépendances
 npm install
 
-# Démarrer le serveur de dev
+# Lancer en dev
+npm run dev
+
+# Build pour production
+npm run build
+
+# Preview du build
+npm run preview
+```
+
+### Basculer entre mocks et API
+
+```bash
+# Activer MSW (mocks)
+cd frontend
+echo "VITE_ENABLE_MSW=true" > .env
+
+# Utiliser l'API réelle
+echo "VITE_ENABLE_MSW=false" > .env
+echo "VITE_API_URL=http://localhost:8001/api" >> .env
+
+# Redémarrer Vite après changement
 npm run dev
 ```
 
-Le frontend sera disponible sur : **http://localhost:5173**
+---
 
-### Structure du Projet
+## 🐛 Troubleshooting
 
-```
-dashboard-parapente/
-├── backend/              # Backend Python FastAPI
-│   ├── cache.py         # Couche cache Redis/FakeRedis
-│   ├── main.py          # Point d'entrée FastAPI
-│   ├── routes.py        # Points de terminaison API
-│   ├── models.py        # Modèles ORM SQLAlchemy
-│   ├── scheduler.py     # Polling données météo (APScheduler)
-│   ├── weather_pipeline.py  # Agrégation & consensus des données
-│   └── scrapers/        # Scrapers sources météo
-├── frontend/            # Frontend React + TypeScript
-│   ├── src/
-│   │   ├── components/  # Composants UI réutilisables
-│   │   ├── pages/       # Composants de pages
-│   │   ├── hooks/       # Hooks React personnalisés
-│   │   └── types/       # Définitions TypeScript
-└── docs/               # Documentation
-```
+### Backend ne démarre pas
 
-### Comment Ça Marche : FakeRedis en Développement
+**Erreur : "externally-managed-environment"**
+→ Utiliser le venv : `source backend/venv/bin/activate`
 
-**FakeRedis** est une implémentation en mémoire de Redis qui ne nécessite aucun serveur :
+**Erreur : "redis.exceptions.ConnectionError"**
+→ Vérifier `.env` : `ENVIRONMENT=development` et `USE_FAKE_REDIS=true`
 
-- ✅ **Automatique** : Quand `ENVIRONMENT=development`, FakeRedis est utilisé par défaut
-- ✅ **Rapide** : Toutes les opérations de cache se font en mémoire Python
-- ✅ **Isolé** : Chaque processus a son propre cache (parfait pour le dev mono-processus)
-- ⚠️ **Éphémère** : Le cache est vidé quand vous redémarrez le serveur
-- ⚠️ **Mono-processus** : Non partagé entre plusieurs workers
+**Erreur : "python-multipart not found"**
+→ Réinstaller : `pip install -r requirements.txt`
 
-**La production utilise un vrai Redis** pour la persistance et le cache multi-processus.
+### Frontend ne se connecte pas à l'API
 
-### Tâches de Développement Courantes
+**Vérifier MSW :**
+→ Ouvrir la console (F12), chercher `[MSW] Mocking enabled`
 
-#### Lancer les Tests
+**Si MSW est activé mais vous voulez l'API réelle :**
+→ Modifier `.env` : `VITE_ENABLE_MSW=false`
 
-```bash
-# Tests backend
-cd backend
-pytest
+**Erreur CORS :**
+→ Vérifier que le backend tourne sur le bon port (8001)
 
-# Tests frontend
-cd frontend
-npm run test
+### Sync Strava ne fonctionne pas
 
-# Vérification des types (TypeScript)
-npm run type-check
-```
+**Avec mocks :** Devrait toujours fonctionner (retourne données mockées)
 
-#### Voir Storybook (Composants UI)
-
-```bash
-cd frontend
-npm run storybook
-# S'ouvre sur http://localhost:6006
-```
-
-#### Vérifier la Qualité du Code
-
-```bash
-# Linting Python
-cd backend
-flake8 .
-
-# Linting TypeScript/React
-cd frontend
-npm run lint
-```
-
-#### Gestion de la Base de Données
-
-```bash
-# Voir la base de données
-sqlite3 backend/db/dashboard.db
-
-# Réinitialiser la base de données
-rm backend/db/dashboard.db
-python -c "from database import Base, engine; import models; Base.metadata.create_all(bind=engine)"
-python seed_sites.py
-```
-
-### Optionnel : Tester avec un Vrai Redis
-
-Si vous voulez tester avec un vrai serveur Redis (plus proche de la production) :
-
-#### Option A : Utiliser Docker Compose
-
-```bash
-# Démarrer seulement Redis
-docker-compose up redis
-
-# Dans un autre terminal, configurer le backend
-cd backend
-# Éditer .env :
-# USE_FAKE_REDIS=false
-# REDIS_HOST=localhost
-# REDIS_PORT=6379
-
-# Redémarrer le backend
-python -m uvicorn main:app --reload
-```
-
-#### Option B : Installation Redis Locale
-
-```bash
-# Ubuntu/Debian
-sudo apt install redis-server
-sudo systemctl start redis-server
-
-# macOS
-brew install redis
-brew services start redis
-
-# Puis configurer backend .env comme ci-dessus
-```
-
-### Dépannage
-
-#### "ModuleNotFoundError: No module named 'fakeredis'"
-
-```bash
-cd backend
-pip install fakeredis
-```
-
-#### "Failed to connect to Redis"
-
-Vérifiez votre fichier `.env` :
-- Pour le développement : `ENVIRONMENT=development` et `USE_FAKE_REDIS=true`
-- FakeRedis ne nécessite pas de connexion serveur
-
-#### "Port 8000 already in use"
-
-```bash
-# Trouver et tuer le processus
-lsof -ti:8000 | xargs kill -9
-# Ou utiliser un port différent
-python -m uvicorn main:app --reload --port 8001
-```
-
-#### Le frontend ne peut pas joindre l'API backend
-
-- Assurez-vous que le backend tourne sur `http://localhost:8000`
-- Vérifiez `frontend/.env` : `VITE_API_URL=http://localhost:8000`
-- Vérifiez la console du navigateur pour les erreurs CORS
-
-### Prochaines Étapes
-
-- 📖 Lisez [USER_GUIDE.md](USER_GUIDE.md) pour comprendre les fonctionnalités du dashboard
-- 🚢 Voir [DEPLOYMENT.md](DEPLOYMENT.md) pour le déploiement en production
-- 🤝 Consultez [CONTRIBUTING.md](CONTRIBUTING.md) pour contribuer au code
+**Avec API réelle :**
+1. Vérifier credentials dans `backend/.env`
+2. Vérifier logs backend : `tail -f backend/logs/dashboard.log`
+3. Tester manuellement : `curl -X POST http://localhost:8001/api/flights/sync-strava -H "Content-Type: application/json" -d '{"date_from":"2025-01-01","date_to":"2025-03-04"}'`
 
 ---
 
-**Happy coding! / Bon développement ! 🪂**
+## 📝 Notes importantes
+
+1. **Base de données :** SQLite à `/home/capic/.openclaw/workspace/paragliding/db/dashboard.db`
+2. **Fichiers GPX :** Stockés dans `backend/db/gpx/`
+3. **Redis :** FakeRedis en dev (in-memory), pas besoin de Redis externe
+4. **Credentials Strava :** Déjà configurés dans `backend/.env` (Client ID: 73115)
+5. **Port frontend :** 5173 par défaut (ou 5174 si 5173 occupé)
+
+---
+
+## 🎯 Workflow recommandé
+
+### Pour développer l'UI uniquement
+→ **Option 1 (MSW)** - Rapide, pas besoin du backend
+
+### Pour tester l'intégration complète
+→ **Option 2 (API réelle)** - Lancer backend + frontend
+
+### Pour tester Strava sync avec vraies données
+→ **Option 2** + vérifier credentials Strava dans `.env`
+
+---
+
+## ✅ Checklist avant de commit
+
+- [ ] Les mocks MSW sont à jour (`frontend/src/mocks/handlers.ts`)
+- [ ] Le backend démarre sans erreur
+- [ ] Le frontend démarre sans erreur
+- [ ] Les deux nouveaux endpoints fonctionnent (sync-strava, upload-gpx)
+- [ ] Les toasts s'affichent correctement
+- [ ] Le badge "GPX manquant" s'affiche
+- [ ] La documentation est à jour
+
+---
+
+Bon développement ! 🚀

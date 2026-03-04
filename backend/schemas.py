@@ -31,6 +31,7 @@ class FlightBase(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     flight_date: date
+    departure_time: Optional[datetime] = None
     duration_minutes: Optional[int] = None
     max_altitude_m: Optional[int] = None
     max_speed_kmh: Optional[float] = None
@@ -45,6 +46,10 @@ class FlightCreate(FlightBase):
 class Flight(FlightBase):
     id: str
     site_id: Optional[str] = None
+    site_name: Optional[str] = None
+    name: Optional[str] = None
+    strava_id: Optional[str] = None
+    gpx_file_path: Optional[str] = None
     external_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
