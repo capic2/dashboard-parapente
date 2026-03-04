@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -1142,6 +1142,180 @@ def create_flight(flight_data: dict, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(flight)
     return flight
+
+
+@router.post("/flights/sync-strava")
+async def sync_strava_activities(
+    request: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Synchronise manuellement les vols Strava pour une période donnée
+    
+    Body:
+        date_from: Date début (format: YYYY-MM-DD)
+        date_to: Date fin (format: YYYY-MM-DD)
+    
+    Returns:
+        {
+            "success": true,
+            "imported": 5,
+            "skipped": 2,
+            "failed": 0,
+            "flights": [...]
+        }
+    """
+    from strava import get_activities_by_period, download_gpx, save_gpx_file
+    
+    date_from = request.get("date_from")
+    date_to = request.get("date_to")
+    
+    if not date_from or not date_to:
+        raise HTTPException(status_code=400, detail="date_from and date_to are required")
+    
+    try:
+        # 1. Récupérer activités Strava
+        logger.info(f"Fetching Strava activities from {date_from} to {date_to}")
+        activities = await get_activities_by_period(date_from, date_to)
+        
+        imported_flights = []
+        skipped_count = 0
+        failed_count = 0
+        
+        # 2. Pour chaque activité
+        for activity in activities:
+            strava_id = str(activity["id"])
+            
+            # 3. Vérifier si existe déjà (doublon)
+            existing = db.query(Flight).filter(Flight.strava_id == strava_id).first()
+            if existing:
+                logger.info(f"Skipping duplicate: Strava ID {strava_id}")
+                skipped_count += 1
+                continue
+            
+            try:
+                # 4. Télécharger GPX
+                gpx_content = await download_gpx(strava_id)
+                
+                gpx_path = None
+                if gpx_content:
+                    # 5. Sauvegarder GPX
+                    gpx_path = save_gpx_file(gpx_content, strava_id)
+                    
+                    if not gpx_path:
+                        logger.warning(f"Failed to save GPX for activity {strava_id}")
+                else:
+                    logger.warning(f"No GPX available for activity {strava_id}")
+                
+                # 6. Extraire données de l'activité Strava
+                activity_date = datetime.strptime(
+                    activity["start_date_local"].split("T")[0],
+                    "%Y-%m-%d"
+                ).date()
+                
+                # 7. Créer Flight
+                flight = Flight(
+                    id=str(uuid.uuid4()),
+                    strava_id=strava_id,
+                    title=activity.get("name", f"Vol {activity_date}"),
+                    flight_date=activity_date,
+                    duration_minutes=int(activity.get("moving_time", 0) / 60),
+                    max_altitude_m=int(activity.get("elev_high", 0)) if activity.get("elev_high") else None,
+                    distance_km=round(activity.get("distance", 0) / 1000, 2),
+                    elevation_gain_m=int(activity.get("total_elevation_gain", 0)) if activity.get("total_elevation_gain") else None,
+                    gpx_file_path=gpx_path,
+                    external_url=f"https://www.strava.com/activities/{strava_id}",
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                
+                db.add(flight)
+                imported_flights.append({
+                    "id": flight.id,
+                    "strava_id": strava_id,
+                    "title": flight.title,
+                    "date": str(activity_date)
+                })
+                
+                logger.info(f"✅ Imported: {flight.title} (Strava ID: {strava_id})")
+            
+            except Exception as e:
+                logger.error(f"Failed to import activity {strava_id}: {e}")
+                failed_count += 1
+        
+        # 8. Commit en base
+        db.commit()
+        
+        return {
+            "success": True,
+            "imported": len(imported_flights),
+            "skipped": skipped_count,
+            "failed": failed_count,
+            "flights": imported_flights
+        }
+    
+    except Exception as e:
+        logger.error(f"Sync failed: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
+
+
+@router.post("/flights/{flight_id}/upload-gpx")
+async def upload_gpx_to_flight(
+    flight_id: str,
+    gpx_file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload un fichier GPX pour un vol existant
+    Sauvegarde le fichier pour visualisation Cesium (ne modifie PAS les stats)
+    """
+    # 1. Vérifier que le vol existe
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    
+    try:
+        # 2. Lire contenu GPX
+        gpx_content = await gpx_file.read()
+        gpx_str = gpx_content.decode("utf-8")
+        
+        # 3. Sauvegarder fichier
+        gpx_dir = Path(__file__).parent / "db" / "gpx"
+        gpx_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Utiliser strava_id si disponible, sinon flight_id
+        if flight.strava_id:
+            file_name = f"strava_{flight.strava_id}.gpx"
+        else:
+            file_name = f"manual_{flight_id}.gpx"
+        
+        file_path = gpx_dir / file_name
+        
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(gpx_str)
+        
+        # 4. Mettre à jour SEULEMENT le chemin du fichier (pas les stats!)
+        flight.gpx_file_path = f"db/gpx/{file_name}"
+        flight.updated_at = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(flight)
+        
+        logger.info(f"✅ Added GPX file to flight {flight_id} (stats unchanged)")
+        
+        return {
+            "success": True,
+            "flight_id": flight.id,
+            "gpx_file_path": flight.gpx_file_path,
+            "message": "GPX file added successfully. Flight stats unchanged."
+        }
+    
+    except Exception as e:
+        logger.error(f"Failed to upload GPX to flight {flight_id}: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
 
 # Alerts endpoints
 @router.get("/alerts")

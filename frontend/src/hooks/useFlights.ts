@@ -180,3 +180,58 @@ export const useDeleteFlight = (flightId: string | undefined): UseMutationResult
     },
   })
 }
+
+/**
+ * Synchroniser les vols Strava pour une période donnée
+ */
+export function useStravaSyncMutation() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ date_from, date_to }: { date_from: string; date_to: string }) => {
+      const data = await api.post('flights/sync-strava', { 
+        json: { date_from, date_to } 
+      }).json<{
+        success: boolean;
+        imported: number;
+        skipped: number;
+        failed: number;
+        flights: any[];
+      }>();
+      return data;
+    },
+    onSuccess: () => {
+      // Invalider le cache des vols pour forcer le refresh
+      queryClient.invalidateQueries({ queryKey: ['flights'] });
+      queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] });
+    }
+  });
+}
+
+/**
+ * Uploader un GPX sur un vol existant (pour visualisation Cesium)
+ * Ne modifie pas les stats du vol, juste ajoute le fichier
+ */
+export function useUploadGPXToFlight(flightId: string) {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (formData: FormData) => {
+      // Ky supporte FormData directement
+      const data = await api.post(`flights/${flightId}/upload-gpx`, { 
+        body: formData 
+      }).json<{
+        success: boolean;
+        flight_id: string;
+        gpx_file_path: string;
+        message: string;
+      }>();
+      return data;
+    },
+    onSuccess: () => {
+      // Invalider le cache du vol spécifique ET la liste
+      queryClient.invalidateQueries({ queryKey: ['flights'] });
+      queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
+    }
+  });
+}

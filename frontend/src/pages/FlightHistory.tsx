@@ -1,11 +1,16 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   useFlights,
   useUpdateFlight,
   useDeleteFlight,
+  useUploadGPXToFlight,
 } from '../hooks/useFlights';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Flight } from '../types';
 import FlightViewer3D from '../components/FlightViewer3D';
+import { StravaSyncModal } from '../components/StravaSyncModal';
+import { ToastContainer } from '../components/ui/Toast';
+import { useToast, useToastStore } from '../hooks/useToast';
 
 export default function FlightHistory() {
   const { data: flights = [], isLoading, error } = useFlights({ limit: 50 });
@@ -13,10 +18,16 @@ export default function FlightHistory() {
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showStravaSyncModal, setShowStravaSyncModal] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedFlight = flights.find((f: Flight) => f.id === selectedFlightId);
   const updateFlight = useUpdateFlight(selectedFlightId || undefined);
   const deleteFlight = useDeleteFlight(selectedFlightId || undefined);
+  const uploadGPXMutation = useUploadGPXToFlight(selectedFlightId || '');
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const { toasts, removeToast } = useToastStore();
 
   const handleSelectFlight = useCallback((flight: Flight) => {
     setSelectedFlightId(flight.id);
@@ -57,6 +68,29 @@ export default function FlightHistory() {
     }
   }, [selectedFlightId, deleteFlight]);
 
+  const handleGPXUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedFlightId) return;
+
+    const formData = new FormData();
+    formData.append('gpx_file', file);
+
+    uploadGPXMutation.mutate(formData, {
+      onSuccess: () => {
+        toast.success('GPX ajouté avec succès');
+        queryClient.invalidateQueries({ queryKey: ['flights'] });
+      },
+      onError: (error: any) => {
+        toast.error(`Échec de l'upload: ${error.message}`);
+      }
+    });
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="py-8">
@@ -89,13 +123,28 @@ export default function FlightHistory() {
 
   return (
     <div>
+      {/* Toast notifications */}
+      <ToastContainer toasts={toasts} onClose={removeToast} />
+      
       <div className="mb-4 bg-white rounded-xl p-4 shadow-md">
-        <h1 className="text-xl font-bold text-gray-900">
-          🪂 Historique des Vols
-        </h1>
-        <div className="text-sm text-gray-600 mt-1">
-          {flights.length} vol{flights.length > 1 ? 's' : ''} enregistré
-          {flights.length > 1 ? 's' : ''}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">
+              🪂 Historique des Vols
+            </h1>
+            <div className="text-sm text-gray-600 mt-1">
+              {flights.length} vol{flights.length > 1 ? 's' : ''} enregistré
+              {flights.length > 1 ? 's' : ''}
+            </div>
+          </div>
+          
+          {/* Bouton Sync Strava */}
+          <button 
+            onClick={() => setShowStravaSyncModal(true)}
+            className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-all flex items-center gap-2"
+          >
+            🔄 Sync Strava
+          </button>
         </div>
       </div>
 
@@ -130,6 +179,14 @@ export default function FlightHistory() {
                   <h3 className="font-semibold text-sm text-gray-900 truncate flex-1">
                     {flight.title || 'Vol sans titre'}
                   </h3>
+                  
+                  {/* Badge GPX manquant */}
+                  {!flight.gpx_file_path && (
+                    <span className="ml-2 px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full shrink-0">
+                      📎 GPX manquant
+                    </span>
+                  )}
+                  
                   <span className="text-xs text-gray-500 ml-2 shrink-0">
                     {new Date(flight.flight_date).toLocaleDateString('fr-FR', {
                       day: '2-digit',
@@ -192,6 +249,26 @@ export default function FlightHistory() {
                     >
                       ✏️ Modifier
                     </button>
+                    
+                    {/* Bouton Upload GPX */}
+                    <button
+                      className={`px-3 py-1.5 text-sm rounded-md transition-all ${
+                        selectedFlight.gpx_file_path
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : 'bg-orange-600 text-white hover:bg-orange-700'
+                      }`}
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadGPXMutation.isPending}
+                    >
+                      {uploadGPXMutation.isPending ? (
+                        <>⏳ Upload...</>
+                      ) : selectedFlight.gpx_file_path ? (
+                        <>🔄 Remplacer GPX</>
+                      ) : (
+                        <>📎 Ajouter GPX</>
+                      )}
+                    </button>
+                    
                     <button
                       className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 transition-all"
                       onClick={() => setShowDeleteConfirm(true)}
@@ -200,6 +277,15 @@ export default function FlightHistory() {
                       🗑️ Supprimer
                     </button>
                   </div>
+                  
+                  {/* Input file caché */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".gpx"
+                    onChange={handleGPXUpload}
+                    className="hidden"
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
@@ -298,6 +384,31 @@ export default function FlightHistory() {
                   )}
                 </div>
 
+                {/* Indicateur statut GPX */}
+                <div className="mt-4 pt-4 border-t">
+                  {selectedFlight.gpx_file_path ? (
+                    <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-3 rounded-lg">
+                      <span className="text-xl">✅</span>
+                      <div>
+                        <p className="font-medium">Fichier GPX disponible</p>
+                        <p className="text-xs text-green-600">
+                          Visualisation 3D active
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-sm text-orange-700 bg-orange-50 p-3 rounded-lg">
+                      <span className="text-xl">⚠️</span>
+                      <div>
+                        <p className="font-medium">Fichier GPX manquant</p>
+                        <p className="text-xs text-orange-600">
+                          Ajoutez un fichier GPX pour activer la visualisation 3D
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Delete Confirmation */}
                 {showDeleteConfirm && (
                   <div className="mt-4 p-4 bg-red-50 border-2 border-red-200 rounded-lg">
@@ -346,6 +457,15 @@ export default function FlightHistory() {
           )}
         </div>
       </div>
+      
+      {/* Modal Sync Strava */}
+      <StravaSyncModal
+        isOpen={showStravaSyncModal}
+        onClose={() => setShowStravaSyncModal(false)}
+        onSyncComplete={() => {
+          queryClient.invalidateQueries({ queryKey: ['flights'] });
+        }}
+      />
     </div>
   );
 }
