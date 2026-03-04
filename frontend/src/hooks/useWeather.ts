@@ -192,14 +192,6 @@ export const createWeatherQueryFn = (siteId: string, dayIndex: number) => async 
       
       const data = todayValidation.data
       
-      // DEBUG: Log data for troubleshooting
-      console.log(`[useWeather] Loading day ${dayIndex} for ${siteId}:`, {
-        site_name: data.site_name,
-        para_index: data.para_index,
-        consensus_length: data.consensus?.length || 0,
-        has_hourly: !!data.consensus
-      })
-      
       // Transform backend structure to frontend WeatherData format
       // Find the hour closest to current time for "Current Conditions"
       const now = new Date()
@@ -390,24 +382,19 @@ export const createWeatherQueryFn = (siteId: string, dayIndex: number) => async 
         daily_forecast: dailyForecast
       }
       
-      // DEBUG: Log transformed data
-      console.log(`[useWeather] Transformed data:`, {
-        hourly_forecast_length: hourlyForecast.length,
-        daily_forecast_length: dailyForecast.length,
-        sample_hour: hourlyForecast[0]
-      })
-      
       // Validate transformed data with Zod
       const transformedValidation = WeatherDataSchema.safeParse(transformed)
       if (!transformedValidation.success) {
         console.error('❌ Transformed weather validation failed:', transformedValidation.error)
-        console.error('📊 Transformed data was:', transformed)
         // In development, return data anyway to help debug
-        console.warn('⚠️ Returning unvalidated data for debugging')
-        return transformed as WeatherData
+        if (import.meta.env.DEV) {
+          console.error('📊 Transformed data was:', transformed)
+          console.warn('⚠️ Returning unvalidated data for debugging')
+          return transformed as WeatherData
+        }
+        throw new Error('Weather data validation failed')
       }
       
-      console.log('✅ Weather data validated successfully')
       return transformedValidation.data
 }
 
