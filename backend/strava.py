@@ -342,6 +342,91 @@ async def get_activity_details(activity_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+async def get_activities_by_period(
+    date_from: str,
+    date_to: str,
+    activity_type: str = "Paragliding",
+    per_page: int = 50
+) -> List[Dict[str, Any]]:
+    """
+    Récupère toutes les activités Strava pour une période donnée
+    
+    Args:
+        date_from: Date début au format YYYY-MM-DD
+        date_to: Date fin au format YYYY-MM-DD
+        activity_type: Type d'activité (default: Paragliding)
+        per_page: Nombre d'activités par page (max 200)
+    
+    Returns:
+        Liste d'activités Strava filtrées par type
+        
+    Raises:
+        Exception si échec API
+    """
+    token = await get_access_token()
+    
+    if not token:
+        logger.error("Cannot get activities: no access token")
+        raise Exception("No Strava access token available")
+    
+    try:
+        # Convertir dates en timestamps Unix
+        from_dt = datetime.strptime(date_from, "%Y-%m-%d")
+        to_dt = datetime.strptime(date_to, "%Y-%m-%d")
+        
+        after_timestamp = int(from_dt.timestamp())
+        before_timestamp = int(to_dt.timestamp())
+        
+        # API Strava: GET /athlete/activities
+        url = "https://www.strava.com/api/v3/athlete/activities"
+        
+        all_activities = []
+        page = 1
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            while True:
+                response = await client.get(
+                    url,
+                    headers={"Authorization": f"Bearer {token}"},
+                    params={
+                        "after": after_timestamp,
+                        "before": before_timestamp,
+                        "per_page": per_page,
+                        "page": page
+                    }
+                )
+                
+                response.raise_for_status()
+                activities = response.json()
+                
+                # Si pas de résultats, fin de pagination
+                if not activities:
+                    break
+                
+                # Filtrer par type d'activité
+                filtered = [
+                    act for act in activities 
+                    if act.get("type") == activity_type or 
+                       act.get("sport_type") == activity_type
+                ]
+                
+                all_activities.extend(filtered)
+                
+                # Si moins de per_page résultats, c'est la dernière page
+                if len(activities) < per_page:
+                    break
+                
+                page += 1
+        
+        logger.info(f"✅ Retrieved {len(all_activities)} {activity_type} activities from {date_from} to {date_to}")
+        
+        return all_activities
+    
+    except Exception as e:
+        logger.error(f"Failed to get activities by period: {e}")
+        raise
+
+
 def save_gpx_file(gpx_content: str, activity_id: str) -> Optional[str]:
     """
     Save GPX content to file system
