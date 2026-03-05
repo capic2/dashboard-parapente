@@ -105,6 +105,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           selectionIndicator: false,
         });
 
+        // Enable terrain collision detection
+        viewer.scene.screenSpaceCameraController.enableCollisionDetection = true;
+        
         viewerRef.current = viewer;
         setViewerError(null);
         setViewerReady(true);
