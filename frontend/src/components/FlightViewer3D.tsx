@@ -15,6 +15,8 @@ import {
   Matrix4,
   SceneTransforms,
   Cartesian2,
+  ShadowMode,
+  JulianDate,
 } from 'cesium';
 import { useFlightGPX } from '../hooks/useFlightGPX';
 
@@ -43,6 +45,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [currentProgress, setCurrentProgress] = useState(0);
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // Terrain rendering states
+  const [terrainShadows, setTerrainShadows] = useState(true);
+  const [ambientOcclusion, setAmbientOcclusion] = useState(false);
+  const [sunTime, setSunTime] = useState(10); // 10:00
+  const [lightIntensity, setLightIntensity] = useState(1.2);
+  const [performanceLevel, setPerformanceLevel] = useState<'auto' | 'manual'>('auto');
 
   const allPositionsRef = useRef<Cartesian3[]>([]);
   const timestampsRef = useRef<number[]>([]);
@@ -136,6 +145,86 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     setElevationOffset(0);
     setAutoOffset(0);
   }, [flightId]);
+
+  // Performance detection - auto-enable/disable AO based on device capabilities
+  useEffect(() => {
+    if (!viewerRef.current || !viewerReady || performanceLevel !== 'auto') {
+      return;
+    }
+
+    const viewer = viewerRef.current;
+    let frameCount = 0;
+    let totalTime = 0;
+    const startTime = performance.now();
+    const measureDuration = 2000; // Measure for 2 seconds
+
+    const measurePerformance = () => {
+      if (!viewer || viewer.isDestroyed()) return;
+      
+      const currentTime = performance.now();
+      const elapsed = currentTime - startTime;
+      
+      if (elapsed < measureDuration) {
+        frameCount++;
+        viewer.scene.requestRender();
+        requestAnimationFrame(measurePerformance);
+      } else {
+        totalTime = elapsed / 1000; // Convert to seconds
+        const averageFPS = frameCount / totalTime;
+        
+        console.log(`🎮 Performance detection: ${averageFPS.toFixed(1)} FPS average`);
+        
+        // Enable AO if FPS is good (> 30), disable otherwise
+        const shouldEnableAO = averageFPS > 30;
+        setAmbientOcclusion(shouldEnableAO);
+        
+        console.log(`${shouldEnableAO ? '🚀' : '⚡'} Auto-${shouldEnableAO ? 'enabling' : 'disabling'} Ambient Occlusion`);
+      }
+    };
+
+    // Start measuring after a small delay to let the scene stabilize
+    const timeoutId = setTimeout(() => {
+      measurePerformance();
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [viewerReady, performanceLevel]);
+
+  // Configure terrain rendering (shadows, AO, lighting)
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || !viewerReady) return;
+
+    try {
+      // 1. Terrain shadows
+      viewer.shadows = terrainShadows;
+      viewer.terrainShadows = terrainShadows ? ShadowMode.ENABLED : ShadowMode.DISABLED;
+      
+      // 2. Ambient Occlusion
+      const aoStage = viewer.scene.postProcessStages.ambientOcclusion;
+      if (aoStage) {
+        aoStage.enabled = ambientOcclusion;
+        if (ambientOcclusion) {
+          aoStage.uniforms.intensity = 3.0;
+          aoStage.uniforms.bias = 0.1;
+          aoStage.uniforms.lengthCap = 0.03;
+        }
+      }
+      
+      // 3. Sun position (time of day)
+      const dateStr = `2024-06-21T${sunTime.toString().padStart(2, '0')}:00:00Z`;
+      viewer.clock.currentTime = JulianDate.fromIso8601(dateStr);
+      
+      // 4. Light intensity
+      if (viewer.scene.light) {
+        viewer.scene.light.intensity = lightIntensity;
+      }
+
+      console.log(`🎨 Terrain rendering updated: shadows=${terrainShadows}, AO=${ambientOcclusion}, time=${sunTime}h, intensity=${lightIntensity}x`);
+    } catch (error) {
+      console.error('Error configuring terrain rendering:', error);
+    }
+  }, [terrainShadows, ambientOcclusion, sunTime, lightIntensity, viewerReady]);
 
   // Load GPX data
   useEffect(() => {
@@ -844,6 +933,75 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   Offset auto: {autoOffset.toFixed(1)}m
                 </p>
               )}
+            </div>
+
+            {/* Terrain Rendering Section */}
+            <div className="border-t pt-3 mt-3">
+              <h4 className="text-sm font-bold mb-2">🎨 Rendu du Terrain</h4>
+              
+              {/* Performance indicator */}
+              {performanceLevel === 'auto' && (
+                <p className="text-xs text-gray-500 mb-2">
+                  Mode: Auto {ambientOcclusion ? '(🚀 Haute perf)' : '(⚡ Économie)'}
+                </p>
+              )}
+              
+              {/* Terrain Shadows Toggle */}
+              <label className="flex items-center text-sm mb-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={terrainShadows}
+                  onChange={(e) => setTerrainShadows(e.target.checked)}
+                  className="mr-2 cursor-pointer"
+                />
+                Ombres du terrain
+              </label>
+              
+              {/* Ambient Occlusion Toggle */}
+              <label className="flex items-center text-sm mb-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={ambientOcclusion}
+                  onChange={(e) => {
+                    setAmbientOcclusion(e.target.checked);
+                    setPerformanceLevel('manual');
+                  }}
+                  className="mr-2 cursor-pointer"
+                />
+                Ambient Occlusion (AO)
+              </label>
+              
+              {/* Sun Time Slider */}
+              <div className="mt-2">
+                <label className="block text-sm font-medium mb-1">
+                  Heure: {sunTime}h00
+                </label>
+                <input
+                  type="range"
+                  min="6"
+                  max="18"
+                  step="1"
+                  value={sunTime}
+                  onChange={(e) => setSunTime(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              
+              {/* Light Intensity Slider */}
+              <div className="mt-2">
+                <label className="block text-sm font-medium mb-1">
+                  Lumière: {lightIntensity.toFixed(1)}x
+                </label>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2.5"
+                  step="0.1"
+                  value={lightIntensity}
+                  onChange={(e) => setLightIntensity(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
             </div>
           </div>
             </>
