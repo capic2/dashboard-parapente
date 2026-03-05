@@ -20,6 +20,8 @@ import {
 } from 'cesium';
 import { useFlightGPX } from '../hooks/useFlightGPX';
 import { ExportVideoModal, VideoExportConfig } from './ExportVideoModal';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
 export interface FlightViewer3DProps {
   flightId: string;
@@ -59,8 +61,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [showExportModal, setShowExportModal] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingProgress, setRecordingProgress] = useState(0);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordedChunksRef = useRef<Blob[]>([]);
+  const [recordingPhase, setRecordingPhase] = useState<'loading' | 'capturing' | 'encoding' | 'done'>('capturing');
+  const [capturedFrames, setCapturedFrames] = useState(0);
+  const [totalFrames, setTotalFrames] = useState(0);
+  const ffmpegRef = useRef<FFmpeg | null>(null);
+  const capturedFramesDataRef = useRef<Uint8Array[]>([]);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const allPositionsRef = useRef<Cartesian3[]>([]);
@@ -762,165 +767,232 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   };
 
   /**
-   * Check if browser supports video recording
+   * Load FFmpeg.wasm
    */
-  const checkVideoRecordingSupport = (): { supported: boolean; error?: string } => {
-    if (!window.MediaRecorder) {
-      return { 
-        supported: false, 
-        error: 'MediaRecorder API non supportée par votre navigateur' 
-      };
+  const loadFFmpeg = async (): Promise<FFmpeg> => {
+    if (ffmpegRef.current) {
+      return ffmpegRef.current;
     }
+
+    const ffmpeg = new FFmpeg();
     
-    if (!HTMLCanvasElement.prototype.captureStream) {
-      return { 
-        supported: false, 
-        error: 'Canvas.captureStream() non supporté par votre navigateur' 
-      };
-    }
-    
-    const mimeType = 'video/webm;codecs=vp9';
-    if (!MediaRecorder.isTypeSupported(mimeType)) {
-      return { 
-        supported: false, 
-        error: 'Format vidéo WebM/VP9 non supporté' 
-      };
-    }
-    
-    return { supported: true };
+    ffmpeg.on('log', ({ message }) => {
+      console.log('FFmpeg:', message);
+    });
+
+    ffmpeg.on('progress', ({ progress }) => {
+      if (recordingPhase === 'encoding') {
+        setRecordingProgress(Math.round(progress * 100));
+      }
+    });
+
+    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+    });
+
+    ffmpegRef.current = ffmpeg;
+    return ffmpeg;
   };
 
   /**
-   * Start video export with configuration
+   * Capture a single frame from the canvas
+   */
+  const captureFrame = async (canvas: HTMLCanvasElement): Promise<Uint8Array> => {
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          resolve(new Uint8Array(0));
+          return;
+        }
+        
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          resolve(new Uint8Array(reader.result as ArrayBuffer));
+        };
+        reader.readAsArrayBuffer(blob);
+      }, 'image/png');
+    });
+  };
+
+  /**
+   * Start video export with frame-by-frame capture
    */
   const startVideoExport = async (config: VideoExportConfig) => {
     const viewer = viewerRef.current;
-    if (!viewer) {
-      console.error('Viewer not initialized');
-      return;
-    }
-    
-    // Check support
-    const supportCheck = checkVideoRecordingSupport();
-    if (!supportCheck.supported) {
-      alert(`❌ Export vidéo impossible: ${supportCheck.error}`);
+    if (!viewer || allPositionsRef.current.length === 0) {
+      console.error('Viewer not initialized or no positions');
       return;
     }
     
     try {
-      console.log('🎥 Starting video export with config:', config);
+      console.log('🎥 Starting frame-by-frame export with config:', config);
       
       // Close modal
       setShowExportModal(false);
       
       // Setup recording state
       setIsRecording(true);
+      setRecordingPhase('loading');
       setRecordingProgress(0);
-      recordedChunksRef.current = [];
+      setCapturedFrames(0);
+      capturedFramesDataRef.current = [];
       
-      // Reset animation to start
-      reset();
+      // Phase 1: Load FFmpeg
+      console.log('📦 Loading FFmpeg.wasm...');
+      await loadFFmpeg();
+      console.log('✅ FFmpeg loaded');
       
-      // Wait for reset to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Phase 2: Calculate frames needed
+      setRecordingPhase('capturing');
       
-      // Capture canvas stream
       const canvas = viewer.scene.canvas;
-      const stream = canvas.captureStream(config.fps);
+      const totalPositions = allPositionsRef.current.length;
       
-      // Create MediaRecorder
-      const mimeType = 'video/webm;codecs=vp9';
-      const bitrate = getVideoBitrate(config.quality);
-      const fpsMultiplier = config.fps === 60 ? 1.5 : 1;
+      // Calculate how many frames we need
+      // For real-time (1x): capture every position
+      // For 2x: capture every 2nd position, etc.
+      const frameStep = Math.max(1, Math.floor(config.speed));
+      const framesToCapture = Math.ceil(totalPositions / frameStep);
+      setTotalFrames(framesToCapture);
       
-      const recorder = new MediaRecorder(stream, {
-        mimeType,
-        videoBitsPerSecond: bitrate * fpsMultiplier,
-      });
+      console.log(`📸 Capturing ${framesToCapture} frames (every ${frameStep} positions)`);
       
-      // Handle data
-      recorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          recordedChunksRef.current.push(event.data);
-          console.log(`📦 Chunk received: ${event.data.size} bytes`);
+      // Reset to start
+      reset();
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Pause animation (we'll control it manually)
+      pause();
+      
+      // Phase 3: Capture frames one by one
+      for (let frameIndex = 0; frameIndex < framesToCapture; frameIndex++) {
+        const positionIndex = frameIndex * frameStep;
+        
+        if (positionIndex >= totalPositions) break;
+        
+        // Move to this position
+        currentIndexRef.current = positionIndex;
+        visiblePositionsRef.current = allPositionsRef.current.slice(0, positionIndex + 1);
+        
+        if (cursorPositionPropertyRef.current) {
+          cursorPositionPropertyRef.current.setValue(allPositionsRef.current[positionIndex]);
         }
-      };
-      
-      // Handle stop
-      recorder.onstop = () => {
-        console.log('🎬 Recording stopped, compiling video...');
         
-        const blob = new Blob(recordedChunksRef.current, { 
-          type: 'video/webm' 
+        // Update camera
+        const currentPosition = allPositionsRef.current[positionIndex];
+        const heading = cameraHeadingRef.current;
+        const distance = cameraDistanceRef.current;
+        
+        viewer.camera.setView({
+          destination: currentPosition,
+          orientation: {
+            heading: heading,
+            pitch: -0.05,
+            roll: 0
+          }
         });
+        viewer.camera.moveBackward(distance);
         
-        console.log(`✅ Video ready: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
+        // Wait for scene to render
+        await new Promise(resolve => setTimeout(resolve, 50));
         
-        // Download
-        const timestamp = new Date().toISOString().split('T')[0];
-        const filename = `flight-${flightId}-${timestamp}.webm`;
-        downloadBlob(blob, filename);
+        // Capture frame
+        const frameData = await captureFrame(canvas);
+        capturedFramesDataRef.current.push(frameData);
         
-        // Cleanup
+        // Update progress
+        setCapturedFrames(frameIndex + 1);
+        setRecordingProgress(Math.round(((frameIndex + 1) / framesToCapture) * 50)); // 0-50% for capture
+        
+        console.log(`📸 Frame ${frameIndex + 1}/${framesToCapture} captured`);
+      }
+      
+      console.log(`✅ All ${framesToCapture} frames captured`);
+      
+      // Phase 4: Encode video with FFmpeg
+      setRecordingPhase('encoding');
+      setRecordingProgress(50);
+      
+      const ffmpeg = ffmpegRef.current!;
+      
+      console.log('🎬 Writing frames to FFmpeg virtual filesystem...');
+      
+      // Write all frames to FFmpeg filesystem
+      for (let i = 0; i < capturedFramesDataRef.current.length; i++) {
+        const filename = `frame${i.toString().padStart(5, '0')}.png`;
+        await ffmpeg.writeFile(filename, capturedFramesDataRef.current[i]);
+      }
+      
+      console.log('🎬 Encoding video...');
+      
+      // Encode video
+      const outputFilename = 'output.mp4';
+      const quality = config.quality === '4K' ? '3840:2160' : config.quality === '1080p' ? '1920:1080' : '1280:720';
+      
+      await ffmpeg.exec([
+        '-framerate', config.fps.toString(),
+        '-i', 'frame%05d.png',
+        '-c:v', 'libx264',
+        '-preset', 'medium',
+        '-crf', '23',
+        '-pix_fmt', 'yuv420p',
+        '-s', quality,
+        outputFilename
+      ]);
+      
+      console.log('✅ Video encoded');
+      
+      // Read the output file
+      const data = await ffmpeg.readFile(outputFilename);
+      const videoBlob = new Blob([data], { type: 'video/mp4' });
+      
+      console.log(`✅ Video ready: ${(videoBlob.size / 1024 / 1024).toFixed(2)} MB`);
+      
+      // Download
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `flight-${flightId}-${timestamp}.mp4`;
+      downloadBlob(videoBlob, filename);
+      
+      // Cleanup FFmpeg filesystem
+      console.log('🧹 Cleaning up...');
+      for (let i = 0; i < capturedFramesDataRef.current.length; i++) {
+        const fname = `frame${i.toString().padStart(5, '0')}.png`;
+        try {
+          await ffmpeg.deleteFile(fname);
+        } catch (e) {
+          // Ignore errors
+        }
+      }
+      try {
+        await ffmpeg.deleteFile(outputFilename);
+      } catch (e) {
+        // Ignore errors
+      }
+      
+      // Cleanup
+      setRecordingPhase('done');
+      setRecordingProgress(100);
+      capturedFramesDataRef.current = [];
+      
+      // Show success and cleanup
+      setTimeout(() => {
         setIsRecording(false);
         setRecordingProgress(0);
-        mediaRecorderRef.current = null;
+        setCapturedFrames(0);
+        setTotalFrames(0);
         
-        if (recordingIntervalRef.current) {
-          clearInterval(recordingIntervalRef.current);
-          recordingIntervalRef.current = null;
-        }
-        
-        alert(`✅ Vidéo exportée avec succès!\n\nFichier: ${filename}\nTaille: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
-      };
-      
-      // Handle errors
-      recorder.onerror = (event) => {
-        console.error('❌ Recording error:', event);
-        setIsRecording(false);
-        alert('❌ Erreur lors de l\'enregistrement vidéo');
-      };
-      
-      // Start recording
-      mediaRecorderRef.current = recorder;
-      recorder.start(1000); // Collect data every 1 second
-      
-      console.log('⏺️ Recording started');
-      
-      // Set speed and start playback
-      setReplaySpeed(config.speed);
-      speedRef.current = config.speed;
-      
-      // Wait a bit then play
-      setTimeout(() => {
-        play();
-      }, 500);
-      
-      // Monitor progress
-      recordingIntervalRef.current = setInterval(() => {
-        const progress = (currentIndexRef.current / (allPositionsRef.current.length - 1)) * 100;
-        setRecordingProgress(progress);
-        
-        // Auto-stop when complete
-        if (currentIndexRef.current >= allPositionsRef.current.length - 1) {
-          if (recordingIntervalRef.current) {
-            clearInterval(recordingIntervalRef.current);
-            recordingIntervalRef.current = null;
-          }
-          
-          // Wait a bit before stopping to ensure last frames are captured
-          setTimeout(() => {
-            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-              console.log('🛑 Auto-stopping recorder (end reached)');
-              mediaRecorderRef.current.stop();
-            }
-          }, 1000);
-        }
-      }, 100);
+        alert(`✅ Vidéo exportée avec succès!\n\nFichier: ${filename}\nTaille: ${(videoBlob.size / 1024 / 1024).toFixed(2)} MB\n\nLa vidéo est parfaitement fluide à ${config.fps} FPS!`);
+      }, 1000);
       
     } catch (error) {
       console.error('❌ Video export error:', error);
       setIsRecording(false);
+      setRecordingProgress(0);
+      setCapturedFrames(0);
+      setTotalFrames(0);
+      capturedFramesDataRef.current = [];
       alert(`❌ Erreur lors de l'export: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     }
   };
@@ -929,20 +1001,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
    * Cancel ongoing recording
    */
   const cancelVideoExport = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
-    }
-    
-    if (recordingIntervalRef.current) {
-      clearInterval(recordingIntervalRef.current);
-      recordingIntervalRef.current = null;
-    }
-    
     setIsRecording(false);
     setRecordingProgress(0);
-    recordedChunksRef.current = [];
+    setCapturedFrames(0);
+    setTotalFrames(0);
+    capturedFramesDataRef.current = [];
     
-    pause();
+    console.log('❌ Export cancelled by user');
   };
 
   const renderOverlay = () => {
@@ -1253,13 +1318,26 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       {/* Recording Progress Overlay */}
       {isRecording && (
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 bg-black/90 text-white px-8 py-6 rounded-lg shadow-2xl min-w-[400px]">
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 bg-black/90 text-white px-8 py-6 rounded-lg shadow-2xl min-w-[450px]">
           <div className="flex items-center gap-4 mb-4">
-            <div className="animate-pulse text-3xl">⏺️</div>
+            <div className="animate-pulse text-3xl">
+              {recordingPhase === 'loading' && '📦'}
+              {recordingPhase === 'capturing' && '📸'}
+              {recordingPhase === 'encoding' && '🎬'}
+              {recordingPhase === 'done' && '✅'}
+            </div>
             <div>
-              <div className="font-bold text-lg">Enregistrement en cours...</div>
+              <div className="font-bold text-lg">
+                {recordingPhase === 'loading' && 'Chargement FFmpeg...'}
+                {recordingPhase === 'capturing' && 'Capture des frames...'}
+                {recordingPhase === 'encoding' && 'Encodage vidéo...'}
+                {recordingPhase === 'done' && 'Export terminé!'}
+              </div>
               <div className="text-sm text-gray-300">
-                Ne fermez pas cette page
+                {recordingPhase === 'loading' && 'Chargement de FFmpeg.wasm (~31MB)'}
+                {recordingPhase === 'capturing' && `Frame ${capturedFrames}/${totalFrames}`}
+                {recordingPhase === 'encoding' && 'Création du fichier MP4...'}
+                {recordingPhase === 'done' && 'Téléchargement en cours...'}
               </div>
             </div>
           </div>
@@ -1277,13 +1355,22 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             {Math.round(recordingProgress)}%
           </div>
           
-          {/* Cancel Button */}
-          <button
-            onClick={cancelVideoExport}
-            className="w-full mt-4 px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
-          >
-            ❌ Annuler
-          </button>
+          {recordingPhase !== 'done' && (
+            <>
+              {/* Info Text */}
+              <div className="text-xs text-gray-400 text-center mt-3">
+                Ne fermez pas cette page
+              </div>
+              
+              {/* Cancel Button */}
+              <button
+                onClick={cancelVideoExport}
+                className="w-full mt-4 px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
+              >
+                ❌ Annuler
+              </button>
+            </>
+          )}
         </div>
       )}
 
