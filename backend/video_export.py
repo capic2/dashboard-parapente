@@ -110,8 +110,8 @@ async def _export_video_playwright(
             )
             page = await context.new_page()
             
-            # Navigate to flight viewer
-            url = f"{frontend_url}/flights/{flight_id}"
+            # Navigate to flight viewer (dedicated viewer route for export)
+            url = f"{frontend_url}/flights/{flight_id}/viewer"
             print(f"📺 Opening {url}")
             
             # Navigate and check for errors
