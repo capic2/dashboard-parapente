@@ -2290,13 +2290,25 @@ def start_flight_video_export(
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
     
+    # Determine frontend URL
+    # In production, frontend is served on same server (port 8001)
+    # In development, frontend is on Vite dev server (port 5173)
+    frontend_url = os.getenv("FRONTEND_URL")
+    if not frontend_url:
+        # Auto-detect: check if static dir exists (production) or use dev server
+        static_dir = Path(__file__).parent / "static"
+        if static_dir.exists() and (static_dir / "index.html").exists():
+            frontend_url = "http://localhost:8001"  # Production: same server
+        else:
+            frontend_url = "http://localhost:5173"  # Development: Vite dev server
+    
     # Start export
     job_id = start_video_export_background(
         flight_id=flight_id,
         quality=quality,
         fps=fps,
         speed=speed,
-        frontend_url=os.getenv("FRONTEND_URL", "http://localhost:5173")
+        frontend_url=frontend_url
     )
     
     return {
