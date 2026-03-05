@@ -191,7 +191,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             () => visiblePositionsRef.current,
             false
           ),
-          width: 5,
+          width: 2,
           material: Color.RED,
           clampToGround: false,
           arcType: ArcType.NONE,
@@ -205,10 +205,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       cursorEntityRef.current = viewer.entities.add({
         position: cursorPositionPropertyRef.current,
         point: {
-          pixelSize: 12,
+          pixelSize: 6,
           color: Color.YELLOW,
           outlineColor: Color.BLACK,
-          outlineWidth: 2,
+          outlineWidth: 1,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
       });
@@ -217,10 +217,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       startEntityRef.current = viewer.entities.add({
         position: positions[0],
         point: {
-          pixelSize: 10,
+          pixelSize: 8,
           color: Color.GREEN,
           outlineColor: Color.WHITE,
-          outlineWidth: 2,
+          outlineWidth: 1,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
       });
