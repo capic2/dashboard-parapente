@@ -19,6 +19,7 @@ import {
   JulianDate,
 } from 'cesium';
 import { useFlightGPX } from '../hooks/useFlightGPX';
+import { ExportVideoModal, VideoExportConfig } from './ExportVideoModal';
 
 export interface FlightViewer3DProps {
   flightId: string;
@@ -45,13 +46,21 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [currentProgress, setCurrentProgress] = useState(0);
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [currentElapsedTime, setCurrentElapsedTime] = useState(0);
   
   // Terrain rendering states
   const [terrainShadows, setTerrainShadows] = useState(true);
   const [ambientOcclusion, setAmbientOcclusion] = useState(false);
   const [sunTime, setSunTime] = useState(10); // 10:00
   const [lightIntensity, setLightIntensity] = useState(1.2);
-  const [performanceLevel, setPerformanceLevel] = useState<'auto' | 'manual'>('auto');
+
+  // Video export states
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingProgress, setRecordingProgress] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const allPositionsRef = useRef<Cartesian3[]>([]);
   const timestampsRef = useRef<number[]>([]);
@@ -145,50 +154,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     setElevationOffset(0);
     setAutoOffset(0);
   }, [flightId]);
-
-  // Performance detection - auto-enable/disable AO based on device capabilities
-  useEffect(() => {
-    if (!viewerRef.current || !viewerReady || performanceLevel !== 'auto') {
-      return;
-    }
-
-    const viewer = viewerRef.current;
-    let frameCount = 0;
-    let totalTime = 0;
-    const startTime = performance.now();
-    const measureDuration = 2000; // Measure for 2 seconds
-
-    const measurePerformance = () => {
-      if (!viewer || viewer.isDestroyed()) return;
-      
-      const currentTime = performance.now();
-      const elapsed = currentTime - startTime;
-      
-      if (elapsed < measureDuration) {
-        frameCount++;
-        viewer.scene.requestRender();
-        requestAnimationFrame(measurePerformance);
-      } else {
-        totalTime = elapsed / 1000; // Convert to seconds
-        const averageFPS = frameCount / totalTime;
-        
-        console.log(`🎮 Performance detection: ${averageFPS.toFixed(1)} FPS average`);
-        
-        // Enable AO if FPS is good (> 30), disable otherwise
-        const shouldEnableAO = averageFPS > 30;
-        setAmbientOcclusion(shouldEnableAO);
-        
-        console.log(`${shouldEnableAO ? '🚀' : '⚡'} Auto-${shouldEnableAO ? 'enabling' : 'disabling'} Ambient Occlusion`);
-      }
-    };
-
-    // Start measuring after a small delay to let the scene stabilize
-    const timeoutId = setTimeout(() => {
-      measurePerformance();
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [viewerReady, performanceLevel]);
 
   // Configure terrain rendering (shadows, AO, lighting)
   useEffect(() => {
@@ -573,6 +538,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           currentIndexRef.current + 1
         );
 
+        // Calculate elapsed time
+        if (timestampsRef.current.length > 0) {
+          const currentTimestamp = timestampsRef.current[currentIndexRef.current];
+          const startTimestamp = timestampsRef.current[0];
+          const elapsedMs = currentTimestamp - startTimestamp;
+          setCurrentElapsedTime(elapsedMs / 1000); // Convert to seconds
+        }
+
         if (cursorPositionPropertyRef.current) {
           cursorPositionPropertyRef.current.setValue(
             allPositionsRef.current[currentIndexRef.current]
@@ -655,6 +628,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     pause();
     currentIndexRef.current = 0;
     setCurrentProgress(0);
+    setCurrentElapsedTime(0);
 
     if (allPositionsRef.current.length > 0) {
       visiblePositionsRef.current = [allPositionsRef.current[0]];
@@ -722,6 +696,225 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
   // Render error messages as overlays instead of early returns
   // This ensures the Cesium container is always rendered
+  /**
+   * Format seconds to "Xmin Ys" format
+   */
+  const formatFlightTime = (seconds: number): string => {
+    if (!seconds || isNaN(seconds)) return '0min 00s';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}min ${secs.toString().padStart(2, '0')}s`;
+  };
+
+  /**
+   * Get video bitrate based on quality
+   */
+  const getVideoBitrate = (quality: '720p' | '1080p' | '4K'): number => {
+    switch (quality) {
+      case '720p': return 2500000;  // 2.5 Mbps
+      case '1080p': return 5000000; // 5 Mbps
+      case '4K': return 15000000;   // 15 Mbps
+    }
+  };
+
+  /**
+   * Download blob as file
+   */
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  /**
+   * Check if browser supports video recording
+   */
+  const checkVideoRecordingSupport = (): { supported: boolean; error?: string } => {
+    if (!window.MediaRecorder) {
+      return { 
+        supported: false, 
+        error: 'MediaRecorder API non supportée par votre navigateur' 
+      };
+    }
+    
+    if (!HTMLCanvasElement.prototype.captureStream) {
+      return { 
+        supported: false, 
+        error: 'Canvas.captureStream() non supporté par votre navigateur' 
+      };
+    }
+    
+    const mimeType = 'video/webm;codecs=vp9';
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      return { 
+        supported: false, 
+        error: 'Format vidéo WebM/VP9 non supporté' 
+      };
+    }
+    
+    return { supported: true };
+  };
+
+  /**
+   * Start video export with configuration
+   */
+  const startVideoExport = async (config: VideoExportConfig) => {
+    const viewer = viewerRef.current;
+    if (!viewer) {
+      console.error('Viewer not initialized');
+      return;
+    }
+    
+    // Check support
+    const supportCheck = checkVideoRecordingSupport();
+    if (!supportCheck.supported) {
+      alert(`❌ Export vidéo impossible: ${supportCheck.error}`);
+      return;
+    }
+    
+    try {
+      console.log('🎥 Starting video export with config:', config);
+      
+      // Close modal
+      setShowExportModal(false);
+      
+      // Setup recording state
+      setIsRecording(true);
+      setRecordingProgress(0);
+      recordedChunksRef.current = [];
+      
+      // Reset animation to start
+      reset();
+      
+      // Wait for reset to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Capture canvas stream
+      const canvas = viewer.scene.canvas;
+      const stream = canvas.captureStream(config.fps);
+      
+      // Create MediaRecorder
+      const mimeType = 'video/webm;codecs=vp9';
+      const bitrate = getVideoBitrate(config.quality);
+      const fpsMultiplier = config.fps === 60 ? 1.5 : 1;
+      
+      const recorder = new MediaRecorder(stream, {
+        mimeType,
+        videoBitsPerSecond: bitrate * fpsMultiplier,
+      });
+      
+      // Handle data
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+          console.log(`📦 Chunk received: ${event.data.size} bytes`);
+        }
+      };
+      
+      // Handle stop
+      recorder.onstop = () => {
+        console.log('🎬 Recording stopped, compiling video...');
+        
+        const blob = new Blob(recordedChunksRef.current, { 
+          type: 'video/webm' 
+        });
+        
+        console.log(`✅ Video ready: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
+        
+        // Download
+        const timestamp = new Date().toISOString().split('T')[0];
+        const filename = `flight-${flightId}-${timestamp}.webm`;
+        downloadBlob(blob, filename);
+        
+        // Cleanup
+        setIsRecording(false);
+        setRecordingProgress(0);
+        mediaRecorderRef.current = null;
+        
+        if (recordingIntervalRef.current) {
+          clearInterval(recordingIntervalRef.current);
+          recordingIntervalRef.current = null;
+        }
+        
+        alert(`✅ Vidéo exportée avec succès!\n\nFichier: ${filename}\nTaille: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
+      };
+      
+      // Handle errors
+      recorder.onerror = (event) => {
+        console.error('❌ Recording error:', event);
+        setIsRecording(false);
+        alert('❌ Erreur lors de l\'enregistrement vidéo');
+      };
+      
+      // Start recording
+      mediaRecorderRef.current = recorder;
+      recorder.start(1000); // Collect data every 1 second
+      
+      console.log('⏺️ Recording started');
+      
+      // Set speed and start playback
+      setReplaySpeed(config.speed);
+      speedRef.current = config.speed;
+      
+      // Wait a bit then play
+      setTimeout(() => {
+        play();
+      }, 500);
+      
+      // Monitor progress
+      recordingIntervalRef.current = setInterval(() => {
+        const progress = (currentIndexRef.current / (allPositionsRef.current.length - 1)) * 100;
+        setRecordingProgress(progress);
+        
+        // Auto-stop when complete
+        if (currentIndexRef.current >= allPositionsRef.current.length - 1) {
+          if (recordingIntervalRef.current) {
+            clearInterval(recordingIntervalRef.current);
+            recordingIntervalRef.current = null;
+          }
+          
+          // Wait a bit before stopping to ensure last frames are captured
+          setTimeout(() => {
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+              console.log('🛑 Auto-stopping recorder (end reached)');
+              mediaRecorderRef.current.stop();
+            }
+          }, 1000);
+        }
+      }, 100);
+      
+    } catch (error) {
+      console.error('❌ Video export error:', error);
+      setIsRecording(false);
+      alert(`❌ Erreur lors de l'export: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    }
+  };
+
+  /**
+   * Cancel ongoing recording
+   */
+  const cancelVideoExport = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+    
+    setIsRecording(false);
+    setRecordingProgress(0);
+    recordedChunksRef.current = [];
+    
+    pause();
+  };
+
   const renderOverlay = () => {
     if (isLoading) {
       return (
@@ -860,20 +1053,32 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
               </p>
 
               <div className="space-y-3">
-            <div className="flex gap-2">
+            <div className="flex gap-2 mb-3">
               <button
                 onClick={() => (isPlayingRef.current ? pause() : play())}
                 className="flex-1 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                disabled={isRecording}
               >
                 {isPlaying ? '⏸ Pause' : '▶ Play'}
               </button>
               <button
                 onClick={reset}
                 className="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                disabled={isRecording}
               >
                 ⏮ Reset
               </button>
             </div>
+
+            {/* Export Video Button */}
+            <button
+              onClick={() => setShowExportModal(true)}
+              disabled={isRecording || isPlaying || !gpxData?.coordinates}
+              className="w-full px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 mb-3"
+              title="Exporter le vol en vidéo"
+            >
+              {isRecording ? '⏺️ Enregistrement...' : '🎥 Export Vidéo'}
+            </button>
 
             <div>
               <label className="block text-sm font-medium mb-1">
@@ -889,6 +1094,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                 onChange={(e) => handleProgressChange(Number(e.target.value))}
                 className="w-full"
               />
+            </div>
+
+            {/* Flight Time Display */}
+            <div className="text-sm text-gray-700 font-medium">
+              ⏱️ Temps: {formatFlightTime(currentElapsedTime)} / {formatFlightTime(gpxData?.flight_duration_seconds || 0)}
             </div>
 
             <div>
@@ -939,13 +1149,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             <div className="border-t pt-3 mt-3">
               <h4 className="text-sm font-bold mb-2">🎨 Rendu du Terrain</h4>
               
-              {/* Performance indicator */}
-              {performanceLevel === 'auto' && (
-                <p className="text-xs text-gray-500 mb-2">
-                  Mode: Auto {ambientOcclusion ? '(🚀 Haute perf)' : '(⚡ Économie)'}
-                </p>
-              )}
-              
               {/* Terrain Shadows Toggle */}
               <label className="flex items-center text-sm mb-2 cursor-pointer">
                 <input
@@ -962,10 +1165,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                 <input
                   type="checkbox"
                   checked={ambientOcclusion}
-                  onChange={(e) => {
-                    setAmbientOcclusion(e.target.checked);
-                    setPerformanceLevel('manual');
-                  }}
+                  onChange={(e) => setAmbientOcclusion(e.target.checked)}
                   className="mr-2 cursor-pointer"
                 />
                 Ambient Occlusion (AO)
@@ -1008,6 +1208,50 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           )}
         </div>
       )}
+
+      {/* Recording Progress Overlay */}
+      {isRecording && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 bg-black/90 text-white px-8 py-6 rounded-lg shadow-2xl min-w-[400px]">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="animate-pulse text-3xl">⏺️</div>
+            <div>
+              <div className="font-bold text-lg">Enregistrement en cours...</div>
+              <div className="text-sm text-gray-300">
+                Ne fermez pas cette page
+              </div>
+            </div>
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="w-full bg-gray-700 rounded-full h-3 mb-3">
+            <div 
+              className="bg-red-600 h-3 rounded-full transition-all duration-300"
+              style={{ width: `${recordingProgress}%` }}
+            />
+          </div>
+          
+          {/* Progress Text */}
+          <div className="text-center text-sm text-gray-300">
+            {Math.round(recordingProgress)}%
+          </div>
+          
+          {/* Cancel Button */}
+          <button
+            onClick={cancelVideoExport}
+            className="w-full mt-4 px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
+          >
+            ❌ Annuler
+          </button>
+        </div>
+      )}
+
+      {/* Export Video Modal */}
+      <ExportVideoModal
+        isOpen={showExportModal}
+        flightDuration={gpxData?.flight_duration_seconds || 0}
+        onExport={startVideoExport}
+        onCancel={() => setShowExportModal(false)}
+      />
 
       {/* Cesium Container */}
       <div ref={containerRef} className="w-full h-full" />
