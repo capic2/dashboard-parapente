@@ -229,14 +229,42 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       // Calculate bounding sphere for better camera positioning
       const boundingSphere = BoundingSphere.fromPoints(positions);
 
+      // Calculate flight direction to orient camera perpendicular to flight path
+      const calculateOptimalHeading = (): number => {
+        if (gpxData.coordinates.length < 2) return 0;
+        
+        // Use first and last 10% of points to get general direction
+        const numPoints = gpxData.coordinates.length;
+        const startSegment = Math.floor(numPoints * 0.1);
+        const endSegment = Math.floor(numPoints * 0.9);
+        
+        const startCoord = gpxData.coordinates[startSegment];
+        const endCoord = gpxData.coordinates[endSegment];
+        
+        // Calculate bearing from start to end
+        const deltaLon = endCoord.lon - startCoord.lon;
+        const deltaLat = endCoord.lat - startCoord.lat;
+        
+        // Calculate angle in radians (0 = North, clockwise)
+        let flightHeading = Math.atan2(deltaLon, deltaLat);
+        
+        // Add 90° (π/2) to be perpendicular (view from the side)
+        // This puts the camera to the right of the flight direction
+        const cameraHeading = flightHeading + Math.PI / 2;
+        
+        return cameraHeading;
+      };
+
       // Position camera - MUST happen after elevation offset is calculated
       // Using a very low angle to see the altitude of the flight track
       const positionCamera = () => {
         if (viewer && !viewer.isDestroyed()) {
+          const heading = calculateOptimalHeading();
+          
           viewer.camera.flyToBoundingSphere(boundingSphere, {
             duration: 2,
             offset: new HeadingPitchRange(
-              0, // heading
+              heading, // heading perpendicular to flight direction
               0, // pitch: 0° (vue complètement horizontale, à l'horizon)
               boundingSphere.radius * 6 // distance très augmentée pour vue panoramique
             ),
