@@ -21,6 +21,8 @@ export const useFlightGPX = (flightId: string) => {
     queryKey: ['flights', flightId, 'gpx'],
     queryFn: async () => {
       const data: any = await api.get(`flights/${flightId}/gpx-data`).json()
+      console.log('🔍 DEBUG useFlightGPX - Raw API response:', data)
+      console.log('🔍 DEBUG useFlightGPX - First 3 coords from API:', data.data?.coordinates?.slice(0, 3))
       return data.data
     },
     enabled: !!flightId,

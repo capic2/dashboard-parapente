@@ -1390,6 +1390,36 @@ def get_flight_gpx_data(flight_id: str, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse GPX file: {str(e)}")
 
+@router.get("/flights/{flight_id}/gpx-data/debug")
+def get_flight_gpx_data_debug(flight_id: str, db: Session = Depends(get_db)):
+    """
+    DEBUG endpoint to verify GPX parsing is working correctly
+    Returns first 5 coordinates with full details
+    """
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    
+    if not flight.gpx_file_path:
+        raise HTTPException(status_code=404, detail="No GPX file available for this flight")
+    
+    gpx_path = Path(flight.gpx_file_path)
+    if not gpx_path.exists():
+        raise HTTPException(status_code=404, detail="GPX file not found on disk")
+    
+    try:
+        coordinates = parse_gpx_file(gpx_path)
+        
+        return {
+            "total_coordinates": len(coordinates),
+            "first_5": coordinates[:5] if len(coordinates) >= 5 else coordinates,
+            "all_timestamps_zero": all(c["timestamp"] == 0 for c in coordinates),
+            "file_path": str(gpx_path),
+            "file_exists": gpx_path.exists()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse GPX file: {str(e)}")
+
 @router.get("/flights/{flight_id}/gpx")
 def download_flight_gpx(flight_id: str, db: Session = Depends(get_db)):
     """Download GPX file for a flight"""
