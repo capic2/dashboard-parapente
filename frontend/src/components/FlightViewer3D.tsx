@@ -58,6 +58,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     null
   );
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const cameraHeadingRef = useRef<number>(0);
+  const cameraDistanceRef = useRef<number>(500);
 
   // Initialize Cesium Viewer
   useEffect(() => {
@@ -248,9 +250,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         // Calculate angle in radians (0 = North, clockwise)
         let flightHeading = Math.atan2(deltaLon, deltaLat);
         
-        // Add 90° (π/2) to be perpendicular (view from the side)
-        // This puts the camera to the right of the flight direction
-        const cameraHeading = flightHeading + Math.PI / 2;
+        // Subtract 90° (-π/2) to be perpendicular (view from the other side)
+        // This puts the camera to the left of the flight direction (better for terrain)
+        const cameraHeading = flightHeading - Math.PI / 2;
         
         return cameraHeading;
       };
@@ -260,13 +262,15 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       const positionCamera = () => {
         if (viewer && !viewer.isDestroyed()) {
           const heading = calculateOptimalHeading();
+          cameraHeadingRef.current = heading;
+          cameraDistanceRef.current = boundingSphere.radius * 2;
           
           viewer.camera.flyToBoundingSphere(boundingSphere, {
             duration: 2,
             offset: new HeadingPitchRange(
               heading, // heading perpendicular to flight direction
-              0, // pitch: 0° (vue complètement horizontale, à l'horizon)
-              boundingSphere.radius * 6 // distance très augmentée pour vue panoramique
+              -0.05, // pitch: légèrement incliné vers le bas pour voir le sol
+              cameraDistanceRef.current // distance plus proche pour meilleure immersion
             ),
           });
         }
@@ -440,6 +444,21 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         if (cursorPositionPropertyRef.current) {
           cursorPositionPropertyRef.current.setValue(
             allPositionsRef.current[currentIndexRef.current]
+          );
+        }
+
+        // Suivre le curseur avec la caméra (translation seulement, pas de rotation)
+        const viewer = viewerRef.current;
+        if (viewer && !viewer.isDestroyed()) {
+          const currentPosition = allPositionsRef.current[currentIndexRef.current];
+          const heading = cameraHeadingRef.current;
+          const distance = cameraDistanceRef.current;
+          const pitch = -0.05;
+          
+          // Position la caméra à distance fixe du curseur, avec le même heading
+          viewer.camera.lookAt(
+            currentPosition,
+            new HeadingPitchRange(heading, pitch, distance)
           );
         }
 
