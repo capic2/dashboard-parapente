@@ -275,9 +275,9 @@ async def _export_video_playwright(
             ms_per_frame = (duration_seconds * 1000) / total_frames
             
             for i in range(total_frames):
-                # Capture screenshot
+                # Capture screenshot with increased timeout (60s instead of default 30s)
                 frame_path = frames_dir / f"frame{i:05d}.png"
-                await page.screenshot(path=str(frame_path))
+                await page.screenshot(path=str(frame_path), timeout=60000)
                 
                 frame_count += 1
                 if frame_count % 10 == 0:
