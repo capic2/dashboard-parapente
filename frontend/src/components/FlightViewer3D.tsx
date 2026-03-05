@@ -13,6 +13,8 @@ import {
   Cartographic,
   sampleTerrainMostDetailed,
   Matrix4,
+  SceneTransforms,
+  Cartesian2,
 } from 'cesium';
 import { useFlightGPX } from '../hooks/useFlightGPX';
 
@@ -461,26 +463,50 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             cameraTargetRef.current = currentPosition;
           }
           
-          // Calculate distance between cursor and camera target
-          const targetCartographic = Cartographic.fromCartesian(cameraTargetRef.current);
-          const currentCartographic = Cartographic.fromCartesian(currentPosition);
+          // Project cursor position to screen coordinates
+          const cursorScreenPos = SceneTransforms.wgs84ToWindowCoordinates(
+            viewer.scene,
+            currentPosition
+          );
           
-          const deltaX = (currentCartographic.longitude - targetCartographic.longitude) * Math.cos(targetCartographic.latitude);
-          const deltaY = currentCartographic.latitude - targetCartographic.latitude;
-          const lateralDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-          
-          // Dead zone: only move camera if cursor moves more than 20% of view width
-          const deadZoneThreshold = distance * 0.2;
-          
-          if (lateralDistance > deadZoneThreshold) {
-            // Smoothly interpolate camera target towards cursor (lerp)
-            const lerpFactor = 0.1; // Smooth following (10% per frame)
+          if (cursorScreenPos) {
+            const canvas = viewer.scene.canvas;
+            const screenWidth = canvas.clientWidth;
+            const screenHeight = canvas.clientHeight;
             
-            cameraTargetRef.current = new Cartesian3(
-              cameraTargetRef.current.x + (currentPosition.x - cameraTargetRef.current.x) * lerpFactor,
-              cameraTargetRef.current.y + (currentPosition.y - cameraTargetRef.current.y) * lerpFactor,
-              cameraTargetRef.current.z + (currentPosition.z - cameraTargetRef.current.z) * lerpFactor
-            );
+            // Calculate position relative to center (0,0 = center, -0.5 to 0.5 range)
+            const relativeX = (cursorScreenPos.x - screenWidth / 2) / screenWidth;
+            const relativeY = (cursorScreenPos.y - screenHeight / 2) / screenHeight;
+            
+            // Dead zone: 30% from center (only move if outside this zone)
+            const deadZone = 0.3;
+            
+            let needsAdjustment = false;
+            let adjustX = 0;
+            let adjustY = 0;
+            
+            // Check if cursor is outside dead zone horizontally
+            if (Math.abs(relativeX) > deadZone) {
+              adjustX = (Math.abs(relativeX) - deadZone) * Math.sign(relativeX);
+              needsAdjustment = true;
+            }
+            
+            // Check if cursor is outside dead zone vertically
+            if (Math.abs(relativeY) > deadZone) {
+              adjustY = (Math.abs(relativeY) - deadZone) * Math.sign(relativeY);
+              needsAdjustment = true;
+            }
+            
+            if (needsAdjustment) {
+              // Smoothly move camera target towards cursor
+              const lerpFactor = 0.05; // Slower, smoother following
+              
+              cameraTargetRef.current = new Cartesian3(
+                cameraTargetRef.current.x + (currentPosition.x - cameraTargetRef.current.x) * lerpFactor,
+                cameraTargetRef.current.y + (currentPosition.y - cameraTargetRef.current.y) * lerpFactor,
+                cameraTargetRef.current.z + (currentPosition.z - cameraTargetRef.current.z) * lerpFactor
+              );
+            }
           }
           
           // Position camera to look at the smoothed target
