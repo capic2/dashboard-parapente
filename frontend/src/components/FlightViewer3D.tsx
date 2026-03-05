@@ -270,24 +270,32 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         const rightLat = midCoord.lat + sampleDistance * Math.sin(flightHeading + Math.PI / 2);
         
         try {
-          const globe = viewer.scene.globe;
+          const terrainProvider = viewer.terrainProvider;
           
           const leftCartographic = Cartographic.fromDegrees(leftLon, leftLat);
           const rightCartographic = Cartographic.fromDegrees(rightLon, rightLat);
           
-          const leftHeight = globe.getHeight(leftCartographic) || 0;
-          const rightHeight = globe.getHeight(rightCartographic) || 0;
+          // Sample terrain with high detail
+          const samples = await sampleTerrainMostDetailed(terrainProvider, [
+            leftCartographic,
+            rightCartographic
+          ]);
+          
+          const leftHeight = samples[0]?.height || midCoord.elevation || 0;
+          const rightHeight = samples[1]?.height || midCoord.elevation || 0;
+          
+          console.log(`🏔️ Terrain sampling - Left: ${leftHeight.toFixed(0)}m, Right: ${rightHeight.toFixed(0)}m, Flight: ${midCoord.elevation.toFixed(0)}m`);
           
           // Place camera on the side with higher terrain (mountain side)
           const cameraHeading = leftHeight > rightHeight 
             ? flightHeading - Math.PI / 2  // Mountain on left, camera on left
             : flightHeading + Math.PI / 2; // Mountain on right, camera on right
           
-          console.log(`Terrain heights - Left: ${leftHeight}m, Right: ${rightHeight}m, Camera side: ${leftHeight > rightHeight ? 'left' : 'right'}`);
+          console.log(`📷 Camera positioned on ${leftHeight > rightHeight ? 'LEFT' : 'RIGHT'} side (mountain side)`);
           
           return cameraHeading;
         } catch (error) {
-          console.warn('Failed to sample terrain, using default right side', error);
+          console.warn('❌ Failed to sample terrain, using default right side', error);
           return flightHeading + Math.PI / 2;
         }
       };
