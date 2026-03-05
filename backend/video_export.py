@@ -90,10 +90,9 @@ async def _export_video_playwright(
         width, height = resolutions.get(quality, (1920, 1080))
         
         async with async_playwright() as p:
-            # Launch browser with GPU acceleration
-            # Note: headless=False for debugging (use xvfb in production)
+            # Launch browser with GPU acceleration in headless mode
             browser = await p.chromium.launch(
-                headless=False,  # Temporarily disable headless for debugging
+                headless=True,  # Headless mode for faster performance
                 args=[
                     '--enable-gpu',
                     '--use-gl=egl',  # Use EGL for headless GPU
@@ -165,48 +164,60 @@ async def _export_video_playwright(
             export_jobs[job_id]["message"] = "Waiting for terrain textures..."
             print("⏳ Waiting for terrain to be ready...")
             
-            # Add timeout to terrain check (max 30 seconds)
+            # Add timeout to terrain check (max 60 seconds)
             try:
-                terrain_ready = await page.evaluate("""
-                    () => {
-                        return new Promise((resolve, reject) => {
-                            let checkCount = 0;
-                            const maxChecks = 60; // 30 seconds (500ms * 60)
-                            
-                            const checkTerrain = () => {
-                                checkCount++;
+                print("🔍 Starting terrain readiness check (max 60s)...")
+                
+                # Wrap page.evaluate() with asyncio.wait_for() to enforce timeout at Python level
+                terrain_ready = await asyncio.wait_for(
+                    page.evaluate("""
+                        () => {
+                            return new Promise((resolve, reject) => {
+                                let checkCount = 0;
+                                const maxChecks = 120; // 60 seconds (500ms * 120)
                                 
-                                // Timeout after maxChecks
-                                if (checkCount >= maxChecks) {
-                                    console.log('⚠️ Terrain check timeout - proceeding anyway');
-                                    resolve(false); // Resolve with false to indicate timeout
-                                    return;
-                                }
-                                
-                                // Check if terrainReady indicator is visible (hidden when ready)
-                                const loadingIndicator = document.querySelector('[class*="bg-blue-100"]');
-                                const hasLoadingText = loadingIndicator && loadingIndicator.textContent.includes('Chargement des textures');
-                                
-                                if (!hasLoadingText) {
-                                    console.log('✅ Terrain textures loaded (or timeout)');
-                                    resolve(true);
-                                } else {
-                                    console.log(`⏳ Still loading terrain... (check ${checkCount}/${maxChecks})`);
-                                    setTimeout(checkTerrain, 500);
-                                }
-                            };
-                            setTimeout(checkTerrain, 1000);
-                        });
-                    }
-                """)
+                                const checkTerrain = () => {
+                                    checkCount++;
+                                    
+                                    // Timeout after maxChecks
+                                    if (checkCount >= maxChecks) {
+                                        console.log('⚠️ Terrain check timeout after 60s - proceeding anyway');
+                                        resolve(false); // Resolve with false to indicate timeout
+                                        return;
+                                    }
+                                    
+                                    // Check if terrainReady indicator is visible (hidden when ready)
+                                    const loadingIndicator = document.querySelector('[class*="bg-blue-100"]');
+                                    const hasLoadingText = loadingIndicator && loadingIndicator.textContent.includes('Chargement des textures');
+                                    
+                                    if (!hasLoadingText) {
+                                        console.log('✅ Terrain textures loaded!');
+                                        resolve(true);
+                                    } else {
+                                        // Log every 10 checks (5 seconds)
+                                        if (checkCount % 10 === 0) {
+                                            console.log(`⏳ Still loading terrain... (${checkCount * 0.5}s / 60s)`);
+                                        }
+                                        setTimeout(checkTerrain, 500);
+                                    }
+                                };
+                                setTimeout(checkTerrain, 1000);
+                            });
+                        }
+                    """),
+                    timeout=65.0  # Python-level timeout (slightly longer than JS timeout)
+                )
                 
                 if terrain_ready:
-                    print("✅ Terrain ready, waiting 2 more seconds for stability...")
+                    print("✅ Terrain ready! Waiting 2 more seconds for stability...")
                 else:
-                    print("⚠️ Terrain check timed out after 30s, proceeding anyway...")
+                    print("⚠️ Terrain check timed out after 60s, proceeding anyway...")
                     
                 await asyncio.sleep(2)  # Extra buffer for complete rendering
                 
+            except asyncio.TimeoutError:
+                print("⚠️ Python-level timeout after 65s - terrain still loading. Proceeding anyway...")
+                await asyncio.sleep(2)
             except Exception as e:
                 print(f"⚠️ Error waiting for terrain: {e}. Proceeding anyway...")
                 await asyncio.sleep(2)
