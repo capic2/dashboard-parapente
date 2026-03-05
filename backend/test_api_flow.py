@@ -79,7 +79,7 @@ def parse_gpx_file(gpx_path: Path) -> List[Dict]:
 
 
 # Simulate the API endpoint
-gpx_path = Path('db/gpx/strava_16394749726.gpx')
+gpx_path = Path('db/gpx/strava_16394022550.gpx')
 print(f"Testing with file: {gpx_path}")
 print(f"File exists: {gpx_path.exists()}")
 print("")
