@@ -236,8 +236,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             duration: 2,
             offset: new HeadingPitchRange(
               0, // heading: 0 = Nord
-              -Math.PI / 4, // pitch: -45° (vue aérienne oblique)
-              boundingSphere.radius * 2.5 // distance optimale pour bonne vue d'ensemble
+              -Math.PI / 6, // pitch: -30° (vue plus basse pour voir l'altitude)
+              boundingSphere.radius * 3.5 // distance augmentée pour meilleure perspective
             ),
           });
         }
@@ -247,10 +247,15 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
 
     return () => {
+      // Reset play state when changing flights
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
+      isPlayingRef.current = false;
+      setIsPlaying(false);
+      currentIndexRef.current = 0;
+      setCurrentProgress(0);
 
       const viewer = viewerRef.current;
       if (!viewer || viewer.isDestroyed()) return;
