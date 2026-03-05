@@ -40,6 +40,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [replaySpeed, setReplaySpeed] = useState(10);
   const [viewerError, setViewerError] = useState<string | null>(null);
   const [viewerReady, setViewerReady] = useState(false);
+  const [terrainReady, setTerrainReady] = useState(false);
   const [elevationOffset, setElevationOffset] = useState(0);
   const [autoOffset, setAutoOffset] = useState(0);
   const [isCalculatingOffset, setIsCalculatingOffset] = useState(false);
@@ -149,10 +150,39 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     };
   }, []);
 
+  // Monitor terrain loading status
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || !viewerReady) return;
+
+    // Check if terrain is already loaded
+    const globe = viewer.scene.globe;
+    
+    const checkTerrainReady = () => {
+      // Check if tiles are loaded in the current view
+      const tilesLoaded = globe.tilesLoaded;
+      
+      if (tilesLoaded) {
+        console.log('✅ Terrain textures loaded');
+        setTerrainReady(true);
+      } else {
+        console.log('⏳ Waiting for terrain textures...');
+        // Check again after a short delay
+        setTimeout(checkTerrainReady, 500);
+      }
+    };
+
+    // Start checking after a small delay
+    const timeoutId = setTimeout(checkTerrainReady, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [viewerReady]);
+
   // Réinitialiser les offsets quand on change de vol
   useEffect(() => {
     setElevationOffset(0);
     setAutoOffset(0);
+    setTerrainReady(false); // Reset terrain ready state on flight change
   }, [flightId]);
 
   // Configure terrain rendering (shadows, AO, lighting)
@@ -1053,18 +1083,30 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
               </p>
 
               <div className="space-y-3">
+            {/* Terrain Loading Indicator */}
+            {!terrainReady && (
+              <div className="bg-blue-100 border border-blue-400 rounded p-2 mb-3">
+                <p className="text-xs text-blue-800 flex items-center gap-2">
+                  <span className="animate-spin">⏳</span>
+                  Chargement des textures du terrain...
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-2 mb-3">
               <button
                 onClick={() => (isPlayingRef.current ? pause() : play())}
-                className="flex-1 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                disabled={isRecording}
+                className="flex-1 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400"
+                disabled={isRecording || !terrainReady}
+                title={!terrainReady ? 'Chargement du terrain...' : ''}
               >
                 {isPlaying ? '⏸ Pause' : '▶ Play'}
               </button>
               <button
                 onClick={reset}
-                className="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-                disabled={isRecording}
+                className="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:bg-gray-400"
+                disabled={isRecording || !terrainReady}
+                title={!terrainReady ? 'Chargement du terrain...' : ''}
               >
                 ⏮ Reset
               </button>
@@ -1073,9 +1115,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             {/* Export Video Button */}
             <button
               onClick={() => setShowExportModal(true)}
-              disabled={isRecording || isPlaying || !gpxData?.coordinates}
+              disabled={isRecording || isPlaying || !gpxData?.coordinates || !terrainReady}
               className="w-full px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 mb-3"
-              title="Exporter le vol en vidéo"
+              title={!terrainReady ? 'Chargement du terrain...' : 'Exporter le vol en vidéo'}
             >
               {isRecording ? '⏺️ Enregistrement...' : '🎥 Export Vidéo'}
             </button>
