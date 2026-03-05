@@ -485,6 +485,21 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           
           // Move camera back by distance
           viewer.camera.moveBackward(distance);
+          
+          // Check terrain collision and adjust camera height if needed
+          const cameraCartographic = Cartographic.fromCartesian(viewer.camera.position);
+          const globe = viewer.scene.globe;
+          const terrainHeight = globe.getHeight(cameraCartographic);
+          
+          if (terrainHeight !== undefined && cameraCartographic.height < terrainHeight + 50) {
+            // Camera is too low, lift it above terrain (minimum 50m above ground)
+            cameraCartographic.height = terrainHeight + 50;
+            viewer.camera.position = Cartesian3.fromRadians(
+              cameraCartographic.longitude,
+              cameraCartographic.latitude,
+              cameraCartographic.height
+            );
+          }
         }
 
         // Mettre à jour le slider de progression
