@@ -2107,45 +2107,7 @@ def parse_gpx_file(gpx_path: Path) -> List[Dict]:
     else:
         # Parse as GPX file (XML)
         print(f"🔍 DEBUG - Detected GPX file: {gpx_path.name}")
-        tree = ET.parse(gpx_path)
-        root = tree.getroot()
-        
-        # Handle GPX namespace
-        ns = {'gpx': 'http://www.topografix.com/GPX/1/1'}
-        if not root.tag.endswith('gpx'):
-            # Try without namespace
-            ns = {}
-        
-        coordinates = []
-        
-        # Find all track points
-        for trkpt in root.findall('.//gpx:trkpt', ns) or root.findall('.//trkpt'):
-            lat = float(trkpt.get('lat', 0))
-            lon = float(trkpt.get('lon', 0))
-            
-            # Get elevation
-            ele_elem = trkpt.find('gpx:ele', ns) or trkpt.find('ele')
-            elevation = float(ele_elem.text) if ele_elem is not None and ele_elem.text else 0
-            
-            # Get timestamp
-            time_elem = trkpt.find('gpx:time', ns) or trkpt.find('time')
-            if time_elem is not None and time_elem.text:
-                try:
-                    dt = datetime.fromisoformat(time_elem.text.replace('Z', '+00:00'))
-                    timestamp = int(dt.timestamp() * 1000)  # milliseconds
-                except:
-                    timestamp = 0
-            else:
-                timestamp = 0
-            
-            coordinates.append({
-                "lat": lat,
-                "lon": lon,
-                "elevation": elevation,
-                "timestamp": timestamp
-            })
-        
-        return coordinates
+        return parse_gpx_file_from_string(content)
 
 
 def calculate_max_speed(coordinates: List[Dict]) -> float:
