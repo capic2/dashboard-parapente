@@ -831,7 +831,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       setExportStatus('starting');
       
       // Call the backend API to start export
-      const response = await fetch(`${API_BASE_URL}/api/flights/${flightId}/export-video`, {
+      const exportUrl = `${API_BASE_URL}/api/flights/${flightId}/export-video`;
+      console.log('🎥 Starting video export:', { flightId, exportUrl, config });
+      
+      const response = await fetch(exportUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
