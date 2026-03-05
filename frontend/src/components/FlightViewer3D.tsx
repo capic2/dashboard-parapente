@@ -26,8 +26,9 @@ export interface FlightViewer3DProps {
   flightTitle?: string;
 }
 
-// API base URL - use environment variable or default to localhost
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+// API base URL - use environment variable or derive from current location
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8001` : 'http://localhost:8001');
 
 /**
  * FlightViewer3D - 3D flight viewer using Cesium
