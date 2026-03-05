@@ -110,12 +110,29 @@ async def _export_video_playwright(
             # Navigate to flight viewer
             url = f"{frontend_url}/flights/{flight_id}"
             print(f"📺 Opening {url}")
-            await page.goto(url, wait_until="networkidle", timeout=60000)
+            
+            # Navigate and check for errors
+            response = await page.goto(url, wait_until="networkidle", timeout=60000)
+            if response.status >= 400:
+                raise Exception(f"Page returned HTTP {response.status}")
+            
+            # Take a screenshot for debugging
+            await page.screenshot(path=f"/tmp/playwright-debug-{job_id}.png")
+            print(f"📸 Debug screenshot saved to /tmp/playwright-debug-{job_id}.png")
             
             # Wait for Cesium to load - wait for any canvas element inside the container
             export_jobs[job_id]["message"] = "Waiting for 3D viewer..."
-            await page.wait_for_selector("canvas", timeout=60000)
-            print("✅ Cesium canvas found")
+            try:
+                await page.wait_for_selector("canvas", timeout=30000)
+                print("✅ Cesium canvas found")
+            except Exception as e:
+                # Take another screenshot to see what went wrong
+                await page.screenshot(path=f"/tmp/playwright-error-{job_id}.png")
+                print(f"❌ Canvas not found. Error screenshot: /tmp/playwright-error-{job_id}.png")
+                # Get page content for debugging
+                content = await page.content()
+                print(f"Page HTML (first 500 chars): {content[:500]}")
+                raise Exception(f"Canvas element not found after 30s. Check if flight viewer loaded correctly.")
             
             # Give it a bit more time for initialization
             await asyncio.sleep(3)
