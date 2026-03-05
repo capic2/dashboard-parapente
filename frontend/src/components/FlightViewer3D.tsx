@@ -26,6 +26,9 @@ export interface FlightViewer3DProps {
   flightTitle?: string;
 }
 
+// API base URL - use environment variable or default to localhost
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+
 /**
  * FlightViewer3D - 3D flight viewer using Cesium
  */
@@ -754,7 +757,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
    */
   const pollExportStatus = async (jobId: string) => {
     try {
-      const response = await fetch(`http://localhost:8001/api/exports/${jobId}/status`);
+      const response = await fetch(`${API_BASE_URL}/api/exports/${jobId}/status`);
       if (!response.ok) {
         throw new Error('Failed to fetch export status');
       }
@@ -772,7 +775,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         
         // Download the video
         console.log('✅ Export completed, downloading...');
-        const downloadUrl = `http://localhost:8001/api/exports/${jobId}/download`;
+        const downloadUrl = `${API_BASE_URL}/api/exports/${jobId}/download`;
         const link = document.createElement('a');
         link.href = downloadUrl;
         link.download = `flight-${flightId}.mp4`;
@@ -827,7 +830,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       setExportStatus('starting');
       
       // Call the backend API to start export
-      const response = await fetch(`http://localhost:8001/api/flights/${flightId}/export-video`, {
+      const response = await fetch(`${API_BASE_URL}/api/flights/${flightId}/export-video`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
