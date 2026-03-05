@@ -122,17 +122,33 @@ async def _export_video_playwright(
             
             # Wait for Cesium to load - wait for any canvas element inside the container
             export_jobs[job_id]["message"] = "Waiting for 3D viewer..."
+            print("⏳ Waiting for canvas element...")
+            
+            # Wait for React to load first
+            await page.wait_for_load_state("domcontentloaded")
+            await asyncio.sleep(2)  # Give React time to hydrate
+            
             try:
-                await page.wait_for_selector("canvas", timeout=30000)
+                # Try to wait for canvas with a longer timeout
+                await page.wait_for_selector("canvas", timeout=60000, state="attached")
                 print("✅ Cesium canvas found")
+                
+                # Wait a bit more for Cesium to initialize
+                await asyncio.sleep(3)
+                
             except Exception as e:
                 # Take another screenshot to see what went wrong
                 await page.screenshot(path=f"/tmp/playwright-error-{job_id}.png")
                 print(f"❌ Canvas not found. Error screenshot: /tmp/playwright-error-{job_id}.png")
+                
                 # Get page content for debugging
                 content = await page.content()
                 print(f"Page HTML (first 500 chars): {content[:500]}")
-                raise Exception(f"Canvas element not found after 30s. Check if flight viewer loaded correctly.")
+                
+                # Try to get console errors
+                print("Checking for JavaScript errors...")
+                
+                raise Exception(f"Canvas element not found after 60s. Check if flight viewer loaded correctly. Error: {str(e)}")
             
             # Give it a bit more time for initialization
             await asyncio.sleep(3)
