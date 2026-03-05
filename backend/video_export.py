@@ -91,14 +91,17 @@ async def _export_video_playwright(
         
         async with async_playwright() as p:
             # Launch browser with GPU acceleration
+            # Note: headless=False for debugging (use xvfb in production)
             browser = await p.chromium.launch(
-                headless=True,
+                headless=False,  # Temporarily disable headless for debugging
                 args=[
                     '--enable-gpu',
                     '--use-gl=egl',  # Use EGL for headless GPU
                     '--enable-webgl',
                     '--ignore-gpu-blocklist',
                     '--disable-gpu-vsync',
+                    '--no-sandbox',  # Required for some environments
+                    '--disable-dev-shm-usage',  # Overcome limited resource problems
                 ]
             )
             context = await browser.new_context(
