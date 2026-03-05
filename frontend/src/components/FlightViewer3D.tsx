@@ -160,15 +160,21 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     const viewer = viewerRef.current;
     if (!viewer || !viewerReady) return;
 
+    // Reset terrain ready when checking
+    setTerrainReady(false);
+    
     // Check if terrain is already loaded
     const globe = viewer.scene.globe;
+    let isMounted = true;
     
     const checkTerrainReady = () => {
+      if (!isMounted) return;
+      
       // Check if tiles are loaded in the current view
       const tilesLoaded = globe.tilesLoaded;
       
       if (tilesLoaded) {
-        console.log('✅ Terrain textures loaded');
+        console.log('✅ Terrain textures loaded for flight', flightId);
         setTerrainReady(true);
       } else {
         console.log('⏳ Waiting for terrain textures...');
@@ -180,8 +186,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     // Start checking after a small delay
     const timeoutId = setTimeout(checkTerrainReady, 1000);
 
-    return () => clearTimeout(timeoutId);
-  }, [viewerReady]);
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, [viewerReady, flightId]);
 
   // Réinitialiser les offsets quand on change de vol
   useEffect(() => {
@@ -335,8 +344,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         // Takeoff is at the beginning
         const takeoffCoord = gpxData.coordinates[0];
         
-        // Use a point further in the flight (20% through) as reference
-        const referenceIndex = Math.floor(numPoints * 0.2);
+        // Use middle of the flight (50%) as reference for better perspective
+        const referenceIndex = Math.floor(numPoints * 0.5);
         const referenceCoord = gpxData.coordinates[referenceIndex];
         
         // Calculate heading from reference point BACK to takeoff
@@ -344,12 +353,18 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         const deltaLon = takeoffCoord.lon - referenceCoord.lon;
         const deltaLat = takeoffCoord.lat - referenceCoord.lat;
         
-        // Calculate angle in radians (0 = North, clockwise)
-        const headingToTakeoff = Math.atan2(deltaLon, deltaLat);
+        // Calculate angle in radians
+        // We need to convert lon/lat differences to proper bearing
+        // Using standard bearing formula
+        const y = Math.sin(deltaLon) * Math.cos(takeoffCoord.lat * Math.PI / 180);
+        const x = Math.cos(referenceCoord.lat * Math.PI / 180) * Math.sin(takeoffCoord.lat * Math.PI / 180) -
+                  Math.sin(referenceCoord.lat * Math.PI / 180) * Math.cos(takeoffCoord.lat * Math.PI / 180) * Math.cos(deltaLon);
+        const headingToTakeoff = Math.atan2(y, x);
         
-        console.log(`🛫 Takeoff position: ${takeoffCoord.lat.toFixed(4)}, ${takeoffCoord.lon.toFixed(4)}`);
-        console.log(`📍 Reference position (20%): ${referenceCoord.lat.toFixed(4)}, ${referenceCoord.lon.toFixed(4)}`);
+        console.log(`🛫 Takeoff: ${takeoffCoord.lat.toFixed(4)}°, ${takeoffCoord.lon.toFixed(4)}°`);
+        console.log(`📍 Reference (50%): ${referenceCoord.lat.toFixed(4)}°, ${referenceCoord.lon.toFixed(4)}°`);
         console.log(`📷 Camera heading: ${(headingToTakeoff * 180 / Math.PI).toFixed(1)}° (facing takeoff)`);
+        console.log(`   Distance: ${Math.sqrt(deltaLat**2 + deltaLon**2).toFixed(4)}° (~${(Math.sqrt(deltaLat**2 + deltaLon**2) * 111).toFixed(1)} km)`);
         
         return headingToTakeoff;
       };
