@@ -12,6 +12,7 @@ import {
   HeadingPitchRange,
   Cartographic,
   sampleTerrainMostDetailed,
+  Matrix4,
 } from 'cesium';
 import { useFlightGPX } from '../hooks/useFlightGPX';
 
@@ -228,20 +229,25 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       // Calculate bounding sphere for better camera positioning
       const boundingSphere = BoundingSphere.fromPoints(positions);
 
-      // Fly to track - on le fait toujours, même si l'offset n'est pas encore calculé
-      // Au 2e passage (après calcul de l'offset), la caméra sera repositionnée correctement
-      setTimeout(() => {
+      // Position camera - MUST happen after elevation offset is calculated
+      // Using a very low angle to see the altitude of the flight track
+      const positionCamera = () => {
         if (viewer && !viewer.isDestroyed()) {
           viewer.camera.flyToBoundingSphere(boundingSphere, {
             duration: 2,
             offset: new HeadingPitchRange(
-              0, // heading: 0 = Nord
-              -Math.PI / 6, // pitch: -30° (vue plus basse pour voir l'altitude)
-              boundingSphere.radius * 3.5 // distance augmentée pour meilleure perspective
+              0, // heading
+              0, // pitch: 0° (vue complètement horizontale, à l'horizon)
+              boundingSphere.radius * 6 // distance très augmentée pour vue panoramique
             ),
           });
         }
-      }, 500);
+      };
+      
+      // Position immédiate
+      setTimeout(positionCamera, 500);
+      // Re-position après calcul de l'offset (1.5s + 500ms)
+      setTimeout(positionCamera, 2500);
     } catch (err) {
       console.error('Error loading GPX data:', err);
     }
