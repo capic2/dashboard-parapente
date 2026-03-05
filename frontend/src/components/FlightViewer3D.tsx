@@ -20,8 +20,6 @@ import {
 } from 'cesium';
 import { useFlightGPX } from '../hooks/useFlightGPX';
 import { ExportVideoModal, VideoExportConfig } from './ExportVideoModal';
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
 export interface FlightViewer3DProps {
   flightId: string;
@@ -59,14 +57,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
   // Video export states
   const [showExportModal, setShowExportModal] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingProgress, setRecordingProgress] = useState(0);
-  const [recordingPhase, setRecordingPhase] = useState<'loading' | 'capturing' | 'encoding' | 'done'>('capturing');
-  const [capturedFrames, setCapturedFrames] = useState(0);
-  const [totalFrames, setTotalFrames] = useState(0);
-  const ffmpegRef = useRef<FFmpeg | null>(null);
-  const capturedFramesDataRef = useRef<Uint8Array[]>([]);
-  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportStatus, setExportStatus] = useState<string>('');
+  const [exportJobId, setExportJobId] = useState<string | null>(null);
+  const exportPollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const allPositionsRef = useRef<Cartesian3[]>([]);
   const timestampsRef = useRef<number[]>([]);
@@ -747,299 +742,138 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   };
 
   /**
-   * Load FFmpeg.wasm
+   * Poll export status from server
    */
-  const loadFFmpeg = async (): Promise<FFmpeg> => {
-    if (ffmpegRef.current) {
-      return ffmpegRef.current;
-    }
-
-    const ffmpeg = new FFmpeg();
-    
-    ffmpeg.on('log', ({ message }) => {
-      console.log('FFmpeg:', message);
-    });
-
-    ffmpeg.on('progress', ({ progress }) => {
-      if (recordingPhase === 'encoding') {
-        setRecordingProgress(Math.round(progress * 100));
+  const pollExportStatus = async (jobId: string) => {
+    try {
+      const response = await fetch(`http://localhost:8001/api/exports/${jobId}/status`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch export status');
       }
-    });
-
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-    await ffmpeg.load({
-      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-    });
-
-    ffmpegRef.current = ffmpeg;
-    return ffmpeg;
-  };
-
-  /**
-   * Capture a single frame from the canvas
-   */
-  const captureFrame = async (canvas: HTMLCanvasElement): Promise<Uint8Array> => {
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          resolve(new Uint8Array(0));
-          return;
+      
+      const data = await response.json();
+      setExportProgress(data.progress || 0);
+      setExportStatus(data.status);
+      
+      if (data.status === 'completed') {
+        // Stop polling
+        if (exportPollingRef.current) {
+          clearInterval(exportPollingRef.current);
+          exportPollingRef.current = null;
         }
         
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          resolve(new Uint8Array(reader.result as ArrayBuffer));
-        };
-        reader.readAsArrayBuffer(blob);
-      }, 'image/png');
-    });
+        // Download the video
+        console.log('✅ Export completed, downloading...');
+        const downloadUrl = `http://localhost:8001/api/exports/${jobId}/download`;
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = `flight-${flightId}.mp4`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Reset state after a delay
+        setTimeout(() => {
+          setIsExporting(false);
+          setExportProgress(0);
+          setExportStatus('');
+          setExportJobId(null);
+        }, 2000);
+      } else if (data.status === 'failed') {
+        // Stop polling
+        if (exportPollingRef.current) {
+          clearInterval(exportPollingRef.current);
+          exportPollingRef.current = null;
+        }
+        
+        console.error('❌ Export failed:', data.error);
+        alert(`Export failed: ${data.error || 'Unknown error'}`);
+        setIsExporting(false);
+        setExportProgress(0);
+        setExportStatus('');
+        setExportJobId(null);
+      }
+    } catch (error) {
+      console.error('Error polling export status:', error);
+    }
   };
 
   /**
-   * Start video export with frame-by-frame capture
+   * Start video export using server API with Playwright
    */
   const startVideoExport = async (config: VideoExportConfig) => {
-    const viewer = viewerRef.current;
-    if (!viewer || allPositionsRef.current.length === 0) {
-      console.error('Viewer not initialized or no positions');
+    if (!gpxData) {
+      console.error('No GPX data available');
       return;
     }
     
     try {
-      console.log('🎥 Starting frame-by-frame export with config:', config);
+      console.log('🎥 Starting server-side video export with config:', config);
       
       // Close modal
       setShowExportModal(false);
       
-      // Setup recording state
-      setIsRecording(true);
-      setRecordingPhase('loading');
-      setRecordingProgress(0);
-      setCapturedFrames(0);
-      capturedFramesDataRef.current = [];
+      // Setup export state
+      setIsExporting(true);
+      setExportProgress(0);
+      setExportStatus('starting');
       
-      // Phase 1: Load FFmpeg
-      console.log('📦 Loading FFmpeg.wasm...');
-      await loadFFmpeg();
-      console.log('✅ FFmpeg loaded');
+      // Call the backend API to start export
+      const response = await fetch(`http://localhost:8001/api/flights/${flightId}/export-video`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          quality: config.quality,
+          fps: config.fps,
+          speed: config.speed,
+        }),
+      });
       
-      // Phase 2: Calculate frames needed
-      setRecordingPhase('capturing');
-      
-      const canvas = viewer.scene.canvas;
-      const totalPositions = allPositionsRef.current.length;
-      const timestamps = timestampsRef.current;
-      
-      if (timestamps.length === 0 || timestamps.length !== totalPositions) {
-        throw new Error('GPS timestamps not available');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to start export');
       }
       
-      // Calculate how many frames we need based on flight duration and FPS
-      const startTime = timestamps[0];
-      const endTime = timestamps[timestamps.length - 1];
-      const flightDurationMs = endTime - startTime;
-      const flightDurationSeconds = flightDurationMs / 1000;
+      const data = await response.json();
+      const jobId = data.job_id;
       
-      // Video duration = flight duration / speed
-      const videoDurationSeconds = flightDurationSeconds / config.speed;
+      console.log('✅ Export job started:', jobId);
+      setExportJobId(jobId);
+      setExportStatus('processing');
       
-      // Frames needed = video duration × FPS
-      const framesToCapture = Math.ceil(videoDurationSeconds * config.fps);
-      setTotalFrames(framesToCapture);
+      // Start polling for status
+      exportPollingRef.current = setInterval(() => {
+        pollExportStatus(jobId);
+      }, 2000); // Poll every 2 seconds
       
-      // Time between each frame in GPS time
-      const msPerFrame = flightDurationMs / framesToCapture;
-      
-      console.log(`📸 Flight duration: ${(flightDurationSeconds / 60).toFixed(1)} min`);
-      console.log(`📸 Video duration: ${(videoDurationSeconds / 60).toFixed(1)} min at ${config.speed}x speed`);
-      console.log(`📸 Capturing ${framesToCapture} frames at ${config.fps} FPS`);
-      console.log(`📸 Time per frame: ${msPerFrame.toFixed(0)}ms GPS time`);
-      
-      // Reset to start
-      reset();
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Pause animation (we'll control it manually)
-      pause();
-      
-      // Phase 3: Capture frames one by one
-      for (let frameIndex = 0; frameIndex < framesToCapture; frameIndex++) {
-        // Calculate the GPS time for this frame
-        const targetTime = startTime + (frameIndex * msPerFrame);
-        
-        // Find the closest position to this time
-        let positionIndex = 0;
-        for (let i = 0; i < timestamps.length - 1; i++) {
-          if (timestamps[i] <= targetTime && timestamps[i + 1] > targetTime) {
-            positionIndex = i;
-            break;
-          }
-        }
-        
-        if (positionIndex >= totalPositions - 1) {
-          positionIndex = totalPositions - 1;
-        }
-        
-        // Move to this position
-        currentIndexRef.current = positionIndex;
-        const currentPositions = allPositionsRef.current.slice(0, positionIndex + 1);
-        visiblePositionsRef.current = currentPositions;
-        
-        // Update cursor position
-        const currentPosition = allPositionsRef.current[positionIndex];
-        if (cursorPositionPropertyRef.current) {
-          cursorPositionPropertyRef.current.setValue(currentPosition);
-        }
-        
-        // Note: polyline is updated automatically via CallbackProperty reading visiblePositionsRef
-        
-        // Update camera to follow the cursor
-        const heading = cameraHeadingRef.current;
-        const distance = cameraDistanceRef.current;
-        const pitch = -0.05;
-        
-        // Use smooth camera positioning like in the animation
-        if (!cameraTargetRef.current) {
-          cameraTargetRef.current = currentPosition;
-        } else {
-          const lerpFactor = 0.08;
-          cameraTargetRef.current = new Cartesian3(
-            cameraTargetRef.current.x + (currentPosition.x - cameraTargetRef.current.x) * lerpFactor,
-            cameraTargetRef.current.y + (currentPosition.y - cameraTargetRef.current.y) * lerpFactor,
-            cameraTargetRef.current.z + (currentPosition.z - cameraTargetRef.current.z) * lerpFactor
-          );
-        }
-        
-        viewer.camera.setView({
-          destination: cameraTargetRef.current,
-          orientation: {
-            heading: heading,
-            pitch: pitch,
-            roll: 0
-          }
-        });
-        viewer.camera.moveBackward(distance);
-        
-        // Force Cesium to render the scene
-        viewer.scene.render();
-        
-        // Wait a bit longer for tiles to load and scene to stabilize
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Force another render to be sure
-        viewer.scene.render();
-        
-        // Capture frame
-        const frameData = await captureFrame(canvas);
-        capturedFramesDataRef.current.push(frameData);
-        
-        // Update progress
-        setCapturedFrames(frameIndex + 1);
-        setRecordingProgress(Math.round(((frameIndex + 1) / framesToCapture) * 50)); // 0-50% for capture
-        
-        if (frameIndex % 10 === 0) {
-          console.log(`📸 Frame ${frameIndex + 1}/${framesToCapture} captured`);
-        }
-      }
-      
-      console.log(`✅ All ${framesToCapture} frames captured`);
-      
-      // Phase 4: Encode video with FFmpeg
-      setRecordingPhase('encoding');
-      setRecordingProgress(50);
-      
-      const ffmpeg = ffmpegRef.current!;
-      
-      console.log('🎬 Writing frames to FFmpeg virtual filesystem...');
-      
-      // Write all frames to FFmpeg filesystem
-      for (let i = 0; i < capturedFramesDataRef.current.length; i++) {
-        const filename = `frame${i.toString().padStart(5, '0')}.png`;
-        await ffmpeg.writeFile(filename, capturedFramesDataRef.current[i]);
-      }
-      
-      console.log('🎬 Encoding video...');
-      
-      // Encode video
-      const outputFilename = 'output.mp4';
-      const quality = config.quality === '4K' ? '3840:2160' : config.quality === '1080p' ? '1920:1080' : '1280:720';
-      
-      await ffmpeg.exec([
-        '-framerate', config.fps.toString(),
-        '-i', 'frame%05d.png',
-        '-c:v', 'libx264',
-        '-preset', 'medium',
-        '-crf', '23',
-        '-pix_fmt', 'yuv420p',
-        '-s', quality,
-        outputFilename
-      ]);
-      
-      console.log('✅ Video encoded');
-      
-      // Read the output file
-      const data = await ffmpeg.readFile(outputFilename);
-      const videoBlob = new Blob([data], { type: 'video/mp4' });
-      
-      console.log(`✅ Video ready: ${(videoBlob.size / 1024 / 1024).toFixed(2)} MB`);
-      
-      // Download
-      const timestamp = new Date().toISOString().split('T')[0];
-      const filename = `flight-${flightId}-${timestamp}.mp4`;
-      downloadBlob(videoBlob, filename);
-      
-      // Cleanup FFmpeg filesystem
-      console.log('🧹 Cleaning up...');
-      for (let i = 0; i < capturedFramesDataRef.current.length; i++) {
-        const fname = `frame${i.toString().padStart(5, '0')}.png`;
-        try {
-          await ffmpeg.deleteFile(fname);
-        } catch (e) {
-          // Ignore errors
-        }
-      }
-      try {
-        await ffmpeg.deleteFile(outputFilename);
-      } catch (e) {
-        // Ignore errors
-      }
-      
-      // Cleanup
-      setRecordingPhase('done');
-      setRecordingProgress(100);
-      capturedFramesDataRef.current = [];
-      
-      // Show success and cleanup
-      setTimeout(() => {
-        setIsRecording(false);
-        setRecordingProgress(0);
-        setCapturedFrames(0);
-        setTotalFrames(0);
-        
-        alert(`✅ Vidéo exportée avec succès!\n\nFichier: ${filename}\nTaille: ${(videoBlob.size / 1024 / 1024).toFixed(2)} MB\n\nLa vidéo est parfaitement fluide à ${config.fps} FPS!`);
-      }, 1000);
+      // Also poll immediately
+      pollExportStatus(jobId);
       
     } catch (error) {
       console.error('❌ Video export error:', error);
-      setIsRecording(false);
-      setRecordingProgress(0);
-      setCapturedFrames(0);
-      setTotalFrames(0);
-      capturedFramesDataRef.current = [];
+      setIsExporting(false);
+      setExportProgress(0);
+      setExportStatus('');
+      setExportJobId(null);
       alert(`❌ Erreur lors de l'export: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     }
   };
 
   /**
-   * Cancel ongoing recording
+   * Cancel ongoing export
    */
   const cancelVideoExport = () => {
-    setIsRecording(false);
-    setRecordingProgress(0);
-    setCapturedFrames(0);
-    setTotalFrames(0);
-    capturedFramesDataRef.current = [];
+    if (exportPollingRef.current) {
+      clearInterval(exportPollingRef.current);
+      exportPollingRef.current = null;
+    }
+    
+    setIsExporting(false);
+    setExportProgress(0);
+    setExportStatus('');
+    setExportJobId(null);
     
     console.log('❌ Export cancelled by user');
   };
@@ -1137,6 +971,16 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     };
   }, []);
 
+  // Cleanup export polling on unmount
+  useEffect(() => {
+    return () => {
+      if (exportPollingRef.current) {
+        clearInterval(exportPollingRef.current);
+        exportPollingRef.current = null;
+      }
+    };
+  }, []);
+
   return (
     <div 
       ref={containerDivRef}
@@ -1194,12 +1038,18 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
             <div className="flex gap-2 mb-3">
               <button
-                onClick={() => (isPlayingRef.current ? pause() : play())}
-                className="flex-1 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400"
-                disabled={isRecording || !terrainReady}
-                title={!terrainReady ? 'Chargement du terrain...' : ''}
+                onClick={togglePlayPause}
+                className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+                disabled={isExporting}
               >
                 {isPlaying ? '⏸ Pause' : '▶ Play'}
+              </button>
+              <button
+                onClick={reset}
+                className="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:bg-gray-400"
+                disabled={isExporting}
+              >
+                ⏮ Reset
               </button>
               <button
                 onClick={reset}
@@ -1214,11 +1064,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             {/* Export Video Button */}
             <button
               onClick={() => setShowExportModal(true)}
-              disabled={isRecording || isPlaying || !gpxData?.coordinates || !terrainReady}
+              disabled={isExporting || isPlaying || !gpxData?.coordinates}
               className="w-full px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 mb-3"
-              title={!terrainReady ? 'Chargement du terrain...' : 'Exporter le vol en vidéo'}
+              title="Exporter le vol en vidéo (rendu serveur)"
             >
-              {isRecording ? '⏺️ Enregistrement...' : '🎥 Export Vidéo'}
+              {isExporting ? '⏺️ Export en cours...' : '🎥 Export Vidéo'}
             </button>
 
             <div>
@@ -1350,28 +1200,28 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         </div>
       )}
 
-      {/* Recording Progress Overlay */}
-      {isRecording && (
+      {/* Export Progress Overlay */}
+      {isExporting && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 bg-black/90 text-white px-8 py-6 rounded-lg shadow-2xl min-w-[450px]">
           <div className="flex items-center gap-4 mb-4">
             <div className="animate-pulse text-3xl">
-              {recordingPhase === 'loading' && '📦'}
-              {recordingPhase === 'capturing' && '📸'}
-              {recordingPhase === 'encoding' && '🎬'}
-              {recordingPhase === 'done' && '✅'}
+              {exportStatus === 'starting' && '🚀'}
+              {exportStatus === 'processing' && '🎬'}
+              {exportStatus === 'completed' && '✅'}
+              {exportStatus === 'failed' && '❌'}
             </div>
             <div>
               <div className="font-bold text-lg">
-                {recordingPhase === 'loading' && 'Chargement FFmpeg...'}
-                {recordingPhase === 'capturing' && 'Capture des frames...'}
-                {recordingPhase === 'encoding' && 'Encodage vidéo...'}
-                {recordingPhase === 'done' && 'Export terminé!'}
+                {exportStatus === 'starting' && 'Démarrage de l\'export...'}
+                {exportStatus === 'processing' && 'Rendu vidéo en cours...'}
+                {exportStatus === 'completed' && 'Export terminé!'}
+                {exportStatus === 'failed' && 'Export échoué'}
               </div>
               <div className="text-sm text-gray-300">
-                {recordingPhase === 'loading' && 'Chargement de FFmpeg.wasm (~31MB)'}
-                {recordingPhase === 'capturing' && `Frame ${capturedFrames}/${totalFrames}`}
-                {recordingPhase === 'encoding' && 'Création du fichier MP4...'}
-                {recordingPhase === 'done' && 'Téléchargement en cours...'}
+                {exportStatus === 'starting' && 'Initialisation du serveur Playwright...'}
+                {exportStatus === 'processing' && 'Capture et encodage sur le serveur...'}
+                {exportStatus === 'completed' && 'Téléchargement en cours...'}
+                {exportStatus === 'failed' && 'Une erreur est survenue'}
               </div>
             </div>
           </div>
@@ -1380,20 +1230,20 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           <div className="w-full bg-gray-700 rounded-full h-3 mb-3">
             <div 
               className="bg-red-600 h-3 rounded-full transition-all duration-300"
-              style={{ width: `${recordingProgress}%` }}
+              style={{ width: `${exportProgress}%` }}
             />
           </div>
           
           {/* Progress Text */}
           <div className="text-center text-sm text-gray-300">
-            {Math.round(recordingProgress)}%
+            {Math.round(exportProgress)}%
           </div>
           
-          {recordingPhase !== 'done' && (
+          {exportStatus !== 'completed' && exportStatus !== 'failed' && (
             <>
               {/* Info Text */}
               <div className="text-xs text-gray-400 text-center mt-3">
-                Ne fermez pas cette page
+                L'export se fait sur le serveur - Vous pouvez continuer à utiliser la page
               </div>
               
               {/* Cancel Button */}

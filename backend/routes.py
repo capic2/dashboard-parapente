@@ -13,6 +13,7 @@ import asyncio
 import xml.etree.ElementTree as ET
 import math
 import logging
+import os
 from typing import List, Dict, Optional, Sequence
 
 logger = logging.getLogger(__name__)
@@ -2258,3 +2259,98 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     
     return R * c
+
+
+# ========================================
+# VIDEO EXPORT ENDPOINTS
+# ========================================
+
+from video_export import (
+    start_video_export_background,
+    get_export_status,
+    list_exports,
+    EXPORTS_DIR
+)
+
+
+@router.post("/flights/{flight_id}/export-video")
+def start_flight_video_export(
+    flight_id: str,
+    quality: str = "1080p",
+    fps: int = 30,
+    speed: int = 1,
+    db: Session = Depends(get_db)
+):
+    """
+    Start video export in background
+    Returns job_id to track progress
+    """
+    # Verify flight exists
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    
+    # Start export
+    job_id = start_video_export_background(
+        flight_id=flight_id,
+        quality=quality,
+        fps=fps,
+        speed=speed,
+        frontend_url=os.getenv("FRONTEND_URL", "http://localhost:5173")
+    )
+    
+    return {
+        "job_id": job_id,
+        "message": "Video export started",
+        "status_url": f"/exports/{job_id}/status"
+    }
+
+
+@router.get("/exports/{job_id}/status")
+def get_video_export_status(job_id: str):
+    """
+    Get status of video export job
+    """
+    status = get_export_status(job_id)
+    if not status:
+        raise HTTPException(status_code=404, detail="Export job not found")
+    
+    return status
+
+
+@router.get("/exports/{job_id}/download")
+def download_exported_video(job_id: str):
+    """
+    Download exported video
+    """
+    status = get_export_status(job_id)
+    if not status:
+        raise HTTPException(status_code=404, detail="Export job not found")
+    
+    if status["status"] != "completed":
+        raise HTTPException(status_code=400, detail="Video not ready yet")
+    
+    video_path = status.get("video_path")
+    if not video_path or not os.path.exists(video_path):
+        raise HTTPException(status_code=404, detail="Video file not found")
+    
+    filename = os.path.basename(video_path)
+    return FileResponse(
+        path=video_path,
+        media_type="video/mp4",
+        filename=filename
+    )
+
+
+@router.get("/flights/{flight_id}/exports")
+def list_flight_exports(flight_id: str, db: Session = Depends(get_db)):
+    """
+    List all exports for a flight
+    """
+    # Verify flight exists
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    
+    exports = list_exports(flight_id=flight_id)
+    return {"exports": exports}
