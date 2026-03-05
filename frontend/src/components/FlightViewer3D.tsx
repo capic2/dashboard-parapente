@@ -849,15 +849,32 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       
       const canvas = viewer.scene.canvas;
       const totalPositions = allPositionsRef.current.length;
+      const timestamps = timestampsRef.current;
       
-      // Calculate how many frames we need
-      // For real-time (1x): capture every position
-      // For 2x: capture every 2nd position, etc.
-      const frameStep = Math.max(1, Math.floor(config.speed));
-      const framesToCapture = Math.ceil(totalPositions / frameStep);
+      if (timestamps.length === 0 || timestamps.length !== totalPositions) {
+        throw new Error('GPS timestamps not available');
+      }
+      
+      // Calculate how many frames we need based on flight duration and FPS
+      const startTime = timestamps[0];
+      const endTime = timestamps[timestamps.length - 1];
+      const flightDurationMs = endTime - startTime;
+      const flightDurationSeconds = flightDurationMs / 1000;
+      
+      // Video duration = flight duration / speed
+      const videoDurationSeconds = flightDurationSeconds / config.speed;
+      
+      // Frames needed = video duration × FPS
+      const framesToCapture = Math.ceil(videoDurationSeconds * config.fps);
       setTotalFrames(framesToCapture);
       
-      console.log(`📸 Capturing ${framesToCapture} frames (every ${frameStep} positions)`);
+      // Time between each frame in GPS time
+      const msPerFrame = flightDurationMs / framesToCapture;
+      
+      console.log(`📸 Flight duration: ${(flightDurationSeconds / 60).toFixed(1)} min`);
+      console.log(`📸 Video duration: ${(videoDurationSeconds / 60).toFixed(1)} min at ${config.speed}x speed`);
+      console.log(`📸 Capturing ${framesToCapture} frames at ${config.fps} FPS`);
+      console.log(`📸 Time per frame: ${msPerFrame.toFixed(0)}ms GPS time`);
       
       // Reset to start
       reset();
@@ -868,9 +885,21 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       
       // Phase 3: Capture frames one by one
       for (let frameIndex = 0; frameIndex < framesToCapture; frameIndex++) {
-        const positionIndex = frameIndex * frameStep;
+        // Calculate the GPS time for this frame
+        const targetTime = startTime + (frameIndex * msPerFrame);
         
-        if (positionIndex >= totalPositions) break;
+        // Find the closest position to this time
+        let positionIndex = 0;
+        for (let i = 0; i < timestamps.length - 1; i++) {
+          if (timestamps[i] <= targetTime && timestamps[i + 1] > targetTime) {
+            positionIndex = i;
+            break;
+          }
+        }
+        
+        if (positionIndex >= totalPositions - 1) {
+          positionIndex = totalPositions - 1;
+        }
         
         // Move to this position
         currentIndexRef.current = positionIndex;
