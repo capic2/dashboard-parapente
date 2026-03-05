@@ -450,7 +450,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           );
         }
 
-        // Suivre le curseur avec la caméra (translation seulement, pas de rotation)
+        // Suivre le curseur avec la caméra
         const viewer = viewerRef.current;
         if (viewer && !viewer.isDestroyed()) {
           const currentPosition = allPositionsRef.current[currentIndexRef.current];
@@ -458,62 +458,30 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           const distance = cameraDistanceRef.current;
           const pitch = -0.05;
           
-          // Initialize camera target on first frame
+          // Smooth lerp vers la position actuelle
           if (!cameraTargetRef.current) {
             cameraTargetRef.current = currentPosition;
+          } else {
+            const lerpFactor = 0.08;
+            cameraTargetRef.current = new Cartesian3(
+              cameraTargetRef.current.x + (currentPosition.x - cameraTargetRef.current.x) * lerpFactor,
+              cameraTargetRef.current.y + (currentPosition.y - cameraTargetRef.current.y) * lerpFactor,
+              cameraTargetRef.current.z + (currentPosition.z - cameraTargetRef.current.z) * lerpFactor
+            );
           }
           
-          // Project cursor position to screen coordinates
-          const cursorScreenPos = SceneTransforms.wgs84ToWindowCoordinates(
-            viewer.scene,
-            currentPosition
-          );
+          // Use setView instead of lookAt for better control
+          viewer.camera.setView({
+            destination: cameraTargetRef.current,
+            orientation: {
+              heading: heading,
+              pitch: pitch,
+              roll: 0
+            }
+          });
           
-          if (cursorScreenPos) {
-            const canvas = viewer.scene.canvas;
-            const screenWidth = canvas.clientWidth;
-            const screenHeight = canvas.clientHeight;
-            
-            // Calculate position relative to center (0,0 = center, -0.5 to 0.5 range)
-            const relativeX = (cursorScreenPos.x - screenWidth / 2) / screenWidth;
-            const relativeY = (cursorScreenPos.y - screenHeight / 2) / screenHeight;
-            
-            // Dead zone: 30% from center (only move if outside this zone)
-            const deadZone = 0.3;
-            
-            let needsAdjustment = false;
-            let adjustX = 0;
-            let adjustY = 0;
-            
-            // Check if cursor is outside dead zone horizontally
-            if (Math.abs(relativeX) > deadZone) {
-              adjustX = (Math.abs(relativeX) - deadZone) * Math.sign(relativeX);
-              needsAdjustment = true;
-            }
-            
-            // Check if cursor is outside dead zone vertically
-            if (Math.abs(relativeY) > deadZone) {
-              adjustY = (Math.abs(relativeY) - deadZone) * Math.sign(relativeY);
-              needsAdjustment = true;
-            }
-            
-            if (needsAdjustment) {
-              // Smoothly move camera target towards cursor
-              const lerpFactor = 0.05; // Slower, smoother following
-              
-              cameraTargetRef.current = new Cartesian3(
-                cameraTargetRef.current.x + (currentPosition.x - cameraTargetRef.current.x) * lerpFactor,
-                cameraTargetRef.current.y + (currentPosition.y - cameraTargetRef.current.y) * lerpFactor,
-                cameraTargetRef.current.z + (currentPosition.z - cameraTargetRef.current.z) * lerpFactor
-              );
-            }
-          }
-          
-          // Position camera to look at the smoothed target
-          viewer.camera.lookAt(
-            cameraTargetRef.current,
-            new HeadingPitchRange(heading, pitch, distance)
-          );
+          // Move camera back by distance
+          viewer.camera.moveBackward(distance);
         }
 
         // Mettre à jour le slider de progression
