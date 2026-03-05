@@ -1059,14 +1059,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
               >
                 ⏮ Reset
               </button>
-              <button
-                onClick={reset}
-                className="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:bg-gray-400"
-                disabled={isRecording || !terrainReady}
-                title={!terrainReady ? 'Chargement du terrain...' : ''}
-              >
-                ⏮ Reset
-              </button>
             </div>
 
             {/* Export Video Button */}
