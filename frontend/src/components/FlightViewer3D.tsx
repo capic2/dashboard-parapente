@@ -326,67 +326,32 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       // Calculate bounding sphere for better camera positioning
       const boundingSphere = BoundingSphere.fromPoints(positions);
 
-      // Calculate flight direction to orient camera perpendicular to flight path
+      // Calculate camera heading to face the takeoff point
       const calculateOptimalHeading = async (): Promise<number> => {
         if (gpxData.coordinates.length < 2) return 0;
         
-        // Use first and last 10% of points to get general direction
         const numPoints = gpxData.coordinates.length;
-        const startSegment = Math.floor(numPoints * 0.1);
-        const endSegment = Math.floor(numPoints * 0.9);
-        const midSegment = Math.floor(numPoints * 0.5);
         
-        const startCoord = gpxData.coordinates[startSegment];
-        const endCoord = gpxData.coordinates[endSegment];
-        const midCoord = gpxData.coordinates[midSegment];
+        // Takeoff is at the beginning
+        const takeoffCoord = gpxData.coordinates[0];
         
-        // Calculate bearing from start to end
-        const deltaLon = endCoord.lon - startCoord.lon;
-        const deltaLat = endCoord.lat - startCoord.lat;
+        // Use a point further in the flight (20% through) as reference
+        const referenceIndex = Math.floor(numPoints * 0.2);
+        const referenceCoord = gpxData.coordinates[referenceIndex];
+        
+        // Calculate heading from reference point BACK to takeoff
+        // This makes the camera look toward the takeoff/launch site
+        const deltaLon = takeoffCoord.lon - referenceCoord.lon;
+        const deltaLat = takeoffCoord.lat - referenceCoord.lat;
         
         // Calculate angle in radians (0 = North, clockwise)
-        let flightHeading = Math.atan2(deltaLon, deltaLat);
+        const headingToTakeoff = Math.atan2(deltaLon, deltaLat);
         
-        // Sample terrain on both sides of the flight to find where the mountain is
-        const sampleDistance = 0.01; // ~1km offset from flight path
+        console.log(`🛫 Takeoff position: ${takeoffCoord.lat.toFixed(4)}, ${takeoffCoord.lon.toFixed(4)}`);
+        console.log(`📍 Reference position (20%): ${referenceCoord.lat.toFixed(4)}, ${referenceCoord.lon.toFixed(4)}`);
+        console.log(`📷 Camera heading: ${(headingToTakeoff * 180 / Math.PI).toFixed(1)}° (facing takeoff)`);
         
-        // Position to the left (-90°)
-        const leftLon = midCoord.lon + sampleDistance * Math.cos(flightHeading - Math.PI / 2);
-        const leftLat = midCoord.lat + sampleDistance * Math.sin(flightHeading - Math.PI / 2);
-        
-        // Position to the right (+90°)
-        const rightLon = midCoord.lon + sampleDistance * Math.cos(flightHeading + Math.PI / 2);
-        const rightLat = midCoord.lat + sampleDistance * Math.sin(flightHeading + Math.PI / 2);
-        
-        try {
-          const terrainProvider = viewer.terrainProvider;
-          
-          const leftCartographic = Cartographic.fromDegrees(leftLon, leftLat);
-          const rightCartographic = Cartographic.fromDegrees(rightLon, rightLat);
-          
-          // Sample terrain with high detail
-          const samples = await sampleTerrainMostDetailed(terrainProvider, [
-            leftCartographic,
-            rightCartographic
-          ]);
-          
-          const leftHeight = samples[0]?.height || midCoord.elevation || 0;
-          const rightHeight = samples[1]?.height || midCoord.elevation || 0;
-          
-          console.log(`🏔️ Terrain sampling - Left: ${leftHeight.toFixed(0)}m, Right: ${rightHeight.toFixed(0)}m, Flight: ${midCoord.elevation.toFixed(0)}m`);
-          
-          // Place camera on the side with higher terrain (mountain side)
-          const cameraHeading = leftHeight > rightHeight 
-            ? flightHeading - Math.PI / 2  // Mountain on left, camera on left
-            : flightHeading + Math.PI / 2; // Mountain on right, camera on right
-          
-          console.log(`📷 Camera positioned on ${leftHeight > rightHeight ? 'LEFT' : 'RIGHT'} side (mountain side)`);
-          
-          return cameraHeading;
-        } catch (error) {
-          console.warn('❌ Failed to sample terrain, using default right side', error);
-          return flightHeading + Math.PI / 2;
-        }
+        return headingToTakeoff;
       };
 
       // Position camera - MUST happen after elevation offset is calculated
