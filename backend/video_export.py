@@ -110,6 +110,10 @@ async def _export_video_playwright(
             )
             page = await context.new_page()
             
+            # Listen to console messages for debugging
+            page.on("console", lambda msg: print(f"🖥️  Browser console [{msg.type}]: {msg.text}"))
+            page.on("pageerror", lambda err: print(f"❌ Browser error: {err}"))
+            
             # Navigate to flight viewer  
             # Use dedicated export viewer page with query param
             url = f"{frontend_url}/export-viewer?flightId={flight_id}"
@@ -161,27 +165,51 @@ async def _export_video_playwright(
             export_jobs[job_id]["message"] = "Waiting for terrain textures..."
             print("⏳ Waiting for terrain to be ready...")
             
-            terrain_ready = await page.evaluate("""
-                () => {
-                    return new Promise((resolve) => {
-                        const checkTerrain = () => {
-                            // Check if terrainReady indicator is visible (hidden when ready)
-                            const loadingIndicator = document.querySelector('[class*="bg-blue-100"]');
-                            if (!loadingIndicator || loadingIndicator.textContent.includes('Chargement des textures') === false) {
-                                console.log('✅ Terrain textures loaded');
-                                resolve(true);
-                            } else {
-                                console.log('⏳ Still loading terrain...');
-                                setTimeout(checkTerrain, 500);
-                            }
-                        };
-                        setTimeout(checkTerrain, 1000);
-                    });
-                }
-            """)
-            
-            print("✅ Terrain ready, waiting 2 more seconds for stability...")
-            await asyncio.sleep(2)  # Extra buffer for complete rendering
+            # Add timeout to terrain check (max 30 seconds)
+            try:
+                terrain_ready = await page.evaluate("""
+                    () => {
+                        return new Promise((resolve, reject) => {
+                            let checkCount = 0;
+                            const maxChecks = 60; // 30 seconds (500ms * 60)
+                            
+                            const checkTerrain = () => {
+                                checkCount++;
+                                
+                                // Timeout after maxChecks
+                                if (checkCount >= maxChecks) {
+                                    console.log('⚠️ Terrain check timeout - proceeding anyway');
+                                    resolve(false); // Resolve with false to indicate timeout
+                                    return;
+                                }
+                                
+                                // Check if terrainReady indicator is visible (hidden when ready)
+                                const loadingIndicator = document.querySelector('[class*="bg-blue-100"]');
+                                const hasLoadingText = loadingIndicator && loadingIndicator.textContent.includes('Chargement des textures');
+                                
+                                if (!hasLoadingText) {
+                                    console.log('✅ Terrain textures loaded (or timeout)');
+                                    resolve(true);
+                                } else {
+                                    console.log(`⏳ Still loading terrain... (check ${checkCount}/${maxChecks})`);
+                                    setTimeout(checkTerrain, 500);
+                                }
+                            };
+                            setTimeout(checkTerrain, 1000);
+                        });
+                    }
+                """)
+                
+                if terrain_ready:
+                    print("✅ Terrain ready, waiting 2 more seconds for stability...")
+                else:
+                    print("⚠️ Terrain check timed out after 30s, proceeding anyway...")
+                    
+                await asyncio.sleep(2)  # Extra buffer for complete rendering
+                
+            except Exception as e:
+                print(f"⚠️ Error waiting for terrain: {e}. Proceeding anyway...")
+                await asyncio.sleep(2)
             
             # Get flight data to calculate duration
             export_jobs[job_id]["message"] = "Calculating frames..."
