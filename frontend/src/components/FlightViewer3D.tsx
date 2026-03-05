@@ -634,6 +634,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     setIsPlaying(false);
   }, []);
 
+  const togglePlayPause = useCallback(() => {
+    if (isPlayingRef.current) {
+      pause();
+    } else {
+      play();
+    }
+  }, [play, pause]);
+
   const reset = useCallback(() => {
     pause();
     currentIndexRef.current = 0;
