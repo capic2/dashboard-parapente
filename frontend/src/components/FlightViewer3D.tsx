@@ -60,6 +60,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const cameraHeadingRef = useRef<number>(0);
   const cameraDistanceRef = useRef<number>(500);
+  const cameraTargetRef = useRef<Cartesian3 | null>(null);
 
   // Initialize Cesium Viewer
   useEffect(() => {
@@ -263,7 +264,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         if (viewer && !viewer.isDestroyed()) {
           const heading = calculateOptimalHeading();
           cameraHeadingRef.current = heading;
-          cameraDistanceRef.current = boundingSphere.radius * 2;
+          cameraDistanceRef.current = boundingSphere.radius * 0.8; // Vue plus rapprochée
           
           viewer.camera.flyToBoundingSphere(boundingSphere, {
             duration: 2,
@@ -455,9 +456,36 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           const distance = cameraDistanceRef.current;
           const pitch = -0.05;
           
-          // Position la caméra à distance fixe du curseur, avec le même heading
+          // Initialize camera target on first frame
+          if (!cameraTargetRef.current) {
+            cameraTargetRef.current = currentPosition;
+          }
+          
+          // Calculate distance between cursor and camera target
+          const targetCartographic = Cartographic.fromCartesian(cameraTargetRef.current);
+          const currentCartographic = Cartographic.fromCartesian(currentPosition);
+          
+          const deltaX = (currentCartographic.longitude - targetCartographic.longitude) * Math.cos(targetCartographic.latitude);
+          const deltaY = currentCartographic.latitude - targetCartographic.latitude;
+          const lateralDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+          
+          // Dead zone: only move camera if cursor moves more than 20% of view width
+          const deadZoneThreshold = distance * 0.2;
+          
+          if (lateralDistance > deadZoneThreshold) {
+            // Smoothly interpolate camera target towards cursor (lerp)
+            const lerpFactor = 0.1; // Smooth following (10% per frame)
+            
+            cameraTargetRef.current = new Cartesian3(
+              cameraTargetRef.current.x + (currentPosition.x - cameraTargetRef.current.x) * lerpFactor,
+              cameraTargetRef.current.y + (currentPosition.y - cameraTargetRef.current.y) * lerpFactor,
+              cameraTargetRef.current.z + (currentPosition.z - cameraTargetRef.current.z) * lerpFactor
+            );
+          }
+          
+          // Position camera to look at the smoothed target
           viewer.camera.lookAt(
-            currentPosition,
+            cameraTargetRef.current,
             new HeadingPitchRange(heading, pitch, distance)
           );
         }
