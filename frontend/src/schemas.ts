@@ -34,7 +34,7 @@ export const FlightSchema = z.object({
   strava_id: z.string().nullable().optional(),
   site_id: z.string().nullable().optional(),
   site_name: z.string().nullable().optional(),
-  name: z.string().optional(),
+  name: z.string().nullable().optional(),
   title: z.string(),
   description: z.string().nullable().optional(),
   flight_date: z.string(),
