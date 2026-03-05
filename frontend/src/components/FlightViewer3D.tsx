@@ -238,16 +238,18 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       const boundingSphere = BoundingSphere.fromPoints(positions);
 
       // Calculate flight direction to orient camera perpendicular to flight path
-      const calculateOptimalHeading = (): number => {
+      const calculateOptimalHeading = async (): Promise<number> => {
         if (gpxData.coordinates.length < 2) return 0;
         
         // Use first and last 10% of points to get general direction
         const numPoints = gpxData.coordinates.length;
         const startSegment = Math.floor(numPoints * 0.1);
         const endSegment = Math.floor(numPoints * 0.9);
+        const midSegment = Math.floor(numPoints * 0.5);
         
         const startCoord = gpxData.coordinates[startSegment];
         const endCoord = gpxData.coordinates[endSegment];
+        const midCoord = gpxData.coordinates[midSegment];
         
         // Calculate bearing from start to end
         const deltaLon = endCoord.lon - startCoord.lon;
@@ -256,18 +258,45 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         // Calculate angle in radians (0 = North, clockwise)
         let flightHeading = Math.atan2(deltaLon, deltaLat);
         
-        // Subtract 90° (-π/2) to be perpendicular (view from the other side)
-        // This puts the camera to the left of the flight direction (better for terrain)
-        const cameraHeading = flightHeading - Math.PI / 2;
+        // Sample terrain on both sides of the flight to find where the mountain is
+        const sampleDistance = 0.01; // ~1km offset from flight path
         
-        return cameraHeading;
+        // Position to the left (-90°)
+        const leftLon = midCoord.lon + sampleDistance * Math.cos(flightHeading - Math.PI / 2);
+        const leftLat = midCoord.lat + sampleDistance * Math.sin(flightHeading - Math.PI / 2);
+        
+        // Position to the right (+90°)
+        const rightLon = midCoord.lon + sampleDistance * Math.cos(flightHeading + Math.PI / 2);
+        const rightLat = midCoord.lat + sampleDistance * Math.sin(flightHeading + Math.PI / 2);
+        
+        try {
+          const globe = viewer.scene.globe;
+          
+          const leftCartographic = Cartographic.fromDegrees(leftLon, leftLat);
+          const rightCartographic = Cartographic.fromDegrees(rightLon, rightLat);
+          
+          const leftHeight = globe.getHeight(leftCartographic) || 0;
+          const rightHeight = globe.getHeight(rightCartographic) || 0;
+          
+          // Place camera on the side with higher terrain (mountain side)
+          const cameraHeading = leftHeight > rightHeight 
+            ? flightHeading - Math.PI / 2  // Mountain on left, camera on left
+            : flightHeading + Math.PI / 2; // Mountain on right, camera on right
+          
+          console.log(`Terrain heights - Left: ${leftHeight}m, Right: ${rightHeight}m, Camera side: ${leftHeight > rightHeight ? 'left' : 'right'}`);
+          
+          return cameraHeading;
+        } catch (error) {
+          console.warn('Failed to sample terrain, using default right side', error);
+          return flightHeading + Math.PI / 2;
+        }
       };
 
       // Position camera - MUST happen after elevation offset is calculated
       // Using a very low angle to see the altitude of the flight track
-      const positionCamera = () => {
+      const positionCamera = async () => {
         if (viewer && !viewer.isDestroyed()) {
-          const heading = calculateOptimalHeading();
+          const heading = await calculateOptimalHeading();
           cameraHeadingRef.current = heading;
           cameraDistanceRef.current = boundingSphere.radius * 0.8; // Vue plus rapprochée
           
@@ -283,9 +312,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       };
       
       // Position immédiate
-      setTimeout(positionCamera, 500);
+      setTimeout(() => positionCamera(), 500);
       // Re-position après calcul de l'offset (1.5s + 500ms)
-      setTimeout(positionCamera, 2500);
+      setTimeout(() => positionCamera(), 2500);
     } catch (err) {
       console.error('Error loading GPX data:', err);
     }
