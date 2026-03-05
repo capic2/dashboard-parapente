@@ -874,29 +874,52 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         
         // Move to this position
         currentIndexRef.current = positionIndex;
-        visiblePositionsRef.current = allPositionsRef.current.slice(0, positionIndex + 1);
+        const currentPositions = allPositionsRef.current.slice(0, positionIndex + 1);
+        visiblePositionsRef.current = currentPositions;
         
+        // Update cursor position
+        const currentPosition = allPositionsRef.current[positionIndex];
         if (cursorPositionPropertyRef.current) {
-          cursorPositionPropertyRef.current.setValue(allPositionsRef.current[positionIndex]);
+          cursorPositionPropertyRef.current.setValue(currentPosition);
         }
         
-        // Update camera
-        const currentPosition = allPositionsRef.current[positionIndex];
+        // Note: polyline is updated automatically via CallbackProperty reading visiblePositionsRef
+        
+        // Update camera to follow the cursor
         const heading = cameraHeadingRef.current;
         const distance = cameraDistanceRef.current;
+        const pitch = -0.05;
+        
+        // Use smooth camera positioning like in the animation
+        if (!cameraTargetRef.current) {
+          cameraTargetRef.current = currentPosition;
+        } else {
+          const lerpFactor = 0.08;
+          cameraTargetRef.current = new Cartesian3(
+            cameraTargetRef.current.x + (currentPosition.x - cameraTargetRef.current.x) * lerpFactor,
+            cameraTargetRef.current.y + (currentPosition.y - cameraTargetRef.current.y) * lerpFactor,
+            cameraTargetRef.current.z + (currentPosition.z - cameraTargetRef.current.z) * lerpFactor
+          );
+        }
         
         viewer.camera.setView({
-          destination: currentPosition,
+          destination: cameraTargetRef.current,
           orientation: {
             heading: heading,
-            pitch: -0.05,
+            pitch: pitch,
             roll: 0
           }
         });
         viewer.camera.moveBackward(distance);
         
-        // Wait for scene to render
-        await new Promise(resolve => setTimeout(resolve, 50));
+        // Force Cesium to render the scene
+        viewer.scene.render();
+        
+        // Wait a bit longer for tiles to load and scene to stabilize
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Force another render to be sure
+        viewer.scene.render();
         
         // Capture frame
         const frameData = await captureFrame(canvas);
@@ -906,7 +929,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         setCapturedFrames(frameIndex + 1);
         setRecordingProgress(Math.round(((frameIndex + 1) / framesToCapture) * 50)); // 0-50% for capture
         
-        console.log(`📸 Frame ${frameIndex + 1}/${framesToCapture} captured`);
+        if (frameIndex % 10 === 0) {
+          console.log(`📸 Frame ${frameIndex + 1}/${framesToCapture} captured`);
+        }
       }
       
       console.log(`✅ All ${framesToCapture} frames captured`);
