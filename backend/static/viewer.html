@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flight Viewer</title>
+  <link rel="stylesheet" href="/cesium/Widgets/widgets.css">
+  <script>
+    // Redirect to main app with viewer route
+    const flightId = new URLSearchParams(window.location.search).get('id');
+    if (flightId) {
+      window.location.href = `/flights/${flightId}/viewer`;
+    } else {
+      window.location.href = '/';
+    }
+  </script>
+</head>
+<body>
+  <div style="text-align: center; padding: 50px;">
+    <p>Redirecting to viewer...</p>
+  </div>
+</body>
+</html>
