@@ -1,4 +1,4 @@
-import { useParams } from '@tanstack/react-router'
+import { useSearch } from '@tanstack/react-router'
 import { FlightViewer3D } from '../components/FlightViewer3D'
 
 /**
@@ -6,12 +6,14 @@ import { FlightViewer3D } from '../components/FlightViewer3D'
  * Used by Playwright for capturing video frames
  */
 export function ViewerExport() {
-  const { flightId } = useParams({ strict: false })
+  // Get flightId from URL search params (?flightId=xxx)
+  const search = useSearch({ strict: false }) as { flightId?: string }
+  const flightId = search?.flightId || new URLSearchParams(window.location.search).get('flightId') || ''
   
   if (!flightId) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <p className="text-gray-600">No flight ID provided</p>
+        <p className="text-gray-600">No flight ID provided. Use ?flightId=xxx</p>
       </div>
     )
   }
