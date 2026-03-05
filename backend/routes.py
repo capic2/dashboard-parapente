@@ -2285,10 +2285,15 @@ def start_flight_video_export(
     Start video export in background
     Returns job_id to track progress
     """
+    logger.info(f"🎥 Video export requested for flight_id: {flight_id}")
+    
     # Verify flight exists
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
+        logger.error(f"❌ Flight not found in DB: {flight_id}")
         raise HTTPException(status_code=404, detail="Flight not found")
+    
+    logger.info(f"✅ Flight found: {flight.title} (date: {flight.flight_date})")
     
     # Determine frontend URL
     # In production, frontend is served on same server (port 8001)
