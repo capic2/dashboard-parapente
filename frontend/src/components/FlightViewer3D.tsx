@@ -269,6 +269,19 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       timestampsRef.current = timestamps;
       currentIndexRef.current = 0;
       visiblePositionsRef.current = [positions[0]];
+      
+      // Expose data globally for video export (Playwright)
+      if (typeof window !== 'undefined' && (window as any)._exportMode) {
+        (window as any)._gpxData = {
+          coordinates: gpxData.coordinates,
+          positions: positions,
+          timestamps: timestamps
+        };
+        (window as any)._cesiumViewer = viewer;
+        console.log('🎥 Exposed GPS data and Cesium viewer for export');
+        console.log('   - GPS points:', gpxData.coordinates.length);
+        console.log('   - Duration:', Math.round((timestamps[timestamps.length-1] - timestamps[0])/1000), 's');
+      }
 
       // Clean old entities
       if (
