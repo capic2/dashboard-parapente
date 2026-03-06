@@ -19,7 +19,10 @@ import {
   JulianDate,
 } from 'cesium';
 import { useFlightGPX } from '../hooks/useFlightGPX';
-import { ExportVideoModal, VideoExportConfig } from './ExportVideoModal';
+import { useFlight } from '../hooks/useFlight';
+import { getHeadingFromOrientation, getOrientationLabel, getOrientationOptions } from '../utils/cameraOrientation';
+import { api } from '../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
 
 export interface FlightViewer3DProps {
   flightId: string;
@@ -38,6 +41,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   flightTitle = 'Flight View',
 }) => {
   const { data: gpxData, isLoading, error } = useFlightGPX(flightId);
+  const { data: flight } = useFlight(flightId);
+  const queryClient = useQueryClient();
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<CesiumViewer | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -58,14 +63,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [ambientOcclusion, setAmbientOcclusion] = useState(false);
   const [sunTime, setSunTime] = useState(10); // 10:00
   const [lightIntensity, setLightIntensity] = useState(1.2);
+  
+  // Orientation editing state
+  const [isUpdatingOrientation, setIsUpdatingOrientation] = useState(false);
 
-  // Video export states
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState(0);
-  const [exportStatus, setExportStatus] = useState<string>('');
-  const [exportJobId, setExportJobId] = useState<string | null>(null);
-  const exportPollingRef = useRef<NodeJS.Timeout | null>(null);
+
 
   const allPositionsRef = useRef<Cartesian3[]>([]);
   const timestampsRef = useRef<number[]>([]);
@@ -454,6 +456,44 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     };
   }, [gpxData, elevationOffset, viewerReady]);
 
+  // Position camera based on site orientation
+  useEffect(() => {
+    if (!viewerRef.current || !viewerReady || !gpxData?.coordinates || !allPositionsRef.current.length) {
+      return
+    }
+
+    const viewer = viewerRef.current
+    const firstPosition = allPositionsRef.current[0]
+    
+    if (!firstPosition) return
+
+    // Check if site has orientation
+    const siteOrientation = flight?.site?.orientation
+    const heading = getHeadingFromOrientation(siteOrientation)
+
+    if (heading !== null) {
+      console.log(`📐 Positioning camera for orientation: ${siteOrientation} → heading ${heading}°`)
+      
+      // Position camera facing the orientation direction
+      viewer.camera.setView({
+        destination: firstPosition,
+        orientation: {
+          heading: Cesium.Math.toRadians(heading),
+          pitch: Cesium.Math.toRadians(-10), // Look slightly down
+          roll: 0.0
+        }
+      })
+      
+      // Move camera back 500m from takeoff point
+      viewer.camera.moveBackward(500)
+      
+      console.log('✅ Camera positioned according to site orientation')
+    } else {
+      console.log('📐 No orientation found, using default camera positioning')
+      // Default positioning is already handled by the GPX loading useEffect
+    }
+  }, [viewerReady, gpxData, flight?.site?.orientation])
+
   // Calculer automatiquement l'offset d'élévation
   const calculateAutoElevationOffset = useCallback(async () => {
     if (!viewerRef.current || !gpxData?.coordinates?.[0]) return;
@@ -729,6 +769,28 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
   };
 
+  /**
+   * Update site orientation
+   */
+  const updateOrientation = async (newOrientation: string) => {
+    if (!flight?.site?.id) return
+    
+    setIsUpdatingOrientation(true)
+    try {
+      await api.patch(`sites/${flight.site.id}/orientation?orientation=${newOrientation}`)
+      
+      // Refresh flight data to get updated site
+      await queryClient.invalidateQueries({ queryKey: ['flights', flightId] })
+      
+      console.log(`✅ Orientation updated to ${newOrientation}`)
+    } catch (error) {
+      console.error('❌ Failed to update orientation:', error)
+      alert('Erreur lors de la mise à jour de l\'orientation')
+    } finally {
+      setIsUpdatingOrientation(false)
+    }
+  };
+
   // Render error messages as overlays instead of early returns
   // This ensures the Cesium container is always rendered
   /**
@@ -766,145 +828,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  /**
-   * Poll export status from server
-   */
-  const pollExportStatus = async (jobId: string) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/exports/${jobId}/status`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch export status');
-      }
-      
-      const data = await response.json();
-      setExportProgress(data.progress || 0);
-      setExportStatus(data.status);
-      
-      if (data.status === 'completed') {
-        // Stop polling
-        if (exportPollingRef.current) {
-          clearInterval(exportPollingRef.current);
-          exportPollingRef.current = null;
-        }
-        
-        // Download the video
-        console.log('✅ Export completed, downloading...');
-        const downloadUrl = `${API_BASE_URL}/api/exports/${jobId}/download`;
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = `flight-${flightId}.mp4`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Reset state after a delay
-        setTimeout(() => {
-          setIsExporting(false);
-          setExportProgress(0);
-          setExportStatus('');
-          setExportJobId(null);
-        }, 2000);
-      } else if (data.status === 'failed') {
-        // Stop polling
-        if (exportPollingRef.current) {
-          clearInterval(exportPollingRef.current);
-          exportPollingRef.current = null;
-        }
-        
-        console.error('❌ Export failed:', data.error);
-        alert(`Export failed: ${data.error || 'Unknown error'}`);
-        setIsExporting(false);
-        setExportProgress(0);
-        setExportStatus('');
-        setExportJobId(null);
-      }
-    } catch (error) {
-      console.error('Error polling export status:', error);
-    }
-  };
 
-  /**
-   * Start video export using server API with Playwright
-   */
-  const startVideoExport = async (config: VideoExportConfig) => {
-    if (!gpxData) {
-      console.error('No GPX data available');
-      return;
-    }
-    
-    try {
-      console.log('🎥 Starting server-side video export with config:', config);
-      
-      // Close modal
-      setShowExportModal(false);
-      
-      // Setup export state
-      setIsExporting(true);
-      setExportProgress(0);
-      setExportStatus('starting');
-      
-      // Call the backend API to start export
-      const exportUrl = `${API_BASE_URL}/api/flights/${flightId}/export-video`;
-      console.log('🎥 Starting video export:', { flightId, exportUrl, config });
-      
-      const response = await fetch(exportUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          quality: config.quality,
-          fps: config.fps,
-          speed: config.speed,
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || 'Failed to start export');
-      }
-      
-      const data = await response.json();
-      const jobId = data.job_id;
-      
-      console.log('✅ Export job started:', jobId);
-      setExportJobId(jobId);
-      setExportStatus('processing');
-      
-      // Start polling for status
-      exportPollingRef.current = setInterval(() => {
-        pollExportStatus(jobId);
-      }, 2000); // Poll every 2 seconds
-      
-      // Also poll immediately
-      pollExportStatus(jobId);
-      
-    } catch (error) {
-      console.error('❌ Video export error:', error);
-      setIsExporting(false);
-      setExportProgress(0);
-      setExportStatus('');
-      setExportJobId(null);
-      alert(`❌ Erreur lors de l'export: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
-    }
-  };
-
-  /**
-   * Cancel ongoing export
-   */
-  const cancelVideoExport = () => {
-    if (exportPollingRef.current) {
-      clearInterval(exportPollingRef.current);
-      exportPollingRef.current = null;
-    }
-    
-    setIsExporting(false);
-    setExportProgress(0);
-    setExportStatus('');
-    setExportJobId(null);
-    
-    console.log('❌ Export cancelled by user');
-  };
 
   const renderOverlay = () => {
     if (isLoading) {
@@ -1068,28 +992,109 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
               <button
                 onClick={togglePlayPause}
                 className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
-                disabled={isExporting}
               >
                 {isPlaying ? '⏸ Pause' : '▶ Play'}
               </button>
               <button
                 onClick={reset}
                 className="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:bg-gray-400"
-                disabled={isExporting}
               >
                 ⏮ Reset
               </button>
             </div>
 
-            {/* Export Video Button */}
-            <button
-              onClick={() => setShowExportModal(true)}
-              disabled={isExporting || isPlaying || !gpxData?.coordinates}
-              className="w-full px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 mb-3"
-              title="Exporter le vol en vidéo (rendu serveur)"
-            >
-              {isExporting ? '⏺️ Export en cours...' : '🎥 Export Vidéo'}
-            </button>
+            {/* Download Video Button */}
+            {flight?.gpx_file_path && (
+              <>
+                {/* Debug log */}
+                {console.log('🎥 Video button state:', {
+                  hasGPX: !!flight.gpx_file_path,
+                  status: flight.video_export_status,
+                  jobId: flight.video_export_job_id,
+                  filePath: flight.video_file_path
+                })}
+                <button
+                onClick={async () => {
+                  if (flight.video_export_status === 'completed' && flight.video_file_path) {
+                    // Download video
+                    window.open(`${API_BASE_URL}/api/exports/${flight.video_export_job_id}/download`, '_blank');
+                  } else if (!flight.video_export_status || flight.video_export_status === 'failed') {
+                    // Generate video
+                    try {
+                      const response = await fetch(`${API_BASE_URL}/api/flights/${flightId}/generate-video`, {
+                        method: 'POST',
+                      });
+                      
+                      if (!response.ok) {
+                        const error = await response.json();
+                        alert(`Erreur: ${error.detail || 'Impossible de lancer la génération'}`);
+                        return;
+                      }
+                      
+                      const data = await response.json();
+                      console.log('✅ Video generation started:', data.job_id);
+                      
+                      // Refresh flight data to get updated status
+                      window.location.reload();
+                    } catch (error) {
+                      console.error('❌ Failed to start video generation:', error);
+                      alert('Erreur lors du lancement de la génération');
+                    }
+                  }
+                }}
+                disabled={flight.video_export_status === 'processing'}
+                className={`w-full px-3 py-2 text-white rounded mb-3 ${
+                  flight.video_export_status === 'completed'
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : flight.video_export_status === 'processing'
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+                title={
+                  flight.video_export_status === 'processing'
+                    ? 'Génération vidéo en cours... (~60-90 min)'
+                    : flight.video_export_status === 'completed'
+                    ? 'Télécharger la vidéo'
+                    : flight.video_export_status === 'failed'
+                    ? 'Relancer la génération'
+                    : 'Générer la vidéo du vol'
+                }
+              >
+                {flight.video_export_status === 'processing' && '⏳ Génération en cours...'}
+                {flight.video_export_status === 'completed' && '📥 Télécharger la vidéo'}
+                {flight.video_export_status === 'failed' && '🔄 Relancer la génération'}
+                {!flight.video_export_status && '🎥 Générer la vidéo'}
+              </button>
+              </>
+            )}
+
+            {/* Orientation Selector */}
+            {flight?.site && (
+              <div className="mb-3">
+                <label className="block text-sm font-medium mb-1">
+                  Orientation Décollage
+                </label>
+                <select
+                  value={flight.site.orientation || ''}
+                  onChange={(e) => updateOrientation(e.target.value)}
+                  disabled={isUpdatingOrientation}
+                  className="w-full px-2 py-1 border rounded text-sm bg-white"
+                >
+                  <option value="">Non définie</option>
+                  {getOrientationOptions().map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {flight.site.orientation 
+                    ? `Direction: ${getOrientationLabel(flight.site.orientation)}`
+                    : 'Direction vers laquelle regarde le pilote'
+                  }
+                </p>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium mb-1">
@@ -1220,71 +1225,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         </div>
       )}
 
-      {/* Export Progress Overlay */}
-      {isExporting && (
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 bg-black/90 text-white px-8 py-6 rounded-lg shadow-2xl min-w-[450px]">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="animate-pulse text-3xl">
-              {exportStatus === 'starting' && '🚀'}
-              {exportStatus === 'processing' && '🎬'}
-              {exportStatus === 'completed' && '✅'}
-              {exportStatus === 'failed' && '❌'}
-            </div>
-            <div>
-              <div className="font-bold text-lg">
-                {exportStatus === 'starting' && 'Démarrage de l\'export...'}
-                {exportStatus === 'processing' && 'Rendu vidéo en cours...'}
-                {exportStatus === 'completed' && 'Export terminé!'}
-                {exportStatus === 'failed' && 'Export échoué'}
-              </div>
-              <div className="text-sm text-gray-300">
-                {exportStatus === 'starting' && 'Initialisation du serveur Playwright...'}
-                {exportStatus === 'processing' && 'Capture et encodage sur le serveur...'}
-                {exportStatus === 'completed' && 'Téléchargement en cours...'}
-                {exportStatus === 'failed' && 'Une erreur est survenue'}
-              </div>
-            </div>
-          </div>
-          
-          {/* Progress Bar */}
-          <div className="w-full bg-gray-700 rounded-full h-3 mb-3">
-            <div 
-              className="bg-red-600 h-3 rounded-full transition-all duration-300"
-              style={{ width: `${exportProgress}%` }}
-            />
-          </div>
-          
-          {/* Progress Text */}
-          <div className="text-center text-sm text-gray-300">
-            {Math.round(exportProgress)}%
-          </div>
-          
-          {exportStatus !== 'completed' && exportStatus !== 'failed' && (
-            <>
-              {/* Info Text */}
-              <div className="text-xs text-gray-400 text-center mt-3">
-                L'export se fait sur le serveur - Vous pouvez continuer à utiliser la page
-              </div>
-              
-              {/* Cancel Button */}
-              <button
-                onClick={cancelVideoExport}
-                className="w-full mt-4 px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
-              >
-                ❌ Annuler
-              </button>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Export Video Modal */}
-      <ExportVideoModal
-        isOpen={showExportModal}
-        flightDuration={gpxData?.flight_duration_seconds || 0}
-        onExport={startVideoExport}
-        onCancel={() => setShowExportModal(false)}
-      />
 
       {/* Cesium Container */}
       <div ref={containerRef} className="w-full h-full" />

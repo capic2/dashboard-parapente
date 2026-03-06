@@ -80,6 +80,21 @@ class FlightUpdate(BaseModel):
             raise ValueError('Flight date cannot be in the future')
         return v
 
+# Site info included in Flight response (for camera orientation)
+class SiteInFlight(BaseModel):
+    id: str
+    name: str
+    code: Optional[str] = None
+    orientation: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    elevation_m: Optional[int] = None
+    region: Optional[str] = None
+    country: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
 class Flight(FlightBase):
     id: str
     site_id: Optional[str] = None
@@ -88,8 +103,12 @@ class Flight(FlightBase):
     strava_id: Optional[str] = None
     gpx_file_path: Optional[str] = None
     external_url: Optional[str] = None
+    video_export_job_id: Optional[str] = None
+    video_export_status: Optional[str] = None  # "processing", "completed", "failed"
+    video_file_path: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    site: Optional[SiteInFlight] = None  # Include site details with orientation
     
     class Config:
         from_attributes = True

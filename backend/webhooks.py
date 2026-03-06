@@ -327,6 +327,16 @@ async def process_strava_activity(activity_id: str):
             logger.info(f"✅ Created flight {flight.id}: {flight_name}")
         
         db.commit()
+        
+        # Trigger automatic video export if GPX available
+        if gpx_file_path:
+            try:
+                from video_export_manual import trigger_auto_export
+                from config import settings
+                frontend_url = f"http://localhost:{settings.PORT}"
+                trigger_auto_export(flight.id, db, frontend_url)
+            except Exception as e:
+                logger.warning(f"Failed to trigger auto video export: {e}")
         db.refresh(flight)
         
         # Step 7: Send Telegram notification
