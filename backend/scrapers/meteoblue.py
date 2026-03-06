@@ -102,12 +102,20 @@ class MeteoblueScraper(PlaywrightScraper):
         city_code = self._get_city_code(city_name)
         
         if not city_code:
-            self.logger.warning(f"No city code for {city_name}, using Arguel fallback")
-            city_code = "3036982"
-            city_name = "arguel"
-        
-        # Build URL - use "week" view for table data
-        url = f"{self.base_url}/fr/meteo/semaine/{city_name}_france_{city_code}"
+            # Fallback to GPS coordinates when city code is not available
+            self.logger.info(f"No city code for {city_name}, using GPS coordinates fallback: {lat:.4f}N {lon:.4f}E")
+            
+            # Format coordinates for Meteoblue URL
+            # Example: 47.0833N 6.0500E → 47.08N6.05E
+            lat_str = f"{abs(lat):.2f}{'N' if lat >= 0 else 'S'}"
+            lon_str = f"{abs(lon):.2f}{'E' if lon >= 0 else 'W'}"
+            coords_slug = f"{lat_str}{lon_str}"
+            
+            # Build URL with coordinates
+            url = f"{self.base_url}/fr/meteo/semaine/{coords_slug}"
+        else:
+            # Build URL with city code
+            url = f"{self.base_url}/fr/meteo/semaine/{city_name}_france_{city_code}"
         
         self.logger.info(f"Fetching Meteoblue with Playwright: {url}")
         
