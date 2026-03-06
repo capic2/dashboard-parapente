@@ -14,6 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
 import subprocess
+from sqlalchemy.orm import Session
 
 # Storage for export jobs
 export_jobs: Dict[str, Dict] = {}
@@ -46,10 +47,19 @@ def start_video_export_manual(
     quality: str = "1080p",
     fps: int = 15,
     speed: int = 1,
-    frontend_url: str = "http://localhost:5173"
+    frontend_url: str = "http://localhost:5173",
+    update_db: bool = True
 ):
     """
     Start video export using Cesium manual render approach
+    
+    Args:
+        flight_id: ID of the flight to export
+        quality: Video quality (720p, 1080p, 4K)
+        fps: Frames per second (default 15)
+        speed: Playback speed multiplier (default 1)
+        frontend_url: URL of the frontend
+        update_db: Whether to update database (default True)
     """
     job_id = f"{flight_id}-{int(time.time())}"
     
@@ -64,10 +74,25 @@ def start_video_export_manual(
         "total_frames": None
     }
     
-    # Start export in background thread
+    # Update flight status in database if requested
+    if update_db:
+        from database import SessionLocal
+        from models import Flight
+        db = SessionLocal()
+        try:
+            flight = db.query(Flight).filter(Flight.id == flight_id).first()
+            if flight:
+                flight.video_export_job_id = job_id
+                flight.video_export_status = "processing"
+                flight.video_file_path = None
+                db.commit()
+        finally:
+            db.close()
+    
+    # Start export in background thread (will create its own DB session)
     thread = threading.Thread(
         target=lambda: asyncio.run(_export_video_manual_render(
-            job_id, flight_id, quality, fps, speed, frontend_url
+            job_id, flight_id, quality, fps, speed, frontend_url, update_db
         ))
     )
     thread.start()
@@ -81,7 +106,8 @@ async def _export_video_manual_render(
     quality: str,
     fps: int,
     speed: int,
-    frontend_url: str
+    frontend_url: str,
+    update_db: bool = True
 ):
     """
     Export video using Cesium manual render - frame by frame
@@ -402,6 +428,20 @@ async def _export_video_manual_render(
             export_jobs[job_id]["video_path"] = str(output_file)
             export_jobs[job_id]["completed_at"] = datetime.now().isoformat()
             
+            # Update flight status in database
+            if update_db:
+                from database import SessionLocal
+                from models import Flight
+                db = SessionLocal()
+                try:
+                    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+                    if flight:
+                        flight.video_export_status = "completed"
+                        flight.video_file_path = f"exports/videos/flight_{flight_id}.mp4"
+                        db.commit()
+                finally:
+                    db.close()
+            
             capture_time_min = int(total_capture_time / 60)
             print(f"✅ Export completed in {capture_time_min} minutes!")
             print(f"📹 Video: {output_file} ({file_size_mb:.1f} MB)")
@@ -414,6 +454,19 @@ async def _export_video_manual_render(
         export_jobs[job_id]["status"] = "failed"
         export_jobs[job_id]["error"] = str(e)
         export_jobs[job_id]["message"] = f"Error: {str(e)}"
+        
+        # Update flight status in database
+        if update_db:
+            from database import SessionLocal
+            from models import Flight
+            db = SessionLocal()
+            try:
+                flight = db.query(Flight).filter(Flight.id == flight_id).first()
+                if flight:
+                    flight.video_export_status = "failed"
+                    db.commit()
+            finally:
+                db.close()
 
 
 def get_export_status(job_id: str) -> Optional[Dict]:
@@ -424,3 +477,49 @@ def get_export_status(job_id: str) -> Optional[Dict]:
 def list_exports(flight_id: str) -> list:
     """List all exports for a flight"""
     return [job for job_id, job in export_jobs.items() if job["flight_id"] == flight_id]
+
+
+def trigger_auto_export(flight_id: str, db: Session, frontend_url: str = "http://localhost:5173"):
+    """
+    Automatically trigger video export for a flight with GPX
+    Called after GPX upload/processing
+    
+    Args:
+        flight_id: ID of the flight
+        db: Database session (only used to check if export needed)
+        frontend_url: URL of the frontend
+    
+    Returns:
+        job_id if export started, None otherwise
+    """
+    from models import Flight
+    
+    # Check if flight has GPX and doesn't already have a video export in progress
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    
+    if not flight:
+        print(f"⚠️  Flight {flight_id} not found, skipping auto-export")
+        return None
+    
+    if not flight.gpx_file_path:
+        print(f"⚠️  Flight {flight_id} has no GPX, skipping auto-export")
+        return None
+    
+    if flight.video_export_status in ["processing", "completed"]:
+        print(f"ℹ️  Flight {flight_id} already has video export status: {flight.video_export_status}")
+        return None
+    
+    print(f"🚀 Auto-triggering video export for flight {flight_id}")
+    
+    # Start export with optimal settings (creates its own DB session in thread)
+    job_id = start_video_export_manual(
+        flight_id=flight_id,
+        quality="1080p",  # Optimal quality
+        fps=15,           # Optimal FPS for smooth playback
+        speed=1,          # Real-time speed
+        frontend_url=frontend_url,
+        update_db=True    # Update DB from within the thread
+    )
+    
+    print(f"✅ Video export job {job_id} started for flight {flight_id}")
+    return job_id
