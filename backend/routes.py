@@ -933,6 +933,19 @@ async def get_weather(spot_id: str, day_index: int = 0, days: int = 1, db: Sessi
                 "days": days
             }
     
+    # Enrich each hour with para_index and thermal_strength
+    from para_index import calculate_hourly_para_index, get_thermal_strength, get_hourly_verdict
+    
+    for hour in all_consensus:
+        # Calculate individual para-index for this hour
+        hour["para_index"] = calculate_hourly_para_index(hour)
+        hour["verdict"] = get_hourly_verdict(hour["para_index"])
+        
+        # Calculate thermal strength based on CAPE and Lifted Index
+        cape = hour.get("cape")
+        li = hour.get("lifted_index")
+        hour["thermal_strength"] = get_thermal_strength(cape, li)
+    
     # Filter to flyable hours (sunrise to sunset) before calculating para_index
     flyable_consensus = all_consensus
     if sunrise_time and sunset_time:

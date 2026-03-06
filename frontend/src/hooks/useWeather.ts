@@ -265,35 +265,9 @@ export const createWeatherQueryFn = (siteId: string, dayIndex: number) => async 
         })
       }
       
-      // Calculate simple para_index per hour based on wind
-      const calculateHourlyParaIndex = (hour: any): number => {
-        const wind = hour.wind_speed || 0
-        const gust = hour.wind_gust || 0
-        const precip = hour.precipitation || 0
-        
-        let score = 50 // Base score
-        
-        // Wind scoring (ideal: 10-25 km/h)
-        if (wind < 5) score -= 30
-        else if (wind < 10) score -= 10
-        else if (wind >= 10 && wind <= 25) score += 20
-        else if (wind > 25) score -= 20
-        
-        // Gust penalty
-        if (gust > 35) score -= 20
-        else if (gust > 25) score -= 10
-        
-        // Precipitation penalty
-        if (precip > 0) score -= 30
-        
-        return Math.max(0, Math.min(100, score))
-      }
-      
       // Transform consensus array to hourly forecast
+      // NOTE: Backend now calculates para_index per hour (not daily average)
       let hourlyForecast = (data.consensus || []).map((hour: any) => {
-        const hourlyScore = calculateHourlyParaIndex(hour)
-        const verdict = hourToVerdict.get(hour.hour) || data.verdict || 'N/A'
-        
         return {
           hour: `${hour.hour}:00`,
           time: `${hour.hour}:00`,
@@ -301,12 +275,15 @@ export const createWeatherQueryFn = (siteId: string, dayIndex: number) => async 
           temperature: hour.temperature || 0,
           wind: hour.wind_speed || 0,
           wind_speed: hour.wind_speed || 0,
+          wind_gust: hour.wind_gust || 0,
           direction: formatWindDirection(hour.wind_direction),
           wind_direction: formatWindDirection(hour.wind_direction),
           conditions: hour.cloud_cover !== null ? `${Math.round(hour.cloud_cover)}% nuages` : 'N/A',
           precipitation: hour.precipitation || 0,
-          para_index: Math.round(hourlyScore), // Keep 0-100 scale (same as backend)
-          verdict: verdict,
+          para_index: hour.para_index || 0, // Use backend calculation (accurate)
+          verdict: hour.verdict || 'N/A', // Use backend verdict (accurate)
+          cape: hour.cape || 0, // CAPE (J/kg)
+          thermal_strength: hour.thermal_strength || 'Faible', // Thermal strength
           sources: hour.sources || {} // Preserve per-source data for tooltip
         }
       })

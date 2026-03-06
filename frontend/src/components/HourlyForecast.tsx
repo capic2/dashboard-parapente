@@ -525,6 +525,9 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Direction</th>
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Précip.</th>
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Nuages</th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">CAPE (J/kg)</th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">Thermiques</th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">Volabilité</th>
             </tr>
           </thead>
           <tbody>
@@ -609,12 +612,26 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
                         ? `${Math.round(cloudCover)}%` 
                         : '—'}
                     </td>
+                    
+                    <td className="py-2.5 px-2">
+                      {hour.cape !== null && hour.cape !== undefined 
+                        ? Math.round(hour.cape) 
+                        : '—'}
+                    </td>
+                    
+                    <td className="py-2.5 px-2">
+                      {hour.thermal_strength || 'Faible'}
+                    </td>
+                    
+                    <td className="py-2.5 px-2 font-medium capitalize">
+                      {hour.verdict}
+                    </td>
                   </tr>
                 );
               })
             ) : (
               <tr>
-                <td colSpan={9} className="py-8 text-center text-gray-500">
+                <td colSpan={12} className="py-8 text-center text-gray-500">
                   Aucune donnée horaire disponible
                 </td>
               </tr>
