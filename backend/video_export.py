@@ -5,6 +5,7 @@ import asyncio
 import os
 import threading
 import time
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
@@ -15,6 +16,31 @@ export_jobs: Dict[str, Dict] = {}
 
 EXPORTS_DIR = Path(__file__).parent / "exports" / "videos"
 EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def check_dependencies():
+    """
+    Check if required system dependencies are installed
+    """
+    missing = []
+    
+    # Check FFmpeg
+    if not shutil.which("ffmpeg"):
+        missing.append("ffmpeg")
+    
+    if missing:
+        deps_str = ", ".join(missing)
+        print(f"⚠️  WARNING: Missing required dependencies: {deps_str}")
+        print(f"⚠️  Video export will not work until these are installed.")
+        print(f"⚠️  See PRODUCTION_SETUP.md for installation instructions.")
+        return False
+    
+    print("✅ Video export dependencies OK (ffmpeg found)")
+    return True
+
+
+# Check dependencies on module load
+_dependencies_ok = check_dependencies()
 
 
 def start_video_export_background(
