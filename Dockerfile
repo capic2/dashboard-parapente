@@ -29,7 +29,7 @@ LABEL maintainer="Dashboard Parapente"
 LABEL version="1.0.0"
 LABEL description="Paragliding weather dashboard with Para-Index scoring"
 
-# Installer dépendances système pour Playwright
+# Installer dépendances système pour Playwright et FFmpeg
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     gnupg \
@@ -54,6 +54,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrandr2 \
     xdg-utils \
     curl \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Copier requirements et installer packages Python
@@ -72,8 +73,9 @@ COPY backend/ ./
 # Copier frontend build depuis stage 1
 COPY --from=frontend-builder /app/frontend/dist ./static
 
-# Créer répertoire pour la base de données
-RUN mkdir -p /app/db && chmod 755 /app/db
+# Créer répertoires pour la base de données et les exports vidéo
+RUN mkdir -p /app/db && chmod 755 /app/db && \
+    mkdir -p /app/exports/videos && chmod 755 /app/exports/videos
 
 # Exposer port
 EXPOSE 8001
