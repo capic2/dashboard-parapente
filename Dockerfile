@@ -77,6 +77,9 @@ COPY --from=frontend-builder /app/frontend/dist ./static
 RUN mkdir -p /app/db && chmod 755 /app/db && \
     mkdir -p /app/exports/videos && chmod 755 /app/exports/videos
 
+# Rendre le script d'entrypoint exécutable
+RUN chmod +x entrypoint.sh
+
 # Exposer port
 EXPOSE 8001
 
@@ -84,5 +87,5 @@ EXPOSE 8001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8001/ || exit 1
 
-# Lancer application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# Lancer application avec migration automatique
+CMD ["./entrypoint.sh"]
