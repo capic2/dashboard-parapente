@@ -18,11 +18,16 @@ export function ViewerExport() {
     )
   }
   
-  // Force optimal rendering for export
-  // Disable UI throttling and force requestAnimationFrame sync
+  // Setup export mode for Playwright
   if (typeof window !== 'undefined') {
-    // @ts-ignore
-    window._exportMode = true
+    // @ts-ignore - Export mode flag
+    window._exportMode = 'manual_render'
+    
+    console.log('🎥 Export mode: manual_render')
+    console.log('📍 Flight ID:', flightId)
+    
+    // Expose flight data when viewer is ready
+    // This will be set by FlightViewer3D component
   }
   
   return (
