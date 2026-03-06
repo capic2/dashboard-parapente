@@ -2277,7 +2277,7 @@ from video_export import (
 def start_flight_video_export(
     flight_id: str,
     quality: str = "1080p",
-    fps: int = 30,
+    fps: int = 15,  # Réduit à 15 FPS par défaut pour meilleure fluidité
     speed: int = 1,
     db: Session = Depends(get_db)
 ):
