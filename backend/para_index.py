@@ -301,3 +301,130 @@ def format_slots_summary(slots: List[Dict[str, Any]]) -> str:
         summary += f"\n⭐ Meilleur créneau: {best_range}"
     
     return summary
+
+
+def get_thermal_strength(cape: float | None, lifted_index: float | None) -> str:
+    """
+    Determine thermal strength based on CAPE and Lifted Index
+    
+    Args:
+        cape: Convective Available Potential Energy (J/kg)
+        lifted_index: Lifted Index (negative = unstable)
+    
+    Returns:
+        "Faible", "Modérée", or "Forte"
+    """
+    if cape is None and lifted_index is None:
+        return "Faible"
+    
+    # Primary indicator: CAPE
+    if cape is not None:
+        if cape < 200:
+            return "Faible"
+        elif cape < 1000:
+            return "Modérée"
+        else:
+            return "Forte"
+    
+    # Fallback: Lifted Index (if CAPE unavailable)
+    if lifted_index is not None:
+        if lifted_index > 0:
+            return "Faible"  # Stable
+        elif lifted_index > -3:
+            return "Faible"  # Slightly unstable
+        elif lifted_index > -6:
+            return "Modérée"
+        else:
+            return "Forte"  # Very unstable
+    
+    return "Faible"
+
+
+def calculate_hourly_para_index(hour: Dict[str, Any]) -> int:
+    """
+    Calculate Para-Index for a single hour (0-100 score)
+    
+    This is the SAME algorithm as calculate_para_index() but for one hour instead of averaging
+    
+    Args:
+        hour: Single consensus hour with weather data
+    
+    Returns:
+        Para-Index score (0-100)
+    """
+    wind = hour.get("wind_speed") or 0
+    gust = hour.get("wind_gust") or 0
+    precip = hour.get("precipitation") or 0
+    temp = hour.get("temperature") or 0
+    li = hour.get("lifted_index") or 0
+    
+    score = 0
+    
+    # === WIND SCORING (most important) ===
+    if wind < 3:
+        score -= 40
+    elif wind < 5:
+        score -= 20
+    elif wind < 8:
+        score += 10
+    elif wind <= 15:  # OPTIMAL RANGE
+        score += 40
+    elif wind <= 20:
+        score += 10
+    else:  # > 20 km/h
+        score -= 50
+    
+    # === GUST SCORING ===
+    if gust < 15:
+        score += 30
+    elif gust < 20:
+        score += 20
+    elif gust < 25:
+        score += 10
+    else:  # >= 25 km/h
+        score -= 50
+    
+    # === RAIN SCORING ===
+    if precip == 0:
+        score += 20
+    elif precip < 1:
+        score += 10
+    elif precip > 2:
+        score -= 10
+    
+    # === STABILITY SCORING (Lifted Index) ===
+    if li > -1:
+        score += 20
+    elif li > -3:
+        score += 10
+    elif li < -5:
+        score -= 10  # Too unstable
+    
+    # === TEMPERATURE SCORING ===
+    if temp > 10:
+        score += 10
+    elif temp > 5:
+        score += 5
+    
+    # Clamp score to 0-100
+    return max(0, min(100, score))
+
+
+def get_hourly_verdict(para_index: int) -> str:
+    """
+    Get verdict label from para-index score
+    
+    Args:
+        para_index: Score 0-100
+    
+    Returns:
+        "BON", "MOYEN", "LIMITE", or "MAUVAIS"
+    """
+    if para_index >= 65:
+        return "BON"
+    elif para_index >= 45:
+        return "MOYEN"
+    elif para_index >= 30:
+        return "LIMITE"
+    else:
+        return "MAUVAIS"
