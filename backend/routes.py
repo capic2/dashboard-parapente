@@ -2267,9 +2267,15 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 
 from video_export import (
     start_video_export_background,
-    get_export_status,
-    list_exports,
+    get_export_status as get_export_status_stream,
+    list_exports as list_exports_stream,
     EXPORTS_DIR
+)
+
+from video_export_manual import (
+    start_video_export_manual,
+    get_export_status as get_export_status_manual,
+    list_exports as list_exports_manual
 )
 
 
@@ -2277,15 +2283,21 @@ from video_export import (
 def start_flight_video_export(
     flight_id: str,
     quality: str = "1080p",
-    fps: int = 15,  # Réduit à 15 FPS par défaut pour meilleure fluidité
+    fps: int = 15,
     speed: int = 1,
+    mode: str = "manual",  # "manual" (Cesium manual render) or "stream" (MediaRecorder)
     db: Session = Depends(get_db)
 ):
     """
     Start video export in background
+    
+    Modes:
+    - manual: Cesium manual render (frame-by-frame, perfect quality, slow ~90min)
+    - stream: MediaRecorder (realtime capture, fast ~8min, may stutter)
+    
     Returns job_id to track progress
     """
-    logger.info(f"🎥 Video export requested for flight_id: {flight_id}")
+    logger.info(f"🎥 Video export requested: flight_id={flight_id}, mode={mode}")
     
     # Verify flight exists
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
@@ -2307,18 +2319,32 @@ def start_flight_video_export(
         else:
             frontend_url = "http://localhost:5173"  # Development: Vite dev server
     
-    # Start export
-    job_id = start_video_export_background(
-        flight_id=flight_id,
-        quality=quality,
-        fps=fps,
-        speed=speed,
-        frontend_url=frontend_url
-    )
+    # Start export with selected mode
+    if mode == "manual":
+        logger.info("Using Cesium Manual Render (slow but perfect quality)")
+        job_id = start_video_export_manual(
+            flight_id=flight_id,
+            quality=quality,
+            fps=fps,
+            speed=speed,
+            frontend_url=frontend_url
+        )
+        export_method = "manual render"
+    else:  # stream mode
+        logger.info("Using MediaRecorder stream (fast but may stutter)")
+        job_id = start_video_export_background(
+            flight_id=flight_id,
+            quality=quality,
+            fps=fps,
+            speed=speed,
+            frontend_url=frontend_url
+        )
+        export_method = "stream"
     
     return {
         "job_id": job_id,
-        "message": "Video export started",
+        "message": f"Video export started ({export_method})",
+        "mode": mode,
         "status_url": f"/exports/{job_id}/status"
     }
 
@@ -2326,9 +2352,13 @@ def start_flight_video_export(
 @router.get("/exports/{job_id}/status")
 def get_video_export_status(job_id: str):
     """
-    Get status of video export job
+    Get status of video export job (works for both manual and stream modes)
     """
-    status = get_export_status(job_id)
+    # Try manual render first, then stream
+    status = get_export_status_manual(job_id)
+    if not status:
+        status = get_export_status_stream(job_id)
+    
     if not status:
         raise HTTPException(status_code=404, detail="Export job not found")
     
