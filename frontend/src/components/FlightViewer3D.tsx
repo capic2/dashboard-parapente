@@ -1003,7 +1003,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
               </button>
             </div>
 
-            {/* Download Video Button */}
+            {/* Video Buttons */}
             {flight?.gpx_file_path && (
               <>
                 {/* Debug log */}
@@ -1013,58 +1013,98 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   jobId: flight.video_export_job_id,
                   filePath: flight.video_file_path
                 })}
+                
+                {/* Download/Generate Button */}
                 <button
-                onClick={async () => {
-                  if (flight.video_export_status === 'completed' && flight.video_file_path) {
-                    // Download video
-                    window.open(`${API_BASE_URL}/api/exports/${flight.video_export_job_id}/download`, '_blank');
-                  } else if (!flight.video_export_status || flight.video_export_status === 'failed') {
-                    // Generate video
-                    try {
-                      const response = await fetch(`${API_BASE_URL}/api/flights/${flightId}/generate-video`, {
-                        method: 'POST',
-                      });
-                      
-                      if (!response.ok) {
-                        const error = await response.json();
-                        alert(`Erreur: ${error.detail || 'Impossible de lancer la génération'}`);
+                  onClick={async () => {
+                    if (flight.video_export_status === 'completed' && flight.video_file_path) {
+                      // Download video
+                      window.open(`${API_BASE_URL}/api/exports/${flight.video_export_job_id}/download`, '_blank');
+                    } else if (!flight.video_export_status || flight.video_export_status === 'failed') {
+                      // Generate video
+                      try {
+                        const response = await fetch(`${API_BASE_URL}/api/flights/${flightId}/generate-video`, {
+                          method: 'POST',
+                        });
+                        
+                        if (!response.ok) {
+                          const error = await response.json();
+                          alert(`Erreur: ${error.detail || 'Impossible de lancer la génération'}`);
+                          return;
+                        }
+                        
+                        const data = await response.json();
+                        console.log('✅ Video generation started:', data.job_id);
+                        
+                        // Refresh flight data to get updated status
+                        window.location.reload();
+                      } catch (error) {
+                        console.error('❌ Failed to start video generation:', error);
+                        alert('Erreur lors du lancement de la génération');
+                      }
+                    }
+                  }}
+                  disabled={flight.video_export_status === 'processing'}
+                  className={`w-full px-3 py-2 text-white rounded ${
+                    flight.video_export_status === 'completed' ? 'mb-2' : 'mb-3'
+                  } ${
+                    flight.video_export_status === 'completed'
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : flight.video_export_status === 'processing'
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
+                  title={
+                    flight.video_export_status === 'processing'
+                      ? 'Génération vidéo en cours... (~60-90 min)'
+                      : flight.video_export_status === 'completed'
+                      ? 'Télécharger la vidéo'
+                      : flight.video_export_status === 'failed'
+                      ? 'Relancer la génération'
+                      : 'Générer la vidéo du vol'
+                  }
+                >
+                  {flight.video_export_status === 'processing' && '⏳ Génération en cours...'}
+                  {flight.video_export_status === 'completed' && '📥 Télécharger la vidéo'}
+                  {flight.video_export_status === 'failed' && '🔄 Relancer la génération'}
+                  {!flight.video_export_status && '🎥 Générer la vidéo'}
+                </button>
+
+                {/* Regenerate Button (only when video exists) */}
+                {flight.video_export_status === 'completed' && (
+                  <button
+                    onClick={async () => {
+                      if (!confirm('Êtes-vous sûr de vouloir régénérer cette vidéo ? L\'ancienne vidéo sera remplacée.')) {
                         return;
                       }
                       
-                      const data = await response.json();
-                      console.log('✅ Video generation started:', data.job_id);
-                      
-                      // Refresh flight data to get updated status
-                      window.location.reload();
-                    } catch (error) {
-                      console.error('❌ Failed to start video generation:', error);
-                      alert('Erreur lors du lancement de la génération');
-                    }
-                  }
-                }}
-                disabled={flight.video_export_status === 'processing'}
-                className={`w-full px-3 py-2 text-white rounded mb-3 ${
-                  flight.video_export_status === 'completed'
-                    ? 'bg-green-600 hover:bg-green-700'
-                    : flight.video_export_status === 'processing'
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700'
-                }`}
-                title={
-                  flight.video_export_status === 'processing'
-                    ? 'Génération vidéo en cours... (~60-90 min)'
-                    : flight.video_export_status === 'completed'
-                    ? 'Télécharger la vidéo'
-                    : flight.video_export_status === 'failed'
-                    ? 'Relancer la génération'
-                    : 'Générer la vidéo du vol'
-                }
-              >
-                {flight.video_export_status === 'processing' && '⏳ Génération en cours...'}
-                {flight.video_export_status === 'completed' && '📥 Télécharger la vidéo'}
-                {flight.video_export_status === 'failed' && '🔄 Relancer la génération'}
-                {!flight.video_export_status && '🎥 Générer la vidéo'}
-              </button>
+                      try {
+                        const response = await fetch(`${API_BASE_URL}/api/flights/${flightId}/generate-video`, {
+                          method: 'POST',
+                        });
+                        
+                        if (!response.ok) {
+                          const error = await response.json();
+                          alert(`Erreur: ${error.detail || 'Impossible de lancer la régénération'}`);
+                          return;
+                        }
+                        
+                        const data = await response.json();
+                        console.log('✅ Video regeneration started:', data.job_id);
+                        
+                        // Refresh flight data to get updated status
+                        window.location.reload();
+                      } catch (error) {
+                        console.error('❌ Failed to regenerate video:', error);
+                        alert('Erreur lors de la régénération');
+                      }
+                    }}
+                    className="w-full px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 mb-3"
+                    title="Régénérer la vidéo (remplace l'ancienne)"
+                  >
+                    🔄 Régénérer la vidéo
+                  </button>
+                )}
               </>
             )}
 
