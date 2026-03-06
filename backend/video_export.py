@@ -116,22 +116,41 @@ async def _export_video_playwright(
         width, height = resolutions.get(quality, (1920, 1080))
         
         async with async_playwright() as p:
-            # Launch browser with GPU acceleration in headless mode
+            # Launch browser with GPU acceleration and increased resources
             browser = await p.chromium.launch(
-                headless=True,  # Headless mode for faster performance
+                headless=True,
                 args=[
+                    # GPU acceleration
                     '--enable-gpu',
-                    '--use-gl=egl',  # Use EGL for headless GPU
+                    '--use-gl=egl',
                     '--enable-webgl',
+                    '--enable-webgl2',
                     '--ignore-gpu-blocklist',
                     '--disable-gpu-vsync',
-                    '--no-sandbox',  # Required for some environments
-                    '--disable-dev-shm-usage',  # Overcome limited resource problems
+                    
+                    # Performance optimizations
+                    '--disable-dev-shm-usage',  # Use /tmp instead of /dev/shm
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    
+                    # Increase memory and resources
+                    '--js-flags=--max-old-space-size=4096',  # 4GB heap for JS
+                    '--disable-background-timer-throttling',  # Don't throttle timers
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-renderer-backgrounding',
+                    
+                    # Better rendering
+                    '--force-device-scale-factor=1',
+                    '--high-dpi-support=1',
+                    '--disable-blink-features=AutomationControlled',  # Appear more like real browser
                 ]
             )
             context = await browser.new_context(
                 viewport={"width": width, "height": height},
-                device_scale_factor=1
+                device_scale_factor=1,
+                # Disable unnecessary features to improve performance
+                java_script_enabled=True,
+                bypass_csp=True,  # Bypass Content Security Policy
             )
             page = await context.new_page()
             
@@ -286,7 +305,7 @@ async def _export_video_playwright(
             
             print(f"🎥 Starting canvas recording for {video_duration}s...")
             
-            # Start canvas recording using MediaRecorder API
+            # Start canvas recording using MediaRecorder API with forced framerate
             recording_started = await page.evaluate(f"""
                 async () => {{
                     // Find the Cesium canvas
@@ -295,15 +314,21 @@ async def _export_video_playwright(
                         throw new Error('Canvas not found');
                     }}
                     
-                    console.log('✅ Canvas found, setting up MediaRecorder...');
+                    console.log('✅ Canvas found, dimensions:', canvas.width, 'x', canvas.height);
                     
-                    // Create a stream from the canvas
-                    const stream = canvas.captureStream({fps}); // Capture at specified FPS
+                    // Force canvas to requested resolution
+                    canvas.width = {width};
+                    canvas.height = {height};
+                    console.log('📐 Canvas resized to {width}x{height}');
                     
-                    // Setup MediaRecorder with best quality
+                    // Create a stream from the canvas with manual frame capture
+                    const stream = canvas.captureStream(0); // 0 = manual mode, we control frame capture
+                    const track = stream.getVideoTracks()[0];
+                    
+                    // Setup MediaRecorder with highest quality
                     const recorder = new MediaRecorder(stream, {{
                         mimeType: 'video/webm;codecs=vp9',
-                        videoBitsPerSecond: 8000000 // 8 Mbps for high quality
+                        videoBitsPerSecond: 20000000 // 20 Mbps for high quality
                     }});
                     
                     const chunks = [];
@@ -315,13 +340,30 @@ async def _export_video_playwright(
                         }}
                     }};
                     
-                    // Store recorder and chunks globally
+                    // Store recorder, chunks, and track globally
                     window._videoRecorder = recorder;
                     window._videoChunks = chunks;
+                    window._videoTrack = track;
                     
                     // Start recording
-                    recorder.start(1000); // Collect data every second
-                    console.log('🎥 Recording started at {fps}fps');
+                    recorder.start(100); // Collect data every 100ms for smoother chunks
+                    console.log('🎥 Recording started in manual mode');
+                    
+                    // Setup frame capture at precise FPS
+                    const targetFPS = {fps};
+                    const msPerFrame = 1000 / targetFPS;
+                    let frameCount = 0;
+                    
+                    window._captureInterval = setInterval(() => {{
+                        // Request a new frame to be captured
+                        track.requestFrame();
+                        frameCount++;
+                        if (frameCount % 30 === 0) {{
+                            console.log(`📸 Captured ${{frameCount}} frames`);
+                        }}
+                    }}, msPerFrame);
+                    
+                    console.log(`⏱️  Frame capture interval: ${{msPerFrame}}ms ({fps} FPS)`);
                     
                     // Click play button to start animation
                     const playButton = Array.from(document.querySelectorAll('button'))
@@ -366,6 +408,12 @@ async def _export_video_playwright(
                     return new Promise((resolve) => {
                         const recorder = window._videoRecorder;
                         const chunks = window._videoChunks;
+                        
+                        // Stop frame capture interval
+                        if (window._captureInterval) {
+                            clearInterval(window._captureInterval);
+                            console.log('⏹️  Frame capture stopped');
+                        }
                         
                         recorder.onstop = async () => {
                             console.log('✅ Recording stopped, chunks:', chunks.length);
