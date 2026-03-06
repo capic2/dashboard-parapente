@@ -60,6 +60,9 @@ npm-debug.log
 yarn-error.log
 dist/
 
+# Frontend build (deployed to backend/static)
+backend/static/
+
 # Playwright
 .auth/
 test-results/

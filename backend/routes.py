@@ -573,6 +573,65 @@ async def create_site(
         logger.error(f"Failed to create site: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Site creation failed: {str(e)}")
 
+
+@router.patch("/sites/{site_id}/orientation")
+def update_site_orientation(
+    site_id: str,
+    orientation: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Update site orientation (direction the pilot faces at takeoff)
+    
+    Args:
+        site_id: Site ID
+        orientation: Compass direction (N, NE, E, SE, S, SW, W, NW, or intermediate)
+    
+    Returns:
+        Updated site information
+    
+    Valid orientations:
+        N, NNE, NE, ENE, E, ESE, SE, SSE, S, SSW, SW, WSW, W, WNW, NW, NNW
+    """
+    VALID_ORIENTATIONS = [
+        'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+        'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
+    ]
+    
+    orientation_upper = orientation.upper().strip()
+    
+    if orientation_upper not in VALID_ORIENTATIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid orientation '{orientation}'. Must be one of: {', '.join(VALID_ORIENTATIONS)}"
+        )
+    
+    site = db.query(Site).filter(Site.id == site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    old_orientation = site.orientation
+    site.orientation = orientation_upper
+    site.updated_at = datetime.utcnow()
+    
+    try:
+        db.commit()
+        db.refresh(site)
+        logger.info(f"✅ Updated orientation for site '{site.name}': {old_orientation} → {orientation_upper}")
+        
+        return {
+            "success": True,
+            "site_id": site.id,
+            "name": site.name,
+            "orientation": site.orientation,
+            "message": f"Orientation updated to {orientation_upper}"
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to update site orientation: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
+
+
 # ============================================================================
 # BEST SPOT RECOMMENDATION ENDPOINT
 # ============================================================================
@@ -1284,11 +1343,55 @@ def get_flight_records(db: Session = Depends(get_db)):
 
 @router.get("/flights/{flight_id}")
 def get_flight(flight_id: str, db: Session = Depends(get_db)):
-    """Get a specific flight"""
+    """Get a specific flight with site details including orientation"""
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
-    return flight
+    
+    # Build response with flight data
+    flight_dict = {
+        "id": flight.id,
+        "name": flight.name,
+        "title": flight.title,
+        "site_id": flight.site_id,
+        "strava_id": flight.strava_id,
+        "description": flight.description,
+        "flight_date": flight.flight_date.isoformat() if flight.flight_date else None,
+        "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
+        "duration_minutes": flight.duration_minutes,
+        "max_altitude_m": flight.max_altitude_m,
+        "max_speed_kmh": flight.max_speed_kmh,
+        "distance_km": flight.distance_km,
+        "elevation_gain_m": flight.elevation_gain_m,
+        "notes": flight.notes,
+        "gpx_file_path": flight.gpx_file_path,
+        "gpx_max_altitude_m": flight.gpx_max_altitude_m,
+        "gpx_elevation_gain_m": flight.gpx_elevation_gain_m,
+        "external_url": flight.external_url,
+        "video_export_job_id": flight.video_export_job_id,
+        "video_export_status": flight.video_export_status,
+        "video_file_path": flight.video_file_path,
+        "created_at": flight.created_at.isoformat() if flight.created_at else None,
+        "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
+    }
+    
+    # Include site details with orientation
+    if flight.site_id:
+        site = db.query(Site).filter(Site.id == flight.site_id).first()
+        if site:
+            flight_dict["site"] = {
+                "id": site.id,
+                "name": site.name,
+                "code": site.code,
+                "orientation": site.orientation,
+                "latitude": site.latitude,
+                "longitude": site.longitude,
+                "elevation_m": site.elevation_m,
+                "region": site.region,
+                "country": site.country
+            }
+    
+    return flight_dict
 
 @router.patch("/flights/{flight_id}")
 async def update_flight(
@@ -1634,6 +1737,15 @@ async def upload_gpx_to_flight(
         
         logger.info(f"✅ Added GPX file to flight {flight_id} (stats unchanged)")
         
+        # 5. Trigger automatic video export
+        try:
+            from video_export_manual import trigger_auto_export
+            from config import settings
+            frontend_url = f"http://localhost:{settings.PORT}"
+            trigger_auto_export(flight_id, db, frontend_url)
+        except Exception as e:
+            logger.warning(f"Failed to trigger auto video export: {e}")
+        
         return {
             "success": True,
             "flight_id": flight.id,
@@ -1777,7 +1889,16 @@ async def create_flight_from_gpx(
         
         logger.info(f"✅ Created new flight from {file_type.upper()}: {flight.name} (ID: {flight_id})")
         
-        # 8. Retourner le vol créé
+        # 8. Trigger automatic video export
+        try:
+            from video_export_manual import trigger_auto_export
+            from config import settings
+            frontend_url = f"http://localhost:{settings.PORT}"
+            trigger_auto_export(flight_id, db, frontend_url)
+        except Exception as e:
+            logger.warning(f"Failed to trigger auto video export: {e}")
+        
+        # 9. Retourner le vol créé
         return {
             "success": True,
             "flight_id": flight.id,
@@ -2346,6 +2467,57 @@ def start_flight_video_export(
         "message": f"Video export started ({export_method})",
         "mode": mode,
         "status_url": f"/exports/{job_id}/status"
+    }
+
+
+@router.post("/flights/{flight_id}/generate-video")
+def generate_flight_video(
+    flight_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Generate video for a flight (simple endpoint with optimal defaults)
+    Used for flights that don't have a video yet.
+    
+    Uses optimal settings: 1080p, 15 FPS, Manual Render
+    """
+    logger.info(f"🎥 Manual video generation requested: flight_id={flight_id}")
+    
+    # Verify flight exists and has GPX
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    
+    if not flight.gpx_file_path:
+        raise HTTPException(status_code=400, detail="Flight has no GPX file")
+    
+    # Check if video already exists or is processing
+    if flight.video_export_status == "completed":
+        raise HTTPException(status_code=400, detail="Video already exists")
+    
+    if flight.video_export_status == "processing":
+        raise HTTPException(status_code=400, detail="Video conversion already in progress")
+    
+    # Determine frontend URL
+    from config import API_PORT
+    frontend_url = f"http://localhost:{API_PORT}"
+    
+    # Start conversion with optimal settings
+    job_id = start_video_export_manual(
+        flight_id=flight_id,
+        quality="1080p",
+        fps=15,
+        speed=1,
+        frontend_url=frontend_url,
+        update_db=True
+    )
+    
+    logger.info(f"✅ Video generation started: job_id={job_id}")
+    
+    return {
+        "job_id": job_id,
+        "message": "Video generation started (Manual Render, ~60-90 min)",
+        "status_url": f"/api/exports/{job_id}/status"
     }
 
 

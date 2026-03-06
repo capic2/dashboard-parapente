@@ -78,6 +78,10 @@ class Flight(Base):
     gpx_max_altitude_m = Column(Integer)
     gpx_elevation_gain_m = Column(Integer)
     external_url = Column(String)
+    # Video export fields
+    video_export_job_id = Column(String, nullable=True)  # Background job ID for video conversion
+    video_export_status = Column(String, nullable=True)  # "processing", "completed", "failed"
+    video_file_path = Column(String, nullable=True)  # Path to generated MP4 file
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
