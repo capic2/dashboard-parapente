@@ -97,6 +97,44 @@ class MeteocielScraper(BaseScraper):
             logger.error(f"Error fetching INSEE code for {city_name}: {e}")
             return None
     
+    async def _get_nearest_insee_code(self, lat: float, lon: float) -> Optional[str]:
+        """
+        Get INSEE code for nearest French city using reverse geocoding
+        
+        Args:
+            lat: Latitude
+            lon: Longitude
+        
+        Returns:
+            INSEE code or None if not in France
+        """
+        try:
+            url = "https://geo.api.gouv.fr/communes"
+            params = {
+                "lat": lat,
+                "lon": lon,
+                "fields": "nom,code,codesPostaux",
+                "limit": 1
+            }
+            
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.get(url, params=params)
+                response.raise_for_status()
+                communes = response.json()
+                
+                if communes and len(communes) > 0:
+                    insee_code = communes[0]['code']
+                    city_name = communes[0]['nom']
+                    logger.info(f"Found nearest French city at {lat:.4f},{lon:.4f}: {city_name} (INSEE: {insee_code})")
+                    return insee_code
+                else:
+                    logger.warning(f"No French city found near coordinates {lat:.4f},{lon:.4f}")
+                    return None
+                    
+        except Exception as e:
+            logger.error(f"Error in reverse geocoding for {lat},{lon}: {e}")
+            return None
+    
     async def fetch(self, lat: float, lon: float, **kwargs) -> Dict[str, Any]:
         """
         Fetch forecast from meteociel
@@ -122,10 +160,15 @@ class MeteocielScraper(BaseScraper):
             insee_code = await self._get_insee_code(site_name)
             
             if not insee_code:
-                return self._build_response(
-                    success=False,
-                    error=f"Could not find INSEE code for {site_name}"
-                )
+                # Graceful degradation: Try to find nearest French city using coordinates
+                logger.info(f"No INSEE code found for {site_name}, trying reverse geocoding with coordinates")
+                insee_code = await self._get_nearest_insee_code(lat, lon)
+                
+                if not insee_code:
+                    return self._build_response(
+                        success=False,
+                        error=f"Meteociel only supports French cities. Could not find INSEE code for {site_name} or nearby location."
+                    )
             
             # Step 2: Build URL - Using AROME hourly forecasts (1h resolution)
             # Normalize city name: lowercase, remove accents, replace spaces
