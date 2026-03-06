@@ -253,74 +253,155 @@ async def _export_video_playwright(
             print(f"📸 Total frames: {total_frames}")
             
             export_jobs[job_id]["total_frames"] = total_frames
-            export_jobs[job_id]["message"] = f"Capturing {total_frames} frames..."
+            export_jobs[job_id]["message"] = f"Recording video with Canvas API..."
             
-            # Create temp directory for frames
-            frames_dir = EXPORTS_DIR / f"frames_{job_id}"
-            frames_dir.mkdir(exist_ok=True)
+            print(f"🎥 Starting canvas recording for {video_duration}s...")
             
-            # Trigger playback and capture frames
-            await page.evaluate("""
-                () => {
-                    // Click play button
-                    const playButton = document.querySelector('button');
-                    if (playButton && playButton.textContent.includes('Play')) {
+            # Start canvas recording using MediaRecorder API
+            recording_started = await page.evaluate(f"""
+                async () => {{
+                    // Find the Cesium canvas
+                    const canvas = document.querySelector('canvas');
+                    if (!canvas) {{
+                        throw new Error('Canvas not found');
+                    }}
+                    
+                    console.log('✅ Canvas found, setting up MediaRecorder...');
+                    
+                    // Create a stream from the canvas
+                    const stream = canvas.captureStream({fps}); // Capture at specified FPS
+                    
+                    // Setup MediaRecorder with best quality
+                    const recorder = new MediaRecorder(stream, {{
+                        mimeType: 'video/webm;codecs=vp9',
+                        videoBitsPerSecond: 8000000 // 8 Mbps for high quality
+                    }});
+                    
+                    const chunks = [];
+                    
+                    recorder.ondataavailable = (e) => {{
+                        if (e.data.size > 0) {{
+                            chunks.push(e.data);
+                            console.log('📦 Chunk received:', e.data.size, 'bytes');
+                        }}
+                    }};
+                    
+                    // Store recorder and chunks globally
+                    window._videoRecorder = recorder;
+                    window._videoChunks = chunks;
+                    
+                    // Start recording
+                    recorder.start(1000); // Collect data every second
+                    console.log('🎥 Recording started at {fps}fps');
+                    
+                    // Click play button to start animation
+                    const playButton = Array.from(document.querySelectorAll('button'))
+                        .find(btn => btn.textContent.includes('Play') || btn.textContent.includes('▶'));
+                    if (playButton) {{
                         playButton.click();
-                    }
+                        console.log('▶️  Playback started');
+                    }} else {{
+                        console.warn('⚠️  Play button not found');
+                    }}
+                    
+                    return true;
+                }}
+            """)
+            
+            if not recording_started:
+                raise Exception("Failed to start canvas recording")
+            
+            print("✅ Canvas recording started successfully")
+            
+            # Wait for the full duration + buffer
+            export_jobs[job_id]["message"] = f"Recording in progress ({int(video_duration)}s)..."
+            
+            # Check recording progress every 5 seconds
+            elapsed = 0
+            check_interval = 5
+            while elapsed < video_duration + 5:  # Add 5s buffer
+                await asyncio.sleep(check_interval)
+                elapsed += check_interval
+                
+                progress = min(int((elapsed / video_duration) * 40), 40)  # 0-40% for recording
+                export_jobs[job_id]["progress"] = progress
+                export_jobs[job_id]["message"] = f"Recording... {elapsed}s / {int(video_duration)}s"
+                print(f"🎥 Recording progress: {elapsed}s / {int(video_duration)}s")
+            
+            print("⏹️  Stopping recording...")
+            
+            # Stop recording and get the video data
+            export_jobs[job_id]["message"] = "Finalizing recording..."
+            video_data = await page.evaluate("""
+                async () => {
+                    return new Promise((resolve) => {
+                        const recorder = window._videoRecorder;
+                        const chunks = window._videoChunks;
+                        
+                        recorder.onstop = async () => {
+                            console.log('✅ Recording stopped, chunks:', chunks.length);
+                            
+                            // Create blob from chunks
+                            const blob = new Blob(chunks, { type: 'video/webm' });
+                            console.log('📦 Video blob size:', blob.size, 'bytes');
+                            
+                            // Convert blob to base64
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                                const base64data = reader.result.split(',')[1];
+                                console.log('✅ Video converted to base64');
+                                resolve(base64data);
+                            };
+                            reader.readAsDataURL(blob);
+                        };
+                        
+                        recorder.stop();
+                        console.log('⏹️  Recorder.stop() called');
+                    });
                 }
             """)
             
-            # Capture frames
-            frame_count = 0
-            ms_per_frame = (duration_seconds * 1000) / total_frames
+            print(f"✅ Received video data: {len(video_data)} bytes (base64)")
             
-            for i in range(total_frames):
-                # Capture screenshot with increased timeout (60s instead of default 30s)
-                frame_path = frames_dir / f"frame{i:05d}.png"
-                await page.screenshot(path=str(frame_path), timeout=60000)
-                
-                frame_count += 1
-                if frame_count % 10 == 0:
-                    progress = int((frame_count / total_frames) * 50)  # 0-50% for capture
-                    export_jobs[job_id]["progress"] = progress
-                    export_jobs[job_id]["message"] = f"Captured {frame_count}/{total_frames} frames"
-                    print(f"📸 Frame {frame_count}/{total_frames}")
-                
-                # Wait appropriate time before next frame
-                await asyncio.sleep(ms_per_frame / 1000)
+            # Save WebM file
+            webm_file = EXPORTS_DIR / f"flight-{flight_id}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.webm"
+            import base64
+            webm_data = base64.b64decode(video_data)
+            webm_file.write_bytes(webm_data)
+            print(f"💾 WebM saved: {webm_file} ({len(webm_data)} bytes)")
             
             await browser.close()
             
-            # Encode video with FFmpeg
+            # Convert WebM to MP4 with FFmpeg
             export_jobs[job_id]["status"] = "encoding"
             export_jobs[job_id]["progress"] = 50
-            export_jobs[job_id]["message"] = "Encoding video with FFmpeg..."
+            export_jobs[job_id]["message"] = "Converting WebM to MP4..."
             
             output_file = EXPORTS_DIR / f"flight-{flight_id}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.mp4"
             
+            # Convert WebM to MP4
             ffmpeg_cmd = [
                 "ffmpeg",
-                "-framerate", str(fps),
-                "-i", str(frames_dir / "frame%05d.png"),
+                "-i", str(webm_file),
                 "-c:v", "libx264",
                 "-preset", "medium",
                 "-crf", "23",
                 "-pix_fmt", "yuv420p",
-                "-s", f"{width}:{height}",
-                "-y",
+                "-c:a", "aac",  # Audio codec (even if no audio)
+                "-y",  # Overwrite output file
                 str(output_file)
             ]
             
-            print(f"🎬 Encoding: {' '.join(ffmpeg_cmd)}")
+            print(f"🎬 Converting WebM to MP4: {' '.join(ffmpeg_cmd)}")
             result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
             
             if result.returncode != 0:
-                raise Exception(f"FFmpeg failed: {result.stderr}")
+                raise Exception(f"FFmpeg conversion failed: {result.stderr}")
             
-            # Cleanup frames
-            for frame_file in frames_dir.glob("*.png"):
-                frame_file.unlink()
-            frames_dir.rmdir()
+            # Cleanup temporary WebM file
+            if webm_file.exists():
+                webm_file.unlink()
+                print(f"🗑️  Cleaned up temporary WebM file")
             
             # Success
             file_size_mb = output_file.stat().st_size / (1024 * 1024)
@@ -330,7 +411,7 @@ async def _export_video_playwright(
             export_jobs[job_id]["video_path"] = str(output_file)
             export_jobs[job_id]["completed_at"] = datetime.now().isoformat()
             
-            print(f"✅ Video exported: {output_file}")
+            print(f"✅ Video exported: {output_file} ({file_size_mb:.1f} MB)")
             
     except Exception as e:
         print(f"❌ Export failed: {str(e)}")
