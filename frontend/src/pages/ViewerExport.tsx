@@ -18,8 +18,15 @@ export function ViewerExport() {
     )
   }
   
+  // Force optimal rendering for export
+  // Disable UI throttling and force requestAnimationFrame sync
+  if (typeof window !== 'undefined') {
+    // @ts-ignore
+    window._exportMode = true
+  }
+  
   return (
-    <div className="w-full h-screen">
+    <div className="w-full h-screen" style={{ backgroundColor: '#000' }}>
       <FlightViewer3D flightId={flightId} />
     </div>
   )
