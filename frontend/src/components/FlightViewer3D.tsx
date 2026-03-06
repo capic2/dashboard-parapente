@@ -472,19 +472,29 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     const heading = getHeadingFromOrientation(siteOrientation)
 
     if (heading !== null) {
-      // If takeoff is oriented North (pilot faces North), camera should be North looking South
-      // So camera heading is the SAME as site orientation, but moveBackward places it opposite
-      console.log(`📐 Site orientation: ${siteOrientation} (pilot faces ${heading}°)`)
-      console.log(`📷 Camera will be positioned at ${heading}° looking toward takeoff`)
+      // If takeoff points North, camera should be 500m North, looking South (back at takeoff)
+      // The camera heading should be OPPOSITE to the takeoff orientation
+      const oppositeHeading = (heading + 180) % 360;
       
-      // Position camera with heading matching the site orientation
+      console.log(`📐 Site orientation: ${siteOrientation} (takeoff points ${heading}°)`)
+      console.log(`📷 Camera positioned ${heading}° from takeoff, looking ${oppositeHeading}° (back at takeoff)`)
+      
+      // First, position camera at takeoff looking in the OPPOSITE direction
       viewer.camera.setView({
         destination: firstPosition,
         orientation: {
-          heading: Cesium.Math.toRadians(heading),  // Same direction as takeoff orientation
+          heading: Cesium.Math.toRadians(oppositeHeading),  // Look back at takeoff
           pitch: Cesium.Math.toRadians(-10), // Look slightly down
           roll: 0.0
         }
+      })
+      
+      // Then move camera FORWARD 500m (which is actually in the takeoff direction)
+      // This places camera ahead of takeoff, looking back at it
+      viewer.camera.moveForward(500)
+      
+      console.log('✅ Camera positioned to face takeoff point')
+    }
       })
       
       // Move camera back 500m - this moves it IN THE DIRECTION of the heading
