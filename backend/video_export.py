@@ -123,9 +123,12 @@ async def _export_video_playwright(
             if response.status >= 400:
                 raise Exception(f"Page returned HTTP {response.status}")
             
-            # Take a screenshot for debugging
-            await page.screenshot(path=f"/tmp/playwright-debug-{job_id}.png")
-            print(f"📸 Debug screenshot saved to /tmp/playwright-debug-{job_id}.png")
+            # Take a screenshot for debugging (with longer timeout for headless)
+            try:
+                await page.screenshot(path=f"/tmp/playwright-debug-{job_id}.png", timeout=60000)
+                print(f"📸 Debug screenshot saved to /tmp/playwright-debug-{job_id}.png")
+            except Exception as e:
+                print(f"⚠️  Debug screenshot failed: {e} (continuing anyway)")
             
             # Wait for Cesium to load - wait for any canvas element inside the container
             export_jobs[job_id]["message"] = "Waiting for 3D viewer..."
