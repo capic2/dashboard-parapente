@@ -472,22 +472,26 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     const heading = getHeadingFromOrientation(siteOrientation)
 
     if (heading !== null) {
-      console.log(`📐 Positioning camera for orientation: ${siteOrientation} → heading ${heading}°`)
+      // If takeoff is oriented North (pilot faces North), camera should be North looking South
+      // So camera heading is the SAME as site orientation, but moveBackward places it opposite
+      console.log(`📐 Site orientation: ${siteOrientation} (pilot faces ${heading}°)`)
+      console.log(`📷 Camera will be positioned at ${heading}° looking toward takeoff`)
       
-      // Position camera facing the orientation direction
+      // Position camera with heading matching the site orientation
       viewer.camera.setView({
         destination: firstPosition,
         orientation: {
-          heading: Cesium.Math.toRadians(heading),
+          heading: Cesium.Math.toRadians(heading),  // Same direction as takeoff orientation
           pitch: Cesium.Math.toRadians(-10), // Look slightly down
           roll: 0.0
         }
       })
       
-      // Move camera back 500m from takeoff point
+      // Move camera back 500m - this moves it IN THE DIRECTION of the heading
+      // Example: heading=0° (North) → camera moves North, looks South toward takeoff
       viewer.camera.moveBackward(500)
       
-      console.log('✅ Camera positioned according to site orientation')
+      console.log('✅ Camera positioned to face takeoff point')
     } else {
       console.log('📐 No orientation found, using default camera positioning')
       // Default positioning is already handled by the GPX loading useEffect
