@@ -395,7 +395,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       const positionCamera = async () => {
         if (viewer && !viewer.isDestroyed()) {
           // Check if camera settings were already loaded from site (camera_angle/camera_distance)
-          // If so, don't overwrite them with calculated values
+          // Read directly from flight.site to avoid stale ref values
           const hasSavedCameraSettings = flight?.site?.camera_angle !== null && 
                                           flight?.site?.camera_angle !== undefined;
           
@@ -403,12 +403,18 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           let distance: number;
           
           if (hasSavedCameraSettings) {
-            // Use already-saved values from refs (set by the camera positioning useEffect)
-            heading = cameraHeadingRef.current;
-            distance = cameraDistanceRef.current;
-            console.log('📷 Using saved camera settings:', {
-              angle: flight.site.camera_angle,
-              distance: flight.site.camera_distance,
+            // Read camera settings directly from flight.site
+            const cameraAngle = flight!.site!.camera_angle!;
+            distance = flight!.site!.camera_distance || 500;
+            heading = CesiumMath.toRadians(cameraAngle);
+            
+            // Also update refs for replay mode
+            cameraHeadingRef.current = heading;
+            cameraDistanceRef.current = distance;
+            
+            console.log('📷 Using saved camera settings from DB:', {
+              angle: cameraAngle,
+              distance: distance,
               headingRad: heading
             });
           } else {
@@ -511,7 +517,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       camera_distance: flight?.site?.camera_distance
     })
     
-    if (!viewerRef.current || !viewerReady || !gpxData?.coordinates || !allPositionsRef.current.length) {
+    if (!viewerRef.current || !viewerReady || !gpxData?.coordinates?.length || !allPositionsRef.current.length) {
+      console.log('🎥 Camera positioning skipped - waiting for data')
       return
     }
 
