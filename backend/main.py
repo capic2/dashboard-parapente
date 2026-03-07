@@ -310,8 +310,13 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("🚀 Starting Dashboard Parapente API...")
     
-    # Start scheduler
+    # Start weather scheduler
     start_scheduler()
+    
+    # Start emagram scheduler
+    from scheduler.emagram_scheduler import setup_emagram_scheduler, start_scheduler as start_emagram
+    emagram_scheduler = setup_emagram_scheduler(app)
+    start_emagram(emagram_scheduler)
     
     # Initial cache warmup (non-blocking)
     logger.info("🔥 Triggering initial cache warmup...")
@@ -322,6 +327,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("⏹️ Shutting down Dashboard Parapente API...")
     stop_scheduler()
+    # Emagram scheduler shutdown handled by registered event
 
 
 app = FastAPI(

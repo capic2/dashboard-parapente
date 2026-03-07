@@ -4,8 +4,10 @@ import CurrentConditions from '../components/CurrentConditions';
 import Forecast7Day from '../components/Forecast7Day';
 import HourlyForecast from '../components/HourlyForecast';
 import StatsPanel from '../components/StatsPanel';
+import EmagramWidget from '../components/EmagramWidget';
 import { BestSpotSuggestion } from '../components/BestSpotSuggestion';
 import { useSites } from '../hooks/useSites';
+import { useSite } from '../hooks/useSites';
 import { useBestSpotAPI } from '../hooks/useBestSpotAPI';
 
 export default function Dashboard() {
@@ -15,6 +17,11 @@ export default function Dashboard() {
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
   const [weatherDataMap] = useState<Map<string, any>>(new Map()); // Pas utilisé mais gardé pour SiteSelector
   const hourlyForecastRef = useRef<HTMLDivElement>(null);
+  
+  // Get selected site coordinates for emagram
+  const { data: selectedSite } = useSite(selectedSiteId);
+  const userLat = selectedSite?.latitude || null;
+  const userLon = selectedSite?.longitude || null;
 
   // OPTIMISATION: Ne charge PAS les données pour tous les sites au démarrage
   // Seul le site sélectionné charge ses données (via CurrentConditions et HourlyForecast)
@@ -93,8 +100,13 @@ export default function Dashboard() {
           <CurrentConditions spotId={selectedSiteId} />
         </div>
 
-        {/* Stats Panel - Full width on mobile, 2/3 on desktop */}
-        <div className="lg:col-span-2 flex">
+        {/* Emagram Widget - Full width on mobile, 1/3 on desktop */}
+        <div className="lg:col-span-1 flex">
+          <EmagramWidget userLat={userLat} userLon={userLon} />
+        </div>
+
+        {/* Stats Panel - Full width on mobile, 1/3 on desktop */}
+        <div className="lg:col-span-1 flex">
           <StatsPanel />
         </div>
 

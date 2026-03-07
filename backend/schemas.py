@@ -1,5 +1,5 @@
 from pydantic import BaseModel, validator
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Optional, List, Dict, Any, Literal
 
 # Sites
@@ -334,3 +334,130 @@ class WeatherSourceTestResult(BaseModel):
     error: Optional[str] = None
     sample_data: Optional[Dict[str, Any]] = None  # First data point for verification
     tested_at: datetime
+
+
+# Emagram Analysis Schemas
+class EmagramAnalysisBase(BaseModel):
+    """Base schema for emagram analysis"""
+    analysis_date: date
+    analysis_time: time
+    station_code: str
+    station_name: str
+    station_latitude: float
+    station_longitude: float
+    distance_km: float
+    data_source: str = "wyoming"
+    sounding_time: str  # "00Z" or "12Z"
+    analysis_method: str  # "llm_vision" or "classic_calculation"
+    
+    # Optional AI analysis results
+    plafond_thermique_m: Optional[int] = None
+    force_thermique_ms: Optional[float] = None
+    cape_jkg: Optional[float] = None
+    stabilite_atmospherique: Optional[str] = None
+    cisaillement_vent: Optional[str] = None
+    heure_debut_thermiques: Optional[time] = None
+    heure_fin_thermiques: Optional[time] = None
+    heures_volables_total: Optional[float] = None
+    risque_orage: Optional[str] = None
+    score_volabilite: Optional[int] = None
+    
+    resume_conditions: Optional[str] = None
+    conseils_vol: Optional[str] = None
+    alertes_securite: Optional[str] = None  # JSON string
+    
+    # Classic meteorology fallback
+    lcl_m: Optional[int] = None
+    lfc_m: Optional[int] = None
+    el_m: Optional[int] = None
+    lifted_index: Optional[float] = None
+    k_index: Optional[float] = None
+    total_totals: Optional[float] = None
+    showalter_index: Optional[float] = None
+    wind_shear_0_3km_ms: Optional[float] = None
+    wind_shear_0_6km_ms: Optional[float] = None
+
+
+class EmagramAnalysisCreate(EmagramAnalysisBase):
+    """Schema for creating new emagram analysis"""
+    llm_provider: Optional[str] = None
+    llm_model: Optional[str] = None
+    llm_tokens_used: Optional[int] = None
+    llm_cost_usd: Optional[float] = None
+    skewt_image_path: Optional[str] = None
+    raw_sounding_data: Optional[str] = None
+    ai_raw_response: Optional[str] = None
+    analysis_status: str = "completed"
+    error_message: Optional[str] = None
+
+
+class EmagramAnalysis(EmagramAnalysisBase):
+    """Complete emagram analysis response schema"""
+    id: str
+    analysis_datetime: datetime
+    
+    # LLM metadata
+    llm_provider: Optional[str] = None
+    llm_model: Optional[str] = None
+    llm_tokens_used: Optional[int] = None
+    llm_cost_usd: Optional[float] = None
+    
+    # Storage paths
+    skewt_image_path: Optional[str] = None
+    raw_sounding_data: Optional[str] = None
+    ai_raw_response: Optional[str] = None
+    
+    # Status
+    analysis_status: str
+    error_message: Optional[str] = None
+    
+    # Computed properties
+    is_from_llm: bool
+    has_thermal_data: bool
+    flyable_hours_formatted: Optional[str] = None
+    
+    # Timestamps
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class EmagramAnalysisListItem(BaseModel):
+    """Lightweight schema for listing multiple analyses"""
+    id: str
+    analysis_date: date
+    analysis_time: time
+    station_code: str
+    station_name: str
+    distance_km: float
+    score_volabilite: Optional[int] = None
+    plafond_thermique_m: Optional[int] = None
+    force_thermique_ms: Optional[float] = None
+    heures_volables_total: Optional[float] = None
+    analysis_method: str
+    analysis_status: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class EmagramTriggerRequest(BaseModel):
+    """Request schema for manually triggering emagram analysis"""
+    user_latitude: float
+    user_longitude: float
+    force_refresh: bool = False  # Force new analysis even if recent one exists
+    
+    @validator('user_latitude')
+    def validate_latitude(cls, v):
+        if not -90 <= v <= 90:
+            raise ValueError('Latitude must be between -90 and 90')
+        return v
+    
+    @validator('user_longitude')
+    def validate_longitude(cls, v):
+        if not -180 <= v <= 180:
+            raise ValueError('Longitude must be between -180 and 180')
+        return v

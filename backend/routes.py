@@ -3,8 +3,8 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
-from models import Site, Flight, WeatherForecast, WeatherSourceConfig
-from schemas import Site as SiteSchema, SiteCreate, SiteUpdate, SpotsResponse, WeatherForecast as WeatherForecastSchema, WeatherResponse, FlightUpdate, WeatherSourceConfig as WeatherSourceConfigSchema, WeatherSourceConfigCreate, WeatherSourceConfigUpdate, WeatherSourceStats, WeatherSourceTestResult
+from models import Site, Flight, WeatherForecast, WeatherSourceConfig, EmagramAnalysis
+from schemas import Site as SiteSchema, SiteCreate, SiteUpdate, SpotsResponse, WeatherForecast as WeatherForecastSchema, WeatherResponse, FlightUpdate, WeatherSourceConfig as WeatherSourceConfigSchema, WeatherSourceConfigCreate, WeatherSourceConfigUpdate, WeatherSourceStats, WeatherSourceTestResult, EmagramAnalysis as EmagramAnalysisSchema, EmagramAnalysisListItem, EmagramTriggerRequest
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -3143,3 +3143,379 @@ async def test_weather_source(
             sample_data=None,
             tested_at=datetime.utcnow()
         )
+
+
+# ============================================================================
+# EMAGRAM (SOUNDING) ANALYSIS ENDPOINTS
+# ============================================================================
+
+@router.get("/emagram/latest", response_model=Optional[EmagramAnalysisSchema])
+async def get_latest_emagram(
+    user_lat: float = Query(..., description="User latitude"),
+    user_lon: float = Query(..., description="User longitude"),
+    max_distance_km: float = Query(200, description="Maximum station distance in km"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get most recent emagram analysis for user location
+    
+    Args:
+        user_lat: User latitude
+        user_lon: User longitude
+        max_distance_km: Maximum acceptable station distance (default: 200km)
+    
+    Returns:
+        Most recent emagram analysis within distance threshold, or None
+    
+    Example:
+        GET /api/emagram/latest?user_lat=45.76&user_lon=4.84
+    """
+    try:
+        # Get all analyses from last 24 hours
+        cutoff_time = datetime.utcnow() - timedelta(hours=24)
+        
+        recent_analyses = db.query(EmagramAnalysis).filter(
+            EmagramAnalysis.analysis_datetime >= cutoff_time,
+            EmagramAnalysis.analysis_status == "completed"
+        ).all()
+        
+        if not recent_analyses:
+            return None
+        
+        # Filter by distance and find closest
+        from scrapers.wyoming import haversine_distance
+        
+        closest_analysis = None
+        min_distance = float('inf')
+        
+        for analysis in recent_analyses:
+            dist = haversine_distance(
+                user_lat, user_lon,
+                analysis.station_latitude, analysis.station_longitude
+            )
+            
+            if dist <= max_distance_km and dist < min_distance:
+                min_distance = dist
+                closest_analysis = analysis
+        
+        return closest_analysis
+    
+    except Exception as e:
+        logger.error(f"Failed to get latest emagram: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/emagram/history", response_model=List[EmagramAnalysisListItem])
+async def get_emagram_history(
+    user_lat: float = Query(..., description="User latitude"),
+    user_lon: float = Query(..., description="User longitude"),
+    days: int = Query(7, ge=1, le=30, description="Number of days of history"),
+    max_distance_km: float = Query(200, description="Maximum station distance in km"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get historical emagram analyses for user location
+    
+    Args:
+        user_lat: User latitude
+        user_lon: User longitude
+        days: Number of days to look back (1-30, default: 7)
+        max_distance_km: Maximum acceptable station distance
+    
+    Returns:
+        List of emagram analyses, sorted by date descending
+    
+    Example:
+        GET /api/emagram/history?user_lat=45.76&user_lon=4.84&days=7
+    """
+    try:
+        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        
+        analyses = db.query(EmagramAnalysis).filter(
+            EmagramAnalysis.analysis_datetime >= cutoff_date,
+            EmagramAnalysis.analysis_status == "completed"
+        ).order_by(EmagramAnalysis.analysis_datetime.desc()).all()
+        
+        # Filter by distance
+        from scrapers.wyoming import haversine_distance
+        
+        filtered_analyses = []
+        for analysis in analyses:
+            dist = haversine_distance(
+                user_lat, user_lon,
+                analysis.station_latitude, analysis.station_longitude
+            )
+            if dist <= max_distance_km:
+                filtered_analyses.append(analysis)
+        
+        return filtered_analyses
+    
+    except Exception as e:
+        logger.error(f"Failed to get emagram history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/emagram/export/csv")
+async def export_emagram_csv(
+    user_lat: float = Query(..., description="User latitude"),
+    user_lon: float = Query(..., description="User longitude"),
+    days: int = Query(30, ge=1, le=90, description="Number of days"),
+    db: Session = Depends(get_db)
+):
+    """
+    Export emagram analyses to CSV
+    
+    Args:
+        user_lat: User latitude
+        user_lon: User longitude
+        days: Number of days to export (1-90, default: 30)
+    
+    Returns:
+        CSV file download
+    """
+    try:
+        import csv
+        from io import StringIO
+        from fastapi.responses import StreamingResponse
+        
+        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        
+        analyses = db.query(EmagramAnalysis).filter(
+            EmagramAnalysis.analysis_datetime >= cutoff_date,
+            EmagramAnalysis.analysis_status == "completed"
+        ).order_by(EmagramAnalysis.analysis_datetime.desc()).all()
+        
+        # Filter by distance
+        from scrapers.wyoming import haversine_distance
+        
+        output = StringIO()
+        writer = csv.writer(output)
+        
+        # Header
+        writer.writerow([
+            'Date', 'Heure', 'Station', 'Distance (km)',
+            'Score', 'Plafond (m)', 'Force (m/s)', 'CAPE (J/kg)',
+            'Stabilité', 'Cisaillement', 'Risque Orage',
+            'Heures Début', 'Heures Fin', 'Total Heures',
+            'LCL (m)', 'LFC (m)', 'Lifted Index',
+            'Méthode', 'LLM Provider'
+        ])
+        
+        # Data
+        for analysis in analyses:
+            dist = haversine_distance(
+                user_lat, user_lon,
+                analysis.station_latitude, analysis.station_longitude
+            )
+            
+            if dist > 200:  # Skip distant stations
+                continue
+            
+            writer.writerow([
+                analysis.analysis_date.strftime('%Y-%m-%d'),
+                analysis.analysis_time.strftime('%H:%M'),
+                analysis.station_name,
+                round(dist, 1),
+                analysis.score_volabilite or '',
+                analysis.plafond_thermique_m or '',
+                round(analysis.force_thermique_ms, 1) if analysis.force_thermique_ms else '',
+                round(analysis.cape_jkg, 0) if analysis.cape_jkg else '',
+                analysis.stabilite_atmospherique or '',
+                analysis.cisaillement_vent or '',
+                analysis.risque_orage or '',
+                analysis.heure_debut_thermiques.strftime('%H:%M') if analysis.heure_debut_thermiques else '',
+                analysis.heure_fin_thermiques.strftime('%H:%M') if analysis.heure_fin_thermiques else '',
+                analysis.heures_volables_total or '',
+                analysis.lcl_m or '',
+                analysis.lfc_m or '',
+                round(analysis.lifted_index, 1) if analysis.lifted_index else '',
+                analysis.analysis_method,
+                analysis.llm_provider or ''
+            ])
+        
+        output.seek(0)
+        
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename=emagram_export_{datetime.now().strftime('%Y%m%d')}.csv"
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to export CSV: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/emagram/analyze", response_model=EmagramAnalysisSchema)
+async def trigger_emagram_analysis(
+    request: EmagramTriggerRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Manually trigger emagram analysis for user location
+    
+    Args:
+        request: EmagramTriggerRequest with user coordinates
+    
+    Returns:
+        Complete emagram analysis
+    
+    Example:
+        POST /api/emagram/analyze
+        {
+          "user_latitude": 45.76,
+          "user_longitude": 4.84,
+          "force_refresh": false
+        }
+    """
+    try:
+        # Check for recent analysis (within 6 hours) unless force_refresh
+        if not request.force_refresh:
+            cutoff_time = datetime.utcnow() - timedelta(hours=6)
+            
+            from scrapers.wyoming import find_closest_station
+            closest_station = find_closest_station(request.user_latitude, request.user_longitude)
+            
+            existing = db.query(EmagramAnalysis).filter(
+                EmagramAnalysis.station_code == closest_station["code"],
+                EmagramAnalysis.analysis_datetime >= cutoff_time,
+                EmagramAnalysis.analysis_status == "completed"
+            ).order_by(EmagramAnalysis.analysis_datetime.desc()).first()
+            
+            if existing:
+                logger.info(f"Returning cached emagram analysis from {existing.analysis_datetime}")
+                return existing
+        
+        # Run full analysis pipeline
+        from scrapers.wyoming import fetch_closest_sounding
+        from scrapers.emagram_generator import generate_emagram_from_wyoming
+        from llm.vision_analyzer import analyze_emagram_with_fallback
+        from schemas import EmagramAnalysisCreate
+        
+        # Step 1: Fetch radiosonde data
+        logger.info(f"Fetching sounding for location ({request.user_latitude}, {request.user_longitude})")
+        
+        # Determine sounding time (00Z or 12Z)
+        current_hour_utc = datetime.utcnow().hour
+        sounding_time = "12" if current_hour_utc >= 12 else "00"
+        
+        sounding_result = await fetch_closest_sounding(
+            user_lat=request.user_latitude,
+            user_lon=request.user_longitude,
+            sounding_time=sounding_time
+        )
+        
+        if not sounding_result.get("success"):
+            raise HTTPException(
+                status_code=503,
+                detail=f"Failed to fetch sounding data: {sounding_result.get('error')}"
+            )
+        
+        # Step 2: Generate Skew-T diagram
+        logger.info("Generating Skew-T diagram...")
+        
+        image_result = generate_emagram_from_wyoming(
+            wyoming_result=sounding_result,
+            output_dir="/tmp/emagram_images"
+        )
+        
+        if not image_result.get("success"):
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to generate Skew-T diagram: {image_result.get('error')}"
+            )
+        
+        # Step 3: Analyze with LLM or fallback
+        logger.info("Analyzing emagram...")
+        
+        analysis_result = await analyze_emagram_with_fallback(
+            image_path=image_result["image_path"],
+            sounding_data=sounding_result["data"],
+            station_name=sounding_result["station_name"],
+            station_latitude=sounding_result["station_latitude"]
+        )
+        
+        if not analysis_result.get("success"):
+            raise HTTPException(
+                status_code=500,
+                detail=f"Analysis failed: {analysis_result.get('error')}"
+            )
+        
+        # Step 4: Save to database
+        logger.info("Saving analysis to database...")
+        
+        now = datetime.utcnow()
+        analysis_id = str(uuid.uuid4())
+        
+        emagram_create = EmagramAnalysisCreate(
+            analysis_date=now.date(),
+            analysis_time=now.time(),
+            station_code=sounding_result["station_code"],
+            station_name=sounding_result["station_name"],
+            station_latitude=sounding_result["station_latitude"],
+            station_longitude=sounding_result["station_longitude"],
+            distance_km=sounding_result["distance_km"],
+            data_source="wyoming",
+            sounding_time=sounding_result["sounding_time"],
+            analysis_method=analysis_result["method"],
+            
+            # LLM metadata
+            llm_provider=analysis_result.get("provider"),
+            llm_model=analysis_result.get("model"),
+            llm_tokens_used=analysis_result.get("tokens_used"),
+            llm_cost_usd=analysis_result.get("cost_usd"),
+            
+            # Analysis results
+            plafond_thermique_m=analysis_result.get("plafond_thermique_m"),
+            force_thermique_ms=analysis_result.get("force_thermique_ms"),
+            cape_jkg=analysis_result.get("cape_jkg"),
+            stabilite_atmospherique=analysis_result.get("stabilite_atmospherique"),
+            cisaillement_vent=analysis_result.get("cisaillement_vent"),
+            heure_debut_thermiques=analysis_result.get("heure_debut_thermiques"),
+            heure_fin_thermiques=analysis_result.get("heure_fin_thermiques"),
+            heures_volables_total=analysis_result.get("heures_volables_total"),
+            risque_orage=analysis_result.get("risque_orage"),
+            score_volabilite=analysis_result.get("score_volabilite"),
+            
+            resume_conditions=analysis_result.get("resume_conditions"),
+            conseils_vol=analysis_result.get("conseils_vol"),
+            alertes_securite=analysis_result.get("alertes_securite"),
+            
+            # Classic indices
+            lcl_m=analysis_result.get("lcl_m"),
+            lfc_m=analysis_result.get("lfc_m"),
+            el_m=analysis_result.get("el_m"),
+            lifted_index=analysis_result.get("lifted_index"),
+            k_index=analysis_result.get("k_index"),
+            total_totals=analysis_result.get("total_totals"),
+            showalter_index=analysis_result.get("showalter_index"),
+            
+            # Storage
+            skewt_image_path=image_result["image_path"],
+            raw_sounding_data=sounding_result.get("raw_text"),
+            ai_raw_response=analysis_result.get("raw_response"),
+            
+            analysis_status="completed"
+        )
+        
+        db_analysis = EmagramAnalysis(
+            id=analysis_id,
+            analysis_datetime=now,
+            **emagram_create.model_dump()
+        )
+        
+        db.add(db_analysis)
+        db.commit()
+        db.refresh(db_analysis)
+        
+        logger.info(f"Emagram analysis complete: {analysis_id}")
+        
+        return db_analysis
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to trigger emagram analysis: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
