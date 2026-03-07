@@ -3612,25 +3612,40 @@ async def trigger_emagram_analysis(
         # Step 1: Fetch radiosonde data
         logger.info(f"Fetching sounding for location ({request.user_latitude}, {request.user_longitude})")
         
-        # Determine sounding time (00Z or 12Z)
+        # Determine sounding time (00Z or 12Z) with fallback
         current_hour_utc = datetime.utcnow().hour
-        sounding_time = "12" if current_hour_utc >= 12 else "00"
+        primary_time = "12" if current_hour_utc >= 12 else "00"
+        fallback_time = "00" if primary_time == "12" else "12"
         
+        # Try primary sounding time first
+        logger.info(f"Trying {primary_time}Z sounding...")
         sounding_result = await fetch_closest_sounding(
             user_lat=request.user_latitude,
             user_lon=request.user_longitude,
-            sounding_time=sounding_time
+            sounding_time=primary_time
         )
         
+        # If primary fails, try fallback
+        if not sounding_result.get("success"):
+            logger.warning(f"⚠️ {primary_time}Z sounding unavailable, trying {fallback_time}Z...")
+            sounding_result = await fetch_closest_sounding(
+                user_lat=request.user_latitude,
+                user_lon=request.user_longitude,
+                sounding_time=fallback_time
+            )
+        
+        # If both fail, return error
         if not sounding_result.get("success"):
             error_detail = sounding_result.get('error', 'Unknown error')
-            logger.error(f"❌ Wyoming fetch failed: {error_detail}")
+            logger.error(f"❌ Wyoming fetch failed for both {primary_time}Z and {fallback_time}Z: {error_detail}")
             if 'raw_text' in sounding_result:
                 logger.error(f"   Raw text preview: {sounding_result['raw_text'][:200]}")
             raise HTTPException(
                 status_code=503,
                 detail=f"Failed to fetch sounding data: {error_detail}"
             )
+        
+        logger.info(f"✅ Using {sounding_result.get('sounding_time', '??')} sounding")
         
         # Step 2: Generate Skew-T diagram
         logger.info("Generating Skew-T diagram...")
