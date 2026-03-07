@@ -6,7 +6,10 @@ from database import engine, Base
 from models import Site, ParaglidingSpot
 from routes import router
 from webhooks import router as webhooks_router
-from scheduler import start_scheduler, stop_scheduler
+# Import weather scheduler functions from scheduler.py module
+import scheduler as weather_scheduler
+start_scheduler = weather_scheduler.start_scheduler
+stop_scheduler = weather_scheduler.stop_scheduler
 from database import SessionLocal
 import logging
 import sqlite3
