@@ -2474,7 +2474,8 @@ from video_export import (
 from video_export_manual import (
     start_video_export_manual,
     get_export_status as get_export_status_manual,
-    list_exports as list_exports_manual
+    list_exports as list_exports_manual,
+    cancel_video_export as cancel_video_export_manual
 )
 
 
@@ -2613,6 +2614,23 @@ def get_video_export_status(job_id: str):
         raise HTTPException(status_code=404, detail="Export job not found")
     
     return status
+
+
+@router.delete("/exports/{job_id}/cancel")
+def cancel_video_export(job_id: str):
+    """
+    Cancel an ongoing video export job
+    """
+    # Try to cancel manual render job
+    success = cancel_video_export_manual(job_id)
+    
+    if not success:
+        raise HTTPException(
+            status_code=400, 
+            detail="Export job not found or cannot be cancelled (may already be completed)"
+        )
+    
+    return {"message": "Export cancelled successfully", "job_id": job_id}
 
 
 @router.get("/exports/{job_id}/download")
