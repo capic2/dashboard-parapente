@@ -1011,6 +1011,42 @@ async def seed_sites_endpoint(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to seed sites: {str(e)}")
 
 
+@router.post("/admin/refresh-weather")
+async def refresh_weather_cache():
+    """
+    Admin endpoint: Manually trigger weather data fetch for all sites
+    
+    This is useful when:
+    - Application just started and cache is empty
+    - Scheduler failed due to connection issues
+    - Need immediate fresh data
+    
+    Returns:
+        Status of the weather fetch operation
+    
+    Example:
+        POST /api/admin/refresh-weather
+    """
+    from scheduler import scheduled_weather_fetch
+    
+    try:
+        logger.info("🔄 Manual weather refresh triggered...")
+        await scheduled_weather_fetch()
+        
+        return {
+            "success": True,
+            "message": "Weather data refresh completed successfully",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error during manual weather refresh: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Weather refresh failed: {str(e)}"
+        )
+
+
 @router.post("/admin/sites/link-to-spots")
 async def link_user_sites_to_spots(db: Session = Depends(get_db)):
     """
