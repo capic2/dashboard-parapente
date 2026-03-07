@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
-from models import Site, Flight, WeatherForecast
-from schemas import Site as SiteSchema, SiteCreate, SiteUpdate, SpotsResponse, WeatherForecast as WeatherForecastSchema, WeatherResponse, FlightUpdate
+from models import Site, Flight, WeatherForecast, WeatherSourceConfig
+from schemas import Site as SiteSchema, SiteCreate, SiteUpdate, SpotsResponse, WeatherForecast as WeatherForecastSchema, WeatherResponse, FlightUpdate, WeatherSourceConfig as WeatherSourceConfigSchema, WeatherSourceConfigCreate, WeatherSourceConfigUpdate, WeatherSourceStats, WeatherSourceTestResult
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -2772,3 +2772,374 @@ def list_flight_exports(flight_id: str, db: Session = Depends(get_db)):
     
     exports = list_exports(flight_id=flight_id)
     return {"exports": exports}
+
+# ============================================================================
+# WEATHER SOURCE CONFIGURATION ENDPOINTS
+# ============================================================================
+
+@router.get("/weather-sources", response_model=List[WeatherSourceConfigSchema])
+def get_weather_sources(
+    enabled_only: bool = False,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all configured weather sources
+    
+    Args:
+        enabled_only: If True, return only enabled sources
+    
+    Returns:
+        List of WeatherSourceConfig with stats
+    """
+    query = db.query(WeatherSourceConfig)
+    
+    if enabled_only:
+        query = query.filter(WeatherSourceConfig.is_enabled == True)
+    
+    sources = query.order_by(WeatherSourceConfig.priority.desc()).all()
+    
+    logger.info(f"Retrieved {len(sources)} weather sources (enabled_only={enabled_only})")
+    return sources
+
+
+@router.get("/weather-sources/stats", response_model=WeatherSourceStats)
+def get_weather_sources_stats(db: Session = Depends(get_db)):
+    """
+    Get global statistics for all weather sources
+    
+    Returns:
+        WeatherSourceStats with aggregations
+    """
+    sources = db.query(WeatherSourceConfig).all()
+    
+    total = len(sources)
+    active = sum(1 for s in sources if s.is_enabled)
+    disabled = total - active
+    with_errors = sum(1 for s in sources if s.status == "error")
+    
+    # Calculate global success rate
+    total_success = sum(s.success_count for s in sources)
+    total_errors = sum(s.error_count for s in sources)
+    total_requests = total_success + total_errors
+    global_success_rate = (total_success / total_requests * 100) if total_requests > 0 else 0.0
+    
+    # Calculate global average response time (only sources with data)
+    response_times = [s.avg_response_time_ms for s in sources if s.avg_response_time_ms is not None]
+    global_avg_time = int(sum(response_times) / len(response_times)) if response_times else None
+    
+    return WeatherSourceStats(
+        total_sources=total,
+        active_sources=active,
+        disabled_sources=disabled,
+        sources_with_errors=with_errors,
+        global_success_rate=round(global_success_rate, 2),
+        global_avg_response_time_ms=global_avg_time
+    )
+
+
+@router.get("/weather-sources/{source_name}", response_model=WeatherSourceConfigSchema)
+def get_weather_source(
+    source_name: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Get a specific weather source by name
+    
+    Args:
+        source_name: Source name (e.g., "open-meteo")
+    
+    Returns:
+        WeatherSourceConfig
+    
+    Raises:
+        404: Source not found
+    """
+    source = db.query(WeatherSourceConfig).filter(
+        WeatherSourceConfig.source_name == source_name
+    ).first()
+    
+    if not source:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Weather source '{source_name}' not found"
+        )
+    
+    return source
+
+
+@router.post("/weather-sources", response_model=WeatherSourceConfigSchema, status_code=201)
+def create_weather_source(
+    source_data: WeatherSourceConfigCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new weather source
+    
+    Args:
+        source_data: Source configuration
+    
+    Returns:
+        Created WeatherSourceConfig
+    
+    Raises:
+        400: Source with this name already exists
+        422: Validation error (missing API key if required, etc.)
+    """
+    # Check source_name uniqueness
+    existing = db.query(WeatherSourceConfig).filter(
+        WeatherSourceConfig.source_name == source_data.source_name
+    ).first()
+    
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Weather source '{source_data.source_name}' already exists"
+        )
+    
+    # Create source
+    new_source = WeatherSourceConfig(
+        id=str(uuid.uuid4()),
+        **source_data.dict()
+    )
+    
+    db.add(new_source)
+    db.commit()
+    db.refresh(new_source)
+    
+    logger.info(f"Created new weather source: {new_source.display_name} ({new_source.source_name})")
+    return new_source
+
+
+@router.patch("/weather-sources/{source_name}", response_model=WeatherSourceConfigSchema)
+def update_weather_source(
+    source_name: str,
+    source_data: WeatherSourceConfigUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    Update weather source configuration
+    
+    Args:
+        source_name: Source name
+        source_data: Fields to update
+    
+    Returns:
+        Updated WeatherSourceConfig
+    
+    Raises:
+        404: Source not found
+        400: Validation error (e.g., trying to disable last active source)
+    """
+    source = db.query(WeatherSourceConfig).filter(
+        WeatherSourceConfig.source_name == source_name
+    ).first()
+    
+    if not source:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Weather source '{source_name}' not found"
+        )
+    
+    # Validation: At least 1 source must remain active
+    if source_data.is_enabled is False:
+        active_count = db.query(WeatherSourceConfig).filter(
+            WeatherSourceConfig.is_enabled == True
+        ).count()
+        
+        if active_count <= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot disable the last active weather source. At least one source must remain enabled."
+            )
+    
+    # Apply updates
+    update_data = source_data.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(source, field, value)
+    
+    source.updated_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(source)
+    
+    logger.info(f"Updated weather source '{source_name}': {list(update_data.keys())}")
+    return source
+
+
+@router.delete("/weather-sources/{source_name}", status_code=200)
+def delete_weather_source(
+    source_name: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a weather source
+    
+    Args:
+        source_name: Source name to delete
+    
+    Returns:
+        { "success": true, "message": "..." }
+    
+    Raises:
+        404: Source not found
+        400: Cannot delete system source (default 5 sources)
+        400: Cannot delete last source
+    """
+    source = db.query(WeatherSourceConfig).filter(
+        WeatherSourceConfig.source_name == source_name
+    ).first()
+    
+    if not source:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Weather source '{source_name}' not found"
+        )
+    
+    # Protection: Cannot delete system sources
+    SYSTEM_SOURCES = ["open-meteo", "weatherapi", "meteo-parapente", "meteociel", "meteoblue"]
+    if source_name in SYSTEM_SOURCES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete system weather source '{source_name}'. You can disable it instead."
+        )
+    
+    # Validation: At least 1 source must remain
+    total_count = db.query(WeatherSourceConfig).count()
+    if total_count <= 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete the last weather source."
+        )
+    
+    db.delete(source)
+    db.commit()
+    
+    logger.info(f"Deleted weather source: {source_name}")
+    return {
+        "success": True,
+        "message": f"Weather source '{source_name}' deleted successfully"
+    }
+
+
+@router.post("/weather-sources/{source_name}/test", response_model=WeatherSourceTestResult)
+async def test_weather_source(
+    source_name: str,
+    lat: float = Query(..., ge=-90, le=90, description="Test latitude"),
+    lon: float = Query(..., ge=-180, le=180, description="Test longitude"),
+    db: Session = Depends(get_db)
+):
+    """
+    Test a weather source in real-time
+    
+    Args:
+        source_name: Source name to test
+        lat: Test latitude (default: known site coordinates)
+        lon: Test longitude
+    
+    Returns:
+        WeatherSourceTestResult with success/failure, response time, sample data
+    
+    Raises:
+        404: Source not found
+        400: No fetch function available for this source
+    """
+    source = db.query(WeatherSourceConfig).filter(
+        WeatherSourceConfig.source_name == source_name
+    ).first()
+    
+    if not source:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Weather source '{source_name}' not found"
+        )
+    
+    # Import fetch functions
+    from scrapers.open_meteo import fetch_open_meteo
+    from scrapers.weatherapi import fetch_weatherapi
+    from scrapers.meteo_parapente import fetch_meteo_parapente
+    from scrapers.meteociel import fetch_meteociel
+    from scrapers.meteoblue import fetch_meteoblue
+    
+    # Map source_name to fetch function
+    fetch_functions = {
+        "open-meteo": fetch_open_meteo,
+        "weatherapi": fetch_weatherapi,
+        "meteo-parapente": fetch_meteo_parapente,
+        "meteociel": fetch_meteociel,
+        "meteoblue": fetch_meteoblue
+    }
+    
+    fetch_func = fetch_functions.get(source_name)
+    if not fetch_func:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No fetch function available for source '{source_name}'"
+        )
+    
+    # Execute test
+    import time
+    start_time = time.time()
+    
+    try:
+        # Call fetch with appropriate parameters per source
+        if source_name == "meteo-parapente":
+            result = await fetch_func(lat, lon, site_name="Test Site", elevation_m=1000)
+        elif source_name == "meteociel":
+            result = await fetch_func(lat, lon, site_name="Test Site")
+        elif source_name == "meteoblue":
+            result = await fetch_func(lat, lon, city_name="Test City")
+        else:
+            result = await fetch_func(lat, lon)
+        
+        response_time_ms = int((time.time() - start_time) * 1000)
+        
+        if result["success"]:
+            # Extract sample data (first hourly point)
+            sample_data = None
+            if result.get("data"):
+                data = result["data"]
+                if isinstance(data, dict):
+                    # For structured APIs (open-meteo, weatherapi)
+                    if "hourly" in data:
+                        hourly = data["hourly"]
+                        if isinstance(hourly, dict):
+                            # Take first element of each array
+                            sample_data = {
+                                key: (val[0] if isinstance(val, list) and len(val) > 0 else val)
+                                for key, val in list(hourly.items())[:5]  # First 5 fields
+                            }
+                    elif "forecast" in data:
+                        # WeatherAPI structure
+                        sample_data = {"preview": "Forecast data available"}
+                
+                elif isinstance(data, list) and len(data) > 0:
+                    # For scrapers returning list (meteo-parapente, etc.)
+                    sample_data = data[0] if data else None
+            
+            return WeatherSourceTestResult(
+                success=True,
+                response_time_ms=response_time_ms,
+                error=None,
+                sample_data=sample_data,
+                tested_at=datetime.utcnow()
+            )
+        else:
+            return WeatherSourceTestResult(
+                success=False,
+                response_time_ms=response_time_ms,
+                error=result.get("error", "Unknown error"),
+                sample_data=None,
+                tested_at=datetime.utcnow()
+            )
+    
+    except Exception as e:
+        response_time_ms = int((time.time() - start_time) * 1000)
+        logger.error(f"Test failed for source '{source_name}': {e}")
+        
+        return WeatherSourceTestResult(
+            success=False,
+            response_time_ms=response_time_ms,
+            error=str(e),
+            sample_data=None,
+            tested_at=datetime.utcnow()
+        )
