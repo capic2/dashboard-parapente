@@ -1269,18 +1269,19 @@ async def get_daily_summary(
             ]
         }
     """
-    # Get the site
-    site = db.query(Site).filter(Site.id == spot_id).first()
-    if not site:
-        raise HTTPException(status_code=404, detail=f"Site not found: {spot_id}")
-    
-    # Default wind limits for paragliding (if not set on site)
-    # Standard values: 10-30 km/h (2.8-8.3 m/s)
-    min_wind_ms = getattr(site, 'min_wind_ms', 2.8)  # 10 km/h
-    max_wind_ms = getattr(site, 'max_wind_ms', 8.3)  # 30 km/h
-    optimal_dirs = getattr(site, 'optimal_directions', 'N,NE,E,SE,S,SW,W,NW')  # All directions
-    
-    # Fetch all days in parallel
+    try:
+        # Get the site
+        site = db.query(Site).filter(Site.id == spot_id).first()
+        if not site:
+            raise HTTPException(status_code=404, detail=f"Site not found: {spot_id}")
+        
+        # Default wind limits for paragliding (if not set on site)
+        # Standard values: 10-30 km/h (2.8-8.3 m/s)
+        min_wind_ms = getattr(site, 'min_wind_ms', 2.8)  # 10 km/h
+        max_wind_ms = getattr(site, 'max_wind_ms', 8.3)  # 30 km/h
+        optimal_dirs = getattr(site, 'optimal_directions', 'N,NE,E,SE,S,SW,W,NW')  # All directions
+        
+        # Fetch all days in parallel
     # Use ALL 5 sources (including Meteoblue) for full consistency with /weather endpoint
     # This ensures para_index on 7-day cards EXACTLY matches the hourly view
     # Note: Meteoblue adds 5-10s per day, but consistency is worth it
@@ -1308,7 +1309,11 @@ async def get_daily_summary(
     for idx, day_result in enumerate(results):
         # Skip failed days
         if isinstance(day_result, Exception):
-            logger.warning(f"Day {idx} failed for {spot_id}: {day_result}")
+            logger.error(f"Day {idx} failed for {spot_id}: {day_result}", exc_info=day_result)
+            continue
+        
+        if day_result is None:
+            logger.warning(f"Day {idx} returned None for {spot_id} (no data available)")
             continue
         
         if day_result:
@@ -1323,17 +1328,26 @@ async def get_daily_summary(
                 "wind_avg": day_result["wind_avg"],
             })
     
-    if not summary_days:
+        if not summary_days:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch daily summary for {site.name}"
+            )
+        
+        return {
+            "site_id": spot_id,
+            "site_name": site.name,
+            "days": summary_days
+        }
+    
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
+    except Exception as e:
+        logger.error(f"Unexpected error in daily_summary for {spot_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to fetch daily summary for {site.name}"
+            detail=f"Internal server error: {str(e)}"
         )
-    
-    return {
-        "site_id": spot_id,
-        "site_name": site.name,
-        "days": summary_days
-    }
 
 # Flights endpoints
 @router.get("/flights")
