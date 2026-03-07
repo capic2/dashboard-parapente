@@ -91,6 +91,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     null
   );
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const exportPollingRef = useRef<NodeJS.Timeout | null>(null);
   const cameraHeadingRef = useRef<number>(0);
   const cameraDistanceRef = useRef<number>(500);
   const cameraTargetRef = useRef<Cartesian3 | null>(null);
@@ -512,6 +513,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       console.log(`📏 Camera distance: ${cameraDistance}m`)
       console.log(`📷 Camera looking ${oppositeHeading}° (back at takeoff)`)
       
+      // Save camera settings for replay mode
+      cameraHeadingRef.current = CesiumMath.toRadians(cameraAngle)
+      cameraDistanceRef.current = cameraDistance
+      
       // First, position camera at takeoff looking in the OPPOSITE direction
       viewer.camera.setView({
         destination: firstPosition,
@@ -885,6 +890,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     const oppositeHeading = (angle + 180) % 360
     
     console.log(`🎥 Manually repositioning camera: angle=${angle}°, distance=${distance}m`)
+    
+    // Save camera settings for replay mode
+    cameraHeadingRef.current = CesiumMath.toRadians(angle)
+    cameraDistanceRef.current = distance
     
     viewer.camera.setView({
       destination: firstPosition,
