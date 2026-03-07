@@ -17,6 +17,7 @@ import {
   Cartesian2,
   ShadowMode,
   JulianDate,
+  Math as CesiumMath,
 } from 'cesium';
 import { useFlightGPX } from '../hooks/useFlightGPX';
 import { useFlight } from '../hooks/useFlight';
@@ -515,8 +516,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       viewer.camera.setView({
         destination: firstPosition,
         orientation: {
-          heading: Cesium.Math.toRadians(oppositeHeading),  // Look back at takeoff
-          pitch: Cesium.Math.toRadians(-10), // Look slightly down
+          heading: CesiumMath.toRadians(oppositeHeading),  // Look back at takeoff
+          pitch: CesiumMath.toRadians(-10), // Look slightly down
           roll: 0.0
         }
       })
@@ -866,8 +867,45 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
   };
 
-  const applyCameraSettings = () => {
-    updateCameraSettings(tempCameraAngle, tempCameraDistance)
+  // Function to manually reposition camera (can be called after settings update)
+  const repositionCamera = useCallback((angle: number, distance: number) => {
+    if (!viewerRef.current || !allPositionsRef.current.length) {
+      console.warn('⚠️ Cannot reposition camera: viewer or positions not ready')
+      return
+    }
+    
+    const viewer = viewerRef.current
+    const firstPosition = allPositionsRef.current[0]
+    
+    if (!firstPosition) {
+      console.warn('⚠️ Cannot reposition camera: no first position')
+      return
+    }
+    
+    const oppositeHeading = (angle + 180) % 360
+    
+    console.log(`🎥 Manually repositioning camera: angle=${angle}°, distance=${distance}m`)
+    
+    viewer.camera.setView({
+      destination: firstPosition,
+      orientation: {
+        heading: CesiumMath.toRadians(oppositeHeading),
+        pitch: CesiumMath.toRadians(-10),
+        roll: 0.0
+      }
+    })
+    
+    viewer.camera.moveForward(distance)
+    
+    console.log('✅ Camera manually repositioned')
+  }, [])
+
+  const applyCameraSettings = async () => {
+    await updateCameraSettings(tempCameraAngle, tempCameraDistance)
+    // Immediately reposition the camera with the new settings
+    setTimeout(() => {
+      repositionCamera(tempCameraAngle, tempCameraDistance)
+    }, 500) // Small delay to ensure state is updated
   };
 
   // Render error messages as overlays instead of early returns
