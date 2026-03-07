@@ -13,6 +13,8 @@ export interface Site {
   elevation_m?: number
   region?: string
   country?: string
+  description?: string       // Site description
+  usage_type?: 'takeoff' | 'landing' | 'both'  // Site usage type
 }
 
 export interface Flight {
