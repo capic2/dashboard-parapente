@@ -1060,18 +1060,18 @@ async def clear_redis_cache():
     Returns:
         Number of keys cleared
     """
-    from cache import get_redis_client
+    from cache import get_redis
     
     try:
-        redis_client = get_redis_client()
+        redis_client = await get_redis()
         
         # Get all weather-related keys
-        weather_keys = redis_client.keys("weather:*")
-        best_spot_keys = redis_client.keys("best_spot:*")
+        weather_keys = await redis_client.keys("weather:*")
+        best_spot_keys = await redis_client.keys("best_spot:*")
         all_keys = weather_keys + best_spot_keys
         
         if all_keys:
-            deleted = redis_client.delete(*all_keys)
+            deleted = await redis_client.delete(*all_keys)
             logger.info(f"🗑️ Cleared {deleted} cache keys")
             
             return {
