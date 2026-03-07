@@ -30,13 +30,14 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
     description: ''
   })
   
+  const [originalData, setOriginalData] = useState<SiteUpdate>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSaving, setIsSaving] = useState(false)
   
   // Initialize form when site changes
   useEffect(() => {
     if (site) {
-      setFormData({
+      const initialData = {
         name: site.name,
         code: site.code || '',
         latitude: site.latitude || 0,
@@ -49,10 +50,12 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         camera_distance: site.camera_distance || 500,
         usage_type: site.usage_type || 'both',
         description: site.description || ''
-      })
+      }
+      setFormData(initialData)
+      setOriginalData(initialData)
     } else {
       // Reset for create mode
-      setFormData({
+      const initialData = {
         name: '',
         code: '',
         latitude: 0,
@@ -65,7 +68,9 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         camera_distance: 500,
         usage_type: 'both',
         description: ''
-      })
+      }
+      setFormData(initialData)
+      setOriginalData({})
     }
     setErrors({})
   }, [site])
@@ -96,7 +101,31 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
     
     setIsSaving(true)
     try {
-      await onSave(formData)
+      // For edit mode: only send changed fields
+      // For create mode: send all fields with values
+      const cleanedData: SiteUpdate = {}
+      
+      Object.entries(formData).forEach(([key, value]) => {
+        const typedKey = key as keyof SiteUpdate
+        const originalValue = originalData[typedKey]
+        
+        // Include field if:
+        // 1. It's a new site (no originalData) and has a non-empty value
+        // 2. It's an edit and the value has changed
+        if (Object.keys(originalData).length === 0) {
+          // Create mode: include all non-empty values
+          if (value !== '' && value !== undefined && value !== null) {
+            cleanedData[typedKey] = value
+          }
+        } else {
+          // Edit mode: only include changed values
+          if (value !== originalValue) {
+            cleanedData[typedKey] = value
+          }
+        }
+      })
+      
+      await onSave(cleanedData)
       onClose()
     } catch (error) {
       console.error('Failed to save site:', error)
@@ -109,7 +138,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
   if (!isOpen) return null
   
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <h2 className="text-2xl font-bold mb-4">
           {site ? `Modifier ${site.name}` : 'Nouveau site'}
