@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
 from models import Site, Flight, WeatherForecast
-from schemas import Site as SiteSchema, SiteCreate, SpotsResponse, WeatherForecast as WeatherForecastSchema, WeatherResponse, FlightUpdate
+from schemas import Site as SiteSchema, SiteCreate, SiteUpdate, SpotsResponse, WeatherForecast as WeatherForecastSchema, WeatherResponse, FlightUpdate
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -695,6 +695,107 @@ def update_site_camera(
         db.rollback()
         logger.error(f"Failed to update site camera settings: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
+
+
+@router.patch("/sites/{site_id}")
+def update_site(
+    site_id: str,
+    site_data: SiteUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    Update site details
+    
+    Args:
+        site_id: Site ID to update
+        site_data: Site fields to update (all optional)
+    
+    Returns:
+        Updated site object
+    
+    Raises:
+        404: Site not found
+        400: Validation error (e.g., duplicate code)
+    """
+    site = db.query(Site).filter(Site.id == site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    update_data = site_data.dict(exclude_unset=True)
+    
+    # If code is being changed, check uniqueness
+    if 'code' in update_data and update_data['code'] != site.code:
+        existing = db.query(Site).filter(Site.code == update_data['code']).first()
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Site with code '{update_data['code']}' already exists"
+            )
+    
+    # Apply updates
+    for field, value in update_data.items():
+        setattr(site, field, value)
+    
+    site.updated_at = datetime.utcnow()
+    
+    try:
+        db.commit()
+        db.refresh(site)
+        logger.info(f"Updated site '{site.name}' (ID: {site_id}): {list(update_data.keys())}")
+        return site
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to update site {site_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
+
+
+@router.delete("/sites/{site_id}")
+def delete_site(
+    site_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a site
+    
+    Args:
+        site_id: Site ID to delete
+    
+    Returns:
+        Success message
+    
+    Raises:
+        404: Site not found
+        400: Site has associated flights (cannot delete)
+    """
+    site = db.query(Site).filter(Site.id == site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    # Check for associated flights
+    flight_count = db.query(Flight).filter(Flight.site_id == site_id).count()
+    
+    if flight_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete site '{site.name}': {flight_count} flight(s) are linked to this site. "
+                   f"Please reassign or unlink these flights before deleting the site."
+        )
+    
+    try:
+        site_name = site.name
+        db.delete(site)
+        db.commit()
+        logger.info(f"Deleted site '{site_name}' (ID: {site_id})")
+        
+        return {
+            "success": True,
+            "message": f"Site '{site_name}' deleted successfully",
+            "site_id": site_id
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to delete site {site_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Deletion failed: {str(e)}")
 
 
 # ============================================================================
