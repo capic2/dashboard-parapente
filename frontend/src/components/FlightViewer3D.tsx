@@ -182,10 +182,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       const tilesLoaded = globe.tilesLoaded;
       
       if (tilesLoaded) {
-        console.log('✅ Terrain textures loaded for flight', flightId);
         setTerrainReady(true);
       } else {
-        console.log('⏳ Waiting for terrain textures...');
         // Check again after a short delay
         setTimeout(checkTerrainReady, 500);
       }
@@ -236,8 +234,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       if (viewer.scene.light) {
         viewer.scene.light.intensity = lightIntensity;
       }
-
-      console.log(`🎨 Terrain rendering updated: shadows=${terrainShadows}, AO=${ambientOcclusion}, time=${sunTime}h, intensity=${lightIntensity}x`);
     } catch (error) {
       console.error('Error configuring terrain rendering:', error);
     }
@@ -267,13 +263,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       const timestamps = gpxData.coordinates.map((coord) => coord.timestamp);
 
-      // Debug: Check timestamps
-      console.log('🔍 DEBUG FlightViewer3D - Total coordinates:', gpxData.coordinates.length);
-      console.log('🔍 DEBUG FlightViewer3D - First 3 RAW coords:', gpxData.coordinates.slice(0, 3));
-      console.log('🔍 DEBUG FlightViewer3D - First 3 timestamps:', timestamps.slice(0, 3));
-      console.log('🔍 DEBUG FlightViewer3D - Last 3 timestamps:', timestamps.slice(-3));
-      console.log('🔍 DEBUG FlightViewer3D - All timestamps zero?', timestamps.every(t => t === 0));
-
       allPositionsRef.current = positions;
       timestampsRef.current = timestamps;
       currentIndexRef.current = 0;
@@ -287,9 +276,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           timestamps: timestamps
         };
         (window as any)._cesiumViewer = viewer;
-        console.log('🎥 Exposed GPS data and Cesium viewer for export');
-        console.log('   - GPS points:', gpxData.coordinates.length);
-        console.log('   - Duration:', Math.round((timestamps[timestamps.length-1] - timestamps[0])/1000), 's');
       }
 
       // Clean old entities
@@ -382,11 +368,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   Math.sin(referenceCoord.lat * Math.PI / 180) * Math.cos(takeoffCoord.lat * Math.PI / 180) * Math.cos(deltaLon);
         const headingToTakeoff = Math.atan2(y, x);
         
-        console.log(`🛫 Takeoff: ${takeoffCoord.lat.toFixed(4)}°, ${takeoffCoord.lon.toFixed(4)}°`);
-        console.log(`📍 Reference (50%): ${referenceCoord.lat.toFixed(4)}°, ${referenceCoord.lon.toFixed(4)}°`);
-        console.log(`📷 Camera heading: ${(headingToTakeoff * 180 / Math.PI).toFixed(1)}° (facing takeoff)`);
-        console.log(`   Distance: ${Math.sqrt(deltaLat**2 + deltaLon**2).toFixed(4)}° (~${(Math.sqrt(deltaLat**2 + deltaLon**2) * 111).toFixed(1)} km)`);
-        
         return headingToTakeoff;
       };
 
@@ -411,22 +392,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             // Also update refs for replay mode
             cameraHeadingRef.current = heading;
             cameraDistanceRef.current = distance;
-            
-            console.log('📷 Using saved camera settings from DB:', {
-              angle: cameraAngle,
-              distance: distance,
-              headingRad: heading
-            });
           } else {
             // Calculate optimal heading automatically
             heading = await calculateOptimalHeading();
             distance = boundingSphere.radius * 0.8;
             cameraHeadingRef.current = heading;
             cameraDistanceRef.current = distance;
-            console.log('📷 Using calculated camera settings:', {
-              headingRad: heading,
-              distance: distance
-            });
           }
           
           viewer.camera.flyToBoundingSphere(boundingSphere, {
@@ -509,16 +480,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
   // Position camera based on site orientation
   useEffect(() => {
-    console.log('🎥 Camera positioning useEffect triggered', {
-      viewerReady,
-      hasGpxData: !!gpxData?.coordinates,
-      hasPositions: allPositionsRef.current.length > 0,
-      camera_angle: flight?.site?.camera_angle,
-      camera_distance: flight?.site?.camera_distance
-    })
-    
     if (!viewerRef.current || !viewerReady || !gpxData?.coordinates?.length || !allPositionsRef.current.length) {
-      console.log('🎥 Camera positioning skipped - waiting for data')
       return
     }
 
@@ -541,10 +503,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       // The camera heading should be OPPOSITE to the camera angle
       const oppositeHeading = (cameraAngle + 180) % 360;
       
-      console.log(`📐 Camera angle: ${cameraAngle}° (position)`)
-      console.log(`📏 Camera distance: ${cameraDistance}m`)
-      console.log(`📷 Camera looking ${oppositeHeading}° (back at takeoff)`)
-      
       // Save camera settings for replay mode
       cameraHeadingRef.current = CesiumMath.toRadians(cameraAngle)
       cameraDistanceRef.current = cameraDistance
@@ -562,11 +520,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       // Then move camera FORWARD by the specified distance
       // This places camera ahead of takeoff, looking back at it
       viewer.camera.moveForward(cameraDistance)
-      
-      console.log('✅ Camera positioned to face takeoff point')
-    } else {
-      console.log('📐 No camera angle found, using default camera positioning')
-      // Default positioning is already handled by the GPX loading useEffect
     }
   }, [viewerReady, gpxData, flight?.site?.camera_angle, flight?.site?.camera_distance, flight?.site?.orientation])
 
@@ -857,8 +810,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       
       // Refresh flight data to get updated site
       await queryClient.invalidateQueries({ queryKey: ['flights', flightId] })
-      
-      console.log(`✅ Orientation updated to ${newOrientation}`)
     } catch (error) {
       console.error('❌ Failed to update orientation:', error)
       alert('Erreur lors de la mise à jour de l\'orientation')
@@ -868,14 +819,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   };
 
   const updateCameraSettings = async (angle: number, distance: number) => {
-    console.log('📡 Updating camera settings:', { 
-      siteId: flight?.site?.id,
-      angle, 
-      distance 
-    })
-    
     if (!flight?.site?.id) {
-      console.error('❌ No site ID available')
+      console.error('No site ID available')
       return
     }
     
@@ -885,22 +830,15 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       params.append('angle', angle.toString())
       params.append('distance', distance.toString())
       
-      const url = `sites/${flight.site.id}/camera?${params.toString()}`
-      console.log('📡 API URL:', url)
-      
-      const response = await api.patch(url)
-      console.log('📡 API Response:', response)
+      await api.patch(`sites/${flight.site.id}/camera?${params.toString()}`)
       
       // Refresh flight data to get updated site
       await queryClient.invalidateQueries({ queryKey: ['flights', flightId] })
-      console.log('🔄 Query invalidated, flight data should refresh')
-      
-      console.log(`✅ Camera updated successfully: angle=${angle}°, distance=${distance}m`)
       
       // Show success message
       alert(`✅ Réglages caméra sauvegardés pour le site "${flight?.site?.name}"!\n\nAngle: ${angle}°\nDistance: ${distance}m\n\nCes réglages s'appliqueront à tous les vols de ce site.`)
     } catch (error) {
-      console.error('❌ Failed to update camera settings:', error)
+      console.error('Failed to update camera settings:', error)
       alert('❌ Erreur lors de la mise à jour de la caméra')
     } finally {
       setIsUpdatingCamera(false)
@@ -910,26 +848,20 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   // Function to manually reposition camera (can be called after settings update)
   const repositionCamera = useCallback((angle: number, distance: number) => {
     if (!viewerRef.current || !allPositionsRef.current.length) {
-      console.warn('⚠️ Cannot reposition camera: viewer or positions not ready')
       return
     }
     
     const viewer = viewerRef.current
     const firstPosition = allPositionsRef.current[0]
     
-    if (!firstPosition) {
-      console.warn('⚠️ Cannot reposition camera: no first position')
-      return
-    }
-    
-    const oppositeHeading = (angle + 180) % 360
-    
-    console.log(`🎥 Manually repositioning camera: angle=${angle}°, distance=${distance}m`)
-    
-    // Save camera settings for replay mode
+    // Update refs for replay mode
     cameraHeadingRef.current = CesiumMath.toRadians(angle)
     cameraDistanceRef.current = distance
     
+    // Calculate opposite heading (camera looks back at takeoff)
+    const oppositeHeading = (angle + 180) % 360
+    
+    // Position camera
     viewer.camera.setView({
       destination: firstPosition,
       orientation: {
@@ -939,9 +871,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       }
     })
     
+    // Move camera forward to position it at specified distance
     viewer.camera.moveForward(distance)
-    
-    console.log('✅ Camera manually repositioned')
   }, [])
 
   const applyCameraSettings = async () => {
@@ -1167,14 +1098,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             {/* Video Buttons */}
             {flight?.gpx_file_path && (
               <>
-                {/* Debug log */}
-                {console.log('🎥 Video button state:', {
-                  hasGPX: !!flight.gpx_file_path,
-                  status: flight.video_export_status,
-                  jobId: flight.video_export_job_id,
-                  filePath: flight.video_file_path
-                })}
-                
                 {/* Download/Generate Button */}
                 <button
                   onClick={async () => {
@@ -1193,9 +1116,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           alert(`Erreur: ${error.detail || 'Impossible de lancer la génération'}`);
                           return;
                         }
-                        
-                        const data = await response.json();
-                        console.log('✅ Video generation started:', data.job_id);
                         
                         // Refresh flight data to get updated status
                         window.location.reload();
@@ -1250,12 +1170,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           return;
                         }
                         
-                        console.log('✅ Video generation cancelled');
-                        
                         // Refresh flight data to get updated status
                         window.location.reload();
                       } catch (error) {
-                        console.error('❌ Failed to cancel video generation:', error);
+                        console.error('Failed to cancel video generation:', error);
                         alert('Erreur lors de l\'annulation');
                       }
                     }}
@@ -1285,13 +1203,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           return;
                         }
                         
-                        const data = await response.json();
-                        console.log('✅ Video regeneration started:', data.job_id);
-                        
                         // Refresh flight data to get updated status
                         window.location.reload();
                       } catch (error) {
-                        console.error('❌ Failed to regenerate video:', error);
+                        console.error('Failed to regenerate video:', error);
                         alert('Erreur lors de la régénération');
                       }
                     }}
