@@ -864,9 +864,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       console.log('🔄 Query invalidated, flight data should refresh')
       
       console.log(`✅ Camera updated successfully: angle=${angle}°, distance=${distance}m`)
+      
+      // Show success message
+      alert(`✅ Réglages caméra sauvegardés pour le site "${flight?.site?.name}"!\n\nAngle: ${angle}°\nDistance: ${distance}m\n\nCes réglages s'appliqueront à tous les vols de ce site.`)
     } catch (error) {
       console.error('❌ Failed to update camera settings:', error)
-      alert('Erreur lors de la mise à jour de la caméra')
+      alert('❌ Erreur lors de la mise à jour de la caméra')
     } finally {
       setIsUpdatingCamera(false)
     }
@@ -1321,7 +1324,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                 </button>
                 
                 <p className="text-xs text-gray-600 mt-2">
-                  💡 La caméra sera positionnée à l'angle choisi, regardant vers le décollage
+                  💡 Ces réglages seront sauvegardés pour le site "{flight.site.name}" et appliqués à tous ses vols
                 </p>
               </div>
             )}
