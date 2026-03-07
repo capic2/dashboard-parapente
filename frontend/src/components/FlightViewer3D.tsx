@@ -69,7 +69,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   
   // Camera position editing state
   const [isUpdatingCamera, setIsUpdatingCamera] = useState(false);
-  const [tempCameraDirection, setTempCameraDirection] = useState<string | null>(null);
+  const [tempCameraAngle, setTempCameraAngle] = useState<number>(0);
   const [tempCameraDistance, setTempCameraDistance] = useState<number>(500);
 
 
@@ -464,7 +464,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   // Initialize camera settings from flight data
   useEffect(() => {
     if (flight?.site) {
-      setTempCameraDirection(flight.site.camera_direction || flight.site.orientation || null)
+      // Initialize angle from camera_angle or convert orientation to angle
+      let initialAngle = flight.site.camera_angle || 0
+      if (!flight.site.camera_angle && flight.site.orientation) {
+        initialAngle = getHeadingFromOrientation(flight.site.orientation) || 0
+      }
+      setTempCameraAngle(initialAngle)
       setTempCameraDistance(flight.site.camera_distance || 500)
     }
   }, [flight?.site])
@@ -480,17 +485,21 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     
     if (!firstPosition) return
 
-    // Use camera_direction if set, otherwise fall back to orientation
-    const cameraDirection = flight?.site?.camera_direction || flight?.site?.orientation
+    // Use camera_angle if set, otherwise fall back to orientation
+    let cameraAngle = flight?.site?.camera_angle
+    if (cameraAngle === null || cameraAngle === undefined) {
+      // Fallback to orientation if no angle set
+      const orientation = flight?.site?.orientation
+      cameraAngle = getHeadingFromOrientation(orientation) || null
+    }
     const cameraDistance = flight?.site?.camera_distance || 500
-    const heading = getHeadingFromOrientation(cameraDirection)
 
-    if (heading !== null) {
-      // Camera is positioned in the direction specified, looking back at takeoff
-      // The camera heading should be OPPOSITE to the camera direction
-      const oppositeHeading = (heading + 180) % 360;
+    if (cameraAngle !== null && cameraAngle !== undefined) {
+      // Camera is positioned at the specified angle, looking back at takeoff
+      // The camera heading should be OPPOSITE to the camera angle
+      const oppositeHeading = (cameraAngle + 180) % 360;
       
-      console.log(`📐 Camera direction: ${cameraDirection} (position at ${heading}°)`)
+      console.log(`📐 Camera angle: ${cameraAngle}° (position)`)
       console.log(`📏 Camera distance: ${cameraDistance}m`)
       console.log(`📷 Camera looking ${oppositeHeading}° (back at takeoff)`)
       
@@ -510,10 +519,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       
       console.log('✅ Camera positioned to face takeoff point')
     } else {
-      console.log('📐 No camera direction found, using default camera positioning')
+      console.log('📐 No camera angle found, using default camera positioning')
       // Default positioning is already handled by the GPX loading useEffect
     }
-  }, [viewerReady, gpxData, flight?.site?.camera_direction, flight?.site?.camera_distance, flight?.site?.orientation])
+  }, [viewerReady, gpxData, flight?.site?.camera_angle, flight?.site?.camera_distance, flight?.site?.orientation])
 
   // Calculer automatiquement l'offset d'élévation
   const calculateAutoElevationOffset = useCallback(async () => {
@@ -812,13 +821,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
   };
 
-  const updateCameraSettings = async (direction: string | null, distance: number) => {
+  const updateCameraSettings = async (angle: number, distance: number) => {
     if (!flight?.site?.id) return
     
     setIsUpdatingCamera(true)
     try {
       const params = new URLSearchParams()
-      if (direction) params.append('direction', direction)
+      params.append('angle', angle.toString())
       params.append('distance', distance.toString())
       
       await api.patch(`sites/${flight.site.id}/camera?${params.toString()}`)
@@ -826,7 +835,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       // Refresh flight data to get updated site
       await queryClient.invalidateQueries({ queryKey: ['flights', flightId] })
       
-      console.log(`✅ Camera updated: direction=${direction}, distance=${distance}m`)
+      console.log(`✅ Camera updated: angle=${angle}°, distance=${distance}m`)
     } catch (error) {
       console.error('❌ Failed to update camera settings:', error)
       alert('Erreur lors de la mise à jour de la caméra')
@@ -836,7 +845,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   };
 
   const applyCameraSettings = () => {
-    updateCameraSettings(tempCameraDirection, tempCameraDistance)
+    updateCameraSettings(tempCameraAngle, tempCameraDistance)
   };
 
   // Render error messages as overlays instead of early returns
@@ -1191,23 +1200,26 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   📷 Position Caméra
                 </label>
                 
-                {/* Camera Direction */}
+                {/* Camera Angle */}
                 <div className="mb-2">
                   <label className="block text-xs text-gray-600 mb-1">
-                    Direction
+                    Angle: {tempCameraAngle}° {tempCameraAngle === 0 ? '(Nord)' : tempCameraAngle === 90 ? '(Est)' : tempCameraAngle === 180 ? '(Sud)' : tempCameraAngle === 270 ? '(Ouest)' : ''}
                   </label>
-                  <select
-                    value={tempCameraDirection || ''}
-                    onChange={(e) => setTempCameraDirection(e.target.value || null)}
-                    className="w-full px-2 py-1 border rounded text-sm bg-white"
-                  >
-                    <option value="">Auto (depuis orientation)</option>
-                    {getOrientationOptions().map(opt => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    type="range"
+                    min="0"
+                    max="360"
+                    step="5"
+                    value={tempCameraAngle}
+                    onChange={(e) => setTempCameraAngle(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>0° (N)</span>
+                    <span>90° (E)</span>
+                    <span>180° (S)</span>
+                    <span>270° (W)</span>
+                  </div>
                 </div>
                 
                 {/* Camera Distance */}
@@ -1240,7 +1252,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                 </button>
                 
                 <p className="text-xs text-gray-600 mt-2">
-                  💡 La caméra sera positionnée dans la direction choisie, regardant vers le décollage
+                  💡 La caméra sera positionnée à l'angle choisi, regardant vers le décollage
                 </p>
               </div>
             )}

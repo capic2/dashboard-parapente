@@ -6,7 +6,7 @@ export interface Site {
   name: string
   code?: string
   orientation?: string
-  camera_direction?: string  // Manual camera position override
+  camera_angle?: number      // Camera angle in degrees (0-360)
   camera_distance?: number   // Camera distance in meters (default: 500)
   latitude?: number
   longitude?: number

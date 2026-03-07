@@ -50,7 +50,7 @@ class Site(Base):
     linked_spot_id = Column(String, ForeignKey("paragliding_spots.id"))  # Link to external spot data
     rating = Column(Integer)  # 0-6 rating from official spots database
     orientation = Column(String)  # N, NW, W, S, etc. - wind direction the site faces
-    camera_direction = Column(String)  # N, NE, E, SE, S, SW, W, NW, etc. - where to position camera relative to takeoff
+    camera_angle = Column(Integer)  # Camera angle in degrees (0-360) - where to position camera relative to takeoff
     camera_distance = Column(Integer, default=500)  # Distance in meters from takeoff point (default: 500m)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

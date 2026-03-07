@@ -3,7 +3,7 @@ set -e
 
 echo "Running database migrations..."
 python migrate_add_video_fields.py
-python migrate_add_camera_fields.py
+python migrate_camera_to_angle.py
 
 echo "Starting uvicorn server..."
 exec uvicorn main:app --host 0.0.0.0 --port 8001 --proxy-headers --forwarded-allow-ips "*"
