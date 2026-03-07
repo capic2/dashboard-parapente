@@ -54,45 +54,62 @@ interface VerdictTooltipProps extends BaseTooltipProps {
 // ============================================================================
 
 /**
- * Get flyability reason based on weather conditions
+ * Get flyability display with emoji, verdict and reason
+ * Format: "🟢 BON" or "🟡 MOYEN — Vent faible" or "🔴 MAUVAIS — Vent insuffisant"
  */
-const getFlyabilityReason = (hour: any): string => {
+const getFlyabilityDisplay = (hour: any): { emoji: string; text: string; color: string } => {
   const verdict = hour.verdict?.toLowerCase();
+  const verdictUpper = verdict?.toUpperCase() || 'MOYEN';
   
-  // If it's good, just return the verdict
+  // Emoji and color based on verdict
+  let emoji = '🟡';
+  let color = 'text-yellow-600';
+  
   if (verdict === 'bon') {
-    return 'BON';
+    emoji = '🟢';
+    color = 'text-green-600';
+    return { emoji, text: 'BON', color };
+  } else if (verdict === 'mauvais') {
+    emoji = '🔴';
+    color = 'text-red-600';
+  } else if (verdict === 'limite') {
+    emoji = '🟠';
+    color = 'text-orange-600';
   }
   
-  // Check conditions and return the main reason why it's not flyable
+  // Determine the reason when not BON
   const wind = hour.wind || 0;
   const gust = hour.wind_gust || hour.sources?.['open-meteo']?.wind_gust || hour.sources?.['weatherapi']?.wind_gust || 0;
   const precipitation = hour.precipitation || 0;
   const cloudCover = hour.sources?.['open-meteo']?.cloud_cover || hour.sources?.['weatherapi']?.cloud_cover || 0;
   
-  // Priority order: precipitation > wind > gust > clouds > other
+  let reason = '';
+  
+  // Priority order for reason
   if (precipitation > 0.5) {
-    return `Pluie (${precipitation.toFixed(1)}mm)`;
+    reason = 'Pluie';
+  } else if (wind > 35) {
+    reason = 'Vent fort';
+  } else if (gust > 45) {
+    reason = 'Rafales importantes';
+  } else if (wind < 8) {
+    reason = 'Vent insuffisant';
+  } else if (wind < 15) {
+    reason = 'Vent faible';
+  } else if (cloudCover > 80) {
+    reason = 'Très nuageux';
+  } else if (wind > 25) {
+    reason = 'Vent modéré';
+  } else {
+    // Generic reason based on para-index
+    reason = 'Conditions moyennes';
   }
   
-  if (wind > 35) {
-    return `Vent fort (${wind} km/h)`;
-  }
-  
-  if (gust > 45) {
-    return `Rafales (${gust.toFixed(1)} km/h)`;
-  }
-  
-  if (cloudCover > 80) {
-    return `Très nuageux (${Math.round(cloudCover)}%)`;
-  }
-  
-  if (wind > 25) {
-    return `Vent modéré (${wind} km/h)`;
-  }
-  
-  // Otherwise return the verdict with capitalization
-  return verdict?.toUpperCase() || 'MOYEN';
+  return { 
+    emoji, 
+    text: `${verdictUpper} — ${reason}`, 
+    color 
+  };
 };
 
 const getVerdictClass = (verdict: string): string => {
@@ -657,13 +674,15 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
                       {hour.thermal_strength || 'Faible'}
                     </td>
                     
-                    <td className={`py-2.5 px-2 font-medium ${
-                      hour.verdict?.toLowerCase() === 'bon' ? 'text-green-600' :
-                      hour.verdict?.toLowerCase() === 'moyen' ? 'text-yellow-600' :
-                      hour.verdict?.toLowerCase() === 'limite' ? 'text-orange-600' :
-                      'text-red-600'
-                    }`}>
-                      {getFlyabilityReason(hour)}
+                    <td className="py-2.5 px-2">
+                      {(() => {
+                        const display = getFlyabilityDisplay(hour);
+                        return (
+                          <span className={`font-medium ${display.color}`}>
+                            {display.emoji} {display.text}
+                          </span>
+                        );
+                      })()}
                     </td>
                   </tr>
                 );
