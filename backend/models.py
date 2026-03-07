@@ -274,6 +274,11 @@ class EmagramAnalysis(Base):
     raw_sounding_data = Column(Text, nullable=True)  # Original radiosonde data (TEXT:LIST format)
     ai_raw_response = Column(Text, nullable=True)  # Raw JSON response from LLM
     
+    # Multi-Source Emagram Fields (for screenshot-based analysis)
+    external_source_urls = Column(Text, nullable=True)  # JSON: {"meteo-parapente": "url", "topmeteo": "url", ...}
+    sources_count = Column(Integer, nullable=True)  # Number of sources successfully analyzed (e.g., 3)
+    sources_agreement = Column(String, nullable=True)  # "high", "medium", "low" - consensus level between sources
+    
     # Status
     analysis_status = Column(String, nullable=False, default="completed", index=True)  # "completed", "failed", "partial"
     error_message = Column(Text, nullable=True)
