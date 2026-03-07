@@ -15,9 +15,9 @@ from contextlib import contextmanager
 # Import all scrapers
 from scrapers.open_meteo import fetch_open_meteo, extract_hourly_forecast as extract_om
 from scrapers.weatherapi import fetch_weatherapi, extract_hourly_forecast as extract_wa
-from scrapers.meteociel import fetch_meteociel
-from scrapers.meteoblue import fetch_meteoblue
-from scrapers.meteo_parapente import fetch_meteo_parapente
+from scrapers.meteociel import fetch_meteociel, extract_hourly_forecast as extract_mc
+from scrapers.meteoblue import fetch_meteoblue, extract_hourly_forecast as extract_mb
+from scrapers.meteo_parapente import fetch_meteo_parapente, extract_hourly_forecast as extract_mp
 from para_index import calculate_para_index
 
 logger = logging.getLogger(__name__)
@@ -170,6 +170,22 @@ async def fetch_from_enabled_sources(
                     
                     source.updated_at = datetime.utcnow()
                     db.commit()
+                
+                # CRITICAL FIX: Transform raw data to hourly format
+                # Scrapers return {'success': True, 'data': {...}} 
+                # but normalize_data() expects {'success': True, 'hourly': [...]}
+                if result and result.get("success") and "data" in result:
+                    # Extract hourly data for the requested day
+                    if src_name == "open-meteo":
+                        result["hourly"] = extract_om(result, day_index)
+                    elif src_name == "weatherapi":
+                        result["hourly"] = extract_wa(result, day_index)
+                    elif src_name == "meteo-parapente":
+                        result["hourly"] = extract_mp(result, day_index)
+                    elif src_name == "meteociel":
+                        result["hourly"] = extract_mc(result, day_index)
+                    elif src_name == "meteoblue":
+                        result["hourly"] = extract_mb(result, day_index)
                 
                 return result
                 
