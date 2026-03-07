@@ -31,6 +31,9 @@ DEFAULT_SITES = [
 
 scheduler = AsyncIOScheduler()
 
+# Semaphore to limit concurrent database operations (prevent pool exhaustion)
+_db_semaphore = asyncio.Semaphore(5)
+
 
 async def fetch_and_store_weather(site_code: str, day_index: int = 0):
     """
@@ -157,39 +160,41 @@ async def fetch_and_cache_weather(site_id: str, day_index: int = 0):
     Returns:
         True if successful, False otherwise
     """
-    db = SessionLocal()
-    
-    try:
-        # Get site from database
-        site = db.query(Site).filter(Site.id == site_id).first()
+    # Limit concurrent database operations to prevent pool exhaustion
+    async with _db_semaphore:
+        db = SessionLocal()
         
-        if not site:
-            logger.error(f"Site not found: {site_id}")
-            return False
-        
-        logger.info(f"Fetching {site.name} (day {day_index})...")
-        
-        # Fetch normalized forecast (will auto-cache via weather_pipeline.py)
-        result = await get_normalized_forecast(
-            lat=site.latitude,
-            lon=site.longitude,
-            day_index=day_index,
-            site_name=site.name,
-            elevation_m=site.elevation_m
-        )
-        
-        if result.get("success"):
-            logger.info(f"✅ Cached {site.name} day {day_index}")
-            return True
-        else:
-            logger.error(f"❌ Failed {site.name} day {day_index}: {result.get('error')}")
-            return False
+        try:
+            # Get site from database
+            site = db.query(Site).filter(Site.id == site_id).first()
             
-    except Exception as e:
-        logger.error(f"Error fetching {site_id} day {day_index}: {e}", exc_info=True)
-        return False
-    finally:
-        db.close()
+            if not site:
+                logger.error(f"Site not found: {site_id}")
+                return False
+            
+            logger.info(f"Fetching {site.name} (day {day_index})...")
+            
+            # Fetch normalized forecast (will auto-cache via weather_pipeline.py)
+            result = await get_normalized_forecast(
+                lat=site.latitude,
+                lon=site.longitude,
+                day_index=day_index,
+                site_name=site.name,
+                elevation_m=site.elevation_m
+            )
+            
+            if result.get("success"):
+                logger.info(f"✅ Cached {site.name} day {day_index}")
+                return True
+            else:
+                logger.error(f"❌ Failed {site.name} day {day_index}: {result.get('error')}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error fetching {site_id} day {day_index}: {e}", exc_info=True)
+            return False
+        finally:
+            db.close()
 
 
 async def scheduled_weather_fetch():
