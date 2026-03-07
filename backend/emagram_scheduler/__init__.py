@@ -1,5 +1,5 @@
 """Scheduler modules - emagram scheduling"""
-from scheduler.emagram_scheduler import (
+from emagram_scheduler.emagram_scheduler import (
     setup_emagram_scheduler,
     start_scheduler as start_emagram_scheduler,
     run_scheduled_emagram_analysis
