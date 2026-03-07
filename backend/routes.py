@@ -1047,6 +1047,50 @@ async def refresh_weather_cache():
         )
 
 
+@router.post("/admin/clear-cache")
+async def clear_redis_cache():
+    """
+    Admin endpoint: Clear all Redis cache
+    
+    Useful when:
+    - Cache contains invalid/stale data
+    - Need to force fresh fetch from all sources
+    - Debugging cache issues
+    
+    Returns:
+        Number of keys cleared
+    """
+    from cache import get_redis_client
+    
+    try:
+        redis_client = get_redis_client()
+        
+        # Get all weather-related keys
+        weather_keys = redis_client.keys("weather:*")
+        best_spot_keys = redis_client.keys("best_spot:*")
+        all_keys = weather_keys + best_spot_keys
+        
+        if all_keys:
+            deleted = redis_client.delete(*all_keys)
+            logger.info(f"🗑️ Cleared {deleted} cache keys")
+            
+            return {
+                "success": True,
+                "keys_deleted": deleted,
+                "message": f"Successfully cleared {deleted} cache entries"
+            }
+        else:
+            return {
+                "success": True,
+                "keys_deleted": 0,
+                "message": "No cache entries to clear"
+            }
+        
+    except Exception as e:
+        logger.error(f"Error clearing cache: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}")
+
+
 @router.get("/admin/test-weather/{site_id}")
 async def test_weather_fetch(site_id: str, db: Session = Depends(get_db)):
     """
