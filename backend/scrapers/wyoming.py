@@ -313,7 +313,8 @@ async def fetch_wyoming_sounding(
             "error": "No sounding data available for this date/time",
             "station_code": station_code,
             "sounding_time": sounding_time + "Z",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "raw_text": raw_text[:500]  # Include preview for debugging
         }
     
     # Parse the sounding data
