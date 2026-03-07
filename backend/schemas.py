@@ -239,3 +239,98 @@ class SyncSpotsResponse(BaseModel):
     stats: Dict[str, int]
     message: str
     timestamp: datetime
+
+
+# ============================================================================
+# Weather Source Configuration Schemas
+# ============================================================================
+
+class WeatherSourceConfigBase(BaseModel):
+    """Base schema for weather source configuration"""
+    source_name: str
+    display_name: str
+    description: Optional[str] = None
+    is_enabled: bool = True
+    requires_api_key: bool = False
+    api_key: Optional[str] = None
+    priority: int = 1
+    scraper_type: Literal["api", "playwright", "stealth"]
+    base_url: Optional[str] = None
+    documentation_url: Optional[str] = None
+
+    @validator('source_name')
+    def validate_source_name(cls, v):
+        """Source name must be lowercase alphanumeric with hyphens"""
+        import re
+        if not re.match(r'^[a-z0-9-]+$', v):
+            raise ValueError('Source name must contain only lowercase letters, numbers, and hyphens')
+        if len(v) < 2 or len(v) > 50:
+            raise ValueError('Source name must be between 2 and 50 characters')
+        return v
+
+    @validator('api_key')
+    def validate_api_key(cls, v, values):
+        """If requires_api_key=True, api_key should be provided"""
+        if values.get('requires_api_key') and not v:
+            raise ValueError('API key is required for this source')
+        return v
+
+
+class WeatherSourceConfigCreate(WeatherSourceConfigBase):
+    """Schema for creating a new weather source"""
+    pass
+
+
+class WeatherSourceConfigUpdate(BaseModel):
+    """Schema for updating weather source configuration (all fields optional)"""
+    display_name: Optional[str] = None
+    description: Optional[str] = None
+    is_enabled: Optional[bool] = None
+    api_key: Optional[str] = None
+    priority: Optional[int] = None
+    base_url: Optional[str] = None
+    documentation_url: Optional[str] = None
+
+
+class WeatherSourceConfig(WeatherSourceConfigBase):
+    """Complete weather source configuration with stats (response schema)"""
+    id: str
+    
+    # Statistics
+    last_success_at: Optional[datetime] = None
+    last_error_at: Optional[datetime] = None
+    last_error_message: Optional[str] = None
+    success_count: int = 0
+    error_count: int = 0
+    success_rate: float  # Calculated via @property in model
+    avg_response_time_ms: Optional[int] = None  # Calculated via @property
+    
+    # Derived status
+    api_key_configured: bool  # Via @property
+    status: Literal["active", "error", "disabled", "unknown"]  # Via @property
+    
+    # Timestamps
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class WeatherSourceStats(BaseModel):
+    """Global statistics for all weather sources"""
+    total_sources: int
+    active_sources: int
+    disabled_sources: int
+    sources_with_errors: int
+    global_success_rate: float
+    global_avg_response_time_ms: Optional[int]
+
+
+class WeatherSourceTestResult(BaseModel):
+    """Result of a weather source test"""
+    success: bool
+    response_time_ms: int
+    error: Optional[str] = None
+    sample_data: Optional[Dict[str, Any]] = None  # First data point for verification
+    tested_at: datetime
