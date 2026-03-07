@@ -3617,27 +3617,43 @@ async def trigger_emagram_analysis(
         primary_time = "12" if current_hour_utc >= 12 else "00"
         fallback_time = "00" if primary_time == "12" else "12"
         
-        # Try primary sounding time first
-        logger.info(f"Trying {primary_time}Z sounding...")
+        # Try today first, then yesterday if today fails
+        today = datetime.utcnow()
+        yesterday = today - timedelta(days=1)
+        
+        # Try primary sounding time first (today)
+        logger.info(f"Trying {primary_time}Z sounding for {today.strftime('%Y-%m-%d')}...")
         sounding_result = await fetch_closest_sounding(
             user_lat=request.user_latitude,
             user_lon=request.user_longitude,
-            sounding_time=primary_time
+            sounding_time=primary_time,
+            date=today
         )
         
-        # If primary fails, try fallback
+        # If primary fails, try fallback time (same day)
         if not sounding_result.get("success"):
-            logger.warning(f"⚠️ {primary_time}Z sounding unavailable, trying {fallback_time}Z...")
+            logger.warning(f"⚠️ {primary_time}Z sounding unavailable for today, trying {fallback_time}Z...")
             sounding_result = await fetch_closest_sounding(
                 user_lat=request.user_latitude,
                 user_lon=request.user_longitude,
-                sounding_time=fallback_time
+                sounding_time=fallback_time,
+                date=today
             )
         
-        # If both fail, return error
+        # If both times fail for today, try yesterday's 12Z
+        if not sounding_result.get("success"):
+            logger.warning(f"⚠️ Today's soundings unavailable, trying yesterday 12Z ({yesterday.strftime('%Y-%m-%d')})...")
+            sounding_result = await fetch_closest_sounding(
+                user_lat=request.user_latitude,
+                user_lon=request.user_longitude,
+                sounding_time="12",
+                date=yesterday
+            )
+        
+        # If all attempts fail, return error
         if not sounding_result.get("success"):
             error_detail = sounding_result.get('error', 'Unknown error')
-            logger.error(f"❌ Wyoming fetch failed for both {primary_time}Z and {fallback_time}Z: {error_detail}")
+            logger.error(f"❌ Wyoming fetch failed for all attempts: {error_detail}")
             if 'raw_text' in sounding_result:
                 logger.error(f"   Raw text preview: {sounding_result['raw_text'][:200]}")
             raise HTTPException(
