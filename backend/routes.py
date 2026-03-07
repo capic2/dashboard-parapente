@@ -1282,52 +1282,52 @@ async def get_daily_summary(
         optimal_dirs = getattr(site, 'optimal_directions', 'N,NE,E,SE,S,SW,W,NW')  # All directions
         
         # Fetch all days in parallel
-    # Use ALL 5 sources (including Meteoblue) for full consistency with /weather endpoint
-    # This ensures para_index on 7-day cards EXACTLY matches the hourly view
-    # Note: Meteoblue adds 5-10s per day, but consistency is worth it
-    
-    tasks = []
-    for day_idx in range(days):
-        tasks.append(
-            get_daily_aggregate(
-                site.latitude,
-                site.longitude,
-                day_idx,
-                min_wind_ms,
-                max_wind_ms,
-                optimal_dirs,
-                sources=None,  # Use all 5 sources (default: open-meteo, weatherapi, meteo-parapente, meteociel, meteoblue)
-                site_name=site.name,
-                elevation_m=site.elevation_m
+        # Use ALL 5 sources (including Meteoblue) for full consistency with /weather endpoint
+        # This ensures para_index on 7-day cards EXACTLY matches the hourly view
+        # Note: Meteoblue adds 5-10s per day, but consistency is worth it
+        
+        tasks = []
+        for day_idx in range(days):
+            tasks.append(
+                get_daily_aggregate(
+                    site.latitude,
+                    site.longitude,
+                    day_idx,
+                    min_wind_ms,
+                    max_wind_ms,
+                    optimal_dirs,
+                    sources=None,  # Use all 5 sources (default: open-meteo, weatherapi, meteo-parapente, meteociel, meteoblue)
+                    site_name=site.name,
+                    elevation_m=site.elevation_m
+                )
             )
-        )
-    
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    
-    # Format response
-    summary_days = []
-    for idx, day_result in enumerate(results):
-        # Skip failed days
-        if isinstance(day_result, Exception):
-            logger.error(f"Day {idx} failed for {spot_id}: {day_result}", exc_info=day_result)
-            continue
         
-        if day_result is None:
-            logger.warning(f"Day {idx} returned None for {spot_id} (no data available)")
-            continue
+        results = await asyncio.gather(*tasks, return_exceptions=True)
         
-        if day_result:
-            summary_days.append({
-                "day_index": idx,
-                "date": day_result["date"],
-                "para_index": day_result["para_index"],
-                "verdict": day_result["verdict"],
-                "emoji": day_result["emoji"],
-                "temp_min": day_result["temp_min"],
-                "temp_max": day_result["temp_max"],
-                "wind_avg": day_result["wind_avg"],
-            })
-    
+        # Format response
+        summary_days = []
+        for idx, day_result in enumerate(results):
+            # Skip failed days
+            if isinstance(day_result, Exception):
+                logger.error(f"Day {idx} failed for {spot_id}: {day_result}", exc_info=day_result)
+                continue
+            
+            if day_result is None:
+                logger.warning(f"Day {idx} returned None for {spot_id} (no data available)")
+                continue
+            
+            if day_result:
+                summary_days.append({
+                    "day_index": idx,
+                    "date": day_result["date"],
+                    "para_index": day_result["para_index"],
+                    "verdict": day_result["verdict"],
+                    "emoji": day_result["emoji"],
+                    "temp_min": day_result["temp_min"],
+                    "temp_max": day_result["temp_max"],
+                    "wind_avg": day_result["wind_avg"],
+                })
+        
         if not summary_days:
             raise HTTPException(
                 status_code=500,
