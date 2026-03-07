@@ -1,6 +1,6 @@
 from pydantic import BaseModel, validator
 from datetime import date, datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 
 # Sites
 class SiteBase(BaseModel):
@@ -11,9 +11,56 @@ class SiteBase(BaseModel):
     longitude: float
     region: Optional[str] = None
     country: Optional[str] = "FR"
+    description: Optional[str] = None  # Site description
+    usage_type: Optional[Literal['takeoff', 'landing', 'both']] = 'both'  # Site usage type
 
 class SiteCreate(SiteBase):
     pass
+
+class SiteUpdate(BaseModel):
+    """Schema for updating site details - all fields optional for PATCH"""
+    name: Optional[str] = None
+    code: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    elevation_m: Optional[int] = None
+    description: Optional[str] = None
+    region: Optional[str] = None
+    country: Optional[str] = None
+    orientation: Optional[str] = None
+    camera_angle: Optional[int] = None
+    camera_distance: Optional[int] = None
+    usage_type: Optional[Literal['takeoff', 'landing', 'both']] = None
+    
+    @validator('latitude')
+    def validate_latitude(cls, v):
+        if v is not None and not -90 <= v <= 90:
+            raise ValueError('Latitude must be between -90 and 90')
+        return v
+    
+    @validator('longitude')
+    def validate_longitude(cls, v):
+        if v is not None and not -180 <= v <= 180:
+            raise ValueError('Longitude must be between -180 and 180')
+        return v
+    
+    @validator('camera_angle')
+    def validate_camera_angle(cls, v):
+        if v is not None and not 0 <= v <= 360:
+            raise ValueError('Camera angle must be between 0 and 360')
+        return v
+    
+    @validator('camera_distance')
+    def validate_camera_distance(cls, v):
+        if v is not None and not 50 <= v <= 5000:
+            raise ValueError('Camera distance must be between 50 and 5000 meters')
+        return v
+    
+    @validator('orientation')
+    def validate_orientation(cls, v):
+        if v is not None and v not in ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', '']:
+            raise ValueError('Orientation must be one of: N, NE, E, SE, S, SW, W, NW')
+        return v
 
 class Site(SiteBase):
     id: str

@@ -47,6 +47,7 @@ class Site(Base):
     region = Column(String)
     country = Column(String, default="FR")
     site_type = Column(String, default="user_spot")  # "user_spot", "official_spot", "custom"
+    usage_type = Column(String, default="both")  # "takeoff", "landing", "both" - how the site is used
     linked_spot_id = Column(String, ForeignKey("paragliding_spots.id"))  # Link to external spot data
     rating = Column(Integer)  # 0-6 rating from official spots database
     orientation = Column(String)  # N, NW, W, S, etc. - wind direction the site faces
