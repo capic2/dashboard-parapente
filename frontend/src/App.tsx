@@ -8,6 +8,7 @@ import FlightHistory from './pages/FlightHistory'
 import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
 import { ViewerExport } from './pages/ViewerExport'
+import { Sites } from './pages/Sites'
 
 // Create query client for TanStack Query
 const queryClient = new QueryClient({
@@ -68,6 +69,12 @@ const exportViewerRoute = new Route({
   component: ViewerExport,
 })
 
+const sitesRoute = new Route({
+  getParentRoute: () => rootRoute,
+  path: '/sites',
+  component: Sites,
+})
+
 // Create router
 const routeTree = rootRoute.addChildren([
   dashboardRoute,
@@ -75,6 +82,7 @@ const routeTree = rootRoute.addChildren([
   analyticsRoute,
   settingsRoute,
   exportViewerRoute,
+  sitesRoute,
 ])
 
 const router = new Router({ routeTree })

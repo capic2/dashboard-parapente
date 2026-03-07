@@ -30,6 +30,12 @@ export default function Header({ title = '🪂 Tableau de Bord Parapente' }: Hea
           Analyses
         </Link>
         <Link
+          to="/sites"
+          className="px-3.5 py-2 rounded-md text-gray-600 text-sm transition-all hover:bg-gray-100 hover:text-sky-600 [&.active]:bg-sky-600 [&.active]:text-white"
+        >
+          Sites
+        </Link>
+        <Link
           to="/settings"
           className="px-3.5 py-2 rounded-md text-gray-600 text-sm transition-all hover:bg-gray-100 hover:text-sky-600 [&.active]:bg-sky-600 [&.active]:text-white"
         >
