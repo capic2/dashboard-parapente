@@ -3777,3 +3777,168 @@ async def trigger_emagram_analysis(
     except Exception as e:
         logger.error(f"Failed to trigger emagram analysis: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# MULTI-SOURCE EMAGRAM ENDPOINTS
+# ============================================================================
+
+@router.get("/api/emagram/spot/{site_id}/latest", tags=["Emagram"])
+async def get_latest_emagram_for_spot(
+    site_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Get latest multi-source emagram analysis for a specific spot
+    
+    Returns analysis from last 3 hours if available
+    
+    Example:
+        GET /api/emagram/spot/arguel/latest
+        
+    Returns:
+        {
+            "success": True,
+            "analysis_id": "uuid",
+            "spot_name": "Arguel",
+            "last_update": "2024-03-07T20:15:00",
+            "external_links": [
+                {"source": "meteo-parapente", "url": "https://..."},
+                {"source": "topmeteo", "url": "https://..."},
+                {"source": "windy", "url": "https://..."}
+            ],
+            "analysis": {
+                "plafond_thermique_m": 2800,
+                "force_thermique_ms": 2.5,
+                "score_volabilite": 75,
+                ...
+            },
+            "sources_count": 3,
+            "sources_agreement": "high",
+            "next_update": "2024-03-07T23:15:00"
+        }
+    """
+    from datetime import timedelta
+    from emagram_multi_source import emagram_analysis_to_dict
+    
+    # Find most recent analysis for this site (within 3 hours)
+    cutoff_time = datetime.utcnow() - timedelta(hours=3)
+    
+    emagram = db.query(EmagramAnalysis).filter(
+        EmagramAnalysis.station_code == site_id,
+        EmagramAnalysis.analysis_datetime >= cutoff_time,
+        EmagramAnalysis.analysis_status == "completed"
+    ).order_by(EmagramAnalysis.analysis_datetime.desc()).first()
+    
+    if not emagram:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No recent emagram analysis found for spot {site_id}. Try refreshing."
+        )
+    
+    return emagram_analysis_to_dict(emagram)
+
+
+@router.post("/api/emagram/spot/{site_id}/refresh", tags=["Emagram"])
+async def refresh_emagram_for_spot(
+    site_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    Trigger immediate refresh of multi-source emagram for a spot
+    
+    Runs in background to avoid timeout
+    
+    Example:
+        POST /api/emagram/spot/arguel/refresh
+        
+    Returns:
+        {
+            "status": "refreshing",
+            "message": "Emagram refresh started for Arguel",
+            "estimated_time_seconds": 30
+        }
+    """
+    from emagram_multi_source import generate_multi_source_emagram_for_spot
+    
+    # Verify site exists
+    site = db.query(Site).filter(Site.id == site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
+    
+    # Add background task
+    background_tasks.add_task(
+        generate_multi_source_emagram_for_spot,
+        site_id=site_id,
+        db=db,
+        force_refresh=True
+    )
+    
+    logger.info(f"🔄 Emagram refresh triggered for {site.name}")
+    
+    return {
+        "status": "refreshing",
+        "message": f"Emagram refresh started for {site.name}",
+        "spot_id": site_id,
+        "estimated_time_seconds": 30
+    }
+
+
+@router.get("/api/emagram/spots/all", tags=["Emagram"])
+async def get_all_spots_latest_emagrammes(
+    db: Session = Depends(get_db)
+):
+    """
+    Get latest emagram analysis for all spots
+    
+    Useful for overview/dashboard
+    
+    Returns:
+        {
+            "spots": [
+                {
+                    "spot_id": "arguel",
+                    "spot_name": "Arguel",
+                    "last_update": "2024-03-07T20:15:00",
+                    "score_volabilite": 75,
+                    "sources_agreement": "high"
+                },
+                ...
+            ],
+            "total_spots": 6,
+            "updated_count": 5
+        }
+    """
+    from datetime import timedelta
+    
+    cutoff_time = datetime.utcnow() - timedelta(hours=3)
+    
+    # Get all sites with recent emagram
+    sites = db.query(Site).all()
+    
+    spots_data = []
+    for site in sites:
+        emagram = db.query(EmagramAnalysis).filter(
+            EmagramAnalysis.station_code == site.id,
+            EmagramAnalysis.analysis_datetime >= cutoff_time,
+            EmagramAnalysis.analysis_status == "completed"
+        ).order_by(EmagramAnalysis.analysis_datetime.desc()).first()
+        
+        if emagram:
+            spots_data.append({
+                "spot_id": site.id,
+                "spot_name": site.name,
+                "last_update": emagram.analysis_datetime.isoformat(),
+                "score_volabilite": emagram.score_volabilite,
+                "plafond_thermique_m": emagram.plafond_thermique_m,
+                "force_thermique_ms": emagram.force_thermique_ms,
+                "sources_agreement": emagram.sources_agreement,
+                "sources_count": emagram.sources_count
+            })
+    
+    return {
+        "spots": spots_data,
+        "total_spots": len(sites),
+        "updated_count": len(spots_data)
+    }
