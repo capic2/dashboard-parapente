@@ -305,12 +305,6 @@ async def fetch_wyoming_sounding(
                         "retries": max_retries
                     }
     
-    try:
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            response = await client.get(base_url, params=params)
-            response.raise_for_status()
-            raw_text = response.text
-    
     # Check for "No valid sounding found" error
     if "Can't get" in raw_text or "No valid" in raw_text:
         return {
