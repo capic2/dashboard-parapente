@@ -476,6 +476,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
   // Position camera based on site orientation
   useEffect(() => {
+    console.log('🎥 Camera positioning useEffect triggered', {
+      viewerReady,
+      hasGpxData: !!gpxData?.coordinates,
+      hasPositions: allPositionsRef.current.length > 0,
+      camera_angle: flight?.site?.camera_angle,
+      camera_distance: flight?.site?.camera_distance
+    })
+    
     if (!viewerRef.current || !viewerReady || !gpxData?.coordinates || !allPositionsRef.current.length) {
       return
     }
@@ -822,7 +830,16 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   };
 
   const updateCameraSettings = async (angle: number, distance: number) => {
-    if (!flight?.site?.id) return
+    console.log('📡 Updating camera settings:', { 
+      siteId: flight?.site?.id,
+      angle, 
+      distance 
+    })
+    
+    if (!flight?.site?.id) {
+      console.error('❌ No site ID available')
+      return
+    }
     
     setIsUpdatingCamera(true)
     try {
@@ -830,12 +847,17 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       params.append('angle', angle.toString())
       params.append('distance', distance.toString())
       
-      await api.patch(`sites/${flight.site.id}/camera?${params.toString()}`)
+      const url = `sites/${flight.site.id}/camera?${params.toString()}`
+      console.log('📡 API URL:', url)
+      
+      const response = await api.patch(url)
+      console.log('📡 API Response:', response)
       
       // Refresh flight data to get updated site
       await queryClient.invalidateQueries({ queryKey: ['flights', flightId] })
+      console.log('🔄 Query invalidated, flight data should refresh')
       
-      console.log(`✅ Camera updated: angle=${angle}°, distance=${distance}m`)
+      console.log(`✅ Camera updated successfully: angle=${angle}°, distance=${distance}m`)
     } catch (error) {
       console.error('❌ Failed to update camera settings:', error)
       alert('Erreur lors de la mise à jour de la caméra')
