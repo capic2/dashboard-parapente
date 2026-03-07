@@ -566,7 +566,7 @@ async def create_site(
         db.add(new_site)
         db.commit()
         db.refresh(new_site)
-        logger.info(f"✅ Created new site: {new_site.name} (ID: {new_site.id})")
+        logger.info(f" Created new site: {new_site.name} (ID: {new_site.id})")
         return new_site
     except Exception as e:
         db.rollback()
@@ -617,7 +617,7 @@ def update_site_orientation(
     try:
         db.commit()
         db.refresh(site)
-        logger.info(f"✅ Updated orientation for site '{site.name}': {old_orientation} → {orientation_upper}")
+        logger.info(f" Updated orientation for site '{site.name}': {old_orientation} → {orientation_upper}")
         
         return {
             "success": True,
@@ -681,7 +681,7 @@ def update_site_camera(
     try:
         db.commit()
         db.refresh(site)
-        logger.info(f"✅ Updated camera settings for site '{site.name}': angle={site.camera_angle}°, distance={site.camera_distance}m")
+        logger.info(f" Updated camera settings for site '{site.name}': angle={site.camera_angle}°, distance={site.camera_distance}m")
         
         return {
             "success": True,
@@ -1519,7 +1519,7 @@ async def update_flight(
     try:
         db.commit()
         db.refresh(flight)
-        logger.info(f"✅ Updated flight {flight_id}: {list(update_data.keys())}")
+        logger.info(f" Updated flight {flight_id}: {list(update_data.keys())}")
         
         # Return in the format expected by frontend (ApiResponseSchema)
         return {
@@ -1750,7 +1750,7 @@ async def sync_strava_activities(
                     "date": str(activity_date)
                 })
                 
-                logger.info(f"✅ Imported: {flight.title} (Strava ID: {strava_id})")
+                logger.info(f" Imported: {flight.title} (Strava ID: {strava_id})")
             
             except Exception as e:
                 logger.error(f"Failed to import activity {strava_id}: {e}")
@@ -1815,7 +1815,7 @@ async def upload_gpx_to_flight(
         db.commit()
         db.refresh(flight)
         
-        logger.info(f"✅ Added GPX file to flight {flight_id} (stats unchanged)")
+        logger.info(f" Added GPX file to flight {flight_id} (stats unchanged)")
         
         # 5. Trigger automatic video export
         try:
@@ -1967,7 +1967,7 @@ async def create_flight_from_gpx(
         db.commit()
         db.refresh(flight)
         
-        logger.info(f"✅ Created new flight from {file_type.upper()}: {flight.name} (ID: {flight_id})")
+        logger.info(f" Created new flight from {file_type.upper()}: {flight.name} (ID: {flight_id})")
         
         # 8. Trigger automatic video export
         try:
@@ -2038,7 +2038,7 @@ async def delete_flight(
         db.delete(flight)
         db.commit()
         
-        logger.info(f"✅ Deleted flight: {flight_title} (ID: {flight_id})")
+        logger.info(f" Deleted flight: {flight_title} (ID: {flight_id})")
         
         return {
             "success": True,
@@ -2507,7 +2507,7 @@ def start_flight_video_export(
         logger.error(f"❌ Flight not found in DB: {flight_id}")
         raise HTTPException(status_code=404, detail="Flight not found")
     
-    logger.info(f"✅ Flight found: {flight.title} (date: {flight.flight_date})")
+    logger.info(f" Flight found: {flight.title} (date: {flight.flight_date})")
     
     # Determine frontend URL
     # In production, frontend is served on same server (port 8001)
@@ -2593,7 +2593,7 @@ def generate_flight_video(
         update_db=True
     )
     
-    logger.info(f"✅ Video generation started: job_id={job_id}")
+    logger.info(f" Video generation started: job_id={job_id}")
     
     return {
         "job_id": job_id,
