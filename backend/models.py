@@ -1,6 +1,6 @@
-from sqlalchemy import Column, String, Integer, Float, DateTime, Text, Date, ForeignKey, Boolean, BigInteger
+from sqlalchemy import Column, String, Integer, Float, DateTime, Text, Date, Time, ForeignKey, Boolean, BigInteger
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, date, time
 from typing import Optional
 from database import Base
 
@@ -180,3 +180,121 @@ class WeatherSourceConfig(Base):
         if self.last_error_at and (not self.last_success_at or self.last_error_at > self.last_success_at):
             return "error"  # Last attempt failed
         return "active"  # All good
+
+
+class EmagramFeedback(Base):
+    """Pilot feedback on emagram analysis accuracy"""
+    __tablename__ = "emagram_feedback"
+    
+    id = Column(String, primary_key=True)
+    emagram_analysis_id = Column(String, ForeignKey("emagram_analysis.id"), nullable=False)
+    pilot_name = Column(String, nullable=True)
+    feedback_date = Column(Date, nullable=False, index=True)
+    flight_took_place = Column(Boolean, nullable=False)
+    
+    # Actual conditions
+    actual_plafond_m = Column(Integer, nullable=True)
+    actual_force_ms = Column(Float, nullable=True)
+    actual_thermal_quality = Column(String, nullable=True)
+    actual_hours_start = Column(Time, nullable=True)
+    actual_hours_end = Column(Time, nullable=True)
+    actual_risk_level = Column(String, nullable=True)
+    
+    # Accuracy ratings (1-5)
+    accuracy_plafond = Column(Integer, nullable=True)
+    accuracy_force = Column(Integer, nullable=True)
+    accuracy_hours = Column(Integer, nullable=True)
+    accuracy_overall = Column(Integer, nullable=True)
+    
+    # Comments
+    comments = Column(Text, nullable=True)
+    would_recommend = Column(Boolean, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class EmagramAnalysis(Base):
+    """AI-powered emagram (sounding) analysis for thermal forecasting"""
+    __tablename__ = "emagram_analysis"
+    
+    # Primary Key
+    id = Column(String, primary_key=True)
+    
+    # Metadata
+    analysis_date = Column(Date, nullable=False, index=True)
+    analysis_time = Column(Time, nullable=False)
+    analysis_datetime = Column(DateTime, nullable=False, index=True)
+    station_code = Column(String, nullable=False, index=True)  # e.g., "07481" (Lyon)
+    station_name = Column(String, nullable=False)
+    station_latitude = Column(Float, nullable=False)
+    station_longitude = Column(Float, nullable=False)
+    distance_km = Column(Float, nullable=False)  # Distance from user location
+    
+    # Data Source
+    data_source = Column(String, nullable=False, default="wyoming")  # "wyoming", "meteociel", etc.
+    sounding_time = Column(String, nullable=False)  # "00Z" or "12Z"
+    llm_provider = Column(String, nullable=True)  # "anthropic", "openai", "google"
+    llm_model = Column(String, nullable=True)  # "claude-3.5-sonnet", "gpt-4-vision", etc.
+    llm_tokens_used = Column(Integer, nullable=True)
+    llm_cost_usd = Column(Float, nullable=True)
+    analysis_method = Column(String, nullable=False)  # "llm_vision" or "classic_calculation"
+    
+    # AI Analysis Results (Paragliding-specific metrics)
+    plafond_thermique_m = Column(Integer, nullable=True)  # Thermal ceiling in meters
+    force_thermique_ms = Column(Float, nullable=True)  # Thermal strength in m/s
+    cape_jkg = Column(Float, nullable=True)  # Convective Available Potential Energy
+    stabilite_atmospherique = Column(String, nullable=True)  # "stable", "instable", "très instable"
+    cisaillement_vent = Column(String, nullable=True)  # "faible", "modéré", "fort"
+    heure_debut_thermiques = Column(Time, nullable=True)
+    heure_fin_thermiques = Column(Time, nullable=True)
+    heures_volables_total = Column(Float, nullable=True)  # Total flyable hours
+    risque_orage = Column(String, nullable=True)  # "nul", "faible", "modéré", "élevé"
+    score_volabilite = Column(Integer, nullable=True)  # 0-100 flyability score
+    
+    # AI Textual Output
+    resume_conditions = Column(Text, nullable=True)  # Summary of conditions
+    conseils_vol = Column(Text, nullable=True)  # Flight recommendations
+    alertes_securite = Column(Text, nullable=True)  # JSON array of safety alerts
+    
+    # Classic Meteorology Fallback (computed values)
+    lcl_m = Column(Integer, nullable=True)  # Lifting Condensation Level
+    lfc_m = Column(Integer, nullable=True)  # Level of Free Convection
+    el_m = Column(Integer, nullable=True)  # Equilibrium Level
+    lifted_index = Column(Float, nullable=True)  # Stability index
+    k_index = Column(Float, nullable=True)  # Thunderstorm potential
+    total_totals = Column(Float, nullable=True)  # Thunderstorm index
+    showalter_index = Column(Float, nullable=True)  # Stability index
+    wind_shear_0_3km_ms = Column(Float, nullable=True)  # Wind shear 0-3km
+    wind_shear_0_6km_ms = Column(Float, nullable=True)  # Wind shear 0-6km
+    
+    # Raw Data Storage
+    skewt_image_path = Column(String, nullable=True)  # Path to generated Skew-T diagram
+    raw_sounding_data = Column(Text, nullable=True)  # Original radiosonde data (TEXT:LIST format)
+    ai_raw_response = Column(Text, nullable=True)  # Raw JSON response from LLM
+    
+    # Status
+    analysis_status = Column(String, nullable=False, default="completed", index=True)  # "completed", "failed", "partial"
+    error_message = Column(Text, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    @property
+    def is_from_llm(self) -> bool:
+        """Check if analysis was done using LLM vision"""
+        return self.analysis_method == "llm_vision" and self.llm_provider is not None
+    
+    @property
+    def has_thermal_data(self) -> bool:
+        """Check if thermal forecasting data is available"""
+        return self.plafond_thermique_m is not None or self.force_thermique_ms is not None
+    
+    @property
+    def flyable_hours_formatted(self) -> Optional[str]:
+        """Format flyable hours as 'HH:MM - HH:MM'"""
+        if self.heure_debut_thermiques and self.heure_fin_thermiques:
+            return f"{self.heure_debut_thermiques.strftime('%H:%M')} - {self.heure_fin_thermiques.strftime('%H:%M')}"
+        return None
