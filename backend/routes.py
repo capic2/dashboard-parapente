@@ -1462,6 +1462,8 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
                 "name": site.name,
                 "code": site.code,
                 "orientation": site.orientation,
+                "camera_angle": site.camera_angle,
+                "camera_distance": site.camera_distance,
                 "latitude": site.latitude,
                 "longitude": site.longitude,
                 "elevation_m": site.elevation_m,
