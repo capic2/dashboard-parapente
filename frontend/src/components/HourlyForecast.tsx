@@ -53,6 +53,48 @@ interface VerdictTooltipProps extends BaseTooltipProps {
 // UTILITY FUNCTIONS
 // ============================================================================
 
+/**
+ * Get flyability reason based on weather conditions
+ */
+const getFlyabilityReason = (hour: any): string => {
+  const verdict = hour.verdict?.toLowerCase();
+  
+  // If it's good, just return the verdict
+  if (verdict === 'bon') {
+    return 'BON';
+  }
+  
+  // Check conditions and return the main reason why it's not flyable
+  const wind = hour.wind || 0;
+  const gust = hour.wind_gust || hour.sources?.['open-meteo']?.wind_gust || hour.sources?.['weatherapi']?.wind_gust || 0;
+  const precipitation = hour.precipitation || 0;
+  const cloudCover = hour.sources?.['open-meteo']?.cloud_cover || hour.sources?.['weatherapi']?.cloud_cover || 0;
+  
+  // Priority order: precipitation > wind > gust > clouds > other
+  if (precipitation > 0.5) {
+    return `Pluie (${precipitation.toFixed(1)}mm)`;
+  }
+  
+  if (wind > 35) {
+    return `Vent fort (${wind} km/h)`;
+  }
+  
+  if (gust > 45) {
+    return `Rafales (${gust.toFixed(1)} km/h)`;
+  }
+  
+  if (cloudCover > 80) {
+    return `Très nuageux (${Math.round(cloudCover)}%)`;
+  }
+  
+  if (wind > 25) {
+    return `Vent modéré (${wind} km/h)`;
+  }
+  
+  // Otherwise return the verdict with capitalization
+  return verdict?.toUpperCase() || 'MOYEN';
+};
+
 const getVerdictClass = (verdict: string): string => {
   const v = verdict.toLowerCase();
   if (v === 'bon') return 'bg-green-50 hover:bg-green-100';
@@ -518,7 +560,6 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
             <tr className="border-b-2 border-gray-200">
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Heure</th>
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Para-Index</th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">Verdict</th>
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Temp</th>
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Vent</th>
               <th className="text-left py-2 px-2 font-semibold text-gray-700">Rafales</th>
@@ -556,13 +597,6 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
                       {...cellEventHandlers('para-index', hour)}
                     >
                       <strong className="text-sky-600">{hour.para_index}/100</strong>
-                    </td>
-                    
-                    <td 
-                      className="py-2.5 px-2 font-medium capitalize cursor-pointer hover:bg-emerald-100 transition-colors"
-                      {...cellEventHandlers('verdict', hour)}
-                    >
-                      {hour.verdict}
                     </td>
                     
                     <td 
@@ -623,15 +657,20 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
                       {hour.thermal_strength || 'Faible'}
                     </td>
                     
-                    <td className="py-2.5 px-2 font-medium capitalize">
-                      {hour.verdict}
+                    <td className={`py-2.5 px-2 font-medium ${
+                      hour.verdict?.toLowerCase() === 'bon' ? 'text-green-600' :
+                      hour.verdict?.toLowerCase() === 'moyen' ? 'text-yellow-600' :
+                      hour.verdict?.toLowerCase() === 'limite' ? 'text-orange-600' :
+                      'text-red-600'
+                    }`}>
+                      {getFlyabilityReason(hour)}
                     </td>
                   </tr>
                 );
               })
             ) : (
               <tr>
-                <td colSpan={12} className="py-8 text-center text-gray-500">
+                <td colSpan={11} className="py-8 text-center text-gray-500">
                   Aucune donnée horaire disponible
                 </td>
               </tr>
