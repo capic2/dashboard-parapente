@@ -877,8 +877,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       // Refresh flight data to get updated site
       await queryClient.invalidateQueries({ queryKey: ['flights', flightId] })
       
-      // Show success message
-      alert(`✅ Réglages caméra sauvegardés pour le site "${flight?.site?.name}"!\n\nAngle: ${angle}°\nDistance: ${distance}m\n\nCes réglages s'appliqueront à tous les vols de ce site.`)
+      // Success - no alert needed, user already confirmed
+      console.log(`✅ Camera settings saved for site "${flight?.site?.name}": ${angle}° / ${distance}m`)
     } catch (error) {
       console.error('Failed to update camera settings:', error)
       alert('❌ Erreur lors de la mise à jour de la caméra')
@@ -918,6 +918,18 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   }, [])
 
   const applyCameraSettings = async () => {
+    // Ask for confirmation before saving
+    const confirmed = confirm(
+      `Sauvegarder les nouveaux paramètres de caméra pour le site "${flight?.site?.name}" ?\n\n` +
+      `Angle: ${tempCameraAngle}°\n` +
+      `Distance: ${tempCameraDistance}m\n\n` +
+      `Ces réglages s'appliqueront à tous les vols de ce site.`
+    )
+    
+    if (!confirmed) {
+      return
+    }
+    
     await updateCameraSettings(tempCameraAngle, tempCameraDistance)
     // Immediately reposition the camera with the new settings
     setTimeout(() => {
