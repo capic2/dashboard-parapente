@@ -1091,6 +1091,49 @@ async def clear_redis_cache():
         raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}")
 
 
+@router.get("/admin/debug-cache/{site_id}")
+async def debug_cache_data(site_id: str, day_index: int = 0, db: Session = Depends(get_db)):
+    """
+    Admin endpoint: Show RAW cache data for debugging
+    """
+    from cache import get_redis
+    import hashlib
+    
+    try:
+        site = db.query(Site).filter(Site.id == site_id).first()
+        if not site:
+            raise HTTPException(status_code=404, detail=f"Site not found: {site_id}")
+        
+        # Calculate cache key the same way weather_pipeline does
+        cache_key_base = f"{site.latitude},{site.longitude},{day_index}"
+        cache_key = f"weather:forecast:{hashlib.md5(cache_key_base.encode()).hexdigest()[:8]}"
+        
+        redis_client = await get_redis()
+        cached_data = await redis_client.get(cache_key)
+        
+        if cached_data:
+            import json
+            data = json.loads(cached_data)
+            return {
+                "cache_key": cache_key,
+                "found": True,
+                "success": data.get("success"),
+                "error": data.get("error"),
+                "consensus_count": len(data.get("consensus", [])),
+                "sources_count": len(data.get("sources", {})),
+                "sample_hour": data.get("consensus", [{}])[0] if data.get("consensus") else None,
+                "raw_keys": list(data.keys())
+            }
+        else:
+            return {
+                "cache_key": cache_key,
+                "found": False
+            }
+    except Exception as e:
+        logger.error(f"Error debugging cache: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/admin/test-weather/{site_id}")
 async def test_weather_fetch(site_id: str, db: Session = Depends(get_db)):
     """
