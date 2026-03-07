@@ -227,7 +227,7 @@ async def fetch_wyoming_sounding(
     # Try cache first
     if use_cache:
         try:
-            from cache.emagram_cache import get_cache
+            from cache_emagram.emagram_cache import get_cache
             cache = get_cache()
             
             cached_data = cache.get_sounding(station_code, sounding_time, date)
@@ -357,7 +357,7 @@ async def fetch_wyoming_sounding(
     # Cache the result
     if use_cache and result["success"]:
         try:
-            from cache.emagram_cache import get_cache
+            from cache_emagram.emagram_cache import get_cache
             cache = get_cache()
             cache.set_sounding(station_code, sounding_time, date, result)
         except Exception as e:
