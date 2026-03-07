@@ -1047,6 +1047,68 @@ async def refresh_weather_cache():
         )
 
 
+@router.get("/admin/test-weather/{site_id}")
+async def test_weather_fetch(site_id: str, db: Session = Depends(get_db)):
+    """
+    Admin endpoint: Test weather fetching for a specific site with detailed diagnostics
+    
+    Returns detailed information about what's working and what's failing
+    """
+    from weather_pipeline import get_normalized_forecast
+    
+    try:
+        # Get site info
+        site = db.query(Site).filter(Site.id == site_id).first()
+        if not site:
+            raise HTTPException(status_code=404, detail=f"Site not found: {site_id}")
+        
+        logger.info(f"🧪 Testing weather fetch for {site.name} ({site.latitude}, {site.longitude})")
+        
+        # Try fetching day 0
+        result = await get_normalized_forecast(
+            lat=site.latitude,
+            lon=site.longitude,
+            day_index=0,
+            site_name=site.name,
+            elevation_m=site.elevation_m
+        )
+        
+        # Analyze the result
+        diagnostics = {
+            "site": {
+                "id": site_id,
+                "name": site.name,
+                "lat": site.latitude,
+                "lon": site.longitude,
+                "elevation": site.elevation_m
+            },
+            "fetch_result": {
+                "success": result.get("success", False),
+                "error": result.get("error"),
+                "sources": result.get("sources", {}),
+                "consensus_hours": len(result.get("consensus", [])),
+                "timestamp": result.get("timestamp")
+            },
+            "sources_status": {}
+        }
+        
+        # Check each source
+        sources = result.get("sources", {})
+        for source_name, source_data in sources.items():
+            if isinstance(source_data, dict):
+                diagnostics["sources_status"][source_name] = {
+                    "success": source_data.get("success", False),
+                    "error": source_data.get("error"),
+                    "hourly_count": len(source_data.get("hourly", [])) if "hourly" in source_data else 0
+                }
+        
+        return diagnostics
+        
+    except Exception as e:
+        logger.error(f"Error in test-weather: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/admin/sites/link-to-spots")
 async def link_user_sites_to_spots(db: Session = Depends(get_db)):
     """
