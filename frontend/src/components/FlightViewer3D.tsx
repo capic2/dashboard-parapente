@@ -35,6 +35,48 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ||
   (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8001` : 'http://localhost:8001');
 
 /**
+ * AccordionSection - Collapsible section component for control panel
+ */
+interface AccordionSectionProps {
+  title: string;
+  emoji?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}
+
+const AccordionSection: React.FC<AccordionSectionProps> = ({
+  title,
+  emoji = '',
+  defaultOpen = false,
+  children
+}) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  
+  return (
+    <div className="border-b border-gray-200 last:border-0">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between py-2 px-1 hover:bg-gray-50 transition-colors rounded"
+        type="button"
+      >
+        <span className="text-sm font-semibold text-gray-700">
+          {emoji && <span className="mr-1.5">{emoji}</span>}
+          {title}
+        </span>
+        <span className="text-gray-400 text-xs transition-transform" style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+          ▶
+        </span>
+      </button>
+      {isOpen && (
+        <div className="pb-3 pt-1 space-y-3">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
  * FlightViewer3D - 3D flight viewer using Cesium
  */
 export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
@@ -1065,22 +1107,24 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
           {!isPanelCollapsed && (
             <>
-              <p className="text-xs text-gray-500 mb-4">
+              <p className="text-xs text-gray-500 mb-3">
                 Points: {gpxData?.coordinates?.length || 0}
               </p>
 
-              <div className="space-y-3">
-            {/* Terrain Loading Indicator */}
-            {!terrainReady && (
-              <div className="bg-blue-100 border border-blue-400 rounded p-2 mb-3">
-                <p className="text-xs text-blue-800 flex items-center gap-2">
-                  <span className="animate-spin">⏳</span>
-                  Chargement des textures du terrain...
-                </p>
-              </div>
-            )}
+              <div className="divide-y divide-gray-200">
+                {/* Terrain Loading Indicator - Outside accordion, always visible */}
+                {!terrainReady && (
+                  <div className="bg-blue-100 border border-blue-400 rounded p-2 mb-3">
+                    <p className="text-xs text-blue-800 flex items-center gap-2">
+                      <span className="animate-spin">⏳</span>
+                      Chargement des textures du terrain...
+                    </p>
+                  </div>
+                )}
 
-            <div className="flex gap-2 mb-3">
+                {/* ========== SECTION 1: LECTURE ========== */}
+                <AccordionSection title="Lecture" emoji="🎮" defaultOpen={true}>
+                  <div className="flex gap-2">
               <button
                 onClick={togglePlayPause}
                 className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
@@ -1095,8 +1139,46 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
               </button>
             </div>
 
-            {/* Video Buttons */}
-            {flight?.gpx_file_path && (
+            {/* Progress Slider */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Position: {currentIndexRef.current + 1}/{allPositionsRef.current.length}
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="0.1"
+                value={currentProgress}
+                onChange={(e) => handleProgressChange(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+
+            {/* Flight Time Display */}
+            <div className="text-sm text-gray-700 font-medium">
+              ⏱️ {formatFlightTime(currentElapsedTime)} / {formatFlightTime(gpxData?.flight_duration_seconds || 0)}
+            </div>
+
+            {/* Speed Slider */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Vitesse: {replaySpeed}x
+              </label>
+              <input
+                type="range"
+                min="1"
+                max="32"
+                value={replaySpeed}
+                onChange={(e) => handleSpeedChange(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+          </AccordionSection>
+
+          {/* ========== SECTION 2: VIDÉO ========== */}
+          {flight?.gpx_file_path && (
+            <AccordionSection title="Vidéo" emoji="📹" defaultOpen={false}>
               <>
                 {/* Download/Generate Button */}
                 <button
@@ -1213,15 +1295,18 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                     className="w-full px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 mb-3"
                     title="Régénérer la vidéo (remplace l'ancienne)"
                   >
-                    🔄 Régénérer la vidéo
-                  </button>
-                )}
+                  🔄 Régénérer la vidéo
+                </button>
+              )}
               </>
-            )}
+            </AccordionSection>
+          )}
 
-            {/* Orientation Selector */}
-            {flight?.site && (
-              <div className="mb-3">
+          {/* ========== SECTION 3: SITE & CAMÉRA ========== */}
+          {flight?.site && (
+            <AccordionSection title="Site & Caméra" emoji="🏔️" defaultOpen={false}>
+              {/* Orientation Selector */}
+              <div>
                 <label className="block text-sm font-medium mb-1">
                   Orientation Décollage
                 </label>
@@ -1245,11 +1330,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   }
                 </p>
               </div>
-            )}
 
-            {/* Camera Position Controls */}
-            {flight?.site && (
-              <div className="mb-3 p-3 bg-blue-50 rounded border border-blue-200">
+              {/* Camera Position Controls */}
+              <div className="p-3 bg-blue-50 rounded border border-blue-200">
                 <label className="block text-sm font-medium mb-2 text-blue-900">
                   📷 Position Caméra
                 </label>
@@ -1309,43 +1392,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   💡 Ces réglages seront sauvegardés pour le site "{flight.site.name}" et appliqués à tous ses vols
                 </p>
               </div>
-            )}
+            </AccordionSection>
+          )}
 
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Position: {currentIndexRef.current + 1}/
-                {allPositionsRef.current.length}
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="0.1"
-                value={currentProgress}
-                onChange={(e) => handleProgressChange(Number(e.target.value))}
-                className="w-full"
-              />
-            </div>
-
-            {/* Flight Time Display */}
-            <div className="text-sm text-gray-700 font-medium">
-              ⏱️ Temps: {formatFlightTime(currentElapsedTime)} / {formatFlightTime(gpxData?.flight_duration_seconds || 0)}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Vitesse: {replaySpeed}x
-              </label>
-              <input
-                type="range"
-                min="1"
-                max="32"
-                value={replaySpeed}
-                onChange={(e) => handleSpeedChange(Number(e.target.value))}
-                className="w-full"
-              />
-            </div>
-
+          {/* ========== SECTION 4: RENDU & ÉLÉVATION ========== */}
+          <AccordionSection title="Rendu & Élévation" emoji="🎨" defaultOpen={false}>
+            {/* Elevation Offset */}
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-sm font-medium">
@@ -1376,11 +1428,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
               )}
             </div>
 
-            {/* Terrain Rendering Section */}
-            <div className="border-t pt-3 mt-3">
-              <h4 className="text-sm font-bold mb-2">🎨 Rendu du Terrain</h4>
-              
-              {/* Terrain Shadows Toggle */}
+            {/* Terrain Shadows Toggle */}
+            <div>
               <label className="flex items-center text-sm mb-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -1434,7 +1483,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                 />
               </div>
             </div>
-          </div>
+          </AccordionSection>
+        </div>
             </>
           )}
         </div>
