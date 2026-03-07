@@ -69,6 +69,7 @@ class Site(SiteBase):
     camera_angle: Optional[int] = None  # Camera angle in degrees (0-360)
     camera_distance: Optional[int] = 500  # Camera distance from takeoff in meters
     linked_spot_id: Optional[str] = None  # Link to paragliding_spots table
+    flight_count: Optional[int] = 0  # Number of flights at this site
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     
