@@ -75,7 +75,9 @@ export default function EmagramWidget({ userLat, userLon }: EmagramWidgetProps) 
             className="p-1.5 rounded-full hover:bg-gray-100 transition-colors disabled:opacity-50"
             title="Actualiser"
           >
-            <RefreshCw className={`w-4 h-4 text-gray-600 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span className={`text-lg ${isRefreshing ? 'animate-spin inline-block' : ''}`}>
+              🔄
+            </span>
           </button>
         </div>
         <div className="py-5 text-center text-gray-500 text-sm">
