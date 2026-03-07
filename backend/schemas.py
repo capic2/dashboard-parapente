@@ -19,6 +19,8 @@ class Site(SiteBase):
     id: str
     rating: Optional[int] = None  # 0-6 rating from official spots
     orientation: Optional[str] = None  # N, NW, W, S, etc.
+    camera_direction: Optional[str] = None  # Camera position: N, NE, E, SE, S, SW, W, NW, etc.
+    camera_distance: Optional[int] = 500  # Camera distance from takeoff in meters
     linked_spot_id: Optional[str] = None  # Link to paragliding_spots table
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -86,6 +88,8 @@ class SiteInFlight(BaseModel):
     name: str
     code: Optional[str] = None
     orientation: Optional[str] = None
+    camera_direction: Optional[str] = None  # Manual camera position override
+    camera_distance: Optional[int] = 500  # Camera distance in meters
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     elevation_m: Optional[int] = None

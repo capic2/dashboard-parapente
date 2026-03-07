@@ -631,6 +631,75 @@ def update_site_orientation(
         logger.error(f"Failed to update site orientation: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
 
+@router.patch("/sites/{site_id}/camera")
+def update_site_camera(
+    site_id: str,
+    direction: Optional[str] = None,
+    distance: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Update site camera position settings for 3D visualization
+    
+    Args:
+        site_id: Site ID
+        direction: Camera direction (N, NE, E, SE, S, SW, W, NW, etc.) - where to position camera
+        distance: Camera distance from takeoff in meters (default: 500)
+    
+    Returns:
+        Updated site camera settings
+    
+    Valid directions:
+        N, NNE, NE, ENE, E, ESE, SE, SSE, S, SSW, SW, WSW, W, WNW, NW, NNW
+    """
+    VALID_DIRECTIONS = [
+        'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+        'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
+    ]
+    
+    site = db.query(Site).filter(Site.id == site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    # Validate and update direction if provided
+    if direction is not None:
+        direction_upper = direction.upper().strip()
+        if direction_upper not in VALID_DIRECTIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid direction '{direction}'. Must be one of: {', '.join(VALID_DIRECTIONS)}"
+            )
+        site.camera_direction = direction_upper
+    
+    # Validate and update distance if provided
+    if distance is not None:
+        if distance < 50 or distance > 5000:
+            raise HTTPException(
+                status_code=400,
+                detail="Distance must be between 50 and 5000 meters"
+            )
+        site.camera_distance = distance
+    
+    site.updated_at = datetime.utcnow()
+    
+    try:
+        db.commit()
+        db.refresh(site)
+        logger.info(f"✅ Updated camera settings for site '{site.name}': direction={site.camera_direction}, distance={site.camera_distance}m")
+        
+        return {
+            "success": True,
+            "site_id": site.id,
+            "name": site.name,
+            "camera_direction": site.camera_direction,
+            "camera_distance": site.camera_distance,
+            "message": "Camera settings updated successfully"
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to update site camera settings: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
+
 
 # ============================================================================
 # BEST SPOT RECOMMENDATION ENDPOINT
