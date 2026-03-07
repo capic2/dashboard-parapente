@@ -394,16 +394,41 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       // Using a very low angle to see the altitude of the flight track
       const positionCamera = async () => {
         if (viewer && !viewer.isDestroyed()) {
-          const heading = await calculateOptimalHeading();
-          cameraHeadingRef.current = heading;
-          cameraDistanceRef.current = boundingSphere.radius * 0.8; // Vue plus rapprochée
+          // Check if camera settings were already loaded from site (camera_angle/camera_distance)
+          // If so, don't overwrite them with calculated values
+          const hasSavedCameraSettings = flight?.site?.camera_angle !== null && 
+                                          flight?.site?.camera_angle !== undefined;
+          
+          let heading: number;
+          let distance: number;
+          
+          if (hasSavedCameraSettings) {
+            // Use already-saved values from refs (set by the camera positioning useEffect)
+            heading = cameraHeadingRef.current;
+            distance = cameraDistanceRef.current;
+            console.log('📷 Using saved camera settings:', {
+              angle: flight.site.camera_angle,
+              distance: flight.site.camera_distance,
+              headingRad: heading
+            });
+          } else {
+            // Calculate optimal heading automatically
+            heading = await calculateOptimalHeading();
+            distance = boundingSphere.radius * 0.8;
+            cameraHeadingRef.current = heading;
+            cameraDistanceRef.current = distance;
+            console.log('📷 Using calculated camera settings:', {
+              headingRad: heading,
+              distance: distance
+            });
+          }
           
           viewer.camera.flyToBoundingSphere(boundingSphere, {
             duration: 2,
             offset: new HeadingPitchRange(
               heading, // heading perpendicular to flight direction
               -0.05, // pitch: légèrement incliné vers le bas pour voir le sol
-              cameraDistanceRef.current // distance plus proche pour meilleure immersion
+              distance // distance plus proche pour meilleure immersion
             ),
           });
         }
@@ -1198,6 +1223,41 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   {flight.video_export_status === 'failed' && '🔄 Relancer la génération'}
                   {!flight.video_export_status && '🎥 Générer la vidéo'}
                 </button>
+
+                {/* Cancel Button (only when processing) */}
+                {flight.video_export_status === 'processing' && flight.video_export_job_id && (
+                  <button
+                    onClick={async () => {
+                      if (!confirm('Êtes-vous sûr de vouloir annuler cette génération ?')) {
+                        return;
+                      }
+                      
+                      try {
+                        const response = await fetch(`${API_BASE_URL}/api/exports/${flight.video_export_job_id}/cancel`, {
+                          method: 'DELETE',
+                        });
+                        
+                        if (!response.ok) {
+                          const error = await response.json();
+                          alert(`Erreur: ${error.detail || 'Impossible d\'annuler la génération'}`);
+                          return;
+                        }
+                        
+                        console.log('✅ Video generation cancelled');
+                        
+                        // Refresh flight data to get updated status
+                        window.location.reload();
+                      } catch (error) {
+                        console.error('❌ Failed to cancel video generation:', error);
+                        alert('Erreur lors de l\'annulation');
+                      }
+                    }}
+                    className="w-full px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 mb-3"
+                    title="Annuler la génération vidéo en cours"
+                  >
+                    🛑 Annuler la génération
+                  </button>
+                )}
 
                 {/* Regenerate Button (only when video exists) */}
                 {flight.video_export_status === 'completed' && (

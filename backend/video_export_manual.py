@@ -71,7 +71,8 @@ def start_video_export_manual(
         "started_at": datetime.now().isoformat(),
         "video_path": None,
         "error": None,
-        "total_frames": None
+        "total_frames": None,
+        "cancelled": False
     }
     
     # Update flight status in database if requested
@@ -341,6 +342,16 @@ async def _export_video_manual_render(
             start_time = time.time()
             
             for i in range(total_frames):
+                # Check for cancellation
+                if export_jobs[job_id].get("cancelled"):
+                    print("🛑 Export cancelled by user")
+                    await browser.close()
+                    # Cleanup frames
+                    for frame_file in frames_dir.glob("*.png"):
+                        frame_file.unlink()
+                    frames_dir.rmdir()
+                    return
+                
                 # Render this frame in Cesium
                 tiles_loaded = await page.evaluate(f"""
                     () => {{
@@ -383,6 +394,15 @@ async def _export_video_manual_render(
             print(f"✅ Captured all {frame_count} frames in {int(total_capture_time/60)}min {int(total_capture_time%60)}s")
             
             await browser.close()
+            
+            # Check for cancellation before encoding
+            if export_jobs[job_id].get("cancelled"):
+                print("🛑 Export cancelled by user before encoding")
+                # Cleanup frames
+                for frame_file in frames_dir.glob("*.png"):
+                    frame_file.unlink()
+                frames_dir.rmdir()
+                return
             
             # Encode with FFmpeg
             export_jobs[job_id]["status"] = "encoding"
@@ -472,6 +492,48 @@ async def _export_video_manual_render(
 def get_export_status(job_id: str) -> Optional[Dict]:
     """Get status of an export job"""
     return export_jobs.get(job_id)
+
+
+def cancel_video_export(job_id: str, update_db: bool = True) -> bool:
+    """
+    Cancel an ongoing video export
+    
+    Args:
+        job_id: ID of the export job to cancel
+        update_db: Whether to update database (default True)
+    
+    Returns:
+        True if cancellation was successful, False if job not found or already completed
+    """
+    job = export_jobs.get(job_id)
+    if not job:
+        return False
+    
+    # Can only cancel jobs that are in progress
+    if job["status"] in ["completed", "failed"]:
+        return False
+    
+    # Set cancellation flag
+    job["cancelled"] = True
+    job["status"] = "cancelled"
+    job["message"] = "Export cancelled by user"
+    
+    # Update flight status in database
+    if update_db:
+        from database import SessionLocal
+        from models import Flight
+        db = SessionLocal()
+        try:
+            flight = db.query(Flight).filter(Flight.id == job["flight_id"]).first()
+            if flight:
+                flight.video_export_status = "failed"  # Reset to failed
+                flight.video_export_job_id = None
+                db.commit()
+        finally:
+            db.close()
+    
+    print(f"🛑 Video export {job_id} cancelled")
+    return True
 
 
 def list_exports(flight_id: str) -> list:
