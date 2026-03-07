@@ -634,7 +634,7 @@ def update_site_orientation(
 @router.patch("/sites/{site_id}/camera")
 def update_site_camera(
     site_id: str,
-    direction: Optional[str] = None,
+    angle: Optional[int] = None,
     distance: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
@@ -643,33 +643,29 @@ def update_site_camera(
     
     Args:
         site_id: Site ID
-        direction: Camera direction (N, NE, E, SE, S, SW, W, NW, etc.) - where to position camera
+        angle: Camera angle in degrees (0-360) - where to position camera relative to takeoff
         distance: Camera distance from takeoff in meters (default: 500)
     
     Returns:
         Updated site camera settings
     
-    Valid directions:
-        N, NNE, NE, ENE, E, ESE, SE, SSE, S, SSW, SW, WSW, W, WNW, NW, NNW
+    Examples:
+        - angle=0: Camera at North, looking South
+        - angle=90: Camera at East, looking West
+        - angle=180: Camera at South, looking North
     """
-    VALID_DIRECTIONS = [
-        'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
-        'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
-    ]
-    
     site = db.query(Site).filter(Site.id == site_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     
-    # Validate and update direction if provided
-    if direction is not None:
-        direction_upper = direction.upper().strip()
-        if direction_upper not in VALID_DIRECTIONS:
+    # Validate and update angle if provided
+    if angle is not None:
+        if angle < 0 or angle > 360:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid direction '{direction}'. Must be one of: {', '.join(VALID_DIRECTIONS)}"
+                detail="Angle must be between 0 and 360 degrees"
             )
-        site.camera_direction = direction_upper
+        site.camera_angle = angle
     
     # Validate and update distance if provided
     if distance is not None:
@@ -685,13 +681,13 @@ def update_site_camera(
     try:
         db.commit()
         db.refresh(site)
-        logger.info(f"✅ Updated camera settings for site '{site.name}': direction={site.camera_direction}, distance={site.camera_distance}m")
+        logger.info(f"✅ Updated camera settings for site '{site.name}': angle={site.camera_angle}°, distance={site.camera_distance}m")
         
         return {
             "success": True,
             "site_id": site.id,
             "name": site.name,
-            "camera_direction": site.camera_direction,
+            "camera_angle": site.camera_angle,
             "camera_distance": site.camera_distance,
             "message": "Camera settings updated successfully"
         }
