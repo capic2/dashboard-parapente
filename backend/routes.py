@@ -3623,9 +3623,13 @@ async def trigger_emagram_analysis(
         )
         
         if not sounding_result.get("success"):
+            error_detail = sounding_result.get('error', 'Unknown error')
+            logger.error(f"❌ Wyoming fetch failed: {error_detail}")
+            if 'raw_text' in sounding_result:
+                logger.error(f"   Raw text preview: {sounding_result['raw_text'][:200]}")
             raise HTTPException(
                 status_code=503,
-                detail=f"Failed to fetch sounding data: {sounding_result.get('error')}"
+                detail=f"Failed to fetch sounding data: {error_detail}"
             )
         
         # Step 2: Generate Skew-T diagram
