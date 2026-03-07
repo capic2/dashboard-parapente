@@ -66,6 +66,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   
   // Orientation editing state
   const [isUpdatingOrientation, setIsUpdatingOrientation] = useState(false);
+  
+  // Camera position editing state
+  const [isUpdatingCamera, setIsUpdatingCamera] = useState(false);
+  const [tempCameraDirection, setTempCameraDirection] = useState<string | null>(null);
+  const [tempCameraDistance, setTempCameraDistance] = useState<number>(500);
 
 
 
@@ -456,6 +461,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     };
   }, [gpxData, elevationOffset, viewerReady]);
 
+  // Initialize camera settings from flight data
+  useEffect(() => {
+    if (flight?.site) {
+      setTempCameraDirection(flight.site.camera_direction || flight.site.orientation || null)
+      setTempCameraDistance(flight.site.camera_distance || 500)
+    }
+  }, [flight?.site])
+
   // Position camera based on site orientation
   useEffect(() => {
     if (!viewerRef.current || !viewerReady || !gpxData?.coordinates || !allPositionsRef.current.length) {
@@ -467,17 +480,19 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     
     if (!firstPosition) return
 
-    // Check if site has orientation
-    const siteOrientation = flight?.site?.orientation
-    const heading = getHeadingFromOrientation(siteOrientation)
+    // Use camera_direction if set, otherwise fall back to orientation
+    const cameraDirection = flight?.site?.camera_direction || flight?.site?.orientation
+    const cameraDistance = flight?.site?.camera_distance || 500
+    const heading = getHeadingFromOrientation(cameraDirection)
 
     if (heading !== null) {
-      // If takeoff points North, camera should be 500m North, looking South (back at takeoff)
-      // The camera heading should be OPPOSITE to the takeoff orientation
+      // Camera is positioned in the direction specified, looking back at takeoff
+      // The camera heading should be OPPOSITE to the camera direction
       const oppositeHeading = (heading + 180) % 360;
       
-      console.log(`📐 Site orientation: ${siteOrientation} (takeoff points ${heading}°)`)
-      console.log(`📷 Camera positioned ${heading}° from takeoff, looking ${oppositeHeading}° (back at takeoff)`)
+      console.log(`📐 Camera direction: ${cameraDirection} (position at ${heading}°)`)
+      console.log(`📏 Camera distance: ${cameraDistance}m`)
+      console.log(`📷 Camera looking ${oppositeHeading}° (back at takeoff)`)
       
       // First, position camera at takeoff looking in the OPPOSITE direction
       viewer.camera.setView({
@@ -489,24 +504,16 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         }
       })
       
-      // Then move camera FORWARD 500m (which is actually in the takeoff direction)
+      // Then move camera FORWARD by the specified distance
       // This places camera ahead of takeoff, looking back at it
-      viewer.camera.moveForward(500)
-      
-      console.log('✅ Camera positioned to face takeoff point')
-    }
-      })
-      
-      // Move camera back 500m - this moves it IN THE DIRECTION of the heading
-      // Example: heading=0° (North) → camera moves North, looks South toward takeoff
-      viewer.camera.moveBackward(500)
+      viewer.camera.moveForward(cameraDistance)
       
       console.log('✅ Camera positioned to face takeoff point')
     } else {
-      console.log('📐 No orientation found, using default camera positioning')
+      console.log('📐 No camera direction found, using default camera positioning')
       // Default positioning is already handled by the GPX loading useEffect
     }
-  }, [viewerReady, gpxData, flight?.site?.orientation])
+  }, [viewerReady, gpxData, flight?.site?.camera_direction, flight?.site?.camera_distance, flight?.site?.orientation])
 
   // Calculer automatiquement l'offset d'élévation
   const calculateAutoElevationOffset = useCallback(async () => {
@@ -803,6 +810,33 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     } finally {
       setIsUpdatingOrientation(false)
     }
+  };
+
+  const updateCameraSettings = async (direction: string | null, distance: number) => {
+    if (!flight?.site?.id) return
+    
+    setIsUpdatingCamera(true)
+    try {
+      const params = new URLSearchParams()
+      if (direction) params.append('direction', direction)
+      params.append('distance', distance.toString())
+      
+      await api.patch(`sites/${flight.site.id}/camera?${params.toString()}`)
+      
+      // Refresh flight data to get updated site
+      await queryClient.invalidateQueries({ queryKey: ['flights', flightId] })
+      
+      console.log(`✅ Camera updated: direction=${direction}, distance=${distance}m`)
+    } catch (error) {
+      console.error('❌ Failed to update camera settings:', error)
+      alert('Erreur lors de la mise à jour de la caméra')
+    } finally {
+      setIsUpdatingCamera(false)
+    }
+  };
+
+  const applyCameraSettings = () => {
+    updateCameraSettings(tempCameraDirection, tempCameraDistance)
   };
 
   // Render error messages as overlays instead of early returns
@@ -1146,6 +1180,67 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                     ? `Direction: ${getOrientationLabel(flight.site.orientation)}`
                     : 'Direction vers laquelle regarde le pilote'
                   }
+                </p>
+              </div>
+            )}
+
+            {/* Camera Position Controls */}
+            {flight?.site && (
+              <div className="mb-3 p-3 bg-blue-50 rounded border border-blue-200">
+                <label className="block text-sm font-medium mb-2 text-blue-900">
+                  📷 Position Caméra
+                </label>
+                
+                {/* Camera Direction */}
+                <div className="mb-2">
+                  <label className="block text-xs text-gray-600 mb-1">
+                    Direction
+                  </label>
+                  <select
+                    value={tempCameraDirection || ''}
+                    onChange={(e) => setTempCameraDirection(e.target.value || null)}
+                    className="w-full px-2 py-1 border rounded text-sm bg-white"
+                  >
+                    <option value="">Auto (depuis orientation)</option>
+                    {getOrientationOptions().map(opt => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                {/* Camera Distance */}
+                <div className="mb-2">
+                  <label className="block text-xs text-gray-600 mb-1">
+                    Distance: {tempCameraDistance}m
+                  </label>
+                  <input
+                    type="range"
+                    min="100"
+                    max="2000"
+                    step="50"
+                    value={tempCameraDistance}
+                    onChange={(e) => setTempCameraDistance(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>100m</span>
+                    <span>2000m</span>
+                  </div>
+                </div>
+                
+                {/* Apply Button */}
+                <button
+                  onClick={applyCameraSettings}
+                  disabled={isUpdatingCamera}
+                  className="w-full px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isUpdatingCamera ? '⏳ Mise à jour...' : '✓ Appliquer'}
+                </button>
+                
+                <p className="text-xs text-gray-600 mt-2">
+                  💡 La caméra sera positionnée dans la direction choisie, regardant vers le décollage
                 </p>
               </div>
             )}
