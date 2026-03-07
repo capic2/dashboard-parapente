@@ -506,8 +506,24 @@ async def get_spot_weather(
 
 @router.get("/spots", response_model=SpotsResponse)
 def get_spots(db: Session = Depends(get_db)):
-    """Get all user-managed paragliding spots"""
-    sites = db.query(Site).all()
+    """Get all user-managed paragliding spots with flight counts"""
+    from models import Flight
+    from sqlalchemy import func
+    
+    # Query sites with flight count
+    sites_with_counts = db.query(
+        Site,
+        func.count(Flight.id).label('flight_count')
+    ).outerjoin(
+        Flight, Site.id == Flight.site_id
+    ).group_by(Site.id).all()
+    
+    # Add flight_count to each site object
+    sites = []
+    for site, flight_count in sites_with_counts:
+        site.flight_count = flight_count
+        sites.append(site)
+    
     return SpotsResponse(sites=sites)
 
 @router.post("/spots")
