@@ -8,6 +8,9 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime, date, timedelta
 import statistics
 import math
+import time
+import logging
+from contextlib import contextmanager
 
 # Import all scrapers
 from scrapers.open_meteo import fetch_open_meteo, extract_hourly_forecast as extract_om
@@ -16,6 +19,220 @@ from scrapers.meteociel import fetch_meteociel
 from scrapers.meteoblue import fetch_meteoblue
 from scrapers.meteo_parapente import fetch_meteo_parapente
 from para_index import calculate_para_index
+
+logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# INSTRUMENTATION HELPERS FOR WEATHER SOURCE STATISTICS
+# ============================================================================
+
+@contextmanager
+def instrument_source_call(source_name: str, db_session):
+    """
+    Context manager to instrument weather source calls
+    
+    Usage:
+        with instrument_source_call("open-meteo", db):
+            result = await fetch_open_meteo(...)
+    
+    Automatically logs:
+    - Response time
+    - Success/failure
+    - Error message if applicable
+    - Updates counters in weather_source_config table
+    """
+    start_time = time.time()
+    source = None
+    success = False
+    error_message = None
+    
+    try:
+        # Import here to avoid circular dependencies
+        from models import WeatherSourceConfig
+        
+        # Get source config
+        source = db_session.query(WeatherSourceConfig).filter(
+            WeatherSourceConfig.source_name == source_name
+        ).first()
+        
+        yield  # Execute wrapped code
+        
+        success = True  # If no exception, it's a success
+        
+    except Exception as e:
+        success = False
+        error_message = str(e)
+        raise  # Re-raise to not hide the error
+        
+    finally:
+        # Calculate response time
+        response_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Update stats in DB
+        if source:
+            if success:
+                source.success_count += 1
+                source.total_response_time_ms += response_time_ms
+                source.last_success_at = datetime.utcnow()
+            else:
+                source.error_count += 1
+                source.last_error_at = datetime.utcnow()
+                source.last_error_message = error_message[:500] if error_message else None  # Limit length
+            
+            source.updated_at = datetime.utcnow()
+            
+            try:
+                db_session.commit()
+            except Exception as commit_error:
+                logger.error(f"Failed to update source stats for '{source_name}': {commit_error}")
+                db_session.rollback()
+
+
+async def fetch_from_enabled_sources(
+    lat: float,
+    lon: float,
+    day_index: int = 0,
+    site_name: Optional[str] = None,
+    elevation_m: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Fetch weather only from enabled sources in DB
+    
+    This replaces the hardcoded logic in aggregate_forecasts()
+    Sources are filtered by is_enabled=True from weather_source_config table
+    """
+    from database import SessionLocal
+    from models import WeatherSourceConfig
+    
+    db = SessionLocal()
+    
+    try:
+        # Get enabled sources
+        enabled_sources = db.query(WeatherSourceConfig).filter(
+            WeatherSourceConfig.is_enabled == True
+        ).order_by(WeatherSourceConfig.priority.desc()).all()
+        
+        if not enabled_sources:
+            logger.warning("No enabled weather sources found! Using fallback.")
+            # Fallback: enable open-meteo by default
+            fallback = db.query(WeatherSourceConfig).filter(
+                WeatherSourceConfig.source_name == "open-meteo"
+            ).first()
+            if fallback:
+                fallback.is_enabled = True
+                db.commit()
+                enabled_sources = [fallback]
+        
+        logger.info(f"Fetching weather from {len(enabled_sources)} enabled sources: "
+                   f"{[s.source_name for s in enabled_sources]}")
+        
+        # Map sources to fetch functions
+        fetch_map = {
+            "open-meteo": fetch_open_meteo,
+            "weatherapi": fetch_weatherapi,
+            "meteo-parapente": fetch_meteo_parapente,
+            "meteociel": fetch_meteociel,
+            "meteoblue": fetch_meteoblue
+        }
+        
+        # Create instrumented tasks
+        async def instrumented_fetch(src_name, func):
+            """Wrapper to instrument each fetch call"""
+            result = None
+            try:
+                # Adapt arguments per source
+                if src_name == "open-meteo":
+                    result = await func(lat, lon, days=7)
+                elif src_name == "meteo-parapente":
+                    result = await func(lat, lon, site_name=site_name, elevation_m=elevation_m, days=1)
+                elif src_name == "meteociel":
+                    result = await func(lat, lon, site_name=site_name)
+                elif src_name == "meteoblue":
+                    result = await func(lat, lon, city_name=site_name)
+                else:
+                    result = await func(lat, lon)
+                
+                # Update stats based on result
+                from models import WeatherSourceConfig
+                source = db.query(WeatherSourceConfig).filter(
+                    WeatherSourceConfig.source_name == src_name
+                ).first()
+                
+                if source and result:
+                    if result.get("success"):
+                        source.success_count += 1
+                        source.last_success_at = datetime.utcnow()
+                    else:
+                        source.error_count += 1
+                        source.last_error_at = datetime.utcnow()
+                        source.last_error_message = result.get("error", "Unknown error")[:500]
+                    
+                    source.updated_at = datetime.utcnow()
+                    db.commit()
+                
+                return result
+                
+            except Exception as e:
+                logger.error(f"Error fetching from {src_name}: {e}")
+                # Update error stats
+                from models import WeatherSourceConfig
+                source = db.query(WeatherSourceConfig).filter(
+                    WeatherSourceConfig.source_name == src_name
+                ).first()
+                
+                if source:
+                    source.error_count += 1
+                    source.last_error_at = datetime.utcnow()
+                    source.last_error_message = str(e)[:500]
+                    source.updated_at = datetime.utcnow()
+                    db.commit()
+                
+                return {
+                    "success": False,
+                    "source": src_name,
+                    "error": str(e),
+                    "timestamp": datetime.now().isoformat()
+                }
+        
+        # Create tasks
+        tasks = []
+        source_names = []
+        
+        for source in enabled_sources:
+            fetch_func = fetch_map.get(source.source_name)
+            if not fetch_func:
+                logger.warning(f"No fetch function for source '{source.source_name}', skipping")
+                continue
+            
+            tasks.append(instrumented_fetch(source.source_name, fetch_func))
+            source_names.append(source.source_name)
+        
+        # Execute all fetches in parallel
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Build aggregated response
+        aggregated = {
+            "timestamp": datetime.now().isoformat(),
+            "day_index": day_index,
+            "sources": {}
+        }
+        
+        for i, result in enumerate(results):
+            source_name = source_names[i]
+            
+            if isinstance(result, Exception):
+                aggregated["sources"][source_name] = {
+                    "success": False,
+                    "error": str(result)
+                }
+            else:
+                aggregated["sources"][source_name] = result
+        
+        return aggregated
+        
+    finally:
+        db.close()
 
 
 async def aggregate_forecasts(
@@ -29,103 +246,34 @@ async def aggregate_forecasts(
     """
     Aggregate weather forecasts from available sources
     
+    UPDATED: Now uses weather_source_config table to filter enabled sources
+    
     Args:
         lat: Latitude
         lon: Longitude
         day_index: 0=today, 1=tomorrow, etc.
-        sources: List of sources to use (default: reliable sources only)
-                 NOTE: meteo_parapente, meteociel, meteoblue are disabled due to
-                 website structure changes. See SCRAPER_STATUS.md for details.
+        sources: DEPRECATED - Ignored. Enabled sources from DB are used instead.
         site_name: Site name (required for meteo_parapente)
         elevation_m: Site elevation in meters (required for meteo_parapente)
     
     Returns:
         Dict with aggregated raw data from all sources
     """
-    # Default to sources that reliably return data
-    # Active: ["open-meteo", "weatherapi", "meteo-parapente", "meteociel", "meteoblue"] - All working!
-    if sources is None:
-        sources = ["open-meteo", "weatherapi", "meteo-parapente", "meteociel", "meteoblue"]
+    # Warn if deprecated parameter is used
+    if sources is not None:
+        logger.warning("Parameter 'sources' is deprecated and ignored. Using enabled sources from database instead.")
     
-    # Fetch all data concurrently
-    tasks = []
-    source_map = {}
+    # Delegate to new instrumented function
+    return await fetch_from_enabled_sources(
+        lat=lat,
+        lon=lon,
+        day_index=day_index,
+        site_name=site_name,
+        elevation_m=elevation_m
+    )
     
-    if "open-meteo" in sources:
-        tasks.append(fetch_open_meteo(lat, lon, days=7))  # Fetch 7 days for sunrise/sunset
-        source_map["open-meteo"] = len(tasks) - 1
-    
-    if "weatherapi" in sources:
-        tasks.append(fetch_weatherapi(lat, lon))
-        source_map["weatherapi"] = len(tasks) - 1
-    
-    if "meteo-parapente" in sources:
-        tasks.append(fetch_meteo_parapente(
-            lat, lon,
-            site_name=site_name,
-            elevation_m=elevation_m,
-            days=1  # Un jour par appel (pour compatibilité avec day_index)
-        ))
-        source_map["meteo-parapente"] = len(tasks) - 1
-    
-    if "meteociel" in sources:
-        tasks.append(fetch_meteociel(
-            lat, lon,
-            site_name=site_name
-        ))
-        source_map["meteociel"] = len(tasks) - 1
-    
-    if "meteoblue" in sources:
-        tasks.append(fetch_meteoblue(lat, lon, city_name=site_name))
-        source_map["meteoblue"] = len(tasks) - 1
-    
-    # Execute all fetches in parallel
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    
-    # Parse results
-    aggregated = {
-        "timestamp": datetime.now().isoformat(),
-        "day_index": day_index,
-        "sources": {}
-    }
-    
-    for source_name, idx in source_map.items():
-        result = results[idx]
-        
-        # Handle exceptions
-        if isinstance(result, Exception):
-            aggregated["sources"][source_name] = {
-                "success": False,
-                "error": str(result)
-            }
-            continue
-        
-        # Extract hourly data for the specific day
-        hourly = None
-        if source_name == "open-meteo":
-            hourly = extract_om(result, day_index)
-        elif source_name == "weatherapi":
-            hourly = extract_wa(result, day_index)
-        elif source_name == "meteo-parapente":
-            # meteo-parapente extractor
-            from scrapers.meteo_parapente import extract_hourly_forecast as extract_mp
-            hourly = extract_mp(result)
-        elif source_name == "meteociel":
-            # meteociel extractor
-            from scrapers.meteociel import extract_hourly_forecast as extract_mc
-            hourly = extract_mc(result, day_index)
-        elif source_name == "meteoblue":
-            # meteoblue extractor takes day_index
-            from scrapers.meteoblue import extract_hourly_forecast as extract_mb
-            hourly = extract_mb(result, day_index)
-        
-        aggregated["sources"][source_name] = {
-            "success": result.get("success", False),
-            "hourly": hourly,
-            "raw": result
-        }
-    
-    return aggregated
+    # OLD CODE REMOVED - Now uses fetch_from_enabled_sources() which reads from DB
+    # This ensures only enabled sources are queried and stats are automatically logged
 
 
 def normalize_data(aggregated: Dict[str, Any]) -> Dict[str, Any]:
@@ -407,7 +555,7 @@ async def get_normalized_forecast(
     elevation_m: Optional[int] = None
 ) -> Dict[str, Any]:
     """
-    Complete pipeline: fetch → normalize → consensus (with Redis cache)
+    Complete pipeline: fetch -> normalize -> consensus (with Redis cache)
     
     Args:
         lat: Latitude

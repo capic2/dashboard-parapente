@@ -1,6 +1,7 @@
-from sqlalchemy import Column, String, Integer, Float, DateTime, Text, Date, ForeignKey
+from sqlalchemy import Column, String, Integer, Float, DateTime, Text, Date, ForeignKey, Boolean, BigInteger
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from typing import Optional
 from database import Base
 
 class ParaglidingSpot(Base):
@@ -110,3 +111,72 @@ class WeatherForecast(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     site = relationship("Site", back_populates="weather_forecasts")
+
+
+class WeatherSourceConfig(Base):
+    """Configuration and statistics for weather data sources"""
+    __tablename__ = "weather_source_config"
+    
+    # Identification
+    id = Column(String, primary_key=True)
+    source_name = Column(String, unique=True, nullable=False, index=True)  # "open-meteo", "weatherapi", etc.
+    display_name = Column(String, nullable=False)  # "Open-Meteo", "WeatherAPI.com", etc.
+    description = Column(Text, nullable=True)  # Description for UI
+    
+    # Configuration
+    is_enabled = Column(Boolean, default=True, nullable=False)
+    requires_api_key = Column(Boolean, default=False, nullable=False)
+    api_key = Column(String, nullable=True)  # TODO: Encrypt in production
+    priority = Column(Integer, default=1, nullable=False)  # For future weighted consensus
+    
+    # Type and metadata
+    scraper_type = Column(String, nullable=False)  # "api", "playwright", "stealth"
+    base_url = Column(String, nullable=True)  # Base URL for the source
+    documentation_url = Column(String, nullable=True)  # Link to API docs
+    
+    # Statistics (rolling 30 days window)
+    last_success_at = Column(DateTime, nullable=True)
+    last_error_at = Column(DateTime, nullable=True)
+    last_error_message = Column(Text, nullable=True)
+    success_count = Column(Integer, default=0, nullable=False)
+    error_count = Column(Integer, default=0, nullable=False)
+    total_response_time_ms = Column(BigInteger, default=0, nullable=False)  # For avg calculation
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    @property
+    def success_rate(self) -> float:
+        """Success rate as percentage (0-100)"""
+        total = self.success_count + self.error_count
+        if total == 0:
+            return 0.0
+        return round((self.success_count / total) * 100, 2)
+    
+    @property
+    def avg_response_time_ms(self) -> Optional[int]:
+        """Average response time in milliseconds"""
+        if self.success_count == 0:
+            return None
+        return int(self.total_response_time_ms / self.success_count)
+    
+    @property
+    def api_key_configured(self) -> bool:
+        """Check if API key is configured (if required)"""
+        if not self.requires_api_key:
+            return True  # No key needed
+        return bool(self.api_key)
+    
+    @property
+    def status(self) -> str:
+        """Current source status: active, error, disabled, unknown"""
+        if not self.is_enabled:
+            return "disabled"
+        if not self.api_key_configured:
+            return "error"  # Missing required API key
+        if self.last_success_at is None and self.last_error_at is None:
+            return "unknown"  # Never tested
+        if self.last_error_at and (not self.last_success_at or self.last_error_at > self.last_success_at):
+            return "error"  # Last attempt failed
+        return "active"  # All good
