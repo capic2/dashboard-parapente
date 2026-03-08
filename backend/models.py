@@ -276,6 +276,7 @@ class EmagramAnalysis(Base):
     
     # Multi-Source Emagram Fields (for screenshot-based analysis)
     external_source_urls = Column(Text, nullable=True)  # JSON: {"meteo-parapente": "url", "topmeteo": "url", ...}
+    screenshot_paths = Column(Text, nullable=True)  # JSON: {"meteo-parapente": "/tmp/...", "topmeteo": "/tmp/...", ...}
     sources_count = Column(Integer, nullable=True)  # Number of sources successfully analyzed (e.g., 3)
     sources_agreement = Column(String, nullable=True)  # "high", "medium", "low" - consensus level between sources
     
