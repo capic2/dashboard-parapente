@@ -14,6 +14,7 @@ import xml.etree.ElementTree as ET
 import math
 import logging
 import os
+import redis
 from typing import List, Dict, Optional, Sequence
 
 logger = logging.getLogger(__name__)
@@ -3916,3 +3917,38 @@ async def get_emagram_screenshot(
         media_type="image/png",
         filename=f"emagram_{source}_{analysis_id[:8]}.png"
     )
+
+
+# ============================================================================
+# ADMIN ENDPOINTS
+# ============================================================================
+
+@router.post("/admin/clear-cache")
+async def clear_emagram_cache(db: Session = Depends(get_db)):
+    """
+    Clear all emagram cache (database + Redis)
+    Use this to fix stuck/old analyses
+    """
+    try:
+        # 1. Delete all emagram analyses from database
+        deleted_count = db.query(EmagramAnalysis).delete()
+        db.commit()
+        
+        # 2. Clear Redis cache
+        try:
+            r = redis.Redis(host='redis', port=6379, decode_responses=True)
+            r.flushall()
+            redis_cleared = True
+        except Exception as redis_error:
+            logger.warning(f"Redis clear failed (non-critical): {redis_error}")
+            redis_cleared = False
+        
+        return {
+            "success": True,
+            "database_deleted": deleted_count,
+            "redis_cleared": redis_cleared,
+            "message": f"Cleared {deleted_count} emagram analyses and Redis cache"
+        }
+    except Exception as e:
+        logger.error(f"Clear cache failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
