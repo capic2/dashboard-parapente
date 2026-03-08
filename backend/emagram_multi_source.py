@@ -238,11 +238,14 @@ def save_emagram_analysis(
     now = datetime.utcnow()
     analysis_id = str(uuid.uuid4())
     
-    # Build external URLs JSON
+    # Build external URLs and screenshot paths JSON
     external_urls = {}
+    screenshot_paths = {}
     for screenshot in screenshot_result.get("screenshots", []):
         if screenshot.get("success"):
-            external_urls[screenshot["source"]] = screenshot["external_url"]
+            source_name = screenshot["source"]
+            external_urls[source_name] = screenshot["external_url"]
+            screenshot_paths[source_name] = screenshot.get("image_path", "")
     
     # Create EmagramAnalysis object
     emagram = EmagramAnalysis(
@@ -290,6 +293,7 @@ def save_emagram_analysis(
         
         # Raw data storage (new fields for multi-source)
         external_source_urls=json.dumps(external_urls, ensure_ascii=False),
+        screenshot_paths=json.dumps(screenshot_paths, ensure_ascii=False),
         sources_count=screenshot_result.get("sources_successful", 0),
         sources_agreement=analysis_result.get("sources_agreement"),
         

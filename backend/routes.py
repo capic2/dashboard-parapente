@@ -3566,211 +3566,120 @@ async def export_emagram_csv(
 @router.post("/emagram/analyze", response_model=EmagramAnalysisSchema, tags=["Emagram"])
 async def trigger_emagram_analysis(
     request: EmagramTriggerRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """
-    Manually trigger emagram analysis for user location
+    Trigger multi-source emagram analysis for closest spot
+    
+    This endpoint finds the closest paragliding spot to the given coordinates
+    and generates a complete multi-source emagram analysis using:
+    - Screenshots from Meteo-Parapente, TopMeteo, and Windy
+    - AI analysis with Google Gemini Vision
     
     Args:
         request: EmagramTriggerRequest with user coordinates
     
     Returns:
-        Complete emagram analysis
+        Complete emagram analysis with multi-source data
     
     Example:
         POST /api/emagram/analyze
         {
-          "user_latitude": 45.76,
-          "user_longitude": 4.84,
+          "user_latitude": 47.1944,
+          "user_longitude": 5.9896,
           "force_refresh": false
         }
     """
     try:
-        # Check for recent analysis (within 6 hours) unless force_refresh
-        if not request.force_refresh:
-            cutoff_time = datetime.utcnow() - timedelta(hours=6)
+        from emagram_multi_source import generate_multi_source_emagram_for_spot, emagram_analysis_to_dict
+        
+        # Step 1: Find closest site
+        logger.info(f"Finding closest site to ({request.user_latitude}, {request.user_longitude})")
+        
+        # Query all sites with coordinates
+        sites = db.query(Site).filter(
+            Site.latitude.isnot(None),
+            Site.longitude.isnot(None)
+        ).all()
+        
+        if not sites:
+            raise HTTPException(
+                status_code=404,
+                detail="No paragliding sites found in database. Please add sites first."
+            )
+        
+        # Calculate distance to each site using haversine
+        def haversine_distance(lat1, lon1, lat2, lon2):
+            from math import radians, sin, cos, sqrt, atan2
+            R = 6371  # Earth radius in km
             
-            from scrapers.wyoming import find_closest_station
-            closest_station = find_closest_station(request.user_latitude, request.user_longitude)
+            lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+            dlat = lat2 - lat1
+            dlon = lon2 - lon1
+            
+            a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+            c = 2 * atan2(sqrt(a), sqrt(1-a))
+            
+            return R * c
+        
+        closest_site = None
+        min_distance = float('inf')
+        
+        for site in sites:
+            distance = haversine_distance(
+                request.user_latitude, request.user_longitude,
+                site.latitude, site.longitude
+            )
+            if distance < min_distance:
+                min_distance = distance
+                closest_site = site
+        
+        logger.info(f"Closest site: {closest_site.name} ({closest_site.id}) at {min_distance:.1f}km")
+        
+        # Step 2: Check for recent analysis (unless force_refresh)
+        if not request.force_refresh:
+            cutoff_time = datetime.utcnow() - timedelta(hours=3)
             
             existing = db.query(EmagramAnalysis).filter(
-                EmagramAnalysis.station_code == closest_station["code"],
+                EmagramAnalysis.station_code == closest_site.id,
                 EmagramAnalysis.analysis_datetime >= cutoff_time,
                 EmagramAnalysis.analysis_status == "completed"
             ).order_by(EmagramAnalysis.analysis_datetime.desc()).first()
             
             if existing:
-                logger.info(f"Returning cached emagram analysis from {existing.analysis_datetime}")
+                logger.info(f"Returning cached multi-source emagram from {existing.analysis_datetime}")
                 return existing
         
-        # Run full analysis pipeline
-        from scrapers.wyoming import fetch_closest_sounding
-        from scrapers.emagram_generator import generate_emagram_from_wyoming
-        from llm.vision_analyzer import analyze_emagram_with_fallback
-        from schemas import EmagramAnalysisCreate
+        # Step 3: Generate new multi-source analysis
+        logger.info(f"Generating multi-source emagram for {closest_site.name}...")
         
-        # Step 1: Fetch radiosonde data
-        logger.info(f"Fetching sounding for location ({request.user_latitude}, {request.user_longitude})")
-        
-        # Determine sounding time (00Z or 12Z) with fallback
-        current_hour_utc = datetime.utcnow().hour
-        primary_time = "12" if current_hour_utc >= 12 else "00"
-        fallback_time = "00" if primary_time == "12" else "12"
-        
-        # WORKAROUND: System date appears to be 2026, which is incorrect
-        # Wyoming University has real-time data but only up to current real date
-        # Force use of March 2024 (known to have data) for testing
-        # TODO: Fix system date or use NTP to get real current date
-        today = datetime.utcnow()
-        if today.year >= 2026:
-            logger.warning(f"⚠️ System date is {today.strftime('%Y-%m-%d')}, using March 2024 for Wyoming (data not available for future dates)")
-            # Use a recent date known to have data
-            today = datetime(2024, 3, 7, 12, 0, 0)  # March 7, 2024 12:00 UTC
-        
-        yesterday = today - timedelta(days=1)
-        
-        # Try primary sounding time first (today)
-        logger.info(f"Trying {primary_time}Z sounding for {today.strftime('%Y-%m-%d')}...")
-        sounding_result = await fetch_closest_sounding(
-            user_lat=request.user_latitude,
-            user_lon=request.user_longitude,
-            sounding_time=primary_time,
-            date=today
+        result = await generate_multi_source_emagram_for_spot(
+            site_id=closest_site.id,
+            db=db,
+            force_refresh=request.force_refresh
         )
         
-        # If primary fails, try fallback time (same day)
-        if not sounding_result.get("success"):
-            logger.warning(f"⚠️ {primary_time}Z sounding unavailable for today, trying {fallback_time}Z...")
-            sounding_result = await fetch_closest_sounding(
-                user_lat=request.user_latitude,
-                user_lon=request.user_longitude,
-                sounding_time=fallback_time,
-                date=today
-            )
-        
-        # If both times fail for today, try yesterday's 12Z
-        if not sounding_result.get("success"):
-            logger.warning(f"⚠️ Today's soundings unavailable, trying yesterday 12Z ({yesterday.strftime('%Y-%m-%d')})...")
-            sounding_result = await fetch_closest_sounding(
-                user_lat=request.user_latitude,
-                user_lon=request.user_longitude,
-                sounding_time="12",
-                date=yesterday
-            )
-        
-        # If all attempts fail, return error
-        if not sounding_result.get("success"):
-            error_detail = sounding_result.get('error', 'Unknown error')
-            logger.error(f"❌ Wyoming fetch failed for all attempts: {error_detail}")
-            if 'raw_text' in sounding_result:
-                logger.error(f"   Raw text preview: {sounding_result['raw_text'][:200]}")
-            raise HTTPException(
-                status_code=503,
-                detail=f"Failed to fetch sounding data: {error_detail}"
-            )
-        
-        logger.info(f"✅ Using {sounding_result.get('sounding_time', '??')} sounding")
-        
-        # Step 2: Generate Skew-T diagram
-        logger.info("Generating Skew-T diagram...")
-        
-        image_result = generate_emagram_from_wyoming(
-            wyoming_result=sounding_result,
-            output_dir="/tmp/emagram_images"
-        )
-        
-        if not image_result.get("success"):
+        if not result.get("success"):
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to generate Skew-T diagram: {image_result.get('error')}"
+                detail=f"Failed to generate emagram: {result.get('error', 'Unknown error')}"
             )
         
-        # Step 3: Analyze with LLM or fallback
-        logger.info("Analyzing emagram...")
+        # Fetch the saved analysis from database
+        analysis = db.query(EmagramAnalysis).filter(
+            EmagramAnalysis.id == result["analysis_id"]
+        ).first()
         
-        analysis_result = await analyze_emagram_with_fallback(
-            image_path=image_result["image_path"],
-            sounding_data=sounding_result["data"],
-            station_name=sounding_result["station_name"],
-            station_latitude=sounding_result["station_latitude"]
-        )
-        
-        if not analysis_result.get("success"):
+        if not analysis:
             raise HTTPException(
                 status_code=500,
-                detail=f"Analysis failed: {analysis_result.get('error')}"
+                detail="Analysis completed but not found in database"
             )
         
-        # Step 4: Save to database
-        logger.info("Saving analysis to database...")
+        logger.info(f"Multi-source emagram complete: {analysis.id}")
         
-        now = datetime.utcnow()
-        analysis_id = str(uuid.uuid4())
-        
-        emagram_create = EmagramAnalysisCreate(
-            analysis_date=now.date(),
-            analysis_time=now.time(),
-            station_code=sounding_result["station_code"],
-            station_name=sounding_result["station_name"],
-            station_latitude=sounding_result["station_latitude"],
-            station_longitude=sounding_result["station_longitude"],
-            distance_km=sounding_result["distance_km"],
-            data_source="wyoming",
-            sounding_time=sounding_result["sounding_time"],
-            analysis_method=analysis_result["method"],
-            
-            # LLM metadata
-            llm_provider=analysis_result.get("provider"),
-            llm_model=analysis_result.get("model"),
-            llm_tokens_used=analysis_result.get("tokens_used"),
-            llm_cost_usd=analysis_result.get("cost_usd"),
-            
-            # Analysis results
-            plafond_thermique_m=analysis_result.get("plafond_thermique_m"),
-            force_thermique_ms=analysis_result.get("force_thermique_ms"),
-            cape_jkg=analysis_result.get("cape_jkg"),
-            stabilite_atmospherique=analysis_result.get("stabilite_atmospherique"),
-            cisaillement_vent=analysis_result.get("cisaillement_vent"),
-            heure_debut_thermiques=analysis_result.get("heure_debut_thermiques"),
-            heure_fin_thermiques=analysis_result.get("heure_fin_thermiques"),
-            heures_volables_total=analysis_result.get("heures_volables_total"),
-            risque_orage=analysis_result.get("risque_orage"),
-            score_volabilite=analysis_result.get("score_volabilite"),
-            
-            resume_conditions=analysis_result.get("resume_conditions"),
-            conseils_vol=analysis_result.get("conseils_vol"),
-            alertes_securite=analysis_result.get("alertes_securite"),
-            
-            # Classic indices
-            lcl_m=analysis_result.get("lcl_m"),
-            lfc_m=analysis_result.get("lfc_m"),
-            el_m=analysis_result.get("el_m"),
-            lifted_index=analysis_result.get("lifted_index"),
-            k_index=analysis_result.get("k_index"),
-            total_totals=analysis_result.get("total_totals"),
-            showalter_index=analysis_result.get("showalter_index"),
-            
-            # Storage
-            skewt_image_path=image_result["image_path"],
-            raw_sounding_data=sounding_result.get("raw_text"),
-            ai_raw_response=analysis_result.get("raw_response"),
-            
-            analysis_status="completed"
-        )
-        
-        db_analysis = EmagramAnalysis(
-            id=analysis_id,
-            analysis_datetime=now,
-            **emagram_create.model_dump()
-        )
-        
-        db.add(db_analysis)
-        db.commit()
-        db.refresh(db_analysis)
-        
-        logger.info(f"Emagram analysis complete: {analysis_id}")
-        
-        return db_analysis
+        return analysis
     
     except HTTPException:
         raise
@@ -3942,3 +3851,68 @@ async def get_all_spots_latest_emagrammes(
         "total_spots": len(sites),
         "updated_count": len(spots_data)
     }
+
+
+@router.get("/emagram/screenshot/{analysis_id}/{source}", tags=["Emagram"])
+async def get_emagram_screenshot(
+    analysis_id: str,
+    source: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Serve emagram screenshot image file
+    
+    Args:
+        analysis_id: EmagramAnalysis ID
+        source: Screenshot source name (meteo-parapente, topmeteo, windy)
+    
+    Returns:
+        PNG image file
+    
+    Example:
+        GET /api/emagram/screenshot/abc123.../meteo-parapente
+    """
+    import json
+    from pathlib import Path
+    
+    # Find the analysis record
+    emagram = db.query(EmagramAnalysis).filter(
+        EmagramAnalysis.id == analysis_id
+    ).first()
+    
+    if not emagram:
+        raise HTTPException(status_code=404, detail=f"Emagram analysis {analysis_id} not found")
+    
+    if not emagram.screenshot_paths:
+        raise HTTPException(status_code=404, detail="No screenshots available for this analysis")
+    
+    # Parse screenshot paths JSON
+    try:
+        screenshot_paths = json.loads(emagram.screenshot_paths)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Invalid screenshot paths data")
+    
+    # Get the requested screenshot path
+    image_path = screenshot_paths.get(source)
+    
+    if not image_path:
+        available_sources = list(screenshot_paths.keys())
+        raise HTTPException(
+            status_code=404,
+            detail=f"Screenshot source '{source}' not found. Available: {available_sources}"
+        )
+    
+    # Check if file exists
+    image_file = Path(image_path)
+    if not image_file.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Screenshot file not found: {image_path}"
+        )
+    
+    # Serve the image
+    return FileResponse(
+        path=str(image_file),
+        media_type="image/png",
+        filename=f"emagram_{source}_{analysis_id[:8]}.png"
+    )
