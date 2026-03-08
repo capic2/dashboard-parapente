@@ -24,17 +24,17 @@ environment:
   # ... variables existantes ...
   
   # Weather API Keys (MANQUANTES - cause du "non dispo")
-  - WEATHERAPI_KEY=***REMOVED***
-  - METEOBLUE_API_KEY=***REMOVED***
+  - WEATHERAPI_KEY=64cfa0092fa84c77940180226261802
+  - METEOBLUE_API_KEY=Kd8IHD0Oj5zCmWUa
   
   # Strava OAuth (si pas déjà là)
   - STRAVA_CLIENT_ID=73115
-  - STRAVA_CLIENT_SECRET=***REMOVED***
-  - STRAVA_ACCESS_TOKEN=***REMOVED***
-  - STRAVA_REFRESH_TOKEN=***REMOVED***
+  - STRAVA_CLIENT_SECRET=34de079501057b6409367e7bea00ecebb9f6e4d6
+  - STRAVA_ACCESS_TOKEN=5aad34b765ac46ce6072caf40ac7c95ab180148b
+  - STRAVA_REFRESH_TOKEN=fb3a53726c083e884e145fe66a34237ffc0cd3ef
   
   # Google Gemini API (pour emagrammes)
-  - GOOGLE_API_KEY=***REMOVED***
+  - GOOGLE_API_KEY=AIzaSyB-IFGZWz01FgH7TsPyZmYkFlKLbsXnVsg
   - GEMINI_MODEL=gemini-2.5-flash
 ```
 
