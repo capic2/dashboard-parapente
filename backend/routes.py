@@ -3364,7 +3364,7 @@ async def test_weather_source(
 # EMAGRAM (SOUNDING) ANALYSIS ENDPOINTS
 # ============================================================================
 
-@router.get("/api/emagram/latest", response_model=Optional[EmagramAnalysisSchema], tags=["Emagram"])
+@router.get("/emagram/latest", response_model=Optional[EmagramAnalysisSchema], tags=["Emagram"])
 async def get_latest_emagram(
     user_lat: float = Query(..., description="User latitude"),
     user_lon: float = Query(..., description="User longitude"),
@@ -3420,7 +3420,7 @@ async def get_latest_emagram(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/api/emagram/history", response_model=List[EmagramAnalysisListItem], tags=["Emagram"])
+@router.get("/emagram/history", response_model=List[EmagramAnalysisListItem], tags=["Emagram"])
 async def get_emagram_history(
     user_lat: float = Query(..., description="User latitude"),
     user_lon: float = Query(..., description="User longitude"),
@@ -3563,7 +3563,7 @@ async def export_emagram_csv(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/api/emagram/analyze", response_model=EmagramAnalysisSchema, tags=["Emagram"])
+@router.post("/emagram/analyze", response_model=EmagramAnalysisSchema, tags=["Emagram"])
 async def trigger_emagram_analysis(
     request: EmagramTriggerRequest,
     db: Session = Depends(get_db)
@@ -3783,7 +3783,7 @@ async def trigger_emagram_analysis(
 # MULTI-SOURCE EMAGRAM ENDPOINTS
 # ============================================================================
 
-@router.get("/api/emagram/spot/{site_id}/latest", tags=["Emagram"])
+@router.get("/emagram/spot/{site_id}/latest", tags=["Emagram"])
 async def get_latest_emagram_for_spot(
     site_id: str,
     db: Session = Depends(get_db)
@@ -3839,7 +3839,7 @@ async def get_latest_emagram_for_spot(
     return emagram_analysis_to_dict(emagram)
 
 
-@router.post("/api/emagram/spot/{site_id}/refresh", tags=["Emagram"])
+@router.post("/emagram/spot/{site_id}/refresh", tags=["Emagram"])
 async def refresh_emagram_for_spot(
     site_id: str,
     background_tasks: BackgroundTasks,
@@ -3885,7 +3885,7 @@ async def refresh_emagram_for_spot(
     }
 
 
-@router.get("/api/emagram/spots/all", tags=["Emagram"])
+@router.get("/emagram/spots/all", tags=["Emagram"])
 async def get_all_spots_latest_emagrammes(
     db: Session = Depends(get_db)
 ):
