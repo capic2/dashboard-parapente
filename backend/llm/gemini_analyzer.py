@@ -231,7 +231,7 @@ def _parse_gemini_response(response_text: str) -> Dict:
         
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse Gemini response as JSON: {e}")
-        logger.debug(f"Response was: {response_text}")
+        logger.error(f"Full response text ({len(response_text)} chars): {response_text}")
         
         # Return fallback analysis
         return {
@@ -241,7 +241,7 @@ def _parse_gemini_response(response_text: str) -> Dict:
             'score_volabilite': 0,
             'conseils_vol': 'Analyse impossible - erreur de parsing Gemini',
             'alertes_securite': ['Erreur lors de l\'analyse'],
-            'details_analyse': f'Erreur de parsing JSON: {str(e)}\n\nRéponse brute: {response_text[:500]}'
+            'details_analyse': f'Erreur de parsing JSON: {str(e)}\n\nRéponse brute: {response_text[:1000]}'
         }
 
 
