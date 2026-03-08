@@ -3,9 +3,14 @@ Migration: Add Multi-Source Emagram Fields
 Adds columns to emagram_analysis table for multi-source screenshot-based analysis
 """
 
-from database import engine
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 import logging
+import sys
+import os
+
+# Add parent directory to path so we can import config
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import config
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +20,7 @@ MIGRATION_NAME = "003_add_multi_source_emagram_fields"
 def upgrade():
     """Add new columns for multi-source emagram analysis"""
     
+    engine = create_engine(config.DATABASE_URL)
     with engine.connect() as conn:
         # Check if migration already applied
         result = conn.execute(text(
