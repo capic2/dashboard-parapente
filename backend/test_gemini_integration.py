@@ -96,7 +96,7 @@ def test_gemini_analysis(api_key, screenshot_paths):
             spot_name="Test Spot Arguel",
             coordinates=(47.2167, 6.0833),
             api_key=api_key,
-            model_name=os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
+            model_name=os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         )
         
         logger.info("✅ Gemini analysis successful!")
