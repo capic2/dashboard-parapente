@@ -69,6 +69,7 @@ export interface EmagramAnalysis {
   
   // Multi-source support (Gemini multi-emagram analysis)
   external_source_urls?: string | null; // JSON: {"meteo-parapente": "url", ...}
+  screenshot_paths?: string | null; // JSON: {"meteo-parapente": "/path/to/screenshot.png", ...}
   sources_count?: number | null; // Number of sources analyzed
   sources_agreement?: string | null; // "high", "medium", "low"
   
