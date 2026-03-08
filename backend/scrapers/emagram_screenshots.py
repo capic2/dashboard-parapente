@@ -233,10 +233,9 @@ async def fetch_all_emagram_screenshots(
     logger.info(f"🎬 Starting screenshot fetch for {spot_name} ({spot_id})")
     logger.info(f"   Coordinates: {latitude}, {longitude}")
     
-    # Fetch all 3 in parallel
+    # Fetch 2 sources in parallel (TopMeteo removed - doesn't work anymore)
     tasks = [
         screenshot_meteo_parapente(latitude, longitude, spot_name),
-        screenshot_topmeteo(latitude, longitude, spot_name),
         screenshot_windy(latitude, longitude, spot_name),
     ]
     
@@ -257,7 +256,7 @@ async def fetch_all_emagram_screenshots(
     # Count successes
     success_count = sum(1 for s in processed_screenshots if s.get("success"))
     
-    logger.info(f"✅ Screenshot fetch complete: {success_count}/3 successful")
+    logger.info(f"✅ Screenshot fetch complete: {success_count}/2 successful")
     
     return {
         "success": success_count > 0,  # At least one must succeed
@@ -267,7 +266,7 @@ async def fetch_all_emagram_screenshots(
         "longitude": longitude,
         "screenshots": processed_screenshots,
         "sources_successful": success_count,
-        "sources_total": 3,
+        "sources_total": 2,
         "timestamp": datetime.now().isoformat()
     }
 
