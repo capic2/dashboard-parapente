@@ -122,9 +122,13 @@ async def generate_multi_source_emagram_for_spot(
         
         # Priority 1: Try Gemini if API key is available
         google_api_key = os.getenv("GOOGLE_API_KEY")
+        logger.info(f"🔍 Checking Gemini availability: API Key = {'SET' if google_api_key else 'NOT SET'}")
+        
         if google_api_key:
+            logger.info("🔷 Trying Gemini Vision analysis...")
+            logger.info(f"   API Key found: {google_api_key[:20]}...")
+            logger.info(f"   Model: {os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')}")
             try:
-                logger.info("🔷 Trying Gemini Vision analysis...")
                 gemini_analysis = analyze_emagram_with_gemini(
                     screenshot_paths=image_paths,
                     spot_name=site.name,
