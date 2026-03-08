@@ -271,7 +271,6 @@ export default function EmagramWidget({ userLat, userLon }: EmagramWidgetProps) 
       {emagram.screenshot_paths && (() => {
         try {
           const screenshots = JSON.parse(emagram.screenshot_paths);
-          const externalUrls = emagram.external_source_urls ? JSON.parse(emagram.external_source_urls) : {};
           const sourceKeys = Object.keys(screenshots);
           if (sourceKeys.length > 0) {
             // Use window.location to get the current host, backend is on same host:8000
@@ -281,29 +280,22 @@ export default function EmagramWidget({ userLat, userLon }: EmagramWidgetProps) 
                 <div className="text-xs text-gray-600 font-semibold mb-2">
                   📊 Émagrammes capturés ({sourceKeys.length})
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-wrap gap-2">
                   {sourceKeys.map((source) => {
-                    const externalUrl = externalUrls[source] || '';
                     const sourceName = source.replace('-', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                    const screenshotUrl = `${API_BASE}/api/emagram/screenshot/${emagram.id}/${source}`;
                     return (
-                      <div key={source} className="block" title={sourceName}>
-                        <a
-                          href={externalUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block"
-                        >
-                          <img
-                            src={`${API_BASE}/api/emagram/screenshot/${emagram.id}/${source}`}
-                            alt={`Emagramme ${sourceName}`}
-                            className="w-full h-32 object-cover rounded border border-gray-200 hover:border-blue-400 transition-colors cursor-pointer"
-                            loading="lazy"
-                          />
-                        </a>
-                        <div className="text-xs text-center text-gray-500 mt-1">
-                          {sourceName}
-                        </div>
-                      </div>
+                      <a
+                        key={source}
+                        href={screenshotUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-3 py-2 text-xs bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200"
+                      >
+                        <span>📸</span>
+                        <span>{sourceName}</span>
+                        <span className="text-blue-400">↗</span>
+                      </a>
                     );
                   })}
                 </div>
