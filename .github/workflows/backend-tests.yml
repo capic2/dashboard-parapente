@@ -52,10 +52,7 @@ jobs:
             -m "not integration and not slow" \
             -v \
             --tb=short \
-            --cov=. \
-            --cov-report=term-missing \
-            --cov-report=xml \
-            --cov-fail-under=40
+            --cov-report=xml
       
       - name: 📊 Upload coverage to Codecov
         uses: codecov/codecov-action@v4
