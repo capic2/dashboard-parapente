@@ -3364,7 +3364,7 @@ async def test_weather_source(
 # EMAGRAM (SOUNDING) ANALYSIS ENDPOINTS
 # ============================================================================
 
-@router.get("/emagram/latest", response_model=Optional[EmagramAnalysisSchema])
+@router.get("/api/emagram/latest", response_model=Optional[EmagramAnalysisSchema], tags=["Emagram"])
 async def get_latest_emagram(
     user_lat: float = Query(..., description="User latitude"),
     user_lon: float = Query(..., description="User longitude"),
@@ -3420,7 +3420,7 @@ async def get_latest_emagram(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/emagram/history", response_model=List[EmagramAnalysisListItem])
+@router.get("/api/emagram/history", response_model=List[EmagramAnalysisListItem], tags=["Emagram"])
 async def get_emagram_history(
     user_lat: float = Query(..., description="User latitude"),
     user_lon: float = Query(..., description="User longitude"),
@@ -3563,7 +3563,7 @@ async def export_emagram_csv(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/emagram/analyze", response_model=EmagramAnalysisSchema)
+@router.post("/api/emagram/analyze", response_model=EmagramAnalysisSchema, tags=["Emagram"])
 async def trigger_emagram_analysis(
     request: EmagramTriggerRequest,
     db: Session = Depends(get_db)

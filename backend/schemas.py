@@ -417,6 +417,11 @@ class EmagramAnalysis(EmagramAnalysisBase):
     has_thermal_data: bool
     flyable_hours_formatted: Optional[str] = None
     
+    # Multi-source support (for Gemini multi-emagram analysis)
+    external_source_urls: Optional[str] = None  # JSON: {"meteo-parapente": "url", ...}
+    sources_count: Optional[int] = None  # Number of sources analyzed
+    sources_agreement: Optional[str] = None  # "high", "medium", "low"
+    
     # Timestamps
     created_at: datetime
     updated_at: datetime
