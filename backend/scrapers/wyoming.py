@@ -325,7 +325,7 @@ async def fetch_wyoming_sounding(
             "timestamp": datetime.now().isoformat()
         }
     
-    station_info = FRENCH_STATIONS.get(station_code, {})
+    station_info = EUROPEAN_STATIONS.get(station_code, {})
     
     result = {
         "success": True,

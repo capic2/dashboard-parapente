@@ -21,7 +21,7 @@ try:
         EmagramTriggerRequest
     )
     from scrapers.wyoming import (
-        FRENCH_STATIONS,
+        EUROPEAN_STATIONS,
         find_closest_station,
         haversine_distance
     )

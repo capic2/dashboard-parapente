@@ -10,7 +10,7 @@ import json
 
 # Import modules to test
 from scrapers.wyoming import (
-    FRENCH_STATIONS,
+    EUROPEAN_STATIONS,
     haversine_distance,
     find_closest_station,
     parse_text_list_sounding
@@ -28,10 +28,10 @@ class TestWyomingScraper:
     
     def test_french_stations_exist(self):
         """Test that all French stations are configured"""
-        assert len(FRENCH_STATIONS) == 5
-        assert "07481" in FRENCH_STATIONS  # Lyon
-        assert "07145" in FRENCH_STATIONS  # Paris
-        assert "07510" in FRENCH_STATIONS  # Bordeaux
+        assert len(EUROPEAN_STATIONS) == 5
+        assert "07481" in EUROPEAN_STATIONS  # Lyon
+        assert "07145" in EUROPEAN_STATIONS  # Paris
+        assert "07510" in EUROPEAN_STATIONS  # Bordeaux
         
     def test_haversine_distance(self):
         """Test distance calculation"""
