@@ -54,6 +54,27 @@ interface VerdictTooltipProps extends BaseTooltipProps {
 // ============================================================================
 
 /**
+ * Generate source URL for a given weather source
+ */
+const getSourceUrl = (sourceKey: string, spotId: string, date?: string): string | null => {
+  // Note: These are approximations - exact URLs would need site coordinates
+  switch (sourceKey) {
+    case 'open-meteo':
+      return 'https://open-meteo.com/';
+    case 'weatherapi':
+      return 'https://www.weatherapi.com/';
+    case 'meteo-parapente':
+      return 'https://meteo-parapente.com/';
+    case 'meteociel':
+      return 'https://www.meteociel.fr/';
+    case 'meteoblue':
+      return 'https://www.meteoblue.com/';
+    default:
+      return null;
+  }
+};
+
+/**
  * Get flyability display with emoji, verdict and reason
  * Format: "🟢 BON" or "🟡 MOYEN — Vent faible" or "🔴 MAUVAIS — Vent insuffisant"
  */
@@ -313,14 +334,29 @@ const SourceDataTooltip = ({
 
           let value = sourceData[fieldName];
           
+          const sourceUrl = getSourceUrl(sourceKey, '');
+          
           // Special handling for wind (show speed + gust)
           if (fieldName === 'wind_speed' && value !== null && value !== undefined) {
             const gust = sourceData['wind_gust'];
             const displayValue = `${value.toFixed(1)} km/h`;
             const gustValue = gust !== null && gust !== undefined ? ` (rafales: ${gust.toFixed(1)} km/h)` : '';
             return (
-              <div key={sourceKey} className="text-xs text-gray-700">
-                <span className="font-semibold">{sourceName}:</span> {displayValue}{gustValue}
+              <div key={sourceKey} className="text-xs text-gray-700 flex items-center justify-between gap-2">
+                <span>
+                  <span className="font-semibold">{sourceName}:</span> {displayValue}{gustValue}
+                </span>
+                {sourceUrl && (
+                  <a
+                    href={sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:text-blue-700 text-xs flex-shrink-0"
+                    title={`Ouvrir ${sourceName}`}
+                  >
+                    ↗
+                  </a>
+                )}
               </div>
             );
           }
@@ -329,8 +365,21 @@ const SourceDataTooltip = ({
           if (fieldName === 'wind_direction' && value !== null && value !== undefined) {
             const displayValue = formatWindDirectionWithDegrees(value);
             return (
-              <div key={sourceKey} className="text-xs text-gray-700">
-                <span className="font-semibold">{sourceName}:</span> {displayValue}
+              <div key={sourceKey} className="text-xs text-gray-700 flex items-center justify-between gap-2">
+                <span>
+                  <span className="font-semibold">{sourceName}:</span> {displayValue}
+                </span>
+                {sourceUrl && (
+                  <a
+                    href={sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:text-blue-700 text-xs flex-shrink-0"
+                    title={`Ouvrir ${sourceName}`}
+                  >
+                    ↗
+                  </a>
+                )}
               </div>
             );
           }
@@ -347,8 +396,21 @@ const SourceDataTooltip = ({
           const displayValue = typeof value === 'number' ? value.toFixed(1) : value;
           
           return (
-            <div key={sourceKey} className="text-xs text-gray-700">
-              <span className="font-semibold">{sourceName}:</span> {displayValue} {unit}
+            <div key={sourceKey} className="text-xs text-gray-700 flex items-center justify-between gap-2">
+              <span>
+                <span className="font-semibold">{sourceName}:</span> {displayValue} {unit}
+              </span>
+              {sourceUrl && (
+                <a
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:text-blue-700 text-xs"
+                  title={`Ouvrir ${sourceName}`}
+                >
+                  ↗
+                </a>
+              )}
             </div>
           );
         })}
@@ -436,7 +498,7 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
     const commonProps = {
       position,
       hour: data.hour,
-      onClose: isMobile ? handleCloseTooltip : undefined,
+      onClose: handleCloseTooltip, // Always show close button
       isMobile
     };
 
