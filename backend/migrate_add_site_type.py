@@ -26,6 +26,12 @@ def migrate_add_site_type():
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
+        # Check if sites table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sites'")
+        if not cursor.fetchone():
+            print("⚠️ sites table doesn't exist yet, skipping migration")
+            return
+        
         # Check if column already exists
         cursor.execute("PRAGMA table_info(sites)")
         columns = [row[1] for row in cursor.fetchall()]
