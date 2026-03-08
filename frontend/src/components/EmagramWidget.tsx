@@ -273,8 +273,8 @@ export default function EmagramWidget({ userLat, userLon }: EmagramWidgetProps) 
           const screenshots = JSON.parse(emagram.screenshot_paths);
           const sourceKeys = Object.keys(screenshots);
           if (sourceKeys.length > 0) {
-            // Use window.location to get the current host, backend is on same host:8000
-            const API_BASE = `${window.location.protocol}//${window.location.hostname}:8000`;
+            // Use window.location to get the current host, backend is on same host:8001
+            const API_BASE = `${window.location.protocol}//${window.location.hostname}:8001`;
             return (
               <div className="mt-3 pt-3 border-t border-gray-100">
                 <div className="text-xs text-gray-600 font-semibold mb-2">
