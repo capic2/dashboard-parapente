@@ -67,6 +67,11 @@ export interface EmagramAnalysis {
   has_thermal_data: boolean;
   flyable_hours_formatted: string | null;
   
+  // Multi-source support (Gemini multi-emagram analysis)
+  external_source_urls?: string | null; // JSON: {"meteo-parapente": "url", ...}
+  sources_count?: number | null; // Number of sources analyzed
+  sources_agreement?: string | null; // "high", "medium", "low"
+  
   // Timestamps
   created_at: string;
   updated_at: string;
