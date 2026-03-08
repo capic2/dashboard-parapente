@@ -3952,3 +3952,45 @@ async def clear_emagram_cache(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Clear cache failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/admin/debug/gemini")
+async def debug_gemini_api():
+    """
+    Test Gemini API configuration and connectivity
+    """
+    try:
+        import google.generativeai as genai
+        
+        api_key = os.getenv("GOOGLE_API_KEY")
+        model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        
+        if not api_key:
+            return {
+                "success": False,
+                "error": "GOOGLE_API_KEY not set in environment"
+            }
+        
+        # Configure and test
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name)
+        
+        # Simple test prompt
+        response = model.generate_content("Say hello in JSON format: {\"message\": \"...\"}")
+        
+        return {
+            "success": True,
+            "api_key_set": True,
+            "api_key_preview": f"{api_key[:10]}...{api_key[-4:]}",
+            "model_name": model_name,
+            "test_response": response.text,
+            "message": "Gemini API is working!"
+        }
+        
+    except Exception as e:
+        logger.error(f"Gemini debug test failed: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
