@@ -623,8 +623,8 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
       };
     } else {
       return {
-        onMouseEnter: (e: React.MouseEvent) => handleCellInteraction(cellType, hourData, e),
-        onMouseLeave: handleCloseTooltip
+        onMouseEnter: (e: React.MouseEvent) => handleCellInteraction(cellType, hourData, e)
+        // onMouseLeave removed - tooltip stays open until close button clicked
       };
     }
   };
