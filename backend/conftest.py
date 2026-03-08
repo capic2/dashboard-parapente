@@ -6,6 +6,10 @@ import sys
 import os
 from pathlib import Path
 
+# Set testing mode before importing config
+os.environ["TESTING"] = "true"
+os.environ["USE_FAKE_REDIS"] = "true"
+
 # Add backend dir to Python path
 sys.path.insert(0, str(Path(__file__).parent))
 
