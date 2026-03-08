@@ -94,33 +94,25 @@ export default function Dashboard() {
         weatherData={weatherDataMap}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:items-stretch">
-        {/* Current Conditions - Full width on mobile, 1/3 on desktop */}
-        <div className="lg:col-span-1 flex">
+      <div className="space-y-4">
+        {/* Row 1: Current Conditions + Emagram Widget (2 columns) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <CurrentConditions spotId={selectedSiteId} />
-        </div>
-
-        {/* Emagram Widget - Full width on mobile, 1/3 on desktop */}
-        <div className="lg:col-span-1 flex">
           <EmagramWidget userLat={userLat} userLon={userLon} />
         </div>
 
-        {/* Stats Panel - Full width on mobile, 1/3 on desktop */}
-        <div className="lg:col-span-1 flex">
-          <StatsPanel />
-        </div>
+        {/* Row 2: Stats Panel (full width) */}
+        <StatsPanel />
 
-        {/* 7-Day Forecast - Full width */}
-        <div className="lg:col-span-3">
-          <Forecast7Day 
-            spotId={selectedSiteId}
-            selectedDayIndex={selectedDayIndex}
-            onSelectDay={handleSelectDay}
-          />
-        </div>
+        {/* Row 3: 7-Day Forecast (full width) */}
+        <Forecast7Day 
+          spotId={selectedSiteId}
+          selectedDayIndex={selectedDayIndex}
+          onSelectDay={handleSelectDay}
+        />
 
-        {/* Hourly Forecast - Full width */}
-        <div ref={hourlyForecastRef} className="lg:col-span-3">
+        {/* Row 4: Hourly Forecast (full width) */}
+        <div ref={hourlyForecastRef}>
           <HourlyForecast spotId={selectedSiteId} dayIndex={selectedDayIndex} />
         </div>
       </div>
