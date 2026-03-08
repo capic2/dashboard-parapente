@@ -58,18 +58,20 @@ async def screenshot_meteo_parapente(
             # Wait for page to load
             await page.wait_for_timeout(3000)
             
-            # Click on "Emagramme" tab (try multiple selectors)
-            logger.info("Looking for Emagramme tab...")
+            # Click on "Sounding" tab (meteo-parapente uses English)
+            logger.info("Looking for Sounding tab...")
             emagram_tab_clicked = False
             try:
-                # Try different possible selectors for the emagram tab
+                # Try different possible selectors for the sounding/emagram tab
                 tab_selectors = [
-                    "text=Emagramme",
+                    "text=Sounding",           # English (primary)
+                    "text=sounding",
+                    "text=Emagramme",          # French fallback
                     "text=Émagramme", 
+                    "[data-tab='sounding']",
                     "[data-tab='emagram']",
-                    "[data-tab='emagramme']",
-                    "button:has-text('Emagram')",
-                    "a:has-text('Emagram')"
+                    "button:has-text('Sounding')",
+                    "a:has-text('Sounding')"
                 ]
                 
                 for selector in tab_selectors:
@@ -77,17 +79,17 @@ async def screenshot_meteo_parapente(
                         element = page.locator(selector).first
                         if await element.count() > 0:
                             await element.click(timeout=3000)
-                            logger.info(f"✅ Clicked emagram tab: {selector}")
+                            logger.info(f"✅ Clicked sounding tab: {selector}")
                             emagram_tab_clicked = True
                             break
                     except:
                         continue
                         
             except Exception as e:
-                logger.warning(f"Could not click emagram tab: {e}")
+                logger.warning(f"Could not click sounding tab: {e}")
             
             if not emagram_tab_clicked:
-                logger.warning("Emagram tab not clicked, emagram may not be visible")
+                logger.warning("Sounding tab not clicked, emagram may not be visible")
             
             # Wait for emagram to render
             await page.wait_for_timeout(5000)
