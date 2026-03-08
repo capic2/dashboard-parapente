@@ -47,6 +47,10 @@ services:
       - WEATHERAPI_KEY=${WEATHERAPI_KEY}
       - METEOBLUE_API_KEY=${METEOBLUE_API_KEY}
       
+      # Google Gemini API (for emagram analysis)
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      
       # Strava OAuth (set in Portainer)
       - STRAVA_CLIENT_ID=${STRAVA_CLIENT_ID}
       - STRAVA_CLIENT_SECRET=${STRAVA_CLIENT_SECRET}
