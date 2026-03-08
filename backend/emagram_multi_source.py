@@ -13,6 +13,7 @@ import logging
 from scrapers.emagram_screenshots import fetch_all_emagram_screenshots
 from llm.multi_emagram_analyzer import analyze_emagrammes_with_fallback
 from llm.acp_analyzer import analyze_emagram_with_acp
+from llm.gemini_analyzer import analyze_emagram_with_gemini
 from models import Site, EmagramAnalysis
 import os
 
@@ -113,13 +114,46 @@ async def generate_multi_source_emagram_for_spot(
         
         logger.info(f"📸 {len(successful_screenshots)}/3 screenshots successful")
         
-        # Step 4: Analyze with Claude Vision (via ACP if available, fallback to direct API)
+        # Step 4: Analyze with AI (priority: Gemini > ACP > Anthropic direct)
         image_paths = [s["image_path"] for s in successful_screenshots]
         sources = [s["source"] for s in successful_screenshots]
         
-        # Try ACP first if OPENCLAW_ACP_ENABLED is set
         analysis_result = None
-        if os.getenv("OPENCLAW_ACP_ENABLED", "false").lower() == "true":
+        
+        # Priority 1: Try Gemini if API key is available
+        google_api_key = os.getenv("GOOGLE_API_KEY")
+        if google_api_key:
+            try:
+                logger.info("🔷 Trying Gemini Vision analysis...")
+                gemini_analysis = analyze_emagram_with_gemini(
+                    screenshot_paths=image_paths,
+                    spot_name=site.name,
+                    coordinates=(site.latitude, site.longitude),
+                    api_key=google_api_key,
+                    model_name=os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp"),
+                    max_retries=3
+                )
+                
+                # Convert to expected format
+                analysis_result = {
+                    "success": True,
+                    "plafond_thermique_m": gemini_analysis["plafond_thermique_m"],
+                    "force_thermique_ms": gemini_analysis["force_thermique_ms"],
+                    "heures_volables": gemini_analysis["heures_volables"],
+                    "score_volabilite": gemini_analysis["score_volabilite"],
+                    "conseils_vol": gemini_analysis["conseils_vol"],
+                    "alertes_securite": gemini_analysis["alertes_securite"],
+                    "details_analyse": gemini_analysis["details_analyse"],
+                    "analyzer": "gemini"
+                }
+                logger.info(f"🔷 Gemini analysis successful!")
+                
+            except Exception as e:
+                logger.warning(f"Gemini analysis failed: {e}")
+                analysis_result = None
+        
+        # Priority 2: Try OpenClaw ACP if enabled and Gemini failed
+        if not analysis_result and os.getenv("OPENCLAW_ACP_ENABLED", "false").lower() == "true":
             try:
                 logger.info("🦞 Trying OpenClaw ACP analysis...")
                 acp_analysis = analyze_emagram_with_acp(
@@ -127,7 +161,7 @@ async def generate_multi_source_emagram_for_spot(
                     spot_name=site.name,
                     coordinates=(site.latitude, site.longitude),
                     openclaw_command=os.getenv("OPENCLAW_COMMAND", "openclaw"),
-                    agent_id=os.getenv("OPENCLAW_AGENT_ID"),  # e.g., "claude", "codex"
+                    agent_id=os.getenv("OPENCLAW_AGENT_ID"),
                     timeout=int(os.getenv("OPENCLAW_TIMEOUT", "120"))
                 )
                 
@@ -146,12 +180,12 @@ async def generate_multi_source_emagram_for_spot(
                 logger.info(f"🦞 OpenClaw ACP analysis successful!")
                 
             except Exception as e:
-                logger.warning(f"OpenClaw ACP failed, falling back to direct API: {e}")
+                logger.warning(f"OpenClaw ACP failed: {e}")
                 analysis_result = None
         
-        # Fallback to direct API if ACP not available or failed
+        # Priority 3: Fallback to Anthropic direct API
         if not analysis_result:
-            logger.info("🤖 Using direct LLM API...")
+            logger.info("🤖 Using Anthropic direct API (fallback)...")
             analysis_result = await analyze_emagrammes_with_fallback(
                 image_paths=image_paths,
                 spot_name=site.name,

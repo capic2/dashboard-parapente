@@ -72,3 +72,4 @@ pillow==11.1.0
 # AI/LLM Integration
 # ============================================
 anthropic==0.42.0
+google-generativeai==0.8.3
