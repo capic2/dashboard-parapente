@@ -284,25 +284,26 @@ export default function EmagramWidget({ userLat, userLon }: EmagramWidgetProps) 
                 <div className="grid grid-cols-2 gap-2">
                   {sourceKeys.map((source) => {
                     const externalUrl = externalUrls[source] || '';
+                    const sourceName = source.replace('-', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
                     return (
-                      <a
-                        key={source}
-                        href={`${API_BASE}/api/emagram/screenshot/${emagram.id}/${source}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block"
-                        title={`${source}\n${externalUrl}`}
-                      >
-                        <img
-                          src={`${API_BASE}/api/emagram/screenshot/${emagram.id}/${source}`}
-                          alt={`Emagramme ${source}`}
-                          className="w-full h-32 object-cover rounded border border-gray-200 hover:border-blue-400 transition-colors cursor-pointer"
-                          loading="lazy"
-                        />
-                        <div className="text-xs text-center text-gray-500 mt-1 capitalize truncate px-1" title={externalUrl}>
-                          {source.replace('-', ' ')}
+                      <div key={source} className="block" title={sourceName}>
+                        <a
+                          href={externalUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block"
+                        >
+                          <img
+                            src={`${API_BASE}/api/emagram/screenshot/${emagram.id}/${source}`}
+                            alt={`Emagramme ${sourceName}`}
+                            className="w-full h-32 object-cover rounded border border-gray-200 hover:border-blue-400 transition-colors cursor-pointer"
+                            loading="lazy"
+                          />
+                        </a>
+                        <div className="text-xs text-center text-gray-500 mt-1">
+                          {sourceName}
                         </div>
-                      </a>
+                      </div>
                     );
                   })}
                 </div>
