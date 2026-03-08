@@ -84,7 +84,7 @@ def find_closest_station(user_lat: float, user_lon: float) -> Dict[str, Any]:
     closest_station = None
     min_distance = float('inf')
     
-    for code, station in FRENCH_STATIONS.items():
+    for code, station in EUROPEAN_STATIONS.items():
         distance = haversine_distance(
             user_lat, user_lon,
             station['latitude'], station['longitude']
