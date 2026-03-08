@@ -43,6 +43,12 @@ def migrate(db_path: str):
     cursor = conn.cursor()
     
     try:
+        # Check if sites table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sites'")
+        if not cursor.fetchone():
+            print("⚠️ sites table doesn't exist yet, skipping migration")
+            return
+        
         # Check current columns
         cursor.execute("PRAGMA table_info(sites)")
         columns = {column[1]: column for column in cursor.fetchall()}

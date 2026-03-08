@@ -9,6 +9,12 @@ def migrate():
     engine = create_engine(config.DATABASE_URL)
     
     with engine.connect() as conn:
+        # Check if flights table exists
+        result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='flights'"))
+        if not result.fetchone():
+            print("⚠️ flights table doesn't exist yet, skipping migration")
+            return
+        
         # For SQLite, check columns using PRAGMA
         result = conn.execute(text("PRAGMA table_info(flights)"))
         existing_columns = {row[1] for row in result}
