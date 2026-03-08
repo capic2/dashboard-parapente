@@ -267,6 +267,46 @@ export default function EmagramWidget({ userLat, userLon }: EmagramWidgetProps) 
         </div>
       )}
 
+      {/* External Sources - Multi-source Gemini analysis */}
+      {emagram.external_source_urls && (() => {
+        try {
+          const sources = JSON.parse(emagram.external_source_urls);
+          const sourceKeys = Object.keys(sources);
+          if (sourceKeys.length > 0) {
+            return (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <div className="text-xs text-gray-600 font-semibold mb-2">
+                  📊 Sources analysées ({sourceKeys.length})
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {sourceKeys.map((key) => (
+                    <a
+                      key={key}
+                      href={sources[key]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors"
+                    >
+                      <span>🔗</span>
+                      <span className="capitalize">{key.replace('-', ' ')}</span>
+                      <span className="text-blue-400">↗</span>
+                    </a>
+                  ))}
+                </div>
+                {emagram.sources_agreement && (
+                  <div className="mt-2 text-xs text-gray-500">
+                    Consensus: <span className="font-medium">{emagram.sources_agreement}</span>
+                  </div>
+                )}
+              </div>
+            );
+          }
+        } catch (e) {
+          // Invalid JSON, skip
+        }
+        return null;
+      })()}
+
       {/* Method indicator */}
       <div className="mt-3 pt-3 border-t border-gray-100">
         <div className="flex items-center justify-between text-xs text-gray-500">
