@@ -87,6 +87,11 @@ def analyze_emagram_with_gemini(
                 }
             )
             
+            # Log response details for debugging
+            logger.debug(f"Gemini response candidates: {len(response.candidates)}")
+            logger.debug(f"Gemini finish reason: {response.candidates[0].finish_reason if response.candidates else 'N/A'}")
+            logger.debug(f"Gemini response text length: {len(response.text)} chars")
+            
             # Parse response
             analysis = _parse_gemini_response(response.text)
             
@@ -199,6 +204,18 @@ def _parse_gemini_response(response_text: str) -> Dict:
         text = text[:-3]  # Remove trailing ```
     
     text = text.strip()
+    
+    # Try to fix incomplete JSON
+    if not text.endswith('}'):
+        logger.warning("JSON appears incomplete, attempting to close it")
+        # Count opening and closing braces
+        open_braces = text.count('{')
+        close_braces = text.count('}')
+        
+        # Add missing closing braces
+        if open_braces > close_braces:
+            text += '}' * (open_braces - close_braces)
+            logger.info(f"Added {open_braces - close_braces} closing braces")
     
     try:
         analysis = json.loads(text)
