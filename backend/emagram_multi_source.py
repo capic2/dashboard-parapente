@@ -130,7 +130,7 @@ async def generate_multi_source_emagram_for_spot(
                     spot_name=site.name,
                     coordinates=(site.latitude, site.longitude),
                     api_key=google_api_key,
-                    model_name=os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp"),
+                    model_name=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
                     max_retries=3
                 )
                 

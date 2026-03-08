@@ -10,43 +10,37 @@ import re
 import math
 
 
-# French radiosonde stations (WMO codes)
-FRENCH_STATIONS = {
-    "07481": {
-        "name": "Lyon-Bron",
-        "latitude": 45.73,
-        "longitude": 5.08,
-        "elevation_m": 200,
-        "region": "Rhône-Alpes"
+# European radiosonde stations available on Wyoming (WMO codes)
+# Note: French stations (07xxx) don't have data on Wyoming
+# Using German stations which are closest to French paragliding spots
+EUROPEAN_STATIONS = {
+    # Germany - Stuttgart (closest to East France: Jura, Alps)
+    "10739": {
+        "name": "Stuttgart, Germany",
+        "latitude": 48.83,
+        "longitude": 9.20,
+        "elevation_m": 314,
+        "region": "Baden-Württemberg",
+        "coverage": "East France (Jura, Vosges, French Alps)"
     },
-    "07145": {
-        "name": "Trappes (Paris)",
-        "latitude": 48.77,
-        "longitude": 2.01,
-        "elevation_m": 167,
-        "region": "Île-de-France"
+    # Germany - Munich (good for French/Swiss Alps)
+    "10868": {
+        "name": "Munich, Germany", 
+        "latitude": 48.25,
+        "longitude": 11.55,
+        "elevation_m": 515,
+        "region": "Bavaria",
+        "coverage": "French Alps, Switzerland"
     },
-    "07510": {
-        "name": "Bordeaux",
-        "latitude": 44.83,
-        "longitude": -0.69,
-        "elevation_m": 47,
-        "region": "Nouvelle-Aquitaine"
+    # Germany - Meiningen (Central Germany, good for North-East France)
+    "10548": {
+        "name": "Meiningen, Germany",
+        "latitude": 50.56,
+        "longitude": 10.38,
+        "elevation_m": 450,
+        "region": "Thuringia", 
+        "coverage": "North-East France, Luxembourg"
     },
-    "07645": {
-        "name": "Nîmes",
-        "latitude": 43.86,
-        "longitude": 4.40,
-        "elevation_m": 60,
-        "region": "Occitanie"
-    },
-    "07761": {
-        "name": "Ajaccio",
-        "latitude": 41.92,
-        "longitude": 8.80,
-        "elevation_m": 4,
-        "region": "Corse"
-    }
 }
 
 
