@@ -88,12 +88,25 @@ def analyze_emagram_with_gemini(
             )
             
             # Log response details for debugging
-            logger.debug(f"Gemini response candidates: {len(response.candidates)}")
-            logger.debug(f"Gemini finish reason: {response.candidates[0].finish_reason if response.candidates else 'N/A'}")
-            logger.debug(f"Gemini response text length: {len(response.text)} chars")
+            logger.info(f"Gemini response candidates: {len(response.candidates)}")
+            if response.candidates:
+                logger.info(f"Gemini finish reason: {response.candidates[0].finish_reason}")
+                logger.info(f"Gemini safety ratings: {response.candidates[0].safety_ratings}")
+                
+                # Try to get full text from parts
+                if hasattr(response.candidates[0].content, 'parts'):
+                    full_text = ''.join(part.text for part in response.candidates[0].content.parts if hasattr(part, 'text'))
+                    logger.info(f"Full text from parts: {len(full_text)} chars")
+                    response_text = full_text
+                else:
+                    response_text = response.text
+            else:
+                response_text = response.text
+            
+            logger.info(f"Gemini response text length: {len(response_text)} chars")
             
             # Parse response
-            analysis = _parse_gemini_response(response.text)
+            analysis = _parse_gemini_response(response_text)
             
             logger.info(f"Successfully analyzed emagram for {spot_name} with Gemini")
             return analysis
