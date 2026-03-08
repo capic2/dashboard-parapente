@@ -12,7 +12,9 @@ import logging
 
 from scrapers.emagram_screenshots import fetch_all_emagram_screenshots
 from llm.multi_emagram_analyzer import analyze_emagrammes_with_fallback
+from llm.acp_analyzer import analyze_emagram_with_acp
 from models import Site, EmagramAnalysis
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -111,15 +113,50 @@ async def generate_multi_source_emagram_for_spot(
         
         logger.info(f"📸 {len(successful_screenshots)}/3 screenshots successful")
         
-        # Step 4: Analyze with Claude Vision
+        # Step 4: Analyze with Claude Vision (via ACP if available, fallback to direct API)
         image_paths = [s["image_path"] for s in successful_screenshots]
         sources = [s["source"] for s in successful_screenshots]
         
-        analysis_result = await analyze_emagrammes_with_fallback(
-            image_paths=image_paths,
-            spot_name=site.name,
-            sources=sources
-        )
+        # Try ACP first if OPENCLAW_ACP_ENABLED is set
+        analysis_result = None
+        if os.getenv("OPENCLAW_ACP_ENABLED", "false").lower() == "true":
+            try:
+                logger.info("🦞 Trying OpenClaw ACP analysis...")
+                acp_analysis = analyze_emagram_with_acp(
+                    screenshot_paths=image_paths,
+                    spot_name=site.name,
+                    coordinates=(site.latitude, site.longitude),
+                    openclaw_command=os.getenv("OPENCLAW_COMMAND", "openclaw"),
+                    agent_id=os.getenv("OPENCLAW_AGENT_ID"),  # e.g., "claude", "codex"
+                    timeout=int(os.getenv("OPENCLAW_TIMEOUT", "120"))
+                )
+                
+                # Convert to expected format
+                analysis_result = {
+                    "success": True,
+                    "plafond_thermique_m": acp_analysis["plafond_thermique_m"],
+                    "force_thermique_ms": acp_analysis["force_thermique_ms"],
+                    "heures_volables": acp_analysis["heures_volables"],
+                    "score_volabilite": acp_analysis["score_volabilite"],
+                    "conseils_vol": acp_analysis["conseils_vol"],
+                    "alertes_securite": acp_analysis["alertes_securite"],
+                    "details_analyse": acp_analysis["details_analyse"],
+                    "analyzer": "openclaw_acp"
+                }
+                logger.info(f"🦞 OpenClaw ACP analysis successful!")
+                
+            except Exception as e:
+                logger.warning(f"OpenClaw ACP failed, falling back to direct API: {e}")
+                analysis_result = None
+        
+        # Fallback to direct API if ACP not available or failed
+        if not analysis_result:
+            logger.info("🤖 Using direct LLM API...")
+            analysis_result = await analyze_emagrammes_with_fallback(
+                image_paths=image_paths,
+                spot_name=site.name,
+                sources=sources
+            )
         
         if not analysis_result.get("success"):
             logger.error(f"LLM analysis failed: {analysis_result.get('error')}")
@@ -131,7 +168,8 @@ async def generate_multi_source_emagram_for_spot(
                 "details": analysis_result
             }
         
-        logger.info(f"🤖 LLM analysis successful: Score {analysis_result.get('score_volabilite')}/100")
+        analyzer_used = analysis_result.get("analyzer", "unknown")
+        logger.info(f"🤖 LLM analysis successful ({analyzer_used}): Score {analysis_result.get('score_volabilite')}/100")
         
         # Step 5: Save to database
         emagram_analysis = save_emagram_analysis(
