@@ -141,13 +141,16 @@ async def fetch_from_enabled_sources(
             """Wrapper to instrument each fetch call"""
             result = None
             try:
+                # Clean site name for scrapers (remove suffixes like "Test", "Nord", etc. for better matching)
+                clean_site_name = site_name.split()[0] if site_name else site_name
+                
                 # Adapt arguments per source
                 if src_name == "open-meteo":
                     result = await func(lat, lon, days=7)
                 elif src_name == "meteo-parapente":
                     result = await func(lat, lon, site_name=site_name, elevation_m=elevation_m, days=1)
                 elif src_name == "meteociel":
-                    result = await func(lat, lon, site_name=site_name)
+                    result = await func(lat, lon, site_name=clean_site_name)
                 elif src_name == "meteoblue":
                     result = await func(lat, lon, city_name=site_name)
                 else:
