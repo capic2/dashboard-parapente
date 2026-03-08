@@ -95,10 +95,14 @@ export default function Dashboard() {
       />
 
       <div className="space-y-4">
-        {/* Row 1: Current Conditions + Emagram Widget (2 columns) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <CurrentConditions spotId={selectedSiteId} />
-          <EmagramWidget userLat={userLat} userLon={userLon} />
+        {/* Row 1: Current Conditions + Emagram Widget (1/3 - 2/3) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-1">
+            <CurrentConditions spotId={selectedSiteId} />
+          </div>
+          <div className="lg:col-span-2">
+            <EmagramWidget userLat={userLat} userLon={userLon} />
+          </div>
         </div>
 
         {/* Row 2: Stats Panel (full width) */}
