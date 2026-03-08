@@ -6,9 +6,9 @@ Ce guide vous aide à déployer l'intégration Google Gemini Vision sur votre se
 
 ## Prérequis
 
-- ✅ Clé API Google Gemini: `***REMOVED***`
+- ✅ Clé API Google Gemini (obtenir sur: https://aistudio.google.com/app/apikey)
 - ✅ Docker et docker-compose installés
-- ✅ Serveur: `192.168.1.106`
+- ✅ Serveur Docker avec accès réseau
 
 ## Étapes de déploiement
 
@@ -38,7 +38,7 @@ environment:
   # ... variables existantes ...
   
   # Google Gemini API
-  - GOOGLE_API_KEY=***REMOVED***
+  - GOOGLE_API_KEY=your_google_api_key_here
   - GEMINI_MODEL=gemini-2.5-flash
 ```
 
@@ -51,7 +51,7 @@ environment:
 nano .env
 
 # Ajouter ces lignes:
-GOOGLE_API_KEY=***REMOVED***
+GOOGLE_API_KEY=your_google_api_key_here
 GEMINI_MODEL=gemini-2.5-flash
 ```
 

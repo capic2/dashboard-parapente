@@ -18,7 +18,7 @@ Utilise **Google Gemini Vision API** pour analyser les emagrammes.
 **Configuration:**
 ```bash
 # Dans .env
-GOOGLE_API_KEY=***REMOVED***
+GOOGLE_API_KEY=your_google_api_key_here
 GEMINI_MODEL=gemini-2.5-flash  # ou gemini-1.5-pro
 ```
 
@@ -198,7 +198,7 @@ python multi_emagram_analyzer.py
 
 ```bash
 # .env
-GOOGLE_API_KEY=***REMOVED***
+GOOGLE_API_KEY=your_google_api_key_here
 GEMINI_MODEL=gemini-2.5-flash
 
 # Désactiver OpenClaw ACP (complexe avec Docker)
@@ -210,14 +210,14 @@ OPENCLAW_ACP_ENABLED=false
 ```bash
 # .env
 # Priority 1: Gemini
-GOOGLE_API_KEY=***REMOVED***
+GOOGLE_API_KEY=your_google_api_key_here
 
 # Priority 2: OpenClaw ACP (optionnel)
 OPENCLAW_ACP_ENABLED=true
 OPENCLAW_AGENT_ID=claude
 
 # Priority 3: Anthropic (optionnel)
-ANTHROPIC_API_KEY=sk-ant-api03-...
+ANTHROPIC_API_KEY=your_anthropic_key_here
 ```
 
 ## Dépannage
