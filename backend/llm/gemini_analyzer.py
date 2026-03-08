@@ -83,7 +83,7 @@ def analyze_emagram_with_gemini(
                     "temperature": 0.2,  # Low temperature for consistent structured output
                     "top_p": 0.8,
                     "top_k": 40,
-                    "max_output_tokens": 2048,
+                    "max_output_tokens": 8192,  # Increased significantly
                 }
             )
             
@@ -140,31 +140,22 @@ def _build_analysis_prompt(
     
     lat, lon = coordinates
     
-    # Text prompt
-    text_prompt = f"""Tu es un expert en météorologie aéronautique et en parapente. Analyse les {len(screenshot_paths)} emagrammes ci-dessous pour le site de parapente "{spot_name}" (coordonnées: {lat:.4f}, {lon:.4f}).
+    # Text prompt - CONCIS pour économiser les tokens
+    text_prompt = f"""Analyse ces {len(screenshot_paths)} emagrammes pour {spot_name} ({lat:.4f}, {lon:.4f}).
 
-Ces emagrammes proviennent de sources différentes (Meteo-Parapente, TopMeteo, Windy). Compare-les et fournis une analyse consensuelle optimisée pour la pratique du parapente.
-
-Réponds UNIQUEMENT avec un objet JSON valide (sans markdown, sans ```json```) contenant EXACTEMENT ces champs:
+Réponds UNIQUEMENT avec ce JSON (sans markdown):
 
 {{
-  "plafond_thermique_m": <altitude du plafond thermique en mètres (nombre entier)>,
-  "force_thermique_ms": <force moyenne des thermiques en m/s (nombre décimal)>,
-  "heures_volables": "<plage horaire favorable, ex: 14h-18h>",
-  "score_volabilite": <score de 0 à 100 (0=impossible, 100=excellent)>,
-  "conseils_vol": "<conseils pratiques courts pour les pilotes>",
-  "alertes_securite": [<liste d'alertes si applicable, sinon liste vide>],
-  "details_analyse": "<comparaison des sources et analyse détaillée>"
+  "plafond_thermique_m": <altitude plafond en mètres>,
+  "force_thermique_ms": <force thermiques en m/s>,
+  "heures_volables": "<ex: 12h-18h>",
+  "score_volabilite": <0-100>,
+  "conseils_vol": "<conseils courts MAX 50 mots>",
+  "alertes_securite": [<liste ou []>],
+  "details_analyse": "<analyse courte MAX 100 mots>"
 }}
 
-Critères d'analyse pour le parapente:
-- Plafond thermique: altitude maximale des ascendances
-- Force thermique: vitesse verticale moyenne attendue
-- Heures volables: créneaux avec thermiques exploitables (généralement entre midi et 18h)
-- Score: prend en compte plafond, force, stabilité de la masse d'air, cisaillement
-- Alertes: vent fort, orage, cisaillement, inversion basse, etc.
-
-IMPORTANT: Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.
+IMPORTANT: Réponds UNIQUEMENT le JSON complet, rien d'autre.
 """
     
     # Build parts list: [text, image1, image2, ...]
@@ -178,15 +169,22 @@ IMPORTANT: Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.
             continue
         
         try:
-            # Read image as bytes
-            image_bytes = image_path.read_bytes()
-            
-            # Add as PIL Image (Gemini accepts various formats)
+            # Read and resize image to reduce token usage
             from PIL import Image
             import io
-            image = Image.open(io.BytesIO(image_bytes))
-            parts.append(image)
             
+            image = Image.open(image_path)
+            original_size = image.size
+            
+            # Resize to max 1024px on longest side (to reduce token count)
+            max_size = 1024
+            if max(image.size) > max_size:
+                ratio = max_size / max(image.size)
+                new_size = (int(image.size[0] * ratio), int(image.size[1] * ratio))
+                image = image.resize(new_size, Image.Resampling.LANCZOS)
+                logger.info(f"Resized image {path} from {original_size} to {new_size}")
+            
+            parts.append(image)
             logger.debug(f"Added image to prompt: {path}")
             
         except Exception as e:
