@@ -27,7 +27,7 @@ def analyze_emagram_with_gemini(
     spot_name: str,
     coordinates: tuple,
     api_key: str,
-    model_name: str = "gemini-2.0-flash-exp",
+    model_name: str = "gemini-2.5-flash",
     max_retries: int = 3,
     retry_delay: float = 2.0
 ) -> Dict:

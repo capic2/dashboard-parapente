@@ -19,7 +19,7 @@ Utilise **Google Gemini Vision API** pour analyser les emagrammes.
 ```bash
 # Dans .env
 GOOGLE_API_KEY=***REMOVED***
-GEMINI_MODEL=gemini-2.0-flash-exp  # ou gemini-1.5-pro
+GEMINI_MODEL=gemini-2.5-flash  # ou gemini-1.5-pro
 ```
 
 **Utilisation:**
@@ -199,7 +199,7 @@ python multi_emagram_analyzer.py
 ```bash
 # .env
 GOOGLE_API_KEY=***REMOVED***
-GEMINI_MODEL=gemini-2.0-flash-exp
+GEMINI_MODEL=gemini-2.5-flash
 
 # Désactiver OpenClaw ACP (complexe avec Docker)
 OPENCLAW_ACP_ENABLED=false
@@ -231,7 +231,7 @@ echo $GOOGLE_API_KEY
 # Tester manuellement
 curl -H "Content-Type: application/json" \
      -d '{"contents":[{"parts":[{"text":"test"}]}]}' \
-     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=$GOOGLE_API_KEY"
+     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$GOOGLE_API_KEY"
 
 # Vérifier les quotas
 # https://aistudio.google.com/app/apikey
