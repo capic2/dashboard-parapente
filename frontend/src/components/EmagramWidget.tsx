@@ -267,29 +267,36 @@ export default function EmagramWidget({ userLat, userLon }: EmagramWidgetProps) 
         </div>
       )}
 
-      {/* External Sources - Multi-source Gemini analysis */}
-      {emagram.external_source_urls && (() => {
+      {/* Screenshots - Multi-source Gemini analysis */}
+      {emagram.screenshot_paths && (() => {
         try {
-          const sources = JSON.parse(emagram.external_source_urls);
-          const sourceKeys = Object.keys(sources);
+          const screenshots = JSON.parse(emagram.screenshot_paths);
+          const sourceKeys = Object.keys(screenshots);
           if (sourceKeys.length > 0) {
+            const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001';
             return (
               <div className="mt-3 pt-3 border-t border-gray-100">
                 <div className="text-xs text-gray-600 font-semibold mb-2">
-                  📊 Sources analysées ({sourceKeys.length})
+                  📊 Émagrammes capturés ({sourceKeys.length})
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {sourceKeys.map((key) => (
+                <div className="grid grid-cols-2 gap-2">
+                  {sourceKeys.map((source) => (
                     <a
-                      key={key}
-                      href={sources[key]}
+                      key={source}
+                      href={`${API_BASE}/api/emagram/screenshot/${emagram.id}/${source}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors"
+                      className="block"
                     >
-                      <span>🔗</span>
-                      <span className="capitalize">{key.replace('-', ' ')}</span>
-                      <span className="text-blue-400">↗</span>
+                      <img
+                        src={`${API_BASE}/api/emagram/screenshot/${emagram.id}/${source}`}
+                        alt={`Emagramme ${source}`}
+                        className="w-full h-32 object-cover rounded border border-gray-200 hover:border-blue-400 transition-colors cursor-pointer"
+                        loading="lazy"
+                      />
+                      <div className="text-xs text-center text-gray-500 mt-1 capitalize">
+                        {source.replace('-', ' ')}
+                      </div>
                     </a>
                   ))}
                 </div>
