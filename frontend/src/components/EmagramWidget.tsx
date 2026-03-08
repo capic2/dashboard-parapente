@@ -271,6 +271,7 @@ export default function EmagramWidget({ userLat, userLon }: EmagramWidgetProps) 
       {emagram.screenshot_paths && (() => {
         try {
           const screenshots = JSON.parse(emagram.screenshot_paths);
+          const externalUrls = emagram.external_source_urls ? JSON.parse(emagram.external_source_urls) : {};
           const sourceKeys = Object.keys(screenshots);
           if (sourceKeys.length > 0) {
             // Use window.location to get the current host, backend is on same host:8000
@@ -281,25 +282,29 @@ export default function EmagramWidget({ userLat, userLon }: EmagramWidgetProps) 
                   📊 Émagrammes capturés ({sourceKeys.length})
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  {sourceKeys.map((source) => (
-                    <a
-                      key={source}
-                      href={`${API_BASE}/api/emagram/screenshot/${emagram.id}/${source}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block"
-                    >
-                      <img
-                        src={`${API_BASE}/api/emagram/screenshot/${emagram.id}/${source}`}
-                        alt={`Emagramme ${source}`}
-                        className="w-full h-32 object-cover rounded border border-gray-200 hover:border-blue-400 transition-colors cursor-pointer"
-                        loading="lazy"
-                      />
-                      <div className="text-xs text-center text-gray-500 mt-1 capitalize">
-                        {source.replace('-', ' ')}
-                      </div>
-                    </a>
-                  ))}
+                  {sourceKeys.map((source) => {
+                    const externalUrl = externalUrls[source] || '';
+                    return (
+                      <a
+                        key={source}
+                        href={`${API_BASE}/api/emagram/screenshot/${emagram.id}/${source}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block"
+                        title={`${source}\n${externalUrl}`}
+                      >
+                        <img
+                          src={`${API_BASE}/api/emagram/screenshot/${emagram.id}/${source}`}
+                          alt={`Emagramme ${source}`}
+                          className="w-full h-32 object-cover rounded border border-gray-200 hover:border-blue-400 transition-colors cursor-pointer"
+                          loading="lazy"
+                        />
+                        <div className="text-xs text-center text-gray-500 mt-1 capitalize truncate px-1" title={externalUrl}>
+                          {source.replace('-', ' ')}
+                        </div>
+                      </a>
+                    );
+                  })}
                 </div>
                 {emagram.sources_agreement && (
                   <div className="mt-2 text-xs text-gray-500">
