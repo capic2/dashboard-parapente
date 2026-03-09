@@ -276,10 +276,12 @@ def run_migrations():
     logger.info("✓ All migrations completed")
 
 # Initialize database (create schema + seed sites)
-initialize_database()
-
-# Run migrations (if any exist)
-run_migrations()
+# Skip in test mode - tests use temporary in-memory DB
+if not config.TESTING:
+    initialize_database()
+    run_migrations()
+else:
+    logger.info("🧪 Testing mode: Skipping database initialization and migrations")
 
 
 async def initial_cache_warmup():
