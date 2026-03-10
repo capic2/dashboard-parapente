@@ -1,6 +1,7 @@
-import type { StorybookConfig } from '@storybook/react-vite';
+import { defineMain } from '@storybook/react-vite/node';
 
-const config: StorybookConfig = {
+
+export default defineMain({
   stories: [
     "../src/**/*.mdx",
     "../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"
@@ -22,6 +23,9 @@ const config: StorybookConfig = {
   docs: {
     autodocs: "tag"
   },
+  features: {
+    experimentalTestSyntax: true,
+  },
   typescript: {
     reactDocgen: "react-docgen-typescript",
     reactDocgenTypescriptOptions: {
@@ -29,6 +33,4 @@ const config: StorybookConfig = {
       propFilter: (prop) => (prop.parent ? !/node_modules/.test(prop.parent.fileName) : true),
     }
   }
-};
-
-export default config;
+})
