@@ -538,15 +538,29 @@ def extract_sunrise_sunset(aggregated: Dict[str, Any], day_index: int) -> tuple:
     """
     open_meteo_data = aggregated.get("sources", {}).get("open-meteo", {})
     
+    # Debug write to file
+    with open("/tmp/extract_sunrise_sunset_debug.log", "a") as f:
+        f.write(f"\n=== extract_sunrise_sunset START: day_index={day_index} ===\n")
+        f.write(f"aggregated sources keys: {list(aggregated.get('sources', {}).keys())}\n")
+        f.write(f"open_meteo_data keys: {list(open_meteo_data.keys())}\n")
+        f.write(f"open_meteo success: {open_meteo_data.get('success')}\n")
+    
     if not open_meteo_data.get("success"):
+        with open("/tmp/extract_sunrise_sunset_debug.log", "a") as f:
+            f.write(f"No successful open-meteo data\n")
         return None, None
     
-    raw_wrapper = open_meteo_data.get("raw", {})
-    # The raw data is wrapped in {"success": True, "source": "open-meteo", "data": {...}, "timestamp": ...}
-    api_data = raw_wrapper.get("data", {})
+    # Open-Meteo data is in the "data" field (not "raw")
+    api_data = open_meteo_data.get("data", {})
     daily = api_data.get("daily", {})
     sunrises = daily.get("sunrise", [])
     sunsets = daily.get("sunset", [])
+    
+    with open("/tmp/extract_sunrise_sunset_debug.log", "a") as f:
+        f.write(f"api_data keys: {list(api_data.keys())}\n")
+        f.write(f"daily keys: {list(daily.keys())}\n")
+        f.write(f"sunrises (len={len(sunrises)}): {sunrises[:2] if sunrises else 'EMPTY'}\n")
+        f.write(f"sunsets (len={len(sunsets)}): {sunsets[:2] if sunsets else 'EMPTY'}\n")
     
     if day_index >= len(sunrises) or day_index >= len(sunsets):
         return None, None
@@ -604,8 +618,13 @@ async def get_normalized_forecast(
     try:
         cached_result = await get_cached(cache_key)
         if cached_result is not None:
-            logger.info(f"✅ Cache HIT for forecast: {cache_key}")
-            return cached_result
+            # Only return cache if it has sunrise/sunset data
+            if cached_result.get("sunrise") is not None:
+                logger.info(f"✅ Cache HIT for forecast: {cache_key}")
+                return cached_result
+            else:
+                # Stale cache without sunrise/sunset - invalidate it
+                logger.warning(f"⚠️ Stale cache detected (missing sunrise/sunset) for {cache_key}, refetching...")
     except Exception as e:
         logger.warning(f"Cache get error: {e}, falling back to live fetch")
     
@@ -627,6 +646,7 @@ async def get_normalized_forecast(
     
     # Step 4: Extract sunrise/sunset
     sunrise, sunset = extract_sunrise_sunset(aggregated, day_index)
+    print(f"DEBUG get_normalized_forecast: sunrise={sunrise}, sunset={sunset}")
     
     # Add sunrise/sunset to response
     result = consensus.copy()
