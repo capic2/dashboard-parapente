@@ -16,12 +16,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
-from database import Base, get_db
-from main import app
-import tempfile
 
-# Import all models to register them with SQLAlchemy Base.metadata
-# This ensures all tables are created when Base.metadata.create_all() is called
+# IMPORTANT: Import all models BEFORE importing main.app
+# This ensures all tables are registered with SQLAlchemy Base.metadata
+# before Base.metadata.create_all() is called in the test_db fixture
 from models import (
     Site,
     Flight,
@@ -31,6 +29,10 @@ from models import (
     EmagramFeedback,
     ParaglidingSpot
 )
+
+from database import Base, get_db
+from main import app
+import tempfile
 
 # Use temporary file SQLite for tests
 @pytest.fixture(scope="function")
