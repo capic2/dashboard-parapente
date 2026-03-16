@@ -65,6 +65,10 @@ omit = [
     "*/.venv/*",
     "conftest.py",
     "*/test_*.py",
+    "*/llm/*",              # LLM analyzers (external API dependencies)
+    "*/emagram_scheduler/*", # Wrapper scheduler
+    "*/cache_emagram/*",     # Wrapper cache
+    "emagram_aggregator.py", # Obsolete script
 ]
 
 [tool.coverage.report]
