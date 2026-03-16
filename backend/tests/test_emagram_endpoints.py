@@ -38,6 +38,11 @@ class TestEmagramEndpoints:
             station_longitude=6.0,
             analysis_date=datetime.now().date(),
             analysis_time=datetime.now().time(),
+            analysis_datetime=datetime.now(),  # Required field
+            distance_km=0.0,  # Required field
+            data_source="wyoming",  # Required field
+            sounding_time="12Z",  # Required field
+            analysis_method="test",  # Required field
             plafond_thermique_m=3500,
             force_thermique_ms=2.5,
             score_volabilite=80,
@@ -78,6 +83,11 @@ class TestEmagramEndpoints:
                 station_longitude=6.0 + i * 0.1,
                 analysis_date=datetime.now().date(),
                 analysis_time=datetime.now().time(),
+                analysis_datetime=datetime.now(),  # Required field
+                distance_km=0.0,  # Required field
+                data_source="wyoming",  # Required field
+                sounding_time="12Z",  # Required field
+                analysis_method="test",  # Required field
                 plafond_thermique_m=3000 + i * 100,
                 force_thermique_ms=2.0,
                 score_volabilite=75 + i * 5,
@@ -105,6 +115,11 @@ class TestEmagramEndpoints:
                 station_longitude=6.0,
                 analysis_date=datetime.now().date(),
                 analysis_time=datetime.now().time(),
+                analysis_datetime=datetime.now(),  # Required field
+                distance_km=0.0,  # Required field
+                data_source="wyoming",  # Required field
+                sounding_time="12Z",  # Required field
+                analysis_method="test",  # Required field
                 plafond_thermique_m=3000,
                 force_thermique_ms=2.0,
                 score_volabilite=75,
