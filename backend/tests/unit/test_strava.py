@@ -47,7 +47,11 @@ async def test_refresh_access_token_success():
         "expires_at": int((datetime.now() + timedelta(hours=6)).timestamp())
     }
     
-    with patch("strava.httpx.AsyncClient") as mock_client:
+    with patch("strava.STRAVA_CLIENT_ID", "test_client_id"), \
+         patch("strava.STRAVA_CLIENT_SECRET", "test_secret"), \
+         patch("strava.STRAVA_REFRESH_TOKEN", "test_refresh_token"), \
+         patch("strava.httpx.AsyncClient") as mock_client:
+        
         mock_client.return_value.__aenter__.return_value.post = AsyncMock(
             return_value=MagicMock(
                 status_code=200,
@@ -478,7 +482,11 @@ async def test_refresh_access_token_expired():
         "expires_at": int((datetime.now() + timedelta(hours=6)).timestamp())
     }
     
-    with patch("strava.httpx.AsyncClient") as mock_client:
+    with patch("strava.STRAVA_CLIENT_ID", "test_client_id"), \
+         patch("strava.STRAVA_CLIENT_SECRET", "test_secret"), \
+         patch("strava.STRAVA_REFRESH_TOKEN", "test_refresh_token"), \
+         patch("strava.httpx.AsyncClient") as mock_client:
+        
         mock_client.return_value.__aenter__.return_value.post = AsyncMock(
             return_value=MagicMock(
                 status_code=200,
