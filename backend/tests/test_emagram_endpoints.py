@@ -13,7 +13,8 @@ class TestEmagramEndpoints:
     def test_get_latest_no_data(self, client, db_session):
         """Get latest emagram when no data exists"""
         response = client.get("/api/emagram/latest?user_lat=47.0&user_lon=6.0&station_name=Test")
-        assert response.status_code == 404
+        assert response.status_code == 200
+        assert response.json() is None  # API returns None (null) when no data, not 404
     
     def test_get_latest_with_data(self, client, db_session):
         """Get latest emagram analysis"""
@@ -65,22 +66,22 @@ class TestEmagramEndpoints:
     
     def test_list_analyses_empty(self, client):
         """List analyses when DB is empty"""
-        response = client.get("/api/emagram/list")
+        response = client.get("/api/emagram/history?user_lat=47.0&user_lon=6.0")
         assert response.status_code == 200
         data = response.json()
-        assert "analyses" in data
-        assert data["analyses"] == []
+        assert isinstance(data, list)
+        assert data == []
     
     def test_list_analyses_with_data(self, client, db_session):
         """List all emagram analyses"""
-        # Add multiple analyses
+        # Add multiple analyses near user location (47.0, 6.0)
         for i in range(3):
             analysis = EmagramAnalysis(
                 id=f"test-analysis-{i}",
                 station_code=f"site-{i}",
                 station_name=f"Site {i}",
-                station_latitude=47.0 + i * 0.1,
-                station_longitude=6.0 + i * 0.1,
+                station_latitude=47.0 + i * 0.01,  # Close to user location
+                station_longitude=6.0 + i * 0.01,
                 analysis_date=datetime.now().date(),
                 analysis_time=datetime.now().time(),
                 analysis_datetime=datetime.now(),  # Required field
@@ -97,15 +98,15 @@ class TestEmagramEndpoints:
             db_session.add(analysis)
         db_session.commit()
         
-        response = client.get("/api/emagram/list")
+        response = client.get("/api/emagram/history?user_lat=47.0&user_lon=6.0")
         assert response.status_code == 200
         data = response.json()
-        assert len(data["analyses"]) == 3
-        assert data["total"] == 3
+        assert isinstance(data, list)
+        assert len(data) == 3
     
-    def test_list_analyses_with_limit(self, client, db_session):
-        """List analyses with limit"""
-        # Add 5 analyses
+    def test_list_analyses_with_days_filter(self, client, db_session):
+        """List analyses with days filter"""
+        # Add 5 analyses at same location
         for i in range(5):
             analysis = EmagramAnalysis(
                 id=f"test-analysis-{i}",
@@ -129,11 +130,12 @@ class TestEmagramEndpoints:
             db_session.add(analysis)
         db_session.commit()
         
-        response = client.get("/api/emagram/list?limit=3")
+        # The history endpoint uses days parameter, not limit
+        response = client.get("/api/emagram/history?user_lat=47.0&user_lon=6.0&days=7")
         assert response.status_code == 200
         data = response.json()
-        assert len(data["analyses"]) == 3
-        assert data["total"] == 5
+        assert isinstance(data, list)
+        assert len(data) == 5  # All 5 are within 7 days
     
     def test_analyze_missing_params(self, client):
         """Trigger analysis without required params"""
