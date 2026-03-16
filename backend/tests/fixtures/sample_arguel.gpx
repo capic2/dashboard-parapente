@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Test" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>Vol Arguel - Test Flight</name>
+    <desc>Sample paragliding flight from Arguel takeoff</desc>
+    <time>2026-03-15T14:00:00Z</time>
+  </metadata>
+  <trk>
+    <name>Arguel 15-03 14h00</name>
+    <type>Paragliding</type>
+    <trkseg>
+      <!-- Takeoff Arguel (427m) -->
+      <trkpt lat="47.22356" lon="6.01842">
+        <ele>427</ele>
+        <time>2026-03-15T14:00:00Z</time>
+      </trkpt>
+      <!-- Climbing -->
+      <trkpt lat="47.22400" lon="6.01900">
+        <ele>550</ele>
+        <time>2026-03-15T14:05:00Z</time>
+      </trkpt>
+      <trkpt lat="47.22450" lon="6.01950">
+        <ele>720</ele>
+        <time>2026-03-15T14:10:00Z</time>
+      </trkpt>
+      <trkpt lat="47.22500" lon="6.02000">
+        <ele>900</ele>
+        <time>2026-03-15T14:15:00Z</time>
+      </trkpt>
+      <!-- Peak altitude -->
+      <trkpt lat="47.22550" lon="6.02050">
+        <ele>1200</ele>
+        <time>2026-03-15T14:20:00Z</time>
+      </trkpt>
+      <trkpt lat="47.22600" lon="6.02100">
+        <ele>1350</ele>
+        <time>2026-03-15T14:25:00Z</time>
+      </trkpt>
+      <!-- Gliding -->
+      <trkpt lat="47.22650" lon="6.02150">
+        <ele>1280</ele>
+        <time>2026-03-15T14:30:00Z</time>
+      </trkpt>
+      <trkpt lat="47.22700" lon="6.02200">
+        <ele>1150</ele>
+        <time>2026-03-15T14:35:00Z</time>
+      </trkpt>
+      <trkpt lat="47.22750" lon="6.02250">
+        <ele>980</ele>
+        <time>2026-03-15T14:40:00Z</time>
+      </trkpt>
+      <!-- Final approach -->
+      <trkpt lat="47.22800" lon="6.02300">
+        <ele>750</ele>
+        <time>2026-03-15T14:45:00Z</time>
+      </trkpt>
+      <trkpt lat="47.22850" lon="6.02350">
+        <ele>580</ele>
+        <time>2026-03-15T14:50:00Z</time>
+      </trkpt>
+      <!-- Landing -->
+      <trkpt lat="47.22900" lon="6.02400">
+        <ele>450</ele>
+        <time>2026-03-15T14:55:00Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>
