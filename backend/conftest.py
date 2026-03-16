@@ -149,7 +149,8 @@ def arguel_site(db_session):
         region="Doubs",
         country="France",
         orientation="SW",
-        type="paragliding"
+        site_type="user_spot",
+        usage_type="takeoff"
     )
     db_session.add(site)
     db_session.commit()
@@ -171,7 +172,8 @@ def chalais_site(db_session):
         region="Doubs",
         country="France",
         orientation="W",
-        type="paragliding"
+        site_type="user_spot",
+        usage_type="takeoff"
     )
     db_session.add(site)
     db_session.commit()
@@ -195,7 +197,7 @@ def sample_flight(db_session, arguel_site):
         max_altitude_m=1350,
         max_speed_kmh=45.5,
         site_id="site-arguel",
-        strava_activity_id=123456789
+        strava_id="123456789"
     )
     db_session.add(flight)
     db_session.commit()
