@@ -1,3 +1,7 @@
+[project]
+name = "dashboard-parapente-backend"
+requires-python = ">=3.12"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
@@ -6,7 +10,7 @@ python_functions = "test_*"
 
 [tool.black]
 line-length = 100
-target-version = ['py311', 'py312']
+target-version = ['py312']
 include = '\.pyi?$'
 exclude = '''
 /(
@@ -29,7 +33,7 @@ skip = [".venv", "venv", "venv_311", "migrations"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 exclude = [
     ".venv",
     "venv",
