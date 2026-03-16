@@ -10,13 +10,16 @@ from models import Flight, Site
 import json
 from pathlib import Path
 
+# API prefix for all routes
+API_PREFIX = "/api"
+
 
 class TestFlightsListEndpoint:
     """Tests for GET /flights"""
     
     def test_get_flights_empty_database(self, client, db_session):
         """GET /flights returns empty list when no flights exist"""
-        response = client.get("/flights")
+        response = client.get(f"{API_PREFIX}/flights")
         assert response.status_code == 200
         data = response.json()
         assert data["flights"] == []
@@ -38,7 +41,7 @@ class TestFlightsListEndpoint:
             flights.append(flight)
         db_session.commit()
         
-        response = client.get("/flights")
+        response = client.get(f"{API_PREFIX}/flights")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 3
@@ -62,7 +65,7 @@ class TestFlightsListEndpoint:
         db_session.add_all([flight_arguel, flight_chalais])
         db_session.commit()
         
-        response = client.get("/flights?site_id=site-arguel")
+        response = client.get(f"{API_PREFIX}/flights?site_id=site-arguel")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
@@ -86,7 +89,7 @@ class TestFlightsListEndpoint:
         db_session.add_all([flight_2025, flight_2026])
         db_session.commit()
         
-        response = client.get("/flights?year=2026")
+        response = client.get(f"{API_PREFIX}/flights?year=2026")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
@@ -106,14 +109,14 @@ class TestFlightsListEndpoint:
         db_session.commit()
         
         # First page
-        response = client.get("/flights?limit=5&skip=0")
+        response = client.get(f"{API_PREFIX}/flights?limit=5&skip=0")
         assert response.status_code == 200
         data = response.json()
         assert len(data["flights"]) == 5
         assert data["total"] == 10
         
         # Second page
-        response = client.get("/flights?limit=5&skip=5")
+        response = client.get(f"{API_PREFIX}/flights?limit=5&skip=5")
         assert response.status_code == 200
         data = response.json()
         assert len(data["flights"]) == 5
@@ -133,7 +136,7 @@ class TestFlightsListEndpoint:
             db_session.add(flight)
         db_session.commit()
         
-        response = client.get("/flights")
+        response = client.get(f"{API_PREFIX}/flights")
         assert response.status_code == 200
         data = response.json()
         
@@ -148,7 +151,7 @@ class TestFlightStatsEndpoint:
     
     def test_get_flight_stats_empty_database(self, client, db_session):
         """GET /flights/stats returns zeros when no flights"""
-        response = client.get("/flights/stats")
+        response = client.get(f"{API_PREFIX}/flights/stats")
         assert response.status_code == 200
         data = response.json()
         assert data["total_flights"] == 0
@@ -177,7 +180,7 @@ class TestFlightStatsEndpoint:
         db_session.add_all([flight1, flight2])
         db_session.commit()
         
-        response = client.get("/flights/stats")
+        response = client.get(f"{API_PREFIX}/flights/stats")
         assert response.status_code == 200
         data = response.json()
         assert data["total_flights"] == 2
@@ -197,7 +200,7 @@ class TestFlightStatsEndpoint:
         db_session.add(flight)
         db_session.commit()
         
-        response = client.get("/flights/stats")
+        response = client.get(f"{API_PREFIX}/flights/stats")
         assert response.status_code == 200
         data = response.json()
         assert data["total_flights"] == 1
@@ -211,7 +214,7 @@ class TestFlightRecordsEndpoint:
     
     def test_get_flight_records_empty_database(self, client, db_session):
         """GET /flights/records returns nulls when no flights"""
-        response = client.get("/flights/records")
+        response = client.get(f"{API_PREFIX}/flights/records")
         assert response.status_code == 200
         data = response.json()
         assert data["longest_flight"] is None
@@ -251,7 +254,7 @@ class TestFlightRecordsEndpoint:
         db_session.add_all([flight1, flight2, flight3])
         db_session.commit()
         
-        response = client.get("/flights/records")
+        response = client.get(f"{API_PREFIX}/flights/records")
         assert response.status_code == 200
         data = response.json()
         
@@ -270,13 +273,13 @@ class TestFlightDetailEndpoint:
     
     def test_get_flight_not_found(self, client, db_session):
         """GET /flights/{flight_id} returns 404 for non-existent flight"""
-        response = client.get("/flights/non-existent")
+        response = client.get(f"{API_PREFIX}/flights/non-existent")
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
     
     def test_get_flight_returns_details(self, client, db_session, sample_flight):
         """GET /flights/{flight_id} returns flight details"""
-        response = client.get("/flights/flight-test-001")
+        response = client.get(f"{API_PREFIX}/flights/flight-test-001")
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == "flight-test-001"
@@ -288,7 +291,7 @@ class TestFlightDetailEndpoint:
     
     def test_get_flight_includes_site_details(self, client, db_session, sample_flight):
         """GET /flights/{flight_id} includes site information"""
-        response = client.get("/flights/flight-test-001")
+        response = client.get(f"{API_PREFIX}/flights/flight-test-001")
         assert response.status_code == 200
         data = response.json()
         assert "site" in data
@@ -352,12 +355,12 @@ class TestDeleteFlightEndpoint:
     
     def test_delete_flight_not_found(self, client, db_session):
         """DELETE /flights/{flight_id} returns 404 for non-existent flight"""
-        response = client.delete("/flights/non-existent")
+        response = client.delete(f"{API_PREFIX}/flights/non-existent")
         assert response.status_code == 404
     
     def test_delete_flight_success(self, client, db_session, sample_flight):
         """DELETE /flights/{flight_id} deletes flight"""
-        response = client.delete("/flights/flight-test-001")
+        response = client.delete(f"{API_PREFIX}/flights/flight-test-001")
         assert response.status_code == 200
         assert "deleted" in response.json()["message"].lower()
         
@@ -368,14 +371,14 @@ class TestDeleteFlightEndpoint:
     def test_delete_flight_removes_from_list(self, client, db_session, sample_flight):
         """DELETE /flights/{flight_id} removes flight from GET /flights"""
         # Verify flight exists
-        response = client.get("/flights")
+        response = client.get(f"{API_PREFIX}/flights")
         assert response.json()["total"] == 1
         
         # Delete flight
-        client.delete("/flights/flight-test-001")
+        client.delete(f"{API_PREFIX}/flights/flight-test-001")
         
         # Verify flight is gone
-        response = client.get("/flights")
+        response = client.get(f"{API_PREFIX}/flights")
         assert response.json()["total"] == 0
 
 
@@ -389,7 +392,7 @@ class TestCreateFlightEndpoint:
             "flight_date": "2026-03-20",
             "site_id": "site-arguel"
         }
-        response = client.post("/flights", json=flight_data)
+        response = client.post(f"{API_PREFIX}/flights", json=flight_data)
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "New Flight"
@@ -411,7 +414,7 @@ class TestCreateFlightEndpoint:
             "max_speed_kmh": 42.0,
             "notes": "Perfect conditions"
         }
-        response = client.post("/flights", json=flight_data)
+        response = client.post(f"{API_PREFIX}/flights", json=flight_data)
         assert response.status_code == 200
         data = response.json()
         assert data["distance_km"] == 25.5
@@ -425,7 +428,7 @@ class TestCreateFlightEndpoint:
             "flight_date": "2026-03-20",
             "site_id": "non-existent-site"
         }
-        response = client.post("/flights", json=flight_data)
+        response = client.post(f"{API_PREFIX}/flights", json=flight_data)
         # Should fail with 404 or 400
         assert response.status_code in [400, 404, 500]
 
@@ -435,13 +438,13 @@ class TestFlightGPXEndpoints:
     
     def test_get_gpx_data_no_gpx(self, client, db_session, sample_flight):
         """GET /flights/{flight_id}/gpx-data returns empty when no GPX"""
-        response = client.get("/flights/flight-test-001/gpx-data")
+        response = client.get(f"{API_PREFIX}/flights/flight-test-001/gpx-data")
         # Should return empty or 404
         assert response.status_code in [200, 404]
     
     def test_download_gpx_no_file(self, client, db_session, sample_flight):
         """GET /flights/{flight_id}/gpx returns 404 when no GPX file"""
-        response = client.get("/flights/flight-test-001/gpx")
+        response = client.get(f"{API_PREFIX}/flights/flight-test-001/gpx")
         assert response.status_code == 404
     
     def test_upload_gpx_to_flight(self, client, db_session, sample_flight, sample_gpx):
@@ -450,7 +453,7 @@ class TestFlightGPXEndpoints:
         files = {
             "file": ("test.gpx", sample_gpx.encode(), "application/gpx+xml")
         }
-        response = client.post("/flights/flight-test-001/upload-gpx", files=files)
+        response = client.post(f"{API_PREFIX}/flights/flight-test-001/upload-gpx", files=files)
         # May succeed or fail depending on implementation
         assert response.status_code in [200, 201, 400, 500]
 
@@ -466,14 +469,14 @@ class TestCreateFlightFromGPX:
         data = {
             "site_id": "site-arguel"
         }
-        response = client.post("/flights/create-from-gpx", files=files, data=data)
+        response = client.post(f"{API_PREFIX}/flights/create-from-gpx", files=files, data=data)
         # Should succeed or fail gracefully
         assert response.status_code in [200, 201, 400, 422, 500]
     
     def test_create_flight_from_gpx_no_file(self, client, db_session, arguel_site):
         """POST /flights/create-from-gpx fails without file"""
         data = {"site_id": "site-arguel"}
-        response = client.post("/flights/create-from-gpx", data=data)
+        response = client.post(f"{API_PREFIX}/flights/create-from-gpx", data=data)
         assert response.status_code in [400, 422]
 
 
@@ -482,7 +485,7 @@ class TestHealthCheck:
     
     def test_health_check_returns_ok(self, client):
         """GET /health returns healthy status"""
-        response = client.get("/health")
+        response = client.get(f"{API_PREFIX}/health")
         assert response.status_code == 200
         data = response.json()
         assert "status" in data

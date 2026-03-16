@@ -10,13 +10,16 @@ from models import Site
 from unittest.mock import patch, MagicMock
 import json
 
+# API prefix for all routes
+API_PREFIX = "/api"
+
 
 class TestWeatherEndpoint:
     """Tests for GET /weather/{spot_id}"""
     
     def test_get_weather_invalid_spot(self, client, db_session):
         """GET /weather/{spot_id} returns 404 for non-existent spot"""
-        response = client.get("/weather/non-existent-spot")
+        response = client.get(f"{API_PREFIX}/weather/non-existent-spot")
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
     
@@ -36,7 +39,7 @@ class TestWeatherEndpoint:
                 ]
             }
             
-            response = client.get("/weather/site-arguel")
+            response = client.get(f"{API_PREFIX}/weather/site-arguel")
             # Should return 200 or fail gracefully
             assert response.status_code in [200, 404, 500]
     
@@ -45,7 +48,7 @@ class TestWeatherEndpoint:
         with patch("routes.get_or_fetch_weather") as mock_weather:
             mock_weather.return_value = {"forecast": []}
             
-            response = client.get("/weather/site-arguel?day_index=1")
+            response = client.get(f"{API_PREFIX}/weather/site-arguel?day_index=1")
             # Should accept day_index parameter
             assert response.status_code in [200, 404, 500]
     
@@ -54,7 +57,7 @@ class TestWeatherEndpoint:
         with patch("routes.get_or_fetch_weather") as mock_weather:
             mock_weather.return_value = {"forecast": []}
             
-            response = client.get("/weather/site-arguel?days=3")
+            response = client.get(f"{API_PREFIX}/weather/site-arguel?days=3")
             # Should accept days parameter
             assert response.status_code in [200, 404, 500]
 
@@ -64,7 +67,7 @@ class TestWeatherTodayEndpoint:
     
     def test_get_weather_today_invalid_spot(self, client, db_session):
         """GET /weather/{spot_id}/today returns 404 for invalid spot"""
-        response = client.get("/weather/non-existent/today")
+        response = client.get(f"{API_PREFIX}/weather/non-existent/today")
         assert response.status_code == 404
     
     def test_get_weather_today_valid_spot(self, client, db_session, arguel_site):
@@ -81,7 +84,7 @@ class TestWeatherTodayEndpoint:
                 ]
             }
             
-            response = client.get("/weather/site-arguel/today")
+            response = client.get(f"{API_PREFIX}/weather/site-arguel/today")
             # Should return today's forecast
             assert response.status_code in [200, 404, 500]
 
@@ -91,7 +94,7 @@ class TestWeatherSummaryEndpoint:
     
     def test_get_weather_summary_invalid_spot(self, client, db_session):
         """GET /weather/{spot_id}/summary returns 404 for invalid spot"""
-        response = client.get("/weather/non-existent/summary")
+        response = client.get(f"{API_PREFIX}/weather/non-existent/summary")
         assert response.status_code == 404
     
     def test_get_weather_summary_valid_spot(self, client, db_session, arguel_site):
@@ -106,7 +109,7 @@ class TestWeatherSummaryEndpoint:
                 }
             }
             
-            response = client.get("/weather/site-arguel/summary")
+            response = client.get(f"{API_PREFIX}/weather/site-arguel/summary")
             # Should return summary
             assert response.status_code in [200, 404, 500]
     
@@ -115,7 +118,7 @@ class TestWeatherSummaryEndpoint:
         with patch("routes.get_or_fetch_weather") as mock_weather:
             mock_weather.return_value = {"summary": {}}
             
-            response = client.get("/weather/site-arguel/summary?day_index=1")
+            response = client.get(f"{API_PREFIX}/weather/site-arguel/summary?day_index=1")
             assert response.status_code in [200, 404, 500]
 
 
@@ -124,7 +127,7 @@ class TestDailySummaryEndpoint:
     
     def test_get_daily_summary_invalid_spot(self, client, db_session):
         """GET /weather/{spot_id}/daily-summary returns 404 for invalid spot"""
-        response = client.get("/weather/non-existent/daily-summary")
+        response = client.get(f"{API_PREFIX}/weather/non-existent/daily-summary")
         assert response.status_code == 404
     
     def test_get_daily_summary_valid_spot(self, client, db_session, arguel_site):
@@ -140,7 +143,7 @@ class TestDailySummaryEndpoint:
                 }
             }
             
-            response = client.get("/weather/site-arguel/daily-summary")
+            response = client.get(f"{API_PREFIX}/weather/site-arguel/daily-summary")
             assert response.status_code in [200, 404, 500]
     
     def test_get_daily_summary_future_day(self, client, db_session, arguel_site):
@@ -148,7 +151,7 @@ class TestDailySummaryEndpoint:
         with patch("routes.get_or_fetch_weather") as mock_weather:
             mock_weather.return_value = {"daily_summary": {}}
             
-            response = client.get("/weather/site-arguel/daily-summary?day_index=2")
+            response = client.get(f"{API_PREFIX}/weather/site-arguel/daily-summary?day_index=2")
             assert response.status_code in [200, 404, 500]
 
 
@@ -160,19 +163,19 @@ class TestAdminWeatherEndpoints:
         with patch("routes.refresh_all_weather") as mock_refresh:
             mock_refresh.return_value = {"refreshed": 5}
             
-            response = client.post("/admin/refresh-weather")
+            response = client.post(f"{API_PREFIX}/admin/refresh-weather")
             # Should succeed or require auth
             assert response.status_code in [200, 401, 403, 500]
     
     def test_clear_cache(self, client, db_session):
         """POST /admin/clear-cache clears Redis cache"""
-        response = client.post("/admin/clear-cache")
+        response = client.post(f"{API_PREFIX}/admin/clear-cache")
         # Should succeed or require auth
         assert response.status_code in [200, 401, 403, 500]
     
     def test_debug_cache_data(self, client, db_session, arguel_site):
         """GET /admin/debug-cache/{site_id} shows cache debug info"""
-        response = client.get("/admin/debug-cache/site-arguel")
+        response = client.get(f"{API_PREFIX}/admin/debug-cache/site-arguel")
         # Should return debug info or require auth
         assert response.status_code in [200, 401, 403, 404, 500]
     
@@ -181,7 +184,7 @@ class TestAdminWeatherEndpoints:
         with patch("routes.fetch_weather_for_site") as mock_fetch:
             mock_fetch.return_value = {"test": "data"}
             
-            response = client.get("/admin/test-weather/site-arguel")
+            response = client.get(f"{API_PREFIX}/admin/test-weather/site-arguel")
             assert response.status_code in [200, 401, 403, 404, 500]
 
 
@@ -190,19 +193,19 @@ class TestWeatherSourcesEndpoints:
     
     def test_get_weather_sources(self, client, db_session):
         """GET /weather-sources lists all weather sources"""
-        response = client.get("/weather-sources")
+        response = client.get(f"{API_PREFIX}/weather-sources")
         # Should return list of sources
         assert response.status_code in [200, 500]
     
     def test_get_weather_sources_stats(self, client, db_session):
         """GET /weather-sources/stats returns usage statistics"""
-        response = client.get("/weather-sources/stats")
+        response = client.get(f"{API_PREFIX}/weather-sources/stats")
         # Should return stats or empty
         assert response.status_code in [200, 500]
     
     def test_get_weather_source_by_name(self, client, db_session):
         """GET /weather-sources/{source_name} gets specific source"""
-        response = client.get("/weather-sources/open-meteo")
+        response = client.get(f"{API_PREFIX}/weather-sources/open-meteo")
         # Should return source config or 404
         assert response.status_code in [200, 404, 500]
     
@@ -214,7 +217,7 @@ class TestWeatherSourcesEndpoints:
             "priority": 10,
             "api_key": "test-key"
         }
-        response = client.post("/weather-sources", json=source_data)
+        response = client.post(f"{API_PREFIX}/weather-sources", json=source_data)
         # Should create or fail with validation error
         assert response.status_code in [201, 400, 422, 500]
     
@@ -224,13 +227,13 @@ class TestWeatherSourcesEndpoints:
             "enabled": False,
             "priority": 5
         }
-        response = client.patch("/weather-sources/open-meteo", json=update_data)
+        response = client.patch(f"{API_PREFIX}/weather-sources/open-meteo", json=update_data)
         # Should update or 404
         assert response.status_code in [200, 404, 422, 500]
     
     def test_delete_weather_source(self, client, db_session):
         """DELETE /weather-sources/{source_name} deletes source"""
-        response = client.delete("/weather-sources/test-source")
+        response = client.delete(f"{API_PREFIX}/weather-sources/test-source")
         # Should delete or 404
         assert response.status_code in [200, 404, 500]
     
@@ -239,7 +242,7 @@ class TestWeatherSourcesEndpoints:
         with patch("routes.test_weather_api") as mock_test:
             mock_test.return_value = {"status": "ok"}
             
-            response = client.post("/weather-sources/open-meteo/test")
+            response = client.post(f"{API_PREFIX}/weather-sources/open-meteo/test")
             assert response.status_code in [200, 404, 500]
 
 
@@ -252,10 +255,10 @@ class TestWeatherCaching:
             mock_weather.return_value = {"cached": False}
             
             # First request
-            response1 = client.get("/weather/site-arguel")
+            response1 = client.get(f"{API_PREFIX}/weather/site-arguel")
             
             # Second request (should be cached)
-            response2 = client.get("/weather/site-arguel")
+            response2 = client.get(f"{API_PREFIX}/weather/site-arguel")
             
             # Both should succeed
             assert response1.status_code in [200, 404, 500]
@@ -267,13 +270,13 @@ class TestWeatherCaching:
             mock_weather.return_value = {"cached": False}
             
             # Get weather (cache it)
-            client.get("/weather/site-arguel")
+            client.get(f"{API_PREFIX}/weather/site-arguel")
             
             # Clear cache
-            client.post("/admin/clear-cache")
+            client.post(f"{API_PREFIX}/admin/clear-cache")
             
             # Request again (should fetch fresh)
-            response = client.get("/weather/site-arguel")
+            response = client.get(f"{API_PREFIX}/weather/site-arguel")
             assert response.status_code in [200, 404, 500]
 
 
@@ -285,7 +288,7 @@ class TestWeatherErrorHandling:
         with patch("routes.get_or_fetch_weather") as mock_weather:
             mock_weather.side_effect = TimeoutError("API timeout")
             
-            response = client.get("/weather/site-arguel")
+            response = client.get(f"{API_PREFIX}/weather/site-arguel")
             # Should fail gracefully with 500 or 503
             assert response.status_code in [500, 503, 504]
     
@@ -294,7 +297,7 @@ class TestWeatherErrorHandling:
         with patch("routes.get_or_fetch_weather") as mock_weather:
             mock_weather.return_value = None  # Invalid response
             
-            response = client.get("/weather/site-arguel")
+            response = client.get(f"{API_PREFIX}/weather/site-arguel")
             # Should handle gracefully
             assert response.status_code in [200, 404, 500]
     
@@ -312,6 +315,6 @@ class TestWeatherErrorHandling:
         db_session.add(site)
         db_session.commit()
         
-        response = client.get("/weather/site-no-coords")
+        response = client.get(f"{API_PREFIX}/weather/site-no-coords")
         # Should fail with 400 or 422
         assert response.status_code in [400, 404, 422, 500]
