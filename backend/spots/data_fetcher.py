@@ -260,7 +260,10 @@ def merge_duplicate_spots(
         if matched_pgs:
             # Merge the two spots
             # Generate new merged ID
-            merged_id = f"merged_{hashlib.md5(f'{oa_spot['id']}_{matched_pgs['id']}'.encode()).hexdigest()[:16]}"
+            # Extract IDs first for Python 3.11 compatibility (f-string syntax)
+            oa_id = oa_spot['id']
+            pgs_id = matched_pgs['id']
+            merged_id = f"merged_{hashlib.md5(f'{oa_id}_{pgs_id}'.encode()).hexdigest()[:16]}"
             
             merged_spot = {
                 "id": merged_id,
