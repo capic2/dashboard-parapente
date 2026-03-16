@@ -1271,7 +1271,8 @@ async def get_weather(spot_id: str, day_index: int = 0, days: int = 1, db: Sessi
             site.longitude,
             day_index + d,
             site_name=site.name,
-            elevation_m=site.elevation_m
+            elevation_m=site.elevation_m,
+            db=db
         ))
     
     results = await asyncio.gather(*tasks)
@@ -1390,7 +1391,8 @@ async def get_weather_summary(spot_id: str, day_index: int = 0, db: Session = De
         site.longitude,
         day_index,
         site_name=site.name,
-        elevation_m=site.elevation_m
+        elevation_m=site.elevation_m,
+        db=db
     )
     
     if not day_result.get("success"):

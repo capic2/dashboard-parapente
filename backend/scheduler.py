@@ -56,7 +56,7 @@ async def fetch_and_store_weather(site_code: str, day_index: int = 0):
         logger.info(f"Fetching weather for {site.name} (day_index={day_index})...")
         
         # Fetch normalized forecast
-        consensus = await get_normalized_forecast(site.latitude, site.longitude, day_index)
+        consensus = await get_normalized_forecast(site.latitude, site.longitude, day_index, db=db)
         
         if not consensus.get("success"):
             logger.error(f"Failed to fetch weather for {site.name}: {consensus.get('error')}")
@@ -180,7 +180,8 @@ async def fetch_and_cache_weather(site_id: str, day_index: int = 0):
                 lon=site.longitude,
                 day_index=day_index,
                 site_name=site.name,
-                elevation_m=site.elevation_m
+                elevation_m=site.elevation_m,
+                db=db
             )
             
             if result.get("success"):
