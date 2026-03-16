@@ -109,7 +109,7 @@ async def test_fetch_and_cache_weather_success(db_session, arguel_site):
     }
     
     with patch("scheduler.get_normalized_forecast", new=AsyncMock(return_value=mock_result)):
-        result = await fetch_and_cache_weather(arguel_site.id, day_index=0)
+        result = await fetch_and_cache_weather(arguel_site.id, day_index=0, db=db_session)
     
     assert result is True
 
@@ -124,7 +124,7 @@ async def test_fetch_and_cache_weather_failure(db_session, arguel_site):
     }
     
     with patch("scheduler.get_normalized_forecast", new=AsyncMock(return_value=mock_result)):
-        result = await fetch_and_cache_weather(arguel_site.id, day_index=0)
+        result = await fetch_and_cache_weather(arguel_site.id, day_index=0, db=db_session)
     
     assert result is False
 
@@ -133,7 +133,7 @@ async def test_fetch_and_cache_weather_failure(db_session, arguel_site):
 async def test_fetch_and_cache_weather_site_not_found(db_session):
     """Test cache fetch with non-existent site"""
     
-    result = await fetch_and_cache_weather("invalid-site-id", day_index=0)
+    result = await fetch_and_cache_weather("invalid-site-id", day_index=0, db=db_session)
     
     assert result is False
 
@@ -144,7 +144,7 @@ async def test_fetch_and_cache_weather_exception_handling(db_session, arguel_sit
     
     # Simulate exception in weather_pipeline
     with patch("scheduler.get_normalized_forecast", new=AsyncMock(side_effect=Exception("API error"))):
-        result = await fetch_and_cache_weather(arguel_site.id, day_index=0)
+        result = await fetch_and_cache_weather(arguel_site.id, day_index=0, db=db_session)
     
     assert result is False
 
