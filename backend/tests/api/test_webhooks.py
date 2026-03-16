@@ -309,23 +309,18 @@ async def test_process_strava_activity_new_flight(db_session, arguel_site):
          patch("webhooks.download_gpx", new=AsyncMock(return_value=gpx_content)), \
          patch("webhooks.send_telegram_notification", new=AsyncMock()):
         
-        await process_strava_activity("12345678")
+        await process_strava_activity("12345678", db=db_session)
     
-    # Need to refresh session since process_strava_activity uses its own SessionLocal
-    from database import SessionLocal
-    fresh_db = SessionLocal()
-    try:
-        flight = fresh_db.query(Flight).filter(Flight.strava_id == "12345678").first()
-        
-        assert flight is not None
-        assert "Arguel" in flight.name
-        assert flight.distance_km == 15.0
-        assert flight.duration_minutes == 60
-        assert flight.elevation_gain_m == 450
-        assert flight.max_altitude_m == 1200
-        assert flight.site_id == arguel_site.id
-    finally:
-        fresh_db.close()
+    # Query from the same test database session
+    flight = db_session.query(Flight).filter(Flight.strava_id == "12345678").first()
+    
+    assert flight is not None
+    assert "Arguel" in flight.name
+    assert flight.distance_km == 15.0
+    assert flight.duration_minutes == 60
+    assert flight.elevation_gain_m == 450
+    assert flight.max_altitude_m == 1200
+    assert flight.site_id == arguel_site.id
 
 
 @pytest.mark.asyncio
@@ -360,19 +355,18 @@ async def test_process_strava_activity_update_existing(db_session, sample_flight
          patch("webhooks.download_gpx", new=AsyncMock(return_value=gpx_content)), \
          patch("webhooks.send_telegram_notification", new=AsyncMock()):
         
-        await process_strava_activity(strava_id)
+        await process_strava_activity(strava_id, db=db_session)
     
-    # Refresh from fresh DB session
-    from database import SessionLocal
-    fresh_db = SessionLocal()
-    try:
-        flight = fresh_db.query(Flight).filter(Flight.strava_id == strava_id).first()
-        
-        # Check flight was updated
-        assert flight.distance_km == 20.0
-        assert flight.duration_minutes == 75
-    finally:
-        fresh_db.close()
+    # Query from the same test database session
+    db_session.refresh(sample_flight)
+    flight = db_session.query(Flight).filter(Flight.strava_id == strava_id).first()
+    
+    assert flight is not None
+    assert flight.name != original_name  # Name should be updated
+    assert flight.distance_km == 20.0  # Updated
+    assert flight.duration_minutes == 75  # Updated (4500s / 60)
+    assert flight.elevation_gain_m == 500
+    assert flight.max_altitude_m == 1300
 
 
 @pytest.mark.asyncio
@@ -387,7 +381,7 @@ async def test_process_strava_activity_non_flight_ignored(db_session):
     }
     
     with patch("webhooks.get_activity_details", new=AsyncMock(return_value=activity_data)):
-        await process_strava_activity("99999")
+        await process_strava_activity("99999", db=db_session)
     
     # Check no flight was created
     flight = db_session.query(Flight).filter(Flight.strava_id == "99999").first()
@@ -399,7 +393,7 @@ async def test_process_strava_activity_api_failure(db_session):
     """Test handling of Strava API failure"""
     
     with patch("webhooks.get_activity_details", new=AsyncMock(return_value=None)):
-        await process_strava_activity("invalid-id")
+        await process_strava_activity("invalid-id", db=db_session)
     
     # No flight should be created
     flight = db_session.query(Flight).filter(Flight.strava_id == "invalid-id").first()
