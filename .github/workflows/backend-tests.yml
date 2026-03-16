@@ -78,6 +78,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           MINIMUM_GREEN: 60
           MINIMUM_ORANGE: 40
+          COVERAGE_PATH: backend
 
   integration-tests:
     name: Integration Tests
