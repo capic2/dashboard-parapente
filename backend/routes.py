@@ -1271,7 +1271,8 @@ async def get_weather(spot_id: str, day_index: int = 0, days: int = 1, db: Sessi
             site.longitude,
             day_index + d,
             site_name=site.name,
-            elevation_m=site.elevation_m
+            elevation_m=site.elevation_m,
+            db=db
         ))
     
     results = await asyncio.gather(*tasks)
@@ -1390,7 +1391,8 @@ async def get_weather_summary(spot_id: str, day_index: int = 0, db: Session = De
         site.longitude,
         day_index,
         site_name=site.name,
-        elevation_m=site.elevation_m
+        elevation_m=site.elevation_m,
+        db=db
     )
     
     if not day_result.get("success"):
@@ -3923,11 +3925,14 @@ async def get_emagram_screenshot(
 # ADMIN ENDPOINTS
 # ============================================================================
 
-@router.post("/admin/clear-cache")
+@router.post("/admin/clear-emagram-cache")
 async def clear_emagram_cache(db: Session = Depends(get_db)):
     """
     Clear all emagram cache (database + Redis)
     Use this to fix stuck/old analyses
+    
+    Note: This is different from /admin/clear-cache which only clears Redis.
+    This endpoint also deletes emagram analyses from the database.
     """
     try:
         # 1. Delete all emagram analyses from database
@@ -3961,7 +3966,15 @@ async def debug_gemini_api():
     """
     try:
         import google.generativeai as genai
-        
+    except ImportError:
+        return {
+            "success": False,
+            "error": "google-generativeai package not installed (optional dependency)",
+            "error_type": "ImportError",
+            "message": "Install with: pip install google-generativeai"
+        }
+    
+    try:
         api_key = os.getenv("GOOGLE_API_KEY")
         model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         

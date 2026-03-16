@@ -1,0 +1,40 @@
+{
+  "sites": [
+    {
+      "id": "site-arguel",
+      "code": "ARG",
+      "name": "Arguel",
+      "latitude": 47.2,
+      "longitude": 6.0,
+      "elevation_m": 427,
+      "region": "Doubs",
+      "country": "France",
+      "orientation": "SW",
+      "type": "paragliding"
+    },
+    {
+      "id": "site-chalais",
+      "code": "CHA",
+      "name": "Chalais",
+      "latitude": 47.183333,
+      "longitude": 6.216667,
+      "elevation_m": 920,
+      "region": "Doubs",
+      "country": "France",
+      "orientation": "W",
+      "type": "paragliding"
+    },
+    {
+      "id": "site-planfait",
+      "code": "PLF",
+      "name": "Planfait",
+      "latitude": 47.15,
+      "longitude": 6.25,
+      "elevation_m": 1100,
+      "region": "Doubs",
+      "country": "France",
+      "orientation": "NW",
+      "type": "paragliding"
+    }
+  ]
+}

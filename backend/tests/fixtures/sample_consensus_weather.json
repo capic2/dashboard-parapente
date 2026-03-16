@@ -1,0 +1,49 @@
+{
+  "site_id": "site-arguel",
+  "date": "2026-03-15",
+  "consensus_hours": [
+    {
+      "hour": 12,
+      "temperature": 18.3,
+      "wind_speed": 12.5,
+      "wind_gust": 18.2,
+      "wind_direction": 240,
+      "precipitation": 0.0,
+      "cloud_cover": 40,
+      "lifted_index": -1.5,
+      "cape": 520,
+      "confidence": 0.85,
+      "sources_count": 3
+    },
+    {
+      "hour": 13,
+      "temperature": 19.5,
+      "wind_speed": 14.0,
+      "wind_gust": 20.0,
+      "wind_direction": 245,
+      "precipitation": 0.0,
+      "cloud_cover": 35,
+      "lifted_index": -2.0,
+      "cape": 580,
+      "confidence": 0.88,
+      "sources_count": 3
+    },
+    {
+      "hour": 14,
+      "temperature": 20.1,
+      "wind_speed": 13.8,
+      "wind_gust": 19.5,
+      "wind_direction": 242,
+      "precipitation": 0.0,
+      "cloud_cover": 38,
+      "lifted_index": -1.8,
+      "cape": 620,
+      "confidence": 0.90,
+      "sources_count": 3
+    }
+  ],
+  "sunrise": "06:30",
+  "sunset": "18:45",
+  "para_index": 75,
+  "verdict": "BON"
+}
