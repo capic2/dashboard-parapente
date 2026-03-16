@@ -116,7 +116,7 @@ class TestWeatherErrorHandling:
     """Tests for weather API error handling"""
     
     def test_weather_missing_coordinates(self, client, db_session):
-        """Weather endpoint handles site without coordinates gracefully"""
+        """Weather endpoint fails when site has no coordinates"""
         # Create site with no coordinates
         site = Site(
             id="site-no-coords",
@@ -130,5 +130,5 @@ class TestWeatherErrorHandling:
         db_session.commit()
         
         response = client.get(f"{API_PREFIX}/weather/site-no-coords")
-        # Should fail with 400, 422, or 500
+        # Current implementation fails with 500 (TypeError), could be improved
         assert response.status_code in [400, 422, 500]
