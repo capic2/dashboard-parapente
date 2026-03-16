@@ -121,12 +121,12 @@ async def strava_webhook_handler(
     
     # Process activity asynchronously (don't block webhook response)
     import asyncio
-    asyncio.create_task(process_strava_activity(activity_id))
+    asyncio.create_task(process_strava_activity(activity_id, db=db))
     
     return {"status": "ok", "message": f"Processing activity {activity_id}"}
 
 
-async def process_strava_activity(activity_id: str):
+async def process_strava_activity(activity_id: str, db: Session = None):
     """
     Process a Strava activity using API data directly
     
@@ -144,7 +144,12 @@ async def process_strava_activity(activity_id: str):
     7. Store in database with API data
     8. Send Telegram notification
     """
-    db = SessionLocal()
+    # Use provided db or create new one
+    if db is None:
+        db = SessionLocal()
+        close_db = True
+    else:
+        close_db = False
     
     try:
         logger.info(f"🪂 Processing Strava activity {activity_id}...")
@@ -346,7 +351,8 @@ async def process_strava_activity(activity_id: str):
         logger.error(f"❌ Error processing Strava activity {activity_id}: {e}", exc_info=True)
         db.rollback()
     finally:
-        db.close()
+        if close_db:
+            db.close()
 
 
 def extract_location_from_name(activity_name: str, location_city: str) -> str:

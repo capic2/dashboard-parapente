@@ -10,6 +10,7 @@ import uuid
 import asyncio
 import logging
 
+from sqlalchemy.orm import Session
 from database import SessionLocal
 from models import Site, WeatherForecast
 from weather_pipeline import get_normalized_forecast
@@ -148,7 +149,7 @@ async def fetch_and_store_weather(site_code: str, day_index: int = 0):
         db.close()
 
 
-async def fetch_and_cache_weather(site_id: str, day_index: int = 0):
+async def fetch_and_cache_weather(site_id: str, day_index: int = 0, db: Session = None):
     """
     Fetch weather for a site and populate Redis cache
     Used by scheduler for polling mode (replaces fetch_and_store_weather)
@@ -156,13 +157,20 @@ async def fetch_and_cache_weather(site_id: str, day_index: int = 0):
     Args:
         site_id: Site ID (e.g., 'site-arguel')
         day_index: 0=today, 1=tomorrow, etc.
+        db: Optional database session (for testing)
     
     Returns:
         True if successful, False otherwise
     """
+    # Use provided db or create new one
+    if db is None:
+        db = SessionLocal()
+        close_db = True
+    else:
+        close_db = False
+    
     # Limit concurrent database operations to prevent pool exhaustion
     async with _db_semaphore:
-        db = SessionLocal()
         
         try:
             # Get site from database
@@ -195,7 +203,8 @@ async def fetch_and_cache_weather(site_id: str, day_index: int = 0):
             logger.error(f"Error fetching {site_id} day {day_index}: {e}", exc_info=True)
             return False
         finally:
-            db.close()
+            if close_db:
+                db.close()
 
 
 async def scheduled_weather_fetch():

@@ -198,7 +198,7 @@ async def test_calculate_best_spot_from_cache_success(db_session, arguel_site, c
     mock_arguel_para = {"para_index": 75, "verdict": "Excellent"}
     mock_chalais_para = {"para_index": 60, "verdict": "Bon"}
     
-    async def mock_get_forecast(lat, lon, day_index, site_name=None, elevation_m=None):
+    async def mock_get_forecast(lat, lon, day_index, site_name=None, elevation_m=None, db=None):
         if site_name == "Arguel":
             return mock_arguel_forecast
         elif site_name == "Chalais":
