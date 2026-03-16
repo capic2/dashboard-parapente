@@ -94,7 +94,8 @@ async def fetch_from_enabled_sources(
     lon: float,
     day_index: int = 0,
     site_name: Optional[str] = None,
-    elevation_m: Optional[int] = None
+    elevation_m: Optional[int] = None,
+    db = None
 ) -> Dict[str, Any]:
     """
     Fetch weather only from enabled sources in DB
@@ -105,7 +106,12 @@ async def fetch_from_enabled_sources(
     from database import SessionLocal
     from models import WeatherSourceConfig
     
-    db = SessionLocal()
+    # Use provided db session or create new one
+    if db is None:
+        db = SessionLocal()
+        close_db = True
+    else:
+        close_db = False
     
     try:
         # Get enabled sources
@@ -251,7 +257,8 @@ async def fetch_from_enabled_sources(
         return aggregated
         
     finally:
-        db.close()
+        if close_db:
+            db.close()
 
 
 async def aggregate_forecasts(
@@ -260,7 +267,8 @@ async def aggregate_forecasts(
     day_index: int = 0,
     sources: Optional[List[str]] = None,
     site_name: Optional[str] = None,
-    elevation_m: Optional[int] = None
+    elevation_m: Optional[int] = None,
+    db = None
 ) -> Dict[str, Any]:
     """
     Aggregate weather forecasts from available sources
@@ -271,12 +279,13 @@ async def aggregate_forecasts(
         lat: Latitude
         lon: Longitude
         day_index: 0=today, 1=tomorrow, etc.
-        sources: DEPRECATED - Ignored. Enabled sources from DB are used instead.
-        site_name: Site name (required for meteo_parapente)
-        elevation_m: Site elevation in meters (required for meteo_parapente)
+        sources: DEPRECATED - Now reads from database instead
+        site_name: Site name for context
+        elevation_m: Site elevation
+        db: Database session (optional, will create new one if not provided)
     
     Returns:
-        Dict with aggregated raw data from all sources
+        Dict with aggregated data from all sources
     """
     # Warn if deprecated parameter is used
     if sources is not None:
@@ -288,7 +297,8 @@ async def aggregate_forecasts(
         lon=lon,
         day_index=day_index,
         site_name=site_name,
-        elevation_m=elevation_m
+        elevation_m=elevation_m,
+        db=db
     )
     
     # OLD CODE REMOVED - Now uses fetch_from_enabled_sources() which reads from DB
@@ -538,15 +548,29 @@ def extract_sunrise_sunset(aggregated: Dict[str, Any], day_index: int) -> tuple:
     """
     open_meteo_data = aggregated.get("sources", {}).get("open-meteo", {})
     
+    # Debug write to file
+    with open("/tmp/extract_sunrise_sunset_debug.log", "a") as f:
+        f.write(f"\n=== extract_sunrise_sunset START: day_index={day_index} ===\n")
+        f.write(f"aggregated sources keys: {list(aggregated.get('sources', {}).keys())}\n")
+        f.write(f"open_meteo_data keys: {list(open_meteo_data.keys())}\n")
+        f.write(f"open_meteo success: {open_meteo_data.get('success')}\n")
+    
     if not open_meteo_data.get("success"):
+        with open("/tmp/extract_sunrise_sunset_debug.log", "a") as f:
+            f.write(f"No successful open-meteo data\n")
         return None, None
     
-    raw_wrapper = open_meteo_data.get("raw", {})
-    # The raw data is wrapped in {"success": True, "source": "open-meteo", "data": {...}, "timestamp": ...}
-    api_data = raw_wrapper.get("data", {})
+    # Open-Meteo data is in the "data" field (not "raw")
+    api_data = open_meteo_data.get("data", {})
     daily = api_data.get("daily", {})
     sunrises = daily.get("sunrise", [])
     sunsets = daily.get("sunset", [])
+    
+    with open("/tmp/extract_sunrise_sunset_debug.log", "a") as f:
+        f.write(f"api_data keys: {list(api_data.keys())}\n")
+        f.write(f"daily keys: {list(daily.keys())}\n")
+        f.write(f"sunrises (len={len(sunrises)}): {sunrises[:2] if sunrises else 'EMPTY'}\n")
+        f.write(f"sunsets (len={len(sunsets)}): {sunsets[:2] if sunsets else 'EMPTY'}\n")
     
     if day_index >= len(sunrises) or day_index >= len(sunsets):
         return None, None
@@ -571,7 +595,8 @@ async def get_normalized_forecast(
     day_index: int = 0,
     sources: Optional[List[str]] = None,
     site_name: Optional[str] = None,
-    elevation_m: Optional[int] = None
+    elevation_m: Optional[int] = None,
+    db = None
 ) -> Dict[str, Any]:
     """
     Complete pipeline: fetch -> normalize -> consensus (with Redis cache)
@@ -583,6 +608,7 @@ async def get_normalized_forecast(
         sources: List of sources to use (default: all active sources)
         site_name: Site name (required for meteo_parapente)
         elevation_m: Site elevation in meters (required for meteo_parapente)
+        db: Database session (optional, will create new one if not provided)
     
     Returns:
         Normalized consensus forecast with sunrise/sunset times
@@ -604,8 +630,13 @@ async def get_normalized_forecast(
     try:
         cached_result = await get_cached(cache_key)
         if cached_result is not None:
-            logger.info(f"✅ Cache HIT for forecast: {cache_key}")
-            return cached_result
+            # Only return cache if it has sunrise/sunset data
+            if cached_result.get("sunrise") is not None:
+                logger.info(f"✅ Cache HIT for forecast: {cache_key}")
+                return cached_result
+            else:
+                # Stale cache without sunrise/sunset - invalidate it
+                logger.warning(f"⚠️ Stale cache detected (missing sunrise/sunset) for {cache_key}, refetching...")
     except Exception as e:
         logger.warning(f"Cache get error: {e}, falling back to live fetch")
     
@@ -616,7 +647,8 @@ async def get_normalized_forecast(
         lat, lon, day_index,
         sources=sources,
         site_name=site_name,
-        elevation_m=elevation_m
+        elevation_m=elevation_m,
+        db=db
     )
     
     # Step 2: Normalize
@@ -627,6 +659,7 @@ async def get_normalized_forecast(
     
     # Step 4: Extract sunrise/sunset
     sunrise, sunset = extract_sunrise_sunset(aggregated, day_index)
+    print(f"DEBUG get_normalized_forecast: sunrise={sunrise}, sunset={sunset}")
     
     # Add sunrise/sunset to response
     result = consensus.copy()
@@ -652,7 +685,8 @@ async def get_daily_aggregate(
     optimal_directions: str,
     sources: Optional[List[str]] = None,
     site_name: Optional[str] = None,
-    elevation_m: Optional[int] = None
+    elevation_m: Optional[int] = None,
+    db = None
 ) -> Optional[Dict[str, Any]]:
     """
     Get daily aggregate data (SIMPLIFIED - reuses get_normalized_forecast).
@@ -682,7 +716,8 @@ async def get_daily_aggregate(
         lat, lon, day_index,
         sources=sources,
         site_name=site_name,
-        elevation_m=elevation_m
+        elevation_m=elevation_m,
+        db=db
     )
     
     if not forecast_result.get("success"):

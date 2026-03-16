@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from pathlib import Path
 from database import engine, Base
-from models import Site, ParaglidingSpot
 from routes import router
 from webhooks import router as webhooks_router
 from scheduler import start_scheduler, stop_scheduler
@@ -14,6 +13,12 @@ import asyncio
 
 # Import configuration (loads environment variables automatically)
 import config
+
+# Import ALL models to register them with SQLAlchemy Base.metadata
+# This ensures all tables are available for Base.metadata.create_all()
+# even in test mode where initialize_database() is not called
+import models  # noqa: F401 - imported for side effects (model registration)
+from models import Site  # Needed for database initialization
 
 # Configure logging
 logging.basicConfig(
@@ -29,7 +34,7 @@ def initialize_database():
     This ensures the database is always properly set up on startup
     """
     from database import Base, engine, DB_PATH
-    import models  # Import models to register them with Base
+    # models is already imported at module level
     
     logger.info("=" * 60)
     logger.info("DATABASE INITIALIZATION")
@@ -276,10 +281,12 @@ def run_migrations():
     logger.info("✓ All migrations completed")
 
 # Initialize database (create schema + seed sites)
-initialize_database()
-
-# Run migrations (if any exist)
-run_migrations()
+# Skip in test mode - tests use temporary in-memory DB
+if not config.TESTING:
+    initialize_database()
+    run_migrations()
+else:
+    logger.info("🧪 Testing mode: Skipping database initialization and migrations")
 
 
 async def initial_cache_warmup():

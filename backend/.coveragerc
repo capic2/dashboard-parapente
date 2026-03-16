@@ -1,0 +1,50 @@
+[run]
+source = .
+relative_files = true
+omit = 
+    */tests/*
+    */migrations/*
+    */__pycache__/*
+    */venv/*
+    */venv_311/*
+    */.venv/*
+    */site-packages/*
+    conftest.py
+    */test_*.py
+    # Exclude utility scripts and migrations
+    explore_*.py
+    prototype_*.py
+    fix_*.py
+    seed_*.py
+    import_*.py
+    migrate_*.py
+    link_*.py
+    debug_*.py
+    validate_*.py
+    clear_cache.py
+    init_database.py
+    search_*.py
+    find_*.py
+    # Exclude LLM modules (integration tests not in unit suite)
+    llm/*
+    emagram_scheduler/*
+    cache_emagram/*
+    scrapers/emagram_*.py
+    scrapers/wyoming.py
+    scrapers/open_meteo_sounding.py
+    # Exclude video export (background jobs)
+    video_export*.py
+
+[report]
+precision = 2
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+
+[html]
+directory = htmlcov

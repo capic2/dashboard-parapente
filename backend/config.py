@@ -20,6 +20,7 @@ BACKEND_ROOT = Path(__file__).parent
 
 # Charger les variables d'environnement selon le contexte
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+TESTING = os.getenv("TESTING", "false").lower() == "true"
 
 if ENVIRONMENT != "production":
     # En développement : chercher .env.development puis .env
@@ -93,13 +94,16 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 # VALIDATION
 # ============================================================================
 
-# Valider les variables critiques
-if not WEATHERAPI_KEY:
-    logger.error("❌ WEATHERAPI_KEY is required")
-    raise ValueError("WEATHERAPI_KEY environment variable is required")
-
-if not METEOBLUE_API_KEY:
-    logger.warning("⚠️ METEOBLUE_API_KEY is missing")
+# Valider les variables critiques (sauf en mode test)
+if not TESTING:
+    if not WEATHERAPI_KEY:
+        logger.error("❌ WEATHERAPI_KEY is required")
+        raise ValueError("WEATHERAPI_KEY environment variable is required")
+    
+    if not METEOBLUE_API_KEY:
+        logger.warning("⚠️ METEOBLUE_API_KEY is missing")
+else:
+    logger.info("🧪 Testing mode: API key validation skipped")
 
 # Log Strava credentials status
 if STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET and STRAVA_REFRESH_TOKEN:
