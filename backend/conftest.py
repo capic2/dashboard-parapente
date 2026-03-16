@@ -20,6 +20,18 @@ from database import Base, get_db
 from main import app
 import tempfile
 
+# Import all models to register them with SQLAlchemy Base.metadata
+# This ensures all tables are created when Base.metadata.create_all() is called
+from models import (
+    Site,
+    Flight,
+    WeatherForecast,
+    WeatherSourceConfig,
+    EmagramAnalysis,
+    EmagramFeedback,
+    ParaglidingSpot
+)
+
 # Use temporary file SQLite for tests
 @pytest.fixture(scope="function")
 def test_db():
