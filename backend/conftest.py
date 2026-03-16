@@ -30,34 +30,8 @@ from models import (
     ParaglidingSpot
 )
 
-# DIAGNOSTIC CHECKPOINT 1: Verify models are registered after import
-from database import Base
-print("\n" + "=" * 80)
-print("🔍 DIAGNOSTIC CHECKPOINT 1: After importing model classes")
-print("=" * 80)
-print(f"📊 Base.metadata.tables keys: {list(Base.metadata.tables.keys())}")
-print(f"📈 Number of registered tables: {len(Base.metadata.tables)}")
-print(f"✅ Expected: 7 tables")
-print(f"📍 Status: {'PASS' if len(Base.metadata.tables) == 7 else 'FAIL ⚠️'}")
-if len(Base.metadata.tables) != 7:
-    print(f"⚠️  WARNING: Only {len(Base.metadata.tables)}/7 models registered!")
-print("=" * 80 + "\n")
-
-from database import get_db
+from database import Base, get_db
 from main import app
-
-# DIAGNOSTIC CHECKPOINT 2: Verify registration after main.app import
-print("\n" + "=" * 80)
-print("🔍 DIAGNOSTIC CHECKPOINT 2: After importing main.app")
-print("=" * 80)
-print(f"📊 Base.metadata.tables keys: {list(Base.metadata.tables.keys())}")
-print(f"📈 Number of registered tables: {len(Base.metadata.tables)}")
-print(f"✅ Expected: 7 tables (should not change from Checkpoint 1)")
-print(f"📍 Status: {'PASS' if len(Base.metadata.tables) == 7 else 'FAIL ⚠️'}")
-if len(Base.metadata.tables) != 7:
-    print(f"⚠️  WARNING: Only {len(Base.metadata.tables)}/7 models registered!")
-print("=" * 80 + "\n")
-
 import tempfile
 
 # Use temporary file SQLite for tests
@@ -73,57 +47,7 @@ def test_db():
     
     # Connect to temp DB
     engine = create_engine(f"sqlite:///{db_path}")
-    
-    # DIAGNOSTIC CHECKPOINT 3: Verify registration before create_all()
-    print("\n" + "=" * 80)
-    print("🔍 DIAGNOSTIC CHECKPOINT 3: Before Base.metadata.create_all()")
-    print("=" * 80)
-    print(f"📊 Base.metadata.tables keys: {list(Base.metadata.tables.keys())}")
-    print(f"📈 Number of tables to create: {len(Base.metadata.tables)}")
-    print(f"✅ Expected: 7 tables")
-    print(f"📍 Status: {'PASS' if len(Base.metadata.tables) == 7 else 'CRITICAL FAIL ⚠️'}")
-    if len(Base.metadata.tables) != 7:
-        print(f"🚨 CRITICAL: Only {len(Base.metadata.tables)}/7 models in metadata!")
-        print(f"🚨 This means create_all() will only create {len(Base.metadata.tables)} tables")
-    print("=" * 80 + "\n")
-    
     Base.metadata.create_all(bind=engine)
-    
-    # DIAGNOSTIC CHECKPOINT 4: Verify actual tables created in database
-    from sqlalchemy import inspect
-    inspector = inspect(engine)
-    actual_tables = inspector.get_table_names()
-    
-    print("\n" + "=" * 80)
-    print("🔍 DIAGNOSTIC CHECKPOINT 4: After Base.metadata.create_all()")
-    print("=" * 80)
-    print(f"📊 Metadata tables: {list(Base.metadata.tables.keys())}")
-    print(f"💾 Actual DB tables: {actual_tables}")
-    print(f"📈 Metadata count: {len(Base.metadata.tables)}")
-    print(f"💿 Actual DB count: {len(actual_tables)}")
-    print(f"✅ Expected: 7 tables in both")
-    
-    if len(Base.metadata.tables) == len(actual_tables) == 7:
-        print(f"✅ PASS: All 7 tables created successfully!")
-    else:
-        print(f"🚨 MISMATCH DETECTED!")
-        print(f"   - Metadata has: {len(Base.metadata.tables)} tables")
-        print(f"   - Database has: {len(actual_tables)} tables")
-        
-        if len(Base.metadata.tables) != 7:
-            print(f"   - Issue: Models not registered in metadata")
-        
-        if len(actual_tables) != len(Base.metadata.tables):
-            print(f"   - Issue: create_all() did not create all metadata tables")
-            missing_in_db = set(Base.metadata.tables.keys()) - set(actual_tables)
-            extra_in_db = set(actual_tables) - set(Base.metadata.tables.keys())
-            if missing_in_db:
-                print(f"   - Missing in DB: {missing_in_db}")
-            if extra_in_db:
-                print(f"   - Extra in DB: {extra_in_db}")
-    
-    print("=" * 80 + "\n")
-    
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     
     def override_get_db():

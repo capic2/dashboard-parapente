@@ -145,7 +145,8 @@ async def calculate_best_spot_from_cache(db: Session) -> Optional[Dict[str, Any]
                     lon=site.longitude,
                     day_index=0,
                     site_name=site.name,
-                    elevation_m=site.elevation_m
+                    elevation_m=site.elevation_m,
+                    db=db
                 )
                 
                 if not forecast.get("success"):
