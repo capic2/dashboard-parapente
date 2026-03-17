@@ -1,7 +1,10 @@
 import type { Meta } from '@storybook/react';
 import { expect, within, userEvent } from 'storybook/test';
 import { fn } from 'storybook/test';
-import { BestSpotSuggestion, BestSpotSuggestionCompact } from './BestSpotSuggestion';
+import {
+  BestSpotSuggestion,
+  BestSpotSuggestionCompact,
+} from './BestSpotSuggestion';
 import type { BestSpotResult } from '../hooks/useBestSpot';
 
 const meta = {
@@ -20,11 +23,12 @@ const mockBestSpotExcellent: BestSpotResult = {
   site: {
     id: '1',
     name: 'Annecy',
-    orientation: ['NW', 'W'],
+    orientation: 'NW',
     latitude: 45.9,
     longitude: 6.1,
+    country: 'FR',
     rating: 5,
-  },
+  } as any,
   paraIndex: 90,
   windDirection: 'NW',
   windSpeed: 12,
@@ -37,10 +41,10 @@ const mockBestSpotGood: BestSpotResult = {
   site: {
     id: '2',
     name: 'Chamonix',
-    orientation: ['N', 'NE'],
+    orientation: 'N',
     latitude: 45.9,
     longitude: 6.8,
-    rating: 4,
+    country: 'FR',
   },
   paraIndex: 75,
   windDirection: 'N',
@@ -54,10 +58,10 @@ const mockBestSpotModerate: BestSpotResult = {
   site: {
     id: '3',
     name: 'Talloires',
-    orientation: ['W', 'NW'],
+    orientation: 'W',
     latitude: 45.8,
     longitude: 6.2,
-    rating: 3,
+    country: 'FR',
   },
   paraIndex: 55,
   windDirection: 'E',
@@ -71,9 +75,10 @@ const mockBestSpotPoor: BestSpotResult = {
   site: {
     id: '4',
     name: 'Col de la Forclaz',
-    orientation: ['S', 'SE'],
+    orientation: 'S',
     latitude: 45.8,
     longitude: 6.2,
+    country: 'FR',
   },
   paraIndex: 35,
   windDirection: 'N',
@@ -87,10 +92,10 @@ const mockBestSpotNoWind: BestSpotResult = {
   site: {
     id: '5',
     name: 'Les Contamines',
-    orientation: ['E'],
+    orientation: 'E',
     latitude: 45.8,
     longitude: 6.7,
-    rating: 2,
+    country: 'FR',
   },
   paraIndex: 80,
   windDirection: undefined,
@@ -104,9 +109,10 @@ const mockBestSpotNoRating: BestSpotResult = {
   site: {
     id: '6',
     name: 'Saint-Hilaire',
-    orientation: ['S'],
+    orientation: 'S',
     latitude: 45.3,
     longitude: 5.9,
+    country: 'FR',
   },
   paraIndex: 88,
   windDirection: 'S',
@@ -232,12 +238,18 @@ export const DisplaysBestSpotData = {
   test: async ({ canvas }: { canvas: HTMLElement }) => {
     const canvasElement = within(canvas);
 
-    expect(canvasElement.getByText("Meilleur spot aujourd'hui")).toBeInTheDocument();
+    expect(
+      canvasElement.getByText("Meilleur spot aujourd'hui")
+    ).toBeInTheDocument();
     expect(canvasElement.getByText('Annecy')).toBeInTheDocument();
     expect(canvasElement.getByText('90/100')).toBeInTheDocument();
     expect(canvasElement.getByText(/NW 12km\/h/)).toBeInTheDocument();
-    expect(canvasElement.getByText(/Excellentes conditions/)).toBeInTheDocument();
-    expect(canvasElement.getByText('Voir les prévisions →')).toBeInTheDocument();
+    expect(
+      canvasElement.getByText(/Excellentes conditions/)
+    ).toBeInTheDocument();
+    expect(
+      canvasElement.getByText('Voir les prévisions →')
+    ).toBeInTheDocument();
   },
 };
 
@@ -249,7 +261,9 @@ export const ShowsRatingStars = {
   test: async ({ canvas }: { canvas: HTMLElement }) => {
     const canvasElement = within(canvas);
 
-    expect(canvasElement.getByText('⭐⭐⭐⭐⭐')).toBeInTheDocument();
+    // Rating stars should be displayed
+    const ratingText = canvasElement.queryByText('⭐⭐⭐⭐⭐');
+    expect(ratingText).toBeInTheDocument();
   },
 };
 
@@ -291,7 +305,9 @@ export const RendersNothingWhenNull = {
   test: async ({ canvas }: { canvas: HTMLElement }) => {
     const canvasElement = within(canvas);
 
-    expect(canvasElement.queryByText("Meilleur spot aujourd'hui")).not.toBeInTheDocument();
+    expect(
+      canvasElement.queryByText("Meilleur spot aujourd'hui")
+    ).not.toBeInTheDocument();
   },
 };
 
@@ -307,7 +323,7 @@ export const CompactCallsOnSelectSite = {
 
     const button = canvasElement.getByText('Annecy').closest('button');
     expect(button).toBeInTheDocument();
-    
+
     await user.click(button!);
 
     expect(args.onSelectSite).toHaveBeenCalledWith('1');
