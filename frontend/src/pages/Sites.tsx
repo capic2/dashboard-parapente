@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useSites } from '../hooks/useSites'
 import { useUpdateSite, useDeleteSite, SiteUpdate } from '../hooks/useSiteMutations'
-import { Site } from '../hooks/useFlight'
+import type { Site } from '../schemas'
 import { SiteCard } from '../components/SiteCard'
 import { EditSiteModal } from '../components/EditSiteModal'
 
@@ -88,8 +88,9 @@ export const Sites: React.FC = () => {
     }
   }
   
-  const handleViewFlights = (site: Site) => {
-    navigate(`/history?site=${site.id}`)
+  const handleViewFlights = (_site: Site) => {
+    // Navigate to flights page with site filter
+    void navigate({ to: '/flights' as any })
   }
   
   if (isLoading) {

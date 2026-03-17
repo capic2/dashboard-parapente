@@ -28,7 +28,7 @@ export default function StatsPanel() {
   };
 
   const avgDistancePerFlight = stats.total_flights > 0 
-    ? (stats.total_distance / stats.total_flights).toFixed(1)
+    ? (stats.total_distance_km / stats.total_flights).toFixed(1)
     : '0.0';
 
   const avgHoursPerFlight = stats.total_flights > 0
@@ -60,7 +60,7 @@ export default function StatsPanel() {
         <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
           <div className="text-2xl leading-none shrink-0">📏</div>
           <div className="flex-1 min-w-0">
-            <div className="text-base font-bold text-gray-900 leading-tight truncate">{stats.total_distance.toFixed(1)} km</div>
+            <div className="text-base font-bold text-gray-900 leading-tight truncate">{stats.total_distance_km.toFixed(1)} km</div>
             <div className="text-[10px] text-gray-600 font-medium mt-0.5">Distance totale</div>
           </div>
         </div>
@@ -68,7 +68,7 @@ export default function StatsPanel() {
         <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
           <div className="text-2xl leading-none shrink-0">⌀</div>
           <div className="flex-1 min-w-0">
-            <div className="text-base font-bold text-gray-900 leading-tight truncate">{formatDuration(stats.avg_duration)}</div>
+            <div className="text-base font-bold text-gray-900 leading-tight truncate">{formatDuration(stats.avg_duration_minutes / 60)}</div>
             <div className="text-[10px] text-gray-600 font-medium mt-0.5">Durée moyenne</div>
           </div>
         </div>

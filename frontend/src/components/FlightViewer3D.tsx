@@ -547,7 +547,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     let cameraAngle: number | null | undefined = flight?.site?.camera_angle;
     if (cameraAngle === null || cameraAngle === undefined) {
       // Fallback to orientation if no angle set
-      const orientation = flight?.site?.orientation;
+      const orientation = flight?.site?.orientation || undefined;
       cameraAngle = getHeadingFromOrientation(orientation);
     }
     const cameraDistance = flight?.site?.camera_distance || 500;

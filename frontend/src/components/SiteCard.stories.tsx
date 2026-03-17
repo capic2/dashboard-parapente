@@ -47,6 +47,9 @@ const mockSiteArguel = {
   elevation_m: 427,
   orientation: 'N,NE,NW',
   region: 'Doubs',
+  country: 'FR',
+  camera_distance: null,
+  flight_count: 0,
   usage_type: 'both' as const,
   description: 'Site principal de Besançon, accessible toute l\'année',
   is_active: true,
@@ -107,7 +110,7 @@ export const LandingOnly = meta.story({
       name: 'Atterrissage Besançon',
       usage_type: 'landing' as const,
       orientation: 'ALL',
-      description: null,
+      description: undefined,
     },
     flightCount: 42,
     onEdit: fn(),
@@ -134,7 +137,7 @@ export const NoDescription = meta.story({
   args: {
     site: {
       ...mockSiteArguel,
-      description: null,
+      description: undefined,
     },
     flightCount: 5,
     onEdit: fn(),

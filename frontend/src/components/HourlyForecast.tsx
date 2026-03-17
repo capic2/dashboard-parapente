@@ -10,7 +10,15 @@ interface HourlyForecastProps {
 // TYPES
 // ============================================================================
 
-type CellType = 'para-index' | 'verdict' | 'temperature' | 'wind' | 'gust' | 'direction' | 'precipitation' | 'cloud-cover';
+type CellType =
+  | 'para-index'
+  | 'verdict'
+  | 'temperature'
+  | 'wind'
+  | 'gust'
+  | 'direction'
+  | 'precipitation'
+  | 'cloud-cover';
 
 interface TooltipPosition {
   x: number;
@@ -78,14 +86,16 @@ const getSourceUrl = (sourceKey: string): string | null => {
  * Get flyability display with emoji, verdict and reason
  * Format: "🟢 BON" or "🟡 MOYEN — Vent faible" or "🔴 MAUVAIS — Vent insuffisant"
  */
-const getFlyabilityDisplay = (hour: any): { emoji: string; text: string; color: string } => {
+const getFlyabilityDisplay = (
+  hour: any
+): { emoji: string; text: string; color: string } => {
   const verdict = hour.verdict?.toLowerCase();
   const verdictUpper = verdict?.toUpperCase() || 'MOYEN';
-  
+
   // Emoji and color based on verdict
   let emoji = '🟡';
   let color = 'text-yellow-600';
-  
+
   if (verdict === 'bon') {
     emoji = '🟢';
     color = 'text-green-600';
@@ -97,15 +107,22 @@ const getFlyabilityDisplay = (hour: any): { emoji: string; text: string; color: 
     emoji = '🟠';
     color = 'text-orange-600';
   }
-  
+
   // Determine the reason when not BON
   const wind = hour.wind || 0;
-  const gust = hour.wind_gust || hour.sources?.['open-meteo']?.wind_gust || hour.sources?.['weatherapi']?.wind_gust || 0;
+  const gust =
+    hour.wind_gust ||
+    hour.sources?.['open-meteo']?.wind_gust ||
+    hour.sources?.['weatherapi']?.wind_gust ||
+    0;
   const precipitation = hour.precipitation || 0;
-  const cloudCover = hour.sources?.['open-meteo']?.cloud_cover || hour.sources?.['weatherapi']?.cloud_cover || 0;
-  
+  const cloudCover =
+    hour.sources?.['open-meteo']?.cloud_cover ||
+    hour.sources?.['weatherapi']?.cloud_cover ||
+    0;
+
   let reason = '';
-  
+
   // Priority order for reason
   if (precipitation > 0.5) {
     reason = 'Pluie';
@@ -125,11 +142,11 @@ const getFlyabilityDisplay = (hour: any): { emoji: string; text: string; color: 
     // Generic reason based on para-index
     reason = 'Conditions moyennes';
   }
-  
-  return { 
-    emoji, 
-    text: `${verdictUpper} — ${reason}`, 
-    color 
+
+  return {
+    emoji,
+    text: `${verdictUpper} — ${reason}`,
+    color,
   };
 };
 
@@ -144,7 +161,7 @@ const getVerdictClass = (verdict: string): string => {
 const formatWindDirectionFromDegrees = (deg: number | null): string => {
   if (deg === null) return '—';
   const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  const index = Math.round(((deg % 360) / 45)) % 8;
+  const index = Math.round((deg % 360) / 45) % 8;
   return directions[index];
 };
 
@@ -155,34 +172,54 @@ const formatWindDirectionWithDegrees = (deg: number | null): string => {
 
 const SOURCE_NAMES: Record<string, string> = {
   'open-meteo': 'Open-Meteo',
-  'weatherapi': 'WeatherAPI',
+  weatherapi: 'WeatherAPI',
   'meteo-parapente': 'Météo-parapente',
-  'meteociel': 'Meteociel',
-  'meteoblue': 'Meteoblue'
+  meteociel: 'Meteociel',
+  meteoblue: 'Meteoblue',
 };
 
-const SOURCE_ORDER = ['open-meteo', 'weatherapi', 'meteo-parapente', 'meteociel', 'meteoblue'];
+const SOURCE_ORDER = [
+  'open-meteo',
+  'weatherapi',
+  'meteo-parapente',
+  'meteociel',
+  'meteoblue',
+];
 
 // ============================================================================
 // TOOLTIP COMPONENTS
 // ============================================================================
 
-const ParaIndexTooltip = ({ position, hour, paraIndex, wind, gust, precipitation, temperature, onClose, isMobile }: ParaIndexTooltipProps) => {
+const ParaIndexTooltip = ({
+  position,
+  hour,
+  paraIndex,
+  wind,
+  gust,
+  precipitation,
+  temperature,
+  onClose,
+  isMobile,
+}: ParaIndexTooltipProps) => {
   return (
-    <div 
+    <div
       className={`
         ${isMobile ? 'fixed bottom-0 left-0 right-0 mx-4 mb-4' : 'fixed'}
         bg-white border-2 border-sky-500 rounded-lg shadow-xl p-4 z-50 text-sm
       `}
-      style={isMobile ? {} : {
-        left: `${position.x}px`,
-        top: `${position.y - 10}px`,
-        transform: 'translateX(-50%) translateY(-100%)',
-        maxWidth: '320px'
-      }}
+      style={
+        isMobile
+          ? {}
+          : {
+              left: `${position.x}px`,
+              top: `${position.y - 10}px`,
+              transform: 'translateX(-50%) translateY(-100%)',
+              maxWidth: '320px',
+            }
+      }
     >
       {onClose && (
-        <button 
+        <button
           onClick={onClose}
           className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
         >
@@ -195,12 +232,22 @@ const ParaIndexTooltip = ({ position, hour, paraIndex, wind, gust, precipitation
       <div className="space-y-2 text-gray-700">
         <div className="text-lg font-bold text-sky-600">{paraIndex}/100</div>
         <div className="border-t border-gray-200 pt-2 mt-2">
-          <div className="text-xs font-semibold text-gray-500 mb-2">Métriques utilisées :</div>
+          <div className="text-xs font-semibold text-gray-500 mb-2">
+            Métriques utilisées :
+          </div>
           <div className="space-y-1 text-xs">
-            <div>• Vent moyen : <strong>{wind.toFixed(1)} km/h</strong></div>
-            <div>• Rafales max : <strong>{gust.toFixed(1)} km/h</strong></div>
-            <div>• Précipitations : <strong>{precipitation.toFixed(1)} mm</strong></div>
-            <div>• Température : <strong>{temperature.toFixed(1)}°C</strong></div>
+            <div>
+              • Vent moyen : <strong>{wind.toFixed(1)} km/h</strong>
+            </div>
+            <div>
+              • Rafales max : <strong>{gust.toFixed(1)} km/h</strong>
+            </div>
+            <div>
+              • Précipitations : <strong>{precipitation.toFixed(1)} mm</strong>
+            </div>
+            <div>
+              • Température : <strong>{temperature.toFixed(1)}°C</strong>
+            </div>
           </div>
         </div>
         <div className="text-xs text-gray-500 mt-3">
@@ -211,45 +258,59 @@ const ParaIndexTooltip = ({ position, hour, paraIndex, wind, gust, precipitation
   );
 };
 
-const VerdictTooltip = ({ position, hour, verdict, paraIndex, wind, gust, precipitation, onClose, isMobile }: VerdictTooltipProps) => {
+const VerdictTooltip = ({
+  position,
+  hour,
+  verdict,
+  paraIndex,
+  wind,
+  gust,
+  precipitation,
+  onClose,
+  isMobile,
+}: VerdictTooltipProps) => {
   const criteria = [
-    { 
-      label: 'Vent dans plage optimale (8-15 km/h)', 
-      met: wind >= 8 && wind <= 15 
+    {
+      label: 'Vent dans plage optimale (8-15 km/h)',
+      met: wind >= 8 && wind <= 15,
     },
-    { 
-      label: 'Vent pas trop faible (> 5 km/h)', 
-      met: wind > 5 
+    {
+      label: 'Vent pas trop faible (> 5 km/h)',
+      met: wind > 5,
     },
-    { 
-      label: 'Vent pas trop fort (< 20 km/h)', 
-      met: wind < 20 
+    {
+      label: 'Vent pas trop fort (< 20 km/h)',
+      met: wind < 20,
     },
-    { 
-      label: 'Rafales acceptables (< 25 km/h)', 
-      met: gust < 25 
+    {
+      label: 'Rafales acceptables (< 25 km/h)',
+      met: gust < 25,
     },
-    { 
-      label: 'Pas de précipitations', 
-      met: precipitation < 0.5 
+    {
+      label: 'Pas de précipitations',
+      met: precipitation < 0.5,
     },
   ];
 
   return (
-    <div 
+    <div
       className={`
         ${isMobile ? 'fixed bottom-0 left-0 right-0 mx-4 mb-4' : 'fixed'}
         bg-white border-2 border-emerald-500 rounded-lg shadow-xl p-4 z-50 text-sm
       `}
-      style={isMobile ? {} : {
-        left: `${position.x}px`,
-        top: `${position.y - 10}px`,
-        transform: 'translateX(-50%) translateY(-100%)',
-        maxWidth: '320px'
-      }}
+      style={
+        isMobile
+          ? {}
+          : {
+              left: `${position.x}px`,
+              top: `${position.y - 10}px`,
+              transform: 'translateX(-50%) translateY(-100%)',
+              maxWidth: '320px',
+            }
+      }
     >
       {onClose && (
-        <button 
+        <button
           onClick={onClose}
           className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
         >
@@ -260,17 +321,27 @@ const VerdictTooltip = ({ position, hour, verdict, paraIndex, wind, gust, precip
         ✓ Verdict - {hour}
       </div>
       <div className="space-y-2 text-gray-700">
-        <div className="text-lg font-bold capitalize text-emerald-600">{verdict}</div>
-        <div className="text-xs text-gray-500">Para-Index : {paraIndex}/100</div>
+        <div className="text-lg font-bold capitalize text-emerald-600">
+          {verdict}
+        </div>
+        <div className="text-xs text-gray-500">
+          Para-Index : {paraIndex}/100
+        </div>
         <div className="border-t border-gray-200 pt-2 mt-2">
-          <div className="text-xs font-semibold text-gray-500 mb-2">Critères évalués :</div>
+          <div className="text-xs font-semibold text-gray-500 mb-2">
+            Critères évalués :
+          </div>
           <div className="space-y-1 text-xs">
             {criteria.map((criterion, i) => (
               <div key={i} className="flex items-start gap-2">
-                <span className={criterion.met ? 'text-green-500' : 'text-red-500'}>
+                <span
+                  className={criterion.met ? 'text-green-500' : 'text-red-500'}
+                >
                   {criterion.met ? '✓' : '✗'}
                 </span>
-                <span className={criterion.met ? 'text-gray-700' : 'text-gray-500'}>
+                <span
+                  className={criterion.met ? 'text-gray-700' : 'text-gray-500'}
+                >
                   {criterion.label}
                 </span>
               </div>
@@ -282,34 +353,38 @@ const VerdictTooltip = ({ position, hour, verdict, paraIndex, wind, gust, precip
   );
 };
 
-const SourceDataTooltip = ({ 
-  position, 
-  hour, 
-  sources, 
-  consensus, 
-  unit, 
-  fieldName, 
-  label, 
+const SourceDataTooltip = ({
+  position,
+  hour,
+  sources,
+  consensus,
+  unit,
+  fieldName,
+  label,
   color,
   onClose,
-  isMobile 
+  isMobile,
 }: SourceDataTooltipProps) => {
   return (
-    <div 
+    <div
       className={`
         ${isMobile ? 'fixed bottom-0 left-0 right-0 mx-4 mb-4' : 'fixed'}
         bg-white border-2 rounded-lg shadow-xl p-4 z-50 text-sm
       `}
-      style={isMobile ? {} : {
-        left: `${position.x}px`,
-        top: `${position.y - 10}px`,
-        transform: 'translateX(-50%) translateY(-100%)',
-        maxWidth: '320px',
-        borderColor: color
-      }}
+      style={
+        isMobile
+          ? {}
+          : {
+              left: `${position.x}px`,
+              top: `${position.y - 10}px`,
+              transform: 'translateX(-50%) translateY(-100%)',
+              maxWidth: '320px',
+              borderColor: color,
+            }
+      }
     >
       {onClose && (
-        <button 
+        <button
           onClick={onClose}
           className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
         >
@@ -320,31 +395,44 @@ const SourceDataTooltip = ({
         {label} - {hour}
       </div>
       <div className="space-y-2">
-        {SOURCE_ORDER.map(sourceKey => {
+        {SOURCE_ORDER.map((sourceKey) => {
           const sourceData = sources[sourceKey];
           const sourceName = SOURCE_NAMES[sourceKey] || sourceKey;
-          
+
           if (!sourceData) {
             return (
               <div key={sourceKey} className="text-xs text-gray-400">
-                <span className="font-semibold">{sourceName}:</span> (non disponible)
+                <span className="font-semibold">{sourceName}:</span> (non
+                disponible)
               </div>
             );
           }
 
           let value = sourceData[fieldName];
-          
+
           const sourceUrl = getSourceUrl(sourceKey);
-          
+
           // Special handling for wind (show speed + gust)
-          if (fieldName === 'wind_speed' && value !== null && value !== undefined) {
+          if (
+            fieldName === 'wind_speed' &&
+            value !== null &&
+            value !== undefined
+          ) {
             const gust = sourceData['wind_gust'];
             const displayValue = `${value.toFixed(1)} km/h`;
-            const gustValue = gust !== null && gust !== undefined ? ` (rafales: ${gust.toFixed(1)} km/h)` : '';
+            const gustValue =
+              gust !== null && gust !== undefined
+                ? ` (rafales: ${gust.toFixed(1)} km/h)`
+                : '';
             return (
-              <div key={sourceKey} className="text-xs text-gray-700 flex items-center justify-between gap-2">
+              <div
+                key={sourceKey}
+                className="text-xs text-gray-700 flex items-center justify-between gap-2"
+              >
                 <span>
-                  <span className="font-semibold">{sourceName}:</span> {displayValue}{gustValue}
+                  <span className="font-semibold">{sourceName}:</span>{' '}
+                  {displayValue}
+                  {gustValue}
                 </span>
                 {sourceUrl && (
                   <a
@@ -357,48 +445,62 @@ const SourceDataTooltip = ({
                     ↗
                   </a>
                 )}
-              </div>
-            );
-          }
-          
-          // Special handling for wind direction (show cardinal + degrees)
-          if (fieldName === 'wind_direction' && value !== null && value !== undefined) {
-            const displayValue = formatWindDirectionWithDegrees(value);
-            return (
-              <div key={sourceKey} className="text-xs text-gray-700 flex items-center justify-between gap-2">
-                <span>
-                  <span className="font-semibold">{sourceName}:</span> {displayValue}
-                </span>
-                {sourceUrl && (
-                  <a
-                    href={sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 hover:text-blue-700 text-xs flex-shrink-0"
-                    title={`Ouvrir ${sourceName}`}
-                  >
-                    ↗
-                  </a>
-                )}
-              </div>
-            );
-          }
-          
-          // General case
-          if (value === null || value === undefined) {
-            return (
-              <div key={sourceKey} className="text-xs text-gray-400">
-                <span className="font-semibold">{sourceName}:</span> (non dispo.)
               </div>
             );
           }
 
-          const displayValue = typeof value === 'number' ? value.toFixed(1) : value;
-          
+          // Special handling for wind direction (show cardinal + degrees)
+          if (
+            fieldName === 'wind_direction' &&
+            value !== null &&
+            value !== undefined
+          ) {
+            const displayValue = formatWindDirectionWithDegrees(value);
+            return (
+              <div
+                key={sourceKey}
+                className="text-xs text-gray-700 flex items-center justify-between gap-2"
+              >
+                <span>
+                  <span className="font-semibold">{sourceName}:</span>{' '}
+                  {displayValue}
+                </span>
+                {sourceUrl && (
+                  <a
+                    href={sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:text-blue-700 text-xs flex-shrink-0"
+                    title={`Ouvrir ${sourceName}`}
+                  >
+                    ↗
+                  </a>
+                )}
+              </div>
+            );
+          }
+
+          // General case
+          if (value === null || value === undefined) {
+            return (
+              <div key={sourceKey} className="text-xs text-gray-400">
+                <span className="font-semibold">{sourceName}:</span> (non
+                dispo.)
+              </div>
+            );
+          }
+
+          const displayValue =
+            typeof value === 'number' ? value.toFixed(1) : value;
+
           return (
-            <div key={sourceKey} className="text-xs text-gray-700 flex items-center justify-between gap-2">
+            <div
+              key={sourceKey}
+              className="text-xs text-gray-700 flex items-center justify-between gap-2"
+            >
               <span>
-                <span className="font-semibold">{sourceName}:</span> {displayValue} {unit}
+                <span className="font-semibold">{sourceName}:</span>{' '}
+                {displayValue} {unit}
               </span>
               {sourceUrl && (
                 <a
@@ -414,12 +516,16 @@ const SourceDataTooltip = ({
             </div>
           );
         })}
-        
+
         <div className="border-t border-gray-200 pt-2 mt-2">
           <div className="text-xs font-bold text-gray-800">
-            Consensus : {consensus !== null && consensus !== undefined ? 
-              (typeof consensus === 'number' ? consensus.toFixed(1) : consensus) 
-              : '—'} {consensus !== null && consensus !== undefined ? unit : ''}
+            Consensus :{' '}
+            {consensus !== null && consensus !== undefined
+              ? typeof consensus === 'number'
+                ? consensus.toFixed(1)
+                : consensus
+              : '—'}{' '}
+            {consensus !== null && consensus !== undefined ? unit : ''}
           </div>
         </div>
       </div>
@@ -431,7 +537,10 @@ const SourceDataTooltip = ({
 // MAIN COMPONENT
 // ============================================================================
 
-export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastProps) {
+export default function HourlyForecast({
+  spotId,
+  dayIndex = 0,
+}: HourlyForecastProps) {
   const { data: weather, isLoading, error } = useWeather(spotId, dayIndex);
   const [activeTooltip, setActiveTooltip] = useState<{
     type: CellType;
@@ -445,7 +554,7 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -454,8 +563,12 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
   if (isLoading) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md">
-        <h2 className="text-sm text-gray-600 mb-3 font-semibold">Prévisions Horaires</h2>
-        <div className="py-5 text-center text-gray-500 text-sm">Chargement...</div>
+        <h2 className="text-sm text-gray-600 mb-3 font-semibold">
+          Prévisions Horaires
+        </h2>
+        <div className="py-5 text-center text-gray-500 text-sm">
+          Chargement...
+        </div>
       </div>
     );
   }
@@ -463,8 +576,12 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
   if (error || !weather || !weather.hourly_forecast) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md">
-        <h2 className="text-sm text-gray-600 mb-3 font-semibold">Prévisions Horaires</h2>
-        <div className="py-5 text-center text-red-500 text-sm">Données non disponibles</div>
+        <h2 className="text-sm text-gray-600 mb-3 font-semibold">
+          Prévisions Horaires
+        </h2>
+        <div className="py-5 text-center text-red-500 text-sm">
+          Données non disponibles
+        </div>
       </div>
     );
   }
@@ -479,11 +596,11 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const x = rect.left + rect.width / 2;
     const y = rect.top;
-    
+
     setActiveTooltip({
       type: cellType,
       data: hourData,
-      position: { x, y }
+      position: { x, y },
     });
   };
 
@@ -499,7 +616,7 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
       position,
       hour: data.hour,
       onClose: handleCloseTooltip, // Always show close button
-      isMobile
+      isMobile,
     };
 
     switch (type) {
@@ -509,7 +626,11 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
             {...commonProps}
             paraIndex={data.para_index}
             wind={data.wind_speed || 0}
-            gust={data.sources?.['open-meteo']?.wind_gust || data.sources?.['weatherapi']?.wind_gust || 0}
+            gust={
+              data.sources?.['open-meteo']?.wind_gust ||
+              data.sources?.['weatherapi']?.wind_gust ||
+              0
+            }
             precipitation={data.precipitation || 0}
             temperature={data.temperature || 0}
           />
@@ -522,7 +643,11 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
             verdict={data.verdict}
             paraIndex={data.para_index}
             wind={data.wind_speed || 0}
-            gust={data.sources?.['open-meteo']?.wind_gust || data.sources?.['weatherapi']?.wind_gust || 0}
+            gust={
+              data.sources?.['open-meteo']?.wind_gust ||
+              data.sources?.['weatherapi']?.wind_gust ||
+              0
+            }
             precipitation={data.precipitation || 0}
           />
         );
@@ -572,9 +697,9 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
             {...commonProps}
             sources={data.sources || {}}
             consensus={formatWindDirectionWithDegrees(
-              data.sources?.['open-meteo']?.wind_direction || 
-              data.sources?.['weatherapi']?.wind_direction || 
-              null
+              data.sources?.['open-meteo']?.wind_direction ||
+                data.sources?.['weatherapi']?.wind_direction ||
+                null
             )}
             unit=""
             fieldName="wind_direction"
@@ -601,9 +726,11 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
           <SourceDataTooltip
             {...commonProps}
             sources={data.sources || {}}
-            consensus={data.sources?.['open-meteo']?.cloud_cover || 
-                      data.sources?.['weatherapi']?.cloud_cover || 
-                      null}
+            consensus={
+              data.sources?.['open-meteo']?.cloud_cover ||
+              data.sources?.['weatherapi']?.cloud_cover ||
+              null
+            }
             unit="%"
             fieldName="cloud_cover"
             label="☁️ Couverture nuageuse"
@@ -619,11 +746,13 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
   const cellEventHandlers = (cellType: CellType, hourData: any) => {
     if (isMobile) {
       return {
-        onClick: (e: React.MouseEvent) => handleCellInteraction(cellType, hourData, e)
+        onClick: (e: React.MouseEvent) =>
+          handleCellInteraction(cellType, hourData, e),
       };
     } else {
       return {
-        onMouseEnter: (e: React.MouseEvent) => handleCellInteraction(cellType, hourData, e)
+        onMouseEnter: (e: React.MouseEvent) =>
+          handleCellInteraction(cellType, hourData, e),
         // onMouseLeave removed - tooltip stays open until close button clicked
       };
     }
@@ -631,111 +760,140 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
 
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
-      <h2 className="text-sm text-gray-600 mb-3 font-semibold">Prévisions Horaires</h2>
-      
+      <h2 className="text-sm text-gray-600 mb-3 font-semibold">
+        Prévisions Horaires
+      </h2>
+
       <div className="overflow-x-auto -mx-4 px-4">
         <table className="w-full min-w-[800px] text-sm">
           <thead>
             <tr className="border-b-2 border-gray-200">
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">Heure</th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">Para-Index</th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">Temp</th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">Vent</th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">Rafales</th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">Direction</th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">Précip.</th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">Nuages</th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">CAPE (J/kg)</th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">Thermiques</th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">Volabilité</th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">
+                Heure
+              </th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">
+                Para-Index
+              </th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">
+                Temp
+              </th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">
+                Vent
+              </th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">
+                Rafales
+              </th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">
+                Direction
+              </th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">
+                Précip.
+              </th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">
+                Nuages
+              </th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">
+                CAPE (J/kg)
+              </th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">
+                Thermiques
+              </th>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">
+                Volabilité
+              </th>
             </tr>
           </thead>
           <tbody>
             {flyingHours.length > 0 ? (
               flyingHours.map((hour, index) => {
                 // Extract cloud cover from sources
-                const cloudCover = hour.sources?.['open-meteo']?.cloud_cover || 
-                                 hour.sources?.['weatherapi']?.cloud_cover || 
-                                 null;
+                const cloudCover =
+                  hour.sources?.['open-meteo']?.cloud_cover ||
+                  hour.sources?.['weatherapi']?.cloud_cover ||
+                  null;
 
                 // Extract gust from sources
-                const gustValue = hour.wind_gust ?? 
-                                 hour.sources?.['open-meteo']?.wind_gust ?? 
-                                 hour.sources?.['weatherapi']?.wind_gust ?? 
-                                 null;
+                const gustValue =
+                  hour.wind_gust ??
+                  hour.sources?.['open-meteo']?.wind_gust ??
+                  hour.sources?.['weatherapi']?.wind_gust ??
+                  null;
 
                 return (
-                  <tr 
-                    key={index} 
+                  <tr
+                    key={index}
                     className={`border-b border-gray-100 ${getVerdictClass(hour.verdict)}`}
                   >
                     <td className="py-2.5 px-2 font-medium">{hour.hour}</td>
-                    
-                    <td 
+
+                    <td
                       className="py-2.5 px-2 cursor-pointer hover:bg-sky-100 transition-colors"
                       {...cellEventHandlers('para-index', hour)}
                     >
-                      <strong className="text-sky-600">{hour.para_index}/100</strong>
+                      <strong className="text-sky-600">
+                        {hour.para_index}/100
+                      </strong>
                     </td>
-                    
-                    <td 
+
+                    <td
                       className="py-2.5 px-2 cursor-pointer hover:bg-red-50 transition-colors"
                       {...cellEventHandlers('temperature', hour)}
                     >
                       {hour.temp}°C
                     </td>
-                    
-                    <td 
+
+                    <td
                       className="py-2.5 px-2 cursor-pointer hover:bg-blue-50 transition-colors"
                       {...cellEventHandlers('wind', hour)}
                     >
                       {hour.wind} km/h
                     </td>
-                    
-                    <td 
+
+                    <td
                       className="py-2.5 px-2 cursor-pointer hover:bg-red-50 transition-colors"
                       {...cellEventHandlers('gust', hour)}
                     >
-                      {gustValue !== null && gustValue !== undefined 
-                        ? `${gustValue.toFixed(1)} km/h` 
+                      {gustValue !== null && gustValue !== undefined
+                        ? `${gustValue.toFixed(1)} km/h`
                         : '—'}
                     </td>
-                    
-                    <td 
+
+                    <td
                       className="py-2.5 px-2 cursor-pointer hover:bg-violet-50 transition-colors"
                       {...cellEventHandlers('direction', hour)}
                     >
                       {hour.direction}
                     </td>
-                    
-                    <td 
+
+                    <td
                       className="py-2.5 px-2 cursor-pointer hover:bg-cyan-50 transition-colors"
                       {...cellEventHandlers('precipitation', hour)}
                     >
-                      {hour.precipitation !== null && hour.precipitation !== undefined 
-                        ? `${hour.precipitation.toFixed(1)} mm` 
+                      {hour.precipitation !== null &&
+                      hour.precipitation !== undefined
+                        ? `${hour.precipitation.toFixed(1)} mm`
                         : '—'}
                     </td>
-                    
-                    <td 
+
+                    <td
                       className="py-2.5 px-2 cursor-pointer hover:bg-slate-50 transition-colors"
                       {...cellEventHandlers('cloud-cover', hour)}
                     >
-                      {cloudCover !== null && cloudCover !== undefined 
-                        ? `${Math.round(cloudCover)}%` 
+                      {cloudCover !== null && cloudCover !== undefined
+                        ? `${Math.round(cloudCover)}%`
                         : '—'}
                     </td>
-                    
+
                     <td className="py-2.5 px-2">
-                      {hour.cape !== null && hour.cape !== undefined 
-                        ? Math.round(hour.cape) 
+                      {hour.cape !== null && hour.cape !== undefined
+                        ? Math.round(hour.cape)
                         : '—'}
                     </td>
-                    
+
                     <td className="py-2.5 px-2">
                       {hour.thermal_strength || 'Faible'}
                     </td>
-                    
+
                     <td className="py-2.5 px-2">
                       {(() => {
                         const display = getFlyabilityDisplay(hour);
@@ -759,7 +917,7 @@ export default function HourlyForecast({ spotId, dayIndex = 0 }: HourlyForecastP
           </tbody>
         </table>
       </div>
-      
+
       {/* Render active tooltip */}
       {renderTooltip()}
     </div>

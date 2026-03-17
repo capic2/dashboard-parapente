@@ -20,9 +20,13 @@ export const SiteSchema = z.object({
   country: z.string().nullable().optional().default('FR'),
   rating: z.number().nullable().optional(),
   orientation: z.string().nullable().optional(),
+  camera_angle: z.number().nullable().optional(),
+  camera_distance: z.number().nullable().optional().default(500),
   linked_spot_id: z.string().nullable().optional(),
+  flight_count: z.number().optional().default(0),
   created_at: z.string().nullable().optional(),
   updated_at: z.string().nullable().optional(),
+  usage_type: z.enum(['takeoff', 'landing', 'both']).optional(),
   // Legacy fields kept for backward compatibility
   description: z.string().optional().catch(''),
   difficulty_level: z.string().optional().catch(''),
@@ -35,7 +39,7 @@ export const FlightSchema = z.object({
   site_id: z.string().nullable().optional(),
   site_name: z.string().nullable().optional(),
   name: z.string().nullable().optional(),
-  title: z.string(),
+  title: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   flight_date: z.string(),
   departure_time: z.string().nullable().optional(),
@@ -49,6 +53,9 @@ export const FlightSchema = z.object({
   gpx_max_altitude_m: z.number().nullable().optional(),
   gpx_elevation_gain_m: z.number().nullable().optional(),
   external_url: z.string().nullable().optional(),
+  video_export_job_id: z.string().nullable().optional(),
+  video_export_status: z.enum(['processing', 'completed', 'failed']).nullable().optional(),
+  video_file_path: z.string().nullable().optional(),
   site: SiteSchema.optional(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
@@ -58,10 +65,8 @@ export const FlightStatsSchema = z.object({
   total_flights: z.number().catch(0),
   total_hours: z.number().catch(0),
   total_duration_minutes: z.number().catch(0),
-  total_distance: z.number().catch(0),
   total_distance_km: z.number().catch(0),
   total_elevation_gain_m: z.number().catch(0),
-  avg_duration: z.number().catch(0),
   avg_duration_minutes: z.number().catch(0),
   avg_distance_km: z.number().catch(0),
   max_altitude_m: z.number().catch(0),
@@ -103,129 +108,36 @@ export const AlertHistorySchema = z.object({
 // ============================================================================
 // WEATHER SCHEMAS
 // ============================================================================
-
-export const WeatherConditionsSchema = z.object({
-  site_id: z.string(),
-  timestamp: z.string(),
-  temperature_c: z.number(),
-  wind_speed_kmh: z.number(),
-  wind_gust_kmh: z.number(),
-  wind_direction_deg: z.number(),
-  precipitation_mm: z.number(),
-  cloud_cover_percent: z.number(),
-  cloud_base_m: z.number(),
-  humidity_percent: z.number(),
-  pressure_hpa: z.number(),
-  visibility_km: z.number(),
-});
-
-export const ForecastHourSchema = z.object({
-  time: z.string(),
-  temperature_c: z.number(),
-  wind_speed_kmh: z.number(),
-  wind_gust_kmh: z.number(),
-  wind_direction_deg: z.number(),
-  precipitation_mm: z.number(),
-  precipitation_probability_percent: z.number(),
-  cloud_cover_percent: z.number(),
-  cloud_base_m: z.number(),
-});
-
-export const ForecastDaySchema = z.object({
-  date: z.string(),
-  hours: z.array(ForecastHourSchema),
-  max_temp_c: z.number(),
-  min_temp_c: z.number(),
-  precipitation_total_mm: z.number(),
-  avg_wind_speed_kmh: z.number(),
-});
-
-export const WeatherSourceSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  provider_type: z.enum(['meteo_france', 'open_meteo', 'windy', 'custom']),
-  is_active: z.boolean().catch(true),
-  api_config: z.record(z.string(), z.any()).optional(),
-  created_at: z.string().catch(''),
-});
-
-// ============================================================================
-// COMBINED WEATHER API RESPONSE SCHEMAS (for main useWeather hook)
-// ============================================================================
-
-export const HourlyForecastItemSchema = z
-  .object({
-    hour: z.string(),
-    time: z.string(),
-    temp: z.number(),
-    temperature: z.number(),
-    wind: z.number(),
-    wind_speed: z.number(),
-    wind_gust: z.number().optional(),
-    direction: z.string(),
-    wind_direction: z.string(),
-    conditions: z.string(),
-    precipitation: z.number(),
-    para_index: z.number(),
-    verdict: z.string(),
-    sources: z.record(z.string(), z.any()).optional(), // Per-source weather data
-  })
-
-export const DailyForecastItemSchema = z.object({
-  date: z.string(),
-  day_of_week: z.string(),
-  temp_min: z.number(),
-  temp_max: z.number(),
-  min_temp: z.number(),
-  max_temp: z.number(),
-  wind_avg: z.number(),
-  conditions: z.string(),
-  precipitation_prob: z.number(),
-  para_index: z.number(),
-  verdict: z.string(),
-});
-
-export const WeatherDataSchema = z.object({
-  spot_name: z.string(),
-  para_index: z.number(),
-  verdict: z.string(),
-  temperature: z.number(),
-  wind_speed: z.number(),
-  wind_direction: z.string(),
-  wind_gusts: z.number().optional(),
-  conditions: z.string(),
-  forecast_time: z.string(),
-  hourly_forecast: z.array(HourlyForecastItemSchema).optional(),
-  daily_forecast: z.array(DailyForecastItemSchema).optional(),
-});
+// Note: ForecastHourSchema, HourlyForecastItemSchema, DailyForecastItemSchema, 
+// and WeatherDataSchema have been removed as they are obsolete.
+// The app now uses BackendWeatherResponseSchema directly and transforms 
+// data in useWeather hook.
 
 // ============================================================================
 // BACKEND API RESPONSE SCHEMAS (raw API format before transformation)
 // ============================================================================
 
-export const ConsensusHourSchema = z
-  .object({
-    hour: z.number(),
-    num_sources: z.number().optional(),
-    temperature: z.number().nullable(),
-    temperature_confidence: z.number().optional(),
-    wind_speed: z.number().nullable(),
-    wind_confidence: z.number().optional(),
-    wind_gust: z.number().nullable(),
-    gust_confidence: z.number().optional(),
-    wind_direction: z.number().nullable(),
-    direction_confidence: z.number().optional(),
-    precipitation: z.number().nullable(),
-    precipitation_confidence: z.number().optional(),
-    cloud_cover: z.number().nullable(),
-    cloud_confidence: z.number().optional(),
-    cape: z.number().nullable().optional(),
-    cape_confidence: z.number().optional(),
-    lifted_index: z.number().nullable().optional(),
-    li_confidence: z.number().optional(),
-    sources: z.record(z.string(), z.any()).optional(), // Per-source data for tooltip
-  })
-  .passthrough(); // Keep all extra fields from API response
+export const ConsensusHourSchema = z.object({
+  hour: z.number(),
+  num_sources: z.number().optional(),
+  temperature: z.number().nullable(),
+  temperature_confidence: z.number().optional(),
+  wind_speed: z.number().nullable(),
+  wind_confidence: z.number().optional(),
+  wind_gust: z.number().nullable(),
+  gust_confidence: z.number().optional(),
+  wind_direction: z.number().nullable(),
+  direction_confidence: z.number().optional(),
+  precipitation: z.number().nullable(),
+  precipitation_confidence: z.number().optional(),
+  cloud_cover: z.number().nullable(),
+  cloud_confidence: z.number().optional(),
+  cape: z.number().nullable().optional(),
+  cape_confidence: z.number().optional(),
+  lifted_index: z.number().nullable().optional(),
+  li_confidence: z.number().optional(),
+  sources: z.record(z.string(), z.any()).optional(), // Per-source data for tooltip
+});
 
 export const SlotSchema = z.object({
   start_hour: z.number(),
@@ -245,14 +157,19 @@ export const BackendWeatherResponseSchema = z.object({
   site_id: z.string().catch(''),
   site_name: z.string().catch(''),
   day_index: z.number().catch(0),
+  days: z.number().catch(1),
+  sunrise: z.string().optional(),
+  sunset: z.string().optional(),
+  sources_metadata: z.record(z.string(), z.any()).optional(),
+  consensus: z.array(ConsensusHourSchema).optional(),
   para_index: z.number().catch(0),
   verdict: z.string().catch(''),
+  emoji: z.string().catch(''),
   explanation: z.string().catch(''),
-  slots_summary: z.string().catch(''),
-  consensus: z.array(ConsensusHourSchema).optional(),
-  slots: z.array(SlotSchema).optional(),
   metrics: MetricsSchema.optional(),
-  hourly_forecast:
+  slots: z.array(SlotSchema).optional(),
+  slots_summary: z.string().catch(''),
+  total_sources: z.number().optional(),
 });
 
 // ============================================================================
@@ -283,16 +200,98 @@ export const FlightsApiResponseSchema = z.object({
 // ============================================================================
 
 export const DailySummaryDaySchema = z.object({
+  day_index: z.number(),
   date: z.string(),
   para_index: z.number(),
   verdict: z.string(),
+  emoji: z.string(),
   temp_min: z.number(),
   temp_max: z.number(),
   wind_avg: z.number(),
 });
 
 export const DailySummarySchema = z.object({
+  site_id: z.string(),
+  site_name: z.string(),
   days: z.array(DailySummaryDaySchema),
+});
+
+// ============================================================================
+// PARAGLIDING SPOT SEARCH SCHEMAS
+// ============================================================================
+
+export const ParaglidingSpotBaseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.enum(['takeoff', 'landing', 'both']),
+  latitude: z.number(),
+  longitude: z.number(),
+  elevation_m: z.number().nullable().optional(),
+  orientation: z.string().nullable().optional(),
+  rating: z.number().nullable().optional(),
+  country: z.string().default('FR'),
+  source: z.string(), // "openaip", "paraglidingspots", "merged"
+});
+
+export const ParaglidingSpotSearchResultSchema = ParaglidingSpotBaseSchema.extend({
+  distance_km: z.number().nullable().optional(),
+});
+
+export const SpotSearchResponseSchema = z.object({
+  query: z.record(z.string(), z.any()),
+  total: z.number(),
+  spots: z.array(ParaglidingSpotSearchResultSchema),
+});
+
+// ============================================================================
+// GEOCODE RESPONSE SCHEMA
+// ============================================================================
+
+export const GeocodeResponseSchema = z.object({
+  name: z.string(),
+  latitude: z.number(),
+  longitude: z.number(),
+  display_name: z.string(),
+});
+
+// ============================================================================
+// FLIGHT RECORDS SCHEMAS
+// ============================================================================
+
+export const FlightRecordSchema = z.object({
+  value: z.number(),
+  flight_id: z.string(),
+  flight_name: z.string(),
+  flight_date: z.string(),
+  site_name: z.string().nullable().optional(),
+});
+
+export const FlightRecordsSchema = z.object({
+  longest_duration: FlightRecordSchema.nullable().optional(),
+  highest_altitude: FlightRecordSchema.nullable().optional(),
+  longest_distance: FlightRecordSchema.nullable().optional(),
+  max_speed: FlightRecordSchema.nullable().optional(),
+});
+
+// ============================================================================
+// GPX DATA SCHEMAS
+// ============================================================================
+
+export const GeoPointSchema = z.object({
+  lat: z.number(),
+  lon: z.number(),
+  elevation: z.number(),
+  timestamp: z.string().optional(),
+});
+
+export const GPXDataSchema = z.object({
+  coordinates: z.array(GeoPointSchema),
+  max_altitude_m: z.number(),
+  min_altitude_m: z.number(),
+  elevation_gain_m: z.number(),
+  elevation_loss_m: z.number(),
+  total_distance_km: z.number(),
+  flight_duration_seconds: z.number(),
 });
 
 // ============================================================================
@@ -303,19 +302,15 @@ export type Site = z.infer<typeof SiteSchema>;
 export type Flight = z.infer<typeof FlightSchema>;
 export type FlightStats = z.infer<typeof FlightStatsSchema>;
 export type Alert = z.infer<typeof AlertSchema>;
-export type AlertHistory = z.infer<typeof AlertHistorySchema>;
-export type WeatherConditions = z.infer<typeof WeatherConditionsSchema>;
-export type ForecastHour = z.infer<typeof ForecastHourSchema>;
-export type ForecastDay = z.infer<typeof ForecastDaySchema>;
-export type WeatherSource = z.infer<typeof WeatherSourceSchema>;
-export type WeatherData = z.infer<typeof WeatherDataSchema>;
-export type HourlyForecastItem = z.infer<typeof HourlyForecastItemSchema>;
-export type DailyForecastItem = z.infer<typeof DailyForecastItemSchema>;
-export type BackendWeatherResponse = z.infer<
-  typeof BackendWeatherResponseSchema
->;
-export type ConsensusHour = z.infer<typeof ConsensusHourSchema>;
 export type Slot = z.infer<typeof SlotSchema>;
 export type Metrics = z.infer<typeof MetricsSchema>;
 export type DailySummaryDay = z.infer<typeof DailySummaryDaySchema>;
 export type DailySummary = z.infer<typeof DailySummarySchema>;
+export type ParaglidingSpotBase = z.infer<typeof ParaglidingSpotBaseSchema>;
+export type ParaglidingSpotSearchResult = z.infer<typeof ParaglidingSpotSearchResultSchema>;
+export type SpotSearchResponse = z.infer<typeof SpotSearchResponseSchema>;
+export type GeocodeResponse = z.infer<typeof GeocodeResponseSchema>;
+export type FlightRecord = z.infer<typeof FlightRecordSchema>;
+export type FlightRecords = z.infer<typeof FlightRecordsSchema>;
+export type GeoPoint = z.infer<typeof GeoPointSchema>;
+export type GPXData = z.infer<typeof GPXDataSchema>;

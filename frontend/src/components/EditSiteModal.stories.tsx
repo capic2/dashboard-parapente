@@ -2,7 +2,7 @@ import type { Meta } from '@storybook/react';
 import { expect, within, userEvent, waitFor } from 'storybook/test';
 import { fn } from 'storybook/test';
 import { EditSiteModal } from './EditSiteModal';
-import type { Site } from '../hooks/useFlight';
+import type { Site } from '../schemas';
 
 const meta = {
   title: 'Components/Forms/EditSiteModal',
@@ -28,8 +28,10 @@ const mockSite: Site = {
   orientation: 'NW',
   camera_angle: 180,
   camera_distance: 500,
+  flight_count: 0,
   usage_type: 'both',
   description: 'Magnifique site de vol',
+  is_active: true,
 };
 
 const mockSiteMinimal: Site = {
@@ -40,7 +42,10 @@ const mockSiteMinimal: Site = {
   longitude: 6.0,
   elevation_m: 300,
   country: 'FR',
+  camera_distance: null,
+  flight_count: 0,
   usage_type: 'both',
+  is_active: true,
 };
 
 // Closed state

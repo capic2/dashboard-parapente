@@ -1,10 +1,11 @@
 import { useQuery, useMutation, useQueryClient, type UseQueryResult, type UseMutationResult } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import type { Flight, FlightFilters, FlightStats, FlightFormData, ApiResponse, Site } from '../types'
+import type { Flight, FlightFilters, FlightStats, FlightFormData, ApiResponse, Site, FlightRecords } from '../types'
 import {
   FlightsApiResponseSchema,
   FlightSchema,
   FlightStatsSchema,
+  FlightRecordsSchema,
   ApiResponseSchema,
 } from '../schemas'
 
@@ -92,38 +93,25 @@ export const useFlightStats = (): UseQueryResult<FlightStats, Error> => {
 }
 
 /**
- * Flight record for a specific metric
- */
-interface FlightRecord {
-  value: number
-  flight_id: string
-  flight_name: string
-  date: string
-  site_name: string | null
-  site_id: string | null
-}
-
-/**
- * Personal flight records (longest, highest, fastest, farthest)
- */
-export interface FlightRecords {
-  longest_duration: FlightRecord | null
-  highest_altitude: FlightRecord | null
-  longest_distance: FlightRecord | null
-  max_speed: FlightRecord | null
-}
-
-/**
  * Fetch personal flight records
+ * Uses FlightRecordsSchema from schemas.ts for validation
  */
 export const useFlightRecords = (): UseQueryResult<FlightRecords, Error> => {
   return useQuery({
     queryKey: ['flights', 'records'],
     queryFn: async () => {
       const data = await api.get('flights/records').json()
-      return data as FlightRecords
+      
+      // Validate with Zod
+      const validation = FlightRecordsSchema.safeParse(data)
+      if (!validation.success) {
+        console.error('❌ Flight records validation failed:', validation.error)
+        throw new Error(`Invalid flight records: ${validation.error.message}`)
+      }
+      
+      return validation.data
     },
-    staleTime: 1000 * 60 * 60, // 1 hour - records don't change often
+    staleTime: 1000 * 60 * 60, // 1 hour - records don't change often,
   })
 }
 

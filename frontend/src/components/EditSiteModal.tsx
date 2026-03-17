@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Site } from '../hooks/useFlight';
+import type { Site } from '../schemas';
 import { SiteUpdate } from '../hooks/useSiteMutations';
 
 interface EditSiteModalProps {
