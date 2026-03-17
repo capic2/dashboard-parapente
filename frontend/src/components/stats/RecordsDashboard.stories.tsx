@@ -204,11 +204,9 @@ export const ShowsLoadingSkeletons = {
     },
   },
   test: async ({ canvas }: { canvas: HTMLElement }) => {
-    const canvasElement = within(canvas);
-
     // Check for loading state (animate-pulse class)
-    const skeletons = canvasElement.container.querySelectorAll('.animate-pulse');
-    expect(skeletons.length).toBeGreaterThan(0);
+    const skeletons = canvas.querySelectorAll('.animate-pulse');
+    await expect(skeletons.length).toBeGreaterThan(0);
   },
 };
 

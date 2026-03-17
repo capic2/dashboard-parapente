@@ -77,7 +77,7 @@ export default function Forecast7Day({ spotId, selectedDayIndex = 0, onSelectDay
       <h2 className="text-sm text-gray-600 mb-3 font-semibold">Prévisions 7 Jours</h2>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
-        {dailySummary.days.map((day: any, index: number) => {
+        {dailySummary.days.map((day, index) => {
           const isSelected = index === selectedDayIndex;
           
           return (

@@ -1,19 +1,19 @@
-import React, { useState, useEffect } from 'react'
-import { Site } from '../hooks/useFlight'
-import { SiteUpdate } from '../hooks/useSiteMutations'
+import React, { useState, useEffect } from 'react';
+import { Site } from '../hooks/useFlight';
+import { SiteUpdate } from '../hooks/useSiteMutations';
 
 interface EditSiteModalProps {
-  site: Site | null  // null = create mode, Site = edit mode
-  isOpen: boolean
-  onClose: () => void
-  onSave: (data: SiteUpdate) => Promise<void>
+  site: Site | null; // null = create mode, Site = edit mode
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (data: SiteUpdate) => Promise<void>;
 }
 
 export const EditSiteModal: React.FC<EditSiteModalProps> = ({
   site,
   isOpen,
   onClose,
-  onSave
+  onSave,
 }) => {
   const [formData, setFormData] = useState<SiteUpdate>({
     name: '',
@@ -27,13 +27,13 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
     camera_angle: 180,
     camera_distance: 500,
     usage_type: 'both',
-    description: ''
-  })
-  
-  const [originalData, setOriginalData] = useState<SiteUpdate>({})
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [isSaving, setIsSaving] = useState(false)
-  
+    description: '',
+  });
+
+  const [originalData, setOriginalData] = useState<SiteUpdate>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSaving, setIsSaving] = useState(false);
+
   // Initialize form when site changes
   useEffect(() => {
     if (site) {
@@ -49,13 +49,13 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         camera_angle: site.camera_angle || 180,
         camera_distance: site.camera_distance || 500,
         usage_type: site.usage_type || 'both',
-        description: site.description || ''
-      }
-      setFormData(initialData)
-      setOriginalData(initialData)
+        description: site.description || '',
+      };
+      setFormData(initialData);
+      setOriginalData(initialData);
     } else {
       // Reset for create mode
-      const initialData = {
+      const initialData: SiteUpdate = {
         name: '',
         code: '',
         latitude: 0,
@@ -67,83 +67,89 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         camera_angle: 180,
         camera_distance: 500,
         usage_type: 'both',
-        description: ''
-      }
-      setFormData(initialData)
-      setOriginalData({})
+        description: '',
+      };
+      setFormData(initialData);
+      setOriginalData({});
     }
-    setErrors({})
-  }, [site])
-  
+    setErrors({});
+  }, [site]);
+
   const validate = () => {
-    const newErrors: Record<string, string> = {}
-    
+    const newErrors: Record<string, string> = {};
+
     if (!formData.name || formData.name.length < 2) {
-      newErrors.name = 'Le nom doit contenir au moins 2 caractères'
+      newErrors.name = 'Le nom doit contenir au moins 2 caractères';
     }
-    
-    if (formData.latitude !== undefined && (formData.latitude < -90 || formData.latitude > 90)) {
-      newErrors.latitude = 'Latitude invalide (-90 à 90)'
+
+    if (
+      formData.latitude !== undefined &&
+      (formData.latitude < -90 || formData.latitude > 90)
+    ) {
+      newErrors.latitude = 'Latitude invalide (-90 à 90)';
     }
-    
-    if (formData.longitude !== undefined && (formData.longitude < -180 || formData.longitude > 180)) {
-      newErrors.longitude = 'Longitude invalide (-180 à 180)'
+
+    if (
+      formData.longitude !== undefined &&
+      (formData.longitude < -180 || formData.longitude > 180)
+    ) {
+      newErrors.longitude = 'Longitude invalide (-180 à 180)';
     }
-    
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-  
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!validate()) return
-    
-    setIsSaving(true)
+    e.preventDefault();
+
+    if (!validate()) return;
+
+    setIsSaving(true);
     try {
       // For edit mode: only send changed fields
       // For create mode: send all fields with values
-      const cleanedData: SiteUpdate = {}
-      
+      const cleanedData: SiteUpdate = {};
+
       Object.entries(formData).forEach(([key, value]) => {
-        const typedKey = key as keyof SiteUpdate
-        const originalValue = originalData[typedKey]
-        
+        const typedKey = key as keyof SiteUpdate;
+        const originalValue = originalData[typedKey];
+
         // Include field if:
         // 1. It's a new site (no originalData) and has a non-empty value
         // 2. It's an edit and the value has changed
         if (Object.keys(originalData).length === 0) {
           // Create mode: include all non-empty values
           if (value !== '' && value !== undefined && value !== null) {
-            cleanedData[typedKey] = value
+            cleanedData[typedKey] = value;
           }
         } else {
           // Edit mode: only include changed values
           if (value !== originalValue) {
-            cleanedData[typedKey] = value
+            cleanedData[typedKey] = value;
           }
         }
-      })
-      
-      await onSave(cleanedData)
-      onClose()
+      });
+
+      await onSave(cleanedData);
+      onClose();
     } catch (error) {
-      console.error('Failed to save site:', error)
-      alert('Erreur lors de la sauvegarde')
+      console.error('Failed to save site:', error);
+      alert('Erreur lors de la sauvegarde');
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
-  
-  if (!isOpen) return null
-  
+  };
+
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <h2 className="text-2xl font-bold mb-4">
           {site ? `Modifier ${site.name}` : 'Nouveau site'}
         </h2>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Nom */}
           <div>
@@ -153,22 +159,26 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
               className="w-full px-3 py-2 border rounded"
               required
             />
-            {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+            {errors.name && (
+              <p className="text-red-500 text-xs mt-1">{errors.name}</p>
+            )}
           </div>
-          
+
           {/* Code */}
           <div>
-            <label className="block text-sm font-medium mb-1">
-              Code
-            </label>
+            <label className="block text-sm font-medium mb-1">Code</label>
             <input
               type="text"
               value={formData.code}
-              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, code: e.target.value })
+              }
               className="w-full px-3 py-2 border rounded disabled:bg-gray-100"
               disabled={!!site}
             />
@@ -178,7 +188,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               </p>
             )}
           </div>
-          
+
           {/* Type de site */}
           <div>
             <label className="block text-sm font-medium mb-2">
@@ -190,7 +200,9 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                   type="radio"
                   value="takeoff"
                   checked={formData.usage_type === 'takeoff'}
-                  onChange={(e) => setFormData({ ...formData, usage_type: 'takeoff' })}
+                  onChange={() =>
+                    setFormData({ ...formData, usage_type: 'takeoff' })
+                  }
                   className="mr-2"
                 />
                 <span>Décollage uniquement</span>
@@ -200,7 +212,9 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                   type="radio"
                   value="landing"
                   checked={formData.usage_type === 'landing'}
-                  onChange={(e) => setFormData({ ...formData, usage_type: 'landing' })}
+                  onChange={() =>
+                    setFormData({ ...formData, usage_type: 'landing' })
+                  }
                   className="mr-2"
                 />
                 <span>Atterrissage uniquement</span>
@@ -210,14 +224,16 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                   type="radio"
                   value="both"
                   checked={formData.usage_type === 'both'}
-                  onChange={(e) => setFormData({ ...formData, usage_type: 'both' })}
+                  onChange={() =>
+                    setFormData({ ...formData, usage_type: 'both' })
+                  }
                   className="mr-2"
                 />
                 <span>Décollage et Atterrissage</span>
               </label>
             </div>
           </div>
-          
+
           {/* GPS Coordinates */}
           <div className="grid grid-cols-3 gap-3">
             <div>
@@ -228,11 +244,18 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                 type="number"
                 step="0.0001"
                 value={formData.latitude}
-                onChange={(e) => setFormData({ ...formData, latitude: parseFloat(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    latitude: parseFloat(e.target.value) || 0,
+                  })
+                }
                 className="w-full px-3 py-2 border rounded"
                 required
               />
-              {errors.latitude && <p className="text-red-500 text-xs mt-1">{errors.latitude}</p>}
+              {errors.latitude && (
+                <p className="text-red-500 text-xs mt-1">{errors.latitude}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
@@ -242,11 +265,18 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                 type="number"
                 step="0.0001"
                 value={formData.longitude}
-                onChange={(e) => setFormData({ ...formData, longitude: parseFloat(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    longitude: parseFloat(e.target.value) || 0,
+                  })
+                }
                 className="w-full px-3 py-2 border rounded"
                 required
               />
-              {errors.longitude && <p className="text-red-500 text-xs mt-1">{errors.longitude}</p>}
+              {errors.longitude && (
+                <p className="text-red-500 text-xs mt-1">{errors.longitude}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
@@ -255,33 +285,38 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               <input
                 type="number"
                 value={formData.elevation_m}
-                onChange={(e) => setFormData({ ...formData, elevation_m: parseInt(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    elevation_m: parseInt(e.target.value) || 0,
+                  })
+                }
                 className="w-full px-3 py-2 border rounded"
               />
             </div>
           </div>
-          
+
           {/* Region & Country */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Région
-              </label>
+              <label className="block text-sm font-medium mb-1">Région</label>
               <input
                 type="text"
                 value={formData.region}
-                onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, region: e.target.value })
+                }
                 className="w-full px-3 py-2 border rounded"
                 placeholder="Ex: Franche-Comté"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Pays
-              </label>
+              <label className="block text-sm font-medium mb-1">Pays</label>
               <select
                 value={formData.country}
-                onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, country: e.target.value })
+                }
                 className="w-full px-3 py-2 border rounded"
               >
                 <option value="FR">France</option>
@@ -291,7 +326,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               </select>
             </div>
           </div>
-          
+
           {/* Orientation */}
           <div>
             <label className="block text-sm font-medium mb-1">
@@ -299,7 +334,9 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
             </label>
             <select
               value={formData.orientation}
-              onChange={(e) => setFormData({ ...formData, orientation: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, orientation: e.target.value })
+              }
               className="w-full px-3 py-2 border rounded"
             >
               <option value="">Non définie</option>
@@ -313,11 +350,13 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               <option value="NW">Nord-Ouest (NW)</option>
             </select>
           </div>
-          
+
           {/* Camera Settings */}
           <div className="p-3 bg-blue-50 rounded border border-blue-200">
-            <h4 className="text-sm font-semibold mb-3">📷 Position Caméra 3D</h4>
-            
+            <h4 className="text-sm font-semibold mb-3">
+              📷 Position Caméra 3D
+            </h4>
+
             <div className="mb-3">
               <label className="block text-sm mb-1">
                 Angle: {formData.camera_angle}°
@@ -328,7 +367,12 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                 max="360"
                 step="5"
                 value={formData.camera_angle}
-                onChange={(e) => setFormData({ ...formData, camera_angle: parseInt(e.target.value) })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    camera_angle: parseInt(e.target.value),
+                  })
+                }
                 className="w-full"
               />
               <div className="flex justify-between text-xs text-gray-500 mt-1">
@@ -338,7 +382,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                 <span>270° (W)</span>
               </div>
             </div>
-            
+
             <div>
               <label className="block text-sm mb-1">
                 Distance: {formData.camera_distance}m
@@ -349,7 +393,12 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                 max="2000"
                 step="50"
                 value={formData.camera_distance}
-                onChange={(e) => setFormData({ ...formData, camera_distance: parseInt(e.target.value) })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    camera_distance: parseInt(e.target.value),
+                  })
+                }
                 className="w-full"
               />
               <div className="flex justify-between text-xs text-gray-500 mt-1">
@@ -358,7 +407,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               </div>
             </div>
           </div>
-          
+
           {/* Description */}
           <div>
             <label className="block text-sm font-medium mb-1">
@@ -366,13 +415,15 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
             </label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               className="w-full px-3 py-2 border rounded"
               rows={3}
               placeholder="Informations complémentaires sur le site..."
             />
           </div>
-          
+
           {/* Actions */}
           <div className="flex gap-3 pt-4 border-t">
             <button
@@ -394,5 +445,5 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         </form>
       </div>
     </div>
-  )
-}
+  );
+};

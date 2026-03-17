@@ -56,7 +56,7 @@ interface VerdictTooltipProps extends BaseTooltipProps {
 /**
  * Generate source URL for a given weather source
  */
-const getSourceUrl = (sourceKey: string, spotId: string, date?: string): string | null => {
+const getSourceUrl = (sourceKey: string): string | null => {
   // Note: These are approximations - exact URLs would need site coordinates
   switch (sourceKey) {
     case 'open-meteo':
@@ -334,7 +334,7 @@ const SourceDataTooltip = ({
 
           let value = sourceData[fieldName];
           
-          const sourceUrl = getSourceUrl(sourceKey, '');
+          const sourceUrl = getSourceUrl(sourceKey);
           
           // Special handling for wind (show speed + gust)
           if (fieldName === 'wind_speed' && value !== null && value !== undefined) {

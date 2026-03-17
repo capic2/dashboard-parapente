@@ -4,7 +4,7 @@ import { api } from '../lib/api'
 export interface Site {
   id: string
   name: string
-  code?: string
+  code?: string | null
   orientation?: string
   camera_angle?: number      // Camera angle in degrees (0-360)
   camera_distance?: number   // Camera distance in meters (default: 500)
@@ -13,7 +13,7 @@ export interface Site {
   elevation_m?: number
   region?: string
   country?: string
-  description?: string       // Site description
+  description?: string | null      // Site description
   usage_type?: 'takeoff' | 'landing' | 'both'  // Site usage type
 }
 

@@ -126,7 +126,7 @@ export default function WeekdayChart() {
               borderRadius: '8px',
               padding: '8px 12px',
             }}
-            formatter={(value: number, name: string, props: any) => [
+            formatter={(value, _name, props) => [
               `${value} vols (${props.payload.percentage}%)`,
               props.payload.day,
             ]}

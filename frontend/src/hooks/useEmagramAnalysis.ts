@@ -108,9 +108,9 @@ export function useTriggerEmagram() {
 
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       // Invalidate and refetch latest emagram
-      queryClient.invalidateQueries({ queryKey: emagramKeys.all });
+      void queryClient.invalidateQueries({ queryKey: emagramKeys.all });
     },
   });
 }

@@ -1,27 +1,28 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Viewer as CesiumViewer,
-  Cartesian3,
-  Color,
-  Terrain,
-  Entity,
-  CallbackProperty,
-  ConstantPositionProperty,
   ArcType,
   BoundingSphere,
-  HeadingPitchRange,
+  CallbackProperty,
+  Cartesian3,
   Cartographic,
-  sampleTerrainMostDetailed,
-  Matrix4,
-  SceneTransforms,
-  Cartesian2,
-  ShadowMode,
+  Color,
+  ConstantPositionProperty,
+  Entity,
+  HeadingPitchRange,
   JulianDate,
   Math as CesiumMath,
+  sampleTerrainMostDetailed,
+  ShadowMode,
+  Terrain,
+  Viewer as CesiumViewer,
 } from 'cesium';
 import { useFlightGPX } from '../hooks/useFlightGPX';
 import { useFlight } from '../hooks/useFlight';
-import { getHeadingFromOrientation, getOrientationLabel, getOrientationOptions } from '../utils/cameraOrientation';
+import {
+  getHeadingFromOrientation,
+  getOrientationLabel,
+  getOrientationOptions,
+} from '../utils/cameraOrientation';
 import { api } from '../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -31,8 +32,11 @@ export interface FlightViewer3DProps {
 }
 
 // API base URL - use environment variable or derive from current location
-const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8001` : 'http://localhost:8001');
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== 'undefined'
+    ? `${window.location.protocol}//${window.location.hostname}:8001`
+    : 'http://localhost:8001');
 
 /**
  * AccordionSection - Collapsible section component for control panel
@@ -48,10 +52,10 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
   title,
   emoji = '',
   defaultOpen = false,
-  children
+  children,
 }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
-  
+
   return (
     <div className="border-b border-gray-200 last:border-0">
       <button
@@ -63,15 +67,14 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
           {emoji && <span className="mr-1.5">{emoji}</span>}
           {title}
         </span>
-        <span className="text-gray-400 text-xs transition-transform" style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+        <span
+          className="text-gray-400 text-xs transition-transform"
+          style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}
+        >
           ▶
         </span>
       </button>
-      {isOpen && (
-        <div className="pb-3 pt-1 space-y-3">
-          {children}
-        </div>
-      )}
+      {isOpen && <div className="pb-3 pt-1 space-y-3">{children}</div>}
     </div>
   );
 };
@@ -100,22 +103,20 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentElapsedTime, setCurrentElapsedTime] = useState(0);
-  
+
   // Terrain rendering states
   const [terrainShadows, setTerrainShadows] = useState(true);
   const [ambientOcclusion, setAmbientOcclusion] = useState(false);
   const [sunTime, setSunTime] = useState(10); // 10:00
   const [lightIntensity, setLightIntensity] = useState(1.2);
-  
+
   // Orientation editing state
   const [isUpdatingOrientation, setIsUpdatingOrientation] = useState(false);
-  
+
   // Camera position editing state
   const [isUpdatingCamera, setIsUpdatingCamera] = useState(false);
   const [tempCameraAngle, setTempCameraAngle] = useState<number>(0);
   const [tempCameraDistance, setTempCameraDistance] = useState<number>(500);
-
-
 
   const allPositionsRef = useRef<Cartesian3[]>([]);
   const timestampsRef = useRef<number[]>([]);
@@ -181,7 +182,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
         // Enable terrain collision detection
         viewer.scene.screenSpaceCameraController.enableCollisionDetection = true;
-        
+
         viewerRef.current = viewer;
         setViewerError(null);
         setViewerReady(true);
@@ -212,17 +213,17 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
     // Reset terrain ready when checking
     setTerrainReady(false);
-    
+
     // Check if terrain is already loaded
     const globe = viewer.scene.globe;
     let isMounted = true;
-    
+
     const checkTerrainReady = () => {
       if (!isMounted) return;
-      
+
       // Check if tiles are loaded in the current view
       const tilesLoaded = globe.tilesLoaded;
-      
+
       if (tilesLoaded) {
         setTerrainReady(true);
       } else {
@@ -255,8 +256,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     try {
       // 1. Terrain shadows
       viewer.shadows = terrainShadows;
-      viewer.terrainShadows = terrainShadows ? ShadowMode.ENABLED : ShadowMode.DISABLED;
-      
+      viewer.terrainShadows = terrainShadows
+        ? ShadowMode.ENABLED
+        : ShadowMode.DISABLED;
+
       // 2. Ambient Occlusion
       const aoStage = viewer.scene.postProcessStages.ambientOcclusion;
       if (aoStage) {
@@ -267,11 +270,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           aoStage.uniforms.lengthCap = 0.03;
         }
       }
-      
+
       // 3. Sun position (time of day)
       const dateStr = `2024-06-21T${sunTime.toString().padStart(2, '0')}:00:00Z`;
       viewer.clock.currentTime = JulianDate.fromIso8601(dateStr);
-      
+
       // 4. Light intensity
       if (viewer.scene.light) {
         viewer.scene.light.intensity = lightIntensity;
@@ -309,13 +312,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       timestampsRef.current = timestamps;
       currentIndexRef.current = 0;
       visiblePositionsRef.current = [positions[0]];
-      
+
       // Expose data globally for video export (Playwright)
       if (typeof window !== 'undefined' && (window as any)._exportMode) {
         (window as any)._gpxData = {
           coordinates: gpxData.coordinates,
           positions: positions,
-          timestamps: timestamps
+          timestamps: timestamps,
         };
         (window as any)._cesiumViewer = viewer;
       }
@@ -387,30 +390,33 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       // Calculate camera heading to face the takeoff point
       const calculateOptimalHeading = async (): Promise<number> => {
         if (gpxData.coordinates.length < 2) return 0;
-        
+
         const numPoints = gpxData.coordinates.length;
-        
+
         // Takeoff is at the beginning
         const takeoffCoord = gpxData.coordinates[0];
-        
+
         // Use middle of the flight (50%) as reference for better perspective
         const referenceIndex = Math.floor(numPoints * 0.5);
         const referenceCoord = gpxData.coordinates[referenceIndex];
-        
+
         // Calculate heading from reference point BACK to takeoff
         // This makes the camera look toward the takeoff/launch site
         const deltaLon = takeoffCoord.lon - referenceCoord.lon;
-        const deltaLat = takeoffCoord.lat - referenceCoord.lat;
-        
+
         // Calculate angle in radians
         // We need to convert lon/lat differences to proper bearing
         // Using standard bearing formula
-        const y = Math.sin(deltaLon) * Math.cos(takeoffCoord.lat * Math.PI / 180);
-        const x = Math.cos(referenceCoord.lat * Math.PI / 180) * Math.sin(takeoffCoord.lat * Math.PI / 180) -
-                  Math.sin(referenceCoord.lat * Math.PI / 180) * Math.cos(takeoffCoord.lat * Math.PI / 180) * Math.cos(deltaLon);
-        const headingToTakeoff = Math.atan2(y, x);
-        
-        return headingToTakeoff;
+        const y =
+          Math.sin(deltaLon) * Math.cos((takeoffCoord.lat * Math.PI) / 180);
+        const x =
+          Math.cos((referenceCoord.lat * Math.PI) / 180) *
+            Math.sin((takeoffCoord.lat * Math.PI) / 180) -
+          Math.sin((referenceCoord.lat * Math.PI) / 180) *
+            Math.cos((takeoffCoord.lat * Math.PI) / 180) *
+            Math.cos(deltaLon);
+
+        return Math.atan2(y, x);
       };
 
       // Position camera - MUST happen after elevation offset is calculated
@@ -419,18 +425,19 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         if (viewer && !viewer.isDestroyed()) {
           // Check if camera settings were already loaded from site (camera_angle/camera_distance)
           // Read directly from flight.site to avoid stale ref values
-          const hasSavedCameraSettings = flight?.site?.camera_angle !== null && 
-                                          flight?.site?.camera_angle !== undefined;
-          
+          const hasSavedCameraSettings =
+            flight?.site?.camera_angle !== null &&
+            flight?.site?.camera_angle !== undefined;
+
           let heading: number;
           let distance: number;
-          
+
           if (hasSavedCameraSettings) {
             // Read camera settings directly from flight.site
             const cameraAngle = flight!.site!.camera_angle!;
             distance = flight!.site!.camera_distance || 500;
             heading = CesiumMath.toRadians(cameraAngle);
-            
+
             // Also update refs for replay mode
             cameraHeadingRef.current = heading;
             cameraDistanceRef.current = distance;
@@ -441,7 +448,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             cameraHeadingRef.current = heading;
             cameraDistanceRef.current = distance;
           }
-          
+
           viewer.camera.flyToBoundingSphere(boundingSphere, {
             duration: 2,
             offset: new HeadingPitchRange(
@@ -452,7 +459,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           });
         }
       };
-      
+
       // Position immédiate
       setTimeout(() => positionCamera(), 500);
       // Re-position après calcul de l'offset (1.5s + 500ms)
@@ -511,59 +518,70 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   useEffect(() => {
     if (flight?.site) {
       // Initialize angle from camera_angle or convert orientation to angle
-      let initialAngle = flight.site.camera_angle || 0
+      let initialAngle = flight.site.camera_angle || 0;
       if (!flight.site.camera_angle && flight.site.orientation) {
-        initialAngle = getHeadingFromOrientation(flight.site.orientation) || 0
+        initialAngle = getHeadingFromOrientation(flight.site.orientation) || 0;
       }
-      setTempCameraAngle(initialAngle)
-      setTempCameraDistance(flight.site.camera_distance || 500)
+      setTempCameraAngle(initialAngle);
+      setTempCameraDistance(flight.site.camera_distance || 500);
     }
-  }, [flight?.site])
+  }, [flight?.site]);
 
   // Position camera based on site orientation
   useEffect(() => {
-    if (!viewerRef.current || !viewerReady || !gpxData?.coordinates?.length || !allPositionsRef.current.length) {
-      return
+    if (
+      !viewerRef.current ||
+      !viewerReady ||
+      !gpxData?.coordinates?.length ||
+      !allPositionsRef.current.length
+    ) {
+      return;
     }
 
-    const viewer = viewerRef.current
-    const firstPosition = allPositionsRef.current[0]
-    
-    if (!firstPosition) return
+    const viewer = viewerRef.current;
+    const firstPosition = allPositionsRef.current[0];
+
+    if (!firstPosition) return;
 
     // Use camera_angle if set, otherwise fall back to orientation
-    let cameraAngle = flight?.site?.camera_angle
+    let cameraAngle: number | null | undefined = flight?.site?.camera_angle;
     if (cameraAngle === null || cameraAngle === undefined) {
       // Fallback to orientation if no angle set
-      const orientation = flight?.site?.orientation
-      cameraAngle = getHeadingFromOrientation(orientation) || null
+      const orientation = flight?.site?.orientation;
+      cameraAngle = getHeadingFromOrientation(orientation);
     }
-    const cameraDistance = flight?.site?.camera_distance || 500
+    const cameraDistance = flight?.site?.camera_distance || 500;
 
     if (cameraAngle !== null && cameraAngle !== undefined) {
       // Camera is positioned at the specified angle, looking back at takeoff
       // The camera heading should be OPPOSITE to the camera angle
       const oppositeHeading = (cameraAngle + 180) % 360;
-      
+
       // Save camera settings for replay mode
-      cameraHeadingRef.current = CesiumMath.toRadians(cameraAngle)
-      cameraDistanceRef.current = cameraDistance
-      
+      cameraHeadingRef.current = CesiumMath.toRadians(cameraAngle);
+      cameraDistanceRef.current = cameraDistance;
+
       // First, position camera at takeoff looking in the OPPOSITE direction
       viewer.camera.setView({
         destination: firstPosition,
         orientation: {
-          heading: CesiumMath.toRadians(oppositeHeading),  // Look back at takeoff
+          heading: CesiumMath.toRadians(oppositeHeading), // Look back at takeoff
           pitch: CesiumMath.toRadians(-10), // Look slightly down
-          roll: 0.0
-        }
-      })
-      
+          roll: 0.0,
+        },
+      });
+
       // Then move camera FORWARD by the specified distance
       // This places camera ahead of takeoff, looking back at it
-      viewer.camera.moveForward(cameraDistance)
+      viewer.camera.moveForward(cameraDistance);
     }
-  }, [viewerReady, gpxData, flight?.site?.camera_angle, flight?.site?.camera_distance, flight?.site?.orientation])
+  }, [
+    viewerReady,
+    gpxData,
+    flight?.site?.camera_angle,
+    flight?.site?.camera_distance,
+    flight?.site?.orientation,
+  ]);
 
   // Calculer automatiquement l'offset d'élévation
   const calculateAutoElevationOffset = useCallback(async () => {
@@ -588,7 +606,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       if (samples && samples.length > 0 && samples[0].height !== undefined) {
         const terrainHeight = samples[0].height;
         const gpsElevation = firstPoint.elevation;
-        
+
         // Calculer l'offset nécessaire pour que le pilote soit au-dessus du terrain
         // Si terrain = 1000m et GPS = 800m, offset = 1000 - 800 = +200m (on monte le pilote)
         // Si terrain = 1000m et GPS = 1200m, offset = 1000 - 1200 = -200m (on descend le pilote)
@@ -678,7 +696,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
         // Calculate elapsed time
         if (timestampsRef.current.length > 0) {
-          const currentTimestamp = timestampsRef.current[currentIndexRef.current];
+          const currentTimestamp =
+            timestampsRef.current[currentIndexRef.current];
           const startTimestamp = timestampsRef.current[0];
           const elapsedMs = currentTimestamp - startTimestamp;
           setCurrentElapsedTime(elapsedMs / 1000); // Convert to seconds
@@ -693,42 +712,51 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         // Suivre le curseur avec la caméra
         const viewer = viewerRef.current;
         if (viewer && !viewer.isDestroyed()) {
-          const currentPosition = allPositionsRef.current[currentIndexRef.current];
+          const currentPosition =
+            allPositionsRef.current[currentIndexRef.current];
           const heading = cameraHeadingRef.current;
           const distance = cameraDistanceRef.current;
           const pitch = -0.05;
-          
+
           // Smooth lerp vers la position actuelle
           if (!cameraTargetRef.current) {
             cameraTargetRef.current = currentPosition;
           } else {
             const lerpFactor = 0.08;
             cameraTargetRef.current = new Cartesian3(
-              cameraTargetRef.current.x + (currentPosition.x - cameraTargetRef.current.x) * lerpFactor,
-              cameraTargetRef.current.y + (currentPosition.y - cameraTargetRef.current.y) * lerpFactor,
-              cameraTargetRef.current.z + (currentPosition.z - cameraTargetRef.current.z) * lerpFactor
+              cameraTargetRef.current.x +
+                (currentPosition.x - cameraTargetRef.current.x) * lerpFactor,
+              cameraTargetRef.current.y +
+                (currentPosition.y - cameraTargetRef.current.y) * lerpFactor,
+              cameraTargetRef.current.z +
+                (currentPosition.z - cameraTargetRef.current.z) * lerpFactor
             );
           }
-          
+
           // Use setView instead of lookAt for better control
           viewer.camera.setView({
             destination: cameraTargetRef.current,
             orientation: {
               heading: heading,
               pitch: pitch,
-              roll: 0
-            }
+              roll: 0,
+            },
           });
-          
+
           // Move camera back by distance
           viewer.camera.moveBackward(distance);
-          
+
           // Check terrain collision and adjust camera height if needed
-          const cameraCartographic = Cartographic.fromCartesian(viewer.camera.position);
+          const cameraCartographic = Cartographic.fromCartesian(
+            viewer.camera.position
+          );
           const globe = viewer.scene.globe;
           const terrainHeight = globe.getHeight(cameraCartographic);
-          
-          if (terrainHeight !== undefined && cameraCartographic.height < terrainHeight + 50) {
+
+          if (
+            terrainHeight !== undefined &&
+            cameraCartographic.height < terrainHeight + 50
+          ) {
             // Camera is too low, lift it above terrain (minimum 50m above ground)
             cameraCartographic.height = terrainHeight + 50;
             viewer.camera.position = Cartesian3.fromRadians(
@@ -844,97 +872,101 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
    * Update site orientation
    */
   const updateOrientation = async (newOrientation: string) => {
-    if (!flight?.site?.id) return
-    
-    setIsUpdatingOrientation(true)
+    if (!flight?.site?.id) return;
+
+    setIsUpdatingOrientation(true);
     try {
-      await api.patch(`sites/${flight.site.id}/orientation?orientation=${newOrientation}`)
-      
+      await api.patch(
+        `sites/${flight.site.id}/orientation?orientation=${newOrientation}`
+      );
+
       // Refresh flight data to get updated site
-      await queryClient.invalidateQueries({ queryKey: ['flights', flightId] })
+      await queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
     } catch (error) {
-      console.error('❌ Failed to update orientation:', error)
-      alert('Erreur lors de la mise à jour de l\'orientation')
+      console.error('❌ Failed to update orientation:', error);
+      alert("Erreur lors de la mise à jour de l'orientation");
     } finally {
-      setIsUpdatingOrientation(false)
+      setIsUpdatingOrientation(false);
     }
   };
 
   const updateCameraSettings = async (angle: number, distance: number) => {
     if (!flight?.site?.id) {
-      console.error('No site ID available')
-      return
+      console.error('No site ID available');
+      return;
     }
-    
-    setIsUpdatingCamera(true)
+
+    setIsUpdatingCamera(true);
     try {
-      const params = new URLSearchParams()
-      params.append('angle', angle.toString())
-      params.append('distance', distance.toString())
-      
-      await api.patch(`sites/${flight.site.id}/camera?${params.toString()}`)
-      
+      const params = new URLSearchParams();
+      params.append('angle', angle.toString());
+      params.append('distance', distance.toString());
+
+      await api.patch(`sites/${flight.site.id}/camera?${params.toString()}`);
+
       // Refresh flight data to get updated site
-      await queryClient.invalidateQueries({ queryKey: ['flights', flightId] })
-      
+      await queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
+
       // Success - no alert needed, user already confirmed
-      console.log(`✅ Camera settings saved for site "${flight?.site?.name}": ${angle}° / ${distance}m`)
+      console.log(
+        `✅ Camera settings saved for site "${flight?.site?.name}": ${angle}° / ${distance}m`
+      );
     } catch (error) {
-      console.error('Failed to update camera settings:', error)
-      alert('❌ Erreur lors de la mise à jour de la caméra')
+      console.error('Failed to update camera settings:', error);
+      alert('❌ Erreur lors de la mise à jour de la caméra');
     } finally {
-      setIsUpdatingCamera(false)
+      setIsUpdatingCamera(false);
     }
   };
 
   // Function to manually reposition camera (can be called after settings update)
   const repositionCamera = useCallback((angle: number, distance: number) => {
     if (!viewerRef.current || !allPositionsRef.current.length) {
-      return
+      return;
     }
-    
-    const viewer = viewerRef.current
-    const firstPosition = allPositionsRef.current[0]
-    
+
+    const viewer = viewerRef.current;
+    const firstPosition = allPositionsRef.current[0];
+
     // Update refs for replay mode
-    cameraHeadingRef.current = CesiumMath.toRadians(angle)
-    cameraDistanceRef.current = distance
-    
+    cameraHeadingRef.current = CesiumMath.toRadians(angle);
+    cameraDistanceRef.current = distance;
+
     // Calculate opposite heading (camera looks back at takeoff)
-    const oppositeHeading = (angle + 180) % 360
-    
+    const oppositeHeading = (angle + 180) % 360;
+
     // Position camera
     viewer.camera.setView({
       destination: firstPosition,
       orientation: {
         heading: CesiumMath.toRadians(oppositeHeading),
         pitch: CesiumMath.toRadians(-10),
-        roll: 0.0
-      }
-    })
-    
+        roll: 0.0,
+      },
+    });
+
     // Move camera forward to position it at specified distance
-    viewer.camera.moveForward(distance)
-  }, [])
+    viewer.camera.moveForward(distance);
+  }, []);
 
   const applyCameraSettings = async () => {
     // Ask for confirmation before saving
     const confirmed = confirm(
       `Sauvegarder les nouveaux paramètres de caméra pour le site "${flight?.site?.name}" ?\n\n` +
-      `Angle: ${tempCameraAngle}°\n` +
-      `Distance: ${tempCameraDistance}m\n\n` +
-      `Ces réglages s'appliqueront à tous les vols de ce site.`
-    )
-    
+        `Angle: ${tempCameraAngle}°\n` +
+        `Distance: ${tempCameraDistance}m\n\n` +
+        `Ces réglages s'appliqueront à tous les vols de ce site.`
+    );
+
     if (!confirmed) {
-      return
+      return;
     }
-    
-    await updateCameraSettings(tempCameraAngle, tempCameraDistance)
+
+    await updateCameraSettings(tempCameraAngle, tempCameraDistance);
     // Immediately reposition the camera with the new settings
     setTimeout(() => {
-      repositionCamera(tempCameraAngle, tempCameraDistance)
-    }, 500) // Small delay to ensure state is updated
+      repositionCamera(tempCameraAngle, tempCameraDistance);
+    }, 500); // Small delay to ensure state is updated
   };
 
   // Render error messages as overlays instead of early returns
@@ -948,33 +980,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     const secs = Math.floor(seconds % 60);
     return `${mins}min ${secs.toString().padStart(2, '0')}s`;
   };
-
-  /**
-   * Get video bitrate based on quality
-   */
-  const getVideoBitrate = (quality: '720p' | '1080p' | '4K'): number => {
-    switch (quality) {
-      case '720p': return 2500000;  // 2.5 Mbps
-      case '1080p': return 5000000; // 5 Mbps
-      case '4K': return 15000000;   // 15 Mbps
-    }
-  };
-
-  /**
-   * Download blob as file
-   */
-  const downloadBlob = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-
 
   const renderOverlay = () => {
     if (isLoading) {
@@ -1080,9 +1085,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   }, []);
 
   return (
-    <div 
+    <div
       ref={containerDivRef}
-      className="relative w-full bg-gray-900" 
+      className="relative w-full bg-gray-900"
       style={{ height: isFullscreen ? '100vh' : '600px' }}
     >
       {/* Overlay for loading/error states */}
@@ -1101,9 +1106,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       {/* Controls - only show when data is loaded */}
       {gpxData?.coordinates && (
-        <div className={`absolute top-4 left-4 z-10 bg-white rounded-lg shadow-lg transition-all ${
-          isPanelCollapsed ? 'p-2' : 'p-4 max-w-xs'
-        }`}>
+        <div
+          className={`absolute top-4 left-4 z-10 bg-white rounded-lg shadow-lg transition-all ${
+            isPanelCollapsed ? 'p-2' : 'p-4 max-w-xs'
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
             {!isPanelCollapsed && (
               <h3 className="text-lg font-bold">🪂 {flightTitle}</h3>
@@ -1111,7 +1118,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             <button
               onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
               className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm"
-              title={isPanelCollapsed ? 'Ouvrir le panneau' : 'Réduire le panneau'}
+              title={
+                isPanelCollapsed ? 'Ouvrir le panneau' : 'Réduire le panneau'
+              }
             >
               {isPanelCollapsed ? '▶' : '◀'}
             </button>
@@ -1137,371 +1146,454 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                 {/* ========== SECTION 1: LECTURE ========== */}
                 <AccordionSection title="Lecture" emoji="🎮" defaultOpen={true}>
                   <div className="flex gap-2">
-              <button
-                onClick={togglePlayPause}
-                className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
-              >
-                {isPlaying ? '⏸ Pause' : '▶ Play'}
-              </button>
-              <button
-                onClick={reset}
-                className="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:bg-gray-400"
-              >
-                ⏮ Reset
-              </button>
-            </div>
+                    <button
+                      onClick={togglePlayPause}
+                      className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+                    >
+                      {isPlaying ? '⏸ Pause' : '▶ Play'}
+                    </button>
+                    <button
+                      onClick={reset}
+                      className="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:bg-gray-400"
+                    >
+                      ⏮ Reset
+                    </button>
+                  </div>
 
-            {/* Progress Slider */}
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Position: {currentIndexRef.current + 1}/{allPositionsRef.current.length}
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="0.1"
-                value={currentProgress}
-                onChange={(e) => handleProgressChange(Number(e.target.value))}
-                className="w-full"
-              />
-            </div>
-
-            {/* Flight Time Display */}
-            <div className="text-sm text-gray-700 font-medium">
-              ⏱️ {formatFlightTime(currentElapsedTime)} / {formatFlightTime(gpxData?.flight_duration_seconds || 0)}
-            </div>
-
-            {/* Speed Slider */}
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Vitesse: {replaySpeed}x
-              </label>
-              <input
-                type="range"
-                min="1"
-                max="32"
-                value={replaySpeed}
-                onChange={(e) => handleSpeedChange(Number(e.target.value))}
-                className="w-full"
-              />
-            </div>
-          </AccordionSection>
-
-          {/* ========== SECTION 2: VIDÉO ========== */}
-          {flight?.gpx_file_path && (
-            <AccordionSection title="Vidéo" emoji="📹" defaultOpen={false}>
-              <>
-                {/* Download/Generate Button */}
-                <button
-                  onClick={async () => {
-                    if (flight.video_export_status === 'completed' && flight.video_file_path) {
-                      // Download video
-                      window.open(`${API_BASE_URL}/api/exports/${flight.video_export_job_id}/download`, '_blank');
-                    } else if (!flight.video_export_status || flight.video_export_status === 'failed') {
-                      // Generate video
-                      try {
-                        const response = await fetch(`${API_BASE_URL}/api/flights/${flightId}/generate-video`, {
-                          method: 'POST',
-                        });
-                        
-                        if (!response.ok) {
-                          const error = await response.json();
-                          alert(`Erreur: ${error.detail || 'Impossible de lancer la génération'}`);
-                          return;
-                        }
-                        
-                        // Refresh flight data to get updated status
-                        window.location.reload();
-                      } catch (error) {
-                        console.error('❌ Failed to start video generation:', error);
-                        alert('Erreur lors du lancement de la génération');
+                  {/* Progress Slider */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Position: {currentIndexRef.current + 1}/
+                      {allPositionsRef.current.length}
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={currentProgress}
+                      onChange={(e) =>
+                        handleProgressChange(Number(e.target.value))
                       }
-                    }
-                  }}
-                  disabled={flight.video_export_status === 'processing'}
-                  className={`w-full px-3 py-2 text-white rounded ${
-                    flight.video_export_status === 'completed' ? 'mb-2' : 'mb-3'
-                  } ${
-                    flight.video_export_status === 'completed'
-                      ? 'bg-green-600 hover:bg-green-700'
-                      : flight.video_export_status === 'processing'
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
-                  title={
-                    flight.video_export_status === 'processing'
-                      ? 'Génération vidéo en cours... (~60-90 min)'
-                      : flight.video_export_status === 'completed'
-                      ? 'Télécharger la vidéo'
-                      : flight.video_export_status === 'failed'
-                      ? 'Relancer la génération'
-                      : 'Générer la vidéo du vol'
-                  }
-                >
-                  {flight.video_export_status === 'processing' && '⏳ Génération en cours...'}
-                  {flight.video_export_status === 'completed' && '📥 Télécharger la vidéo'}
-                  {flight.video_export_status === 'failed' && '🔄 Relancer la génération'}
-                  {!flight.video_export_status && '🎥 Générer la vidéo'}
-                </button>
+                      className="w-full"
+                    />
+                  </div>
 
-                {/* Cancel Button (only when processing) */}
-                {flight.video_export_status === 'processing' && flight.video_export_job_id && (
-                  <button
-                    onClick={async () => {
-                      if (!confirm('Êtes-vous sûr de vouloir annuler cette génération ?')) {
-                        return;
+                  {/* Flight Time Display */}
+                  <div className="text-sm text-gray-700 font-medium">
+                    ⏱️ {formatFlightTime(currentElapsedTime)} /{' '}
+                    {formatFlightTime(gpxData?.flight_duration_seconds || 0)}
+                  </div>
+
+                  {/* Speed Slider */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Vitesse: {replaySpeed}x
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="32"
+                      value={replaySpeed}
+                      onChange={(e) =>
+                        handleSpeedChange(Number(e.target.value))
                       }
-                      
-                      try {
-                        const response = await fetch(`${API_BASE_URL}/api/exports/${flight.video_export_job_id}/cancel`, {
-                          method: 'DELETE',
-                        });
-                        
-                        if (!response.ok) {
-                          const error = await response.json();
-                          alert(`Erreur: ${error.detail || 'Impossible d\'annuler la génération'}`);
-                          return;
-                        }
-                        
-                        // Refresh flight data to get updated status
-                        window.location.reload();
-                      } catch (error) {
-                        console.error('Failed to cancel video generation:', error);
-                        alert('Erreur lors de l\'annulation');
-                      }
-                    }}
-                    className="w-full px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 mb-3"
-                    title="Annuler la génération vidéo en cours"
+                      className="w-full"
+                    />
+                  </div>
+                </AccordionSection>
+
+                {/* ========== SECTION 2: VIDÉO ========== */}
+                {flight?.gpx_file_path && (
+                  <AccordionSection
+                    title="Vidéo"
+                    emoji="📹"
+                    defaultOpen={false}
                   >
-                    🛑 Annuler la génération
-                  </button>
+                    <>
+                      {/* Download/Generate Button */}
+                      <button
+                        onClick={async () => {
+                          if (
+                            flight.video_export_status === 'completed' &&
+                            flight.video_file_path
+                          ) {
+                            // Download video
+                            window.open(
+                              `${API_BASE_URL}/api/exports/${flight.video_export_job_id}/download`,
+                              '_blank'
+                            );
+                          } else if (
+                            !flight.video_export_status ||
+                            flight.video_export_status === 'failed'
+                          ) {
+                            // Generate video
+                            try {
+                              const response = await fetch(
+                                `${API_BASE_URL}/api/flights/${flightId}/generate-video`,
+                                {
+                                  method: 'POST',
+                                }
+                              );
+
+                              if (!response.ok) {
+                                const error = await response.json();
+                                alert(
+                                  `Erreur: ${error.detail || 'Impossible de lancer la génération'}`
+                                );
+                                return;
+                              }
+
+                              // Refresh flight data to get updated status
+                              window.location.reload();
+                            } catch (error) {
+                              console.error(
+                                '❌ Failed to start video generation:',
+                                error
+                              );
+                              alert(
+                                'Erreur lors du lancement de la génération'
+                              );
+                            }
+                          }
+                        }}
+                        disabled={flight.video_export_status === 'processing'}
+                        className={`w-full px-3 py-2 text-white rounded ${
+                          flight.video_export_status === 'completed'
+                            ? 'mb-2'
+                            : 'mb-3'
+                        } ${
+                          flight.video_export_status === 'completed'
+                            ? 'bg-green-600 hover:bg-green-700'
+                            : flight.video_export_status === 'processing'
+                              ? 'bg-gray-400 cursor-not-allowed'
+                              : 'bg-blue-600 hover:bg-blue-700'
+                        }`}
+                        title={
+                          flight.video_export_status === 'processing'
+                            ? 'Génération vidéo en cours... (~60-90 min)'
+                            : flight.video_export_status === 'completed'
+                              ? 'Télécharger la vidéo'
+                              : flight.video_export_status === 'failed'
+                                ? 'Relancer la génération'
+                                : 'Générer la vidéo du vol'
+                        }
+                      >
+                        {flight.video_export_status === 'processing' &&
+                          '⏳ Génération en cours...'}
+                        {flight.video_export_status === 'completed' &&
+                          '📥 Télécharger la vidéo'}
+                        {flight.video_export_status === 'failed' &&
+                          '🔄 Relancer la génération'}
+                        {!flight.video_export_status && '🎥 Générer la vidéo'}
+                      </button>
+
+                      {/* Cancel Button (only when processing) */}
+                      {flight.video_export_status === 'processing' &&
+                        flight.video_export_job_id && (
+                          <button
+                            onClick={async () => {
+                              if (
+                                !confirm(
+                                  'Êtes-vous sûr de vouloir annuler cette génération ?'
+                                )
+                              ) {
+                                return;
+                              }
+
+                              try {
+                                const response = await fetch(
+                                  `${API_BASE_URL}/api/exports/${flight.video_export_job_id}/cancel`,
+                                  {
+                                    method: 'DELETE',
+                                  }
+                                );
+
+                                if (!response.ok) {
+                                  const error = await response.json();
+                                  alert(
+                                    `Erreur: ${error.detail || "Impossible d'annuler la génération"}`
+                                  );
+                                  return;
+                                }
+
+                                // Refresh flight data to get updated status
+                                window.location.reload();
+                              } catch (error) {
+                                console.error(
+                                  'Failed to cancel video generation:',
+                                  error
+                                );
+                                alert("Erreur lors de l'annulation");
+                              }
+                            }}
+                            className="w-full px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 mb-3"
+                            title="Annuler la génération vidéo en cours"
+                          >
+                            🛑 Annuler la génération
+                          </button>
+                        )}
+
+                      {/* Regenerate Button (only when video exists) */}
+                      {flight.video_export_status === 'completed' && (
+                        <button
+                          onClick={async () => {
+                            if (
+                              !confirm(
+                                "Êtes-vous sûr de vouloir régénérer cette vidéo ? L'ancienne vidéo sera remplacée."
+                              )
+                            ) {
+                              return;
+                            }
+
+                            try {
+                              const response = await fetch(
+                                `${API_BASE_URL}/api/flights/${flightId}/generate-video`,
+                                {
+                                  method: 'POST',
+                                }
+                              );
+
+                              if (!response.ok) {
+                                const error = await response.json();
+                                alert(
+                                  `Erreur: ${error.detail || 'Impossible de lancer la régénération'}`
+                                );
+                                return;
+                              }
+
+                              // Refresh flight data to get updated status
+                              window.location.reload();
+                            } catch (error) {
+                              console.error(
+                                'Failed to regenerate video:',
+                                error
+                              );
+                              alert('Erreur lors de la régénération');
+                            }
+                          }}
+                          className="w-full px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 mb-3"
+                          title="Régénérer la vidéo (remplace l'ancienne)"
+                        >
+                          🔄 Régénérer la vidéo
+                        </button>
+                      )}
+                    </>
+                  </AccordionSection>
                 )}
 
-                {/* Regenerate Button (only when video exists) */}
-                {flight.video_export_status === 'completed' && (
-                  <button
-                    onClick={async () => {
-                      if (!confirm('Êtes-vous sûr de vouloir régénérer cette vidéo ? L\'ancienne vidéo sera remplacée.')) {
-                        return;
-                      }
-                      
-                      try {
-                        const response = await fetch(`${API_BASE_URL}/api/flights/${flightId}/generate-video`, {
-                          method: 'POST',
-                        });
-                        
-                        if (!response.ok) {
-                          const error = await response.json();
-                          alert(`Erreur: ${error.detail || 'Impossible de lancer la régénération'}`);
-                          return;
-                        }
-                        
-                        // Refresh flight data to get updated status
-                        window.location.reload();
-                      } catch (error) {
-                        console.error('Failed to regenerate video:', error);
-                        alert('Erreur lors de la régénération');
-                      }
-                    }}
-                    className="w-full px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 mb-3"
-                    title="Régénérer la vidéo (remplace l'ancienne)"
+                {/* ========== SECTION 3: SITE & CAMÉRA ========== */}
+                {flight?.site && (
+                  <AccordionSection
+                    title="Site & Caméra"
+                    emoji="🏔️"
+                    defaultOpen={false}
                   >
-                  🔄 Régénérer la vidéo
-                </button>
-              )}
-              </>
-            </AccordionSection>
-          )}
+                    {/* Orientation Selector */}
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Orientation Décollage
+                      </label>
+                      <select
+                        value={flight.site.orientation || ''}
+                        onChange={(e) => updateOrientation(e.target.value)}
+                        disabled={isUpdatingOrientation}
+                        className="w-full px-2 py-1 border rounded text-sm bg-white"
+                      >
+                        <option value="">Non définie</option>
+                        {getOrientationOptions().map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {flight.site.orientation
+                          ? `Direction: ${getOrientationLabel(flight.site.orientation)}`
+                          : 'Direction vers laquelle regarde le pilote'}
+                      </p>
+                    </div>
 
-          {/* ========== SECTION 3: SITE & CAMÉRA ========== */}
-          {flight?.site && (
-            <AccordionSection title="Site & Caméra" emoji="🏔️" defaultOpen={false}>
-              {/* Orientation Selector */}
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Orientation Décollage
-                </label>
-                <select
-                  value={flight.site.orientation || ''}
-                  onChange={(e) => updateOrientation(e.target.value)}
-                  disabled={isUpdatingOrientation}
-                  className="w-full px-2 py-1 border rounded text-sm bg-white"
+                    {/* Camera Position Controls */}
+                    <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                      <label className="block text-sm font-medium mb-2 text-blue-900">
+                        📷 Position Caméra
+                      </label>
+
+                      {/* Camera Angle */}
+                      <div className="mb-2">
+                        <label className="block text-xs text-gray-600 mb-1">
+                          Angle: {tempCameraAngle}°{' '}
+                          {tempCameraAngle === 0
+                            ? '(Nord)'
+                            : tempCameraAngle === 90
+                              ? '(Est)'
+                              : tempCameraAngle === 180
+                                ? '(Sud)'
+                                : tempCameraAngle === 270
+                                  ? '(Ouest)'
+                                  : ''}
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="360"
+                          step="5"
+                          value={tempCameraAngle}
+                          onChange={(e) =>
+                            setTempCameraAngle(Number(e.target.value))
+                          }
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                          <span>0° (N)</span>
+                          <span>90° (E)</span>
+                          <span>180° (S)</span>
+                          <span>270° (W)</span>
+                        </div>
+                      </div>
+
+                      {/* Camera Distance */}
+                      <div className="mb-2">
+                        <label className="block text-xs text-gray-600 mb-1">
+                          Distance: {tempCameraDistance}m
+                        </label>
+                        <input
+                          type="range"
+                          min="100"
+                          max="2000"
+                          step="50"
+                          value={tempCameraDistance}
+                          onChange={(e) =>
+                            setTempCameraDistance(Number(e.target.value))
+                          }
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                          <span>100m</span>
+                          <span>2000m</span>
+                        </div>
+                      </div>
+
+                      {/* Apply Button */}
+                      <button
+                        onClick={applyCameraSettings}
+                        disabled={isUpdatingCamera}
+                        className="w-full px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isUpdatingCamera ? '⏳ Mise à jour...' : '✓ Appliquer'}
+                      </button>
+
+                      <p className="text-xs text-gray-600 mt-2">
+                        💡 Ces réglages seront sauvegardés pour le site "
+                        {flight.site.name}" et appliqués à tous ses vols
+                      </p>
+                    </div>
+                  </AccordionSection>
+                )}
+
+                {/* ========== SECTION 4: RENDU & ÉLÉVATION ========== */}
+                <AccordionSection
+                  title="Rendu & Élévation"
+                  emoji="🎨"
+                  defaultOpen={false}
                 >
-                  <option value="">Non définie</option>
-                  {getOrientationOptions().map(opt => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  {flight.site.orientation 
-                    ? `Direction: ${getOrientationLabel(flight.site.orientation)}`
-                    : 'Direction vers laquelle regarde le pilote'
-                  }
-                </p>
-              </div>
-
-              {/* Camera Position Controls */}
-              <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                <label className="block text-sm font-medium mb-2 text-blue-900">
-                  📷 Position Caméra
-                </label>
-                
-                {/* Camera Angle */}
-                <div className="mb-2">
-                  <label className="block text-xs text-gray-600 mb-1">
-                    Angle: {tempCameraAngle}° {tempCameraAngle === 0 ? '(Nord)' : tempCameraAngle === 90 ? '(Est)' : tempCameraAngle === 180 ? '(Sud)' : tempCameraAngle === 270 ? '(Ouest)' : ''}
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="360"
-                    step="5"
-                    value={tempCameraAngle}
-                    onChange={(e) => setTempCameraAngle(Number(e.target.value))}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>0° (N)</span>
-                    <span>90° (E)</span>
-                    <span>180° (S)</span>
-                    <span>270° (W)</span>
+                  {/* Elevation Offset */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-sm font-medium">
+                        Élévation: {elevationOffset.toFixed(1)}m
+                      </label>
+                      <button
+                        onClick={calculateAutoElevationOffset}
+                        disabled={isCalculatingOffset}
+                        className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
+                        title="Calculer automatiquement l'offset par rapport au terrain"
+                      >
+                        {isCalculatingOffset ? '⏳' : '🔄'} Auto
+                      </button>
+                    </div>
+                    <input
+                      type="range"
+                      min="-100"
+                      max="100"
+                      step="1"
+                      value={elevationOffset}
+                      onChange={(e) =>
+                        setElevationOffset(Number(e.target.value))
+                      }
+                      className="w-full"
+                    />
+                    {autoOffset !== 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Offset auto: {autoOffset.toFixed(1)}m
+                      </p>
+                    )}
                   </div>
-                </div>
-                
-                {/* Camera Distance */}
-                <div className="mb-2">
-                  <label className="block text-xs text-gray-600 mb-1">
-                    Distance: {tempCameraDistance}m
-                  </label>
-                  <input
-                    type="range"
-                    min="100"
-                    max="2000"
-                    step="50"
-                    value={tempCameraDistance}
-                    onChange={(e) => setTempCameraDistance(Number(e.target.value))}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>100m</span>
-                    <span>2000m</span>
+
+                  {/* Terrain Shadows Toggle */}
+                  <div>
+                    <label className="flex items-center text-sm mb-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={terrainShadows}
+                        onChange={(e) => setTerrainShadows(e.target.checked)}
+                        className="mr-2 cursor-pointer"
+                      />
+                      Ombres du terrain
+                    </label>
+
+                    {/* Ambient Occlusion Toggle */}
+                    <label className="flex items-center text-sm mb-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={ambientOcclusion}
+                        onChange={(e) => setAmbientOcclusion(e.target.checked)}
+                        className="mr-2 cursor-pointer"
+                      />
+                      Ambient Occlusion (AO)
+                    </label>
+
+                    {/* Sun Time Slider */}
+                    <div className="mt-2">
+                      <label className="block text-sm font-medium mb-1">
+                        Heure: {sunTime}h00
+                      </label>
+                      <input
+                        type="range"
+                        min="6"
+                        max="18"
+                        step="1"
+                        value={sunTime}
+                        onChange={(e) => setSunTime(Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Light Intensity Slider */}
+                    <div className="mt-2">
+                      <label className="block text-sm font-medium mb-1">
+                        Lumière: {lightIntensity.toFixed(1)}x
+                      </label>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="2.5"
+                        step="0.1"
+                        value={lightIntensity}
+                        onChange={(e) =>
+                          setLightIntensity(Number(e.target.value))
+                        }
+                        className="w-full"
+                      />
+                    </div>
                   </div>
-                </div>
-                
-                {/* Apply Button */}
-                <button
-                  onClick={applyCameraSettings}
-                  disabled={isUpdatingCamera}
-                  className="w-full px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isUpdatingCamera ? '⏳ Mise à jour...' : '✓ Appliquer'}
-                </button>
-                
-                <p className="text-xs text-gray-600 mt-2">
-                  💡 Ces réglages seront sauvegardés pour le site "{flight.site.name}" et appliqués à tous ses vols
-                </p>
+                </AccordionSection>
               </div>
-            </AccordionSection>
-          )}
-
-          {/* ========== SECTION 4: RENDU & ÉLÉVATION ========== */}
-          <AccordionSection title="Rendu & Élévation" emoji="🎨" defaultOpen={false}>
-            {/* Elevation Offset */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-sm font-medium">
-                  Élévation: {elevationOffset.toFixed(1)}m
-                </label>
-                <button
-                  onClick={calculateAutoElevationOffset}
-                  disabled={isCalculatingOffset}
-                  className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
-                  title="Calculer automatiquement l'offset par rapport au terrain"
-                >
-                  {isCalculatingOffset ? '⏳' : '🔄'} Auto
-                </button>
-              </div>
-              <input
-                type="range"
-                min="-100"
-                max="100"
-                step="1"
-                value={elevationOffset}
-                onChange={(e) => setElevationOffset(Number(e.target.value))}
-                className="w-full"
-              />
-              {autoOffset !== 0 && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Offset auto: {autoOffset.toFixed(1)}m
-                </p>
-              )}
-            </div>
-
-            {/* Terrain Shadows Toggle */}
-            <div>
-              <label className="flex items-center text-sm mb-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={terrainShadows}
-                  onChange={(e) => setTerrainShadows(e.target.checked)}
-                  className="mr-2 cursor-pointer"
-                />
-                Ombres du terrain
-              </label>
-              
-              {/* Ambient Occlusion Toggle */}
-              <label className="flex items-center text-sm mb-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={ambientOcclusion}
-                  onChange={(e) => setAmbientOcclusion(e.target.checked)}
-                  className="mr-2 cursor-pointer"
-                />
-                Ambient Occlusion (AO)
-              </label>
-              
-              {/* Sun Time Slider */}
-              <div className="mt-2">
-                <label className="block text-sm font-medium mb-1">
-                  Heure: {sunTime}h00
-                </label>
-                <input
-                  type="range"
-                  min="6"
-                  max="18"
-                  step="1"
-                  value={sunTime}
-                  onChange={(e) => setSunTime(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              
-              {/* Light Intensity Slider */}
-              <div className="mt-2">
-                <label className="block text-sm font-medium mb-1">
-                  Lumière: {lightIntensity.toFixed(1)}x
-                </label>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2.5"
-                  step="0.1"
-                  value={lightIntensity}
-                  onChange={(e) => setLightIntensity(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-            </div>
-          </AccordionSection>
-        </div>
             </>
           )}
         </div>
       )}
-
 
       {/* Cesium Container */}
       <div ref={containerRef} className="w-full h-full" />

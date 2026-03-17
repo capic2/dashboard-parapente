@@ -1,6 +1,6 @@
 // Core domain types
 // Re-export types from Zod schemas to ensure consistency between validation and types
-export type { Site, Flight, FlightStats } from '../schemas'
+export type { Site, Flight, FlightStats, DailySummary, DailySummaryDay } from '../schemas';
 
 export interface FlightFilters {
   siteId?: string;
@@ -8,8 +8,6 @@ export interface FlightFilters {
   dateTo?: string;
   limit?: number;
 }
-
-
 
 export interface Alert {
   id: string;
@@ -115,6 +113,8 @@ export interface HourlyForecastItem {
   para_index: number;
   verdict: string;
   sources?: Record<string, any>; // Per-source weather data for tooltips
+  cape: number;
+  thermal_strength: 'Faible' | 'Modérée' | 'Forte' | undefined;
 }
 
 export interface DailyForecastItem {

@@ -20,16 +20,20 @@ const mockSitesMontPoupet: Site[] = [
   {
     id: '1',
     name: 'Mont Poupet Nord',
-    orientation: ['N'],
+    orientation: 'N',
     latitude: 46.8,
     longitude: 5.9,
     elevation_m: 850,
     rating: 4,
+    country: 'FR',
+    is_active: true,
   },
   {
     id: '2',
     name: 'Mont Poupet Sud',
-    orientation: ['S'],
+    orientation: 'S',
+    is_active: true,
+    country: 'FR',
     latitude: 46.8,
     longitude: 5.9,
     elevation_m: 850,
@@ -38,11 +42,13 @@ const mockSitesMontPoupet: Site[] = [
   {
     id: '3',
     name: 'Mont Poupet Est',
-    orientation: ['E'],
+    orientation: 'E',
     latitude: 46.8,
     longitude: 5.9,
     elevation_m: 850,
     rating: 3,
+    country: 'FR',
+    is_active: true,
   },
 ];
 
@@ -50,20 +56,24 @@ const mockSitesAnnecy: Site[] = [
   {
     id: '4',
     name: 'Annecy NW',
-    orientation: ['NW'],
+    orientation: 'NW',
     latitude: 45.9,
     longitude: 6.1,
     elevation_m: 1200,
     rating: 5,
+    is_active: true,
+    country: 'FR',
   },
   {
     id: '5',
     name: 'Annecy W',
-    orientation: ['W'],
+    orientation: 'W',
     latitude: 45.9,
     longitude: 6.1,
     elevation_m: 1200,
     rating: 4,
+    country: 'FR',
+    is_active: true,
   },
 ];
 
@@ -71,18 +81,22 @@ const mockSitesNoRating: Site[] = [
   {
     id: '6',
     name: 'Talloires Nord',
-    orientation: ['N'],
+    orientation: 'N',
     latitude: 45.8,
     longitude: 6.2,
     elevation_m: 900,
+    is_active: true,
+    country: 'FR',
   },
   {
     id: '7',
     name: 'Talloires Sud',
-    orientation: ['S'],
+    orientation: 'S',
     latitude: 45.8,
     longitude: 6.2,
     elevation_m: 900,
+    is_active: true,
+    country: 'FR',
   },
 ];
 
@@ -165,7 +179,10 @@ export const SingleSite = {
 // No elevation data
 export const NoElevation = {
   args: {
-    sites: mockSitesMontPoupet.map(site => ({ ...site, elevation_m: undefined })),
+    sites: mockSitesMontPoupet.map((site) => ({
+      ...site,
+      elevation_m: undefined,
+    })),
     selectedSiteId: '1',
     onSelectSite: fn(),
   },
@@ -216,7 +233,9 @@ export const OpensDropdownOnClick = {
     await user.click(button);
 
     await waitFor(() => {
-      expect(canvasElement.getByText('Choisir un décollage')).toBeInTheDocument();
+      expect(
+        canvasElement.getByText('Choisir un décollage')
+      ).toBeInTheDocument();
     });
 
     expect(canvasElement.getByText('Nord')).toBeInTheDocument();
@@ -312,14 +331,18 @@ export const ClosesOnOutsideClick = {
     await user.click(button);
 
     await waitFor(() => {
-      expect(canvasElement.getByText('Choisir un décollage')).toBeInTheDocument();
+      expect(
+        canvasElement.getByText('Choisir un décollage')
+      ).toBeInTheDocument();
     });
 
     // Click outside (on document body)
     await user.click(document.body);
 
     await waitFor(() => {
-      expect(canvasElement.queryByText('Choisir un décollage')).not.toBeInTheDocument();
+      expect(
+        canvasElement.queryByText('Choisir un décollage')
+      ).not.toBeInTheDocument();
     });
   },
 };

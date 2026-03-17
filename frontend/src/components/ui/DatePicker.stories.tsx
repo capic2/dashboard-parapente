@@ -1,5 +1,5 @@
 import preview from '../../../.storybook/preview'
-import { fn, userEvent, within, expect } from 'storybook/test'
+import { fn, within, expect } from 'storybook/test'
 import { DatePicker } from './DatePicker'
 
 const meta = preview.meta({

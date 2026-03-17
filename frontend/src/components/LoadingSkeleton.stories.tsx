@@ -1,5 +1,5 @@
 import preview from '../../.storybook/preview'
-import { within, expect } from 'storybook/test'
+import { expect } from 'storybook/test'
 import LoadingSkeleton from './LoadingSkeleton'
 
 const meta = preview.meta({
@@ -42,7 +42,6 @@ export const Default = meta.story({
 
 // Test default rendering
 Default.test('should render single card skeleton', async ({ canvasElement }) => {
-  const canvas = within(canvasElement)
   const element = canvasElement.querySelector('.animate-pulse')
   await expect(element).toBeTruthy()
 })

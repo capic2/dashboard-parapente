@@ -32,7 +32,7 @@ export const useSites = () => {
         throw new Error(`Invalid sites data: ${validation.error.message}`);
       }
       
-      return validation.data.sites as any; // Extract validated sites array
+      return validation.data.sites
     },
     staleTime: 1000 * 60 * 30, // 30 minutes - sites don't change often
   });
