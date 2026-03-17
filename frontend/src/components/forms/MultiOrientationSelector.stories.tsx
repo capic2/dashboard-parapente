@@ -212,10 +212,10 @@ export const DropdownOpen = meta.story({
   },
 });
 
-DropdownOpen.play = async ({ canvas }) => {
+DropdownOpen.test("interaction test", async ({ canvas }) => {
   const button = canvas.getByRole('button');
   await userEvent.click(button);
-};
+});
 
 // Interaction Tests
 
