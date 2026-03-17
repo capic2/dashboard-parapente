@@ -23,6 +23,6 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src"],
+  "include": ["src", "src/routeTree.gen.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
