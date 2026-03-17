@@ -1,5 +1,5 @@
-import type { Meta } from '@storybook/react';
-import { expect, within, waitFor } from 'storybook/test';
+import preview from '../../../.storybook/preview';
+import { expect, waitFor } from 'storybook/test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import RecordsDashboard from './RecordsDashboard';
@@ -10,7 +10,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const meta = {
+const meta = preview.meta({
   title: 'Components/Stats/RecordsDashboard',
   component: RecordsDashboard,
   decorators: [
@@ -26,7 +26,7 @@ const meta = {
     layout: 'fullscreen',
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof RecordsDashboard>;
+});
 
 export default meta;
 
@@ -75,37 +75,37 @@ const mockPartialRecords = {
 };
 
 // Default story - all records
-export const AllRecords = {
+export const AllRecords = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('http://localhost:5000/api/flights/records', () => {
+        http.get('*/api/flights/records*', () => {
           return HttpResponse.json(mockRecords);
         }),
       ],
     },
   },
-};
+});
 
 // Partial records
-export const PartialRecords = {
+export const PartialRecords = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('http://localhost:5000/api/flights/records', () => {
+        http.get('*/api/flights/records*', () => {
           return HttpResponse.json(mockPartialRecords);
         }),
       ],
     },
   },
-};
+});
 
 // No records
-export const NoRecords = {
+export const NoRecords = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('http://localhost:5000/api/flights/records', () => {
+        http.get('*/api/flights/records*', () => {
           return HttpResponse.json({
             longest_duration: null,
             highest_altitude: null,
@@ -116,138 +116,135 @@ export const NoRecords = {
       ],
     },
   },
-};
+});
 
 // Loading state
-export const Loading = {
+export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('http://localhost:5000/api/flights/records', async () => {
+        http.get('*/api/flights/records*', async () => {
           await new Promise(() => {}); // Never resolves
         }),
       ],
     },
   },
-};
+});
 
 // Error state
-export const Error = {
+export const Error = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('http://localhost:5000/api/flights/records', () => {
+        http.get('*/api/flights/records*', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],
     },
   },
-};
+});
 
 // Interaction Tests
 
-export const DisplaysAllRecordCards = {
+export const DisplaysAllRecordCards = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('http://localhost:5000/api/flights/records', () => {
+        http.get('*/api/flights/records*', () => {
           return HttpResponse.json(mockRecords);
         }),
       ],
     },
   },
-  test: async ({ canvas }: { canvas: HTMLElement }) => {
-    const canvasElement = within(canvas);
+});
 
-    await waitFor(() => {
-      expect(canvasElement.getByText('🏆 Records Personnels')).toBeInTheDocument();
-    });
+DisplaysAllRecordCards.test('displays all record cards', async ({ canvas }) => {
+  await waitFor(() => {
+    expect(canvas.getByText('🏆 Records Personnels')).toBeInTheDocument();
+  });
 
-    expect(canvasElement.getByText('Vol le plus long')).toBeInTheDocument();
-    expect(canvasElement.getByText('Plus haute altitude')).toBeInTheDocument();
-    expect(canvasElement.getByText('Plus longue distance')).toBeInTheDocument();
-    expect(canvasElement.getByText('Vitesse maximale')).toBeInTheDocument();
-  },
-};
+  await expect(canvas.getByText('Vol le plus long')).toBeInTheDocument();
+  await expect(canvas.getByText('Plus haute altitude')).toBeInTheDocument();
+  await expect(canvas.getByText('Plus longue distance')).toBeInTheDocument();
+  await expect(canvas.getByText('Vitesse maximale')).toBeInTheDocument();
+});
 
-export const DisplaysRecordValues = {
+export const DisplaysRecordValues = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('http://localhost:5000/api/flights/records', () => {
+        http.get('*/api/flights/records*', () => {
           return HttpResponse.json(mockRecords);
         }),
       ],
     },
   },
-  test: async ({ canvas }: { canvas: HTMLElement }) => {
-    const canvasElement = within(canvas);
+});
 
-    await waitFor(() => {
-      expect(canvasElement.getByText('125 min')).toBeInTheDocument();
-    });
+DisplaysRecordValues.test('displays record values correctly', async ({ canvas }) => {
+  await waitFor(() => {
+    expect(canvas.getByText('125 min')).toBeInTheDocument();
+  });
 
-    expect(canvasElement.getByText('2850 m')).toBeInTheDocument();
-    expect(canvasElement.getByText('45.30 km')).toBeInTheDocument();
-    expect(canvasElement.getByText('62.4 km/h')).toBeInTheDocument();
-  },
-};
+  await expect(canvas.getByText('2850 m')).toBeInTheDocument();
+  await expect(canvas.getByText('45.30 km')).toBeInTheDocument();
+  await expect(canvas.getByText('62.4 km/h')).toBeInTheDocument();
+});
 
-export const ShowsLoadingSkeletons = {
+export const ShowsLoadingSkeletons = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('http://localhost:5000/api/flights/records', async () => {
+        http.get('*/api/flights/records*', async () => {
           await new Promise(() => {});
         }),
       ],
     },
   },
-  test: async ({ canvas }: { canvas: HTMLElement }) => {
-    // Check for loading state (animate-pulse class)
-    const skeletons = canvas.querySelectorAll('.animate-pulse');
-    await expect(skeletons.length).toBeGreaterThan(0);
-  },
-};
+});
 
-export const ShowsErrorMessage = {
+ShowsLoadingSkeletons.test('shows loading skeletons', async ({ canvas }) => {
+  // Check for loading state (animate-pulse class)
+  const skeletons = canvas.querySelectorAll('.animate-pulse');
+  await expect(skeletons.length).toBeGreaterThan(0);
+});
+
+export const ShowsErrorMessage = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('http://localhost:5000/api/flights/records', () => {
+        http.get('*/api/flights/records*', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],
     },
   },
-  test: async ({ canvas }: { canvas: HTMLElement }) => {
-    const canvasElement = within(canvas);
+});
 
-    await waitFor(() => {
-      expect(canvasElement.getByText(/Erreur/)).toBeInTheDocument();
-    });
-  },
-};
+ShowsErrorMessage.test('shows error message on error', async ({ canvas }) => {
+  await waitFor(() => {
+    expect(canvas.getByText(/Erreur/)).toBeInTheDocument();
+  });
+});
 
-export const ShowsNoDataForMissingRecords = {
+export const ShowsNoDataForMissingRecords = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('http://localhost:5000/api/flights/records', () => {
+        http.get('*/api/flights/records*', () => {
           return HttpResponse.json(mockPartialRecords);
         }),
       ],
     },
   },
-  test: async ({ canvas }: { canvas: HTMLElement }) => {
-    const canvasElement = within(canvas);
+});
 
-    await waitFor(() => {
-      expect(canvasElement.getByText('90 min')).toBeInTheDocument();
-    });
+ShowsNoDataForMissingRecords.test('shows no data message for missing records', async ({ canvas }) => {
+  await waitFor(() => {
+    expect(canvas.getByText('90 min')).toBeInTheDocument();
+  });
 
-    // Should show "Aucune donnée disponible" for missing records
-    const noDataTexts = canvasElement.getAllByText('Aucune donnée disponible');
-    expect(noDataTexts.length).toBe(2); // For distance and speed
-  },
-};
+  // Should show "Aucune donnée disponible" for missing records
+  const noDataTexts = canvas.getAllByText('Aucune donnée disponible');
+  await expect(noDataTexts.length).toBe(2); // For distance and speed
+});

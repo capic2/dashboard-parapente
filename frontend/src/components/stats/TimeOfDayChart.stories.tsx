@@ -1,4 +1,4 @@
-import type { Meta } from '@storybook/react';
+import preview from '../../../.storybook/preview';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import TimeOfDayChart from './TimeOfDayChart';
@@ -9,7 +9,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const meta = {
+const meta = preview.meta({
   title: 'Components/Stats/TimeOfDayChart',
   component: TimeOfDayChart,
   decorators: [
@@ -25,7 +25,7 @@ const meta = {
     layout: 'fullscreen',
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof TimeOfDayChart>;
+});
 
 export default meta;
 
@@ -36,38 +36,38 @@ const mockFlights = [
   ...Array.from({ length: 4 }, (_, i) => ({ id: `${i + 16}`, start_time: '16:30' })),
 ];
 
-export const Default = {
+export const Default = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('http://localhost:5000/api/flights', () => {
+        http.get('*/api/flights*', () => {
           return HttpResponse.json({ flights: mockFlights });
         }),
       ],
     },
   },
-};
+});
 
-export const NoData = {
+export const NoData = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('http://localhost:5000/api/flights', () => {
+        http.get('*/api/flights*', () => {
           return HttpResponse.json({ flights: [] });
         }),
       ],
     },
   },
-};
+});
 
-export const Loading = {
+export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('http://localhost:5000/api/flights', async () => {
+        http.get('*/api/flights*', async () => {
           await new Promise(() => {});
         }),
       ],
     },
   },
-};
+});

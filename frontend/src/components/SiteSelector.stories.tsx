@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import preview from '../../.storybook/preview';
 import SiteSelector from './SiteSelector';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
@@ -73,7 +73,7 @@ const createQueryClient = () =>
   });
 
 // CSF Factory - meta export
-const meta = {
+const meta = preview.meta({
   title: 'Components/SiteSelector',
   component: SiteSelector,
   parameters: {
@@ -86,7 +86,7 @@ const meta = {
     },
     msw: {
       handlers: [
-        http.get('/api/spots', () => {
+        http.get('*/api/spots*', () => {
           return HttpResponse.json({
             sites: mockSites,
           });
@@ -115,46 +115,43 @@ const meta = {
       description: 'Callback when a site is selected',
     },
   },
-} satisfies Meta<typeof SiteSelector>;
+});
 
 export default meta;
-type Story = StoryObj<typeof meta>;
-
-// CSF Factory - Story exports
 
 /**
  * Default story showing Arguel selected
  */
-export const Default: Story = {
+export const Default = meta.story({
   args: {
     selectedSiteId: 'site-arguel',
     onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
   },
-};
+});
 
 /**
  * Story showing Mont Poupet Nord selected
  * Demonstrates multi-orientation site selection (dropdown)
  */
-export const MontPoupetSelected: Story = {
+export const MontPoupetSelected = meta.story({
   args: {
     selectedSiteId: 'mont-poupet-nord',
     onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
   },
-};
+});
 
 /**
  * Story showing La Côte selected
  */
-export const LaCoteSelected: Story = {
+export const LaCoteSelected = meta.story({
   args: {
     selectedSiteId: 'site-la-cote',
     onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
   },
-};
+});
 
 // Loading state story
-export const Loading: Story = {
+export const Loading = meta.story({
   args: {
     selectedSiteId: '',
     onSelectSite: () => {},
@@ -177,10 +174,10 @@ export const Loading: Story = {
       </div>
     );
   },
-};
+});
 
 // Error state story
-export const Error: Story = {
+export const Error = meta.story({
   args: {
     selectedSiteId: '',
     onSelectSite: () => {},
@@ -203,4 +200,4 @@ export const Error: Story = {
       </div>
     );
   },
-};
+});

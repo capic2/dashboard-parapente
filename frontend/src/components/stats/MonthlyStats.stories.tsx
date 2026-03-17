@@ -1,4 +1,4 @@
-import type { Meta } from '@storybook/react';
+import preview from '../../../.storybook/preview';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import MonthlyStats from './MonthlyStats';
@@ -9,7 +9,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const meta = {
+const meta = preview.meta({
   title: 'Components/Stats/MonthlyStats',
   component: MonthlyStats,
   decorators: [
@@ -25,7 +25,7 @@ const meta = {
     layout: 'fullscreen',
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof MonthlyStats>;
+});
 
 export default meta;
 
@@ -47,38 +47,38 @@ const mockFlights = [
   })),
 ];
 
-export const Default = {
+export const Default = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('http://localhost:5000/api/flights', () => {
+        http.get('*/api/flights*', () => {
           return HttpResponse.json({ flights: mockFlights });
         }),
       ],
     },
   },
-};
+});
 
-export const NoData = {
+export const NoData = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('http://localhost:5000/api/flights', () => {
+        http.get('*/api/flights*', () => {
           return HttpResponse.json({ flights: [] });
         }),
       ],
     },
   },
-};
+});
 
-export const Loading = {
+export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('http://localhost:5000/api/flights', async () => {
+        http.get('*/api/flights*', async () => {
           await new Promise(() => {});
         }),
       ],
     },
   },
-};
+});

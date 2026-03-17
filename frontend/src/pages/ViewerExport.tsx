@@ -1,5 +1,5 @@
 import { useSearch } from '@tanstack/react-router'
-import { FlightViewer3D } from '../components/FlightViewer3D'
+import { FlightViewer3D } from '../components/complex/FlightViewer3D'
 
 /**
  * Dedicated page for video export - shows only the 3D viewer

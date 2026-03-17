@@ -4,7 +4,7 @@ import { useSites } from '../hooks/useSites'
 import { useUpdateSite, useDeleteSite, SiteUpdate } from '../hooks/useSiteMutations'
 import type { Site } from '../schemas'
 import { SiteCard } from '../components/SiteCard'
-import { EditSiteModal } from '../components/EditSiteModal'
+import { EditSiteModal } from '../components/forms/EditSiteModal'
 
 export const Sites: React.FC = () => {
   const navigate = useNavigate()
