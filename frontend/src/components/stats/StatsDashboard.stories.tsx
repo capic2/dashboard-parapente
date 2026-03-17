@@ -1,0 +1,75 @@
+import type { Meta } from '@storybook/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { http, HttpResponse } from 'msw';
+import StatsDashboard from './StatsDashboard';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: false },
+  },
+});
+
+const meta = {
+  title: 'Components/Stats/StatsDashboard',
+  component: StatsDashboard,
+  decorators: [
+    (Story) => (
+      <QueryClientProvider client={queryClient}>
+        <div style={{ maxWidth: '1400px', padding: '20px' }}>
+          <Story />
+        </div>
+      </QueryClientProvider>
+    ),
+  ],
+  parameters: {
+    layout: 'fullscreen',
+  },
+  tags: ['autodocs'],
+} satisfies Meta<typeof StatsDashboard>;
+
+export default meta;
+
+const mockStats = {
+  total_flights: 42,
+  total_hours: 85.5,
+  total_distance_km: 420.5,
+  max_altitude_m: 2850,
+  avg_duration_minutes: 122,
+  avg_distance_km: 10.0,
+};
+
+const mockFlights = Array.from({ length: 42 }, (_, i) => ({
+  id: `flight-${i}`,
+  flight_date: new Date(2024, Math.floor(i / 5), (i % 28) + 1).toISOString().split('T')[0],
+  duration_minutes: 90 + Math.random() * 60,
+  distance_km: 8 + Math.random() * 15,
+  max_altitude_m: 1200 + Math.random() * 1000,
+  site_name: ['Annecy', 'Chamonix', 'Mont Poupet'][i % 3],
+}));
+
+export const Default = {
+  parameters: {
+    msw: {
+      handlers: [
+        http.get('http://localhost:5000/api/flights/stats', () => {
+          return HttpResponse.json(mockStats);
+        }),
+        http.get('http://localhost:5000/api/flights', () => {
+          return HttpResponse.json({ flights: mockFlights });
+        }),
+      ],
+    },
+  },
+};
+
+export const Loading = {
+  parameters: {
+    msw: {
+      handlers: [
+        http.get('http://localhost:5000/api/flights/stats', async () => {
+          await new Promise(() => {});
+        }),
+      ],
+    },
+  },
+};
