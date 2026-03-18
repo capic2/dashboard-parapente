@@ -203,9 +203,8 @@ export const ShowsLoadingSkeletons = meta.story({
   },
 });
 
-ShowsLoadingSkeletons.test('shows loading skeletons', async ({ canvas }) => {
-  // Check for loading state (animate-pulse class)
-  const skeletons = canvas.querySelectorAll('.animate-pulse');
+ShowsLoadingSkeletons.test('shows loading skeletons', async ({ canvasElement }) => {
+  const skeletons = canvasElement.querySelectorAll('.animate-pulse');
   await expect(skeletons.length).toBeGreaterThan(0);
 });
 

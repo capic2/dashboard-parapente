@@ -23,8 +23,11 @@ const meta = preview.meta({
   ],
   parameters: {
     layout: 'fullscreen',
+    vitest: {
+      skip: true, // Skip Cesium tests - requires full browser environment
+    },
   },
-  tags: ['autodocs'],
+  tags: ['autodocs', 'test-skip'],
 });
 
 export default meta;

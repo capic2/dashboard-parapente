@@ -20,9 +20,6 @@ export default defineMain({
       }
     }
   },
-  docs: {
-    autodocs: "tag"
-  },
   features: {
     experimentalTestSyntax: true,
   },

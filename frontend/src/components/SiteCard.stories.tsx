@@ -77,7 +77,7 @@ Default.test('should call callbacks when buttons clicked', async ({ canvasElemen
   await expect(args.onEdit).toHaveBeenCalledWith(mockSiteArguel)
   
   // Click view flights button
-  await userEvent.click(canvas.getByText(/Vols/i))
+  await userEvent.click(canvas.getByRole('button', { name: /Vols/i }))
   await expect(args.onViewFlights).toHaveBeenCalledWith(mockSiteArguel)
 })
 

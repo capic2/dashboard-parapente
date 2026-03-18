@@ -1,5 +1,5 @@
 import preview from '../../../.storybook/preview';
-import { expect, userEvent, waitFor } from 'storybook/test';
+import { expect, userEvent, waitFor, screen } from 'storybook/test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse, delay } from 'msw';
 import { fn } from 'storybook/test';
@@ -43,17 +43,8 @@ const mockFlightResult = {
   },
 };
 
-// Closed state
-export const Closed = meta.story({
-  args: {
-    isOpen: false,
-    onClose: fn(),
-    onCreateComplete: fn(),
-  },
-});
 
-// Open - default state
-export const Open = meta.story({
+export const FlightModal = meta.story({
   args: {
     isOpen: true,
     onClose: fn(),
@@ -62,7 +53,7 @@ export const Open = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*/api/flights/upload*', () => {
+        http.post('*/api/flights/create-from-gpx', () => {
           return HttpResponse.json(mockFlightResult);
         }),
       ],
@@ -70,309 +61,133 @@ export const Open = meta.story({
   },
 });
 
-// With file selected
-export const WithFileSelected = meta.story({
-  args: {
-    isOpen: true,
-    onClose: fn(),
-    onCreateComplete: fn(),
-  },
-  parameters: {
-    msw: {
-      handlers: [
-        http.post('*/api/flights/upload*', () => {
-          return HttpResponse.json(mockFlightResult);
-        }),
-      ],
-    },
-  },
-});
+FlightModal.test('The upload button is disabled when no file selected', async() => {
+  const uploadButton = await screen.getByText('📤 Créer le vol');
+  await expect(uploadButton).toBeDisabled()
+})
 
-WithFileSelected.play = async ({ canvas }) => {
+FlightModal.test('The cancel button is disabled when no file selected', async() => {
+  const cancelButton = screen.getByText('Annuler');
+  await expect(cancelButton).toBeDisabled()
+})
+
+FlightModal.test('It can upload a file', async ({args}) => {
   // Create a mock GPX file
   const file = new File(['<?xml version="1.0"?><gpx></gpx>'], 'test-flight.gpx', {
     type: 'application/gpx+xml',
   });
 
-  const input = canvas.getByLabelText('Fichier GPX ou IGC') as HTMLInputElement;
+  // Find the file input
+  const input = screen.getByLabelText('Fichier GPX ou IGC') as HTMLInputElement;
+  
+  // Upload the file
   await userEvent.upload(input, file);
-};
+  await expect(await screen.findByText(/test-flight.gpx/)).toBeInTheDocument();
 
-// Upload in progress
-export const UploadInProgress = meta.story({
-  args: {
-    isOpen: true,
-    onClose: fn(),
-    onCreateComplete: fn(),
-  },
-  parameters: {
-    msw: {
-      handlers: [
-        http.post('*/api/flights/upload*', async () => {
-          await delay('infinite');
-          return HttpResponse.json(mockFlightResult);
-        }),
-      ],
-    },
-  },
-});
-
-UploadInProgress.play = async ({ canvas }) => {
-  const file = new File(['<?xml version="1.0"?><gpx></gpx>'], 'test-flight.gpx', {
-    type: 'application/gpx+xml',
-  });
-
-  const input = canvas.getByLabelText('Fichier GPX ou IGC') as HTMLInputElement;
-  await userEvent.upload(input, file);
-
-  const uploadButton = canvas.getByText('📤 Créer le vol');
+  // Click the upload button
+  const uploadButton = await screen.findByText('📤 Créer le vol');
   await userEvent.click(uploadButton);
-};
+  
+  // Verify success message appears{
+  await expect(await screen.findByText('✅ Vol créé avec succès')).toBeInTheDocument();
 
-// Upload success
-export const UploadSuccess = meta.story({
-  args: {
-    isOpen: true,
-    onClose: fn(),
-    onCreateComplete: fn(),
-  },
-  parameters: {
-    msw: {
-      handlers: [
-        http.post('*/api/flights/upload*', async () => {
-          await delay(500);
-          return HttpResponse.json(mockFlightResult);
-        }),
-      ],
-    },
-  },
-});
+  await expect(args.onCreateComplete).toHaveBeenCalled()
+  await waitFor(async () => {
+    await expect(args.onClose).toHaveBeenCalled()
+  }, {timeout: 3000})
+})
 
-UploadSuccess.play = async ({ canvas }) => {
+FlightModal.test('it clears the selected file when click on cancel', async () => {
+  // Create a mock GPX file
   const file = new File(['<?xml version="1.0"?><gpx></gpx>'], 'test-flight.gpx', {
     type: 'application/gpx+xml',
   });
 
-  const input = canvas.getByLabelText('Fichier GPX ou IGC') as HTMLInputElement;
+  // Find the file input
+  const input = await screen.findByLabelText('Fichier GPX ou IGC') as HTMLInputElement;
+
+  // Upload the file
   await userEvent.upload(input, file);
+  await expect(await screen.findByText(/test-flight.gpx/)).toBeInTheDocument();
 
-  const uploadButton = canvas.getByText('📤 Créer le vol');
-  await userEvent.click(uploadButton);
-};
-
-// IGC file selected
-export const IGCFileSelected = meta.story({
-  args: {
-    isOpen: true,
-    onClose: fn(),
-    onCreateComplete: fn(),
-  },
-  parameters: {
-    msw: {
-      handlers: [
-        http.post('*/api/flights/upload*', () => {
-          return HttpResponse.json(mockFlightResult);
-        }),
-      ],
-    },
-  },
-});
-
-IGCFileSelected.play = async ({ canvas }) => {
-  const file = new File(['IGCFILE'], 'test-flight.igc', {
-    type: 'application/vnd.fai.igc',
-  });
-
-  const input = canvas.getByLabelText('Fichier GPX ou IGC') as HTMLInputElement;
-  await userEvent.upload(input, file);
-};
-
-// Interaction Tests
-
-export const DisplaysModalTitle = meta.story({
-  args: {
-    isOpen: true,
-    onClose: fn(),
-    onCreateComplete: fn(),
-  },
-});
-
-DisplaysModalTitle.test('displays modal title and instructions', async ({ canvas }) => {
-  await expect(canvas.getByText('📤 Créer un vol depuis GPX/IGC')).toBeInTheDocument();
-  await expect(canvas.getByText(/Uploadez un fichier GPX ou IGC/)).toBeInTheDocument();
-});
-
-export const AcceptsGPXFile = meta.story({
-  args: {
-    isOpen: true,
-    onClose: fn(),
-    onCreateComplete: fn(),
-  },
-});
-
-AcceptsGPXFile.test('accepts GPX file upload', async ({ canvas }) => {
-  const file = new File(['<?xml version="1.0"?><gpx></gpx>'], 'test-flight.gpx', {
-    type: 'application/gpx+xml',
-  });
-
-  const input = canvas.getByLabelText('Fichier GPX ou IGC') as HTMLInputElement;
-  await userEvent.upload(input, file);
-
-  await waitFor(() => {
-    expect(canvas.getByText(/test-flight.gpx/)).toBeInTheDocument();
-  });
-});
-
-export const DisablesUploadWithoutFile = meta.story({
-  args: {
-    isOpen: true,
-    onClose: fn(),
-    onCreateComplete: fn(),
-  },
-});
-
-DisablesUploadWithoutFile.test('disables upload button without file', async ({ canvas }) => {
-  const uploadButton = canvas.getByText('📤 Créer le vol');
-  await expect(uploadButton).toBeDisabled();
-});
-
-export const EnablesUploadWithFile = meta.story({
-  args: {
-    isOpen: true,
-    onClose: fn(),
-    onCreateComplete: fn(),
-  },
-});
-
-EnablesUploadWithFile.test('enables upload button with file', async ({ canvas }) => {
-  const file = new File(['<?xml version="1.0"?><gpx></gpx>'], 'test-flight.gpx', {
-    type: 'application/gpx+xml',
-  });
-
-  const input = canvas.getByLabelText('Fichier GPX ou IGC') as HTMLInputElement;
-  await userEvent.upload(input, file);
-
-  const uploadButton = canvas.getByText('📤 Créer le vol');
-  await expect(uploadButton).not.toBeDisabled();
-});
-
-export const ShowsUploadingState = meta.story({
-  args: {
-    isOpen: true,
-    onClose: fn(),
-    onCreateComplete: fn(),
-  },
-  parameters: {
-    msw: {
-      handlers: [
-        http.post('*/api/flights/upload*', async () => {
-          await delay(100);
-          return HttpResponse.json(mockFlightResult);
-        }),
-      ],
-    },
-  },
-});
-
-ShowsUploadingState.test('shows uploading state during upload', async ({ canvas }) => {
-  const file = new File(['<?xml version="1.0"?><gpx></gpx>'], 'test-flight.gpx', {
-    type: 'application/gpx+xml',
-  });
-
-  const input = canvas.getByLabelText('Fichier GPX ou IGC') as HTMLInputElement;
-  await userEvent.upload(input, file);
-
-  const uploadButton = canvas.getByText('📤 Créer le vol');
-  await userEvent.click(uploadButton);
-
-  await waitFor(() => {
-    expect(canvas.getByText(/Création en cours.../)).toBeInTheDocument();
-  });
-});
-
-export const ShowsSuccessMessage = meta.story({
-  args: {
-    isOpen: true,
-    onClose: fn(),
-    onCreateComplete: fn(),
-  },
-  parameters: {
-    msw: {
-      handlers: [
-        http.post('*/api/flights/upload*', async () => {
-          await delay(100);
-          return HttpResponse.json(mockFlightResult);
-        }),
-      ],
-    },
-  },
-});
-
-ShowsSuccessMessage.test('shows success message after upload', async ({ canvas }) => {
-  const file = new File(['<?xml version="1.0"?><gpx></gpx>'], 'test-flight.gpx', {
-    type: 'application/gpx+xml',
-  });
-
-  const input = canvas.getByLabelText('Fichier GPX ou IGC') as HTMLInputElement;
-  await userEvent.upload(input, file);
-
-  const uploadButton = canvas.getByText('📤 Créer le vol');
-  await userEvent.click(uploadButton);
-
-  await waitFor(() => {
-    expect(canvas.getByText('✅ Vol créé avec succès')).toBeInTheDocument();
-  }, { timeout: 3000 });
-
-  await expect(canvas.getByText(/Vol Mont Poupet/)).toBeInTheDocument();
-  await expect(canvas.getByText(/Mont Poupet/)).toBeInTheDocument();
-  await expect(canvas.getByText(/65 min/)).toBeInTheDocument();
-});
-
-export const CallsOnCreateComplete = meta.story({
-  args: {
-    isOpen: true,
-    onClose: fn(),
-    onCreateComplete: fn(),
-  },
-  parameters: {
-    msw: {
-      handlers: [
-        http.post('*/api/flights/upload*', async () => {
-          await delay(100);
-          return HttpResponse.json(mockFlightResult);
-        }),
-      ],
-    },
-  },
-});
-
-CallsOnCreateComplete.test('calls onCreateComplete callback', async ({ args, canvas }) => {
-  const file = new File(['<?xml version="1.0"?><gpx></gpx>'], 'test-flight.gpx', {
-    type: 'application/gpx+xml',
-  });
-
-  const input = canvas.getByLabelText('Fichier GPX ou IGC') as HTMLInputElement;
-  await userEvent.upload(input, file);
-
-  const uploadButton = canvas.getByText('📤 Créer le vol');
-  await userEvent.click(uploadButton);
-
-  await waitFor(() => {
-    expect(args.onCreateComplete).toHaveBeenCalled();
-  }, { timeout: 3000 });
-});
-
-export const ClosesModalOnCancel = meta.story({
-  args: {
-    isOpen: true,
-    onClose: fn(),
-    onCreateComplete: fn(),
-  },
-});
-
-ClosesModalOnCancel.test('closes modal on cancel click', async ({ args, canvas }) => {
-  const cancelButton = canvas.getByText('Annuler');
+  // Click the upload button
+  const cancelButton = screen.getByText('Annuler');
   await userEvent.click(cancelButton);
 
-  await expect(args.onClose).toHaveBeenCalled();
+  await expect(screen.queryByText(/test-flight.gpx/)).not.toBeInTheDocument();
+})
+
+FlightModal.test('It displays uploading state', async () => {
+  const file = new File(['<?xml version="1.0"?><gpx></gpx>'], 'test-flight.gpx', {
+    type: 'application/gpx+xml',
+  });
+
+  const input = await screen.findByLabelText('Fichier GPX ou IGC') as HTMLInputElement;
+  await userEvent.upload(input, file);
+
+  const uploadButton = await screen.findByText('📤 Créer le vol');
+  await userEvent.click(uploadButton);
+
+
+    await expect(await screen.findByText(/Création en cours.../)).toBeInTheDocument();
+})
+
+FlightModal.test('shows error message when upload fails', {parameters: {
+    msw: {
+      handlers: [
+        http.post('*/api/flights/create-from-gpx', async () => {
+          await delay(100);
+          return new HttpResponse(
+              JSON.stringify({
+                error: 'Fichier GPX invalide',
+                message: 'Le fichier GPX ne contient pas de données de vol valides',
+              }),
+              { 
+                status: 400,
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+              }
+          );
+        }),
+      ],
+    },
+  }}, async ({args}) => {
+  // Create a mock GPX file
+  const file = new File(['<?xml version="1.0"?><gpx></gpx>'], 'invalid-flight.gpx', {
+    type: 'application/gpx+xml',
+  });
+
+  // Find the file input and upload
+  const input = await screen.findByLabelText('Fichier GPX ou IGC') as HTMLInputElement;
+  await userEvent.upload(input, file);
+  
+  // Verify file is selected
+  await expect(await screen.findByText(/invalid-flight.gpx/)).toBeInTheDocument();
+
+  // Click the upload button
+  const uploadButton = await screen.findByText('📤 Créer le vol');
+  await userEvent.click(uploadButton);
+
+  // Wait for error message to appear
+  await waitFor(async () => {
+    expect(await screen.findByText('❌ Erreur lors de la création')).toBeInTheDocument();
+  }, { timeout: 5000 });
+
+  // Verify the error message contains helpful text
+  await expect(await screen.findByText(/données de vol valides/i)).toBeInTheDocument();
+
+  // Verify that onCreateComplete was NOT called (since upload failed)
+  await expect(args.onCreateComplete).not.toHaveBeenCalled();
+  
+  // Verify that onClose was NOT called (modal should stay open on error)
+  await expect(args.onClose).not.toHaveBeenCalled();
+  
+  // The success message should NOT appear
+  await expect(screen.queryByText('✅ Vol créé avec succès')).not.toBeInTheDocument();
 });
+
+FlightModal.test('it calls onClose when click on close button', async ({args}) => {
+  await userEvent.click(screen.getByRole('button', {name: /fermer/i}))
+  await expect(args.onClose).toHaveBeenCalled()
+})

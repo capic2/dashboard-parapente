@@ -1,5 +1,5 @@
 import preview from '../../../.storybook/preview';
-import { expect, userEvent, waitFor } from 'storybook/test';
+import { expect, userEvent, waitFor, screen } from 'storybook/test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse, delay } from 'msw';
 import { fn } from 'storybook/test';
@@ -54,17 +54,7 @@ const mockCreatedSite = {
   country: 'FR',
 };
 
-// Default story - Closed
-export const Closed = meta.story({
-  args: {
-    isOpen: false,
-    onClose: fn(),
-    onSiteCreated: fn(),
-  },
-});
-
-// Open - Search mode
-export const OpenSearchMode = meta.story({
+export const Modal = meta.story({
   args: {
     isOpen: true,
     onClose: fn(),
@@ -81,6 +71,7 @@ export const OpenSearchMode = meta.story({
   },
 });
 
+
 // Open - Manual mode
 export const OpenManualMode = meta.story({
   args: {
@@ -90,10 +81,10 @@ export const OpenManualMode = meta.story({
   },
 });
 
-OpenManualMode.play = async ({ canvas }) => {
-  const manualButton = canvas.getByText('Saisie manuelle');
+OpenManualMode.test("interaction test", async () => {
+  const manualButton = screen.getByText('Saisie manuelle');
   await userEvent.click(manualButton);
-};
+});
 
 // Open - Auto-detect mode (with flight ID and GPX data)
 export const OpenAutoDetectMode = meta.story({
@@ -132,15 +123,13 @@ export const SearchSuccess = meta.story({
   },
 });
 
-SearchSuccess.play = async ({ canvas }) => {
-  const user = userEvent.setup();
+SearchSuccess.test("interaction test", async () => {
+  const input = screen.getByPlaceholderText(/Ex: Besançon/);
+  await userEvent.type(input, 'Besançon');
 
-  const input = canvas.getByPlaceholderText(/Ex: Besançon/);
-  await user.type(input, 'Besançon');
-
-  const searchButton = canvas.getByText('Rechercher');
-  await user.click(searchButton);
-};
+  const searchButton = screen.getByText('Rechercher');
+  await userEvent.click(searchButton);
+});
 
 // Search loading
 export const SearchLoading = meta.story({
@@ -161,15 +150,13 @@ export const SearchLoading = meta.story({
   },
 });
 
-SearchLoading.play = async ({ canvas }) => {
-  const user = userEvent.setup();
+SearchLoading.test("interaction test", async () => {
+  const input = screen.getByPlaceholderText(/Ex: Besançon/);
+  await userEvent.type(input, 'Besançon');
 
-  const input = canvas.getByPlaceholderText(/Ex: Besançon/);
-  await user.type(input, 'Besançon');
-
-  const searchButton = canvas.getByText('Rechercher');
-  await user.click(searchButton);
-};
+  const searchButton = screen.getByText('Rechercher');
+  await userEvent.click(searchButton);
+});
 
 // Manual entry filled
 export const ManualEntryFilled = meta.story({
@@ -189,7 +176,7 @@ export const ManualEntryFilled = meta.story({
   },
 });
 
-ManualEntryFilled.play = async ({ canvas }) => {
+ManualEntryFilled.test("interaction test", async ({ canvas }) => {
   const user = userEvent.setup();
 
   const manualButton = canvas.getByText('Saisie manuelle');
@@ -206,7 +193,7 @@ ManualEntryFilled.play = async ({ canvas }) => {
 
   const elevInput = canvas.getByPlaceholderText('450');
   await user.type(elevInput, '450');
-};
+});
 
 // Create site loading
 export const CreateSiteLoading = meta.story({
@@ -227,7 +214,7 @@ export const CreateSiteLoading = meta.story({
   },
 });
 
-CreateSiteLoading.play = async ({ canvas }) => {
+CreateSiteLoading.test("interaction test", async ({ canvas }) => {
   const user = userEvent.setup();
 
   const manualButton = canvas.getByText('Saisie manuelle');
@@ -244,7 +231,7 @@ CreateSiteLoading.play = async ({ canvas }) => {
 
   const createButton = canvas.getByText('Créer le site');
   await user.click(createButton);
-};
+});
 
 // Interaction Tests
 

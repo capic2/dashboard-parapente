@@ -163,7 +163,7 @@ export default function EmagramWidget({ userLat, userLon }: EmagramWidgetProps) 
           </div>
           <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
             <span>📍</span>
-            <span>{emagram.station_name} ({emagram.distance_km.toFixed(0)} km)</span>
+            <span>{emagram.station_name}{emagram.distance_km != null && ` (${emagram.distance_km.toFixed(0)} km)`}</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-gray-500">
             <span>🕒</span>

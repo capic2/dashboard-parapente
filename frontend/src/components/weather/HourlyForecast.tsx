@@ -758,6 +758,8 @@ export default function HourlyForecast({
     }
   };
 
+  console.log({weather})
+
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
       <h2 className="text-sm text-gray-600 mb-3 font-semibold">

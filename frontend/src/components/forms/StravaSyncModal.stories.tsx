@@ -94,10 +94,10 @@ export const SyncingInProgress = meta.story({
   },
 });
 
-SyncingInProgress.play = async ({ canvas }) => {
+SyncingInProgress.test("interaction test", async ({ canvas }) => {
   const syncButton = canvas.getByText('🔄 Synchroniser');
   await userEvent.click(syncButton);
-};
+});
 
 // Sync success
 export const SyncSuccess = meta.story({
@@ -118,10 +118,10 @@ export const SyncSuccess = meta.story({
   },
 });
 
-SyncSuccess.play = async ({ canvas }) => {
+SyncSuccess.test("interaction test", async ({ canvas }) => {
   const syncButton = canvas.getByText('🔄 Synchroniser');
   await userEvent.click(syncButton);
-};
+});
 
 // Sync with failures
 export const SyncWithFailures = meta.story({
@@ -142,10 +142,10 @@ export const SyncWithFailures = meta.story({
   },
 });
 
-SyncWithFailures.play = async ({ canvas }) => {
+SyncWithFailures.test("interaction test", async ({ canvas }) => {
   const syncButton = canvas.getByText('🔄 Synchroniser');
   await userEvent.click(syncButton);
-};
+});
 
 // Sync no skipped
 export const SyncNoSkipped = meta.story({
@@ -166,10 +166,10 @@ export const SyncNoSkipped = meta.story({
   },
 });
 
-SyncNoSkipped.play = async ({ canvas }) => {
+SyncNoSkipped.test("interaction test", async ({ canvas }) => {
   const syncButton = canvas.getByText('🔄 Synchroniser');
   await userEvent.click(syncButton);
-};
+});
 
 // Custom date range
 export const CustomDateRange = meta.story({
@@ -189,7 +189,7 @@ export const CustomDateRange = meta.story({
   },
 });
 
-CustomDateRange.play = async ({ canvas }) => {
+CustomDateRange.test("interaction test", async ({ canvas }) => {
   const user = userEvent.setup();
 
   // Change date from
@@ -198,7 +198,7 @@ CustomDateRange.play = async ({ canvas }) => {
     await user.clear(dateFromInputs[0]);
     await user.type(dateFromInputs[0], '2024');
   }
-};
+});
 
 // Interaction Tests
 

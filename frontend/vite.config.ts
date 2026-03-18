@@ -17,6 +17,7 @@ export default defineConfig({
     tailwindcss(),
     cesium({ cesiumBuildRootPath: 'node_modules/cesium/Build' })
   ],
+
   server: {
     host: '0.0.0.0',
     port: 5173,

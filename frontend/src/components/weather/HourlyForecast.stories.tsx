@@ -36,95 +36,95 @@ const mockHourlyForecastGood = [
     hour: '10:00',
     para_index: 85,
     verdict: 'bon',
-    temperature: 18,
-    temp: 18,
-    wind: 12,
-    wind_speed: 12,
-    wind_gust: 18,
+    temperature: 22,
+    temp: 22,
+    wind: 10,
+    wind_speed: 10,
+    wind_gust: 15,
     direction: 'NW',
     precipitation: 0,
-    cape: 250,
-    thermal_strength: 'Moyen',
+    cape: 800,
+    thermal_strength: 'Fort',
     sources: {
       'open-meteo': {
-        temperature: 18.2,
-        wind_speed: 11.8,
-        wind_gust: 17.5,
+        temperature: 22.2,
+        wind_speed: 10.1,
+        wind_gust: 14.8,
         wind_direction: 315,
         precipitation: 0,
-        cloud_cover: 20,
+        cloud_cover: 10,
       },
       'weatherapi': {
-        temperature: 17.8,
-        wind_speed: 12.2,
-        wind_gust: 18.5,
+        temperature: 21.8,
+        wind_speed: 9.9,
+        wind_gust: 15.2,
         wind_direction: 310,
         precipitation: 0,
-        cloud_cover: 25,
+        cloud_cover: 12,
       },
     },
   },
   {
     hour: '11:00',
-    para_index: 90,
+    para_index: 92,
     verdict: 'bon',
-    temperature: 20,
-    temp: 20,
-    wind: 14,
-    wind_speed: 14,
-    wind_gust: 20,
+    temperature: 24,
+    temp: 24,
+    wind: 11,
+    wind_speed: 11,
+    wind_gust: 16,
     direction: 'NW',
     precipitation: 0,
-    cape: 350,
+    cape: 1000,
     thermal_strength: 'Fort',
     sources: {
       'open-meteo': {
-        temperature: 20.1,
-        wind_speed: 13.9,
-        wind_gust: 19.8,
+        temperature: 24.1,
+        wind_speed: 11.2,
+        wind_gust: 16.1,
         wind_direction: 320,
         precipitation: 0,
-        cloud_cover: 15,
+        cloud_cover: 8,
       },
       'weatherapi': {
-        temperature: 19.9,
-        wind_speed: 14.1,
-        wind_gust: 20.2,
+        temperature: 23.9,
+        wind_speed: 10.8,
+        wind_gust: 15.9,
         wind_direction: 315,
         precipitation: 0,
-        cloud_cover: 18,
+        cloud_cover: 10,
       },
     },
   },
   {
     hour: '12:00',
-    para_index: 88,
+    para_index: 90,
     verdict: 'bon',
-    temperature: 22,
-    temp: 22,
-    wind: 15,
-    wind_speed: 15,
-    wind_gust: 22,
+    temperature: 25,
+    temp: 25,
+    wind: 12,
+    wind_speed: 12,
+    wind_gust: 17,
     direction: 'W',
     precipitation: 0,
-    cape: 400,
+    cape: 1200,
     thermal_strength: 'Fort',
     sources: {
       'open-meteo': {
-        temperature: 22.3,
-        wind_speed: 15.2,
-        wind_gust: 21.8,
+        temperature: 25.3,
+        wind_speed: 12.1,
+        wind_gust: 17.2,
         wind_direction: 280,
         precipitation: 0,
-        cloud_cover: 10,
+        cloud_cover: 5,
       },
       'weatherapi': {
-        temperature: 21.7,
-        wind_speed: 14.8,
-        wind_gust: 22.2,
+        temperature: 24.7,
+        wind_speed: 11.9,
+        wind_gust: 16.8,
         wind_direction: 275,
         precipitation: 0,
-        cloud_cover: 12,
+        cloud_cover: 8,
       },
     },
   },
@@ -229,32 +229,68 @@ const mockHourlyForecastMixed = [
   },
 ];
 
-const mockWeatherWithHourly = {
-  id: 1,
-  spot_id: 1,
-  spot_name: 'Annecy',
+const mockBackendWeatherGood = {
+  site_id: '1',
+  site_name: 'Annecy',
+  day_index: 0,
+  days: 1,
   para_index: 85,
   verdict: 'bon',
-  temperature: 20,
-  wind_speed: 12,
-  wind_direction: 'NW',
-  conditions: 'Ensoleillé',
-  forecast_time: '2024-03-15T14:30:00Z',
-  hourly_forecast: mockHourlyForecastGood,
+  emoji: '🟢',
+  explanation: 'Conditions excellentes pour le vol',
+  slots_summary: 'Vol possible toute la journée',
+  metrics: {
+    avg_temp_c: 20,
+    avg_wind_kmh: 14,
+    max_gust_kmh: 22,
+    total_rain_mm: 0,
+  },
+  consensus: mockHourlyForecastGood.map((hour) => ({
+    hour: parseInt(hour.hour.split(':')[0]),
+    temperature: hour.temp,
+    wind_speed: hour.wind_speed,
+    wind_gust: hour.wind_gust,
+    wind_direction: hour.direction === 'NW' ? 315 : hour.direction === 'W' ? 270 : 315,
+    precipitation: hour.precipitation,
+    cloud_cover: hour.sources['open-meteo'].cloud_cover,
+    cape: hour.cape,
+    para_index: hour.para_index,
+    verdict: hour.verdict,
+    thermal_strength: hour.thermal_strength,
+    sources: hour.sources,
+  })),
 };
 
-const mockWeatherWithMixedHourly = {
-  id: 1,
-  spot_id: 1,
-  spot_name: 'Annecy',
+const mockBackendWeatherMixed = {
+  site_id: '1',
+  site_name: 'Annecy',
+  day_index: 0,
+  days: 1,
   para_index: 50,
   verdict: 'moyen',
-  temperature: 15,
-  wind_speed: 25,
-  wind_direction: 'E',
-  conditions: 'Variable',
-  forecast_time: '2024-03-15T14:30:00Z',
-  hourly_forecast: mockHourlyForecastMixed,
+  emoji: '🟡',
+  explanation: 'Conditions variables',
+  slots_summary: 'Vol possible avec prudence',
+  metrics: {
+    avg_temp_c: 15,
+    avg_wind_kmh: 23,
+    max_gust_kmh: 35,
+    total_rain_mm: 1.5,
+  },
+  consensus: mockHourlyForecastMixed.map((hour) => ({
+    hour: parseInt(hour.hour.split(':')[0]),
+    temperature: hour.temp,
+    wind_speed: hour.wind_speed,
+    wind_gust: hour.wind_gust,
+    wind_direction: hour.direction === 'NE' ? 45 : hour.direction === 'E' ? 90 : 90,
+    precipitation: hour.precipitation,
+    cloud_cover: hour.sources['open-meteo'].cloud_cover,
+    cape: hour.cape,
+    para_index: hour.para_index,
+    verdict: hour.verdict,
+    thermal_strength: hour.thermal_strength,
+    sources: hour.sources,
+  })),
 };
 
 // Default story - Good conditions
@@ -266,8 +302,8 @@ export const GoodConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId*', () => {
-          return HttpResponse.json(mockWeatherWithHourly);
+        http.get('/api/weather/:spotId', () => {
+          return HttpResponse.json(mockBackendWeatherGood);
         }),
       ],
     },
@@ -284,7 +320,7 @@ export const MixedConditions = meta.story({
     msw: {
       handlers: [
         http.get('*/api/weather/:spotId*', () => {
-          return HttpResponse.json(mockWeatherWithMixedHourly);
+          return HttpResponse.json(mockBackendWeatherMixed);
         }),
       ],
     },
@@ -302,8 +338,8 @@ export const EmptyForecast = meta.story({
       handlers: [
         http.get('*/api/weather/:spotId*', () => {
           return HttpResponse.json({
-            ...mockWeatherWithHourly,
-            hourly_forecast: [],
+            ...mockBackendWeatherGood,
+            consensus: [],
           });
         }),
       ],
@@ -356,8 +392,8 @@ export const NoHourlyData = meta.story({
       handlers: [
         http.get('*/api/weather/:spotId*', () => {
           return HttpResponse.json({
-            ...mockWeatherWithHourly,
-            hourly_forecast: null,
+            ...mockBackendWeatherGood,
+            consensus: null,
           });
         }),
       ],
@@ -375,7 +411,7 @@ export const DayTwo = meta.story({
     msw: {
       handlers: [
         http.get('*/api/weather/:spotId*', () => {
-          return HttpResponse.json(mockWeatherWithHourly);
+          return HttpResponse.json(mockBackendWeatherGood);
         }),
       ],
     },
@@ -393,7 +429,7 @@ export const DisplaysHourlyData = meta.story({
     msw: {
       handlers: [
         http.get('*/api/weather/:spotId*', () => {
-          return HttpResponse.json(mockWeatherWithHourly);
+          return HttpResponse.json(mockBackendWeatherGood);
         }),
       ],
     },
@@ -472,8 +508,8 @@ export const ShowsEmptyState = meta.story({
       handlers: [
         http.get('*/api/weather/:spotId*', () => {
           return HttpResponse.json({
-            ...mockWeatherWithHourly,
-            hourly_forecast: [],
+            ...mockBackendWeatherGood,
+            consensus: [],
           });
         }),
       ],
@@ -496,7 +532,7 @@ export const OpensTooltipOnHover = meta.story({
     msw: {
       handlers: [
         http.get('*/api/weather/:spotId*', () => {
-          return HttpResponse.json(mockWeatherWithHourly);
+          return HttpResponse.json(mockBackendWeatherGood);
         }),
       ],
     },

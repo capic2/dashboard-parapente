@@ -150,10 +150,10 @@ export const SavingState = meta.story({
   },
 });
 
-SavingState.play = async ({ canvas }) => {
+SavingState.test("interaction test", async ({ canvas }) => {
   const saveButton = canvas.getByText('💾 Enregistrer');
   await userEvent.click(saveButton);
-};
+});
 
 // Interaction Tests
 

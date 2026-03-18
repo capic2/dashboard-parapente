@@ -8,6 +8,7 @@ import {
   FlightRecordsSchema,
   ApiResponseSchema,
 } from '../schemas'
+import { HTTPError } from 'ky'
 
 interface SiteStats {
   site: Site
@@ -241,15 +242,27 @@ export function useCreateFlightFromGPX() {
   
   return useMutation({
     mutationFn: async (formData: FormData) => {
-      // Ky supporte FormData directement
-      const data = await api.post('flights/create-from-gpx', { 
-        body: formData 
-      }).json<{
-        success: boolean;
-        flight: Flight;
-        message: string;
-      }>();
-      return data;
+      try {
+        // Ky supporte FormData directement
+        const data = await api.post('flights/create-from-gpx', { 
+          body: formData 
+        }).json<{
+          success: boolean;
+          flight: Flight;
+          message: string;
+        }>();
+        return data;
+      } catch (error) {
+        console.log({error})
+        // Handle HTTPError from ky
+        if (error instanceof HTTPError) {
+            const errorData = await error.response.json() as { message?: string; error?: string };
+            const errorMessage = errorData.message || errorData.error || 'Erreur lors de la création du vol';
+            throw new Error(errorMessage);
+        }
+        // Re-throw other errors
+        throw error;
+      }
     },
     onSuccess: () => {
       // Invalider le cache pour rafraîchir la liste et les stats

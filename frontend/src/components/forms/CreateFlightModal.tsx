@@ -11,6 +11,7 @@ interface CreateFlightModalProps {
 
 export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateFlightModalProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const { mutate: createFlight, isPending, data } = useCreateFlightFromGPX();
@@ -25,12 +26,14 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
         return;
       }
       setSelectedFile(file);
+      setError(null); // Clear any previous errors
     }
   };
 
   const handleUpload = () => {
     if (!selectedFile) return;
 
+    setError(null); // Clear any previous errors
     const formData = new FormData();
     formData.append('gpx_file', selectedFile);
 
@@ -39,13 +42,16 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
         toast.success(`Vol créé avec succès : ${result.flight.name || 'Sans nom'}`);
         onCreateComplete();
         setSelectedFile(null);
+        setError(null);
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
         setTimeout(() => onClose(), 2000); // Fermer après 2s
       },
       onError: (error: any) => {
-        toast.error(`Échec de la création : ${error.message}`);
+        const errorMessage = error.message || 'Une erreur est survenue lors de la création du vol';
+        setError(errorMessage);
+        toast.error(`Échec de la création : ${errorMessage}`);
       }
     });
   };
@@ -53,6 +59,7 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
   const handleClose = () => {
     if (!isPending) {
       setSelectedFile(null);
+      setError(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -70,11 +77,12 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
         
         {/* File Input */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">
+          <label htmlFor="gpx-file-input" className="block text-sm font-medium text-gray-700">
             Fichier GPX ou IGC
           </label>
           <div className="flex items-center gap-3">
             <input
+              id="gpx-file-input"
               ref={fileInputRef}
               type="file"
               accept=".gpx,.igc"
@@ -121,6 +129,14 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
                 <li>• <strong>Distance :</strong> {data.flight.distance_km.toFixed(2)} km</li>
               )}
             </ul>
+          </div>
+        )}
+
+        {/* Affichage de l'erreur */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="font-semibold text-red-800 mb-2">❌ Erreur lors de la création</p>
+            <p className="text-sm text-red-700">{error}</p>
           </div>
         )}
 

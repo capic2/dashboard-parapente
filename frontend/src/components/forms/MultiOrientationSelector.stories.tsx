@@ -2,7 +2,8 @@ import preview from '../../../.storybook/preview';
 import { expect, userEvent, waitFor } from 'storybook/test';
 import { fn } from 'storybook/test';
 import { MultiOrientationSelector } from './MultiOrientationSelector';
-import type { Site } from '../types';
+import {Site} from "../../schemas.ts";
+
 
 const meta = preview.meta({
   title: 'Components/Forms/MultiOrientationSelector',
