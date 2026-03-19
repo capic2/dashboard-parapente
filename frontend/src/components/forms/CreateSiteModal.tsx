@@ -18,6 +18,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
   flightId,
 }) => {
   const [mode, setMode] = useState<'auto' | 'search' | 'manual'>('search');
+  const [error, setError] = useState<string | null>(null);
   
   // Search mode
   const [searchQuery, setSearchQuery] = useState('');
@@ -35,10 +36,11 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
 
   const handleAutoDetect = () => {
     if (!gpxData?.coordinates || gpxData.coordinates.length === 0) {
-      alert('Aucune trace GPX disponible pour auto-détection');
+      setError('Aucune trace GPX disponible pour auto-détection');
       return;
     }
 
+    setError(null);
     const firstPoint = gpxData.coordinates[0];
     setSiteName('');
     setLatitude(firstPoint.lat.toString());
@@ -50,6 +52,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
 
+    setError(null);
     try {
       const result = await geocode.mutateAsync({ query: searchQuery });
       setSearchResult(result);
@@ -57,7 +60,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
       setLatitude(result.latitude.toString());
       setLongitude(result.longitude.toString());
     } catch (error) {
-      alert('Ville non trouvée');
+      setError('Ville non trouvée. Veuillez vérifier l\'orthographe ou essayer une autre recherche.');
       setSearchResult(null);
     }
   };
@@ -68,15 +71,16 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
     const elev = elevation ? parseInt(elevation) : undefined;
 
     if (!siteName.trim()) {
-      alert('Le nom du site est requis');
+      setError('Le nom du site est requis');
       return;
     }
 
     if (isNaN(lat) || isNaN(lon)) {
-      alert('Coordonnées invalides');
+      setError('Coordonnées invalides. Veuillez entrer des nombres valides pour la latitude et longitude.');
       return;
     }
 
+    setError(null);
     try {
       const newSite = await createSite.mutateAsync({
         name: siteName,
@@ -96,8 +100,9 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
       setElevation('');
       setSearchQuery('');
       setSearchResult(null);
-    } catch (error) {
-      alert('Erreur lors de la création du site');
+      setError(null);
+    } catch (error: any) {
+      setError(error?.message || 'Erreur lors de la création du site. Veuillez réessayer.');
     }
   };
 
@@ -108,7 +113,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
         <div className="flex gap-2">
           {flightId && gpxData?.coordinates && (
             <button
-              onClick={() => setMode('auto')}
+              onClick={() => { setMode('auto'); setError(null); }}
               className={`px-4 py-2 rounded ${
                 mode === 'auto' ? 'bg-blue-500 text-white' : 'bg-gray-200'
               }`}
@@ -117,7 +122,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
             </button>
           )}
           <button
-            onClick={() => setMode('search')}
+            onClick={() => { setMode('search'); setError(null); }}
             className={`px-4 py-2 rounded ${
               mode === 'search' ? 'bg-blue-500 text-white' : 'bg-gray-200'
             }`}
@@ -125,7 +130,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
             Recherche
           </button>
           <button
-            onClick={() => setMode('manual')}
+            onClick={() => { setMode('manual'); setError(null); }}
             className={`px-4 py-2 rounded ${
               mode === 'manual' ? 'bg-blue-500 text-white' : 'bg-gray-200'
             }`}
@@ -133,6 +138,16 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
             Saisie manuelle
           </button>
         </div>
+
+        {/* Error display */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-sm text-red-800">
+              <span className="font-semibold">❌ Erreur : </span>
+              {error}
+            </p>
+          </div>
+        )}
 
         {/* Auto-detect mode */}
         {mode === 'auto' && (
