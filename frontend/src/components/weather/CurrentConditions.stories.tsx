@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import preview from '../../../.storybook/preview';
 import CurrentConditions from './CurrentConditions';
+import { expect } from 'storybook/test';
 
 const meta = preview.meta({
   title: 'Components/Weather/CurrentConditions',
@@ -11,14 +12,14 @@ const meta = preview.meta({
       // Create a new QueryClient for each story to avoid cache conflicts
       const queryClient = new QueryClient({
         defaultOptions: {
-          queries: { 
+          queries: {
             retry: false,
-            gcTime: 0,  // Disable cache
-            staleTime: 0,  // Always consider data stale
+            gcTime: 0, // Disable cache
+            staleTime: 0, // Always consider data stale
           },
         },
       });
-      
+
       return (
         <QueryClientProvider client={queryClient}>
           <div style={{ maxWidth: '400px' }}>
@@ -208,15 +209,18 @@ export const ModerateConditions = meta.story({
   },
 });
 
-ModerateConditions.test('displays moderate conditions correctly', async ({ canvas }) => {
-  await canvas.findByText(/65\/100/);
-  
-  await expect(canvas.getByText(/MOYEN/)).toBeInTheDocument();
-  await expect(canvas.getByText('18°C')).toBeInTheDocument();
-  await expect(canvas.getByText(/20 km\/h NE/)).toBeInTheDocument();
-  await expect(canvas.getByText(/28 km\/h/)).toBeInTheDocument();
-  await expect(canvas.getByText(/50% nuages, Sec/)).toBeInTheDocument();
-});
+ModerateConditions.test(
+  'displays moderate conditions correctly',
+  async ({ canvas }) => {
+    await canvas.findByText(/65\/100/);
+
+    await expect(canvas.getByText(/MOYEN/)).toBeInTheDocument();
+    await expect(canvas.getByText('18°C')).toBeInTheDocument();
+    await expect(canvas.getByText(/20 km\/h NE/)).toBeInTheDocument();
+    await expect(canvas.getByText(/28 km\/h/)).toBeInTheDocument();
+    await expect(canvas.getByText(/50% nuages, Sec/)).toBeInTheDocument();
+  }
+);
 
 // Limite conditions
 export const LimiteConditions = meta.story({
@@ -237,15 +241,18 @@ export const LimiteConditions = meta.story({
   },
 });
 
-LimiteConditions.test('displays limite conditions correctly', async ({ canvas }) => {
-  await canvas.findByText(/45\/100/);
-  
-  await expect(canvas.getByText(/LIMITE/)).toBeInTheDocument();
-  await expect(canvas.getByText('15°C')).toBeInTheDocument();
-  await expect(canvas.getByText(/28 km\/h S/)).toBeInTheDocument();
-  await expect(canvas.getByText(/35 km\/h/)).toBeInTheDocument();
-  await expect(canvas.getByText(/75% nuages, Sec/)).toBeInTheDocument();
-});
+LimiteConditions.test(
+  'displays limite conditions correctly',
+  async ({ canvas }) => {
+    await canvas.findByText(/45\/100/);
+
+    await expect(canvas.getByText(/LIMITE/)).toBeInTheDocument();
+    await expect(canvas.getByText('15°C')).toBeInTheDocument();
+    await expect(canvas.getByText(/28 km\/h S/)).toBeInTheDocument();
+    await expect(canvas.getByText(/35 km\/h/)).toBeInTheDocument();
+    await expect(canvas.getByText(/75% nuages, Sec/)).toBeInTheDocument();
+  }
+);
 
 // Bad conditions
 export const BadConditions = meta.story({
@@ -268,12 +275,14 @@ export const BadConditions = meta.story({
 
 BadConditions.test('displays bad conditions correctly', async ({ canvas }) => {
   await canvas.findByText(/25\/100/);
-  
+
   await expect(canvas.getByText(/MAUVAIS/)).toBeInTheDocument();
   await expect(canvas.getByText('10°C')).toBeInTheDocument();
   await expect(canvas.getByText(/35 km\/h E/)).toBeInTheDocument();
   await expect(canvas.getByText(/45 km\/h/)).toBeInTheDocument();
-  await expect(canvas.getByText(/90% nuages, 5\.0mm pluie/)).toBeInTheDocument();
+  await expect(
+    canvas.getByText(/90% nuages, 5\.0mm pluie/)
+  ).toBeInTheDocument();
 });
 
 // No gusts data

@@ -99,10 +99,10 @@ export default function ProgressChart() {
               padding: '8px',
             }}
             labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
-            formatter={(value: number | undefined, name: string | undefined) => {
+            formatter={(value, name) => {
               const val = value || 0;
-              const hours = Math.floor(val / 60);
-              const mins = val % 60;
+              const hours = Math.floor(Number(val) / 60);
+              const mins = Number(val) % 60;
               let label = 'Durée';
               if (name === 'average') label = 'Moy. cumulée';
               if (name === 'rollingAvg') label = 'Moy. glissante (10)';

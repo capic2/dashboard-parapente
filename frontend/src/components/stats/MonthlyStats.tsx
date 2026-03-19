@@ -1,5 +1,14 @@
 import { useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 import { useFlights } from '../../hooks/useFlights';
 import { useFiltersStore } from '../../stores/filtersStore';
 import { format } from 'date-fns';
@@ -7,7 +16,11 @@ import { fr } from 'date-fns/locale';
 
 export default function MonthlyStats() {
   const { filters } = useFiltersStore();
-  const { data: flights = [], isLoading, error } = useFlights({ 
+  const {
+    data: flights = [],
+    isLoading,
+    error,
+  } = useFlights({
     limit: 300,
     siteId: filters.siteId || undefined,
     dateFrom: filters.dateFrom || undefined,
@@ -42,7 +55,9 @@ export default function MonthlyStats() {
       }))
       .sort((a, b) => {
         // Sort by date (reconstruct from fullMonth)
-        return new Date(a.fullMonth).getTime() - new Date(b.fullMonth).getTime();
+        return (
+          new Date(a.fullMonth).getTime() - new Date(b.fullMonth).getTime()
+        );
       });
 
     return data;
@@ -62,7 +77,9 @@ export default function MonthlyStats() {
   if (error || !chartData.length) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md text-center">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">📅 Statistiques Mensuelles</h3>
+        <h3 className="text-lg font-bold text-gray-900 mb-4">
+          📅 Statistiques Mensuelles
+        </h3>
         <p className="text-red-600 text-sm">Pas de données disponibles</p>
       </div>
     );
@@ -70,9 +87,14 @@ export default function MonthlyStats() {
 
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
-      <h3 className="text-lg font-bold text-gray-900 mb-4">📅 Statistiques Mensuelles</h3>
+      <h3 className="text-lg font-bold text-gray-900 mb-4">
+        📅 Statistiques Mensuelles
+      </h3>
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+        <BarChart
+          data={chartData}
+          margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
           <XAxis
             dataKey="month"
@@ -81,14 +103,24 @@ export default function MonthlyStats() {
           />
           <YAxis
             yAxisId="left"
-            label={{ value: 'Nombre de vols', angle: -90, position: 'insideLeft', style: { fontSize: 12, fill: '#666' } }}
+            label={{
+              value: 'Nombre de vols',
+              angle: -90,
+              position: 'insideLeft',
+              style: { fontSize: 12, fill: '#666' },
+            }}
             tick={{ fontSize: 12, fill: '#666' }}
             stroke="#999"
           />
           <YAxis
             yAxisId="right"
             orientation="right"
-            label={{ value: 'Heures de vol', angle: 90, position: 'insideRight', style: { fontSize: 12, fill: '#666' } }}
+            label={{
+              value: 'Heures de vol',
+              angle: 90,
+              position: 'insideRight',
+              style: { fontSize: 12, fill: '#666' },
+            }}
             tick={{ fontSize: 12, fill: '#666' }}
             stroke="#999"
           />
@@ -100,9 +132,10 @@ export default function MonthlyStats() {
               padding: '8px',
             }}
             labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
-            formatter={(value: number | undefined, name: string | undefined) => {
+            formatter={(value, name) => {
               const val = value || 0;
-              if (name === 'count') return [`${val} vol${val > 1 ? 's' : ''}`, 'Nombre de vols'];
+              if (name === 'count')
+                return [`${val} vol${Number(val) > 1 ? 's' : ''}`, 'Nombre de vols'];
               return [`${val}h`, 'Heures de vol'];
             }}
             labelFormatter={(label, payload) => {
@@ -114,10 +147,22 @@ export default function MonthlyStats() {
           />
           <Legend
             wrapperStyle={{ paddingTop: '20px' }}
-            formatter={(value) => (value === 'count' ? 'Nombre de vols' : 'Heures de vol')}
+            formatter={(value) =>
+              value === 'count' ? 'Nombre de vols' : 'Heures de vol'
+            }
           />
-          <Bar yAxisId="left" dataKey="count" fill="#4a90e2" radius={[8, 8, 0, 0]} />
-          <Bar yAxisId="right" dataKey="hours" fill="#82ca9d" radius={[8, 8, 0, 0]} />
+          <Bar
+            yAxisId="left"
+            dataKey="count"
+            fill="#4a90e2"
+            radius={[8, 8, 0, 0]}
+          />
+          <Bar
+            yAxisId="right"
+            dataKey="hours"
+            fill="#82ca9d"
+            radius={[8, 8, 0, 0]}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>
