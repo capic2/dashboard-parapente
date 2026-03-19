@@ -25,12 +25,14 @@ share/python-wheels/
 *.egg
 MANIFEST
 venv/
+venv_*/
 ENV/
 env/
 .venv/
 .env
 .env.*
 !.env.example
+!.env.development.example
 *.env.backup
 
 # IDEs
