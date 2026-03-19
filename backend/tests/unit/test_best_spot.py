@@ -761,3 +761,6 @@ async def test_calculate_best_spot_multiple_days_different_results(mock_db):
             # (This test assumes wind favorability logic works correctly)
             # Day 0 with W wind should favor W-oriented site (Arguel)
             # Day 3 with E wind should favor E-oriented site (Mont Poupet)
+            assert result_day_0["site"]["name"] == "Arguel"
+            assert result_day_3["site"]["name"] == "Mont Poupet"
+            assert result_day_0["site"]["name"] != result_day_3["site"]["name"]
