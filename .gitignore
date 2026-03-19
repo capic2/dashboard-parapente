@@ -25,12 +25,14 @@ share/python-wheels/
 *.egg
 MANIFEST
 venv/
+venv_*/
 ENV/
 env/
 .venv/
 .env
 .env.*
 !.env.example
+!.env.development.example
 *.env.backup
 
 # IDEs
@@ -55,6 +57,7 @@ logs/
 # Testing
 .pytest_cache/
 .coverage
+frontend/coverage
 htmlcov/
 
 # Node
@@ -84,4 +87,3 @@ cache/
 
 *storybook.log
 storybook-static
-docker-compose.prod.yml

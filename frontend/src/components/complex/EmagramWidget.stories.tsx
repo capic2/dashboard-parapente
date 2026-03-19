@@ -3,23 +3,30 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import EmagramWidget from './EmagramWidget';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: false },
-  },
-});
-
 const meta = preview.meta({
   title: 'Components/Complex/EmagramWidget',
   component: EmagramWidget,
   decorators: [
-    (Story) => (
-      <QueryClientProvider client={queryClient}>
-        <div style={{ maxWidth: '800px', padding: '20px' }}>
-          <Story />
-        </div>
-      </QueryClientProvider>
-    ),
+    (Story) => {
+      // Create a new QueryClient for each story to avoid cache conflicts
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: { 
+            retry: false,
+            gcTime: 0,  // Disable cache
+            staleTime: 0,  // Always consider data stale
+          },
+        },
+      });
+      
+      return (
+        <QueryClientProvider client={queryClient}>
+          <div style={{ maxWidth: '800px', padding: '20px' }}>
+            <Story />
+          </div>
+        </QueryClientProvider>
+      );
+    },
   ],
   parameters: {
     layout: 'fullscreen',
@@ -91,7 +98,7 @@ export const Default = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/emagram*', () => {
+        http.get('*/api/emagram', () => {
           return HttpResponse.json(mockEmagramData);
         }),
       ],
@@ -107,7 +114,7 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/emagram*', async () => {
+        http.get('*/api/emagram', async () => {
           await new Promise(() => {});
         }),
       ],
@@ -123,7 +130,7 @@ export const Error = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/emagram*', () => {
+        http.get('*/api/emagram', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],

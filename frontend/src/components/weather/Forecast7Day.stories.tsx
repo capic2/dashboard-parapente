@@ -4,23 +4,30 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import Forecast7Day from './Forecast7Day';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: false },
-  },
-});
-
 const meta = preview.meta({
   title: 'Components/Weather/Forecast7Day',
   component: Forecast7Day,
   decorators: [
-    (Story) => (
-      <QueryClientProvider client={queryClient}>
-        <div style={{ maxWidth: '1200px' }}>
-          <Story />
-        </div>
-      </QueryClientProvider>
-    ),
+    (Story) => {
+      // Create a new QueryClient for each story to avoid cache conflicts
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: { 
+            retry: false,
+            gcTime: 0,  // Disable cache
+            staleTime: 0,  // Always consider data stale
+          },
+        },
+      });
+      
+      return (
+        <QueryClientProvider client={queryClient}>
+          <div style={{ maxWidth: '1200px' }}>
+            <Story />
+          </div>
+        </QueryClientProvider>
+      );
+    },
   ],
   parameters: {
     layout: 'padded',
@@ -32,59 +39,75 @@ export default meta;
 
 // Mock daily summary data
 const mockDailySummaryGood = {
+  site_id: '1',
+  site_name: 'Annecy',
   days: [
     {
+      day_index: 0,
       date: new Date().toISOString().split('T')[0],
       para_index: 85,
       verdict: 'bon',
+      emoji: '🟢',
       temp_min: 15,
       temp_max: 25,
       wind_avg: 12,
     },
     {
+      day_index: 1,
       date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
       para_index: 90,
       verdict: 'bon',
+      emoji: '🟢',
       temp_min: 16,
       temp_max: 26,
       wind_avg: 10,
     },
     {
+      day_index: 2,
       date: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0],
       para_index: 75,
       verdict: 'moyen',
+      emoji: '🟡',
       temp_min: 14,
       temp_max: 22,
       wind_avg: 18,
     },
     {
+      day_index: 3,
       date: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
       para_index: 50,
       verdict: 'limite',
+      emoji: '🟠',
       temp_min: 12,
       temp_max: 20,
       wind_avg: 25,
     },
     {
+      day_index: 4,
       date: new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0],
       para_index: 30,
       verdict: 'mauvais',
+      emoji: '🔴',
       temp_min: 10,
       temp_max: 18,
       wind_avg: 35,
     },
     {
+      day_index: 5,
       date: new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0],
       para_index: 65,
       verdict: 'moyen',
+      emoji: '🟡',
       temp_min: 13,
       temp_max: 21,
       wind_avg: 20,
     },
     {
+      day_index: 6,
       date: new Date(Date.now() + 6 * 86400000).toISOString().split('T')[0],
       para_index: 80,
       verdict: 'bon',
+      emoji: '🟢',
       temp_min: 15,
       temp_max: 24,
       wind_avg: 14,
@@ -93,27 +116,35 @@ const mockDailySummaryGood = {
 };
 
 const mockDailySummaryAllGood = {
+  site_id: '1',
+  site_name: 'Annecy',
   days: [
     {
+      day_index: 0,
       date: new Date().toISOString().split('T')[0],
       para_index: 85,
       verdict: 'bon',
+      emoji: '🟢',
       temp_min: 18,
       temp_max: 28,
       wind_avg: 12,
     },
     {
+      day_index: 1,
       date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
       para_index: 90,
       verdict: 'bon',
+      emoji: '🟢',
       temp_min: 19,
       temp_max: 29,
       wind_avg: 10,
     },
     {
+      day_index: 2,
       date: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0],
       para_index: 88,
       verdict: 'bon',
+      emoji: '🟢',
       temp_min: 18,
       temp_max: 27,
       wind_avg: 11,
@@ -122,27 +153,35 @@ const mockDailySummaryAllGood = {
 };
 
 const mockDailySummaryAllBad = {
+  site_id: '1',
+  site_name: 'Annecy',
   days: [
     {
+      day_index: 0,
       date: new Date().toISOString().split('T')[0],
       para_index: 25,
       verdict: 'mauvais',
+      emoji: '🔴',
       temp_min: 8,
       temp_max: 15,
       wind_avg: 40,
     },
     {
+      day_index: 1,
       date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
       para_index: 30,
       verdict: 'mauvais',
+      emoji: '🔴',
       temp_min: 9,
       temp_max: 16,
       wind_avg: 38,
     },
     {
+      day_index: 2,
       date: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0],
       para_index: 20,
       verdict: 'mauvais',
+      emoji: '🔴',
       temp_min: 7,
       temp_max: 14,
       wind_avg: 42,
@@ -159,12 +198,43 @@ export const MixedConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/daily-summary/:spotId*', () => {
+        http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
       ],
     },
   },
+});
+
+MixedConditions.test('displays mixed conditions correctly', async ({ canvas }) => {
+  // Wait for data to load
+  await canvas.findByText(/85/);
+  
+  // Verify para_index values for all 7 days (these are unique identifiers)
+  await expect(canvas.getByText('85')).toBeInTheDocument();
+  await expect(canvas.getByText('90')).toBeInTheDocument();
+  await expect(canvas.getByText('75')).toBeInTheDocument();
+  await expect(canvas.getByText('50')).toBeInTheDocument();
+  await expect(canvas.getByText('30')).toBeInTheDocument();
+  await expect(canvas.getByText('65')).toBeInTheDocument();
+  await expect(canvas.getByText('80')).toBeInTheDocument();
+  
+  // Verify temperature range for first day
+  await expect(canvas.getByText('15° - 25°')).toBeInTheDocument();
+  
+  // Verify wind speed for first day
+  await expect(canvas.getByText(/12 km\/h/)).toBeInTheDocument();
+  
+  // Verify mixed verdicts exist (multiple instances expected)
+  const bonElements = canvas.getAllByText('bon');
+  const moyenElements = canvas.getAllByText('moyen');
+  const limiteElements = canvas.getAllByText('limite');
+  const mauvaisElements = canvas.getAllByText('mauvais');
+  
+  await expect(bonElements.length).toBeGreaterThan(0);
+  await expect(moyenElements.length).toBeGreaterThan(0);
+  await expect(limiteElements.length).toBeGreaterThan(0);
+  await expect(mauvaisElements.length).toBeGreaterThan(0);
 });
 
 // All good conditions
@@ -176,12 +246,32 @@ export const AllGoodConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/daily-summary/:spotId*', () => {
+        http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryAllGood);
         }),
       ],
     },
   },
+});
+
+AllGoodConditions.test('displays all good conditions correctly', async ({ canvas }) => {
+  // Wait for data to load
+  await canvas.findByText(/85/);
+  
+  // Verify all days show "bon" verdict (should appear 3 times)
+  const bonElements = canvas.getAllByText('bon');
+  await expect(bonElements).toHaveLength(3);
+  
+  // Verify para_index values for all 3 days
+  await expect(canvas.getByText('85')).toBeInTheDocument();
+  await expect(canvas.getByText('90')).toBeInTheDocument();
+  await expect(canvas.getByText('88')).toBeInTheDocument();
+  
+  // Verify temperature range for first day
+  await expect(canvas.getByText('18° - 28°')).toBeInTheDocument();
+  
+  // Verify wind speed for first day
+  await expect(canvas.getByText(/12 km\/h/)).toBeInTheDocument();
 });
 
 // All bad conditions
@@ -193,12 +283,32 @@ export const AllBadConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/daily-summary/:spotId*', () => {
+        http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryAllBad);
         }),
       ],
     },
   },
+});
+
+AllBadConditions.test('displays all bad conditions correctly', async ({ canvas }) => {
+  // Wait for data to load
+  await canvas.findByText(/25/);
+  
+  // Verify all days show "mauvais" verdict (should appear 3 times)
+  const mauvaisElements = canvas.getAllByText('mauvais');
+  await expect(mauvaisElements).toHaveLength(3);
+  
+  // Verify para_index values for all 3 days
+  await expect(canvas.getByText('25')).toBeInTheDocument();
+  await expect(canvas.getByText('30')).toBeInTheDocument();
+  await expect(canvas.getByText('20')).toBeInTheDocument();
+  
+  // Verify temperature range for first day
+  await expect(canvas.getByText('8° - 15°')).toBeInTheDocument();
+  
+  // Verify wind speed for first day
+  await expect(canvas.getByText(/40 km\/h/)).toBeInTheDocument();
 });
 
 // Second day selected
@@ -210,7 +320,7 @@ export const SecondDaySelected = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/daily-summary/:spotId*', () => {
+        http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
       ],
@@ -226,7 +336,7 @@ export const NoSelection = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/daily-summary/:spotId*', () => {
+        http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
       ],
@@ -244,7 +354,7 @@ export const WithCallback = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/daily-summary/:spotId*', () => {
+        http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
       ],
@@ -260,7 +370,7 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/daily-summary/:spotId*', async () => {
+        http.get('*/api/weather/daily-summary/:spotId', async () => {
           await new Promise(() => {}); // Never resolves
         }),
       ],
@@ -276,7 +386,7 @@ export const Error = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/daily-summary/:spotId*', () => {
+        http.get('*/api/weather/:spotId/daily-summary', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],
@@ -292,7 +402,7 @@ export const EmptyDays = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/daily-summary/:spotId*', () => {
+        http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json({ days: [] });
         }),
       ],
@@ -308,7 +418,7 @@ export const NoDaysField = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/daily-summary/:spotId*', () => {
+        http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json({});
         }),
       ],
@@ -327,7 +437,7 @@ export const DisplaysDailyData = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*!/api/weather/daily-summary/:spotId*', () => {
+        http.get('*!/api/weather/daily-summary/:spotId', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
       ],
@@ -359,7 +469,7 @@ export const ShowsLoadingState = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/daily-summary/:spotId*', async () => {
+        http.get('*/api/weather/daily-summary/:spotId', async () => {
           await new Promise(() => {});
         }),
       ],
@@ -380,7 +490,7 @@ export const ShowsErrorState = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/daily-summary/:spotId*', () => {
+        http.get('*/api/weather/:spotId/daily-summary', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],
@@ -403,7 +513,7 @@ export const HighlightsSelectedDay = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*!/api/weather/daily-summary/:spotId*', () => {
+        http.get('*!/api/weather/daily-summary/:spotId', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
       ],
@@ -431,7 +541,7 @@ export const CallsOnSelectDayCallback = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*!/api/weather/daily-summary/:spotId*', () => {
+        http.get('*!/api/weather/daily-summary/:spotId', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
       ],

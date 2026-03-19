@@ -4,23 +4,30 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import RecordsDashboard from './RecordsDashboard';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: false },
-  },
-});
-
 const meta = preview.meta({
   title: 'Components/Stats/RecordsDashboard',
   component: RecordsDashboard,
   decorators: [
-    (Story) => (
-      <QueryClientProvider client={queryClient}>
-        <div style={{ maxWidth: '1200px', padding: '20px' }}>
-          <Story />
-        </div>
-      </QueryClientProvider>
-    ),
+    (Story) => {
+      // Create a new QueryClient for each story to avoid cache conflicts
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: { 
+            retry: false,
+            gcTime: 0,  // Disable cache
+            staleTime: 0,  // Always consider data stale
+          },
+        },
+      });
+      
+      return (
+        <QueryClientProvider client={queryClient}>
+          <div style={{ maxWidth: '1200px', padding: '20px' }}>
+            <Story />
+          </div>
+        </QueryClientProvider>
+      );
+    },
   ],
   parameters: {
     layout: 'fullscreen',
@@ -34,26 +41,30 @@ export default meta;
 const mockRecords = {
   longest_duration: {
     value: 125,
+    flight_id: '1',
     flight_name: 'Vol XC Annecy',
-    date: '2024-08-15',
+    flight_date: '2024-08-15',
     site_name: 'Annecy',
   },
   highest_altitude: {
     value: 2850,
+    flight_id: '2',
     flight_name: 'Vol thermique',
-    date: '2024-07-22',
+    flight_date: '2024-07-22',
     site_name: 'Chamonix',
   },
   longest_distance: {
     value: 45.3,
+    flight_id: '3',
     flight_name: 'Cross country',
-    date: '2024-06-10',
+    flight_date: '2024-06-10',
     site_name: 'Mont Poupet',
   },
   max_speed: {
     value: 62.4,
+    flight_id: '4',
     flight_name: 'Speedflying',
-    date: '2024-09-01',
+    flight_date: '2024-09-01',
     site_name: 'Talloires',
   },
 };
@@ -61,14 +72,17 @@ const mockRecords = {
 const mockPartialRecords = {
   longest_duration: {
     value: 90,
+    flight_id: '5',
     flight_name: 'Vol local',
-    date: '2024-08-15',
+    flight_date: '2024-08-15',
     site_name: 'Annecy',
   },
   highest_altitude: {
     value: 1500,
+    flight_id: '6',
     flight_name: 'Vol thermal',
-    date: '2024-07-22',
+    flight_date: '2024-07-22',
+    site_name: null,
   },
   longest_distance: null,
   max_speed: null,
@@ -79,7 +93,7 @@ export const AllRecords = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/records*', () => {
+        http.get('*/api/flights/records', () => {
           return HttpResponse.json(mockRecords);
         }),
       ],
@@ -92,7 +106,7 @@ export const PartialRecords = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/records*', () => {
+        http.get('*/api/flights/records', () => {
           return HttpResponse.json(mockPartialRecords);
         }),
       ],
@@ -105,7 +119,7 @@ export const NoRecords = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/records*', () => {
+        http.get('*/api/flights/records', () => {
           return HttpResponse.json({
             longest_duration: null,
             highest_altitude: null,
@@ -123,7 +137,7 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/records*', async () => {
+        http.get('*/api/flights/records', async () => {
           await new Promise(() => {}); // Never resolves
         }),
       ],
@@ -136,7 +150,7 @@ export const Error = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/records*', () => {
+        http.get('*/api/flights/records', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],
@@ -150,7 +164,7 @@ export const DisplaysAllRecordCards = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/records*', () => {
+        http.get('*/api/flights/records', () => {
           return HttpResponse.json(mockRecords);
         }),
       ],
@@ -174,7 +188,7 @@ export const DisplaysRecordValues = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*!/api/flights/records*', () => {
+        http.get('*!/api/flights/records', () => {
           return HttpResponse.json(mockRecords);
         }),
       ],
@@ -196,7 +210,7 @@ export const ShowsLoadingSkeletons = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*!/api/flights/records*', async () => {
+        http.get('*!/api/flights/records', async () => {
           await new Promise(() => {});
         }),
       ],
@@ -213,7 +227,7 @@ export const ShowsErrorMessage = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*!/api/flights/records*', () => {
+        http.get('*!/api/flights/records', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],
@@ -231,7 +245,7 @@ export const ShowsNoDataForMissingRecords = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*!/api/flights/records*', () => {
+        http.get('*!/api/flights/records', () => {
           return HttpResponse.json(mockPartialRecords);
         }),
       ],

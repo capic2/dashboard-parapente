@@ -85,6 +85,7 @@ export interface HourlyForecastItem {
   sources?: Record<string, any>;
   thermal_strength?: 'faible' | 'modérée' | 'forte';
   cape?: number;
+  cloud_cover?: number | null;
 }
 
 export interface DailyForecastItem {
