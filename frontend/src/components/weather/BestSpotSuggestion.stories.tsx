@@ -18,19 +18,16 @@ const meta = preview.meta({
 
 export default meta;
 
-// Mock data
+// Mock data - simplified to match API response
 const mockBestSpotExcellent: BestSpotResult = {
   site: {
     id: '1',
+    code: 'annecy',
     name: 'Annecy',
     orientation: 'NW',
     latitude: 45.9,
     longitude: 6.1,
-    country: 'FR',
     rating: 5,
-    camera_distance: null,
-    flight_count: 0,
-    is_active: true,
   },
   paraIndex: 90,
   windDirection: 'NW',
@@ -38,19 +35,17 @@ const mockBestSpotExcellent: BestSpotResult = {
   windFavorability: 'good',
   score: 90,
   reason: 'Excellentes conditions (Para-Index 90), vent favorable NW 12km/h',
+  verdict: 'BON',
 };
 
 const mockBestSpotGood: BestSpotResult = {
   site: {
     id: '2',
+    code: 'chamonix',
     name: 'Chamonix',
     orientation: 'N',
     latitude: 45.9,
     longitude: 6.8,
-    country: 'FR',
-    camera_distance: null,
-    flight_count: 0,
-    is_active: true,
   },
   paraIndex: 75,
   windDirection: 'N',
@@ -58,19 +53,17 @@ const mockBestSpotGood: BestSpotResult = {
   windFavorability: 'good',
   score: 75,
   reason: 'Bonnes conditions (Para-Index 75), vent favorable N 15km/h',
+  verdict: 'BON',
 };
 
 const mockBestSpotModerate: BestSpotResult = {
   site: {
     id: '3',
+    code: 'talloires',
     name: 'Talloires',
     orientation: 'W',
     latitude: 45.8,
     longitude: 6.2,
-    country: 'FR',
-    camera_distance: null,
-    flight_count: 0,
-    is_active: true,
   },
   paraIndex: 55,
   windDirection: 'E',
@@ -78,19 +71,17 @@ const mockBestSpotModerate: BestSpotResult = {
   windFavorability: 'moderate',
   score: 55,
   reason: 'Conditions moyennes (Para-Index 55)',
+  verdict: 'MOYEN',
 };
 
 const mockBestSpotPoor: BestSpotResult = {
   site: {
     id: '4',
+    code: 'col-forclaz',
     name: 'Col de la Forclaz',
     orientation: 'S',
     latitude: 45.8,
     longitude: 6.2,
-    country: 'FR',
-    camera_distance: null,
-    flight_count: 0,
-    is_active: true,
   },
   paraIndex: 35,
   windDirection: 'N',
@@ -98,19 +89,17 @@ const mockBestSpotPoor: BestSpotResult = {
   windFavorability: 'bad',
   score: 35,
   reason: 'Conditions limites (Para-Index 35), vent défavorable N 25km/h',
+  verdict: 'LIMITE',
 };
 
 const mockBestSpotNoWind: BestSpotResult = {
   site: {
     id: '5',
+    code: 'contamines',
     name: 'Les Contamines',
     orientation: 'E',
     latitude: 45.8,
     longitude: 6.7,
-    country: 'FR',
-    camera_distance: null,
-    flight_count: 0,
-    is_active: true,
   },
   paraIndex: 80,
   windDirection: undefined,
@@ -118,19 +107,17 @@ const mockBestSpotNoWind: BestSpotResult = {
   windFavorability: 'moderate',
   score: 80,
   reason: 'Excellentes conditions (Para-Index 80)',
+  verdict: 'BON',
 };
 
 const mockBestSpotNoRating: BestSpotResult = {
   site: {
     id: '6',
+    code: 'saint-hilaire',
     name: 'Saint-Hilaire',
     orientation: 'S',
     latitude: 45.3,
     longitude: 5.9,
-    country: 'FR',
-    camera_distance: null,
-    flight_count: 0,
-    is_active: true,
   },
   paraIndex: 88,
   windDirection: 'S',
@@ -138,6 +125,7 @@ const mockBestSpotNoRating: BestSpotResult = {
   windFavorability: 'good',
   score: 88,
   reason: 'Excellentes conditions (Para-Index 88), vent favorable S 10km/h',
+  verdict: 'BON',
 };
 
 // Default story - Excellent conditions
@@ -210,17 +198,11 @@ export const NullData = meta.story({
   ),
 });
 
-// No site in bestSpot (renders nothing)
+// No site in bestSpot (renders nothing) - using null for the whole bestSpot
 export const NoSite = meta.story({
   render: () => (
     <BestSpotSuggestion
-      bestSpot={{
-        site: null,
-        paraIndex: 0,
-        windFavorability: 'moderate' as const,
-        score: 0,
-        reason: 'Aucune donnée météo disponible',
-      }}
+      bestSpot={null}
       onSelectSite={fn()}
     />
   ),
