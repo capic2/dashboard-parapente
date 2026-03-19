@@ -1,22 +1,28 @@
 /**
  * BestSpotSuggestion Component
  * 
- * Prominent card at the top of the dashboard showing the best spot to fly today
+ * Prominent card at the top of the dashboard showing the best spot to fly
  * Based on Para-Index and wind favorability
+ * 
+ * Updated to support displaying the date for different days
  */
 
+import { format, addDays } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import { WindIndicatorCompact } from '../WindIndicator';
-import type { BestSpotResult } from '../../hooks/useBestSpot';
+import type { BestSpotResult } from '../../hooks/useBestSpotAPI';
 
 export interface BestSpotSuggestionProps {
   bestSpot: BestSpotResult | null;
   onSelectSite: (siteId: string) => void;
+  selectedDayIndex?: number;
   className?: string;
 }
 
 export function BestSpotSuggestion({
   bestSpot,
   onSelectSite,
+  selectedDayIndex = 0,
   className = '',
 }: BestSpotSuggestionProps) {
   // Don't show if no data available
@@ -25,6 +31,14 @@ export function BestSpotSuggestion({
   }
 
   const { site, paraIndex, windDirection, windSpeed, reason } = bestSpot;
+
+  // Calculate the date label based on selectedDayIndex
+  const selectedDate = addDays(new Date(), selectedDayIndex);
+  const dateLabel = selectedDayIndex === 0
+    ? "aujourd'hui"
+    : selectedDayIndex === 1
+    ? "demain"
+    : format(selectedDate, 'EEEE d MMMM', { locale: fr });
 
   // Consistent sky blue theme for best spot card
   const bgColor = 'bg-sky-50 dark:bg-sky-900/20';
@@ -38,7 +52,7 @@ export function BestSpotSuggestion({
           <div className="text-3xl">🎯</div>
           <div>
             <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
-              Meilleur spot aujourd'hui
+              Meilleur spot pour {dateLabel}
             </h3>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xl font-bold text-gray-900 dark:text-white">
@@ -54,10 +68,10 @@ export function BestSpotSuggestion({
         </div>
 
         {/* Right side: Wind indicator */}
-        {windDirection && windSpeed !== undefined && (
+        {windDirection && windSpeed != null && (
           <WindIndicatorCompact
             windDirection={windDirection}
-            siteOrientation={site.orientation || undefined}
+            siteOrientation={site.orientation ?? undefined}
             windSpeed={windSpeed}
             className="text-2xl"
           />
@@ -120,10 +134,10 @@ export function BestSpotSuggestionCompact({
         <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
           🎯 Recommandé
         </span>
-        {windDirection && windSpeed !== undefined && (
+        {windDirection && windSpeed != null && (
           <WindIndicatorCompact
             windDirection={windDirection}
-            siteOrientation={site.orientation || undefined}
+            siteOrientation={site.orientation ?? undefined}
             windSpeed={windSpeed}
           />
         )}

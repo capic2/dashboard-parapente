@@ -6,116 +6,47 @@
  * 1. Para-Index scores from all sites
  * 2. Wind favorability matching
  * 3. Results are cached for 60 minutes (aligned with scheduler)
+ * 
+ * Updated to support day_index parameter for fetching best spot for different days
  */
 
-import { useState, useEffect } from 'react';
-import type { BestSpotResult } from './useBestSpot';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { BestSpotResultSchema, type BestSpotResult } from '../schemas';
 
-export interface ApiBestSpotResponse {
-  site: {
-    id: string;
-    code: string;
-    name: string;
-    latitude: number;
-    longitude: number;
-    orientation?: string;
-    rating?: number;
-  };
-  paraIndex: number;
-  windDirection?: string;
-  windSpeed?: number;
-  windFavorability: 'good' | 'moderate' | 'bad';
-  score: number;
-  reason: string;
-  verdict?: string;
-}
-
-export function useBestSpotAPI() {
-  const [bestSpot, setBestSpot] = useState<BestSpotResult | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function fetchBestSpot() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const data: ApiBestSpotResponse = await api.get('spots/best').json();
-
-        if (!mounted) return;
-
-        // Transform API response to BestSpotResult format
-        const result: BestSpotResult = {
-          site: {
-            id: data.site.id,
-            code: data.site.code,
-            name: data.site.name,
-            latitude: data.site.latitude,
-            longitude: data.site.longitude,
-            orientation: data.site.orientation || null,
-            rating: data.site.rating,
-            elevation_m: undefined, // Not provided by API
-            region: undefined,
-            country: 'FR',
-            description: undefined,
-            camera_distance: null,
-            flight_count: 0,
-            is_active: true,
-          },
-          paraIndex: data.paraIndex,
-          windDirection: data.windDirection,
-          windSpeed: data.windSpeed,
-          windFavorability: data.windFavorability,
-          score: data.score,
-          reason: data.reason,
-        };
-
-        setBestSpot(result);
-      } catch (err: any) {
-        if (!mounted) return;
-        
-        // Handle HTTPError from Ky
-        if (err.response) {
-          if (err.response.status === 404) {
-            setError('Aucune donnée disponible. Le scheduler n\'a peut-être pas encore été exécuté.');
-            setBestSpot(null);
-            return;
-          }
-          const message = `HTTP ${err.response.status}: ${err.response.statusText}`;
-          setError(message);
-        } else {
-          const message = err instanceof Error ? err.message : 'Erreur inconnue';
-          if (import.meta.env.DEV) {
-            console.error('Error fetching best spot:', err);
-          }
-          setError(message);
-        }
-        setBestSpot(null);
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    fetchBestSpot();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  return { bestSpot, loading, error };
+/**
+ * Hook to fetch the best spot for a specific day
+ * @param dayIndex - Day index (0 = today, 1 = tomorrow, ..., 6 = in 6 days)
+ * @returns Query result with the best spot data
+ */
+export function useBestSpotAPI(dayIndex: number = 0) {
+  return useQuery<BestSpotResult, Error>({
+    queryKey: ['bestSpot', dayIndex],
+    queryFn: async () => {
+      const params = new URLSearchParams({ day_index: dayIndex.toString() });
+      const response = await api
+        .get(`spots/best?${params}`)
+        .json();
+      
+      // Validate response with Zod schema
+      return BestSpotResultSchema.parse(response);
+    },
+    staleTime: 1000 * 60 * 60, // 60 minutes (aligned with backend cache)
+    gcTime: 1000 * 60 * 60 * 2, // 2 hours
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
 }
 
 /**
- * Get just the best site ID (useful for auto-selecting on dashboard)
+ * Get just the best site ID for a specific day (useful for auto-selecting on dashboard)
+ * @param dayIndex - Day index (0-6)
+ * @returns Site ID or null
  */
-export function useBestSiteIdAPI(): string | null {
-  const { bestSpot } = useBestSpotAPI();
+export function useBestSiteIdAPI(dayIndex: number = 0): string | null {
+  const { data: bestSpot } = useBestSpotAPI(dayIndex);
   return bestSpot?.site?.id || null;
 }
+
+// Re-export the type for convenience
+export type { BestSpotResult } from '../schemas';

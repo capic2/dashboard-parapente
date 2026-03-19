@@ -5,6 +5,7 @@ import { gpxData } from './data/gpx';
 import { weatherData } from './data/weather';
 import { flightStats } from './data/stats';
 import { weatherSources } from './data/weatherSources';
+import { getBestSpotForDay } from './data/bestSpot';
 
 // Helper to create handlers that work in both dev and Storybook
 const createHandler = (
@@ -13,8 +14,7 @@ const createHandler = (
   handler: Parameters<typeof http.get>[1]
 ): HttpHandler[] => {
   return [
-    http[method](`/api${path}`, handler),
-    http[method](`http://localhost:6006/api${path}`, handler),
+    http[method](`*/api${path}`, handler),
   ];
 };
 
@@ -28,6 +28,19 @@ export const handlers = [
     return HttpResponse.json({
       sites: sites,
     });
+  }),
+
+  // GET /api/spots/best - Retourne le meilleur spot pour un jour spécifique
+  // IMPORTANT: Must be BEFORE /spots/:spotId to avoid matching "best" as a spotId
+  ...createHandler('get', '/spots/best', ({ request }) => {
+    const url = new URL(request.url);
+    const dayIndexParam = url.searchParams.get('day_index');
+    const dayIndex = dayIndexParam ? parseInt(dayIndexParam, 10) : 0;
+    
+    // Get best spot data for the requested day
+    const bestSpot = getBestSpotForDay(dayIndex);
+    
+    return HttpResponse.json(bestSpot);
   }),
 
   // GET /api/spots/:spot_id - Retourne un site spécifique
@@ -73,15 +86,6 @@ export const handlers = [
     return HttpResponse.json({ success: true });
   }),
 
-  // GET /api/spots/best - Retourne le meilleur spot
-  ...createHandler('get', '/spots/best', () => {
-    return HttpResponse.json({
-      spot: sites[0],
-      score: 8.5,
-      reason: 'Vent favorable, conditions thermiques excellentes',
-    });
-  }),
-
   // ============================================
   // FLIGHTS / VOLS
   // ============================================
@@ -99,22 +103,24 @@ export const handlers = [
     });
   }),
 
-  // GET /api/flights/:flight_id - Retourne un vol spécifique
-  ...createHandler('get', '/flights/:flightId', ({ params }) => {
-    const { flightId } = params;
-    const flight = flights.find((f) => f.id === flightId);
+  // GET /api/flights/stats - Retourne les statistiques des vols
+  // IMPORTANT: Must be BEFORE /flights/:flightId to avoid matching "stats" as a flightId
+  ...createHandler('get', '/flights/stats', () => {
+    return HttpResponse.json(flightStats);
+  }),
 
-    if (!flight) {
-      return new HttpResponse(null, {
-        status: 404,
-        statusText: 'Flight not found',
-      });
-    }
-
-    return HttpResponse.json(flight);
+  // GET /api/flights/records - Retourne les records de vols
+  // IMPORTANT: Must be BEFORE /flights/:flightId to avoid matching "records" as a flightId
+  ...createHandler('get', '/flights/records', () => {
+    return HttpResponse.json({
+      longest_flight: 180,
+      highest_altitude: 2450,
+      longest_distance: 45.2,
+    });
   }),
 
   // GET /api/flights/:flight_id/gpx-data - Retourne les données GPX d'un vol
+  // IMPORTANT: Must be BEFORE /flights/:flightId to match the more specific path first
   ...createHandler('get', '/flights/:flightId/gpx-data', ({ params }) => {
     const { flightId } = params;
     const flight = flights.find((f) => f.id === flightId);
@@ -155,18 +161,19 @@ export const handlers = [
     return HttpResponse.json({ data });
   }),
 
-  // GET /api/flights/stats - Retourne les statistiques des vols
-  ...createHandler('get', '/flights/stats', () => {
-    return HttpResponse.json(flightStats);
-  }),
+  // GET /api/flights/:flight_id - Retourne un vol spécifique
+  ...createHandler('get', '/flights/:flightId', ({ params }) => {
+    const { flightId } = params;
+    const flight = flights.find((f) => f.id === flightId);
 
-  // GET /api/flights/records - Retourne les records de vols
-  ...createHandler('get', '/flights/records', () => {
-    return HttpResponse.json({
-      longest_flight: 180,
-      highest_altitude: 2450,
-      longest_distance: 45.2,
-    });
+    if (!flight) {
+      return new HttpResponse(null, {
+        status: 404,
+        statusText: 'Flight not found',
+      });
+    }
+
+    return HttpResponse.json(flight);
   }),
 
   // POST /api/flights - Créer un nouveau vol
@@ -357,6 +364,50 @@ export const handlers = [
       current: weather.consensus[0],
       today: weather.consensus,
     });
+  }),
+
+  // GET /api/weather/:spotId/daily-summary - Retourne le résumé météo sur plusieurs jours
+  ...createHandler('get', '/weather/:spotId/daily-summary', ({ params, request }) => {
+    const { spotId } = params;
+    const url = new URL(request.url);
+    const daysParam = url.searchParams.get('days');
+    const days = daysParam ? parseInt(daysParam, 10) : 7;
+
+    const site = sites.find((s) => s.id === spotId);
+    if (!site) {
+      return new HttpResponse(null, {
+        status: 404,
+        statusText: 'Spot not found',
+      });
+    }
+
+    // Generate daily summary for the requested number of days
+    const dailySummary = {
+      site_id: spotId,
+      site_name: site.name,
+      days: Array.from({ length: days }, (_, index) => {
+        const date = new Date();
+        date.setDate(date.getDate() + index);
+        
+        // Vary conditions across days for realistic mock data
+        const baseParaIndex = 70 + (index % 3) * 10;
+        const variance = Math.floor(Math.random() * 10);
+        const paraIndex = Math.min(100, baseParaIndex + variance);
+        
+        return {
+          day_index: index,
+          date: date.toISOString().split('T')[0],
+          para_index: paraIndex,
+          verdict: paraIndex >= 75 ? 'BON' : paraIndex >= 60 ? 'MOYEN' : 'MAUVAIS',
+          emoji: paraIndex >= 75 ? '✅' : paraIndex >= 60 ? '⚠️' : '❌',
+          temp_min: 10 + index,
+          temp_max: 18 + index,
+          wind_avg: 8 + index * 2,
+        };
+      }),
+    };
+
+    return HttpResponse.json(dailySummary);
   }),
 
   // ============================================

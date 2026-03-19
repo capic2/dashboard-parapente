@@ -217,8 +217,8 @@ export const NoSite = meta.story({
       bestSpot={{
         site: null,
         paraIndex: 0,
-        windFavorability: 'moderate' as const,
-        score: 0,
+        windDirection: null,
+        windSpeed: null,
         reason: 'Aucune donnée météo disponible',
       }}
       onSelectSite={fn()}

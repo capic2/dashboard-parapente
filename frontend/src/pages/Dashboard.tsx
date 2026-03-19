@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import SiteSelector from '../components/SiteSelector';
 import CurrentConditions from '../components/weather/CurrentConditions';
 import Forecast7Day from '../components/weather/Forecast7Day';
@@ -12,11 +12,10 @@ import { useBestSpotAPI } from '../hooks/useBestSpotAPI';
 
 export default function Dashboard() {
   const { data: sites, isLoading: sitesLoading, error } = useSites();
-  const { bestSpot, loading: bestSpotLoading, error: bestSpotError } = useBestSpotAPI();
   const [selectedSiteId, setSelectedSiteId] = useState<string>('');
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
+  const { data: bestSpot, isLoading: bestSpotLoading, isError: bestSpotError } = useBestSpotAPI(selectedDayIndex);
   const [weatherDataMap] = useState<Map<string, any>>(new Map()); // Pas utilisé mais gardé pour SiteSelector
-  const hourlyForecastRef = useRef<HTMLDivElement>(null);
   
   // Get selected site coordinates for emagram
   const { data: selectedSite } = useSite(selectedSiteId);
@@ -38,13 +37,9 @@ export default function Dashboard() {
     }
   }, [sites, selectedSiteId]);
 
-  // Handler for day selection with smooth scroll
+  // Handler for day selection (no scroll)
   const handleSelectDay = (dayIndex: number) => {
     setSelectedDayIndex(dayIndex);
-    // Scroll to hourly forecast
-    setTimeout(() => {
-      hourlyForecastRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
   };
 
   // Show error state
@@ -79,23 +74,31 @@ export default function Dashboard() {
 
   return (
     <div>
-      {/* Best Spot Suggestion - Loaded from backend API (cached) */}
-      {!bestSpotLoading && !bestSpotError && bestSpot && (
-        <BestSpotSuggestion 
-          bestSpot={bestSpot}
-          onSelectSite={setSelectedSiteId}
-          className="mb-4"
-        />
-      )}
-      
-      <SiteSelector 
-        selectedSiteId={selectedSiteId}
-        onSelectSite={setSelectedSiteId}
-        weatherData={weatherDataMap}
-      />
-
       <div className="space-y-4">
-        {/* Row 1: Current Conditions + Emagram Widget (1/3 - 2/3) */}
+        {/* Row 1: 7-Day Forecast (full width) - EN HAUT */}
+        <Forecast7Day 
+          spotId={selectedSiteId}
+          selectedDayIndex={selectedDayIndex}
+          onSelectDay={handleSelectDay}
+        />
+
+        {/* Row 2: Best Spot Suggestion - Loaded from backend API (cached) */}
+        {!bestSpotLoading && !bestSpotError && bestSpot && (
+          <BestSpotSuggestion 
+            bestSpot={bestSpot}
+            onSelectSite={setSelectedSiteId}
+            selectedDayIndex={selectedDayIndex}
+          />
+        )}
+        
+        {/* Row 3: Site Selector */}
+        <SiteSelector 
+          selectedSiteId={selectedSiteId}
+          onSelectSite={setSelectedSiteId}
+          weatherData={weatherDataMap}
+        />
+
+        {/* Row 4: Current Conditions + Emagram Widget (1/3 - 2/3) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-1">
             <CurrentConditions spotId={selectedSiteId} />
@@ -105,20 +108,11 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Row 2: Stats Panel (full width) */}
+        {/* Row 5: Stats Panel (full width) */}
         <StatsPanel />
 
-        {/* Row 3: 7-Day Forecast (full width) */}
-        <Forecast7Day 
-          spotId={selectedSiteId}
-          selectedDayIndex={selectedDayIndex}
-          onSelectDay={handleSelectDay}
-        />
-
-        {/* Row 4: Hourly Forecast (full width) */}
-        <div ref={hourlyForecastRef}>
-          <HourlyForecast spotId={selectedSiteId} dayIndex={selectedDayIndex} />
-        </div>
+        {/* Row 6: Hourly Forecast (full width) */}
+        <HourlyForecast spotId={selectedSiteId} dayIndex={selectedDayIndex} />
       </div>
     </div>
   );
