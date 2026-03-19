@@ -1,13 +1,13 @@
 import { useMemo } from 'react';
 import {
-  BarChart,
   Bar,
-  XAxis,
-  YAxis,
+  BarChart,
   CartesianGrid,
-  Tooltip,
   Legend,
   ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from 'recharts';
 import { useFlights } from '../../hooks/useFlights';
 import { useFiltersStore } from '../../stores/filtersStore';
@@ -46,21 +46,14 @@ export default function MonthlyStats() {
     });
 
     // Convert to array and sort chronologically
-    const data = Array.from(monthMap.entries())
+    return Array.from(monthMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, stats]) => ({
         month: format(new Date(key + '-01'), 'MMM yy', { locale: fr }),
         fullMonth: format(new Date(key + '-01'), 'MMMM yyyy', { locale: fr }),
         count: stats.count,
-        hours: Math.round((stats.totalMinutes / 60) * 10) / 10, // Round to 1 decimal
-      }))
-      .sort((a, b) => {
-        // Sort by date (reconstruct from fullMonth)
-        return (
-          new Date(a.fullMonth).getTime() - new Date(b.fullMonth).getTime()
-        );
-      });
-
-    return data;
+        hours: Math.round((stats.totalMinutes / 60) * 10) / 10,
+      }));
   }, [flights]);
 
   if (isLoading) {
@@ -135,7 +128,10 @@ export default function MonthlyStats() {
             formatter={(value, name) => {
               const val = value || 0;
               if (name === 'count')
-                return [`${val} vol${Number(val) > 1 ? 's' : ''}`, 'Nombre de vols'];
+                return [
+                  `${val} vol${Number(val) > 1 ? 's' : ''}`,
+                  'Nombre de vols',
+                ];
               return [`${val}h`, 'Heures de vol'];
             }}
             labelFormatter={(label, payload) => {
