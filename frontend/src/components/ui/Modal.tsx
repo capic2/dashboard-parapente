@@ -35,6 +35,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
               {title}
             </Heading>
             <Button
+                aria-label="Fermer"
               onPress={onClose}
               className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
             >

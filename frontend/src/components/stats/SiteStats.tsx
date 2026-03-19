@@ -23,7 +23,11 @@ export default function SiteStats() {
 
     flights.forEach((flight) => {
       const siteId = flight.site_id;
-      const siteName = flight.site_name || flight.site_id;
+      
+      // Skip flights without a site_id
+      if (!siteId) return;
+      
+      const siteName = flight.site_name || flight.site_id || 'Site inconnu';
 
       if (!siteMap.has(siteId)) {
         siteMap.set(siteId, { flights: [], name: siteName });

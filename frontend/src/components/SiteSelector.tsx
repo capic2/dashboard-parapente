@@ -1,5 +1,5 @@
 import { useSites } from '../hooks/useSites';
-import { MultiOrientationSelector } from './MultiOrientationSelector';
+import { MultiOrientationSelector } from './forms/MultiOrientationSelector';
 import { useQueryClient } from '@tanstack/react-query';
 import { createWeatherQueryFn } from '../hooks/useWeather';
 import type { Site } from '../types';

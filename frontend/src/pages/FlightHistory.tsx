@@ -7,10 +7,10 @@ import {
 } from '../hooks/useFlights';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Flight, Site } from '../types';
-import FlightViewer3D from '../components/FlightViewer3D';
-import { StravaSyncModal } from '../components/StravaSyncModal';
-import { CreateFlightModal } from '../components/CreateFlightModal';
-import { CreateSiteModal } from '../components/CreateSiteModal';
+import FlightViewer3D from '../components/complex/FlightViewer3D';
+import { StravaSyncModal } from '../components/forms/StravaSyncModal';
+import { CreateFlightModal } from '../components/forms/CreateFlightModal';
+import { CreateSiteModal } from '../components/forms/CreateSiteModal';
 import { useSites } from '../hooks/useSites';
 import { ToastContainer } from '../components/ui/Toast';
 import { useToast, useToastStore } from '../hooks/useToast';

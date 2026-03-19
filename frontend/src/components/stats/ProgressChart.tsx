@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, ComposedChart } from 'recharts';
+import { Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, ComposedChart } from 'recharts';
 import { useFlights } from '../../hooks/useFlights';
 import { useFiltersStore } from '../../stores/filtersStore';
 import { format } from 'date-fns';
@@ -25,14 +25,14 @@ export default function ProgressChart() {
       // Calculate cumulative average
       const relevantFlights = sortedFlights.slice(0, index + 1);
       const avgDuration =
-        relevantFlights.reduce((sum, f) => sum + f.duration_minutes, 0) / relevantFlights.length;
+        relevantFlights.reduce((sum, f) => sum + (f.duration_minutes ?? 0), 0) / relevantFlights.length;
 
       // Calculate rolling average (last 10 flights)
       const rollingWindow = 10;
       const startIndex = Math.max(0, index - rollingWindow + 1);
       const rollingFlights = sortedFlights.slice(startIndex, index + 1);
       const rollingAvg =
-        rollingFlights.reduce((sum, f) => sum + f.duration_minutes, 0) / rollingFlights.length;
+        rollingFlights.reduce((sum, f) => sum + (f.duration_minutes ?? 0), 0) / rollingFlights.length;
 
       return {
         date: format(new Date(flight.flight_date), 'dd MMM', { locale: fr }),

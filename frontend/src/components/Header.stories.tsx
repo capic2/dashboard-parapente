@@ -1,9 +1,12 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import preview from '../../.storybook/preview';
+import { TanstackRouterDecorator } from '../../.storybook/decorators';
 import Header from './Header';
+import {ComponentType} from "react";
 
-const meta: Meta<typeof Header> = {
+const meta = preview.meta({
   title: 'Components/Header',
   component: Header,
+  decorators: [TanstackRouterDecorator],
   parameters: {
     layout: 'fullscreen',
     docs: {
@@ -14,51 +17,66 @@ const meta: Meta<typeof Header> = {
     },
   },
   tags: ['autodocs'],
-};
+});
 
 export default meta;
-type Story = StoryObj<typeof Header>;
 
 /**
  * Default header with title
  * Router is initialized at root path '/'
  */
-export const Default: Story = {
+export const Default = meta.story({
   args: {},
-};
+  parameters: {
+    router: {
+      initialPath: '/',
+      routes: [{ path: '/', element: 'story' }],
+      renderRootRoute: (Story: ComponentType) => <Story />,
+    },
+  },
+});
 
 /**
  * Header with custom title
  */
-export const CustomTitle: Story = {
+export const CustomTitle = meta.story({
   args: {
     title: '🪂 Mon Dashboard Personnalisé',
   },
-};
+  parameters: {
+    router: {
+      initialPath: '/',
+      routes: [{ path: '/', element: 'story' }],
+      renderRootRoute: (Story: React.ComponentType) => <Story />,
+    },
+  },
+});
 
 /**
  * Header with router initialized on /flights path
  * Demonstrates custom router configuration via parameters
  */
-export const OnFlightsPage: Story = {
+export const OnFlightsPage = meta.story({
   args: {},
   parameters: {
     router: {
-      initialEntries: ['/flights'],
-      routes: ['/flights'],
+      initialPath: '/flights',
+      routes: [{ path: '/flights', element: 'story' }],
+      renderRootRoute: (Story: React.ComponentType) => <Story />,
     },
   },
-};
+});
 
 /**
  * Header with router initialized on /analytics path
  */
-export const OnAnalyticsPage: Story = {
+export const OnAnalyticsPage = meta.story({
   args: {},
   parameters: {
     router: {
-      initialEntries: ['/analytics'],
-      routes: ['/analytics'],
+      initialPath: '/analytics',
+      routes: [{ path: '/analytics', element: 'story' }],
+      renderRootRoute: (Story: React.ComponentType) => <Story />,
     },
   },
-};
+});

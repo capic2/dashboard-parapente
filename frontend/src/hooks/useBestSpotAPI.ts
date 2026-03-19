@@ -62,6 +62,8 @@ export function useBestSpotAPI() {
             region: undefined,
             country: 'FR',
             description: undefined,
+            camera_distance: null,
+            flight_count: 0,
             is_active: true,
           },
           paraIndex: data.paraIndex,

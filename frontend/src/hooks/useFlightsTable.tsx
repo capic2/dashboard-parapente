@@ -13,7 +13,8 @@ import {
   type Table,
 } from '@tanstack/react-table';
 import { useFlights } from './useFlights';
-import type { Flight, FlightFilters, WeatherSource } from '../types';
+import type { Flight, FlightFilters } from '../types';
+import type { WeatherSource } from '../types/weatherSources';
 
 /**
  * TanStack Table hook for flights list with sorting, filtering, pagination

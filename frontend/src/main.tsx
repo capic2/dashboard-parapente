@@ -8,7 +8,7 @@ async function enableMocking() {
   const enableMSW = import.meta.env.VITE_ENABLE_MSW !== 'false'
   
   if (import.meta.env.DEV && enableMSW) {
-    const { worker } = await import('./mocks/browser')
+    const { worker } = await import('../mocks/browser')
     
     // `worker.start()` retourne une Promise qui se résout
     // une fois que le Service Worker est prêt à intercepter les requêtes

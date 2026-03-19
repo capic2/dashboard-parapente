@@ -26,11 +26,11 @@ export const useUpdateSite = () => {
     mutationFn: async ({ siteId, data }: { siteId: string; data: SiteUpdate }) => {
       return await api.patch(`sites/${siteId}`, { json: data }).json()
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       // Invalidate all sites queries
-      queryClient.invalidateQueries({ queryKey: ['sites'] })
+      void queryClient.invalidateQueries({ queryKey: ['sites'] })
       // Invalidate specific site query
-      queryClient.invalidateQueries({ queryKey: ['sites', variables.siteId] })
+      void queryClient.invalidateQueries({ queryKey: ['sites', variables.siteId] })
     },
   })
 }

@@ -1,5 +1,14 @@
 import { useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
 import { useFlights } from '../../hooks/useFlights';
 import { useFiltersStore } from '../../stores/filtersStore';
 import { parseISO, getHours } from 'date-fns';
@@ -14,13 +23,17 @@ const TIME_COLORS: Record<string, string> = {
 
 /**
  * Graphique des heures de vol préférées
- * 
+ *
  * Analyse les heures de décollage (departure_time) pour identifier
  * les périodes de la journée préférées du pilote
  */
 export default function TimeOfDayChart() {
   const { filters } = useFiltersStore();
-  const { data: flights = [], isLoading, error } = useFlights({
+  const {
+    data: flights = [],
+    isLoading,
+    error,
+  } = useFlights({
     limit: 300,
     siteId: filters.siteId || undefined,
     dateFrom: filters.dateFrom || undefined,
@@ -62,7 +75,8 @@ export default function TimeOfDayChart() {
     return Object.entries(timeSlots).map(([period, count]) => ({
       period,
       count,
-      percentage: flights.length > 0 ? Math.round((count / flights.length) * 100) : 0,
+      percentage:
+        flights.length > 0 ? Math.round((count / flights.length) * 100) : 0,
     }));
   }, [flights]);
 
@@ -80,7 +94,9 @@ export default function TimeOfDayChart() {
   if (error) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md">
-        <h3 className="text-lg font-semibold mb-2 text-gray-900">⏰ Heures de vol préférées</h3>
+        <h3 className="text-lg font-semibold mb-2 text-gray-900">
+          ⏰ Heures de vol préférées
+        </h3>
         <div className="text-red-600">Erreur : {error.message}</div>
       </div>
     );
@@ -89,7 +105,9 @@ export default function TimeOfDayChart() {
   if (!chartData.length || flights.length === 0) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md">
-        <h3 className="text-lg font-semibold mb-2 text-gray-900">⏰ Heures de vol préférées</h3>
+        <h3 className="text-lg font-semibold mb-2 text-gray-900">
+          ⏰ Heures de vol préférées
+        </h3>
         <p className="text-gray-500 text-center py-8">
           Aucune donnée d'heure de décollage disponible
         </p>
@@ -102,14 +120,19 @@ export default function TimeOfDayChart() {
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">⏰ Heures de vol préférées</h3>
+        <h3 className="text-lg font-semibold text-gray-900">
+          ⏰ Heures de vol préférées
+        </h3>
         <p className="text-sm text-gray-600 mt-1">
           Répartition de vos {totalFlights} vols par période de la journée
         </p>
       </div>
 
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <BarChart
+          data={chartData}
+          margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis
             dataKey="period"
@@ -128,14 +151,17 @@ export default function TimeOfDayChart() {
               borderRadius: '8px',
               padding: '8px 12px',
             }}
-            formatter={(value: number, name: string, props: any) => [
+            formatter={(value, _name, props) => [
               `${value} vols (${props.payload.percentage}%)`,
               'Nombre de vols',
             ]}
           />
           <Bar dataKey="count" radius={[8, 8, 0, 0]}>
             {chartData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={TIME_COLORS[entry.period] || '#4a90e2'} />
+              <Cell
+                key={`cell-${index}`}
+                fill={TIME_COLORS[entry.period] || '#4a90e2'}
+              />
             ))}
           </Bar>
         </BarChart>
@@ -144,10 +170,7 @@ export default function TimeOfDayChart() {
       {/* Légende avec statistiques */}
       <div className="grid grid-cols-2 gap-3 mt-4">
         {chartData.map((slot) => (
-          <div
-            key={slot.period}
-            className="flex items-center gap-2 text-sm"
-          >
+          <div key={slot.period} className="flex items-center gap-2 text-sm">
             <div
               className="w-3 h-3 rounded"
               style={{ backgroundColor: TIME_COLORS[slot.period] }}

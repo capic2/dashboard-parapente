@@ -1,22 +1,26 @@
 import { create } from 'zustand'
-import type { Site, WeatherConditions, ForecastDay, WeatherSource } from '../types'
+import type { Site } from '../types'
+
+// Note: This store is deprecated and not currently used
+// WeatherConditions, ForecastDay, WeatherSource types have been removed
+// Consider removing this file if not needed
 
 interface WeatherStore {
   // State
   sites: Site[]
   currentSite: string | null
-  conditions: Record<string, WeatherConditions>
-  forecast: ForecastDay[]
-  sources: WeatherSource[]
+  conditions: Record<string, any> // Previously WeatherConditions
+  forecast: any[] // Previously ForecastDay[]
+  sources: any[] // Previously WeatherSource[]
   loading: boolean
   error: Error | null
 
   // Actions
   setCurrentSite: (siteId: string | null) => void
-  setConditions: (conditions: Record<string, WeatherConditions>) => void
-  setForecast: (forecast: ForecastDay[]) => void
+  setConditions: (conditions: Record<string, any>) => void
+  setForecast: (forecast: any[]) => void
   setSites: (sites: Site[]) => void
-  setSources: (sources: WeatherSource[]) => void
+  setSources: (sources: any[]) => void
   setLoading: (loading: boolean) => void
   setError: (error: Error | null) => void
   reset: () => void

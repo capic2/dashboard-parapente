@@ -1,6 +1,20 @@
 // Core domain types
 // Re-export types from Zod schemas to ensure consistency between validation and types
-export type { Site, Flight, FlightStats } from '../schemas'
+export type { 
+  Site, 
+  Flight, 
+  FlightStats, 
+  FlightRecord,
+  FlightRecords,
+  DailySummary, 
+  DailySummaryDay,
+  GeoPoint,
+  GPXData,
+  ParaglidingSpotBase,
+  ParaglidingSpotSearchResult,
+  SpotSearchResponse,
+  GeocodeResponse,
+} from '../schemas';
 
 export interface FlightFilters {
   siteId?: string;
@@ -8,8 +22,6 @@ export interface FlightFilters {
   dateTo?: string;
   limit?: number;
 }
-
-
 
 export interface Alert {
   id: string;
@@ -40,52 +52,8 @@ export interface AlertHistory {
   alert?: Alert;
 }
 
-export interface WeatherConditions {
-  site_id: string;
-  timestamp: string;
-  temperature_c: number;
-  wind_speed_kmh: number;
-  wind_gust_kmh: number;
-  wind_direction_deg: number;
-  precipitation_mm: number;
-  cloud_cover_percent: number;
-  cloud_base_m: number;
-  humidity_percent: number;
-  pressure_hpa: number;
-  visibility_km: number;
-}
-
-export interface ForecastHour {
-  time: string;
-  temperature_c: number;
-  wind_speed_kmh: number;
-  wind_gust_kmh: number;
-  wind_direction_deg: number;
-  precipitation_mm: number;
-  precipitation_probability_percent: number;
-  cloud_cover_percent: number;
-  cloud_base_m: number;
-}
-
-export interface ForecastDay {
-  date: string;
-  hours: ForecastHour[];
-  max_temp_c: number;
-  min_temp_c: number;
-  precipitation_total_mm: number;
-  avg_wind_speed_kmh: number;
-}
-
-export interface WeatherSource {
-  id: string;
-  name: string;
-  provider_type: 'meteo_france' | 'open_meteo' | 'windy' | 'custom';
-  is_active: boolean;
-  api_config?: Record<string, unknown>;
-  created_at: string;
-}
-
 // Weather data as returned by the API for combined endpoint
+// Transformed from BackendWeatherResponseSchema in useWeather hook
 export interface WeatherData {
   spot_name: string;
   para_index: number;
@@ -114,7 +82,9 @@ export interface HourlyForecastItem {
   precipitation: number;
   para_index: number;
   verdict: string;
-  sources?: Record<string, any>; // Per-source weather data for tooltips
+  sources?: Record<string, any>;
+  thermal_strength?: 'faible' | 'modérée' | 'forte';
+  cape?: number;
 }
 
 export interface DailyForecastItem {
