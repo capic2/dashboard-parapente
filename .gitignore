@@ -84,4 +84,3 @@ cache/
 
 *storybook.log
 storybook-static
-docker-compose.prod.yml
