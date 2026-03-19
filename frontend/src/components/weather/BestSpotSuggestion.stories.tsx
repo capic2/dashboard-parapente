@@ -1,11 +1,11 @@
-import { expect, userEvent } from 'storybook/test';
+import { expect, userEvent, screen } from 'storybook/test';
 import { fn } from 'storybook/test';
 import preview from '../../../.storybook/preview';
 import {
   BestSpotSuggestion,
   BestSpotSuggestionCompact,
 } from './BestSpotSuggestion';
-import type { BestSpotResult } from '../../hooks/useBestSpot';
+import type { BestSpotResult } from '../../hooks/useBestSpotAPI';
 
 const meta = preview.meta({
   title: 'Components/Weather/BestSpotSuggestion',
@@ -375,4 +375,100 @@ CompactCallsOnSelectSite.test('should call onSelectSite callback in compact vari
 
   // Note: In CSF3 with .test(), we can't easily check the callback
   // This test verifies the button is clickable and doesn't error
+});
+
+// ==========================================
+// NEW STORIES - DAY INDEX SUPPORT
+// ==========================================
+
+/**
+ * Meilleur spot pour aujourd'hui (day 0)
+ */
+export const Today = meta.story({
+  args: {
+    bestSpot: mockBestSpotExcellent,
+    selectedDayIndex: 0,
+    onSelectSite: fn(),
+  },
+});
+
+Today.test('should display "aujourd\'hui"', async () => {
+  await expect(screen.getByText(/aujourd'hui/i)).toBeInTheDocument();
+});
+
+/**
+ * Meilleur spot pour demain (day 1)
+ */
+export const Tomorrow = meta.story({
+  args: {
+    bestSpot: mockBestSpotGood,
+    selectedDayIndex: 1,
+    onSelectSite: fn(),
+  },
+});
+
+Tomorrow.test('should display "demain"', async () => {
+  await expect(screen.getByText(/demain/i)).toBeInTheDocument();
+});
+
+/**
+ * Meilleur spot pour dans 3 jours (day 3)
+ */
+export const Day3 = meta.story({
+  args: {
+    bestSpot: mockBestSpotModerate,
+    selectedDayIndex: 3,
+    onSelectSite: fn(),
+  },
+});
+
+Day3.test('should display formatted date', async () => {
+  // Devrait afficher "jeudi 22 mars" ou similaire
+  const text = screen.getByText(/meilleur spot pour/i).textContent;
+  expect(text).toMatch(/\w+ \d+ \w+/); // Pattern: "jeudi 22 mars"
+});
+
+/**
+ * Test de vent favorable (good)
+ */
+export const FavorableWind = meta.story({
+  args: {
+    bestSpot: {
+      ...mockBestSpotExcellent,
+      windFavorability: 'good',
+      paraIndex: 80,
+    },
+    selectedDayIndex: 0,
+    onSelectSite: fn(),
+  },
+});
+
+/**
+ * Test de vent modéré (moderate)
+ */
+export const ModerateWind = meta.story({
+  args: {
+    bestSpot: {
+      ...mockBestSpotModerate,
+      windFavorability: 'moderate',
+      paraIndex: 60,
+    },
+    selectedDayIndex: 0,
+    onSelectSite: fn(),
+  },
+});
+
+/**
+ * Test de vent défavorable (bad)
+ */
+export const BadWind = meta.story({
+  args: {
+    bestSpot: {
+      ...mockBestSpotPoor,
+      windFavorability: 'bad',
+      paraIndex: 40,
+    },
+    selectedDayIndex: 0,
+    onSelectSite: fn(),
+  },
 });

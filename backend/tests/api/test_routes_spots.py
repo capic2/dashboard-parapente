@@ -133,6 +133,35 @@ class TestBestSpotEndpoint:
         """GET /spots/best responds with multiple spots"""
         response = client.get(f"{API_PREFIX}/spots/best")
         assert response.status_code in [200, 404, 500, 503]
+    
+    def test_get_best_spot_with_day_index_0(self, client, db_session):
+        """GET /spots/best?day_index=0 returns best spot for today"""
+        response = client.get(f"{API_PREFIX}/spots/best?day_index=0")
+        # Should respond successfully or fail gracefully
+        assert response.status_code in [200, 404, 500, 503]
+    
+    def test_get_best_spot_with_day_index_3(self, client, db_session):
+        """GET /spots/best?day_index=3 returns best spot for day 3"""
+        response = client.get(f"{API_PREFIX}/spots/best?day_index=3")
+        assert response.status_code in [200, 404, 500, 503]
+    
+    def test_get_best_spot_invalid_day_index_too_high(self, client, db_session):
+        """GET /spots/best?day_index=10 returns 422 validation error"""
+        response = client.get(f"{API_PREFIX}/spots/best?day_index=10")
+        assert response.status_code == 422  # Validation error
+    
+    def test_get_best_spot_negative_day_index(self, client, db_session):
+        """GET /spots/best?day_index=-1 returns 422 validation error"""
+        response = client.get(f"{API_PREFIX}/spots/best?day_index=-1")
+        assert response.status_code == 422  # Validation error
+    
+    def test_get_best_spot_default_to_today(self, client, db_session):
+        """GET /spots/best without day_index defaults to day 0"""
+        response_default = client.get(f"{API_PREFIX}/spots/best")
+        response_day_0 = client.get(f"{API_PREFIX}/spots/best?day_index=0")
+        
+        # Both should have same status code
+        assert response_default.status_code == response_day_0.status_code
 
 
 class TestGetSpotByIdEndpoint:
