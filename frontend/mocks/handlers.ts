@@ -5,6 +5,7 @@ import { gpxData } from './data/gpx';
 import { weatherData } from './data/weather';
 import { flightStats } from './data/stats';
 import { weatherSources } from './data/weatherSources';
+import { mockBestSpotsByDay } from './data/bestSpot';
 
 // Helper to create handlers that work in both dev and Storybook
 const createHandler = (
@@ -73,13 +74,34 @@ export const handlers = [
     return HttpResponse.json({ success: true });
   }),
 
-  // GET /api/spots/best - Retourne le meilleur spot
-  ...createHandler('get', '/spots/best', () => {
-    return HttpResponse.json({
-      spot: sites[0],
-      score: 8.5,
-      reason: 'Vent favorable, conditions thermiques excellentes',
-    });
+  // GET /api/spots/best - Retourne le meilleur spot pour un jour donné
+  ...createHandler('get', '/spots/best', ({ request }) => {
+    const url = new URL(request.url);
+    const dayIndexParam = url.searchParams.get('day_index');
+    const dayIndex = dayIndexParam ? parseInt(dayIndexParam) : 0;
+    
+    // Validation
+    if (dayIndex < 0 || dayIndex > 6) {
+      return new HttpResponse(
+        JSON.stringify({
+          detail: [
+            {
+              loc: ['query', 'day_index'],
+              msg: 'ensure this value is greater than or equal to 0 and less than or equal to 6',
+              type: 'value_error',
+            },
+          ],
+        }),
+        {
+          status: 422,
+          statusText: 'Validation Error',
+        }
+      );
+    }
+    
+    // Retourner le meilleur spot pour le jour demandé
+    const bestSpot = mockBestSpotsByDay[dayIndex];
+    return HttpResponse.json(bestSpot);
   }),
 
   // ============================================

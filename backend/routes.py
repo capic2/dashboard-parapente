@@ -821,14 +821,21 @@ def delete_site(
 # IMPORTANT: This must be BEFORE /spots/{spot_id} to avoid route collision
 
 @router.get("/spots/best")
-async def get_best_spot(db: Session = Depends(get_db)):
+async def get_best_spot(
+    day_index: int = Query(default=0, ge=0, le=6, description="Day index (0=today, 1=tomorrow, ..., 6=in 6 days)"),
+    db: Session = Depends(get_db)
+):
     """
-    Get the best flying spot for today based on Para-Index and wind conditions
+    Get the best flying spot for a specific day based on Para-Index and wind conditions
     
     This endpoint:
     1. Returns cached result if available (fast response)
     2. Calculates from database if cache miss
-    3. Cache is automatically refreshed every hour by scheduler
+    3. Cache for day 0 (today) is automatically refreshed every hour by scheduler
+    4. Other days (1-6) are calculated on-demand and cached for 60 minutes
+    
+    Args:
+        day_index: Day index (0-6) where 0 is today, 1 is tomorrow, etc.
     
     Returns:
         Best spot with score, Para-Index, wind conditions, and reasoning
@@ -856,12 +863,12 @@ async def get_best_spot(db: Session = Depends(get_db)):
     from best_spot import get_best_spot_cached
     
     try:
-        best_spot = await get_best_spot_cached(db)
+        best_spot = await get_best_spot_cached(db, day_index)
         
         if not best_spot:
             raise HTTPException(
                 status_code=404,
-                detail="No forecast data available for today. The scheduler may not have run yet."
+                detail=f"No forecast data available for day {day_index}. The scheduler may not have run yet or weather data is unavailable."
             )
         
         return best_spot
