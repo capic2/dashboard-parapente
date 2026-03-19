@@ -33,7 +33,7 @@ aiofiles==25.1.0
 # Web Scraping & Browser Automation
 # ============================================
 playwright==1.58.0
-scrapling==0.4.1
+scrapling==0.4.2
 beautifulsoup4==4.14.3
 
 # ============================================
@@ -71,7 +71,7 @@ python-multipart==0.0.22
 metpy==1.7.1
 matplotlib==3.10.8
 numpy==2.4.3
-pillow==11.1.0
+pillow==11.3.0
 
 # ============================================
 # AI/LLM Integration
