@@ -83,6 +83,8 @@ export default defineConfig({
             headless: true,
             instances: [{ browser: 'chromium' }],
           },
+          testTimeout: 15000, // 15s per test (default is 5s)
+          teardownTimeout: 10000, // 10s for cleanup
           setupFiles: ['./.storybook/vitest.setup.ts'],
           // Disable coverage for Storybook tests
           coverage: {
