@@ -54,10 +54,10 @@ export const Default = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/stats*', () => {
+        http.get('*/api/flights/stats', () => {
           return HttpResponse.json(mockStats);
         }),
-        http.get('*/api/flights*', () => {
+        http.get('*/api/flights', () => {
           return HttpResponse.json({ flights: mockFlights });
         }),
       ],
@@ -69,10 +69,10 @@ export const Beginner = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/stats*', () => {
+        http.get('*/api/flights/stats', () => {
           return HttpResponse.json({ ...mockStats, total_flights: 3 });
         }),
-        http.get('*/api/flights*', () => {
+        http.get('*/api/flights', () => {
           return HttpResponse.json({ flights: mockFlights.slice(0, 3) });
         }),
       ],
@@ -84,7 +84,7 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/stats*', async () => {
+        http.get('*/api/flights/stats', async () => {
           await new Promise(() => {});
         }),
       ],

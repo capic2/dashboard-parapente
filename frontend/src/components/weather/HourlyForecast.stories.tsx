@@ -313,7 +313,7 @@ export const GoodConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId*', () => {
+        http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockBackendWeatherGood);
         }),
       ],
@@ -395,7 +395,7 @@ export const MixedConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId*', () => {
+        http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockBackendWeatherMixed);
         }),
       ],

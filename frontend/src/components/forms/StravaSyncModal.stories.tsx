@@ -73,7 +73,7 @@ export const Open = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*/api/strava/sync*', () => {
+        http.post('*/api/strava/sync', () => {
           return HttpResponse.json(mockSyncResult);
         }),
       ],
@@ -92,7 +92,7 @@ export const SyncingInProgress = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*!/api/strava/sync*', async () => {
+        http.post('*!/api/strava/sync', async () => {
           await delay('infinite');
           return HttpResponse.json(mockSyncResult);
         }),
@@ -116,7 +116,7 @@ export const SyncSuccess = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*!/api/strava/sync*', async () => {
+        http.post('*!/api/strava/sync', async () => {
           await delay(500);
           return HttpResponse.json(mockSyncResult);
         }),
@@ -140,7 +140,7 @@ export const SyncWithFailures = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*!/api/strava/sync*', async () => {
+        http.post('*!/api/strava/sync', async () => {
           await delay(500);
           return HttpResponse.json(mockSyncResultWithFailures);
         }),
@@ -164,7 +164,7 @@ export const SyncNoSkipped = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*!/api/strava/sync*', async () => {
+        http.post('*!/api/strava/sync', async () => {
           await delay(500);
           return HttpResponse.json(mockSyncResultNoSkipped);
         }),
@@ -190,7 +190,7 @@ export const CustomDateRange = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*!/api/strava/sync*', () => {
+        http.post('*!/api/strava/sync', () => {
           return HttpResponse.json(mockSyncResult);
         }),
       ],
@@ -266,7 +266,7 @@ export const ShowsSyncingState = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*!/api/strava/sync*', async () => {
+        http.post('*!/api/strava/sync', async () => {
           await delay(100);
           return HttpResponse.json(mockSyncResult);
         }),
@@ -296,7 +296,7 @@ export const ShowsSuccessMessage = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*!/api/strava/sync*', async () => {
+        http.post('*!/api/strava/sync', async () => {
           await delay(100);
           return HttpResponse.json(mockSyncResult);
         }),
@@ -334,7 +334,7 @@ export const ShowsFailures = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*!/api/strava/sync*', async () => {
+        http.post('*!/api/strava/sync', async () => {
           await delay(100);
           return HttpResponse.json(mockSyncResultWithFailures);
         }),
@@ -364,7 +364,7 @@ export const CallsOnSyncComplete = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*!/api/strava/sync*', async () => {
+        http.post('*!/api/strava/sync', async () => {
           await delay(100);
           return HttpResponse.json(mockSyncResult);
         }),

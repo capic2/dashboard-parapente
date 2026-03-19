@@ -153,7 +153,7 @@ export const ManualEntryFilled = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*!/api/sites*', () => {
+        http.post('*!/api/sites', () => {
           return HttpResponse.json(mockCreatedSite);
         }),
       ],
@@ -190,7 +190,7 @@ export const CreateSiteLoading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*!/api/sites*', async () => {
+        http.post('*!/api/sites', async () => {
           await delay('infinite');
           return HttpResponse.json(mockCreatedSite);
         }),
@@ -320,7 +320,7 @@ export const CreatesSiteSuccessfully = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*!/api/sites*', () => {
+        http.post('*!/api/sites', () => {
           return HttpResponse.json(mockCreatedSite);
         }),
       ],
@@ -402,7 +402,7 @@ export const ShowsAutoDetectWithFlightId = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*!/api/flights/:id/gpx*', () => {
+        http.get('*!/api/flights/:id/gpx', () => {
           return HttpResponse.json(mockGPXData);
         }),
       ],

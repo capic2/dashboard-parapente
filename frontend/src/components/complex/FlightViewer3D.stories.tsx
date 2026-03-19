@@ -55,10 +55,10 @@ export const Default = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/:id/gpx*', () => {
+        http.get('*/api/flights/:id/gpx', () => {
           return HttpResponse.json(mockGPXData);
         }),
-        http.get('*/api/flights/:id*', () => {
+        http.get('*/api/flights/:id', () => {
           return HttpResponse.json({
             id: 'flight-1',
             name: 'Test Flight',
@@ -77,7 +77,7 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/:id/gpx*', async () => {
+        http.get('*/api/flights/:id/gpx', async () => {
           await new Promise(() => {});
         }),
       ],
@@ -92,7 +92,7 @@ export const Error = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/:id/gpx*', () => {
+        http.get('*/api/flights/:id/gpx', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],
