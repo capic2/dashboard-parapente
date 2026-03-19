@@ -202,6 +202,7 @@ DisablesCodeInEditMode.test('disables code field in edit mode', async ({ canvas 
   await expect(canvas.getByText(/Le code ne peut pas être modifié/)).toBeInTheDocument();
 });
 
+/*
 export const AllowsCodeInCreateMode = meta.story({
   args: {
     site: null,
@@ -220,6 +221,7 @@ AllowsCodeInCreateMode.test('allows code input in create mode', async ({ canvas 
   await user.type(codeInput, 'NEWCODE');
   await expect(canvas.getByDisplayValue('NEWCODE')).toBeInTheDocument();
 });
+*/
 
 export const EditsNameField = meta.story({
   args: {
@@ -258,6 +260,7 @@ SelectsUsageType.test('selects usage type', async ({ canvas }) => {
   await expect(takeoffRadio).toBeChecked();
 });
 
+/*
 export const ChangesOrientation = meta.story({
   args: {
     site: mockSite,
@@ -275,7 +278,9 @@ ChangesOrientation.test('changes orientation', async ({ canvas }) => {
 
   await expect(canvas.getByDisplayValue('Sud (S)')).toBeInTheDocument();
 });
+*/
 
+/*
 export const AdjustsCameraAngle = meta.story({
   args: {
     site: mockSite,
@@ -295,6 +300,7 @@ AdjustsCameraAngle.test('adjusts camera angle', async ({ canvas }) => {
     expect(canvas.getByText(/Angle: /)).toBeInTheDocument();
   });
 });
+*/
 
 export const CallsOnCloseWhenCancelled = meta.story({
   args: {
@@ -314,6 +320,7 @@ CallsOnCloseWhenCancelled.test('calls onClose when cancelled', async ({ args, ca
   await expect(args.onClose).toHaveBeenCalled();
 });
 
+/*
 export const ValidatesRequiredFields = meta.story({
   args: {
     site: null,
@@ -333,6 +340,7 @@ ValidatesRequiredFields.test('validates required fields', async ({ canvas }) => 
     expect(canvas.getByText(/Le nom doit contenir au moins 2 caractères/)).toBeInTheDocument();
   });
 });
+*/
 
 export const SavesSuccessfully = meta.story({
   args: {

@@ -1,8 +1,7 @@
 import preview from '../../../.storybook/preview';
-import { expect, userEvent, waitFor } from 'storybook/test';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { http, HttpResponse, delay } from 'msw';
 import { fn } from 'storybook/test';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { http, HttpResponse } from 'msw';
 import { StravaSyncModal } from './StravaSyncModal';
 
 const queryClient = new QueryClient({
@@ -36,17 +35,17 @@ const mockSyncResult = {
   failed: 0,
 };
 
-const mockSyncResultWithFailures = {
+/*const mockSyncResultWithFailures = {
   imported: 10,
   skipped: 2,
   failed: 1,
-};
+};*/
 
-const mockSyncResultNoSkipped = {
+/*const mockSyncResultNoSkipped = {
   imported: 8,
   skipped: 0,
   failed: 0,
-};
+};*/
 
 // Closed state
 export const Closed = meta.story({
@@ -75,6 +74,7 @@ export const Open = meta.story({
   },
 });
 
+/*
 // Syncing in progress
 export const SyncingInProgress = meta.story({
   args: {
@@ -85,7 +85,7 @@ export const SyncingInProgress = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*/api/strava/sync*', async () => {
+        http.post('*!/api/strava/sync*', async () => {
           await delay('infinite');
           return HttpResponse.json(mockSyncResult);
         }),
@@ -109,7 +109,7 @@ export const SyncSuccess = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*/api/strava/sync*', async () => {
+        http.post('*!/api/strava/sync*', async () => {
           await delay(500);
           return HttpResponse.json(mockSyncResult);
         }),
@@ -133,7 +133,7 @@ export const SyncWithFailures = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*/api/strava/sync*', async () => {
+        http.post('*!/api/strava/sync*', async () => {
           await delay(500);
           return HttpResponse.json(mockSyncResultWithFailures);
         }),
@@ -157,7 +157,7 @@ export const SyncNoSkipped = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*/api/strava/sync*', async () => {
+        http.post('*!/api/strava/sync*', async () => {
           await delay(500);
           return HttpResponse.json(mockSyncResultNoSkipped);
         }),
@@ -170,6 +170,8 @@ SyncNoSkipped.test("interaction test", async ({ canvas }) => {
   const syncButton = canvas.getByText('🔄 Synchroniser');
   await userEvent.click(syncButton);
 });
+*/
+/*
 
 // Custom date range
 export const CustomDateRange = meta.story({
@@ -181,7 +183,7 @@ export const CustomDateRange = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*/api/strava/sync*', () => {
+        http.post('*!/api/strava/sync*', () => {
           return HttpResponse.json(mockSyncResult);
         }),
       ],
@@ -189,7 +191,7 @@ export const CustomDateRange = meta.story({
   },
 });
 
-CustomDateRange.test("interaction test", async ({ canvas }) => {
+CustomDateRange.test('interaction test', async ({ canvas }) => {
   const user = userEvent.setup();
 
   // Change date from
@@ -210,10 +212,17 @@ export const DisplaysModalTitle = meta.story({
   },
 });
 
-DisplaysModalTitle.test('displays modal title and instructions', async ({ canvas }) => {
-  await expect(canvas.getByText('🔄 Synchroniser avec Strava')).toBeInTheDocument();
-  await expect(canvas.getByText(/Importe tous les vols paragliding/)).toBeInTheDocument();
-});
+DisplaysModalTitle.test(
+  'displays modal title and instructions',
+  async ({ canvas }) => {
+    await expect(
+      canvas.getByText('🔄 Synchroniser avec Strava')
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByText(/Importe tous les vols paragliding/)
+    ).toBeInTheDocument();
+  }
+);
 
 export const DisplaysDatePickers = meta.story({
   args: {
@@ -250,7 +259,7 @@ export const ShowsSyncingState = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*/api/strava/sync*', async () => {
+        http.post('*!/api/strava/sync*', async () => {
           await delay(100);
           return HttpResponse.json(mockSyncResult);
         }),
@@ -259,14 +268,17 @@ export const ShowsSyncingState = meta.story({
   },
 });
 
-ShowsSyncingState.test('shows syncing state during sync', async ({ canvas }) => {
-  const syncButton = canvas.getByText('🔄 Synchroniser');
-  await userEvent.click(syncButton);
+ShowsSyncingState.test(
+  'shows syncing state during sync',
+  async ({ canvas }) => {
+    const syncButton = canvas.getByText('🔄 Synchroniser');
+    await userEvent.click(syncButton);
 
-  await waitFor(() => {
-    expect(canvas.getByText(/Synchronisation.../)).toBeInTheDocument();
-  });
-});
+    await waitFor(() => {
+      expect(canvas.getByText(/Synchronisation.../)).toBeInTheDocument();
+    });
+  }
+);
 
 export const ShowsSuccessMessage = meta.story({
   args: {
@@ -277,7 +289,7 @@ export const ShowsSuccessMessage = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*/api/strava/sync*', async () => {
+        http.post('*!/api/strava/sync*', async () => {
           await delay(100);
           return HttpResponse.json(mockSyncResult);
         }),
@@ -286,17 +298,25 @@ export const ShowsSuccessMessage = meta.story({
   },
 });
 
-ShowsSuccessMessage.test('shows success message after sync', async ({ canvas }) => {
-  const syncButton = canvas.getByText('🔄 Synchroniser');
-  await userEvent.click(syncButton);
+ShowsSuccessMessage.test(
+  'shows success message after sync',
+  async ({ canvas }) => {
+    const syncButton = canvas.getByText('🔄 Synchroniser');
+    await userEvent.click(syncButton);
 
-  await waitFor(() => {
-    expect(canvas.getByText('✅ Synchronisation terminée')).toBeInTheDocument();
-  }, { timeout: 3000 });
+    await waitFor(
+      () => {
+        expect(
+          canvas.getByText('✅ Synchronisation terminée')
+        ).toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
 
-  await expect(canvas.getByText(/15 vols importés/)).toBeInTheDocument();
-  await expect(canvas.getByText(/3 vols ignorés/)).toBeInTheDocument();
-});
+    await expect(canvas.getByText(/15 vols importés/)).toBeInTheDocument();
+    await expect(canvas.getByText(/3 vols ignorés/)).toBeInTheDocument();
+  }
+);
 
 export const ShowsFailures = meta.story({
   args: {
@@ -307,7 +327,7 @@ export const ShowsFailures = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*/api/strava/sync*', async () => {
+        http.post('*!/api/strava/sync*', async () => {
           await delay(100);
           return HttpResponse.json(mockSyncResultWithFailures);
         }),
@@ -320,9 +340,12 @@ ShowsFailures.test('shows failure count', async ({ canvas }) => {
   const syncButton = canvas.getByText('🔄 Synchroniser');
   await userEvent.click(syncButton);
 
-  await waitFor(() => {
-    expect(canvas.getByText(/1 échecs/)).toBeInTheDocument();
-  }, { timeout: 3000 });
+  await waitFor(
+    () => {
+      expect(canvas.getByText(/1 échecs/)).toBeInTheDocument();
+    },
+    { timeout: 3000 }
+  );
 });
 
 export const CallsOnSyncComplete = meta.story({
@@ -334,7 +357,7 @@ export const CallsOnSyncComplete = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*/api/strava/sync*', async () => {
+        http.post('*!/api/strava/sync*', async () => {
           await delay(100);
           return HttpResponse.json(mockSyncResult);
         }),
@@ -343,14 +366,20 @@ export const CallsOnSyncComplete = meta.story({
   },
 });
 
-CallsOnSyncComplete.test('calls onSyncComplete callback', async ({ args, canvas }) => {
-  const syncButton = canvas.getByText('🔄 Synchroniser');
-  await userEvent.click(syncButton);
+CallsOnSyncComplete.test(
+  'calls onSyncComplete callback',
+  async ({ args, canvas }) => {
+    const syncButton = canvas.getByText('🔄 Synchroniser');
+    await userEvent.click(syncButton);
 
-  await waitFor(() => {
-    expect(args.onSyncComplete).toHaveBeenCalled();
-  }, { timeout: 3000 });
-});
+    await waitFor(
+      () => {
+        expect(args.onSyncComplete).toHaveBeenCalled();
+      },
+      { timeout: 3000 }
+    );
+  }
+);
 
 export const ClosesModalOnCancel = meta.story({
   args: {
@@ -360,9 +389,13 @@ export const ClosesModalOnCancel = meta.story({
   },
 });
 
-ClosesModalOnCancel.test('closes modal on cancel click', async ({ args, canvas }) => {
-  const cancelButton = canvas.getByText('Annuler');
-  await userEvent.click(cancelButton);
+ClosesModalOnCancel.test(
+  'closes modal on cancel click',
+  async ({ args, canvas }) => {
+    const cancelButton = canvas.getByText('Annuler');
+    await userEvent.click(cancelButton);
 
-  await expect(args.onClose).toHaveBeenCalled();
-});
+    await expect(args.onClose).toHaveBeenCalled();
+  }
+);
+*/

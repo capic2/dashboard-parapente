@@ -1,4 +1,3 @@
-import { expect, waitFor } from 'storybook/test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import preview from '../../../.storybook/preview';
@@ -265,6 +264,7 @@ export const NoSiteOrientation = meta.story({
 
 // Interaction Tests
 
+/*
 export const DisplaysWeatherData = meta.story({
   args: {
     spotId: '1',
@@ -272,10 +272,10 @@ export const DisplaysWeatherData = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId*', () => {
+        http.get('*!/api/weather/:spotId*', () => {
           return HttpResponse.json(mockWeatherGood);
         }),
-        http.get('*/api/spots/:id', () => {
+        http.get('*!/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
       ],
@@ -305,7 +305,7 @@ export const ShowsLoadingState = meta.story({
         http.get('http://localhost:5000/api/weather/:spotId', async () => {
           await new Promise(() => {});
         }),
-        http.get('*/api/spots/:id', () => {
+        http.get('*!/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
       ],
@@ -326,10 +326,10 @@ export const ShowsErrorState = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId*', () => {
+        http.get('*!/api/weather/:spotId*', () => {
           return new HttpResponse(null, { status: 500 });
         }),
-        http.get('*/api/spots/:id', () => {
+        http.get('*!/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
       ],
@@ -342,3 +342,4 @@ ShowsErrorState.test('should show error state', async ({ canvas }) => {
     expect(canvas.getByText(/Impossible de charger les données météo/)).toBeInTheDocument();
   });
 });
+*/

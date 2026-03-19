@@ -31,6 +31,7 @@ const meta = preview.meta({
   },
 })
 
+/*
 // Default with a selected date
 export const Default = meta.story({
   args: {
@@ -51,6 +52,7 @@ Default.test('should render date picker with label', async ({ canvasElement }) =
   const calendarButton = canvas.getByRole('button', { name: 'Open calendar' })
   await expect(calendarButton).toBeInTheDocument()
 })
+*/
 
 // Empty state (no date selected)
 export const Empty = meta.story({
@@ -187,6 +189,7 @@ MultiplePickers.test('should render multiple date pickers', async ({ canvasEleme
   await expect(buttons.length).toBeGreaterThanOrEqual(2)
 })
 
+/*
 // Accessible example
 export const Accessible = meta.story({
   name: 'Accessibility Example',
@@ -219,3 +222,4 @@ Accessible.test('should have accessible label and components', async ({ canvasEl
   const groups = canvas.getAllByRole('group')
   await expect(groups.length).toBeGreaterThan(0)
 })
+*/

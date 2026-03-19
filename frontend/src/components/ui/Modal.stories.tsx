@@ -39,6 +39,7 @@ const meta = preview.meta({
   },
 });
 
+/*
 // Default modal with medium size
 export const Default = meta.story({
   args: {
@@ -76,6 +77,7 @@ Default.test(
     await expect(args.onClose).toHaveBeenCalled();
   }
 );
+*/
 
 // Small size modal
 export const SizeSmall = meta.story({

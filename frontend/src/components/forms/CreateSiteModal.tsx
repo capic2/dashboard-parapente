@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Label, Input, TextField, Button } from 'react-aria-components';
 import { Modal } from '../ui/Modal';
 import { useCreateSite, useGeocode } from '../../hooks/useSites';
 import { useFlightGPX } from '../../hooks/useFlightGPX';
@@ -112,31 +113,31 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
         {/* Mode selector */}
         <div className="flex gap-2">
           {flightId && gpxData?.coordinates && (
-            <button
-              onClick={() => { setMode('auto'); setError(null); }}
+            <Button
+              onPress={() => { setMode('auto'); setError(null); }}
               className={`px-4 py-2 rounded ${
                 mode === 'auto' ? 'bg-blue-500 text-white' : 'bg-gray-200'
               }`}
             >
               Auto-détection
-            </button>
+            </Button>
           )}
-          <button
-            onClick={() => { setMode('search'); setError(null); }}
+          <Button
+            onPress={() => { setMode('search'); setError(null); }}
             className={`px-4 py-2 rounded ${
               mode === 'search' ? 'bg-blue-500 text-white' : 'bg-gray-200'
             }`}
           >
             Recherche
-          </button>
-          <button
-            onClick={() => { setMode('manual'); setError(null); }}
+          </Button>
+          <Button
+            onPress={() => { setMode('manual'); setError(null); }}
             className={`px-4 py-2 rounded ${
               mode === 'manual' ? 'bg-blue-500 text-white' : 'bg-gray-200'
             }`}
           >
             Saisie manuelle
-          </button>
+          </Button>
         </div>
 
         {/* Error display */}
@@ -155,38 +156,40 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
             <p className="text-sm text-gray-600 mb-2">
               Utiliser le premier point GPS du fichier de vol
             </p>
-            <button
-              onClick={handleAutoDetect}
+            <Button
+              onPress={handleAutoDetect}
               className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
             >
               Détecter depuis le GPX
-            </button>
+            </Button>
           </div>
         )}
 
         {/* Search mode */}
         {mode === 'search' && (
           <div>
-            <label className="block text-sm font-medium mb-1">
-              Nom de la ville
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Ex: Besançon, Arguel..."
-                className="flex-1 px-3 py-2 border rounded"
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              />
-              <button
-                onClick={handleSearch}
-                disabled={geocode.isPending}
-                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50"
-              >
-                {geocode.isPending ? 'Recherche...' : 'Rechercher'}
-              </button>
-            </div>
+            <TextField className="flex flex-col gap-1">
+              <Label className="block text-sm font-medium">
+                Nom de la ville
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Ex: Besançon, Arguel..."
+                  className="flex-1 px-3 py-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                />
+                <Button
+                  onPress={handleSearch}
+                  isDisabled={geocode.isPending}
+                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50"
+                >
+                  {geocode.isPending ? 'Recherche...' : 'Rechercher'}
+                </Button>
+              </div>
+            </TextField>
             
             {searchResult && (
               <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
@@ -203,79 +206,79 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
         {/* Manual mode OR after search/auto */}
         {(mode === 'manual' || searchResult) && (
           <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium mb-1">
+            <TextField className="flex flex-col gap-1">
+              <Label className="block text-sm font-medium">
                 Nom du site *
-              </label>
-              <input
+              </Label>
+              <Input
                 type="text"
                 value={siteName}
                 onChange={(e) => setSiteName(e.target.value)}
                 placeholder="Ex: Mont Poupet"
-                className="w-full px-3 py-2 border rounded"
+                className="w-full px-3 py-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
+            </TextField>
 
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium mb-1">
+              <TextField className="flex flex-col gap-1">
+                <Label className="block text-sm font-medium">
                   Latitude *
-                </label>
-                <input
+                </Label>
+                <Input
                   type="number"
                   step="0.000001"
                   value={latitude}
                   onChange={(e) => setLatitude(e.target.value)}
                   placeholder="47.238"
-                  className="w-full px-3 py-2 border rounded"
+                  className="w-full px-3 py-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"
                 />
-              </div>
+              </TextField>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">
+              <TextField className="flex flex-col gap-1">
+                <Label className="block text-sm font-medium">
                   Longitude *
-                </label>
-                <input
+                </Label>
+                <Input
                   type="number"
                   step="0.000001"
                   value={longitude}
                   onChange={(e) => setLongitude(e.target.value)}
                   placeholder="6.024"
-                  className="w-full px-3 py-2 border rounded"
+                  className="w-full px-3 py-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"
                 />
-              </div>
+              </TextField>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">
+            <TextField className="flex flex-col gap-1">
+              <Label className="block text-sm font-medium">
                 Altitude (m)
-              </label>
-              <input
+              </Label>
+              <Input
                 type="number"
                 value={elevation}
                 onChange={(e) => setElevation(e.target.value)}
                 placeholder="450"
-                className="w-full px-3 py-2 border rounded"
+                className="w-full px-3 py-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
+            </TextField>
           </div>
         )}
 
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-4 border-t">
-          <button
-            onClick={onClose}
+          <Button
+            onPress={onClose}
             className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded"
           >
             Annuler
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={createSite.isPending || !siteName || !latitude || !longitude}
+          </Button>
+          <Button
+            onPress={handleCreate}
+            isDisabled={createSite.isPending || !siteName || !latitude || !longitude}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
           >
             {createSite.isPending ? 'Création...' : 'Créer le site'}
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

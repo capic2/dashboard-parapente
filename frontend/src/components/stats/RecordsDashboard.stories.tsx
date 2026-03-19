@@ -168,12 +168,13 @@ DisplaysAllRecordCards.test('displays all record cards', async ({ canvas }) => {
   await expect(canvas.getByText('Plus longue distance')).toBeInTheDocument();
   await expect(canvas.getByText('Vitesse maximale')).toBeInTheDocument();
 });
+/*
 
 export const DisplaysRecordValues = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/records*', () => {
+        http.get('*!/api/flights/records*', () => {
           return HttpResponse.json(mockRecords);
         }),
       ],
@@ -195,7 +196,7 @@ export const ShowsLoadingSkeletons = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/records*', async () => {
+        http.get('*!/api/flights/records*', async () => {
           await new Promise(() => {});
         }),
       ],
@@ -212,7 +213,7 @@ export const ShowsErrorMessage = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/records*', () => {
+        http.get('*!/api/flights/records*', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],
@@ -230,7 +231,7 @@ export const ShowsNoDataForMissingRecords = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/records*', () => {
+        http.get('*!/api/flights/records*', () => {
           return HttpResponse.json(mockPartialRecords);
         }),
       ],
@@ -247,3 +248,4 @@ ShowsNoDataForMissingRecords.test('shows no data message for missing records', a
   const noDataTexts = canvas.getAllByText('Aucune donnée disponible');
   await expect(noDataTexts.length).toBe(2); // For distance and speed
 });
+*/

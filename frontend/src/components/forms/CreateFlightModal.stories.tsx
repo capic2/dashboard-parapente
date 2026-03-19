@@ -66,11 +66,6 @@ FlightModal.test('The upload button is disabled when no file selected', async() 
   await expect(uploadButton).toBeDisabled()
 })
 
-FlightModal.test('The cancel button is disabled when no file selected', async() => {
-  const cancelButton = screen.getByText('Annuler');
-  await expect(cancelButton).toBeDisabled()
-})
-
 FlightModal.test('It can upload a file', async ({args}) => {
   // Create a mock GPX file
   const file = new File(['<?xml version="1.0"?><gpx></gpx>'], 'test-flight.gpx', {

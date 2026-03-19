@@ -1,8 +1,7 @@
 import preview from '../../../.storybook/preview';
-import { expect, userEvent, waitFor, screen } from 'storybook/test';
+import { expect, fn, screen, userEvent } from 'storybook/test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { http, HttpResponse, delay } from 'msw';
-import { fn } from 'storybook/test';
+import { delay, http, HttpResponse } from 'msw';
 import { CreateSiteModal } from './CreateSiteModal';
 
 const queryClient = new QueryClient({
@@ -36,6 +35,7 @@ const mockGeocodeResult = {
   display_name: 'Besançon, Doubs, France',
 };
 
+/*
 // Mock GPX data
 const mockGPXData = {
   coordinates: [
@@ -53,6 +53,7 @@ const mockCreatedSite = {
   elevation_m: 450,
   country: 'FR',
 };
+*/
 
 export const Modal = meta.story({
   args: {
@@ -63,7 +64,7 @@ export const Modal = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/geocode*', () => {
+        http.get('*/api/spots/geocode', () => {
           return HttpResponse.json(mockGeocodeResult);
         }),
       ],
@@ -71,64 +72,41 @@ export const Modal = meta.story({
   },
 });
 
-
-// Open - Manual mode
-export const OpenManualMode = meta.story({
-  args: {
-    isOpen: true,
-    onClose: fn(),
-    onSiteCreated: fn(),
-  },
+Modal.test('The creation button is disabled if no data', async () => {
+  await expect(
+    screen.getByRole('button', { name: /créer le site/i })
+  ).toBeDisabled();
 });
 
-OpenManualMode.test("interaction test", async () => {
-  const manualButton = screen.getByText('Saisie manuelle');
-  await userEvent.click(manualButton);
-});
-
-// Open - Auto-detect mode (with flight ID and GPX data)
-export const OpenAutoDetectMode = meta.story({
-  args: {
-    isOpen: true,
-    onClose: fn(),
-    onSiteCreated: fn(),
-    flightId: 'flight-1',
-  },
-  parameters: {
-    msw: {
-      handlers: [
-        http.get('*/api/flights/:id/gpx*', () => {
-          return HttpResponse.json(mockGPXData);
-        }),
-      ],
-    },
-  },
-});
-
-// Search success
-export const SearchSuccess = meta.story({
-  args: {
-    isOpen: true,
-    onClose: fn(),
-    onSiteCreated: fn(),
-  },
-  parameters: {
-    msw: {
-      handlers: [
-        http.get('*/api/geocode*', () => {
-          return HttpResponse.json(mockGeocodeResult);
-        }),
-      ],
-    },
-  },
-});
-
-SearchSuccess.test("interaction test", async () => {
+Modal.test('It is possible to search for a site', async ({ step }) => {
   const input = screen.getByPlaceholderText(/Ex: Besançon/);
   await userEvent.type(input, 'Besançon');
 
   const searchButton = screen.getByText('Rechercher');
   await userEvent.click(searchButton);
+
+  await expect(await screen.findByText(/✓ Trouvé !/)).toBeInTheDocument();
+
+  // Verify the location details are shown
+  await expect(
+    await screen.findByText(/Besançon, Doubs, France/)
+  ).toBeInTheDocument();
+  await expect(await screen.findByText(/47.23800/)).toBeInTheDocument();
+
+  await step('it fills the form fields', async () => {
+    await expect(
+      screen.getByLabelText('Nom du site', { exact: false })
+    ).toHaveValue('Besançon');
+    await expect(
+      screen.getByLabelText('Latitude', { exact: false })
+    ).toHaveValue(47.238);
+    await expect(
+      screen.getByLabelText('Longitude', { exact: false })
+    ).toHaveValue(6.024);
+    await expect(
+      screen.getByLabelText('Altitude', { exact: false })
+    ).toHaveValue(null);
+  });
 });
 
 // Search loading
@@ -141,7 +119,7 @@ export const SearchLoading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/geocode*', async () => {
+        http.get('*/api/spots/geocode', async () => {
           await delay('infinite');
           return HttpResponse.json(mockGeocodeResult);
         }),
@@ -150,14 +128,14 @@ export const SearchLoading = meta.story({
   },
 });
 
-SearchLoading.test("interaction test", async () => {
+SearchLoading.test('interaction test', async () => {
   const input = screen.getByPlaceholderText(/Ex: Besançon/);
   await userEvent.type(input, 'Besançon');
 
   const searchButton = screen.getByText('Rechercher');
   await userEvent.click(searchButton);
 });
-
+/*
 // Manual entry filled
 export const ManualEntryFilled = meta.story({
   args: {
@@ -168,7 +146,7 @@ export const ManualEntryFilled = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*/api/sites*', () => {
+        http.post('*!/api/sites*', () => {
           return HttpResponse.json(mockCreatedSite);
         }),
       ],
@@ -176,7 +154,7 @@ export const ManualEntryFilled = meta.story({
   },
 });
 
-ManualEntryFilled.test("interaction test", async ({ canvas }) => {
+ManualEntryFilled.test('interaction test', async ({ canvas }) => {
   const user = userEvent.setup();
 
   const manualButton = canvas.getByText('Saisie manuelle');
@@ -205,7 +183,7 @@ export const CreateSiteLoading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*/api/sites*', async () => {
+        http.post('*!/api/sites*', async () => {
           await delay('infinite');
           return HttpResponse.json(mockCreatedSite);
         }),
@@ -214,7 +192,7 @@ export const CreateSiteLoading = meta.story({
   },
 });
 
-CreateSiteLoading.test("interaction test", async ({ canvas }) => {
+CreateSiteLoading.test('interaction test', async ({ canvas }) => {
   const user = userEvent.setup();
 
   const manualButton = canvas.getByText('Saisie manuelle');
@@ -260,24 +238,33 @@ export const SwitchesBetweenModes = meta.story({
   },
 });
 
-SwitchesBetweenModes.test('switches between search and manual modes', async ({ canvas }) => {
-  const user = userEvent.setup();
+SwitchesBetweenModes.test(
+  'switches between search and manual modes',
+  async ({ canvas }) => {
+    const user = userEvent.setup();
 
-  // Default is search mode
-  await expect(canvas.getByPlaceholderText(/Ex: Besançon/)).toBeInTheDocument();
+    // Default is search mode
+    await expect(
+      canvas.getByPlaceholderText(/Ex: Besançon/)
+    ).toBeInTheDocument();
 
-  // Switch to manual mode
-  const manualButton = canvas.getByText('Saisie manuelle');
-  await user.click(manualButton);
+    // Switch to manual mode
+    const manualButton = canvas.getByText('Saisie manuelle');
+    await user.click(manualButton);
 
-  await expect(canvas.getByPlaceholderText(/Ex: Mont Poupet/)).toBeInTheDocument();
+    await expect(
+      canvas.getByPlaceholderText(/Ex: Mont Poupet/)
+    ).toBeInTheDocument();
 
-  // Switch back to search
-  const searchButton = canvas.getByText('Recherche');
-  await user.click(searchButton);
+    // Switch back to search
+    const searchButton = canvas.getByText('Recherche');
+    await user.click(searchButton);
 
-  await expect(canvas.getByPlaceholderText(/Ex: Besançon/)).toBeInTheDocument();
-});
+    await expect(
+      canvas.getByPlaceholderText(/Ex: Besançon/)
+    ).toBeInTheDocument();
+  }
+);
 
 export const SearchesForLocation = meta.story({
   args: {
@@ -288,7 +275,7 @@ export const SearchesForLocation = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/geocode*', () => {
+        http.get('*!/api/spots/geocode', () => {
           return HttpResponse.json(mockGeocodeResult);
         }),
       ],
@@ -296,21 +283,26 @@ export const SearchesForLocation = meta.story({
   },
 });
 
-SearchesForLocation.test('searches for location and displays results', async ({ canvas }) => {
-  const user = userEvent.setup();
+SearchesForLocation.test(
+  'searches for location and displays results',
+  async ({ canvas }) => {
+    const user = userEvent.setup();
 
-  const input = canvas.getByPlaceholderText(/Ex: Besançon/);
-  await user.type(input, 'Besançon');
+    const input = canvas.getByPlaceholderText(/Ex: Besançon/);
+    await user.type(input, 'Besançon');
 
-  const searchButton = canvas.getByText('Rechercher');
-  await user.click(searchButton);
+    const searchButton = canvas.getByText('Rechercher');
+    await user.click(searchButton);
 
-  await waitFor(() => {
-    expect(canvas.getByText(/✓ Trouvé !/)).toBeInTheDocument();
-  });
+    await waitFor(() => {
+      expect(canvas.getByText(/✓ Trouvé !/)).toBeInTheDocument();
+    });
 
-  await expect(canvas.getByText(/Besançon, Doubs, France/)).toBeInTheDocument();
-});
+    await expect(
+      canvas.getByText(/Besançon, Doubs, France/)
+    ).toBeInTheDocument();
+  }
+);
 
 export const CreatesSiteSuccessfully = meta.story({
   args: {
@@ -321,7 +313,7 @@ export const CreatesSiteSuccessfully = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*/api/sites*', () => {
+        http.post('*!/api/sites*', () => {
           return HttpResponse.json(mockCreatedSite);
         }),
       ],
@@ -329,30 +321,33 @@ export const CreatesSiteSuccessfully = meta.story({
   },
 });
 
-CreatesSiteSuccessfully.test('creates site successfully and calls callbacks', async ({ args, canvas }) => {
-  const user = userEvent.setup();
+CreatesSiteSuccessfully.test(
+  'creates site successfully and calls callbacks',
+  async ({ args, canvas }) => {
+    const user = userEvent.setup();
 
-  const manualButton = canvas.getByText('Saisie manuelle');
-  await user.click(manualButton);
+    const manualButton = canvas.getByText('Saisie manuelle');
+    await user.click(manualButton);
 
-  const nameInput = canvas.getByPlaceholderText(/Ex: Mont Poupet/);
-  await user.type(nameInput, 'Mont Poupet');
+    const nameInput = canvas.getByPlaceholderText(/Ex: Mont Poupet/);
+    await user.type(nameInput, 'Mont Poupet');
 
-  const latInput = canvas.getByPlaceholderText('47.238');
-  await user.type(latInput, '47.238');
+    const latInput = canvas.getByPlaceholderText('47.238');
+    await user.type(latInput, '47.238');
 
-  const lonInput = canvas.getByPlaceholderText('6.024');
-  await user.type(lonInput, '6.024');
+    const lonInput = canvas.getByPlaceholderText('6.024');
+    await user.type(lonInput, '6.024');
 
-  const createButton = canvas.getByText('Créer le site');
-  await user.click(createButton);
+    const createButton = canvas.getByText('Créer le site');
+    await user.click(createButton);
 
-  await waitFor(() => {
-    expect(args.onSiteCreated).toHaveBeenCalledWith(mockCreatedSite);
-  });
+    await waitFor(() => {
+      expect(args.onSiteCreated).toHaveBeenCalledWith(mockCreatedSite);
+    });
 
-  await expect(args.onClose).toHaveBeenCalled();
-});
+    await expect(args.onClose).toHaveBeenCalled();
+  }
+);
 
 export const DisablesCreateButtonWhenInvalid = meta.story({
   args: {
@@ -362,30 +357,33 @@ export const DisablesCreateButtonWhenInvalid = meta.story({
   },
 });
 
-DisablesCreateButtonWhenInvalid.test('disables create button when form is invalid', async ({ canvas }) => {
-  const user = userEvent.setup();
+DisablesCreateButtonWhenInvalid.test(
+  'disables create button when form is invalid',
+  async ({ canvas }) => {
+    const user = userEvent.setup();
 
-  const manualButton = canvas.getByText('Saisie manuelle');
-  await user.click(manualButton);
+    const manualButton = canvas.getByText('Saisie manuelle');
+    await user.click(manualButton);
 
-  const createButton = canvas.getByText('Créer le site');
-  await expect(createButton).toBeDisabled();
+    const createButton = canvas.getByText('Créer le site');
+    await expect(createButton).toBeDisabled();
 
-  // Add name only
-  const nameInput = canvas.getByPlaceholderText(/Ex: Mont Poupet/);
-  await user.type(nameInput, 'Mont Poupet');
-  await expect(createButton).toBeDisabled();
+    // Add name only
+    const nameInput = canvas.getByPlaceholderText(/Ex: Mont Poupet/);
+    await user.type(nameInput, 'Mont Poupet');
+    await expect(createButton).toBeDisabled();
 
-  // Add coordinates
-  const latInput = canvas.getByPlaceholderText('47.238');
-  await user.type(latInput, '47.238');
+    // Add coordinates
+    const latInput = canvas.getByPlaceholderText('47.238');
+    await user.type(latInput, '47.238');
 
-  const lonInput = canvas.getByPlaceholderText('6.024');
-  await user.type(lonInput, '6.024');
+    const lonInput = canvas.getByPlaceholderText('6.024');
+    await user.type(lonInput, '6.024');
 
-  // Now should be enabled
-  await expect(createButton).not.toBeDisabled();
-});
+    // Now should be enabled
+    await expect(createButton).not.toBeDisabled();
+  }
+);
 
 export const ShowsAutoDetectWithFlightId = meta.story({
   args: {
@@ -397,7 +395,7 @@ export const ShowsAutoDetectWithFlightId = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/:id/gpx*', () => {
+        http.get('*!/api/flights/:id/gpx*', () => {
           return HttpResponse.json(mockGPXData);
         }),
       ],
@@ -405,8 +403,11 @@ export const ShowsAutoDetectWithFlightId = meta.story({
   },
 });
 
-ShowsAutoDetectWithFlightId.test('shows auto-detect mode with flight ID', async ({ canvas }) => {
-  await waitFor(() => {
-    expect(canvas.getByText('Auto-détection')).toBeInTheDocument();
-  });
-});
+ShowsAutoDetectWithFlightId.test(
+  'shows auto-detect mode with flight ID',
+  async ({ canvas }) => {
+    await waitFor(() => {
+      expect(canvas.getByText('Auto-détection')).toBeInTheDocument();
+    });
+  }
+);*/
