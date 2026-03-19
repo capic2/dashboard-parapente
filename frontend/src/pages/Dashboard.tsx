@@ -37,7 +37,7 @@ export default function Dashboard() {
     }
   }, [sites, selectedSiteId]);
 
-  // Handler for day selection
+  // Handler for day selection (no scroll)
   const handleSelectDay = (dayIndex: number) => {
     setSelectedDayIndex(dayIndex);
   };
@@ -75,8 +75,8 @@ export default function Dashboard() {
   return (
     <div>
       <div className="space-y-4">
-        {/* Row 1: 7-Day Forecast (full width) - MOVED TO TOP */}
-        <Forecast7Day
+        {/* Row 1: 7-Day Forecast (full width) - EN HAUT */}
+        <Forecast7Day 
           spotId={selectedSiteId}
           selectedDayIndex={selectedDayIndex}
           onSelectDay={handleSelectDay}
@@ -84,15 +84,15 @@ export default function Dashboard() {
 
         {/* Row 2: Best Spot Suggestion - Loaded from backend API (cached) */}
         {!bestSpotLoading && !bestSpotError && bestSpot && (
-          <BestSpotSuggestion
+          <BestSpotSuggestion 
             bestSpot={bestSpot}
             onSelectSite={setSelectedSiteId}
             selectedDayIndex={selectedDayIndex}
           />
         )}
-
+        
         {/* Row 3: Site Selector */}
-        <SiteSelector
+        <SiteSelector 
           selectedSiteId={selectedSiteId}
           onSelectSite={setSelectedSiteId}
           weatherData={weatherDataMap}

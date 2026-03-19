@@ -1,151 +1,116 @@
 /**
- * Mock data for Best Spot API responses
+ * Mock data for Best Spot API
+ * Different best spot for each day (0-6)
  */
 
 import type { BestSpotResult } from '../../src/schemas';
 
-export const mockBestSpot: BestSpotResult = {
-  site: {
-    id: 'site-arguel',
-    code: 'arguel',
-    name: 'Arguel',
-    latitude: 47.2369,
-    longitude: 6.0636,
-    orientation: 'W',
-    rating: 4,
+export const bestSpotByDay: Record<number, BestSpotResult> = {
+  // Day 0 - Today: Arguel is best (favorable wind, good thermals)
+  0: {
+    site: {
+      id: 'site-arguel',
+      name: 'Arguel',
+      rating: 4,
+      orientation: 'S',
+    },
+    paraIndex: 85,
+    windDirection: 'N',
+    windSpeed: 12,
+    reason: 'Vent favorable Nord 12km/h, thermiques excellents (15h-18h)',
   },
-  paraIndex: 75,
-  windDirection: 'W',
-  windSpeed: 15,
-  windFavorability: 'good' as const,
-  score: 75,
-  reason: 'Excellentes conditions (Para-Index 75), vent favorable W 15km/h',
-  verdict: 'BON',
-};
 
-export const mockBestSpotDay1: BestSpotResult = {
-  site: {
-    id: 'site-arguel',
-    code: 'arguel',
-    name: 'Arguel',
-    latitude: 47.2369,
-    longitude: 6.0636,
-    orientation: 'W',
-    rating: 4,
+  // Day 1 - Tomorrow: Mont Poupet is best (light wind, good conditions)
+  1: {
+    site: {
+      id: 'site-mont-poupet',
+      name: 'Mont Poupet',
+      rating: 5,
+      orientation: 'W',
+    },
+    paraIndex: 92,
+    windDirection: 'E',
+    windSpeed: 8,
+    reason: 'Vent léger Est 8km/h, conditions optimales toute la journée',
   },
-  paraIndex: 70,
-  windDirection: 'W',
-  windSpeed: 14,
-  windFavorability: 'good' as const,
-  score: 70,
-  reason: 'Bonnes conditions (Para-Index 70), vent favorable W 14km/h',
-  verdict: 'BON',
-};
 
-export const mockBestSpotDay2: BestSpotResult = {
-  site: {
-    id: 'site-arguel',
-    code: 'arguel',
-    name: 'Arguel',
-    latitude: 47.2369,
-    longitude: 6.0636,
-    orientation: 'W',
-    rating: 4,
+  // Day 2 - La Côte is best (moderate wind)
+  2: {
+    site: {
+      id: 'site-la-cote',
+      name: 'La Côte',
+      rating: 3,
+      orientation: 'SE',
+    },
+    paraIndex: 72,
+    windDirection: 'NW',
+    windSpeed: 15,
+    reason: 'Vent modéré Nord-Ouest 15km/h, bon créneau 14h-17h',
   },
-  paraIndex: 65,
-  windDirection: 'W',
-  windSpeed: 13,
-  windFavorability: 'good' as const,
-  score: 65,
-  reason: 'Bonnes conditions (Para-Index 65), vent favorable W 13km/h',
-  verdict: 'MOYEN',
-};
 
-export const mockBestSpotDay3: BestSpotResult = {
-  site: {
-    id: 'site-mont-poupet-ouest',
-    code: 'mont-poupet-ouest',
-    name: 'Mont Poupet Ouest',
-    latitude: 46.8,
-    longitude: 5.9,
-    orientation: 'W',
-    rating: 5,
+  // Day 3 - Arguel again (wind picks up)
+  3: {
+    site: {
+      id: 'site-arguel',
+      name: 'Arguel',
+      rating: 4,
+      orientation: 'S',
+    },
+    paraIndex: 68,
+    windDirection: 'N',
+    windSpeed: 18,
+    reason: 'Vent soutenu Nord 18km/h, vol possible pour pilotes confirmés',
   },
-  paraIndex: 65,
-  windDirection: 'W',
-  windSpeed: 12,
-  windFavorability: 'good' as const,
-  score: 65,
-  reason: 'Bonnes conditions (Para-Index 65), vent favorable W 12km/h',
-  verdict: 'MOYEN',
-};
 
-export const mockBestSpotDay4: BestSpotResult = {
-  site: {
-    id: 'site-la-cote',
-    code: 'la-cote',
-    name: 'La Côte',
-    latitude: 47.15,
-    longitude: 6.1,
-    orientation: 'E',
-    rating: 3,
+  // Day 4 - Mont Poupet (calmer conditions)
+  4: {
+    site: {
+      id: 'site-mont-poupet',
+      name: 'Mont Poupet',
+      rating: 5,
+      orientation: 'W',
+    },
+    paraIndex: 78,
+    windDirection: 'SE',
+    windSpeed: 10,
+    reason: 'Vent faible Sud-Est 10km/h, bonnes conditions thermiques',
   },
-  paraIndex: 55,
-  windDirection: 'E',
-  windSpeed: 11,
-  windFavorability: 'good' as const,
-  score: 55,
-  reason: 'Conditions moyennes (Para-Index 55), vent favorable E 11km/h',
-  verdict: 'MOYEN',
-};
 
-export const mockBestSpotDay5: BestSpotResult = {
-  site: {
-    id: 'site-arguel',
-    code: 'arguel',
-    name: 'Arguel',
-    latitude: 47.2369,
-    longitude: 6.0636,
-    orientation: 'W',
-    rating: 4,
+  // Day 5 - La Côte (variable conditions)
+  5: {
+    site: {
+      id: 'site-la-cote',
+      name: 'La Côte',
+      rating: 3,
+      orientation: 'SE',
+    },
+    paraIndex: 55,
+    windDirection: 'W',
+    windSpeed: 22,
+    reason: 'Vent fort Ouest 22km/h, conditions difficiles, prudence recommandée',
   },
-  paraIndex: 50,
-  windDirection: 'SW',
-  windSpeed: 10,
-  windFavorability: 'moderate' as const,
-  score: 35, // 50 * 0.7
-  reason: 'Conditions moyennes (Para-Index 50)',
-  verdict: 'LIMITE',
-};
 
-export const mockBestSpotDay6: BestSpotResult = {
-  site: {
-    id: 'site-arguel',
-    code: 'arguel',
-    name: 'Arguel',
-    latitude: 47.2369,
-    longitude: 6.0636,
-    orientation: 'W',
-    rating: 4,
+  // Day 6 - Arguel (improving conditions)
+  6: {
+    site: {
+      id: 'site-arguel',
+      name: 'Arguel',
+      rating: 4,
+      orientation: 'S',
+    },
+    paraIndex: 81,
+    windDirection: 'NE',
+    windSpeed: 14,
+    reason: 'Vent modéré Nord-Est 14km/h, amélioration en fin de journée',
   },
-  paraIndex: 45,
-  windDirection: 'W',
-  windSpeed: 9,
-  windFavorability: 'moderate' as const,
-  score: 31.5, // 45 * 0.7
-  reason: 'Conditions limites (Para-Index 45)',
-  verdict: 'LIMITE',
 };
 
 /**
- * Array of all best spots by day index
+ * Get best spot for a specific day
+ * @param dayIndex - Day index (0-6)
+ * @returns Best spot data for that day
  */
-export const mockBestSpotsByDay: BestSpotResult[] = [
-  mockBestSpot,      // Day 0
-  mockBestSpotDay1,  // Day 1
-  mockBestSpotDay2,  // Day 2
-  mockBestSpotDay3,  // Day 3
-  mockBestSpotDay4,  // Day 4
-  mockBestSpotDay5,  // Day 5
-  mockBestSpotDay6,  // Day 6
-];
+export function getBestSpotForDay(dayIndex: number): BestSpotResult {
+  const day = Math.max(0, Math.min(6, dayIndex)); // Clamp to 0-6
+  return bestSpotByDay[day];
+}
