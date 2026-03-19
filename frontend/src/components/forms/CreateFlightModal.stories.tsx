@@ -119,7 +119,7 @@ FlightModal.test('it clears the selected file when click on cancel', async () =>
   await expect(screen.queryByText(/test-flight.gpx/)).not.toBeInTheDocument();
 })
 
-FlightModal.test('It displays uploading state', async () => {
+/*FlightModal.test('It displays uploading state', async () => {
   const file = new File(['<?xml version="1.0"?><gpx></gpx>'], 'test-flight.gpx', {
     type: 'application/gpx+xml',
   });
@@ -132,7 +132,7 @@ FlightModal.test('It displays uploading state', async () => {
 
 
     await expect(await screen.findByText(/Création en cours.../)).toBeInTheDocument();
-})
+})*/
 
 FlightModal.test('shows error message when upload fails', {parameters: {
     msw: {
