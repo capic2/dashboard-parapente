@@ -261,7 +261,7 @@ export const DisplaysBestSpotData = meta.story({
 });
 
 DisplaysBestSpotData.test('should display best spot data correctly', async ({ canvas }) => {
-  await expect(canvas.getByText("Meilleur spot aujourd'hui")).toBeInTheDocument();
+  await expect(canvas.getByText("Meilleur spot pour aujourd'hui")).toBeInTheDocument();
   await expect(canvas.getByText('Annecy')).toBeInTheDocument();
   await expect(canvas.getByText('90/100')).toBeInTheDocument();
   await expect(canvas.getByText('Vent:')).toBeInTheDocument();
