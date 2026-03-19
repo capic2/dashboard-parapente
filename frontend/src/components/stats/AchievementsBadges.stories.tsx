@@ -3,23 +3,30 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import AchievementsBadges from './AchievementsBadges';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: false },
-  },
-});
-
 const meta = preview.meta({
   title: 'Components/Stats/AchievementsBadges',
   component: AchievementsBadges,
   decorators: [
-    (Story) => (
-      <QueryClientProvider client={queryClient}>
-        <div style={{ maxWidth: '1200px', padding: '20px' }}>
-          <Story />
-        </div>
-      </QueryClientProvider>
-    ),
+    (Story) => {
+      // Create a new QueryClient for each story to avoid cache conflicts
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: { 
+            retry: false,
+            gcTime: 0,  // Disable cache
+            staleTime: 0,  // Always consider data stale
+          },
+        },
+      });
+      
+      return (
+        <QueryClientProvider client={queryClient}>
+          <div style={{ maxWidth: '1200px', padding: '20px' }}>
+            <Story />
+          </div>
+        </QueryClientProvider>
+      );
+    },
   ],
   parameters: {
     layout: 'fullscreen',
@@ -47,10 +54,10 @@ export const Default = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/stats*', () => {
+        http.get('*/api/flights/stats', () => {
           return HttpResponse.json(mockStats);
         }),
-        http.get('*/api/flights*', () => {
+        http.get('*/api/flights', () => {
           return HttpResponse.json({ flights: mockFlights });
         }),
       ],
@@ -62,10 +69,10 @@ export const Beginner = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/stats*', () => {
+        http.get('*/api/flights/stats', () => {
           return HttpResponse.json({ ...mockStats, total_flights: 3 });
         }),
-        http.get('*/api/flights*', () => {
+        http.get('*/api/flights', () => {
           return HttpResponse.json({ flights: mockFlights.slice(0, 3) });
         }),
       ],
@@ -77,7 +84,7 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/stats*', async () => {
+        http.get('*/api/flights/stats', async () => {
           await new Promise(() => {});
         }),
       ],
