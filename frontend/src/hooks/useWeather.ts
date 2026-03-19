@@ -141,11 +141,12 @@ export const createWeatherQueryFn =
           hour.cloud_cover !== null
             ? `${Math.round(hour.cloud_cover)}% nuages`
             : 'N/A',
-        precipitation: hour.precipitation || 0,
-        para_index: hour.para_index || 0, // Use backend calculation (accurate)
-        verdict: hour.verdict || 'N/A', // Use backend verdict (accurate)
-        cape: hour.cape || 0, // CAPE (J/kg)
+        precipitation: hour.precipitation ?? 0,
+        para_index: hour.para_index ?? 0, // Use backend calculation (accurate)
+        verdict: hour.verdict ?? 'N/A', // Use backend verdict (accurate)
+        cape: hour.cape ?? 0, // CAPE (J/kg)
         thermal_strength: hour.thermal_strength || 'Faible', // Thermal strength
+        cloud_cover: hour.cloud_cover ?? null, // Cloud cover percentage
         sources: hour.sources || {}, // Preserve per-source data for tooltip
       };
     });

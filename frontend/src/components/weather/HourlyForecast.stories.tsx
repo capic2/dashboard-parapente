@@ -2,24 +2,32 @@ import preview from '../../../.storybook/preview';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import HourlyForecast from './HourlyForecast';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: false },
-  },
-});
+import { expect } from 'storybook/test';
 
 const meta = preview.meta({
   title: 'Components/Weather/HourlyForecast',
   component: HourlyForecast,
   decorators: [
-    (Story) => (
-      <QueryClientProvider client={queryClient}>
-        <div style={{ maxWidth: '1200px' }}>
-          <Story />
-        </div>
-      </QueryClientProvider>
-    ),
+    (Story) => {
+      // Create a new QueryClient for each story to avoid cache conflicts
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: false,
+            gcTime: 0, // Disable cache (React Query v5+)
+            staleTime: 0, // Always consider data stale
+          },
+        },
+      });
+
+      return (
+        <QueryClientProvider client={queryClient}>
+          <div style={{ maxWidth: '1200px' }}>
+            <Story />
+          </div>
+        </QueryClientProvider>
+      );
+    },
   ],
   parameters: {
     layout: 'padded',
@@ -236,6 +244,8 @@ const mockBackendWeatherGood = {
   emoji: '🟢',
   explanation: 'Conditions excellentes pour le vol',
   slots_summary: 'Vol possible toute la journée',
+  sunrise: '06:30',
+  sunset: '20:00',
   metrics: {
     avg_temp_c: 20,
     avg_wind_kmh: 14,
@@ -269,6 +279,8 @@ const mockBackendWeatherMixed = {
   emoji: '🟡',
   explanation: 'Conditions variables',
   slots_summary: 'Vol possible avec prudence',
+  sunrise: '06:30',
+  sunset: '20:00',
   metrics: {
     avg_temp_c: 15,
     avg_wind_kmh: 23,
@@ -301,12 +313,77 @@ export const GoodConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('/api/weather/:spotId', () => {
+        http.get('*/api/weather/:spotId*', () => {
           return HttpResponse.json(mockBackendWeatherGood);
         }),
       ],
     },
   },
+});
+GoodConditions.test('it renders the correct values', async ({ canvas }) => {
+  const { getByText, getAllByText } = canvas;
+
+  // Wait for data to load - wait for a specific value that only appears when data is loaded
+  await canvas.findByText('85/100');
+
+  // Verify table headers are present
+  await expect(getByText('Heure')).toBeInTheDocument();
+  await expect(getByText('Para-Index')).toBeInTheDocument();
+  await expect(getByText('Temp')).toBeInTheDocument();
+  await expect(getByText('Vent')).toBeInTheDocument();
+  await expect(getByText('Rafales')).toBeInTheDocument();
+  await expect(getByText('Direction')).toBeInTheDocument();
+  await expect(getByText('Précip.')).toBeInTheDocument();
+  await expect(getByText('Nuages')).toBeInTheDocument();
+  await expect(getByText('CAPE (J/kg)')).toBeInTheDocument();
+  await expect(getByText('Thermiques')).toBeInTheDocument();
+  await expect(getByText('Volabilité')).toBeInTheDocument();
+
+  // Verify hours are displayed
+  await expect(getByText('10:00')).toBeInTheDocument();
+  await expect(getByText('11:00')).toBeInTheDocument();
+  await expect(getByText('12:00')).toBeInTheDocument();
+
+  // Verify para_index values (unique values)
+  await expect(getByText('85/100')).toBeInTheDocument(); // 10:00
+  await expect(getByText('92/100')).toBeInTheDocument(); // 11:00
+  await expect(getByText('90/100')).toBeInTheDocument(); // 12:00
+
+  // Verify temperatures (unique values)
+  await expect(getByText('22°C')).toBeInTheDocument(); // 10:00
+  await expect(getByText('24°C')).toBeInTheDocument(); // 11:00
+  await expect(getByText('25°C')).toBeInTheDocument(); // 12:00
+
+  // Verify wind speeds (unique values)
+  await expect(getByText('10 km/h')).toBeInTheDocument(); // 10:00
+  await expect(getByText('11 km/h')).toBeInTheDocument(); // 11:00
+  await expect(getByText('12 km/h')).toBeInTheDocument(); // 12:00
+
+  // Verify wind gusts (unique values)
+  await expect(getByText('15.0 km/h')).toBeInTheDocument(); // 10:00
+  await expect(getByText('16.0 km/h')).toBeInTheDocument(); // 11:00
+  await expect(getByText('17.0 km/h')).toBeInTheDocument(); // 12:00
+
+  // Verify directions (may appear multiple times - just check they exist)
+  await expect(getAllByText('NW').length).toBeGreaterThanOrEqual(2); // 10:00 and 11:00
+  await expect(getByText('W')).toBeInTheDocument(); // 12:00
+
+  // Verify cloud cover percentages (unique values)
+  await expect(getByText('10%')).toBeInTheDocument(); // 10:00
+  await expect(getByText('8%')).toBeInTheDocument(); // 11:00
+  await expect(getByText('5%')).toBeInTheDocument(); // 12:00
+
+  // Verify CAPE values (unique values)
+  await expect(getByText('800')).toBeInTheDocument(); // 10:00
+  await expect(getByText('1000')).toBeInTheDocument(); // 11:00
+  await expect(getByText('1200')).toBeInTheDocument(); // 12:00
+
+  // Verify thermal strength
+  await expect(getAllByText('Fort').length).toBeGreaterThanOrEqual(3); // All hours have "Fort"
+
+  // Verify all hours show "BON" verdict (since all have verdict: 'bon')
+  const bonVerdicts = getAllByText(/BON/);
+  await expect(bonVerdicts.length).toBeGreaterThanOrEqual(3); // At least one for each hour
 });
 
 // Mixed conditions (good, moderate, bad)
@@ -326,6 +403,39 @@ export const MixedConditions = meta.story({
   },
 });
 
+MixedConditions.test(
+  'it renders mixed conditions correctly',
+  async ({ canvas }) => {
+    const { getByText, getAllByText } = canvas;
+
+    // Wait for data to load
+    await canvas.findByText('75/100');
+
+    // Verify para_index values (different from good conditions)
+    await expect(getByText('75/100')).toBeInTheDocument(); // 10:00 - moyen
+    await expect(getByText('45/100')).toBeInTheDocument(); // 11:00 - limite
+    await expect(getByText('30/100')).toBeInTheDocument(); // 12:00 - mauvais
+
+    // Verify temperatures (lower temps for bad conditions)
+    await expect(getByText('16°C')).toBeInTheDocument(); // 10:00
+    await expect(getByText('15°C')).toBeInTheDocument(); // 11:00
+    await expect(getByText('14°C')).toBeInTheDocument(); // 12:00
+
+    // Verify wind speeds (higher winds for bad conditions)
+    await expect(getByText('18 km/h')).toBeInTheDocument(); // 10:00
+    await expect(getByText('25 km/h')).toBeInTheDocument(); // 11:00
+    await expect(getByText('32 km/h')).toBeInTheDocument(); // 12:00
+
+    // Verify different verdicts appear
+    await expect(getAllByText(/MOYEN/).length).toBeGreaterThanOrEqual(1);
+    await expect(getAllByText(/LIMITE/).length).toBeGreaterThanOrEqual(1);
+    await expect(getAllByText(/MAUVAIS/).length).toBeGreaterThanOrEqual(1);
+
+    // Verify thermal strength is "Faible" for all (bad conditions)
+    await expect(getAllByText('Faible').length).toBeGreaterThanOrEqual(3);
+  }
+);
+
 // Empty hourly forecast
 export const EmptyForecast = meta.story({
   args: {
@@ -335,7 +445,7 @@ export const EmptyForecast = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId*', () => {
+        http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json({
             ...mockBackendWeatherGood,
             consensus: [],
@@ -355,7 +465,7 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId*', async () => {
+        http.get('*/api/weather/:spotId', async () => {
           await new Promise(() => {}); // Never resolves
         }),
       ],
@@ -372,7 +482,7 @@ export const Error = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId*', () => {
+        http.get('*/api/weather/:spotId', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],
@@ -389,7 +499,7 @@ export const NoHourlyData = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId*', () => {
+        http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json({
             ...mockBackendWeatherGood,
             consensus: null,
@@ -409,7 +519,7 @@ export const DayTwo = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId*', () => {
+        http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockBackendWeatherGood);
         }),
       ],
@@ -428,7 +538,7 @@ export const DisplaysHourlyData = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*!/api/weather/:spotId*', () => {
+        http.get('*!/api/weather/:spotId', () => {
           return HttpResponse.json(mockBackendWeatherGood);
         }),
       ],
@@ -462,7 +572,7 @@ export const ShowsLoadingState = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*!/api/weather/:spotId*', async () => {
+        http.get('*!/api/weather/:spotId', async () => {
           await new Promise(() => {});
         }),
       ],
@@ -484,7 +594,7 @@ export const ShowsErrorState = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*!/api/weather/:spotId*', () => {
+        http.get('*!/api/weather/:spotId', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],
@@ -506,7 +616,7 @@ export const ShowsEmptyState = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*!/api/weather/:spotId*', () => {
+        http.get('*!/api/weather/:spotId', () => {
           return HttpResponse.json({
             ...mockBackendWeatherGood,
             consensus: [],
@@ -531,7 +641,7 @@ export const OpensTooltipOnHover = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*!/api/weather/:spotId*', () => {
+        http.get('*!/api/weather/:spotId', () => {
           return HttpResponse.json(mockBackendWeatherGood);
         }),
       ],
