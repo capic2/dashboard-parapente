@@ -1,0 +1,26 @@
+// Mock weather sources data
+export const weatherSources = [
+  {
+    id: '1',
+    source_name: 'open-meteo',
+    display_name: 'Open-Meteo',
+    description: 'Source météo open-source',
+    is_enabled: true,
+    requires_api_key: false,
+    api_key_configured: true,
+    priority: 1,
+    scraper_type: 'api' as const,
+    base_url: 'https://api.open-meteo.com',
+    documentation_url: 'https://open-meteo.com/en/docs',
+    last_success_at: new Date(Date.now() - 5 * 60000).toISOString(),
+    last_error_at: null,
+    last_error_message: null,
+    success_count: 245,
+    error_count: 5,
+    success_rate: 98,
+    avg_response_time_ms: 145,
+    status: 'active' as const,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: new Date().toISOString(),
+  },
+];

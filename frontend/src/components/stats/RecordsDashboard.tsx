@@ -101,7 +101,7 @@ export default function RecordsDashboard() {
                   <div className="text-xs text-gray-600">
                     <div className="font-medium">{record.flight_name}</div>
                     <div className="mt-1">
-                      {format(parseISO(record.date), 'dd MMMM yyyy', { locale: fr })}
+                      {format(parseISO(record.flight_date), 'dd MMMM yyyy', { locale: fr })}
                     </div>
                     {record.site_name && (
                       <div className="mt-1 text-gray-500">📍 {record.site_name}</div>

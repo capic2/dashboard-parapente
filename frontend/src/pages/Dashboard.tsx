@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import SiteSelector from '../components/SiteSelector';
-import CurrentConditions from '../components/CurrentConditions';
-import Forecast7Day from '../components/Forecast7Day';
-import HourlyForecast from '../components/HourlyForecast';
+import CurrentConditions from '../components/weather/CurrentConditions';
+import Forecast7Day from '../components/weather/Forecast7Day';
+import HourlyForecast from '../components/weather/HourlyForecast';
 import StatsPanel from '../components/StatsPanel';
-import EmagramWidget from '../components/EmagramWidget';
-import { BestSpotSuggestion } from '../components/BestSpotSuggestion';
+import EmagramWidget from '../components/complex/EmagramWidget';
+import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
 import { useSites } from '../hooks/useSites';
 import { useSite } from '../hooks/useSites';
 import { useBestSpotAPI } from '../hooks/useBestSpotAPI';

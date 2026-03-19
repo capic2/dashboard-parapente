@@ -19,7 +19,7 @@ export const api = ky.create({
       }
     ],
     afterResponse: [
-      async (request, options, response) => {
+      async (request, _options, response) => {
         // Log des erreurs (en dev seulement pour éviter de polluer la console en prod)
         if (!response.ok && import.meta.env.DEV) {
           console.error(`[API Error] ${request.method} ${request.url}:`, response.status);

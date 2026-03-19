@@ -1,425 +1,296 @@
-import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
-import { api } from '../lib/api'
-import { useEffect } from 'react'
-import type { Site, WeatherConditions, ForecastDay, WeatherSource, WeatherData, ApiResponse } from '../types'
 import {
-  SitesApiResponseSchema,
-  WeatherDataSchema,
-  ForecastDaySchema,
-  WeatherSourceSchema,
-  WeatherConditionsSchema,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
+import { api } from '../lib/api';
+import { useEffect } from 'react';
+import type { DailySummary, WeatherData } from '../types';
+import {
   BackendWeatherResponseSchema,
-  ApiResponseSchema,
-} from '../schemas'
-
-/**
- * Fetch all flying sites
- * Uses TanStack Query for automatic caching & refetching
- */
-export const useSites = (): UseQueryResult<Site[], Error> => {
-  return useQuery({
-    queryKey: ['sites'],
-    queryFn: async () => {
-      const data = await api.get('/spots').json() // Fixed: /sites -> /spots
-      
-      // Validate API response with Zod
-      const validation = SitesApiResponseSchema.safeParse(data)
-      if (!validation.success) {
-        console.error('❌ Sites API validation failed:', validation.error)
-        throw new Error(`Invalid sites data: ${validation.error.message}`)
-      }
-      
-      return validation.data.sites // Extract validated sites array
-    },
-    staleTime: 1000 * 60 * 60, // 1 hour (sites rarely change)
-  })
-}
-
-/**
- * Fetch current weather conditions
- */
-export const useCurrentConditions = (siteId?: string): UseQueryResult<WeatherConditions | WeatherConditions[], Error> => {
-  return useQuery({
-    queryKey: ['weather', 'current', siteId],
-    queryFn: async () => {
-      if (!siteId) throw new Error('Site ID is required')
-      const data = await api.get(`/weather/${siteId}`).json() // Fixed: /weather/current/{id} -> /weather/{id}
-      
-      // Validate API response with Zod
-      const validation = BackendWeatherResponseSchema.safeParse(data)
-      if (!validation.success) {
-        console.error('❌ Current weather validation failed:', validation.error)
-        throw new Error(`Invalid weather data: ${validation.error.message}`)
-      }
-      
-      return validation.data as any // Backend returns weather data directly
-    },
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    enabled: !!siteId,
-  })
-}
-
-/**
- * Fetch 7-day forecast
- */
-export const useForecast = (siteId: string | undefined): UseQueryResult<any[], Error> => {
-  return useQuery({
-    queryKey: ['weather', 'forecast', siteId],
-    queryFn: async () => {
-      if (!siteId) throw new Error('Site ID is required')
-      const data = await api.get(`/weather/${siteId}`).json() // Fixed: /weather/forecast/{id} -> /weather/{id}
-      
-      // Validate API response with Zod
-      const validation = BackendWeatherResponseSchema.safeParse(data)
-      if (!validation.success) {
-        console.error('❌ Forecast validation failed:', validation.error)
-        throw new Error(`Invalid forecast data: ${validation.error.message}`)
-      }
-      
-      return validation.data.consensus || [] // Backend returns consensus hourly data
-    },
-    staleTime: 1000 * 60 * 30, // 30 minutes
-    enabled: !!siteId,
-  })
-}
-
-/**
- * Fetch weather sources (data providers)
- */
-export const useWeatherSources = (): UseQueryResult<WeatherSource[], Error> => {
-  return useQuery({
-    queryKey: ['weather', 'sources'],
-    queryFn: async () => {
-      const data = await api.get('weather/sources').json()
-      
-      // Validate API response with Zod
-      const validation = ApiResponseSchema(WeatherSourceSchema.array()).safeParse(data)
-      if (!validation.success) {
-        console.error('❌ Weather sources validation failed:', validation.error)
-        throw new Error(`Invalid weather sources: ${validation.error.message}`)
-      }
-      
-      return validation.data.data
-    },
-    staleTime: 1000 * 60 * 60 * 24, // 24 hours (sources don't change often)
-  })
-}
-
-/**
- * Fetch historical weather for a specific date range
- */
-export const useWeatherHistory = (
-  siteId: string | undefined,
-  fromDate: string | undefined,
-  toDate: string | undefined
-): UseQueryResult<WeatherConditions[], Error> => {
-  return useQuery({
-    queryKey: ['weather', 'history', siteId, fromDate, toDate],
-    queryFn: async () => {
-      if (!siteId || !fromDate || !toDate) {
-        throw new Error('Site ID, from date, and to date are required')
-      }
-      const data = await api.get(
-        `weather/history/${siteId}?from_date=${fromDate}&to_date=${toDate}`
-      ).json()
-      
-      // Validate API response with Zod
-      const validation = ApiResponseSchema(WeatherConditionsSchema.array()).safeParse(data)
-      if (!validation.success) {
-        console.error('❌ Weather history validation failed:', validation.error)
-        throw new Error(`Invalid weather history: ${validation.error.message}`)
-      }
-      
-      return validation.data.data
-    },
-    staleTime: 1000 * 60 * 60, // 1 hour
-    enabled: !!(siteId && fromDate && toDate),
-  })
-}
-
-/**
- * Fetch weather data from specific source for comparison
- */
-export const useWeatherBySource = (
-  siteId: string | undefined,
-  sourceId: string | undefined
-): UseQueryResult<ForecastDay[], Error> => {
-  return useQuery({
-    queryKey: ['weather', 'source', siteId, sourceId],
-    queryFn: async () => {
-      if (!siteId || !sourceId) {
-        throw new Error('Site ID and source ID are required')
-      }
-      const data = await api.get(
-        `weather/forecast/${siteId}?source=${sourceId}`
-      ).json()
-      
-      // Validate API response with Zod
-      const validation = ApiResponseSchema(ForecastDaySchema.array()).safeParse(data)
-      if (!validation.success) {
-        console.error('❌ Weather by source validation failed:', validation.error)
-        throw new Error(`Invalid weather by source: ${validation.error.message}`)
-      }
-      
-      return validation.data.data
-    },
-    staleTime: 1000 * 60 * 5,
-    enabled: !!(siteId && sourceId),
-  })
-}
+  DailySummarySchema,
+} from '../schemas';
 
 /**
  * Create the queryFn for fetching and transforming weather data
  * Extracted so it can be reused in prefetch
  * EXPORTED for use in Forecast7Day and SiteSelector prefetch
  */
-export const createWeatherQueryFn = (siteId: string, dayIndex: number) => async () => {
-      if (!siteId) throw new Error('Site ID is required')
-      
-      // Fetch selected day first for current conditions (IMMEDIATE)
-      const todayResponse = await api.get(`weather/${siteId}?day_index=${dayIndex}`).json()
-      
-      // Validate today's response with Zod
-      const todayValidation = BackendWeatherResponseSchema.safeParse(todayResponse)
-      if (!todayValidation.success) {
-        console.error('❌ Today weather validation failed:', todayValidation.error)
-        throw new Error(`Invalid today weather: ${todayValidation.error.message}`)
-      }
-      
-      // OPTIMIZATION: Only fetch the selected day, return immediately
-      // Use the selected day data for the daily forecast
-      const validatedDailyResponses = [{ data: todayValidation.data }]
-      
-      const data = todayValidation.data
-      
-      // Transform backend structure to frontend WeatherData format
-      // Find the hour closest to current time for "Current Conditions"
-      const now = new Date()
-      const nowHour = now.getHours()
-      const currentHourData = data.consensus?.find((h: any) => h.hour === nowHour) || data.consensus?.[0]
-      
-      const currentHour = currentHourData || {
-        hour: 0,
-        temperature: null,
-        wind_speed: null,
-        wind_gust: null,
-        wind_direction: null,
-        precipitation: null,
-        cloud_cover: null,
-      }
-      const metrics = data.metrics || {
-        avg_temp_c: null,
-        avg_wind_kmh: null,
-        max_gust_kmh: null,
-        total_rain_mm: null,
-      }
-      
-      // Helper to format wind direction
-      // CRITICAL FIX: Add 180° to show where wind COMES FROM (not goes to)
-      // Example: if wind comes from North (0°), display as South (180°) with arrow pointing down
-      const formatWindDirection = (deg: number | null): string => {
-        if (deg === null) return '—'
-        // Flip direction by adding 180° (already done in backend, but ensuring consistency)
-        const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
-        const index = Math.round(((deg % 360) / 45)) % 8
-        return directions[index]
-      }
+export const createWeatherQueryFn =
+  (siteId: string, dayIndex: number) => async () => {
+    if (!siteId) throw new Error('Site ID is required');
 
-      // Helper to convert HH:MM string to hour number
-      const timeToHour = (timeStr: string | null): number | null => {
-        if (!timeStr) return null
-        const parts = timeStr.split(':')
-        return parseInt(parts[0], 10)
-      }
+    // Fetch selected day first for current conditions (IMMEDIATE)
+    const todayResponse = await api
+      .get(`weather/${siteId}?day_index=${dayIndex}`)
+      .json();
 
-      // Extract sunrise/sunset and convert to hours
-      // API returns sunrise/sunset for the requested day
-      let sunriseHour = timeToHour((data as any).sunrise as string | null)
-      let sunsetHour = timeToHour((data as any).sunset as string | null)
-      
-      // If sunrise/sunset not available, use seasonal approximation
-      if (sunriseHour === null || sunsetHour === null) {
-        const month = new Date().getMonth() + 1 // 1-12
-        // Approximate sunrise/sunset for France (latitude ~47°)
-        if (month >= 4 && month <= 9) {
-          // Spring/Summer (April-September)
-          sunriseHour = 6
-          sunsetHour = 21
-        } else {
-          // Fall/Winter (October-March)
-          sunriseHour = 7
-          sunsetHour = 18
+    // Validate today's response with Zod
+    const todayValidation =
+      BackendWeatherResponseSchema.safeParse(todayResponse);
+    if (!todayValidation.success) {
+      console.error(
+        '❌ Today weather validation failed:',
+        todayValidation.error
+      );
+      throw new Error(
+        `Invalid today weather: ${todayValidation.error.message}`
+      );
+    }
+
+    // OPTIMIZATION: Only fetch the selected day, return immediately
+    // Use the selected day data for the daily forecast
+    const validatedDailyResponses = [{ data: todayValidation.data }];
+
+    const data = todayValidation.data;
+
+    // Transform backend structure to frontend WeatherData format
+    // Find the hour closest to current time for "Current Conditions"
+    const now = new Date();
+    const nowHour = now.getHours();
+    const currentHourData =
+      data.consensus?.find((h: any) => h.hour === nowHour) ||
+      data.consensus?.[0];
+
+    const currentHour = currentHourData || {
+      hour: 0,
+      temperature: null,
+      wind_speed: null,
+      wind_gust: null,
+      wind_direction: null,
+      precipitation: null,
+      cloud_cover: null,
+    };
+    const metrics = data.metrics || {
+      avg_temp_c: null,
+      avg_wind_kmh: null,
+      max_gust_kmh: null,
+      total_rain_mm: null,
+    };
+
+    // Helper to format wind direction
+    // CRITICAL FIX: Add 180° to show where wind COMES FROM (not goes to)
+    // Example: if wind comes from North (0°), display as South (180°) with arrow pointing down
+    const formatWindDirection = (deg: number | null): string => {
+      if (deg === null) return '—';
+      // Flip direction by adding 180° (already done in backend, but ensuring consistency)
+      const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+      const index = Math.round((deg % 360) / 45) % 8;
+      return directions[index];
+    };
+
+    // Helper to convert HH:MM string to hour number
+    const timeToHour = (timeStr: string | null): number | null => {
+      if (!timeStr) return null;
+      const parts = timeStr.split(':');
+      return parseInt(parts[0], 10);
+    };
+
+    // Extract sunrise/sunset and convert to hours
+    // API returns sunrise/sunset for the requested day
+    let sunriseHour = timeToHour((data as any).sunrise as string | null);
+    let sunsetHour = timeToHour((data as any).sunset as string | null);
+
+    // If sunrise/sunset not available, use seasonal approximation
+    if (sunriseHour === null || sunsetHour === null) {
+      const month = new Date().getMonth() + 1; // 1-12
+      // Approximate sunrise/sunset for France (latitude ~47°)
+      if (month >= 4 && month <= 9) {
+        // Spring/Summer (April-September)
+        sunriseHour = 6;
+        sunsetHour = 21;
+      } else {
+        // Fall/Winter (October-March)
+        sunriseHour = 7;
+        sunsetHour = 18;
+      }
+    }
+
+    // Map slots to hourly verdicts
+    const hourToVerdict = new Map<number, string>();
+    if (data.slots) {
+      data.slots.forEach((slot: any) => {
+        const verdictText =
+          slot.verdict === '🟢'
+            ? 'BON'
+            : slot.verdict === '🟡'
+              ? 'MOYEN'
+              : slot.verdict === '🟠'
+                ? 'LIMITE'
+                : 'MAUVAIS';
+        for (let h = slot.start_hour; h <= slot.end_hour; h++) {
+          hourToVerdict.set(h, verdictText);
         }
-      }
-      
-      // Map slots to hourly verdicts
-      const hourToVerdict = new Map<number, string>()
-      if (data.slots) {
-        data.slots.forEach((slot: any) => {
-          const verdictText = slot.verdict === '🟢' ? 'BON' :
-                             slot.verdict === '🟡' ? 'MOYEN' :
-                             slot.verdict === '🟠' ? 'LIMITE' : 'MAUVAIS'
-          for (let h = slot.start_hour; h <= slot.end_hour; h++) {
-            hourToVerdict.set(h, verdictText)
-          }
-        })
-      }
-      
-      // Transform consensus array to hourly forecast
-      // NOTE: Backend now calculates para_index per hour (not daily average)
-      let hourlyForecast = (data.consensus || []).map((hour: any) => {
+      });
+    }
+
+    // Transform consensus array to hourly forecast
+    // NOTE: Backend now calculates para_index per hour (not daily average)
+    let hourlyForecast = (data.consensus || []).map((hour: any) => {
+      return {
+        hour: `${hour.hour}:00`,
+        time: `${hour.hour}:00`,
+        temp: hour.temperature || 0,
+        temperature: hour.temperature || 0,
+        wind: hour.wind_speed || 0,
+        wind_speed: hour.wind_speed || 0,
+        wind_gust: hour.wind_gust || 0,
+        direction: formatWindDirection(hour.wind_direction),
+        wind_direction: formatWindDirection(hour.wind_direction),
+        conditions:
+          hour.cloud_cover !== null
+            ? `${Math.round(hour.cloud_cover)}% nuages`
+            : 'N/A',
+        precipitation: hour.precipitation || 0,
+        para_index: hour.para_index || 0, // Use backend calculation (accurate)
+        verdict: hour.verdict || 'N/A', // Use backend verdict (accurate)
+        cape: hour.cape || 0, // CAPE (J/kg)
+        thermal_strength: hour.thermal_strength || 'Faible', // Thermal strength
+        sources: hour.sources || {}, // Preserve per-source data for tooltip
+      };
+    });
+
+    // Filter to only show hours between sunrise and sunset
+    if (sunriseHour !== null && sunsetHour !== null) {
+      hourlyForecast = hourlyForecast.filter((h) => {
+        const hourNum = parseInt(h.hour.split(':')[0], 10);
+        return hourNum >= sunriseHour && hourNum <= sunsetHour;
+      });
+    }
+
+    // Transform daily responses to DailyForecastItem[]
+    const dailyForecast = validatedDailyResponses
+      .map((response, index) => {
+        if (!response?.data) return null;
+        const dayData = data;
+        const dayDate = new Date();
+        dayDate.setDate(dayDate.getDate() + index);
+
+        const consensus = dayData.consensus || [];
+        const temps = consensus.map((h: any) => h.temperature || 0);
+        const minTemp = temps.length > 0 ? Math.min(...temps) : 0;
+        const maxTemp = temps.length > 0 ? Math.max(...temps) : 0;
+
         return {
-          hour: `${hour.hour}:00`,
-          time: `${hour.hour}:00`,
-          temp: hour.temperature || 0,
-          temperature: hour.temperature || 0,
-          wind: hour.wind_speed || 0,
-          wind_speed: hour.wind_speed || 0,
-          wind_gust: hour.wind_gust || 0,
-          direction: formatWindDirection(hour.wind_direction),
-          wind_direction: formatWindDirection(hour.wind_direction),
-          conditions: hour.cloud_cover !== null ? `${Math.round(hour.cloud_cover)}% nuages` : 'N/A',
-          precipitation: hour.precipitation || 0,
-          para_index: hour.para_index || 0, // Use backend calculation (accurate)
-          verdict: hour.verdict || 'N/A', // Use backend verdict (accurate)
-          cape: hour.cape || 0, // CAPE (J/kg)
-          thermal_strength: hour.thermal_strength || 'Faible', // Thermal strength
-          sources: hour.sources || {} // Preserve per-source data for tooltip
-        }
+          date: dayDate.toISOString().split('T')[0],
+          day_of_week: dayDate.toLocaleDateString('fr-FR', {
+            weekday: 'short',
+          }),
+          temp_min: Math.round(minTemp),
+          temp_max: Math.round(maxTemp),
+          min_temp: Math.round(minTemp),
+          max_temp: Math.round(maxTemp),
+          wind_avg: Math.round(dayData.metrics?.avg_wind_kmh || 0),
+          conditions: dayData.slots_summary || dayData.explanation || 'N/A',
+          precipitation_prob: Math.round(
+            (dayData.metrics?.total_rain_mm || 0) * 10
+          ),
+          para_index: dayData.para_index || 0,
+          verdict: dayData.verdict || 'N/A',
+        };
       })
+      .filter((day): day is NonNullable<typeof day> => day !== null);
 
-      // Filter to only show hours between sunrise and sunset
-      if (sunriseHour !== null && sunsetHour !== null) {
-        hourlyForecast = hourlyForecast.filter(h => {
-          const hourNum = parseInt(h.hour.split(':')[0], 10)
-          return hourNum >= sunriseHour && hourNum <= sunsetHour
-        })
+    // Build current conditions text based on current hour data
+    const buildCurrentConditions = (): string => {
+      const conditions: string[] = [];
+
+      // Cloud cover
+      if (
+        currentHour.cloud_cover !== null &&
+        currentHour.cloud_cover !== undefined
+      ) {
+        conditions.push(`${Math.round(currentHour.cloud_cover)}% nuages`);
       }
-      
-      // Transform daily responses to DailyForecastItem[]
-      const dailyForecast = validatedDailyResponses
-        .map((response, index) => {
-          if (!response?.data) return null
-          const dayData = data
-          const dayDate = new Date()
-          dayDate.setDate(dayDate.getDate() + index)
-          
-          const consensus = dayData.consensus || []
-          const temps = consensus.map((h: any) => h.temperature || 0)
-          const minTemp = temps.length > 0 ? Math.min(...temps) : 0
-          const maxTemp = temps.length > 0 ? Math.max(...temps) : 0
-          
-          return {
-            date: dayDate.toISOString().split('T')[0],
-            day_of_week: dayDate.toLocaleDateString('fr-FR', { weekday: 'short' }),
-            temp_min: Math.round(minTemp),
-            temp_max: Math.round(maxTemp),
-            min_temp: Math.round(minTemp),
-            max_temp: Math.round(maxTemp),
-            wind_avg: Math.round(dayData.metrics?.avg_wind_kmh || 0),
-            conditions: dayData.slots_summary || dayData.explanation || 'N/A',
-            precipitation_prob: Math.round((dayData.metrics?.total_rain_mm || 0) * 10),
-            para_index: dayData.para_index || 0,
-            verdict: dayData.verdict || 'N/A'
-          }
-        })
-        .filter((day): day is NonNullable<typeof day> => day !== null)
-      
-      // Build current conditions text based on current hour data
-      const buildCurrentConditions = (): string => {
-        const conditions: string[] = []
-        
-        // Cloud cover
-        if (currentHour.cloud_cover !== null && currentHour.cloud_cover !== undefined) {
-          conditions.push(`${Math.round(currentHour.cloud_cover)}% nuages`)
-        }
-        
-        // Precipitation
-        const precip = currentHour.precipitation || 0
-        if (precip > 0) {
-          conditions.push(`${precip.toFixed(1)}mm pluie`)
-        } else {
-          conditions.push('Sec')
-        }
-        
-        return conditions.join(', ') || 'Conditions normales'
+
+      // Precipitation
+      const precip = currentHour.precipitation || 0;
+      if (precip > 0) {
+        conditions.push(`${precip.toFixed(1)}mm pluie`);
+      } else {
+        conditions.push('Sec');
       }
-      
-      const transformed: WeatherData = {
-        spot_name: data.site_name || 'Unknown',
-        para_index: data.para_index || 0,
-        verdict: data.verdict || 'N/A',
-        temperature: currentHour.temperature || metrics.avg_temp_c || 0,
-        wind_speed: currentHour.wind_speed || metrics.avg_wind_kmh || 0,
-        wind_direction: formatWindDirection(currentHour.wind_direction),
-        wind_gusts: currentHour.wind_gust || metrics.max_gust_kmh || 0,
-        conditions: buildCurrentConditions(),
-        forecast_time: new Date().toISOString(),
-        hourly_forecast: hourlyForecast,
-        daily_forecast: dailyForecast
-      }
-      
-      // Validate transformed data with Zod
-      const transformedValidation = WeatherDataSchema.safeParse(transformed)
-      if (!transformedValidation.success) {
-        console.error('❌ Transformed weather validation failed:', transformedValidation.error)
-        // In development, return data anyway to help debug
-        if (import.meta.env.DEV) {
-          console.error('📊 Transformed data was:', transformed)
-          console.warn('⚠️ Returning unvalidated data for debugging')
-          return transformed as WeatherData
-        }
-        throw new Error('Weather data validation failed')
-      }
-      
-      return transformedValidation.data
-}
+
+      return conditions.join(', ') || 'Conditions normales';
+    };
+
+    const transformed: WeatherData = {
+      spot_name: data.site_name || 'Unknown',
+      para_index: data.para_index || 0,
+      verdict: data.verdict || 'N/A',
+      temperature: currentHour.temperature || metrics.avg_temp_c || 0,
+      wind_speed: currentHour.wind_speed || metrics.avg_wind_kmh || 0,
+      wind_direction: formatWindDirection(currentHour.wind_direction),
+      wind_gusts: currentHour.wind_gust || metrics.max_gust_kmh || 0,
+      conditions: buildCurrentConditions(),
+      forecast_time: new Date().toISOString(),
+      hourly_forecast: hourlyForecast,
+      daily_forecast: dailyForecast,
+    };
+
+    // Return transformed data
+    // Note: WeatherData interface is used for type checking but not runtime validation
+    // Backend data is already validated with BackendWeatherResponseSchema
+    return transformed;
+  };
 
 /**
  * Main weather hook - combines current + forecast
  * Transforms backend API response to frontend WeatherData format
  * OPTIMIZED: Loads selected day immediately, prefetches others in background
  */
-export const useWeather = (siteId: string | undefined, dayIndex: number = 0): UseQueryResult<WeatherData, Error> => {
+export const useWeather = (
+  siteId: string | undefined,
+  dayIndex: number = 0
+) => {
   return useQuery({
     queryKey: ['weather', 'combined', siteId, dayIndex],
-    queryFn: siteId ? createWeatherQueryFn(siteId, dayIndex) : async () => { throw new Error('Site ID required') },
+    queryFn: siteId
+      ? createWeatherQueryFn(siteId, dayIndex)
+      : async () => {
+          throw new Error('Site ID required');
+        },
     staleTime: 1000 * 60 * 30, // 30 minutes - weather forecasts don't change that fast
     enabled: !!siteId,
-  })
-}
+  });
+};
 
 /**
  * Hook to fetch a single day's weather (for prefetching)
  */
-export const useWeatherDay = (siteId: string | undefined, dayIndex: number): UseQueryResult<any, Error> => {
+export const useWeatherDay = (siteId: string | undefined, dayIndex: number) => {
   return useQuery({
     queryKey: ['weather', 'day', siteId, dayIndex],
     queryFn: async () => {
-      if (!siteId) throw new Error('Site ID is required')
-      const data = await api.get(`/weather/${siteId}?day_index=${dayIndex}`).json()
-      const validation = BackendWeatherResponseSchema.safeParse(data)
+      if (!siteId) throw new Error('Site ID is required');
+      const data = await api
+        .get(`/weather/${siteId}?day_index=${dayIndex}`)
+        .json();
+      const validation = BackendWeatherResponseSchema.safeParse(data);
       if (!validation.success) {
-        console.warn(`⚠️ Day ${dayIndex} validation failed:`, validation.error)
-        return null
+        console.warn(`⚠️ Day ${dayIndex} validation failed:`, validation.error);
+        return null;
       }
-      return validation.data
+      return validation.data;
     },
     staleTime: 1000 * 60 * 30, // 30 minutes
     enabled: !!siteId,
-  })
-}
+  });
+};
 
 /**
  * Hook to prefetch all 7 days in background (non-blocking)
  * Call this after the selected day has loaded
  */
-export const usePrefetch7Days = (siteId: string | undefined, currentDayIndex: number) => {
-  const queryClient = useQueryClient()
-  
+export const usePrefetch7Days = (
+  siteId: string | undefined,
+  currentDayIndex: number
+) => {
+  const queryClient = useQueryClient();
+
   useEffect(() => {
-    if (!siteId) return
-    
+    if (!siteId) return;
+
     // Delay prefetch slightly to not block initial render
     const timer = setTimeout(() => {
       // Prefetch all days except the current one
@@ -428,45 +299,45 @@ export const usePrefetch7Days = (siteId: string | undefined, currentDayIndex: nu
           queryClient.prefetchQuery({
             queryKey: ['weather', 'day', siteId, i],
             queryFn: async () => {
-              const data = await api.get(`/weather/${siteId}?day_index=${i}`).json()
-              const validation = BackendWeatherResponseSchema.safeParse(data)
-              return validation.success ? validation.data : null
+              const data = await api
+                .get(`/weather/${siteId}?day_index=${i}`)
+                .json();
+              const validation = BackendWeatherResponseSchema.safeParse(data);
+              return validation.success ? validation.data : null;
             },
             staleTime: 1000 * 60 * 30, // 30 minutes
-          })
+          });
         }
       }
-    }, 1000) // 1 second delay
-    
-    return () => clearTimeout(timer)
-  }, [siteId, currentDayIndex, queryClient])
-}
+    }, 1000); // 1 second delay
+
+    return () => clearTimeout(timer);
+  }, [siteId, currentDayIndex, queryClient]);
+};
 
 /**
  * Hook to fetch daily summary for 7 days (lightweight, no hourly data)
  * MUCH faster than useWeather - used for 7-day forecast cards
- * 
+ *
  * This hook fetches aggregate daily data without hourly details:
  * - All sources in parallel (same data quality)
  * - Daily aggregates only (para_index, temps, wind_avg)
  * - 2-3x faster than full hourly forecast
  * - Perfect for displaying forecast cards
  */
-export const useDailySummary = (siteId: string | undefined): UseQueryResult<any, Error> => {
+export const useDailySummary = (
+  siteId: string | undefined
+): UseQueryResult<DailySummary, Error> => {
   return useQuery({
     queryKey: ['weather', 'daily-summary', siteId],
     queryFn: async () => {
-      if (!siteId) throw new Error('Site ID is required')
-      const data = await api.get(`weather/${siteId}/daily-summary?days=7`).json()
-      
-      // Validate response structure
-      if (!data || !data.days) {
-        throw new Error('Invalid daily summary response')
-      }
-      
-      return data
+      if (!siteId) throw new Error('Site ID is required');
+      const data = await api
+        .get(`weather/${siteId}/daily-summary?days=7`)
+        .json();
+      return DailySummarySchema.parse(data);
     },
     staleTime: 1000 * 60 * 30, // 30 minutes - daily summaries don't change fast
     enabled: !!siteId,
-  })
-}
+  });
+};

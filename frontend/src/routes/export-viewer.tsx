@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { FlightViewer3D } from '../components/FlightViewer3D'
+import { FlightViewer3D } from '../components/complex/FlightViewer3D'
 
 export const Route = createFileRoute('/export-viewer')({
   component: ExportViewer,
