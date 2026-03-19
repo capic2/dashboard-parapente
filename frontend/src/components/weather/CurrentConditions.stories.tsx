@@ -2,24 +2,32 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import preview from '../../../.storybook/preview';
 import CurrentConditions from './CurrentConditions';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: false },
-  },
-});
+import { expect } from 'storybook/test';
 
 const meta = preview.meta({
   title: 'Components/Weather/CurrentConditions',
   component: CurrentConditions,
   decorators: [
-    (Story) => (
-      <QueryClientProvider client={queryClient}>
-        <div style={{ maxWidth: '400px' }}>
-          <Story />
-        </div>
-      </QueryClientProvider>
-    ),
+    (Story) => {
+      // Create a new QueryClient for each story to avoid cache conflicts
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: false,
+            gcTime: 0, // Disable cache
+            staleTime: 0, // Always consider data stale
+          },
+        },
+      });
+
+      return (
+        <QueryClientProvider client={queryClient}>
+          <div style={{ maxWidth: '400px' }}>
+            <Story />
+          </div>
+        </QueryClientProvider>
+      );
+    },
   ],
   parameters: {
     layout: 'centered',
@@ -29,75 +37,128 @@ const meta = preview.meta({
 
 export default meta;
 
-// Mock data
+// Mock data - matches BackendWeatherResponseSchema
+// Current hour is used for CurrentConditions display
+const currentHour = new Date().getHours();
+
 const mockWeatherGood = {
-  id: 1,
-  spot_id: 1,
-  spot_name: 'Annecy',
+  site_id: '1',
+  site_name: 'Annecy',
+  day_index: 0,
+  days: 1,
   para_index: 85,
   verdict: 'bon',
-  temperature: 22,
-  wind_speed: 12,
-  wind_direction: 'NW',
-  wind_gusts: 18,
-  conditions: 'Ensoleillé',
-  forecast_time: '2024-03-15T14:30:00Z',
+  emoji: '🟢',
+  explanation: 'Conditions favorables',
+  consensus: [
+    {
+      hour: currentHour,
+      temperature: 22,
+      wind_speed: 12,
+      wind_gust: 18,
+      wind_direction: 315, // NW
+      precipitation: 0,
+      cloud_cover: 10,
+      para_index: 85,
+      verdict: 'bon',
+    },
+  ],
 };
 
 const mockWeatherModerate = {
-  id: 2,
-  spot_id: 1,
-  spot_name: 'Annecy',
+  site_id: '1',
+  site_name: 'Annecy',
+  day_index: 0,
+  days: 1,
   para_index: 65,
   verdict: 'moyen',
-  temperature: 18,
-  wind_speed: 20,
-  wind_direction: 'NE',
-  wind_gusts: 28,
-  conditions: 'Nuageux',
-  forecast_time: '2024-03-15T14:30:00Z',
+  emoji: '🟡',
+  explanation: 'Conditions moyennes',
+  consensus: [
+    {
+      hour: currentHour,
+      temperature: 18,
+      wind_speed: 20,
+      wind_gust: 28,
+      wind_direction: 45, // NE
+      precipitation: 0,
+      cloud_cover: 50,
+      para_index: 65,
+      verdict: 'moyen',
+    },
+  ],
 };
 
 const mockWeatherLimite = {
-  id: 3,
-  spot_id: 1,
-  spot_name: 'Annecy',
+  site_id: '1',
+  site_name: 'Annecy',
+  day_index: 0,
+  days: 1,
   para_index: 45,
   verdict: 'limite',
-  temperature: 15,
-  wind_speed: 28,
-  wind_direction: 'S',
-  wind_gusts: 35,
-  conditions: 'Très nuageux',
-  forecast_time: '2024-03-15T14:30:00Z',
+  emoji: '🟠',
+  explanation: 'Conditions limites',
+  consensus: [
+    {
+      hour: currentHour,
+      temperature: 15,
+      wind_speed: 28,
+      wind_gust: 35,
+      wind_direction: 180, // S
+      precipitation: 0,
+      cloud_cover: 75,
+      para_index: 45,
+      verdict: 'limite',
+    },
+  ],
 };
 
 const mockWeatherBad = {
-  id: 4,
-  spot_id: 1,
-  spot_name: 'Annecy',
+  site_id: '1',
+  site_name: 'Annecy',
+  day_index: 0,
+  days: 1,
   para_index: 25,
   verdict: 'mauvais',
-  temperature: 10,
-  wind_speed: 35,
-  wind_direction: 'E',
-  wind_gusts: 45,
-  conditions: 'Orageux',
-  forecast_time: '2024-03-15T14:30:00Z',
+  emoji: '🔴',
+  explanation: 'Conditions défavorables',
+  consensus: [
+    {
+      hour: currentHour,
+      temperature: 10,
+      wind_speed: 35,
+      wind_gust: 45,
+      wind_direction: 90, // E
+      precipitation: 5,
+      cloud_cover: 90,
+      para_index: 25,
+      verdict: 'mauvais',
+    },
+  ],
 };
 
 const mockWeatherNoGusts = {
-  id: 5,
-  spot_id: 1,
-  spot_name: 'Annecy',
+  site_id: '1',
+  site_name: 'Annecy',
+  day_index: 0,
+  days: 1,
   para_index: 90,
   verdict: 'bon',
-  temperature: 24,
-  wind_speed: 8,
-  wind_direction: 'W',
-  wind_gusts: null,
-  conditions: 'Parfait',
-  forecast_time: '2024-03-15T14:30:00Z',
+  emoji: '🟢',
+  explanation: 'Conditions parfaites',
+  consensus: [
+    {
+      hour: currentHour,
+      temperature: 24,
+      wind_speed: 8,
+      wind_gust: null,
+      wind_direction: 270, // W
+      precipitation: 0,
+      cloud_cover: 5,
+      para_index: 90,
+      verdict: 'bon',
+    },
+  ],
 };
 
 const mockSite = {
@@ -118,7 +179,7 @@ export const GoodConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId*', () => {
+        http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherGood);
         }),
         http.get('*/api/spots/:id', () => {
@@ -137,7 +198,7 @@ export const ModerateConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId*', () => {
+        http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherModerate);
         }),
         http.get('*/api/spots/:id', () => {
@@ -148,6 +209,19 @@ export const ModerateConditions = meta.story({
   },
 });
 
+ModerateConditions.test(
+  'displays moderate conditions correctly',
+  async ({ canvas }) => {
+    await canvas.findByText(/65\/100/);
+
+    await expect(canvas.getByText(/MOYEN/)).toBeInTheDocument();
+    await expect(canvas.getByText('18°C')).toBeInTheDocument();
+    await expect(canvas.getByText(/20 km\/h NE/)).toBeInTheDocument();
+    await expect(canvas.getByText(/28 km\/h/)).toBeInTheDocument();
+    await expect(canvas.getByText(/50% nuages, Sec/)).toBeInTheDocument();
+  }
+);
+
 // Limite conditions
 export const LimiteConditions = meta.story({
   args: {
@@ -156,7 +230,7 @@ export const LimiteConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId*', () => {
+        http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherLimite);
         }),
         http.get('*/api/spots/:id', () => {
@@ -167,6 +241,19 @@ export const LimiteConditions = meta.story({
   },
 });
 
+LimiteConditions.test(
+  'displays limite conditions correctly',
+  async ({ canvas }) => {
+    await canvas.findByText(/45\/100/);
+
+    await expect(canvas.getByText(/LIMITE/)).toBeInTheDocument();
+    await expect(canvas.getByText('15°C')).toBeInTheDocument();
+    await expect(canvas.getByText(/28 km\/h S/)).toBeInTheDocument();
+    await expect(canvas.getByText(/35 km\/h/)).toBeInTheDocument();
+    await expect(canvas.getByText(/75% nuages, Sec/)).toBeInTheDocument();
+  }
+);
+
 // Bad conditions
 export const BadConditions = meta.story({
   args: {
@@ -175,7 +262,7 @@ export const BadConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId*', () => {
+        http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherBad);
         }),
         http.get('*/api/spots/:id', () => {
@@ -186,6 +273,18 @@ export const BadConditions = meta.story({
   },
 });
 
+BadConditions.test('displays bad conditions correctly', async ({ canvas }) => {
+  await canvas.findByText(/25\/100/);
+
+  await expect(canvas.getByText(/MAUVAIS/)).toBeInTheDocument();
+  await expect(canvas.getByText('10°C')).toBeInTheDocument();
+  await expect(canvas.getByText(/35 km\/h E/)).toBeInTheDocument();
+  await expect(canvas.getByText(/45 km\/h/)).toBeInTheDocument();
+  await expect(
+    canvas.getByText(/90% nuages, 5\.0mm pluie/)
+  ).toBeInTheDocument();
+});
+
 // No gusts data
 export const NoGustsData = meta.story({
   args: {
@@ -194,7 +293,7 @@ export const NoGustsData = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId*', () => {
+        http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherNoGusts);
         }),
         http.get('*/api/spots/:id', () => {
@@ -232,7 +331,7 @@ export const Error = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId*', () => {
+        http.get('*/api/weather/:spotId', () => {
           return new HttpResponse(null, { status: 500 });
         }),
         http.get('*/api/spots/:id', () => {
@@ -251,7 +350,7 @@ export const NoSiteOrientation = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId*', () => {
+        http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherGood);
         }),
         http.get('*/api/spots/:id', () => {
@@ -272,7 +371,7 @@ export const DisplaysWeatherData = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*!/api/weather/:spotId*', () => {
+        http.get('*!/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherGood);
         }),
         http.get('*!/api/spots/:id', () => {
@@ -326,7 +425,7 @@ export const ShowsErrorState = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*!/api/weather/:spotId*', () => {
+        http.get('*!/api/weather/:spotId', () => {
           return new HttpResponse(null, { status: 500 });
         }),
         http.get('*!/api/spots/:id', () => {

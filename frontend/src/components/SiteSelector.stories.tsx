@@ -86,7 +86,7 @@ const meta = preview.meta({
     },
     msw: {
       handlers: [
-        http.get('*/api/spots*', () => {
+        http.get('*/api/spots', () => {
           return HttpResponse.json({
             sites: mockSites,
           });

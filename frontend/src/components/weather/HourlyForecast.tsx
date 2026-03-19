@@ -758,8 +758,6 @@ export default function HourlyForecast({
     }
   };
 
-  console.log({weather})
-
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
       <h2 className="text-sm text-gray-600 mb-3 font-semibold">
@@ -808,13 +806,14 @@ export default function HourlyForecast({
           <tbody>
             {flyingHours.length > 0 ? (
               flyingHours.map((hour, index) => {
-                // Extract cloud cover from sources
+                // Prefer top-level cloud_cover, fallback to sources for compatibility
                 const cloudCover =
-                  hour.sources?.['open-meteo']?.cloud_cover ||
-                  hour.sources?.['weatherapi']?.cloud_cover ||
+                  hour.cloud_cover ??
+                  hour.sources?.['open-meteo']?.cloud_cover ??
+                  hour.sources?.['weatherapi']?.cloud_cover ??
                   null;
 
-                // Extract gust from sources
+                // Prefer top-level wind_gust, fallback to sources for compatibility
                 const gustValue =
                   hour.wind_gust ??
                   hour.sources?.['open-meteo']?.wind_gust ??
