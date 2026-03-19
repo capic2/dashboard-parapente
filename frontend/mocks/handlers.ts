@@ -7,15 +7,14 @@ import { flightStats } from './data/stats';
 import { weatherSources } from './data/weatherSources';
 import { mockBestSpotsByDay } from './data/bestSpot';
 
-// Helper to create handlers that work in both dev and Storybook
+// Helper to create handlers that work in both dev, Storybook, and tests
 const createHandler = (
   method: 'get' | 'post' | 'put' | 'patch' | 'delete',
   path: string,
   handler: Parameters<typeof http.get>[1]
 ): HttpHandler[] => {
   return [
-    http[method](`/api${path}`, handler),
-    http[method](`http://localhost:6006/api${path}`, handler),
+    http[method](`*/api${path}`, handler), // Catch-all for any domain - must be first to work in tests
   ];
 };
 
