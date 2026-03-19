@@ -68,7 +68,7 @@ python-multipart==0.0.22
 # ============================================
 # Meteorology & Scientific Computing
 # ============================================
-metpy==1.6.3
+metpy==1.7.1
 matplotlib==3.10.8
 numpy==2.4.3
 pillow==11.3.0
