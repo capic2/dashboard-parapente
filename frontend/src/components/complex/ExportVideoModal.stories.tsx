@@ -3,21 +3,28 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fn } from 'storybook/test';
 import { ExportVideoModal } from './ExportVideoModal';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: false },
-  },
-});
-
 const meta = preview.meta({
   title: 'Components/Complex/ExportVideoModal',
   component: ExportVideoModal,
   decorators: [
-    (Story) => (
-      <QueryClientProvider client={queryClient}>
-        <Story />
-      </QueryClientProvider>
-    ),
+    (Story) => {
+      // Create a new QueryClient for each story to avoid cache conflicts
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: { 
+            retry: false,
+            gcTime: 0,  // Disable cache
+            staleTime: 0,  // Always consider data stale
+          },
+        },
+      });
+      
+      return (
+        <QueryClientProvider client={queryClient}>
+          <Story />
+        </QueryClientProvider>
+      );
+    },
   ],
   parameters: {
     layout: 'centered',
