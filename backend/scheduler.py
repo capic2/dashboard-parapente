@@ -10,6 +10,7 @@ import uuid
 import asyncio
 import logging
 
+from sqlalchemy.orm import Session
 from database import SessionLocal
 from models import Site, WeatherForecast
 from weather_pipeline import get_normalized_forecast
@@ -19,14 +20,20 @@ from para_index import calculate_para_index, analyze_hourly_slots, format_slots_
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Default sites to monitor (Arguel, Mont Poupet, La Côte)
+# Default sites to monitor - UPDATED with real site IDs from database
 DEFAULT_SITES = [
-    "arguel",
-    "poupet",
-    "cote"
+    "site-arguel",
+    "site-mont-poupet-ouest",
+    "site-mont-poupet-nw",  # Nord-Ouest
+    "site-mont-poupet-sud",
+    "site-mont-poupet-nord",
+    "site-la-cote"
 ]
 
 scheduler = AsyncIOScheduler()
+
+# Semaphore to limit concurrent database operations (prevent pool exhaustion)
+_db_semaphore = asyncio.Semaphore(5)
 
 
 async def fetch_and_store_weather(site_code: str, day_index: int = 0):
@@ -50,7 +57,7 @@ async def fetch_and_store_weather(site_code: str, day_index: int = 0):
         logger.info(f"Fetching weather for {site.name} (day_index={day_index})...")
         
         # Fetch normalized forecast
-        consensus = await get_normalized_forecast(site.latitude, site.longitude, day_index)
+        consensus = await get_normalized_forecast(site.latitude, site.longitude, day_index, db=db)
         
         if not consensus.get("success"):
             logger.error(f"Failed to fetch weather for {site.name}: {consensus.get('error')}")
@@ -142,48 +149,132 @@ async def fetch_and_store_weather(site_code: str, day_index: int = 0):
         db.close()
 
 
+async def fetch_and_cache_weather(site_id: str, day_index: int = 0, db: Session = None):
+    """
+    Fetch weather for a site and populate Redis cache
+    Used by scheduler for polling mode (replaces fetch_and_store_weather)
+    
+    Args:
+        site_id: Site ID (e.g., 'site-arguel')
+        day_index: 0=today, 1=tomorrow, etc.
+        db: Optional database session (for testing)
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    # Use provided db or create new one
+    if db is None:
+        db = SessionLocal()
+        close_db = True
+    else:
+        close_db = False
+    
+    # Limit concurrent database operations to prevent pool exhaustion
+    async with _db_semaphore:
+        
+        try:
+            # Get site from database
+            site = db.query(Site).filter(Site.id == site_id).first()
+            
+            if not site:
+                logger.error(f"Site not found: {site_id}")
+                return False
+            
+            logger.info(f"Fetching {site.name} (day {day_index})...")
+            
+            # Fetch normalized forecast (will auto-cache via weather_pipeline.py)
+            result = await get_normalized_forecast(
+                lat=site.latitude,
+                lon=site.longitude,
+                day_index=day_index,
+                site_name=site.name,
+                elevation_m=site.elevation_m,
+                db=db
+            )
+            
+            if result.get("success"):
+                logger.info(f"✅ Cached {site.name} day {day_index}")
+                return True
+            else:
+                logger.error(f"❌ Failed {site.name} day {day_index}: {result.get('error')}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error fetching {site_id} day {day_index}: {e}", exc_info=True)
+            return False
+        finally:
+            if close_db:
+                db.close()
+
+
 async def scheduled_weather_fetch():
     """
     Main scheduled task - fetch weather for all default sites
+    OPTIMIZATION: Only polls day 0-1 (today/tomorrow) - most consulted
+    Days 2-6 are fetched on-demand and cached for 30min
     Runs every hour
     """
     logger.info(f"⏰ Scheduled weather fetch started at {datetime.now()}")
     
     tasks = []
     
-    # Fetch today and tomorrow for each site
-    for site_code in DEFAULT_SITES:
-        tasks.append(fetch_and_store_weather(site_code, day_index=0))  # Today
-        tasks.append(fetch_and_store_weather(site_code, day_index=1))  # Tomorrow
+    # Fetch today and tomorrow ONLY (most consulted days)
+    for site_id in DEFAULT_SITES:
+        tasks.append(fetch_and_cache_weather(site_id, day_index=0))  # Today
+        tasks.append(fetch_and_cache_weather(site_id, day_index=1))  # Tomorrow
     
     # Execute all fetches in parallel
-    await asyncio.gather(*tasks, return_exceptions=True)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
     
-    logger.info(f"✅ Scheduled weather fetch completed at {datetime.now()}")
+    # Log results
+    success_count = sum(1 for r in results if r and not isinstance(r, Exception))
+    logger.info(f"✅ Scheduled fetch completed: {success_count}/{len(tasks)} succeeded at {datetime.now()}")
+    
+    # Refresh best spot cache after weather data is updated
+    try:
+        from best_spot import refresh_best_spot_cache
+        db = SessionLocal()
+        try:
+            await refresh_best_spot_cache(db)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error refreshing best spot cache: {e}", exc_info=True)
 
 
 def start_scheduler():
     """
-    Start the APScheduler
-    Runs every hour on the hour (e.g., 10:00, 11:00, 12:00)
+    Start weather scheduler - polls every hour for today/tomorrow data
+    
+    Configuration:
+    - Runs every hour at :00
+    - Polls 6 sites × 2 days (today + tomorrow)
+    - Results cached in Redis with 30min TTL
+    - Days 2-6 fetched on-demand only
     """
-    # Schedule every hour
+    logger.info("🚀 Starting weather scheduler...")
+    
+    # Add hourly job
     scheduler.add_job(
         scheduled_weather_fetch,
         trigger=CronTrigger(minute=0),  # Every hour at :00
         id="weather_fetch",
-        name="Fetch weather for default sites",
+        name="Hourly weather fetch (6 sites × 2 days)",
         replace_existing=True
     )
     
     scheduler.start()
-    logger.info("✅ Weather scheduler started (runs every hour)")
+    logger.info("✅ Scheduler started - running every hour at :00")
 
 
 def stop_scheduler():
     """Stop the scheduler"""
-    scheduler.shutdown()
-    logger.info("⏹️ Weather scheduler stopped")
+    try:
+        if scheduler.running:
+            scheduler.shutdown(wait=False)
+            logger.info("⏹️ Weather scheduler stopped")
+    except Exception as e:
+        logger.warning(f"⚠️ Error stopping scheduler (may already be stopped): {e}")
 
 
 # Manual trigger for testing

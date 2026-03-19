@@ -7,13 +7,15 @@ import Dashboard from './pages/Dashboard'
 import FlightHistory from './pages/FlightHistory'
 import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
+import { ViewerExport } from './pages/ViewerExport'
+import { Sites } from './pages/Sites'
 
 // Create query client for TanStack Query
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      gcTime: 1000 * 60 * 10, // 10 minutes (formerly cacheTime)
+      staleTime: 1000 * 60 * 5, // 5 minutes (overridden per hook)
+      gcTime: 1000 * 60 * 60, // 1 hour - keep data in cache longer for better UX
       retry: 2,
       refetchOnWindowFocus: false,
     },
@@ -61,12 +63,26 @@ const settingsRoute = new Route({
   component: Settings,
 })
 
+const exportViewerRoute = new Route({
+  getParentRoute: () => rootRoute,
+  path: '/export-viewer',
+  component: ViewerExport,
+})
+
+const sitesRoute = new Route({
+  getParentRoute: () => rootRoute,
+  path: '/sites',
+  component: Sites,
+})
+
 // Create router
 const routeTree = rootRoute.addChildren([
   dashboardRoute,
   flightHistoryRoute,
   analyticsRoute,
   settingsRoute,
+  exportViewerRoute,
+  sitesRoute,
 ])
 
 const router = new Router({ routeTree })

@@ -10,8 +10,10 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# Python lib directories (but not frontend/src/lib)
+/lib/
 lib64/
+backend/lib/
 parts/
 sdist/
 var/
@@ -58,6 +60,9 @@ npm-debug.log
 yarn-error.log
 dist/
 
+# Frontend build (deployed to backend/static)
+backend/static/
+
 # Playwright
 .auth/
 test-results/
@@ -76,3 +81,4 @@ cache/
 
 *storybook.log
 storybook-static
+docker-compose.prod.yml

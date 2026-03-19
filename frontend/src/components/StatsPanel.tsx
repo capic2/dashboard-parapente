@@ -36,12 +36,12 @@ export default function StatsPanel() {
     : '0.0';
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow-md">
+    <div className="bg-white rounded-xl p-4 shadow-md flex-1 flex flex-col">
       <h2 className="text-sm text-gray-600 mb-3 font-semibold">📊 Statistiques</h2>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 flex-1">
         {/* Row 1 */}
-        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-purple-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-purple-100">
+        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
           <div className="text-2xl leading-none shrink-0">🪂</div>
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">{stats.total_flights}</div>
@@ -49,7 +49,7 @@ export default function StatsPanel() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-purple-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-purple-100">
+        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
           <div className="text-2xl leading-none shrink-0">⏱️</div>
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">{formatDuration(stats.total_hours)}</div>
@@ -57,7 +57,7 @@ export default function StatsPanel() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-purple-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-purple-100">
+        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
           <div className="text-2xl leading-none shrink-0">📏</div>
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">{stats.total_distance.toFixed(1)} km</div>
@@ -65,7 +65,7 @@ export default function StatsPanel() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-purple-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-purple-100">
+        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
           <div className="text-2xl leading-none shrink-0">⌀</div>
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">{formatDuration(stats.avg_duration)}</div>
@@ -74,7 +74,7 @@ export default function StatsPanel() {
         </div>
 
         {/* Row 2 */}
-        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-purple-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-purple-100">
+        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
           <div className="text-2xl leading-none shrink-0">📍</div>
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">{avgDistancePerFlight} km</div>
@@ -82,7 +82,7 @@ export default function StatsPanel() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-purple-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-purple-100">
+        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
           <div className="text-2xl leading-none shrink-0">🕐</div>
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">{avgHoursPerFlight}h</div>
@@ -90,7 +90,7 @@ export default function StatsPanel() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-purple-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-purple-100">
+        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
           <div className="text-2xl leading-none shrink-0">⭐</div>
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">{stats.favorite_spot || 'N/A'}</div>
@@ -98,7 +98,7 @@ export default function StatsPanel() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-purple-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-purple-100">
+        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-md border-2 border-gray-200 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
           <div className="text-2xl leading-none shrink-0">📅</div>
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">

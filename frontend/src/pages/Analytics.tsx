@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import { FilterBar } from '../components/FilterBar';
 
 // Lazy load components for better performance
 const StatsDashboard = lazy(() => import('../components/stats/StatsDashboard'));
@@ -6,6 +7,10 @@ const AltitudeChart = lazy(() => import('../components/stats/AltitudeChart'));
 const ProgressChart = lazy(() => import('../components/stats/ProgressChart'));
 const SiteStats = lazy(() => import('../components/stats/SiteStats'));
 const MonthlyStats = lazy(() => import('../components/stats/MonthlyStats'));
+const TimeOfDayChart = lazy(() => import('../components/stats/TimeOfDayChart'));
+const WeekdayChart = lazy(() => import('../components/stats/WeekdayChart'));
+const RecordsDashboard = lazy(() => import('../components/stats/RecordsDashboard'));
+const AchievementsBadges = lazy(() => import('../components/stats/AchievementsBadges'));
 
 // Loading fallback component
 function ChartSkeleton() {
@@ -24,11 +29,28 @@ export default function Analytics() {
         <p className="text-sm text-gray-600 mt-1">Vue d'ensemble de votre progression en parapente</p>
       </div>
 
+      {/* Filtres dynamiques */}
+      <FilterBar />
+
       <div className="space-y-4">
         {/* Overview Stats Cards */}
         <section>
           <Suspense fallback={<ChartSkeleton />}>
             <StatsDashboard />
+          </Suspense>
+        </section>
+
+        {/* Personal Records */}
+        <section>
+          <Suspense fallback={<ChartSkeleton />}>
+            <RecordsDashboard />
+          </Suspense>
+        </section>
+
+        {/* Achievements */}
+        <section>
+          <Suspense fallback={<ChartSkeleton />}>
+            <AchievementsBadges />
           </Suspense>
         </section>
 
@@ -56,6 +78,17 @@ export default function Analytics() {
 
             <Suspense fallback={<ChartSkeleton />}>
               <SiteStats />
+            </Suspense>
+          </div>
+
+          {/* Temporal Analysis - Time of Day & Weekday */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Suspense fallback={<ChartSkeleton />}>
+              <TimeOfDayChart />
+            </Suspense>
+
+            <Suspense fallback={<ChartSkeleton />}>
+              <WeekdayChart />
             </Suspense>
           </div>
         </section>

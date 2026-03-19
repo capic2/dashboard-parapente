@@ -10,8 +10,14 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 import logging
-import os
 from pathlib import Path
+
+# Import configuration from centralized config module
+from config import (
+    STRAVA_CLIENT_ID,
+    STRAVA_CLIENT_SECRET,
+    STRAVA_REFRESH_TOKEN,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +29,6 @@ ACTIVITY_URL = "https://www.strava.com/api/v3/activities"
 _access_token = None
 _token_expires_at = None
 _refresh_token = None
-
-# Environment variables
-STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
-STRAVA_CLIENT_SECRET = os.getenv("STRAVA_CLIENT_SECRET")
-STRAVA_REFRESH_TOKEN = os.getenv("STRAVA_REFRESH_TOKEN")
 
 
 async def refresh_access_token() -> Optional[str]:
@@ -51,8 +52,14 @@ async def refresh_access_token() -> Optional[str]:
         logger.error("STRAVA_REFRESH_TOKEN not set in environment")
         return None
     
+    if not STRAVA_CLIENT_ID or not STRAVA_CLIENT_SECRET:
+        logger.error(f"Missing Strava credentials: CLIENT_ID={STRAVA_CLIENT_ID}, CLIENT_SECRET={'***' if STRAVA_CLIENT_SECRET else None}")
+        return None
+    
     try:
         logger.info("Refreshing Strava access token...")
+        logger.debug(f"Using CLIENT_ID: {STRAVA_CLIENT_ID}")
+        logger.debug(f"Using REFRESH_TOKEN: {STRAVA_REFRESH_TOKEN[:10]}...")
         
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
@@ -65,6 +72,7 @@ async def refresh_access_token() -> Optional[str]:
                 }
             )
             
+            logger.debug(f"Strava API response status: {response.status_code}")
             response.raise_for_status()
             data = response.json()
         
@@ -76,8 +84,13 @@ async def refresh_access_token() -> Optional[str]:
         
         return _access_token
     
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Strava API error (HTTP {e.response.status_code}): {e.response.text}")
+        return None
     except Exception as e:
-        logger.error(f"Failed to refresh token: {e}")
+        logger.error(f"Failed to refresh token: {type(e).__name__}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return None
 
 
@@ -340,6 +353,100 @@ async def get_activity_details(activity_id: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Failed to get activity details for {activity_id}: {e}")
         return None
+
+
+async def get_activities_by_period(
+    date_from: str,
+    date_to: str,
+    activity_type: str = "Workout",
+    per_page: int = 50
+) -> List[Dict[str, Any]]:
+    """
+    Récupère toutes les activités Strava pour une période donnée
+    
+    Args:
+        date_from: Date début au format YYYY-MM-DD
+        date_to: Date fin au format YYYY-MM-DD
+        activity_type: Type d'activité (default: Workout - pour les vols parapente)
+        per_page: Nombre d'activités par page (max 200)
+    
+    Returns:
+        Liste d'activités Strava filtrées par type
+        
+    Raises:
+        Exception si échec API
+    """
+    token = await get_access_token()
+    
+    if not token:
+        logger.error("Cannot get activities: no access token")
+        raise Exception("No Strava access token available")
+    
+    try:
+        # Convertir dates en timestamps Unix
+        from_dt = datetime.strptime(date_from, "%Y-%m-%d")
+        to_dt = datetime.strptime(date_to, "%Y-%m-%d")
+        
+        after_timestamp = int(from_dt.timestamp())
+        before_timestamp = int(to_dt.timestamp())
+        
+        # API Strava: GET /athlete/activities
+        url = "https://www.strava.com/api/v3/athlete/activities"
+        
+        all_activities = []
+        page = 1
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            while True:
+                response = await client.get(
+                    url,
+                    headers={"Authorization": f"Bearer {token}"},
+                    params={
+                        "after": after_timestamp,
+                        "before": before_timestamp,
+                        "per_page": per_page,
+                        "page": page
+                    }
+                )
+                
+                response.raise_for_status()
+                activities = response.json()
+                
+                # Si pas de résultats, fin de pagination
+                if not activities:
+                    break
+                
+                logger.debug(f"Page {page}: Retrieved {len(activities)} activities")
+                
+                # Filtrer par type d'activité
+                filtered = [
+                    act for act in activities 
+                    if act.get("type") == activity_type or 
+                       act.get("sport_type") == activity_type
+                ]
+                
+                logger.debug(f"Page {page}: {len(filtered)} activities match type '{activity_type}'")
+                
+                # Log les types d'activités trouvées (pour debug)
+                if len(filtered) == 0 and len(activities) > 0:
+                    activity_types = set(act.get("type") or act.get("sport_type") for act in activities)
+                    logger.debug(f"Activity types found on page {page}: {activity_types}")
+                
+                all_activities.extend(filtered)
+                
+                # Si moins de per_page résultats, c'est la dernière page
+                if len(activities) < per_page:
+                    break
+                
+                page += 1
+        
+        logger.info(f"✅ Retrieved {len(all_activities)} '{activity_type}' activities from {date_from} to {date_to}")
+        
+        return all_activities
+    
+    except Exception as e:
+        logger.error(f"Failed to get activities by period: {e}")
+        raise
 
 
 def save_gpx_file(gpx_content: str, activity_id: str) -> Optional[str]:

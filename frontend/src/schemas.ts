@@ -11,34 +11,47 @@ import { z } from 'zod'
 
 export const SiteSchema = z.object({
   id: z.string(),
+  code: z.string().nullable().optional(),
   name: z.string(),
   latitude: z.number(),
   longitude: z.number(),
-  elevation_m: z.number(),
-  description: z.string().catch(''),
-  orientation: z.string().catch(''),
-  difficulty_level: z.string().catch(''),
-  is_active: z.union([z.boolean(), z.null(), z.undefined()]).transform(v => v ?? true),
-  created_at: z.string().catch(''),
-  updated_at: z.string().catch(''),
+  elevation_m: z.number().nullable().optional(),
+  region: z.string().nullable().optional(),
+  country: z.string().nullable().optional().default('FR'),
+  rating: z.number().nullable().optional(),
+  orientation: z.string().nullable().optional(),
+  linked_spot_id: z.string().nullable().optional(),
+  created_at: z.string().nullable().optional(),
+  updated_at: z.string().nullable().optional(),
+  // Legacy fields kept for backward compatibility
+  description: z.string().optional().catch(''),
+  difficulty_level: z.string().optional().catch(''),
+  is_active: z.boolean().optional().default(true),
 })
 
 export const FlightSchema = z.object({
   id: z.string(),
-  user_id: z.string().optional(),
-  site_id: z.string(),
-  site_name: z.string().optional(),
+  strava_id: z.string().nullable().optional(),
+  site_id: z.string().nullable().optional(),
+  site_name: z.string().nullable().optional(),
+  name: z.string().nullable().optional(),
   title: z.string(),
+  description: z.string().nullable().optional(),
   flight_date: z.string(),
-  duration_minutes: z.number(),
-  max_altitude_m: z.number(),
-  distance_km: z.number(),
-  elevation_gain_m: z.number(),
+  departure_time: z.string().nullable().optional(),
+  duration_minutes: z.number().nullable().optional(),
+  max_altitude_m: z.number().nullable().optional(),
+  max_speed_kmh: z.number().nullable().optional(),
+  distance_km: z.number().nullable().optional(),
+  elevation_gain_m: z.number().nullable().optional(),
   notes: z.string().nullable().optional(),
   gpx_file_path: z.string().nullable().optional(),
+  gpx_max_altitude_m: z.number().nullable().optional(),
+  gpx_elevation_gain_m: z.number().nullable().optional(),
+  external_url: z.string().nullable().optional(),
   site: SiteSchema.optional(),
-  created_at: z.string(),
-  updated_at: z.string(),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
 })
 
 export const FlightStatsSchema = z.object({
@@ -141,13 +154,15 @@ export const HourlyForecastItemSchema = z.object({
   temperature: z.number(),
   wind: z.number(),
   wind_speed: z.number(),
+  wind_gust: z.number().optional(),
   direction: z.string(),
   wind_direction: z.string(),
   conditions: z.string(),
   precipitation: z.number(),
   para_index: z.number(),
   verdict: z.string(),
-})
+  sources: z.record(z.string(), z.any()).optional(), // Per-source weather data
+}).passthrough() // Keep all extra fields
 
 export const DailyForecastItemSchema = z.object({
   date: z.string(),
@@ -183,13 +198,25 @@ export const WeatherDataSchema = z.object({
 
 export const ConsensusHourSchema = z.object({
   hour: z.number(),
+  num_sources: z.number().optional(),
   temperature: z.number().nullable(),
+  temperature_confidence: z.number().optional(),
   wind_speed: z.number().nullable(),
+  wind_confidence: z.number().optional(),
   wind_gust: z.number().nullable(),
+  gust_confidence: z.number().optional(),
   wind_direction: z.number().nullable(),
+  direction_confidence: z.number().optional(),
   precipitation: z.number().nullable(),
+  precipitation_confidence: z.number().optional(),
   cloud_cover: z.number().nullable(),
-})
+  cloud_confidence: z.number().optional(),
+  cape: z.number().nullable().optional(),
+  cape_confidence: z.number().optional(),
+  lifted_index: z.number().nullable().optional(),
+  li_confidence: z.number().optional(),
+  sources: z.record(z.string(), z.any()).optional(), // Per-source data for tooltip
+}).passthrough() // Keep all extra fields from API response
 
 export const SlotSchema = z.object({
   start_hour: z.number(),

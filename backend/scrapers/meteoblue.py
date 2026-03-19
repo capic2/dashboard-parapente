@@ -1,124 +1,429 @@
-"""Meteoblue scraper using Playwright with improved error handling"""
+"""
+Meteoblue scraper using Playwright to activate 1h/3h toggle
+Site: https://www.meteoblue.com
+Scraping approach: 
+1. Load page with Playwright
+2. Click toggle to switch to 1h view (24 hours)
+3. Extract data from forecast table HTML
+"""
 
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
-from datetime import datetime
-from typing import Dict, List, Any
+import re
+from datetime import datetime, timedelta
+from typing import Dict, List, Any, Optional
+import logging
+from bs4 import BeautifulSoup
+
+from .base import PlaywrightScraper
+
+logger = logging.getLogger(__name__)
 
 
-async def fetch_meteoblue(lat: float, lon: float, days: int = 2) -> Dict[str, Any]:
+class MeteoblueScraper(PlaywrightScraper):
     """
-    Scrape Meteoblue using Playwright for hourly table data
+    Meteoblue scraper using Playwright to activate hourly view toggle
     
-    Args:
-        lat: Latitude coordinate
-        lon: Longitude coordinate
-        days: Number of forecast days (not used by Meteoblue URL, but kept for API consistency)
+    Architecture:
+    - Extends PlaywrightScraper base class
+    - Uses Playwright to load page and click 1h/3h toggle
+    - Uses BeautifulSoup to parse forecast tables
+    - Extracts 24 hours of data at 1-hour intervals
     
-    Returns:
-        Dict with success status, data, source, and timestamp
+    Data provided:
+    - Temperature (°C)
+    - Wind speed (m/s converted from displayed km/h)
+    - Wind direction (degrees from compass or image)
+    - Precipitation (mm)
+    - Cloud cover (%) - from text or inferred from picto
+    - Relative humidity (%)
+    
+    Forecast range: 7 days, 24 hours per day at 1h intervals
     """
-    try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
-            
-            # Meteoblue URL format
-            url = f"https://www.meteoblue.com/en/weather/forecast/hourly/{lat}N{lon}E"
-            
-            await page.goto(url, timeout=30000)
-            await page.wait_for_load_state("networkidle", timeout=15000)
-            
-            # Extract table data using JavaScript
-            table_data = await page.evaluate("""
-                () => {
-                    const rows = document.querySelectorAll('table tbody tr');
-                    const data = [];
-                    rows.forEach(row => {
-                        const cells = row.querySelectorAll('td');
-                        if (cells.length > 0) {
-                            data.push({
-                                time: cells[0]?.textContent?.trim() || '',
-                                temp: cells[1]?.textContent?.trim() || '',
-                                wind: cells[2]?.textContent?.trim() || '',
-                                gust: cells[3]?.textContent?.trim() || '',
-                                precip: cells[4]?.textContent?.trim() || '',
-                            });
-                        }
-                    });
-                    return data;
-                }
-            """)
-            
-            await browser.close()
-            
-            return {
-                "success": bool(table_data),
-                "source": "meteoblue",
-                "data": table_data,
-                "timestamp": datetime.now().isoformat()
-            }
-    except PlaywrightTimeout as e:
-        return {
-            "success": False,
-            "source": "meteoblue",
-            "error": f"Timeout: {str(e)}",
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "source": "meteoblue",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
-
-
-async def extract_hourly_forecast(data: Dict[str, Any], day_index: int = 0) -> List[Dict[str, Any]]:
-    """
-    Parse Meteoblue hourly data
     
-    Args:
-        data: Raw response from fetch_meteoblue
-        day_index: Which day to extract (0=today, 1=tomorrow)
+    # City code cache
+    CITY_CODE_CACHE = {}
     
-    Returns:
-        List of parsed hourly forecasts
-    """
-    if not data.get("success"):
-        return []
+    # City code overrides for known locations
+    CITY_CODE_OVERRIDE = {
+        "arguel": "3036982",
+        "ornans": "2989580",
+    }
     
-    forecasts = []
-    for item in data.get("data", []):
+    # Compass direction to degrees
+    DIRECTION_MAP = {
+        "N": 0, "NNE": 22, "NE": 45, "ENE": 67,
+        "E": 90, "ESE": 112, "SE": 135, "SSE": 157,
+        "S": 180, "SSW": 202, "SW": 225, "WSW": 247,
+        "W": 270, "WNW": 292, "NW": 315, "NNW": 337,
+    }
+    
+    def __init__(self, timeout: int = 20, headless: bool = True):
+        """
+        Initialize Meteoblue scraper
+        
+        Args:
+            timeout: Request timeout in seconds (default 20s - meteoblue is slow)
+            headless: Run browser in headless mode
+        """
+        super().__init__(
+            source_name="meteoblue",
+            base_url="https://www.meteoblue.com",
+            headless=headless,
+            timeout=timeout
+        )
+    
+    def _get_city_code(self, city_name: str) -> Optional[str]:
+        """Get Meteoblue city code"""
+        city_key = city_name.lower()
+        
+        if city_key in self.CITY_CODE_OVERRIDE:
+            return self.CITY_CODE_OVERRIDE[city_key]
+        
+        if city_key in self.CITY_CODE_CACHE:
+            return self.CITY_CODE_CACHE[city_key]
+        
+        return None
+    
+    async def _scrape_page(self, page, lat: float, lon: float, **kwargs) -> List[Dict[str, Any]]:
+        """
+        Scrape Meteoblue forecast using Playwright page
+        
+        Args:
+            page: Playwright Page object
+            lat: Latitude
+            lon: Longitude
+            **kwargs: city_name, etc.
+        
+        Returns:
+            List of hourly forecast dictionaries
+        """
+        city_name = kwargs.get("city_name", "location")
+        
+        # Get city code
+        city_code = self._get_city_code(city_name)
+        
+        if not city_code:
+            # Fallback to GPS coordinates when city code is not available
+            self.logger.info(f"No city code for {city_name}, using GPS coordinates fallback: {lat:.4f}N {lon:.4f}E")
+            
+            # Format coordinates for Meteoblue URL
+            # Example: 47.0833N 6.0500E → 47.08N6.05E
+            lat_str = f"{abs(lat):.2f}{'N' if lat >= 0 else 'S'}"
+            lon_str = f"{abs(lon):.2f}{'E' if lon >= 0 else 'W'}"
+            coords_slug = f"{lat_str}{lon_str}"
+            
+            # Build URL with coordinates
+            url = f"{self.base_url}/fr/meteo/semaine/{coords_slug}"
+        else:
+            # Build URL with city code
+            url = f"{self.base_url}/fr/meteo/semaine/{city_name}_france_{city_code}"
+        
+        self.logger.info(f"Fetching Meteoblue with Playwright: {url}")
+        
+        # Navigate to page - use domcontentloaded for faster load (networkidle too slow)
         try:
-            # Parse time string (e.g., "14:00")
-            time_str = item.get("time", "0:00")
-            hour = int(time_str.split(":")[0]) if ":" in time_str else 0
+            await page.goto(url, wait_until="domcontentloaded", timeout=10000)
+        except Exception as e:
+            self.logger.warning(f"Page load timeout, continuing anyway: {e}")
+        
+        # Wait for forecast table to load (any view - 1h or 3h)
+        try:
+            await page.wait_for_selector('table.picto', timeout=8000)
+        except Exception as e:
+            self.logger.error(f"Forecast table not found: {e}")
+            return []
+        
+        self.logger.info("Page loaded, looking for toggle")
+        
+        # Click the 1h/3h toggle to activate hourly view (24 hours)
+        # The toggle is: <input class="switch" type="checkbox"> inside <div id="switch">
+        try:
+            toggle_selector = '#switch input.switch'
+            await page.wait_for_selector(toggle_selector, timeout=3000)
             
-            # Parse temperature (remove °C symbol)
-            temp_str = item.get("temp", "0").replace("°C", "").replace("°", "").strip()
-            temperature = float(temp_str) if temp_str else 0.0
+            # Check if already in 1h mode (checkbox checked)
+            is_checked = await page.evaluate(f'document.querySelector("{toggle_selector}").checked')
             
-            # Parse wind speed (remove km/h)
-            wind_str = item.get("wind", "0").replace("km/h", "").strip()
-            wind_speed = float(wind_str) if wind_str else 0.0
-            
-            # Parse gust
-            gust_str = item.get("gust", "0").replace("km/h", "").strip()
-            wind_gust = float(gust_str) if gust_str else 0.0
-            
-            # Parse precipitation
-            precip_str = item.get("precip", "0").replace("mm", "").strip()
-            precipitation = float(precip_str) if precip_str else 0.0
-            
-            forecasts.append({
-                "time": time_str,
-                "hour": hour,
-                "temperature": temperature,
-                "wind_speed": wind_speed,
-                "wind_gust": wind_gust,
-                "precipitation": precipitation,
-            })
-        except (ValueError, AttributeError):
-            continue
+            if not is_checked:
+                self.logger.info("Clicking toggle to activate 1h view")
+                # Use JavaScript click (more reliable than Playwright click for hidden checkboxes)
+                await page.evaluate(f'document.querySelector("{toggle_selector}").click()')
+                # Wait for AJAX update (table classes don't change, just content)
+                # Reduced from 2000ms to 800ms - sufficient for table update
+                await page.wait_for_timeout(800)
+            else:
+                self.logger.info("Already in 1h view")
+                
+        except Exception as e:
+            self.logger.warning(f"Could not activate 1h toggle: {e}, continuing with default view")
+        
+        # Get updated HTML content
+        html = await page.content()
+        
+        # Parse HTML to extract forecast data
+        hourly_data = self._parse_html(html)
+        
+        self.logger.info(f"Meteoblue: Extracted {len(hourly_data)} hours")
+        
+        return hourly_data
     
-    return forecasts
+    def _parse_html(self, html: str) -> List[Dict[str, Any]]:
+        """
+        Parse Meteoblue HTML to extract hourly forecasts
+        
+        Args:
+            html: Page HTML content
+        
+        Returns:
+            List of hourly forecast dictionaries
+        """
+        try:
+            soup = BeautifulSoup(html, 'html.parser')
+            
+            # Find the hourly view table
+            hourly_table = soup.find('table', class_='picto hourly-view')
+            
+            if not hourly_table:
+                self.logger.warning("No hourly forecast table found")
+                return []
+            
+            # Find all rows
+            rows = hourly_table.find_all('tr')
+            
+            # Parse times row (has <time datetime="..."> tags)
+            times_row = hourly_table.find('tr', class_='times')
+            if not times_row:
+                self.logger.warning("No times row found")
+                return []
+            
+            # Extract timestamps from <time> tags
+            time_elements = times_row.find_all('time')
+            timestamps = []
+            for time_elem in time_elements:
+                dt_str = time_elem.get('datetime')
+                if dt_str:
+                    timestamps.append(datetime.fromisoformat(dt_str.replace('Z', '+00:00')))
+            
+            if not timestamps:
+                self.logger.warning("No timestamps found")
+                return []
+            
+            self.logger.info(f"Found {len(timestamps)} time slots")
+            
+            # Initialize data structure
+            hourly_data = []
+            for dt in timestamps:
+                hourly_data.append({
+                    'datetime': dt.isoformat(),
+                    'temperature': None,
+                    'wind_speed': None,
+                    'wind_direction': None,
+                    'precipitation': 0.0,
+                    'clouds': None,
+                    'humidity': None,
+                    'picto': None,
+                })
+            
+            # Parse icons row (for picto and cloud inference)
+            icons_row = hourly_table.find('tr', class_='icons')
+            if icons_row:
+                icon_cells = icons_row.find_all('td')
+                for i, cell in enumerate(icon_cells):
+                    if i >= len(hourly_data):
+                        break
+                    img = cell.find('img')
+                    if img and img.get('src'):
+                        picto_url = img.get('src')
+                        hourly_data[i]['picto'] = picto_url
+                        hourly_data[i]['clouds'] = self._infer_clouds_from_picto(picto_url)
+            
+            # Parse temperatures row
+            temp_row = hourly_table.find('tr', class_='temperatures')
+            if temp_row:
+                temp_cells = temp_row.find_all('td')
+                for i, cell in enumerate(temp_cells):
+                    if i >= len(hourly_data):
+                        break
+                    temp_text = cell.get_text(strip=True)
+                    temp_match = re.search(r'(-?\d+)', temp_text)
+                    if temp_match:
+                        hourly_data[i]['temperature'] = int(temp_match.group(1))
+            
+            # Parse wind speeds row
+            wind_row = hourly_table.find('tr', class_='windspeeds')
+            if wind_row:
+                wind_cells = wind_row.find_all('td')
+                for i, cell in enumerate(wind_cells):
+                    if i >= len(hourly_data):
+                        break
+                    wind_text = cell.get_text(strip=True)
+                    wind_match = re.search(r'(\d+)', wind_text)
+                    if wind_match:
+                        wind_kmh = int(wind_match.group(1))
+                        hourly_data[i]['wind_speed'] = round(wind_kmh / 3.6, 1)  # km/h to m/s
+                    
+                    # Try to extract wind direction from div class (format: "glyph winddir SE")
+                    wind_dir_div = cell.find('div', class_='winddir')
+                    if wind_dir_div:
+                        classes = wind_dir_div.get('class', [])
+                        for cls in classes:
+                            if cls != 'glyph' and cls != 'winddir':
+                                # This is the direction (e.g., "SE", "N", "W")
+                                direction = self._parse_direction(cls)
+                                if direction is not None:
+                                    hourly_data[i]['wind_direction'] = direction
+                                    break
+            
+            # Parse precipitation row
+            precip_row = hourly_table.find('tr', class_='precips')
+            if precip_row:
+                precip_cells = precip_row.find_all('td')
+                for i, cell in enumerate(precip_cells):
+                    if i >= len(hourly_data):
+                        break
+                    precip_text = cell.get_text(strip=True)
+                    
+                    if precip_text in ['-', '--', '']:
+                        hourly_data[i]['precipitation'] = 0.0
+                    else:
+                        precip_match = re.search(r'([\d.]+)', precip_text)
+                        if precip_match:
+                            hourly_data[i]['precipitation'] = float(precip_match.group(1))
+            
+            # Note: Meteoblue hourly table doesn't have humidity in the free version
+            # We keep humidity as None
+            
+            self.logger.info(f"Parsed {len(hourly_data)} hours successfully")
+            return hourly_data
+            
+        except Exception as e:
+            self.logger.error(f"Error parsing Meteoblue HTML: {e}", exc_info=True)
+            return []
+    
+    def _parse_direction(self, text: str) -> Optional[int]:
+        """
+        Parse wind direction from text
+        
+        Args:
+            text: Direction text (e.g., "Nord", "NE", "South-West")
+        
+        Returns:
+            Direction in degrees (0-359) or None
+        """
+        if not text:
+            return None
+        
+        text = text.upper()
+        
+        # Try direct mapping
+        for key, value in self.DIRECTION_MAP.items():
+            if key in text:
+                return value
+        
+        # Try French directions
+        french_map = {
+            "NORD": 0, "EST": 90, "SUD": 180, "OUEST": 270,
+        }
+        
+        for key, value in french_map.items():
+            if key in text:
+                return value
+        
+        return None
+    
+    def _infer_clouds_from_picto(self, picto_url: str) -> Optional[int]:
+        """
+        Infer cloud cover from weather icon URL
+        
+        Args:
+            picto_url: URL to weather icon
+        
+        Returns:
+            Cloud cover percentage (0-100) or None
+        """
+        try:
+            # Extract picto code (e.g., "01" from "01_day.svg")
+            picto_match = re.search(r'/(\d{2})_', picto_url)
+            if not picto_match:
+                return None
+            
+            picto_code = int(picto_match.group(1))
+            
+            # Meteoblue picto codes (approximation):
+            # 01 = clear (0%)
+            # 02 = few clouds (25%)
+            # 03 = partly cloudy (50%)
+            # 04 = cloudy (75%)
+            # 05+ = overcast or weather (85%+)
+            
+            if picto_code == 1:
+                return 0
+            elif picto_code == 2:
+                return 25
+            elif picto_code == 3:
+                return 50
+            elif picto_code == 4:
+                return 75
+            elif picto_code >= 5:
+                return 85
+            else:
+                return None
+                
+        except Exception:
+            return None
+    
+    def extract_hourly_forecast(
+        self,
+        data: Dict[str, Any],
+        day_index: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Extract hourly forecast for a specific day
+        
+        Args:
+            data: Response from fetch() method
+            day_index: Day index (0=today, 1=tomorrow, etc.)
+        
+        Returns:
+            List of hourly forecasts for the specified day
+        """
+        if not data.get("success"):
+            return []
+        
+        all_hours = data.get("data", [])
+        
+        # Filter by day
+        target_date = datetime.now().date() + timedelta(days=day_index)
+        
+        day_hours = []
+        for hour in all_hours:
+            try:
+                hour_dt = datetime.fromisoformat(hour["datetime"])
+                if hour_dt.date() == target_date:
+                    # Add 'hour' field and rename 'clouds' to 'cloud_cover' for pipeline compatibility
+                    hour_copy = hour.copy()
+                    hour_copy["hour"] = hour_dt.hour
+                    if "clouds" in hour_copy:
+                        hour_copy["cloud_cover"] = hour_copy.pop("clouds")
+                    day_hours.append(hour_copy)
+            except Exception:
+                continue
+        
+        return day_hours
+
+
+# Standalone functions for compatibility
+
+async def fetch_meteoblue(lat: float, lon: float, city_name: str = "location") -> Dict[str, Any]:
+    """Fetch Meteoblue forecast (standalone function)"""
+    scraper = MeteoblueScraper()
+    return await scraper.fetch(lat, lon, city_name=city_name)
+
+
+def extract_meteoblue_hourly(data: Dict[str, Any], day_index: int = 0) -> List[Dict[str, Any]]:
+    """Extract hourly forecast for specific day (standalone function)"""
+    scraper = MeteoblueScraper()
+    return scraper.extract_hourly_forecast(data, day_index)
+
+
+# Alias for pipeline compatibility
+extract_hourly_forecast = extract_meteoblue_hourly

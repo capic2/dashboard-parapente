@@ -60,16 +60,18 @@ def extract_hourly_forecast(data: Dict[str, Any], day_index: int = 0) -> List[Di
     Extract hourly forecast for a specific day
     
     Args:
-        data: Raw response from fetch_open_meteo
+        data: Response from fetch_open_meteo (wrapper or raw API response)
         day_index: Which day to extract (0=today, 1=tomorrow)
     
     Returns:
         List of hourly forecast dicts
     """
-    if not data.get("success"):
+    # Handle both wrapper format and raw API response
+    raw_data = data.get("data") if isinstance(data, dict) and "data" in data else data
+    if not raw_data:
         return []
     
-    hourly = data.get("data", {}).get("hourly", {})
+    hourly = raw_data.get("hourly", {})
     times = hourly.get("time", [])
     
     if not times:

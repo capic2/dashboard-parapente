@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSites } from '../hooks/useSites';
+import { useWeatherSources, useWeatherSourceStats, useDeleteWeatherSource } from '../hooks/useWeatherSources';
+import { WeatherSourceCard } from '../components/WeatherSourceCard';
+import type { WeatherSource } from '../types/weatherSources';
 
 // Site interface as returned by API
 interface ApiSite {
@@ -49,11 +52,116 @@ const DEFAULT_SETTINGS: AppSettings = {
   favoriteSites: [],
 };
 
+// Weather Sources Tab Component
+function WeatherSourcesTab() {
+  const { data: sources = [], isLoading, error } = useWeatherSources()
+  const { data: stats } = useWeatherSourceStats()
+  const deleteSource = useDeleteWeatherSource()
+  
+  const handleDelete = async (source: WeatherSource) => {
+    if (!confirm(`Supprimer la source "${source.display_name}" ?\n\nCette action est irréversible.`)) {
+      return
+    }
+    
+    try {
+      await deleteSource.mutateAsync(source.source_name)
+      alert(`Source "${source.display_name}" supprimée avec succès`)
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Erreur lors de la suppression'
+      alert(errorMessage)
+    }
+  }
+  
+  // Count active sources
+  const activeSources = sources.filter(s => s.is_enabled)
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+  
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
+        ❌ Erreur lors du chargement des sources météo
+      </div>
+    )
+  }
+  
+  return (
+    <div className="space-y-4">
+      {/* Header with stats */}
+      <div className="bg-white rounded-xl p-6 shadow-md">
+        <h2 className="text-xl font-bold text-gray-900 mb-2">🌦️ Gestion des Sources Météo</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Configurez les sources utilisées pour les prévisions météo. Au moins une source doit rester active.
+        </p>
+        
+        {stats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="p-3 bg-blue-50 rounded-lg">
+              <div className="text-xs text-blue-600 font-semibold mb-1">Sources actives</div>
+              <div className="text-2xl font-bold text-blue-900">{stats.active_sources}/{stats.total_sources}</div>
+            </div>
+            <div className="p-3 bg-green-50 rounded-lg">
+              <div className="text-xs text-green-600 font-semibold mb-1">Taux de succès global</div>
+              <div className="text-2xl font-bold text-green-900">{stats.global_success_rate.toFixed(0)}%</div>
+            </div>
+            <div className="p-3 bg-purple-50 rounded-lg">
+              <div className="text-xs text-purple-600 font-semibold mb-1">Temps moyen</div>
+              <div className="text-2xl font-bold text-purple-900">
+                {stats.global_avg_response_time_ms ? `${stats.global_avg_response_time_ms}ms` : '-'}
+              </div>
+            </div>
+            <div className="p-3 bg-red-50 rounded-lg">
+              <div className="text-xs text-red-600 font-semibold mb-1">Sources en erreur</div>
+              <div className="text-2xl font-bold text-red-900">{stats.sources_with_errors}</div>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Sources Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {sources.map((source) => (
+          <WeatherSourceCard
+            key={source.id}
+            source={source}
+            isLastActive={activeSources.length === 1 && source.is_enabled}
+            onDelete={handleDelete}
+          />
+        ))}
+      </div>
+      
+      {sources.length === 0 && (
+        <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-600">
+          Aucune source météo configurée
+        </div>
+      )}
+      
+      {/* Info Box */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <h3 className="font-semibold text-yellow-900 mb-2">ℹ️ À propos des sources météo</h3>
+        <ul className="text-sm text-yellow-800 space-y-1">
+          <li>• <strong>Open-Meteo</strong>: API gratuite et fiable, recommandée comme source principale</li>
+          <li>• <strong>WeatherAPI</strong>: Nécessite une clé API (plan gratuit disponible)</li>
+          <li>• <strong>Météo Parapente</strong>: Spécialisée parapente avec prévisions de thermiques</li>
+          <li>• <strong>Météociel</strong>: Modèle AROME haute résolution pour la France</li>
+          <li>• <strong>Meteoblue</strong>: Prévisions professionnelles multi-modèles</li>
+        </ul>
+      </div>
+    </div>
+  )
+}
+
 export default function Settings() {
   const { data: sites = [], isLoading: sitesLoading } = useSites();
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [saved, setSaved] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'sites' | 'data'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'sites' | 'weather' | 'data'>('general');
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -143,7 +251,7 @@ export default function Settings() {
           onClick={() => setActiveTab('general')}
           className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
             activeTab === 'general'
-              ? 'bg-purple-600 text-white shadow-md'
+              ? 'bg-sky-600 text-white shadow-md'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
@@ -153,17 +261,27 @@ export default function Settings() {
           onClick={() => setActiveTab('sites')}
           className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
             activeTab === 'sites'
-              ? 'bg-purple-600 text-white shadow-md'
+              ? 'bg-sky-600 text-white shadow-md'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
           📍 Sites Favoris
         </button>
         <button
+          onClick={() => setActiveTab('weather')}
+          className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
+            activeTab === 'weather'
+              ? 'bg-sky-600 text-white shadow-md'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          🌦️ Sources Météo
+        </button>
+        <button
           onClick={() => setActiveTab('data')}
           className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
             activeTab === 'data'
-              ? 'bg-purple-600 text-white shadow-md'
+              ? 'bg-sky-600 text-white shadow-md'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
@@ -187,7 +305,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, distance: 'km' } }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.distance === 'km'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -197,7 +315,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, distance: 'miles' } }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.distance === 'miles'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -213,7 +331,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, altitude: 'm' } }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.altitude === 'm'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -223,7 +341,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, altitude: 'ft' } }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.altitude === 'ft'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -239,7 +357,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, speed: 'kmh' } }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.speed === 'kmh'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -249,7 +367,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, speed: 'mph' } }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.speed === 'mph'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -271,7 +389,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, language: 'fr' }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.language === 'fr'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -281,7 +399,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, language: 'en' }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.language === 'en'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -297,7 +415,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, theme: 'light' }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.theme === 'light'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -307,7 +425,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, theme: 'dark' }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.theme === 'dark'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -317,7 +435,7 @@ export default function Settings() {
                       onClick={() => setSettings((prev) => ({ ...prev, theme: 'auto' }))}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.theme === 'auto'
-                          ? 'bg-purple-600 text-white shadow-md'
+                          ? 'bg-sky-600 text-white shadow-md'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
@@ -343,7 +461,7 @@ export default function Settings() {
                         notifications: { ...prev.notifications, weather: e.target.checked },
                       }))
                     }
-                    className="w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-600"
+                    className="w-5 h-5 text-sky-600 rounded focus:ring-2 focus:ring-sky-600"
                   />
                 </label>
                 <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all cursor-pointer">
@@ -357,7 +475,7 @@ export default function Settings() {
                         notifications: { ...prev.notifications, flights: e.target.checked },
                       }))
                     }
-                    className="w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-600"
+                    className="w-5 h-5 text-sky-600 rounded focus:ring-2 focus:ring-sky-600"
                   />
                 </label>
                 <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all cursor-pointer">
@@ -371,7 +489,7 @@ export default function Settings() {
                         notifications: { ...prev.notifications, alerts: e.target.checked },
                       }))
                     }
-                    className="w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-600"
+                    className="w-5 h-5 text-sky-600 rounded focus:ring-2 focus:ring-sky-600"
                   />
                 </label>
               </div>
@@ -398,7 +516,7 @@ export default function Settings() {
                     key={site.id}
                     className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
                       settings.favoriteSites.includes(site.id)
-                        ? 'border-purple-600 bg-purple-50'
+                        ? 'border-sky-600 bg-sky-50'
                         : 'border-gray-200 bg-gray-50 hover:border-gray-300'
                     }`}
                   >
@@ -417,7 +535,7 @@ export default function Settings() {
                       onClick={() => toggleFavorite(site.id)}
                       className={`ml-4 px-4 py-2 rounded-lg font-medium transition-all ${
                         settings.favoriteSites.includes(site.id)
-                          ? 'bg-purple-600 text-white hover:bg-purple-700'
+                          ? 'bg-sky-600 text-white hover:bg-sky-700'
                           : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                       }`}
                     >
@@ -432,6 +550,9 @@ export default function Settings() {
             </div>
           </div>
         )}
+
+        {/* WEATHER SOURCES TAB */}
+        {activeTab === 'weather' && <WeatherSourcesTab />}
 
         {/* DATA TAB */}
         {activeTab === 'data' && (
@@ -498,7 +619,7 @@ export default function Settings() {
           className={`w-full px-6 py-4 rounded-xl font-bold text-lg shadow-lg transition-all ${
             saved
               ? 'bg-green-600 text-white'
-              : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-xl'
+              : 'bg-sky-600 text-white hover:bg-sky-700 hover:shadow-xl'
           }`}
         >
           {saved ? '✅ Paramètres sauvegardés !' : '💾 Sauvegarder les modifications'}

@@ -1,344 +1,145 @@
 # Backend - Dashboard Parapente
 
-Python backend for weather data collection, normalization, and API serving.
+[![Backend Tests](https://github.com/capic2/dashboard-parapente/actions/workflows/backend-tests.yml/badge.svg)](https://github.com/capic2/dashboard-parapente/actions/workflows/backend-tests.yml)
+[![codecov](https://codecov.io/gh/capic2/dashboard-parapente/branch/main/graph/badge.svg)](https://codecov.io/gh/capic2/dashboard-parapente)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+
+**Python FastAPI backend with weather aggregation, caching, and scheduling.**
 
 ---
 
-## 🏗️ Structure
+## Architecture Overview
 
 ```
-backend/
-├── scrapers/          # Weather data source clients (refactored from existing code)
-├── pipeline/          # Data orchestration & normalization
-├── scheduler/         # APScheduler job management
-├── api/               # FastAPI application & REST endpoints
-├── tests/             # Unit & integration tests
-├── db/                # SQLite database & migrations
-├── requirements.txt   # Python dependencies
-├── .env.example       # Environment variables template
-└── README.md          # THIS FILE
+┌──────────────────────────────────────────────────────┐
+│                  FastAPI Backend                     │
+│                                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────┐ │
+│  │   Routes     │  │   Weather    │  │ Scheduler │ │
+│  │  (REST API)  │──┤   Pipeline   │──┤ (APSched) │ │
+│  └──────┬───────┘  └──────┬───────┘  └─────┬─────┘ │
+│         │                  │                 │       │
+│         │        ┌─────────▼────────┐       │       │
+│         │        │    Scrapers      │       │       │
+│         │        │  (5+ sources)    │       │       │
+│         │        └──────────────────┘       │       │
+│         │                                    │       │
+│    ┌────▼──────────────────────────────────▼────┐  │
+│    │          Cache Layer (Redis)              │  │
+│    │  Development: FakeRedis (in-memory)       │  │
+│    │  Production: Redis (persistent)           │  │
+│    └───────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────┘
+                       │
+         ┌─────────────┴──────────────┐
+         │                            │
+    ┌────▼────┐                 ┌─────▼─────┐
+    │ SQLite  │                 │ External  │
+    │Database │                 │Weather APIs│
+    └─────────┘                 └───────────┘
 ```
 
 ---
 
-## 🚀 Setup (Phase 2, Week 1)
-
-### 1. Database Initialization (2 minutes)
-
-```bash
-# From dashboard root directory:
-# Database directories already created in git
-
-# Initialize SQLite from schema
-sqlite3 backend/db/dashboard.db < docs/PHASE-1-DESIGN/dashboard-schema-sqlite.sql
-
-# Verify
-sqlite3 backend/db/dashboard.db ".tables"
-# Output: sites, flights, weather_sources, weather_forecasts, alerts, ...
-```
-
-### 2. Python Environment
+## 🚀 Quick Start
 
 ```bash
 # Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# Install dependencies
+# Install dependencies (includes fakeredis)
 pip install -r requirements.txt
 
-# Download Playwright browsers
-playwright install chromium
-```
-
-### 3. Configuration
-
-```bash
 # Copy environment template
 cp .env.example .env
 
-# Edit .env with your actual values
-# - WEATHERAPI_KEY
-# - STRAVA_KEY
-# - API_PORT (default 8000)
+# Initialize database
+python -c "from database import Base, engine; import models; Base.metadata.create_all(bind=engine)"
+python seed_sites.py
+
+# Start server
+python -m uvicorn main:app --reload
 ```
 
-### 4. Test Database Connection
+**Server runs on:** http://localhost:8000  
+**No Redis server needed!** FakeRedis runs automatically in dev mode.
 
-```bash
-python
->>> import sqlite3
->>> conn = sqlite3.connect('db/dashboard.db')
->>> cursor = conn.cursor()
->>> cursor.execute("SELECT COUNT(*) FROM sites")
->>> print(cursor.fetchone())
-(3,)  # Should show 3 sites (Arguel, Mont Poupet, La Côte)
->>> conn.close()
-```
+📚 **Full guide:** [DEVELOPMENT.md](../DEVELOPMENT.md)
 
 ---
 
-## 📦 Scrapers (Phase 2, Week 2)
+## Key Components
 
-Refactoring existing production code from `generate-weather-report-v5.js`.
+### Cache Layer (`cache.py`)
 
-### Available Scrapers
-
-1. **OpenMeteoScraper** ✅ REUSE
-   - API: `https://api.open-meteo.com/v1/forecast`
-   - Data: Hourly forecasts (temp, wind, humidity, cloud, etc.)
-   - Refactor time: ~1.5 hours
-
-2. **WeatherAPIScraper** ✅ REUSE
-   - API: `https://api.weatherapi.com/v1/forecast.json`
-   - Requires: API key (free tier available)
-   - Refactor time: ~1.25 hours
-
-3. **MeteoblueScraper** ✅ REUSE (Playwright)
-   - URL: Meteoblue forecast page
-   - Method: Playwright headless browser
-   - Data: Hourly table with ensemble models
-   - Refactor time: ~2.25 hours
-
-4. **MeteoParapenteScraper** ✅ REUSE
-   - Feed: RSS + HTML fallback
-   - Data: Thermal index, stability index
-   - Refactor time: ~1.1 hours
-
-5. **ParaIndexCalculation** ✅ REUSE
-   - Scoring: 0-100 composite score
-   - Factors: Wind, cloud, temperature, thermals, stability
-   - Production-validated algorithm
-   - Refactor time: ~0.75 hours
-
-### Example: Using a Scraper
+**Development:** FakeRedis (in-memory, automatic)  
+**Production:** Redis (persistent, shared)
 
 ```python
-from scrapers.openmeteo import OpenMeteoScraper
-
-# Initialize
-scraper = OpenMeteoScraper()
-
-# Fetch data
-data = await scraper.fetch(latitude=47.22356, longitude=6.01842)
-
-# Normalize for database
-normalized = scraper.normalize(data)
-
-# Insert to database
-db.weather_forecasts.insert_many(normalized)
+# Automatically selects based on ENVIRONMENT
+ENVIRONMENT=development  → FakeRedis
+ENVIRONMENT=production   → Real Redis
 ```
+
+### Weather Pipeline (`weather_pipeline.py`)
+
+Multi-source data aggregation with consensus algorithm.
+
+### Scheduler (`scheduler.py`)
+
+Background polling every 30 minutes to keep cache warm.
+
+### API Routes (`routes.py`)
+
+REST endpoints for weather, sites, flights, and statistics.
 
 ---
 
-## 🔄 Pipeline (Phase 2, Week 3)
+## API Documentation
 
-Data orchestration and normalization.
+**Interactive Swagger UI:** http://localhost:8000/docs  
+**ReDoc:** http://localhost:8000/redoc
 
-```python
-from pipeline.pipeline import WeatherPipeline
-from db.models import Site
-
-pipeline = WeatherPipeline()
-
-# Process all sites
-for site in Site.all():
-    await pipeline.process(site_id=site.id)
-    # Fetches from all 5 sources concurrently
-    # Normalizes data
-    # Inserts to SQLite
-```
+📚 **Full API reference:** [docs/API.md](../docs/API.md)
 
 ---
 
-## ⏰ Scheduler (Phase 2, Week 4)
+## Configuration
 
-APScheduler integration for automated data collection.
+See `.env.example` for all available options.
 
-```python
-from scheduler.scheduler import start_scheduler
-
-# Start scheduler (runs in background)
-start_scheduler()
-
-# Jobs run automatically:
-# - Weather collection: every 30 min
-# - Alert checks: every 5 min
-# - Data cleanup: daily
-```
+**Key variables:**
+- `ENVIRONMENT` - development | production
+- `USE_FAKE_REDIS` - true (dev) | false (prod)
+- `REDIS_HOST` - Redis server host (production only)
+- `SCHEDULER_ENABLED` - Enable background polling
 
 ---
 
-## 🔌 API (Phase 3, Week 1)
-
-FastAPI REST server with 50+ endpoints.
-
-### Start API Server (Development)
-
-```bash
-# Terminal 1: Start API
-python -m uvicorn api.app:app --reload --host 0.0.0.0 --port 8000
-
-# Terminal 2: View API docs
-open http://localhost:8000/docs  # Swagger UI
-open http://localhost:8000/redoc # ReDoc
-
-# Test endpoint
-curl http://localhost:8000/api/v1/sites
-```
-
-### Key Endpoints
-
-- `GET /api/v1/sites` — List flying sites
-- `GET /api/v1/weather/current` — Latest conditions
-- `GET /api/v1/weather/forecast/{site_id}` — 7-day forecast
-- `GET /api/v1/flights` — Flight history
-- `POST /api/v1/alerts` — Create alert
-- `GET /api/v1/stats` — Learning statistics
-
-See [API Spec](../docs/PHASE-1-DESIGN/dashboard-api-spec.md) for complete documentation.
-
----
-
-## 🧪 Testing
+## Testing
 
 ```bash
 # Run all tests
-pytest tests/ -v
+pytest
 
-# Run with coverage
-pytest tests/ -v --cov=scrapers,pipeline,api --cov-report=html
+# With coverage
+pytest --cov
 
-# Run specific test file
-pytest tests/test_scrapers.py -v
-
-# Run specific test
-pytest tests/test_scrapers.py::test_openmeteo_fetch -v
-```
-
-### Test Data
-
-Uses real recorded responses from production:
-
-```python
-# tests/fixtures/openmeteo-response.json
-# Generated from: generate-weather-report-v5.js
-# Same data used in existing weather reports
+# Specific file
+pytest tests/test_cache.py
 ```
 
 ---
 
-## 📊 Database
+## More Documentation
 
-### SQLite Schema
-
-12 tables:
-- `sites` — Flying locations (Arguel, Mont Poupet, La Côte)
-- `weather_forecasts` — Hourly forecasts from all sources
-- `weather_sources` — Source providers (Open-Meteo, WeatherAPI, etc.)
-- `flights` — Flight history (synced from Strava)
-- `alerts` — User-defined alert rules
-- `alert_triggers` — Alert history
-- `flight_statistics` — Aggregated stats per site/period
-- `scraper_health` — Data source health tracking
-- Plus views for common queries
-
-### Inspect Database
-
-```bash
-# Connect to SQLite
-sqlite3 db/dashboard.db
-
-# List tables
-.tables
-
-# View schema
-.schema sites
-
-# Query data
-SELECT COUNT(*) FROM weather_forecasts;
-SELECT * FROM sites;
-
-# Exit
-.quit
-```
-
-### Backup Strategy
-
-```bash
-# Daily backup (cron job)
-cp db/dashboard.db db/backups/dashboard-$(date +%Y%m%d).db
-
-# Keep last 30 backups
-find db/backups -name "*.db" -type f -mtime +30 -delete
-
-# Recovery
-cp db/backups/dashboard-20260315.db db/dashboard.db
-```
+- [Main README](../README.md) - Project overview
+- [DEVELOPMENT.md](../DEVELOPMENT.md) - Setup guide
+- [DEPLOYMENT.md](../DEPLOYMENT.md) - Production deployment
+- [ARCHITECTURE.md](../docs/ARCHITECTURE.md) - Technical details
+- [API.md](../docs/API.md) - API reference
 
 ---
 
-## 📝 Logging
-
-Logs are written to `logs/dashboard.log` and console.
-
-```python
-import logging
-logger = logging.getLogger(__name__)
-
-logger.info("Processing site: Arguel")
-logger.error("Failed to fetch from WeatherAPI", exc_info=True)
-```
-
----
-
-## 🐛 Common Issues
-
-### Issue: "database.db not found"
-```bash
-# Check location
-ls -la db/dashboard.db
-
-# Reinitialize if missing
-sqlite3 db/dashboard.db < ../docs/PHASE-1-DESIGN/dashboard-schema-sqlite.sql
-```
-
-### Issue: "ImportError: No module named 'sqlalchemy'"
-```bash
-# Activate venv and install requirements
-source venv/bin/activate
-pip install -r requirements.txt
-```
-
-### Issue: "Playwright browser not found"
-```bash
-# Install Chromium
-playwright install chromium
-```
-
----
-
-## 📚 Documentation
-
-- **[Implementation Plan](../docs/PHASE-1-DESIGN/dashboard-implementation-plan.md)** — Week-by-week breakdown
-- **[Code Reuse Plan](../docs/PHASE-1-DESIGN/CODE-REUSE-PLAN.md)** — How we reuse existing code
-- **[API Spec](../docs/PHASE-1-DESIGN/dashboard-api-spec.md)** — All endpoints & formats
-- **[Database Schema](../docs/PHASE-1-DESIGN/dashboard-schema-sqlite.sql)** — SQL schema
-
----
-
-## ✅ Phase 2 Checklist
-
-- [ ] Week 1: Database setup + Python environment
-- [ ] Week 2: Refactor 5 scrapers + normalize wrappers
-- [ ] Week 3: Pipeline orchestration + database insertion
-- [ ] Week 4: Scheduler + Strava sync + full test coverage
-- [ ] Week 5: Documentation + code review
-
-**Target completion:** March 28, 2026
-
----
-
-**Last updated:** 2026-02-26  
-**Phase:** Phase 2 Backend (Starting March 1)  
-**Estimated effort:** 20-30 hours
+**Questions?** Check the documentation above or open an issue.

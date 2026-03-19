@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Cesium</title>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
+    <link
+      href="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Widgets/widgets.css"
+      rel="stylesheet"
+    />
+    <style>
+      #cesiumContainer {
+        width: 100%;
+        height: 100vh;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="cesiumContainer"></div>
+    <script>
+      // Configure Ion token
+      Cesium.Ion.defaultAccessToken =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI5N2UyMjcwOS00MDY1LTQxYjEtYjZjMy00YTU0ZTg5MmViYWQiLCJpZCI6OTczMSwic2NvcGVzIjpbImFzciIsImdjIl0sImlhdCI6MTU1NDI2OTk0Mn0.m1gvpzm9tAl0xkTHWNNpEnWUhC3lyQuaS_YbWvCO9Hc';
+
+      // Create viewer
+      const viewer = new Cesium.Viewer('cesiumContainer', {
+        terrain: Cesium.Terrain.fromWorldTerrain(),
+        animation: false,
+        timeline: false,
+      });
+
+      console.log('Cesium viewer created:', viewer);
+    </script>
+  </body>
+</html>

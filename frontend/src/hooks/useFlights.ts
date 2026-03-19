@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient, type UseQueryResult, type UseMutationResult } from '@tanstack/react-query'
-import axios, { type AxiosInstance } from 'axios'
+import { api } from '../lib/api'
 import type { Flight, FlightFilters, FlightStats, FlightFormData, ApiResponse, Site } from '../types'
 import {
   FlightsApiResponseSchema,
@@ -7,13 +7,6 @@ import {
   FlightStatsSchema,
   ApiResponseSchema,
 } from '../schemas'
-
-const API: AxiosInstance = axios.create({
-  baseURL: '/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
 
 interface SiteStats {
   site: Site
@@ -27,24 +20,20 @@ interface SiteStats {
  * Fetch list of flights with optional filtering
  */
 export const useFlights = (filters: FlightFilters = {}): UseQueryResult<Flight[], Error> => {
-  const queryParams = new URLSearchParams(
-    Object.entries(filters).reduce((acc, [key, value]) => {
-      if (value !== undefined) {
-        acc[key] = String(value)
-      }
-      return acc
-    }, {} as Record<string, string>)
-  ).toString()
+  const searchParams = Object.entries(filters).reduce((acc, [key, value]) => {
+    if (value !== undefined) {
+      acc[key] = String(value)
+    }
+    return acc
+  }, {} as Record<string, string>)
   
   return useQuery({
     queryKey: ['flights', filters],
     queryFn: async () => {
-      const response = await API.get(
-        `/flights${queryParams ? `?${queryParams}` : ''}`
-      )
+      const data = await api.get('flights', { searchParams }).json()
       
       // Validate API response with Zod
-      const validation = FlightsApiResponseSchema.safeParse(response.data)
+      const validation = FlightsApiResponseSchema.safeParse(data)
       if (!validation.success) {
         console.error('❌ Flights validation failed:', validation.error)
         throw new Error(`Invalid flights data: ${validation.error.message}`)
@@ -64,10 +53,10 @@ export const useFlight = (flightId: string | undefined): UseQueryResult<Flight, 
     queryKey: ['flights', flightId],
     queryFn: async () => {
       if (!flightId) throw new Error('Flight ID is required')
-      const response = await API.get<ApiResponse<Flight>>(`/flights/${flightId}`)
+      const data = await api.get(`flights/${flightId}`).json()
       
       // Validate API response with Zod
-      const validation = ApiResponseSchema(FlightSchema).safeParse(response.data)
+      const validation = ApiResponseSchema(FlightSchema).safeParse(data)
       if (!validation.success) {
         console.error('❌ Flight validation failed:', validation.error)
         throw new Error(`Invalid flight data: ${validation.error.message}`)
@@ -87,10 +76,10 @@ export const useFlightStats = (): UseQueryResult<FlightStats, Error> => {
   return useQuery({
     queryKey: ['flights', 'stats'],
     queryFn: async () => {
-      const response = await API.get('/flights/stats')
+      const data = await api.get('flights/stats').json()
       
       // Validate API response with Zod
-      const validation = FlightStatsSchema.safeParse(response.data)
+      const validation = FlightStatsSchema.safeParse(data)
       if (!validation.success) {
         console.error('❌ Flight stats validation failed:', validation.error)
         throw new Error(`Invalid flight stats: ${validation.error.message}`)
@@ -103,6 +92,42 @@ export const useFlightStats = (): UseQueryResult<FlightStats, Error> => {
 }
 
 /**
+ * Flight record for a specific metric
+ */
+interface FlightRecord {
+  value: number
+  flight_id: string
+  flight_name: string
+  date: string
+  site_name: string | null
+  site_id: string | null
+}
+
+/**
+ * Personal flight records (longest, highest, fastest, farthest)
+ */
+export interface FlightRecords {
+  longest_duration: FlightRecord | null
+  highest_altitude: FlightRecord | null
+  longest_distance: FlightRecord | null
+  max_speed: FlightRecord | null
+}
+
+/**
+ * Fetch personal flight records
+ */
+export const useFlightRecords = (): UseQueryResult<FlightRecords, Error> => {
+  return useQuery({
+    queryKey: ['flights', 'records'],
+    queryFn: async () => {
+      const data = await api.get('flights/records').json()
+      return data as FlightRecords
+    },
+    staleTime: 1000 * 60 * 60, // 1 hour - records don't change often
+  })
+}
+
+/**
  * Fetch statistics per site
  */
 export const useSiteStats = (siteId: string | undefined): UseQueryResult<SiteStats, Error> => {
@@ -110,8 +135,8 @@ export const useSiteStats = (siteId: string | undefined): UseQueryResult<SiteSta
     queryKey: ['stats', 'sites', siteId],
     queryFn: async () => {
       if (!siteId) throw new Error('Site ID is required')
-      const response = await API.get<ApiResponse<SiteStats>>(`/stats/sites/${siteId}`)
-      return response.data.data
+      const data: ApiResponse<SiteStats> = await api.get(`stats/sites/${siteId}`).json()
+      return data.data
     },
     enabled: !!siteId,
     staleTime: 1000 * 60 * 60,
@@ -126,10 +151,10 @@ export const useCreateFlight = (): UseMutationResult<Flight, Error, FlightFormDa
 
   return useMutation({
     mutationFn: async (flightData: FlightFormData) => {
-      const response = await API.post<ApiResponse<Flight>>('/flights', flightData)
+      const data = await api.post('flights', { json: flightData }).json()
       
       // Validate API response with Zod
-      const validation = ApiResponseSchema(FlightSchema).safeParse(response.data)
+      const validation = ApiResponseSchema(FlightSchema).safeParse(data)
       if (!validation.success) {
         console.error('❌ Create flight validation failed:', validation.error)
         throw new Error(`Invalid flight creation response: ${validation.error.message}`)
@@ -154,10 +179,10 @@ export const useUpdateFlight = (flightId: string | undefined): UseMutationResult
   return useMutation({
     mutationFn: async (flightData: FlightFormData) => {
       if (!flightId) throw new Error('Flight ID is required')
-      const response = await API.patch<ApiResponse<Flight>>(`/flights/${flightId}`, flightData)
+      const data = await api.patch(`flights/${flightId}`, { json: flightData }).json()
       
       // Validate API response with Zod
-      const validation = ApiResponseSchema(FlightSchema).safeParse(response.data)
+      const validation = ApiResponseSchema(FlightSchema).safeParse(data)
       if (!validation.success) {
         console.error('❌ Update flight validation failed:', validation.error)
         throw new Error(`Invalid flight update response: ${validation.error.message}`)
@@ -183,11 +208,94 @@ export const useDeleteFlight = (flightId: string | undefined): UseMutationResult
   return useMutation({
     mutationFn: async () => {
       if (!flightId) throw new Error('Flight ID is required')
-      await API.delete(`/flights/${flightId}`)
+      await api.delete(`flights/${flightId}`)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['flights'] })
       queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] })
     },
   })
+}
+
+/**
+ * Synchroniser les vols Strava pour une période donnée
+ */
+export function useStravaSyncMutation() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ date_from, date_to }: { date_from: string; date_to: string }) => {
+      const data = await api.post('flights/sync-strava', { 
+        json: { date_from, date_to } 
+      }).json<{
+        success: boolean;
+        imported: number;
+        skipped: number;
+        failed: number;
+        flights: any[];
+      }>();
+      return data;
+    },
+    onSuccess: () => {
+      // Invalider le cache des vols pour forcer le refresh
+      queryClient.invalidateQueries({ queryKey: ['flights'] });
+      queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] });
+    }
+  });
+}
+
+/**
+ * Créer un nouveau vol à partir d'un fichier GPX
+ * Parse le GPX, extrait les stats et crée le vol automatiquement
+ */
+export function useCreateFlightFromGPX() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (formData: FormData) => {
+      // Ky supporte FormData directement
+      const data = await api.post('flights/create-from-gpx', { 
+        body: formData 
+      }).json<{
+        success: boolean;
+        flight: Flight;
+        message: string;
+      }>();
+      return data;
+    },
+    onSuccess: () => {
+      // Invalider le cache pour rafraîchir la liste et les stats
+      queryClient.invalidateQueries({ queryKey: ['flights'] });
+      queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] });
+      queryClient.invalidateQueries({ queryKey: ['flights', 'records'] });
+    }
+  });
+}
+
+/**
+ * Uploader un GPX sur un vol existant (pour visualisation Cesium)
+ * Ne modifie pas les stats du vol, juste ajoute le fichier
+ */
+export function useUploadGPXToFlight(flightId: string) {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (formData: FormData) => {
+      // Ky supporte FormData directement
+      const data = await api.post(`flights/${flightId}/upload-gpx`, { 
+        body: formData 
+      }).json<{
+        success: boolean;
+        flight_id: string;
+        gpx_file_path: string;
+        message: string;
+      }>();
+      return data;
+    },
+    onSuccess: () => {
+      // Invalider le cache du vol spécifique ET la liste
+      queryClient.invalidateQueries({ queryKey: ['flights'] });
+      queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
+    }
+  });
 }

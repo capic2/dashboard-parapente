@@ -11,7 +11,7 @@ export const sites = [
     region: 'Franche-Comté',
     country: 'FR',
     created_at: '2025-09-01T10:00:00Z',
-    updated_at: '2025-09-01T10:00:00Z'
+    updated_at: '2025-09-01T10:00:00Z',
   },
   {
     id: 'site-mont-poupet',
@@ -23,7 +23,7 @@ export const sites = [
     region: 'Franche-Comté',
     country: 'FR',
     created_at: '2025-09-01T10:00:00Z',
-    updated_at: '2025-09-01T10:00:00Z'
+    updated_at: '2025-09-01T10:00:00Z',
   },
   {
     id: 'site-la-cote',
@@ -35,8 +35,8 @@ export const sites = [
     region: 'Franche-Comté',
     country: 'FR',
     created_at: '2025-09-01T10:00:00Z',
-    updated_at: '2025-09-01T10:00:00Z'
-  }
+    updated_at: '2025-09-01T10:00:00Z',
+  },
 ];
 
 export const flights = [
@@ -58,7 +58,7 @@ export const flights = [
     description: null,
     external_url: 'https://www.strava.com/activities/16394022550',
     created_at: '2025-11-08T15:10:00Z',
-    updated_at: '2025-11-08T15:10:00Z'
+    updated_at: '2025-11-08T15:10:00Z',
   },
   {
     id: '54b9af02-1d62-4195-8aa0-8040e880cb74',
@@ -78,27 +78,27 @@ export const flights = [
     description: null,
     external_url: 'https://www.strava.com/activities/16394749726',
     created_at: '2025-11-08T16:15:00Z',
-    updated_at: '2025-11-08T16:15:00Z'
+    updated_at: '2025-11-08T16:15:00Z',
   },
   {
     id: '81c2567a-dc68-4ddc-8ce4-4745eb380a0c',
     site_id: 'site-mont-poupet',
     site_name: 'Mont Poupet',
-    title: 'Mont Poupet 12-10 16h17',
-    name: 'Mont Poupet 12-10 16h17',
+    title: 'Mont Poupet 12-10 14h17',
+    name: 'Mont Poupet 12-10 14h17',
     flight_date: '2025-10-12',
-    departure_time: '2025-10-12T16:17:00Z',
-    duration_minutes: 4,
-    max_altitude_m: 842,
+    departure_time: '2025-10-12T14:17:33Z',
+    duration_minutes: 5,
+    max_altitude_m: 815.23,
     distance_km: 1.5,
-    elevation_gain_m: 0,
-    gpx_file_path: 'db/gpx/strava_16118040828.gpx',
-    strava_id: '16118040828',
-    notes: null,
+    elevation_gain_m: 0.51,
+    gpx_file_path: 'db/gpx/Zepp20251012161733.gpx',
+    strava_id: null,
+    notes: 'Vol réel du Mont Poupet enregistré avec Amazfit T-Rex 3 Pro',
     description: null,
-    external_url: 'https://www.strava.com/activities/16118040828',
-    created_at: '2025-10-12T16:30:00Z',
-    updated_at: '2025-10-12T16:30:00Z'
+    external_url: null,
+    created_at: '2025-10-12T14:30:00Z',
+    updated_at: '2025-10-12T14:30:00Z',
   },
   {
     id: '7d386bbe-4d16-42af-bcbd-a25c54a0ce43',
@@ -118,7 +118,7 @@ export const flights = [
     description: null,
     external_url: 'https://www.strava.com/activities/15963566849',
     created_at: '2025-09-28T16:00:00Z',
-    updated_at: '2025-09-28T16:00:00Z'
+    updated_at: '2025-09-28T16:00:00Z',
   },
   {
     id: '027949c0-7ba6-45a1-8291-147b6b962031',
@@ -138,7 +138,7 @@ export const flights = [
     description: null,
     external_url: 'https://www.strava.com/activities/15965366307',
     created_at: '2025-09-28T18:00:00Z',
-    updated_at: '2025-09-28T18:00:00Z'
+    updated_at: '2025-09-28T18:00:00Z',
   },
   {
     id: '90d9748a-27d2-4dd5-96bc-6c7347bfcf5f',
@@ -158,21 +158,61 @@ export const flights = [
     description: null,
     external_url: 'https://www.strava.com/activities/15954552836',
     created_at: '2025-09-27T17:30:00Z',
-    updated_at: '2025-09-27T17:30:00Z'
-  }
+    updated_at: '2025-09-27T17:30:00Z',
+  },
+  {
+    id: 'no-gpx-flight-1',
+    site_id: 'site-mont-poupet',
+    site_name: 'Mont Poupet',
+    title: 'Mont Poupet 15-09 14h30 (sans GPX)',
+    name: 'Mont Poupet 15-09 14h30',
+    flight_date: '2025-09-15',
+    departure_time: '2025-09-15T14:30:00Z',
+    duration_minutes: 12,
+    max_altitude_m: 850,
+    distance_km: 5.2,
+    elevation_gain_m: 35,
+    gpx_file_path: null,
+    strava_id: null,
+    notes: 'Vol manuel sans GPX - idéal pour tester l\'upload',
+    description: null,
+    external_url: null,
+    created_at: '2025-09-15T15:00:00Z',
+    updated_at: '2025-09-15T15:00:00Z',
+  },
 ];
 
 // Mock GPX data pour chaque vol
 export const gpxData: Record<string, any> = {
   '72672aab-7213-43fb-8ad8-ed9fbc0f3246': {
     coordinates: [
-      { lon: 6.2456, lat: 47.1456, elevation: 800, time: '2025-11-08T14:53:00Z' },
-      { lon: 6.2465, lat: 47.1465, elevation: 820, time: '2025-11-08T14:54:00Z' },
-      { lon: 6.2475, lat: 47.1475, elevation: 850, time: '2025-11-08T14:56:00Z' },
-      { lon: 6.2485, lat: 47.1485, elevation: 872, time: '2025-11-08T14:58:00Z' },
-      { lon: 6.2480, lat: 47.1480, elevation: 840, time: '2025-11-08T15:00:00Z' },
-      { lon: 6.2470, lat: 47.1470, elevation: 810, time: '2025-11-08T15:02:00Z' },
-      { lon: 6.2460, lat: 47.1460, elevation: 805, time: '2025-11-08T15:04:00Z' }
+      {
+        lon: 6.2456,
+        lat: 47.1456,
+        elevation: 800,
+        time: '2025-11-08T14:53:00Z',
+      },
+      {
+        lon: 6.2465,
+        lat: 47.1465,
+        elevation: 820,
+        time: '2025-11-08T14:54:00Z',
+      },
+      {
+        lon: 6.2475,
+        lat: 47.1475,
+        elevation: 850,
+        time: '2025-11-08T14:56:00Z',
+      },
+      {
+        lon: 6.2485,
+        lat: 47.1485,
+        elevation: 872,
+        time: '2025-11-08T14:58:00Z',
+      },
+      { lon: 6.248, lat: 47.148, elevation: 840, time: '2025-11-08T15:00:00Z' },
+      { lon: 6.247, lat: 47.147, elevation: 810, time: '2025-11-08T15:02:00Z' },
+      { lon: 6.246, lat: 47.146, elevation: 805, time: '2025-11-08T15:04:00Z' },
     ],
     stats: {
       total_points: 7,
@@ -180,15 +220,25 @@ export const gpxData: Record<string, any> = {
       max_altitude_m: 872,
       min_altitude_m: 800,
       elevation_gain_m: 72,
-      distance_km: 4.6
-    }
+      distance_km: 4.6,
+    },
   },
   '54b9af02-1d62-4195-8aa0-8040e880cb74': {
     coordinates: [
-      { lon: 6.2456, lat: 47.1456, elevation: 800, time: '2025-11-08T16:01:00Z' },
-      { lon: 6.2465, lat: 47.1465, elevation: 798, time: '2025-11-08T16:03:00Z' },
-      { lon: 6.2470, lat: 47.1470, elevation: 795, time: '2025-11-08T16:05:00Z' },
-      { lon: 6.2460, lat: 47.1460, elevation: 800, time: '2025-11-08T16:07:00Z' }
+      {
+        lon: 6.2456,
+        lat: 47.1456,
+        elevation: 800,
+        time: '2025-11-08T16:01:00Z',
+      },
+      {
+        lon: 6.2465,
+        lat: 47.1465,
+        elevation: 798,
+        time: '2025-11-08T16:03:00Z',
+      },
+      { lon: 6.247, lat: 47.147, elevation: 795, time: '2025-11-08T16:05:00Z' },
+      { lon: 6.246, lat: 47.146, elevation: 800, time: '2025-11-08T16:07:00Z' },
     ],
     stats: {
       total_points: 4,
@@ -196,31 +246,384 @@ export const gpxData: Record<string, any> = {
       max_altitude_m: 800,
       min_altitude_m: 795,
       elevation_gain_m: 0,
-      distance_km: 2.2
-    }
+      distance_km: 2.2,
+    },
   },
   '81c2567a-dc68-4ddc-8ce4-4745eb380a0c': {
     coordinates: [
-      { lon: 6.189, lat: 47.3267, elevation: 842, time: '2025-10-12T16:17:00Z' },
-      { lon: 6.190, lat: 47.3275, elevation: 838, time: '2025-10-12T16:18:30Z' },
-      { lon: 6.191, lat: 47.3280, elevation: 835, time: '2025-10-12T16:20:00Z' },
-      { lon: 6.189, lat: 47.3268, elevation: 840, time: '2025-10-12T16:21:00Z' }
+      {
+        lon: 5.87754066,
+        lat: 46.97155566,
+        elevation: 814.82,
+        time: '2025-10-12T14:17:33Z',
+      },
+      {
+        lon: 5.87753868,
+        lat: 46.97155335,
+        elevation: 814.88,
+        time: '2025-10-12T14:17:38Z',
+      },
+      {
+        lon: 5.87753003,
+        lat: 46.97155135,
+        elevation: 814.89,
+        time: '2025-10-12T14:17:43Z',
+      },
+      {
+        lon: 5.87752105,
+        lat: 46.97154571,
+        elevation: 814.98,
+        time: '2025-10-12T14:17:48Z',
+      },
+      {
+        lon: 5.87752138,
+        lat: 46.97154273,
+        elevation: 815.07,
+        time: '2025-10-12T14:17:53Z',
+      },
+      {
+        lon: 5.87752104,
+        lat: 46.97154207,
+        elevation: 815.09,
+        time: '2025-10-12T14:17:58Z',
+      },
+      {
+        lon: 5.87752038,
+        lat: 46.97153974,
+        elevation: 815.07,
+        time: '2025-10-12T14:18:03Z',
+      },
+      {
+        lon: 5.8775217,
+        lat: 46.9715404,
+        elevation: 815.06,
+        time: '2025-10-12T14:18:08Z',
+      },
+      {
+        lon: 5.87752269,
+        lat: 46.97153873,
+        elevation: 815.11,
+        time: '2025-10-12T14:18:13Z',
+      },
+      {
+        lon: 5.87752137,
+        lat: 46.97153807,
+        elevation: 815.19,
+        time: '2025-10-12T14:18:18Z',
+      },
+      {
+        lon: 5.87752236,
+        lat: 46.97153807,
+        elevation: 815.22,
+        time: '2025-10-12T14:18:23Z',
+      },
+      {
+        lon: 5.87752269,
+        lat: 46.97153607,
+        elevation: 815.2,
+        time: '2025-10-12T14:18:28Z',
+      },
+      {
+        lon: 5.87752269,
+        lat: 46.97153574,
+        elevation: 815.14,
+        time: '2025-10-12T14:18:33Z',
+      },
+      {
+        lon: 5.87752169,
+        lat: 46.97153673,
+        elevation: 815.05,
+        time: '2025-10-12T14:18:38Z',
+      },
+      {
+        lon: 5.87749439,
+        lat: 46.97157371,
+        elevation: 814.77,
+        time: '2025-10-12T14:18:43Z',
+      },
+      {
+        lon: 5.87747573,
+        lat: 46.97167003,
+        elevation: 813.99,
+        time: '2025-10-12T14:18:48Z',
+      },
+      {
+        lon: 5.8774514,
+        lat: 46.97189968,
+        elevation: 812.87,
+        time: '2025-10-12T14:18:53Z',
+      },
+      {
+        lon: 5.8774424,
+        lat: 46.97214865,
+        elevation: 812.2,
+        time: '2025-10-12T14:18:58Z',
+      },
+      {
+        lon: 5.87766404,
+        lat: 46.97230996,
+        elevation: 810.89,
+        time: '2025-10-12T14:19:03Z',
+      },
+      {
+        lon: 5.87801403,
+        lat: 46.97229231,
+        elevation: 809.94,
+        time: '2025-10-12T14:19:08Z',
+      },
+      {
+        lon: 5.87837968,
+        lat: 46.97226801,
+        elevation: 808.2,
+        time: '2025-10-12T14:19:13Z',
+      },
+      {
+        lon: 5.878757,
+        lat: 46.9722527,
+        elevation: 805.76,
+        time: '2025-10-12T14:19:18Z',
+      },
+      {
+        lon: 5.87910863,
+        lat: 46.97231533,
+        elevation: 804.53,
+        time: '2025-10-12T14:19:23Z',
+      },
+      {
+        lon: 5.87934228,
+        lat: 46.97246297,
+        elevation: 804.14,
+        time: '2025-10-12T14:19:28Z',
+      },
+      {
+        lon: 5.87949959,
+        lat: 46.97265329,
+        elevation: 801.72,
+        time: '2025-10-12T14:19:33Z',
+      },
+      {
+        lon: 5.87931527,
+        lat: 46.97288594,
+        elevation: 797.76,
+        time: '2025-10-12T14:19:38Z',
+      },
+      {
+        lon: 5.87884929,
+        lat: 46.97307292,
+        elevation: 795.84,
+        time: '2025-10-12T14:19:43Z',
+      },
+      {
+        lon: 5.87831066,
+        lat: 46.9732399,
+        elevation: 793.18,
+        time: '2025-10-12T14:19:48Z',
+      },
+      {
+        lon: 5.87774868,
+        lat: 46.97337954,
+        elevation: 789.43,
+        time: '2025-10-12T14:19:53Z',
+      },
+      {
+        lon: 5.87713605,
+        lat: 46.97334788,
+        elevation: 784.8,
+        time: '2025-10-12T14:19:58Z',
+      },
+      {
+        lon: 5.8765634,
+        lat: 46.97318491,
+        elevation: 780.51,
+        time: '2025-10-12T14:20:03Z',
+      },
+      {
+        lon: 5.87601042,
+        lat: 46.97296794,
+        elevation: 775.4,
+        time: '2025-10-12T14:20:08Z',
+      },
+      {
+        lon: 5.87541878,
+        lat: 46.9727563,
+        elevation: 770.04,
+        time: '2025-10-12T14:20:13Z',
+      },
+      {
+        lon: 5.87477148,
+        lat: 46.97253766,
+        elevation: 763.54,
+        time: '2025-10-12T14:20:18Z',
+      },
+      {
+        lon: 5.87408651,
+        lat: 46.97242068,
+        elevation: 757.35,
+        time: '2025-10-12T14:20:23Z',
+      },
+      {
+        lon: 5.87341788,
+        lat: 46.97238837,
+        elevation: 752.6,
+        time: '2025-10-12T14:20:28Z',
+      },
+      {
+        lon: 5.8727649,
+        lat: 46.97236303,
+        elevation: 748.75,
+        time: '2025-10-12T14:20:33Z',
+      },
+      {
+        lon: 5.87213359,
+        lat: 46.97228106,
+        elevation: 743.7,
+        time: '2025-10-12T14:20:38Z',
+      },
+      {
+        lon: 5.87149161,
+        lat: 46.97218875,
+        elevation: 739.09,
+        time: '2025-10-12T14:20:43Z',
+      },
+      {
+        lon: 5.8708043,
+        lat: 46.97202044,
+        elevation: 733.44,
+        time: '2025-10-12T14:20:48Z',
+      },
+      {
+        lon: 5.870163,
+        lat: 46.97173646,
+        elevation: 726.84,
+        time: '2025-10-12T14:20:53Z',
+      },
+      {
+        lon: 5.86962437,
+        lat: 46.97133948,
+        elevation: 719.22,
+        time: '2025-10-12T14:20:58Z',
+      },
+      {
+        lon: 5.8692144,
+        lat: 46.97084683,
+        elevation: 711.05,
+        time: '2025-10-12T14:21:03Z',
+      },
+      {
+        lon: 5.86894342,
+        lat: 46.97032451,
+        elevation: 702.39,
+        time: '2025-10-12T14:21:08Z',
+      },
+      {
+        lon: 5.86857512,
+        lat: 46.96984421,
+        elevation: 694.06,
+        time: '2025-10-12T14:21:13Z',
+      },
+      {
+        lon: 5.86801047,
+        lat: 46.96963124,
+        elevation: 686.79,
+        time: '2025-10-12T14:21:18Z',
+      },
+      {
+        lon: 5.86788681,
+        lat: 46.9697509,
+        elevation: 676.62,
+        time: '2025-10-12T14:21:23Z',
+      },
+      {
+        lon: 5.86812378,
+        lat: 46.96988755,
+        elevation: 666.41,
+        time: '2025-10-12T14:21:28Z',
+      },
+      {
+        lon: 5.86834675,
+        lat: 46.97005286,
+        elevation: 655.8,
+        time: '2025-10-12T14:21:33Z',
+      },
+      {
+        lon: 5.86855539,
+        lat: 46.97024283,
+        elevation: 645.48,
+        time: '2025-10-12T14:21:38Z',
+      },
+      {
+        lon: 5.86879669,
+        lat: 46.97045779,
+        elevation: 635.43,
+        time: '2025-10-12T14:21:43Z',
+      },
+      {
+        lon: 5.86899766,
+        lat: 46.9706241,
+        elevation: 627.86,
+        time: '2025-10-12T14:21:48Z',
+      },
+      {
+        lon: 5.86904564,
+        lat: 46.97064343,
+        elevation: 622.5,
+        time: '2025-10-12T14:21:53Z',
+      },
+      {
+        lon: 5.8690483,
+        lat: 46.97061912,
+        elevation: 620.11,
+        time: '2025-10-12T14:21:58Z',
+      },
+      {
+        lon: 5.8690483,
+        lat: 46.97060949,
+        elevation: 619.06,
+        time: '2025-10-12T14:22:03Z',
+      },
+      {
+        lon: 5.8690483,
+        lat: 46.9706085,
+        elevation: 618.87,
+        time: '2025-10-12T14:22:09Z',
+      },
     ],
     stats: {
-      total_points: 4,
-      duration_seconds: 240,
-      max_altitude_m: 842,
-      min_altitude_m: 835,
-      elevation_gain_m: 0,
-      distance_km: 1.5
-    }
+      total_points: 56,
+      duration_seconds: 276,
+      max_altitude_m: 815.23,
+      min_altitude_m: 618.87,
+      elevation_gain_m: 0.51,
+      elevation_loss_m: 196.46,
+      distance_km: 1.5,
+    },
   },
   '7d386bbe-4d16-42af-bcbd-a25c54a0ce43': {
     coordinates: [
-      { lon: 6.1234, lat: 47.2518, elevation: 427, time: '2025-09-28T15:42:00Z' },
-      { lon: 6.1240, lat: 47.2525, elevation: 430, time: '2025-09-28T15:43:30Z' },
-      { lon: 6.1245, lat: 47.2530, elevation: 433, time: '2025-09-28T15:45:00Z' },
-      { lon: 6.1235, lat: 47.2520, elevation: 428, time: '2025-09-28T15:47:00Z' }
+      {
+        lon: 6.1234,
+        lat: 47.2518,
+        elevation: 427,
+        time: '2025-09-28T15:42:00Z',
+      },
+      {
+        lon: 6.124,
+        lat: 47.2525,
+        elevation: 430,
+        time: '2025-09-28T15:43:30Z',
+      },
+      {
+        lon: 6.1245,
+        lat: 47.253,
+        elevation: 433,
+        time: '2025-09-28T15:45:00Z',
+      },
+      {
+        lon: 6.1235,
+        lat: 47.252,
+        elevation: 428,
+        time: '2025-09-28T15:47:00Z',
+      },
     ],
     stats: {
       total_points: 4,
@@ -228,20 +631,40 @@ export const gpxData: Record<string, any> = {
       max_altitude_m: 433,
       min_altitude_m: 427,
       elevation_gain_m: 6,
-      distance_km: 2.4
-    }
+      distance_km: 2.4,
+    },
   },
   '027949c0-7ba6-45a1-8291-147b6b962031': {
     coordinates: [
-      { lon: 6.1234, lat: 47.2518, elevation: 427, time: '2025-09-28T17:22:00Z' },
-      { lon: 6.1250, lat: 47.2535, elevation: 480, time: '2025-09-28T17:25:00Z' },
-      { lon: 6.1280, lat: 47.2560, elevation: 550, time: '2025-09-28T17:30:00Z' },
-      { lon: 6.1320, lat: 47.2590, elevation: 620, time: '2025-09-28T17:35:00Z' },
-      { lon: 6.1350, lat: 47.2610, elevation: 676, time: '2025-09-28T17:40:00Z' },
-      { lon: 6.1330, lat: 47.2595, elevation: 640, time: '2025-09-28T17:43:00Z' },
-      { lon: 6.1300, lat: 47.2570, elevation: 580, time: '2025-09-28T17:46:00Z' },
-      { lon: 6.1260, lat: 47.2540, elevation: 500, time: '2025-09-28T17:49:00Z' },
-      { lon: 6.1240, lat: 47.2525, elevation: 450, time: '2025-09-28T17:52:00Z' }
+      {
+        lon: 6.1234,
+        lat: 47.2518,
+        elevation: 427,
+        time: '2025-09-28T17:22:00Z',
+      },
+      {
+        lon: 6.125,
+        lat: 47.2535,
+        elevation: 480,
+        time: '2025-09-28T17:25:00Z',
+      },
+      { lon: 6.128, lat: 47.256, elevation: 550, time: '2025-09-28T17:30:00Z' },
+      { lon: 6.132, lat: 47.259, elevation: 620, time: '2025-09-28T17:35:00Z' },
+      { lon: 6.135, lat: 47.261, elevation: 676, time: '2025-09-28T17:40:00Z' },
+      {
+        lon: 6.133,
+        lat: 47.2595,
+        elevation: 640,
+        time: '2025-09-28T17:43:00Z',
+      },
+      { lon: 6.13, lat: 47.257, elevation: 580, time: '2025-09-28T17:46:00Z' },
+      { lon: 6.126, lat: 47.254, elevation: 500, time: '2025-09-28T17:49:00Z' },
+      {
+        lon: 6.124,
+        lat: 47.2525,
+        elevation: 450,
+        time: '2025-09-28T17:52:00Z',
+      },
     ],
     stats: {
       total_points: 9,
@@ -249,15 +672,35 @@ export const gpxData: Record<string, any> = {
       max_altitude_m: 676,
       min_altitude_m: 427,
       elevation_gain_m: 249,
-      distance_km: 13.1
-    }
+      distance_km: 13.1,
+    },
   },
   '90d9748a-27d2-4dd5-96bc-6c7347bfcf5f': {
     coordinates: [
-      { lon: 6.1234, lat: 47.2518, elevation: 427, time: '2025-09-27T17:08:00Z' },
-      { lon: 6.1240, lat: 47.2525, elevation: 432, time: '2025-09-27T17:09:30Z' },
-      { lon: 6.1245, lat: 47.2530, elevation: 435, time: '2025-09-27T17:11:00Z' },
-      { lon: 6.1235, lat: 47.2520, elevation: 430, time: '2025-09-27T17:13:00Z' }
+      {
+        lon: 6.1234,
+        lat: 47.2518,
+        elevation: 427,
+        time: '2025-09-27T17:08:00Z',
+      },
+      {
+        lon: 6.124,
+        lat: 47.2525,
+        elevation: 432,
+        time: '2025-09-27T17:09:30Z',
+      },
+      {
+        lon: 6.1245,
+        lat: 47.253,
+        elevation: 435,
+        time: '2025-09-27T17:11:00Z',
+      },
+      {
+        lon: 6.1235,
+        lat: 47.252,
+        elevation: 430,
+        time: '2025-09-27T17:13:00Z',
+      },
     ],
     stats: {
       total_points: 4,
@@ -265,9 +708,9 @@ export const gpxData: Record<string, any> = {
       max_altitude_m: 435,
       min_altitude_m: 427,
       elevation_gain_m: 8,
-      distance_km: 2.0
-    }
-  }
+      distance_km: 2.0,
+    },
+  },
 };
 
 // Mock weather data
@@ -284,22 +727,22 @@ export const weatherData: Record<string, any> = {
       wind_avg: 12,
       wind_max: 18,
       temp_avg: 15,
-      precipitation: 0
+      precipitation: 0,
     },
     consensus: [
       { hour: 10, wind_avg: 10, wind_max: 15, temp: 14, precipitation: 0 },
       { hour: 12, wind_avg: 12, wind_max: 18, temp: 16, precipitation: 0 },
       { hour: 14, wind_avg: 14, wind_max: 20, temp: 17, precipitation: 0 },
-      { hour: 16, wind_avg: 12, wind_max: 18, temp: 15, precipitation: 0 }
+      { hour: 16, wind_avg: 12, wind_max: 18, temp: 15, precipitation: 0 },
     ],
     slots: [
       { start: '10:00', end: '11:00', status: 'good', wind_avg: 10 },
       { start: '12:00', end: '13:00', status: 'good', wind_avg: 12 },
       { start: '14:00', end: '15:00', status: 'medium', wind_avg: 14 },
-      { start: '16:00', end: '17:00', status: 'good', wind_avg: 12 }
+      { start: '16:00', end: '17:00', status: 'good', wind_avg: 12 },
     ],
     slots_summary: '4 créneaux volables',
-    total_sources: 3
+    total_sources: 3,
   },
   'site-mont-poupet': {
     site_id: 'site-mont-poupet',
@@ -313,22 +756,22 @@ export const weatherData: Record<string, any> = {
       wind_avg: 10,
       wind_max: 15,
       temp_avg: 16,
-      precipitation: 0
+      precipitation: 0,
     },
     consensus: [
       { hour: 10, wind_avg: 8, wind_max: 12, temp: 15, precipitation: 0 },
       { hour: 12, wind_avg: 10, wind_max: 15, temp: 17, precipitation: 0 },
       { hour: 14, wind_avg: 11, wind_max: 16, temp: 18, precipitation: 0 },
-      { hour: 16, wind_avg: 9, wind_max: 14, temp: 16, precipitation: 0 }
+      { hour: 16, wind_avg: 9, wind_max: 14, temp: 16, precipitation: 0 },
     ],
     slots: [
       { start: '10:00', end: '11:00', status: 'good', wind_avg: 8 },
       { start: '12:00', end: '13:00', status: 'good', wind_avg: 10 },
       { start: '14:00', end: '15:00', status: 'good', wind_avg: 11 },
-      { start: '16:00', end: '17:00', status: 'good', wind_avg: 9 }
+      { start: '16:00', end: '17:00', status: 'good', wind_avg: 9 },
     ],
     slots_summary: '4 créneaux volables',
-    total_sources: 3
+    total_sources: 3,
   },
   'site-la-cote': {
     site_id: 'site-la-cote',
@@ -342,23 +785,23 @@ export const weatherData: Record<string, any> = {
       wind_avg: 15,
       wind_max: 22,
       temp_avg: 14,
-      precipitation: 0
+      precipitation: 0,
     },
     consensus: [
       { hour: 10, wind_avg: 12, wind_max: 18, temp: 13, precipitation: 0 },
       { hour: 12, wind_avg: 15, wind_max: 22, temp: 15, precipitation: 0 },
       { hour: 14, wind_avg: 18, wind_max: 25, temp: 16, precipitation: 0 },
-      { hour: 16, wind_avg: 14, wind_max: 20, temp: 14, precipitation: 0 }
+      { hour: 16, wind_avg: 14, wind_max: 20, temp: 14, precipitation: 0 },
     ],
     slots: [
       { start: '10:00', end: '11:00', status: 'good', wind_avg: 12 },
       { start: '12:00', end: '13:00', status: 'medium', wind_avg: 15 },
       { start: '14:00', end: '15:00', status: 'bad', wind_avg: 18 },
-      { start: '16:00', end: '17:00', status: 'medium', wind_avg: 14 }
+      { start: '16:00', end: '17:00', status: 'medium', wind_avg: 14 },
     ],
     slots_summary: '2 créneaux volables',
-    total_sources: 3
-  }
+    total_sources: 3,
+  },
 };
 
 // Mock flight stats
@@ -375,5 +818,5 @@ export const flightStats = {
   max_altitude_m: 872,
   favorite_spot: 'Arguel',
   favorite_site: null,
-  last_flight_date: '2025-11-08'
+  last_flight_date: '2025-11-08',
 };

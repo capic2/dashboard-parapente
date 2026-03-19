@@ -1,11 +1,18 @@
 import { useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useFlights } from '../../hooks/useFlights';
+import { useFiltersStore } from '../../stores/filtersStore';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 export default function AltitudeChart() {
-  const { data: flights = [], isLoading, error } = useFlights({ limit: 100 });
+  const { filters } = useFiltersStore();
+  const { data: flights = [], isLoading, error } = useFlights({ 
+    limit: 100,
+    siteId: filters.siteId || undefined,
+    dateFrom: filters.dateFrom || undefined,
+    dateTo: filters.dateTo || undefined,
+  });
 
   const chartData = useMemo(() => {
     if (!flights.length) return [];

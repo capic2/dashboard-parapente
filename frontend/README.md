@@ -1,364 +1,395 @@
 # Frontend - Dashboard Parapente
 
-React 18 frontend with TanStack suite for advanced UI patterns.
+**React 18 + TypeScript frontend with TanStack Query, Tailwind CSS, and Storybook.**
 
 ---
 
-## 🚀 Setup (Phase 3, Week 2)
+## Tech Stack
 
-### 1. Install Dependencies
-
-```bash
-npm install
-```
-
-### 2. Development Server
-
-```bash
-npm run dev
-# Open: http://localhost:5173
-```
-
-### 3. Build for Production
-
-```bash
-npm run build
-# Output: dist/
-```
+- **React 18** - UI library with hooks
+- **TypeScript** - Type safety
+- **TanStack Query** - Data fetching & caching
+- **Tailwind CSS** - Utility-first styling
+- **React Router** - Client-side routing
+- **Recharts** - Data visualization
+- **Zod** - Runtime validation
+- **Vitest + Testing Library** - Testing
+- **Storybook** - Component development
+- **Vite** - Build tool
 
 ---
 
-## 📊 Dashboard Sections
-
-1. **Today at a Glance** — Current conditions for all sites
-2. **5-Day Forecast** — Timeline view of best flying days
-3. **Your Flights** — Strava history with weather context (TanStack Table)
-4. **Learning Stats** — Analytics & improvements
-5. **Alert Manager** — Create/manage weather alerts (TanStack Form)
-6. **Weather Sources** — Compare data accuracy (TanStack Table)
-
----
-
-## 🎨 Technology Stack
-
-**Core:**
-- **React 19** with Hooks + Server Components
-  - React Compiler (automatic optimizations)
-  - React Actions (simplified async handling)
-  - Improved error boundaries
-- **Vite** for fast development
-- **Tailwind CSS** for styling
-
-**TanStack Suite:**
-- **@tanstack/react-router** — Modern routing with type safety
-- **@tanstack/react-query** — Data fetching, caching, synchronization
-- **@tanstack/react-table** — Headless table library (sorting, filtering, pagination)
-- **@tanstack/react-form** — Type-safe form handling with validation
-
-**Others:**
-- **Zustand** for lightweight state management (UI state)
-- **Axios** for API calls (wrapped in TanStack Query)
-- **React ChartJS 2** for visualizations
-
----
-
-## 📁 Project Structure
+## Component Architecture
 
 ```
 src/
-├── components/           # Reusable React components
-│   ├── CurrentConditions.jsx
-│   ├── Forecast7Day.jsx
-│   ├── RecentFlights.jsx
-│   ├── LearningStats.jsx
-│   ├── AlertManager.jsx
-│   ├── SourceComparison.jsx
-│   └── Navigation.jsx
+├── components/          # Reusable UI components
+│   ├── SiteSelector.tsx               # Site selection with prefetch
+│   ├── MultiOrientationSelector.tsx   # Generic multi-takeoff selector
+│   ├── CurrentConditions.tsx          # Current weather widget
+│   ├── HourlyForecast.tsx            # Hour-by-hour predictions
+│   ├── Forecast7Day.tsx              # Weekly overview
+│   ├── BestSpotSuggestion.tsx        # AI recommendation
+│   ├── WindIndicator.tsx             # Wind direction arrows
+│   └── stats/                         # Statistics components
 │
-├── pages/               # Page-level components
-│   ├── Dashboard.jsx
-│   ├── FlightHistory.jsx
-│   ├── Settings.jsx
-│   └── Admin.jsx
+├── pages/               # Page components
+│   ├── Dashboard.tsx    # Main weather dashboard
+│   ├── FlightHistory.tsx # Flight log
+│   ├── Analytics.tsx    # Statistics & charts
+│   └── Settings.tsx     # User preferences
 │
 ├── hooks/               # Custom React hooks
-│   ├── useWeather.js    (TanStack Query hooks)
-│   ├── useFlights.js    (TanStack Query + Mutations)
-│   ├── useAlerts.js     (TanStack Query + Mutations)
-│   ├── useAlertForm.js  (TanStack Form)
-│   └── useFlightsTable.js (TanStack Table)
+│   ├── useWeather.ts    # Weather data fetching
+│   ├── useSites.ts      # Sites management
+│   ├── useFlights.ts    # Flight CRUD operations
+│   └── useBestSpot.ts   # Best spot recommendation
 │
-├── stores/              # Zustand stores (UI state only)
-│   └── weatherStore.js
+├── types/               # TypeScript type definitions
+│   └── index.ts         # Shared types
 │
-├── utils/
-│   └── api.js           # Axios instance
-│
-├── App.jsx              # Root component with TanStack Router
-├── main.jsx             # React entry point
-└── App.css              # Global styles
+├── schemas.ts           # Zod validation schemas
+├── api/                 # API client functions
+└── App.tsx              # Root component
 ```
 
 ---
 
-## ⚡ React 19 Features
-
-### React Compiler
-- Automatic memoization (no need for useMemo/useCallback)
-- Better performance without manual optimization
-```jsx
-// React 19: No need for useMemo wrapper
-export function Dashboard() {
-  const expensiveValue = calculateComplexData()
-  // Compiler handles memoization automatically
-  return <div>{expensiveValue}</div>
-}
-```
-
-### React Actions
-- Simplified async form handling
-- Better error handling out of the box
-```jsx
-async function updateAlert(formData) {
-  const result = await API.patch(`/alerts/${id}`, formData)
-  return result
-}
-
-<form action={updateAlert}>
-  <input name="name" />
-  <button type="submit">Save</button>
-</form>
-```
-
----
-
-## 🔌 TanStack Query (Data Fetching)
-
-Automatic caching, refetching, and state synchronization.
-
-```javascript
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { useFlights, useCreateFlight } from './hooks/useFlights'
-
-function FlightsList() {
-  // Automatic caching + background refetch
-  const { data: flights, isLoading } = useFlights()
-  
-  // Mutation with automatic cache invalidation
-  const { mutate: createFlight } = useCreateFlight()
-  
-  if (isLoading) return <div>Loading...</div>
-  
-  return (
-    <div>
-      {flights.map(flight => (
-        <div key={flight.id}>{flight.title}</div>
-      ))}
-    </div>
-  )
-}
-```
-
-**Benefits:**
-- ✅ Automatic caching (configurable staleTime)
-- ✅ Background refetching
-- ✅ Automatic garbage collection
-- ✅ Mutation + automatic cache invalidation
-- ✅ Pagination, infinite queries, optimistic updates
-
----
-
-## 📋 TanStack Table (Data Display)
-
-Headless table with sorting, filtering, pagination.
-
-```javascript
-import { useFlightsTable } from './hooks/useFlightsTable'
-
-function FlightsTable() {
-  const { table, isLoading } = useFlightsTable()
-  
-  return (
-    <table>
-      <thead>
-        {table.getHeaderGroups().map(headerGroup => (
-          <tr key={headerGroup.id}>
-            {headerGroup.headers.map(header => (
-              <th key={header.id} onClick={header.column.getToggleSortingHandler()}>
-                {header.isPlaceholder ? null : header.renderHeader()}
-              </th>
-            ))}
-          </tr>
-        ))}
-      </thead>
-      <tbody>
-        {table.getRowModel().rows.map(row => (
-          <tr key={row.id}>
-            {row.getVisibleCells().map(cell => (
-              <td key={cell.id}>{cell.renderCell()}</td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
-}
-```
-
-**Features:**
-- ✅ Sorting (multi-column)
-- ✅ Filtering
-- ✅ Pagination
-- ✅ Row selection
-- ✅ Column visibility
-- ✅ Fully headless (bring your own UI)
-
----
-
-## 🔑 TanStack Form (Forms)
-
-Type-safe form handling with validation.
-
-```javascript
-import { useAlertForm } from './hooks/useAlertForm'
-
-function AlertForm({ initialAlert }) {
-  const { form, isLoading } = useAlertForm(initialAlert)
-  
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        form.handleSubmit()
-      }}
-    >
-      <form.Field name="name">
-        {(field) => (
-          <div>
-            <label>{field.state.meta.name}</label>
-            <input
-              value={field.state.value}
-              onChange={(e) => field.setValue(e.target.value)}
-            />
-          </div>
-        )}
-      </form.Field>
-      
-      <button type="submit" disabled={isLoading}>
-        Save Alert
-      </button>
-    </form>
-  )
-}
-```
-
-**Benefits:**
-- ✅ Type-safe form state
-- ✅ Built-in validation
-- ✅ Array field support
-- ✅ Async validation
-- ✅ Array fields (dynamic forms)
-
----
-
-## 🧭 TanStack Router (Navigation)
-
-Type-safe routing with modern features.
-
-```javascript
-import { Router, RootRoute, Route } from '@tanstack/react-router'
-
-// Routes are defined in App.jsx
-const dashboardRoute = new Route({
-  getParentRoute: () => rootRoute,
-  path: '/',
-  component: Dashboard,
-})
-
-// Navigate from components
-import { useNavigate } from '@tanstack/react-router'
-
-function Navigation() {
-  const navigate = useNavigate()
-  
-  return (
-    <nav>
-      <button onClick={() => navigate({ to: '/' })}>Dashboard</button>
-      <button onClick={() => navigate({ to: '/flights' })}>Flights</button>
-    </nav>
-  )
-}
-```
-
-**Benefits:**
-- ✅ Type-safe routes & params
-- ✅ Route-level code splitting
-- ✅ Search params with validation
-- ✅ Loader functions (data fetching)
-- ✅ Error boundaries per route
-
----
-
-## 🗂️ Zustand (UI State)
-
-Lightweight state management for UI-only state.
-
-```javascript
-import { useWeatherStore } from './stores/weatherStore'
-
-function Dashboard() {
-  // UI state (separate from data fetching)
-  const { currentSite, setCurrentSite } = useWeatherStore()
-  
-  return (
-    <select value={currentSite} onChange={(e) => setCurrentSite(e.target.value)}>
-      <option>Select a site...</option>
-    </select>
-  )
-}
-```
-
-**When to use:**
-- ✅ UI state (selected site, filters, modal visibility)
-- ❌ NOT for data fetching (use TanStack Query instead)
-
----
-
-## 🧪 Testing
+## 🚀 Quick Start
 
 ```bash
-npm run test           # Run tests
-npm run test:ui        # UI dashboard
-npm run coverage       # Coverage report
+# Install dependencies
+npm install
+
+# Start dev server
+npm run dev
+
+# Visit http://localhost:5173
+```
+
+**Backend must be running** on http://localhost:8000
+
+📚 **Full guide:** [DEVELOPMENT.md](../DEVELOPMENT.md)
+
+---
+
+## Key Features
+
+### 1. Data Fetching Strategy
+
+**TanStack Query** with automatic caching:
+
+```typescript
+// Fetch weather with 5min cache
+const { data, isLoading } = useWeather(siteId, dayIndex);
+
+// Prefetch on hover for instant navigation
+queryClient.prefetchQuery({
+  queryKey: ['weather', 'combined', siteId, 0],
+  queryFn: createWeatherQueryFn(siteId, 0),
+});
+```
+
+### 2. Type Safety
+
+**Zod schemas** validate all API responses:
+
+```typescript
+const WeatherDataSchema = z.object({
+  para_index: z.number(),
+  verdict: z.string(),
+  temperature: z.number(),
+  // ...
+});
+
+// Runtime validation
+const data = WeatherDataSchema.parse(response);
+```
+
+### 3. Generic Components
+
+**MultiOrientationSelector** works for any multi-takeoff site:
+
+```typescript
+// Automatically groups sites by base name
+// Shows dropdown for Mont Poupet (N/S/W/E)
+// Shows button for single-takeoff sites
+<SiteSelector sites={sites} />
+```
+
+### 4. Responsive Design
+
+Mobile-first Tailwind CSS:
+
+```tsx
+// Adapts to screen size
+<div className="p-3 sm:p-2.5 min-w-[120px] sm:min-w-[100px]">
+  {/* Content */}
+</div>
 ```
 
 ---
 
-## 📚 Resources
+## Development
 
-- **[TanStack Router](https://tanstack.com/router/latest)** — Modern routing
-- **[TanStack Query](https://tanstack.com/query/latest)** — Data fetching
-- **[TanStack Table](https://tanstack.com/table/latest)** — Headless table
-- **[TanStack Form](https://tanstack.com/form/latest)** — Type-safe forms
-- **[React Docs](https://react.dev/)** — React fundamentals
-- **[Vite](https://vitejs.dev/)** — Build tool
-- **[Tailwind CSS](https://tailwindcss.com/)** — Styling
+### Run Dev Server
+
+```bash
+npm run dev
+```
+
+### Run Storybook
+
+```bash
+npm run storybook
+# Opens http://localhost:6006
+```
+
+**Browse components** in isolation with mock data.
+
+### Run Tests
+
+```bash
+# All tests
+npm run test
+
+# Watch mode
+npm run test:watch
+
+# Coverage
+npm run test:coverage
+
+# Type check
+npm run type-check
+```
+
+### Linting
+
+```bash
+# Check
+npm run lint
+
+# Fix
+npm run lint:fix
+```
 
 ---
 
-## 🎯 Philosophy
+## Environment Variables
 
-Use **TanStack tools** for complex UI patterns:
-- Data fetching → TanStack Query
-- Tables/lists → TanStack Table
-- Routing → TanStack Router
-- Forms → TanStack Form
-- Simple UI state → Zustand
+Create `.env`:
 
-This keeps the codebase focused and leverages the best tools for each job.
+```bash
+VITE_API_URL=http://localhost:8000
+```
+
+**Production:**
+```bash
+VITE_API_URL=https://your-domain.com
+```
 
 ---
 
-**Phase:** 3 Frontend (Starting March 28)  
-**Technology:** React 18 + TanStack Suite  
-**Estimated effort:** 40-50 hours
+## Building
+
+```bash
+# Production build
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+Output in `dist/` directory.
+
+---
+
+## Component Development with Storybook
+
+### Create Story
+
+```typescript
+// SiteSelector.stories.tsx
+import type { Meta, StoryObj } from '@storybook/react';
+import SiteSelector from './SiteSelector';
+
+const meta: Meta<typeof SiteSelector> = {
+  title: 'Components/SiteSelector',
+  component: SiteSelector,
+  parameters: {
+    layout: 'centered',
+  },
+};
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const Default: Story = {
+  args: {
+    selectedSiteId: 'site-arguel',
+    onSelectSite: (id) => console.log('Selected:', id),
+  },
+};
+```
+
+### Mock Data
+
+Stories use **MSW (Mock Service Worker)** for API mocking:
+
+```typescript
+// .storybook/preview.tsx
+import { http, HttpResponse } from 'msw';
+
+const handlers = [
+  http.get('/api/sites', () => {
+    return HttpResponse.json({
+      sites: [/* mock data */]
+    });
+  }),
+];
+```
+
+---
+
+## Testing
+
+### Component Tests
+
+```typescript
+// SiteSelector.test.tsx
+import { render, screen } from '@testing-library/react';
+import SiteSelector from './SiteSelector';
+
+test('renders site buttons', () => {
+  render(<SiteSelector sites={mockSites} />);
+  expect(screen.getByText('Arguel')).toBeInTheDocument();
+});
+```
+
+### Hook Tests
+
+```typescript
+// useWeather.test.ts
+import { renderHook, waitFor } from '@testing-library/react';
+import { useWeather } from './useWeather';
+
+test('fetches weather data', async () => {
+  const { result } = renderHook(() => useWeather('site-arguel', 0));
+  
+  await waitFor(() => {
+    expect(result.current.data).toBeDefined();
+  });
+});
+```
+
+---
+
+## Performance
+
+### Optimizations
+
+1. **React Query caching** - Avoids redundant API calls
+2. **Prefetching on hover** - Instant navigation
+3. **Code splitting** - Lazy load pages
+4. **Image optimization** - Next-gen formats
+5. **Memoization** - React.memo, useMemo, useCallback
+
+### Bundle Size
+
+Target: < 500 KB gzipped
+
+Check with:
+```bash
+npm run build
+npx vite-bundle-visualizer
+```
+
+---
+
+## Accessibility
+
+- ✅ Semantic HTML
+- ✅ ARIA labels
+- ✅ Keyboard navigation
+- ✅ Color contrast (WCAG AA)
+- ✅ Focus indicators
+
+Test with:
+```bash
+npm run test:a11y
+```
+
+---
+
+## Browser Support
+
+- ✅ Chrome/Edge (last 2 versions)
+- ✅ Firefox (last 2 versions)
+- ✅ Safari (last 2 versions)
+- ✅ Mobile Safari (iOS 15+)
+- ✅ Mobile Chrome (Android 10+)
+
+---
+
+## Deployment
+
+### Static Hosting
+
+Build output in `dist/` can be hosted on:
+- Netlify
+- Vercel
+- GitHub Pages
+- AWS S3 + CloudFront
+- Any static file server
+
+### Docker
+
+```dockerfile
+FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --production
+COPY . .
+RUN npm run build
+CMD ["npm", "run", "preview"]
+```
+
+---
+
+## Troubleshooting
+
+### "Module not found"
+
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### "Type errors"
+
+```bash
+npm run type-check
+```
+
+### "Storybook won't start"
+
+```bash
+# Clear cache
+rm -rf .storybook/cache
+npm run storybook
+```
+
+---
+
+## More Documentation
+
+- [Main README](../README.md) - Project overview
+- [DEVELOPMENT.md](../DEVELOPMENT.md) - Setup guide
+- [USER_GUIDE.md](../USER_GUIDE.md) - User manual
+- [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guidelines
+
+---
+
+**Questions?** Check the docs above or open an issue.
+
+**Happy coding! 🚀**
