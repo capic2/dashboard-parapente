@@ -298,6 +298,31 @@ export const GPXDataSchema = z.object({
 });
 
 // ============================================================================
+// BEST SPOT SCHEMA
+// ============================================================================
+
+export const BestSpotSiteSchema = z.object({
+  id: z.string(),
+  code: z.string(),
+  name: z.string(),
+  latitude: z.number(),
+  longitude: z.number(),
+  orientation: z.string().nullish(), // null or undefined
+  rating: z.number().nullish(), // null or undefined
+});
+
+export const BestSpotResultSchema = z.object({
+  site: BestSpotSiteSchema,
+  paraIndex: z.number(),
+  windDirection: z.string().nullish(), // null or undefined
+  windSpeed: z.number().nullish(), // null or undefined
+  windFavorability: z.enum(['good', 'moderate', 'bad']),
+  score: z.number(),
+  reason: z.string(),
+  verdict: z.string().nullish(), // null or undefined
+});
+
+// ============================================================================
 // TYPE EXPORTS
 // ============================================================================
 
@@ -317,3 +342,4 @@ export type FlightRecord = z.infer<typeof FlightRecordSchema>;
 export type FlightRecords = z.infer<typeof FlightRecordsSchema>;
 export type GeoPoint = z.infer<typeof GeoPointSchema>;
 export type GPXData = z.infer<typeof GPXDataSchema>;
+export type BestSpotResult = z.infer<typeof BestSpotResultSchema>;

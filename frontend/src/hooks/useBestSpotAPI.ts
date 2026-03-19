@@ -12,36 +12,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
-
-export interface ApiBestSpotResponse {
-  site: {
-    id: string;
-    code: string;
-    name: string;
-    latitude: number;
-    longitude: number;
-    orientation?: string;
-    rating?: number;
-  };
-  paraIndex: number;
-  windDirection?: string;
-  windSpeed?: number;
-  windFavorability: 'good' | 'moderate' | 'bad';
-  score: number;
-  reason: string;
-  verdict?: string;
-}
-
-export interface BestSpotResult {
-  site: ApiBestSpotResponse['site'];
-  paraIndex: number;
-  windDirection?: string;
-  windSpeed?: number;
-  windFavorability: 'good' | 'moderate' | 'bad';
-  score: number;
-  reason: string;
-  verdict?: string;
-}
+import { BestSpotResultSchema, type BestSpotResult } from '../schemas';
 
 /**
  * Hook to fetch the best spot for a specific day
@@ -53,12 +24,12 @@ export function useBestSpotAPI(dayIndex: number = 0) {
     queryKey: ['bestSpot', dayIndex],
     queryFn: async () => {
       const params = new URLSearchParams({ day_index: dayIndex.toString() });
-      const data: ApiBestSpotResponse = await api
+      const response = await api
         .get(`spots/best?${params}`)
         .json();
       
-      // Return data in BestSpotResult format (already matches)
-      return data as BestSpotResult;
+      // Validate response with Zod schema
+      return BestSpotResultSchema.parse(response);
     },
     staleTime: 1000 * 60 * 60, // 60 minutes (aligned with backend cache)
     gcTime: 1000 * 60 * 60 * 2, // 2 hours
@@ -76,3 +47,6 @@ export function useBestSiteIdAPI(dayIndex: number = 0): string | null {
   const { data: bestSpot } = useBestSpotAPI(dayIndex);
   return bestSpot?.site?.id || null;
 }
+
+// Re-export the type for convenience
+export type { BestSpotResult } from '../schemas';

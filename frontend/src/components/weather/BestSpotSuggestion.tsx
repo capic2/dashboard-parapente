@@ -68,10 +68,10 @@ export function BestSpotSuggestion({
         </div>
 
         {/* Right side: Wind indicator */}
-        {windDirection && windSpeed !== undefined && (
+        {windDirection && windSpeed != null && (
           <WindIndicatorCompact
             windDirection={windDirection}
-            siteOrientation={site.orientation || undefined}
+            siteOrientation={site.orientation ?? undefined}
             windSpeed={windSpeed}
             className="text-2xl"
           />
@@ -85,7 +85,7 @@ export function BestSpotSuggestion({
           <span className="text-lg font-bold text-sky-600">{paraIndex}/100</span>
         </div>
 
-        {windDirection && windSpeed !== undefined && (
+        {windDirection && windSpeed != null && (
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 dark:text-gray-400">Vent:</span>
             <span className="text-sm font-medium text-gray-900 dark:text-white">
@@ -134,10 +134,10 @@ export function BestSpotSuggestionCompact({
         <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
           🎯 Recommandé
         </span>
-        {windDirection && windSpeed !== undefined && (
+        {windDirection && windSpeed != null && (
           <WindIndicatorCompact
             windDirection={windDirection}
-            siteOrientation={site.orientation || undefined}
+            siteOrientation={site.orientation ?? undefined}
             windSpeed={windSpeed}
           />
         )}

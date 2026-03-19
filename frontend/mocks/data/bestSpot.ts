@@ -2,7 +2,9 @@
  * Mock data for Best Spot API responses
  */
 
-export const mockBestSpot = {
+import type { BestSpotResult } from '../../src/schemas';
+
+export const mockBestSpot: BestSpotResult = {
   site: {
     id: 'site-arguel',
     code: 'arguel',
@@ -21,7 +23,7 @@ export const mockBestSpot = {
   verdict: 'BON',
 };
 
-export const mockBestSpotDay1 = {
+export const mockBestSpotDay1: BestSpotResult = {
   site: {
     id: 'site-arguel',
     code: 'arguel',
@@ -40,7 +42,7 @@ export const mockBestSpotDay1 = {
   verdict: 'BON',
 };
 
-export const mockBestSpotDay2 = {
+export const mockBestSpotDay2: BestSpotResult = {
   site: {
     id: 'site-arguel',
     code: 'arguel',
@@ -59,7 +61,7 @@ export const mockBestSpotDay2 = {
   verdict: 'MOYEN',
 };
 
-export const mockBestSpotDay3 = {
+export const mockBestSpotDay3: BestSpotResult = {
   site: {
     id: 'site-mont-poupet-ouest',
     code: 'mont-poupet-ouest',
@@ -78,7 +80,7 @@ export const mockBestSpotDay3 = {
   verdict: 'MOYEN',
 };
 
-export const mockBestSpotDay4 = {
+export const mockBestSpotDay4: BestSpotResult = {
   site: {
     id: 'site-la-cote',
     code: 'la-cote',
@@ -97,7 +99,7 @@ export const mockBestSpotDay4 = {
   verdict: 'MOYEN',
 };
 
-export const mockBestSpotDay5 = {
+export const mockBestSpotDay5: BestSpotResult = {
   site: {
     id: 'site-arguel',
     code: 'arguel',
@@ -116,7 +118,7 @@ export const mockBestSpotDay5 = {
   verdict: 'LIMITE',
 };
 
-export const mockBestSpotDay6 = {
+export const mockBestSpotDay6: BestSpotResult = {
   site: {
     id: 'site-arguel',
     code: 'arguel',
@@ -138,7 +140,7 @@ export const mockBestSpotDay6 = {
 /**
  * Array of all best spots by day index
  */
-export const mockBestSpotsByDay = [
+export const mockBestSpotsByDay: BestSpotResult[] = [
   mockBestSpot,      // Day 0
   mockBestSpotDay1,  // Day 1
   mockBestSpotDay2,  // Day 2
