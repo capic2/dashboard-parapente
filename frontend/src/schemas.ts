@@ -136,6 +136,9 @@ export const ConsensusHourSchema = z.object({
   cape_confidence: z.number().optional(),
   lifted_index: z.number().nullable().optional(),
   li_confidence: z.number().optional(),
+  para_index: z.number().optional(), // Para-index score per hour
+  verdict: z.string().optional(), // Verdict per hour
+  thermal_strength: z.string().optional(), // Thermal strength
   sources: z.record(z.string(), z.any()).optional(), // Per-source data for tooltip
 });
 
