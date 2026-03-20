@@ -423,21 +423,25 @@ async def test_send_telegram_notification_new_flight(sample_flight):
         importlib.reload(webhooks_module)
         from webhooks import send_telegram_notification
         
-        with patch("httpx.AsyncClient") as mock_client:
-            mock_response = MagicMock()
-            mock_response.raise_for_status = MagicMock()
-            
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
-                return_value=mock_response
-            )
-            
+        # Create proper mock for async context manager
+        mock_post = AsyncMock()
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_post.return_value = mock_response
+        
+        mock_client_instance = MagicMock()
+        mock_client_instance.post = mock_post
+        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+        
+        with patch("httpx.AsyncClient", return_value=mock_client_instance) as mock_client:
             await send_telegram_notification(sample_flight, is_new=True)
             
             # Verify API was called
-            mock_client.return_value.__aenter__.return_value.post.assert_called_once()
+            mock_post.assert_called_once()
             
             # Check call arguments
-            call_args = mock_client.return_value.__aenter__.return_value.post.call_args
+            call_args = mock_post.call_args
             assert "api.telegram.org" in call_args[0][0]
             assert "NOUVEAU VOL" in call_args[1]["json"]["text"]
     finally:
