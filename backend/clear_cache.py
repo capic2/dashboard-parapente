@@ -10,7 +10,7 @@ import sys
 
 # Set environment to production to use real Redis
 os.environ['ENVIRONMENT'] = 'production'
-os.environ['USE_FAKE_REDIS'] = 'false'
+os.environ['BACKEND_USE_FAKE_REDIS'] = 'false'
 
 async def clear_cache():
     from cache import get_redis

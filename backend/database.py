@@ -2,9 +2,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from pathlib import Path
 from contextlib import contextmanager
-import os
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./db/dashboard.db")
+from config import DATABASE_URL
+
 DB_PATH = Path(__file__).parent / "db" / "dashboard.db"
 
 engine = create_engine(

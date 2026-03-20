@@ -1,0 +1,307 @@
+# 📋 Guide de Migration Portainer
+
+## ⚠️ BREAKING CHANGE : Mise à jour des variables d'environnement
+
+Ce guide explique comment mettre à jour les variables d'environnement dans Portainer suite à la centralisation de la configuration.
+
+---
+
+## 🎯 Quand appliquer ce guide
+
+**Appliquez ces changements dans Portainer APRÈS avoir :**
+1. ✅ Testé la nouvelle configuration en local (dev)
+2. ✅ Mergé la PR dans la branche principale
+3. ✅ Choisi une fenêtre de maintenance (downtime de ~5 minutes)
+
+---
+
+## 📝 Variables à mettre à jour dans Portainer
+
+### ⚠️ IMPORTANT
+
+**Toutes les variables backend doivent maintenant avoir le préfixe `BACKEND_`**
+
+### 📊 Table de migration
+
+| Ancienne variable | Nouvelle variable | Exemple de valeur |
+|-------------------|-------------------|-------------------|
+| `DATABASE_URL` | `BACKEND_DATABASE_URL` | `sqlite:///./db/dashboard.db` |
+| `REDIS_HOST` | `BACKEND_REDIS_HOST` | `redis` |
+| `REDIS_PORT` | `BACKEND_REDIS_PORT` | `6379` |
+| `USE_FAKE_REDIS` | `BACKEND_USE_FAKE_REDIS` | `false` |
+| `API_HOST` | `BACKEND_API_HOST` | `0.0.0.0` |
+| `API_PORT` | `BACKEND_API_PORT` | `8001` |
+| `API_DEBUG` | `BACKEND_API_DEBUG` | `false` |
+| `WEATHERAPI_KEY` | `BACKEND_WEATHERAPI_KEY` | `votre_clé` |
+| `METEOBLUE_API_KEY` | `BACKEND_METEOBLUE_API_KEY` | `votre_clé` |
+| `STRAVA_CLIENT_ID` | `BACKEND_STRAVA_CLIENT_ID` | `votre_id` |
+| `STRAVA_CLIENT_SECRET` | `BACKEND_STRAVA_CLIENT_SECRET` | `votre_secret` |
+| `STRAVA_ACCESS_TOKEN` | `BACKEND_STRAVA_ACCESS_TOKEN` | `votre_token` |
+| `STRAVA_REFRESH_TOKEN` | `BACKEND_STRAVA_REFRESH_TOKEN` | `votre_refresh` |
+| *(nouvelle)* | `BACKEND_STRAVA_VERIFY_TOKEN` | `PARAPENTE_2025` |
+| `GOOGLE_API_KEY` | `BACKEND_GOOGLE_API_KEY` | `votre_clé` |
+| `GEMINI_MODEL` | `BACKEND_GEMINI_MODEL` | `gemini-2.5-flash` |
+| `ANTHROPIC_API_KEY` | `BACKEND_ANTHROPIC_API_KEY` | `votre_clé` |
+| `SCHEDULER_ENABLED` | `BACKEND_SCHEDULER_ENABLED` | `true` |
+| `SCHEDULER_INTERVAL_MINUTES` | `BACKEND_SCHEDULER_INTERVAL_MINUTES` | `30` |
+| `LOG_LEVEL` | `BACKEND_LOG_LEVEL` | `INFO` |
+| `LOG_FILE` | `BACKEND_LOG_FILE` | `logs/dashboard.log` |
+| `TELEGRAM_BOT_TOKEN` | `BACKEND_TELEGRAM_BOT_TOKEN` | `votre_token` |
+| `TELEGRAM_CHAT_ID` | `BACKEND_TELEGRAM_CHAT_ID` | `votre_id` |
+| *(nouvelle)* | `BACKEND_FRONTEND_URL` | `https://votre-domaine.com` |
+
+### ✅ Variable SANS changement
+
+| Variable | Action | Valeur |
+|----------|--------|--------|
+| `ENVIRONMENT` | Garder tel quel (pas de préfixe) | `production` |
+
+---
+
+## 🔧 Étapes de migration dans Portainer
+
+### Étape 1 : Sauvegarder la configuration actuelle
+
+1. Connectez-vous à Portainer
+2. Naviguez vers **Stacks** → `dashboard-parapente`
+3. Cliquez sur **"Editor"**
+4. **Copiez toutes les variables actuelles** dans un fichier texte (backup)
+
+### Étape 2 : Mettre à jour les variables
+
+**Option A : Via l'éditeur de stack**
+
+1. Dans l'éditeur, remplacez toutes les variables dans la section `environment:`
+2. Utilisez le tableau ci-dessus pour renommer chaque variable
+3. Ajoutez les nouvelles variables :
+   - `BACKEND_STRAVA_VERIFY_TOKEN=PARAPENTE_2025`
+   - `BACKEND_FRONTEND_URL=https://votre-domaine.com`
+
+**Option B : Via les variables d'environnement (recommandé)**
+
+1. Allez dans **"Environment variables"** ou **"Stack environment variables"**
+2. Pour chaque variable :
+   - Supprimez l'ancienne (ex: `WEATHERAPI_KEY`)
+   - Ajoutez la nouvelle avec le préfixe (ex: `BACKEND_WEATHERAPI_KEY`)
+   - Copiez la valeur de l'ancienne vers la nouvelle
+
+### Étape 3 : Vérifier la configuration
+
+**Checklist avant de sauvegarder :**
+
+- [ ] Toutes les variables commencent par `BACKEND_` (sauf `ENVIRONMENT`)
+- [ ] Les valeurs sont identiques aux anciennes variables
+- [ ] `BACKEND_USE_FAKE_REDIS=false` (important en production)
+- [ ] `BACKEND_REDIS_HOST=redis` (nom du service Docker)
+- [ ] `BACKEND_LOG_LEVEL=INFO` ou `WARNING` (pas `DEBUG`)
+- [ ] `BACKEND_API_DEBUG=false` (important en production)
+- [ ] Nouvelles variables ajoutées :
+  - [ ] `BACKEND_STRAVA_VERIFY_TOKEN=PARAPENTE_2025`
+  - [ ] `BACKEND_FRONTEND_URL` (URL de votre frontend)
+
+### Étape 4 : Redéployer la stack
+
+1. Cliquez sur **"Update the stack"**
+2. Cochez **"Re-pull image and redeploy"** (pour avoir la dernière version)
+3. Cliquez sur **"Update"**
+4. Portainer va redéployer les conteneurs (~2-5 minutes de downtime)
+
+### Étape 5 : Vérifier le déploiement
+
+**1. Vérifier les logs du backend**
+
+Dans Portainer :
+- **Containers** → `parapente-backend` → **Logs**
+
+Recherchez ces lignes (doivent apparaître sans erreur) :
+```
+✅ Strava credentials loaded
+🔧 Environment: production
+🗄️ Database: sqlite:///./db/dashboard.db
+🔴 Redis: redis:6379 (fake: false)
+```
+
+**Signes de problème :**
+```
+❌ WEATHERAPI_KEY is required
+❌ Could not connect to Redis
+```
+
+**2. Tester l'API**
+
+```bash
+# Test de santé
+curl https://votre-domaine.com/api/
+
+# Test d'un endpoint
+curl https://votre-domaine.com/api/sites
+```
+
+**3. Vérifier le frontend**
+
+Visitez votre site web et vérifiez que :
+- [ ] La page d'accueil se charge
+- [ ] Les données météo s'affichent
+- [ ] Les vols Strava sont synchronisés
+
+---
+
+## 🆘 Rollback (en cas de problème)
+
+**Si quelque chose ne fonctionne pas :**
+
+### Option 1 : Restauration rapide
+
+1. Dans Portainer, retournez dans **Stack Editor**
+2. Cliquez sur **"Revert"** si disponible
+3. Ou remplacez manuellement les variables par les anciennes (sans `BACKEND_` prefix)
+4. Cliquez sur **"Update the stack"**
+
+### Option 2 : Rollback complet
+
+```bash
+# Se connecter au serveur
+ssh votre-serveur
+
+# Naviguer vers le projet
+cd /path/to/dashboard-parapente
+
+# Revenir à la version précédente
+git checkout main  # ou la branche précédente
+git pull
+
+# Redéployer
+docker-compose down
+docker-compose up -d
+```
+
+---
+
+## ✅ Configuration de production recommandée
+
+```bash
+# Global
+ENVIRONMENT=production
+
+# Backend - Database
+BACKEND_DATABASE_URL=sqlite:///./db/dashboard.db
+
+# Backend - Redis
+BACKEND_REDIS_HOST=redis
+BACKEND_REDIS_PORT=6379
+BACKEND_USE_FAKE_REDIS=false  # ⚠️ false en production
+
+# Backend - API
+BACKEND_API_HOST=0.0.0.0
+BACKEND_API_PORT=8001
+BACKEND_API_DEBUG=false  # ⚠️ false en production
+
+# Backend - Weather API Keys
+BACKEND_WEATHERAPI_KEY=your_weatherapi_key_here
+BACKEND_METEOBLUE_API_KEY=your_meteoblue_key_here
+
+# Backend - Strava OAuth
+BACKEND_STRAVA_CLIENT_ID=your_strava_client_id
+BACKEND_STRAVA_CLIENT_SECRET=your_strava_client_secret
+BACKEND_STRAVA_ACCESS_TOKEN=your_strava_access_token
+BACKEND_STRAVA_REFRESH_TOKEN=your_strava_refresh_token
+BACKEND_STRAVA_VERIFY_TOKEN=PARAPENTE_2025
+
+# Backend - AI Analysis
+BACKEND_GOOGLE_API_KEY=your_google_api_key_here
+BACKEND_GEMINI_MODEL=gemini-2.5-flash
+BACKEND_ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
+# Backend - Scheduler
+BACKEND_SCHEDULER_ENABLED=true
+BACKEND_SCHEDULER_INTERVAL_MINUTES=30
+
+# Backend - Logging
+BACKEND_LOG_LEVEL=INFO  # ou WARNING en production
+BACKEND_LOG_FILE=logs/dashboard.log
+
+# Backend - Telegram (optionnel)
+BACKEND_TELEGRAM_BOT_TOKEN=
+BACKEND_TELEGRAM_CHAT_ID=
+
+# Backend - Frontend URL
+BACKEND_FRONTEND_URL=https://parapente.votredomaine.com
+```
+
+---
+
+## 🔍 Troubleshooting
+
+### Problème : Le backend ne démarre pas
+
+**Symptôme :** Conteneur redémarre en boucle
+
+**Solution :**
+1. Vérifiez les logs : `Container → parapente-backend → Logs`
+2. Cherchez `❌ WEATHERAPI_KEY is required`
+3. Vérifiez que toutes les variables obligatoires sont présentes avec le bon préfixe
+
+### Problème : Erreur "Redis connection failed"
+
+**Symptôme :** `Could not connect to Redis`
+
+**Solution :**
+1. Vérifiez `BACKEND_REDIS_HOST=redis` (nom du service Docker)
+2. Vérifiez que le conteneur Redis est démarré
+3. Vérifiez `BACKEND_USE_FAKE_REDIS=false`
+
+### Problème : API keys invalides
+
+**Symptôme :** Erreurs 401/403 lors des appels API météo
+
+**Solution :**
+1. Vérifiez que les clés API sont correctes
+2. Testez les clés directement sur les sites des providers
+3. Vérifiez qu'il n'y a pas d'espaces ou caractères invisibles
+
+### Problème : Scheduler ne fonctionne pas
+
+**Symptôme :** Pas de rafraîchissement automatique
+
+**Solution :**
+1. Vérifiez `BACKEND_SCHEDULER_ENABLED=true`
+2. Vérifiez `BACKEND_SCHEDULER_INTERVAL_MINUTES=30`
+3. Regardez les logs pour voir si le scheduler démarre
+
+---
+
+## 📞 Besoin d'aide ?
+
+**Informations à fournir :**
+- Logs complets du conteneur backend (masquez les secrets)
+- Configuration Portainer (variables d'environnement)
+- Message d'erreur exact
+- Version du code déployée (commit hash)
+
+---
+
+## 📋 Checklist finale de migration
+
+**Avant la migration :**
+- [ ] Backup de la configuration Portainer actuelle
+- [ ] Fenêtre de maintenance planifiée
+- [ ] Toutes les valeurs de variables notées
+
+**Pendant la migration :**
+- [ ] Toutes les variables renommées avec `BACKEND_` prefix
+- [ ] `ENVIRONMENT` gardée sans préfixe
+- [ ] Nouvelles variables ajoutées
+- [ ] Valeurs vérifiées (pas d'erreur de copier-coller)
+- [ ] Configuration sauvegardée et stack mise à jour
+
+**Après la migration :**
+- [ ] Conteneurs redémarrés sans erreur
+- [ ] Logs vérifiés (pas d'erreur critique)
+- [ ] API testée (`curl /api/`)
+- [ ] Frontend fonctionne
+- [ ] Scheduler actif
+- [ ] Surveillance des logs pendant 10-30 minutes
+
+---
+
+**Fin du guide - Bonne migration ! 🚀**

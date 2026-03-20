@@ -59,7 +59,9 @@ jobs:
             --cov-fail-under=40
         env:
           TESTING: true
-          DATABASE_URL: sqlite:///./test.db
+          BACKEND_DATABASE_URL: sqlite:///./test.db
+          BACKEND_WEATHERAPI_KEY: test_key
+          BACKEND_METEOBLUE_API_KEY: test_key
       
       - name: 📊 Upload coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -118,9 +120,9 @@ jobs:
             --tb=short \
             --no-cov
         env:
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          WEATHERAPI_KEY: ${{ secrets.WEATHERAPI_KEY }}
+          BACKEND_GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          BACKEND_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BACKEND_WEATHERAPI_KEY: ${{ secrets.WEATHERAPI_KEY }}
         continue-on-error: true
 
   lint:
