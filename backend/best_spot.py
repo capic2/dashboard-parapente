@@ -101,7 +101,7 @@ def get_wind_score_multiplier(favorability: str) -> float:
     return multipliers.get(favorability, 0.7)
 
 
-async def calculate_best_spot_from_cache(db: Session) -> Optional[Dict[str, Any]]:
+async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> Optional[Dict[str, Any]]:
     """
     Calculate the best spot based on cached weather data (from Redis)
     
@@ -117,6 +117,7 @@ async def calculate_best_spot_from_cache(db: Session) -> Optional[Dict[str, Any]
     
     Args:
         db: Database session
+        day_index: Day index (0=today, 1=tomorrow, ..., 6=in 6 days)
     
     Returns:
         Dict with best spot info or None if no data available
@@ -124,7 +125,7 @@ async def calculate_best_spot_from_cache(db: Session) -> Optional[Dict[str, Any]
     from weather_pipeline import get_normalized_forecast
     from para_index import calculate_para_index
     
-    logger.info("Calculating best spot from cached weather data...")
+    logger.info(f"Calculating best spot from cached weather data for day {day_index}...")
     
     try:
         # Get all sites
@@ -139,11 +140,11 @@ async def calculate_best_spot_from_cache(db: Session) -> Optional[Dict[str, Any]
         
         for site in sites:
             try:
-                # Fetch today's forecast from cache
+                # Fetch forecast for the specified day from cache
                 forecast = await get_normalized_forecast(
                     lat=site.latitude,
                     lon=site.longitude,
-                    day_index=0,
+                    day_index=day_index,
                     site_name=site.name,
                     elevation_m=site.elevation_m,
                     db=db
@@ -259,26 +260,27 @@ def degrees_to_cardinal(degrees: float) -> str:
     return dirs[ix % len(dirs)]
 
 
-async def calculate_best_spot_from_db(db: Session, forecast_date: Optional[date] = None) -> Optional[Dict[str, Any]]:
+async def calculate_best_spot_from_db(db: Session, day_index: int = 0) -> Optional[Dict[str, Any]]:
     """
     Calculate the best spot based on database forecasts
     
     Algorithm:
-    1. Get all sites with weather forecasts for today
+    1. Get all sites with weather forecasts for the specified day
     2. For each site, calculate score = Para-Index × wind_multiplier
     3. Return the site with highest score
     
     Args:
         db: Database session
-        forecast_date: Date to check (defaults to today)
+        day_index: Day index (0=today, 1=tomorrow, ..., 6=in 6 days)
     
     Returns:
         Dict with best spot info or None if no data available
     """
-    if forecast_date is None:
-        forecast_date = date.today()
+    from datetime import timedelta
     
-    logger.info(f"Calculating best spot for {forecast_date}...")
+    forecast_date = date.today() + timedelta(days=day_index)
+    
+    logger.info(f"Calculating best spot for day {day_index} ({forecast_date})...")
     
     try:
         # Get all sites with forecasts for the given date
@@ -374,7 +376,7 @@ async def calculate_best_spot_from_db(db: Session, forecast_date: Optional[date]
         return None
 
 
-async def get_best_spot_cached(db: Session) -> Optional[Dict[str, Any]]:
+async def get_best_spot_cached(db: Session, day_index: int = 0) -> Optional[Dict[str, Any]]:
     """
     Get best spot from cache or calculate if not cached
     
@@ -383,18 +385,22 @@ async def get_best_spot_cached(db: Session) -> Optional[Dict[str, Any]]:
     2. If not in cache or Redis unavailable, calculates from database
     3. Stores result in cache with TTL (if Redis available)
     
+    Args:
+        db: Database session
+        day_index: Day index (0=today, 1=tomorrow, ..., 6=in 6 days)
+    
     Returns:
         Best spot data or None
     """
     import json
     
-    cache_key = "best_spot:today"
+    cache_key = f"best_spot:day_{day_index}"
     get_redis_func, cache_ttl = get_cache_module()
     
     # If Redis is not available, just calculate directly
     if get_redis_func is None:
-        logger.info("Redis not available, calculating best spot directly...")
-        return await calculate_best_spot_from_cache(db)
+        logger.info(f"Redis not available, calculating best spot for day {day_index} directly...")
+        return await calculate_best_spot_from_cache(db, day_index)
     
     try:
         # Try to get from cache
@@ -402,12 +408,12 @@ async def get_best_spot_cached(db: Session) -> Optional[Dict[str, Any]]:
         cached_data = await redis.get(cache_key)
         
         if cached_data:
-            logger.info("✅ Best spot retrieved from cache")
+            logger.info(f"✅ Best spot for day {day_index} retrieved from cache")
             return json.loads(cached_data)
         
         # Not in cache, calculate
-        logger.info("Cache miss, calculating best spot...")
-        best_spot = await calculate_best_spot_from_cache(db)
+        logger.info(f"Cache miss, calculating best spot for day {day_index}...")
+        best_spot = await calculate_best_spot_from_cache(db, day_index)
         
         if best_spot and cache_ttl:
             # Store in cache
@@ -417,36 +423,38 @@ async def get_best_spot_cached(db: Session) -> Optional[Dict[str, Any]]:
                 ttl,
                 json.dumps(best_spot)
             )
-            logger.info(f"✅ Best spot cached for {ttl}s")
+            logger.info(f"✅ Best spot for day {day_index} cached for {ttl}s")
         
         return best_spot
         
     except Exception as e:
-        logger.error(f"Error in get_best_spot_cached: {e}", exc_info=True)
+        logger.error(f"Error in get_best_spot_cached for day {day_index}: {e}", exc_info=True)
         # Fallback: try to calculate without caching
-        return await calculate_best_spot_from_cache(db)
+        return await calculate_best_spot_from_cache(db, day_index)
 
 
 async def refresh_best_spot_cache(db: Session):
     """
-    Refresh the best spot cache (called by scheduler)
+    Refresh the best spot cache for today only (called by scheduler)
     
-    This should be called every hour when weather data is refreshed
+    This should be called every hour when weather data is refreshed.
+    Only day 0 (today) is pre-calculated and cached by the scheduler.
+    Other days (1-6) are calculated on-demand when requested via the API.
     """
-    logger.info("♻️ Refreshing best spot cache...")
+    logger.info("♻️ Refreshing best spot cache for today (day 0)...")
     
     get_redis_func, cache_ttl = get_cache_module()
     
     try:
-        # Calculate best spot
-        best_spot = await calculate_best_spot_from_cache(db)
+        # Calculate best spot for today only (day_index=0)
+        best_spot = await calculate_best_spot_from_cache(db, day_index=0)
         
         if best_spot:
             # Store in cache if Redis is available
             if get_redis_func and cache_ttl:
                 import json
                 redis = await get_redis_func()
-                cache_key = "best_spot:today"
+                cache_key = "best_spot:day_0"
                 ttl = cache_ttl.get("summary", 3600)
                 
                 await redis.setex(
@@ -454,11 +462,11 @@ async def refresh_best_spot_cache(db: Session):
                     ttl,
                     json.dumps(best_spot)
                 )
-                logger.info(f"✅ Best spot cache refreshed: {best_spot['site']['name']}")
+                logger.info(f"✅ Best spot cache refreshed for today: {best_spot['site']['name']}")
             else:
-                logger.info(f"✅ Best spot calculated (no cache): {best_spot['site']['name']}")
+                logger.info(f"✅ Best spot calculated for today (no cache): {best_spot['site']['name']}")
         else:
-            logger.warning("⚠️ No best spot calculated (no forecast data?)")
+            logger.warning("⚠️ No best spot calculated for today (no forecast data?)")
             
     except Exception as e:
         logger.error(f"Error refreshing best spot cache: {e}", exc_info=True)

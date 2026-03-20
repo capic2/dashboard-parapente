@@ -258,6 +258,31 @@ export const GeocodeResponseSchema = z.object({
 });
 
 // ============================================================================
+// BEST SPOT SCHEMAS
+// ============================================================================
+
+export const BestSpotSiteSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  code: z.string().optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  rating: z.number().nullable().optional(),
+  orientation: z.string().nullable().optional(),
+});
+
+export const BestSpotResultSchema = z.object({
+  site: BestSpotSiteSchema.nullable(),
+  paraIndex: z.number(),
+  windDirection: z.string().nullable().optional(),
+  windSpeed: z.number().nullable().optional(),
+  windFavorability: z.string().optional(),
+  score: z.number().optional(),
+  verdict: z.string().optional(),
+  reason: z.string(),
+});
+
+// ============================================================================
 // FLIGHT RECORDS SCHEMAS
 // ============================================================================
 
@@ -317,3 +342,5 @@ export type FlightRecord = z.infer<typeof FlightRecordSchema>;
 export type FlightRecords = z.infer<typeof FlightRecordsSchema>;
 export type GeoPoint = z.infer<typeof GeoPointSchema>;
 export type GPXData = z.infer<typeof GPXDataSchema>;
+export type BestSpotSite = z.infer<typeof BestSpotSiteSchema>;
+export type BestSpotResult = z.infer<typeof BestSpotResultSchema>;

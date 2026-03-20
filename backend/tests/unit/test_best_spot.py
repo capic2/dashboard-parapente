@@ -318,7 +318,7 @@ async def test_calculate_best_spot_from_db_specific_date(db_session, arguel_site
     db_session.add(forecast)
     db_session.commit()
     
-    result = await calculate_best_spot_from_db(db_session, forecast_date=tomorrow)
+    result = await calculate_best_spot_from_db(db_session, day_index=0)
     
     assert result is not None
     assert result["paraIndex"] == 70
@@ -484,3 +484,298 @@ def test_get_wind_favorability_boundary_angles():
     
     # Just outside moderate range (bad)
     # Note: This depends on exact implementation of angle difference
+
+
+# ============================================================================
+# DAY INDEX TESTS
+# ============================================================================
+
+@pytest.mark.asyncio
+async def test_get_best_spot_cached_day_0():
+    """Test fetching best spot for today (day 0)"""
+    from best_spot import get_best_spot_cached
+    
+    # Mock database
+    mock_db = MagicMock()
+    
+    # Mock sites
+    mock_site = MagicMock(spec=Site)
+    mock_site.id = "site-arguel"
+    mock_site.name = "Arguel"
+    mock_site.code = "arguel"
+    mock_site.latitude = 47.2369
+    mock_site.longitude = 6.0636
+    mock_site.orientation = "W"
+    mock_site.rating = 4
+    mock_site.elevation_m = 600
+    
+    mock_db.query.return_value.all.return_value = [mock_site]
+    
+    # Mock weather forecast
+    mock_forecast = {
+        "success": True,
+        "consensus": [
+            {"hour": 12, "wind_speed": 15, "wind_direction": 270}
+        ]
+    }
+    
+    with patch('weather_pipeline.get_normalized_forecast', new_callable=AsyncMock) as mock_weather:
+        with patch('para_index.calculate_para_index') as mock_para:
+            with patch('best_spot.get_cache_module') as mock_cache_module:
+                # Setup mocks
+                mock_weather.return_value = mock_forecast
+                mock_para.return_value = {"para_index": 75, "verdict": "BON"}
+                mock_cache_module.return_value = (None, None)  # No Redis
+                
+                # Call function with day_index=0
+                result = await get_best_spot_cached(mock_db, day_index=0)
+                
+                # Verify
+                assert result is not None
+                assert result['site']['name'] == "Arguel"
+                assert result['paraIndex'] == 75
+                
+                # Verify that get_normalized_forecast was called with day_index=0
+                mock_weather.assert_called_once()
+                call_args = mock_weather.call_args
+                assert call_args[1]['day_index'] == 0
+
+
+@pytest.mark.asyncio
+async def test_get_best_spot_cached_day_3():
+    """Test fetching best spot for day 3"""
+    from best_spot import get_best_spot_cached
+    
+    # Mock database
+    mock_db = MagicMock()
+    
+    mock_site = MagicMock(spec=Site)
+    mock_site.id = "site-arguel"
+    mock_site.name = "Arguel"
+    mock_site.code = "arguel"
+    mock_site.latitude = 47.2369
+    mock_site.longitude = 6.0636
+    mock_site.orientation = "W"
+    mock_site.rating = 4
+    mock_site.elevation_m = 600
+    
+    mock_db.query.return_value.all.return_value = [mock_site]
+    
+    mock_forecast = {
+        "success": True,
+        "consensus": [
+            {"hour": 12, "wind_speed": 12, "wind_direction": 270}
+        ]
+    }
+    
+    with patch('weather_pipeline.get_normalized_forecast', new_callable=AsyncMock) as mock_weather:
+        with patch('para_index.calculate_para_index') as mock_para:
+            with patch('best_spot.get_cache_module') as mock_cache_module:
+                mock_weather.return_value = mock_forecast
+                mock_para.return_value = {"para_index": 65, "verdict": "MOYEN"}
+                mock_cache_module.return_value = (None, None)
+                
+                # Call with day_index=3
+                result = await get_best_spot_cached(mock_db, day_index=3)
+                
+                assert result is not None
+                assert result['paraIndex'] == 65
+                
+                # Verify day_index=3 was passed
+                call_args = mock_weather.call_args
+                assert call_args[1]['day_index'] == 3
+
+
+@pytest.mark.asyncio
+async def test_cache_key_per_day():
+    """Test that each day has its own cache key"""
+    from best_spot import get_best_spot_cached
+    
+    # Mock database
+    mock_db = MagicMock()
+    
+    mock_site = MagicMock(spec=Site)
+    mock_site.id = "site-arguel"
+    mock_site.name = "Arguel"
+    mock_site.code = "arguel"
+    mock_site.latitude = 47.2369
+    mock_site.longitude = 6.0636
+    mock_site.orientation = "W"
+    mock_site.rating = 4
+    mock_site.elevation_m = 600
+    
+    mock_db.query.return_value.all.return_value = [mock_site]
+    
+    mock_forecast = {
+        "success": True,
+        "consensus": [{"hour": 12, "wind_speed": 15, "wind_direction": 270}]
+    }
+    
+    mock_redis = AsyncMock()
+    mock_redis.get = AsyncMock(return_value=None)
+    mock_redis.setex = AsyncMock()
+    
+    async def get_redis_func():
+        return mock_redis
+    
+    cache_ttl = {"summary": 3600}
+    
+    with patch('weather_pipeline.get_normalized_forecast', new_callable=AsyncMock) as mock_weather:
+        with patch('para_index.calculate_para_index') as mock_para:
+            with patch('best_spot.get_cache_module') as mock_cache_module:
+                mock_weather.return_value = mock_forecast
+                mock_para.return_value = {"para_index": 75, "verdict": "BON"}
+                mock_cache_module.return_value = (get_redis_func, cache_ttl)
+                
+                # Fetch day 0
+                await get_best_spot_cached(mock_db, day_index=0)
+                
+                # Check cache key for day 0
+                calls = mock_redis.get.call_args_list
+                assert any("best_spot:day_0" in str(call) for call in calls)
+                
+                # Reset mock
+                mock_redis.reset_mock()
+                
+                # Fetch day 3
+                await get_best_spot_cached(mock_db, day_index=3)
+                
+                # Check cache key for day 3
+                calls = mock_redis.get.call_args_list
+                assert any("best_spot:day_3" in str(call) for call in calls)
+
+
+@pytest.mark.asyncio
+async def test_refresh_cache_only_day_0():
+    """Test that scheduler only refreshes day 0 (today)"""
+    from best_spot import refresh_best_spot_cache
+    
+    # Mock database
+    mock_db = MagicMock()
+    
+    mock_site = MagicMock(spec=Site)
+    mock_site.id = "site-arguel"
+    mock_site.name = "Arguel"
+    mock_site.code = "arguel"
+    mock_site.latitude = 47.2369
+    mock_site.longitude = 6.0636
+    mock_site.orientation = "W"
+    mock_site.rating = 4
+    mock_site.elevation_m = 600
+    
+    mock_db.query.return_value.all.return_value = [mock_site]
+    
+    mock_forecast = {
+        "success": True,
+        "consensus": [{"hour": 12, "wind_speed": 15, "wind_direction": 270}]
+    }
+    
+    mock_redis = AsyncMock()
+    mock_redis.setex = AsyncMock()
+    
+    async def get_redis_func():
+        return mock_redis
+    
+    cache_ttl = {"summary": 3600}
+    
+    with patch('weather_pipeline.get_normalized_forecast', new_callable=AsyncMock) as mock_weather:
+        with patch('para_index.calculate_para_index') as mock_para:
+            with patch('best_spot.get_cache_module') as mock_cache_module:
+                mock_weather.return_value = mock_forecast
+                mock_para.return_value = {"para_index": 75, "verdict": "BON"}
+                mock_cache_module.return_value = (get_redis_func, cache_ttl)
+                
+                # Call refresh
+                await refresh_best_spot_cache(mock_db)
+                
+                # Verify setex was called with day_0 key
+                mock_redis.setex.assert_called_once()
+                call_args = mock_redis.setex.call_args
+                assert call_args[0][0] == "best_spot:day_0"
+                
+                # Verify get_normalized_forecast was called with day_index=0
+                mock_weather.assert_called_once()
+                weather_call_args = mock_weather.call_args
+                assert weather_call_args[1]['day_index'] == 0
+
+
+@pytest.mark.asyncio
+async def test_calculate_best_spot_multiple_days_different_results():
+    """Test that different days can have different best spots"""
+    from best_spot import calculate_best_spot_from_cache
+    
+    # Mock database
+    mock_db = MagicMock()
+    
+    # Create two sites
+    site1 = MagicMock(spec=Site)
+    site1.id = "site-arguel"
+    site1.name = "Arguel"
+    site1.code = "arguel"
+    site1.latitude = 47.2369
+    site1.longitude = 6.0636
+    site1.orientation = "W"
+    site1.rating = 4
+    site1.elevation_m = 600
+    
+    site2 = MagicMock(spec=Site)
+    site2.id = "site-mont-poupet"
+    site2.name = "Mont Poupet"
+    site2.code = "mont-poupet"
+    site2.latitude = 46.8
+    site2.longitude = 5.9
+    site2.orientation = "E"
+    site2.rating = 5
+    site2.elevation_m = 800
+    
+    mock_db.query.return_value.all.return_value = [site1, site2]
+    
+    # Mock different forecasts for different days
+    def mock_weather_func(lat, lon, day_index, **kwargs):
+        if day_index == 0:
+            # Day 0: Better conditions at Arguel (W wind)
+            if lat == site1.latitude:
+                return {
+                    "success": True,
+                    "consensus": [{"hour": 12, "wind_speed": 15, "wind_direction": 270}]  # W
+                }
+            else:
+                return {
+                    "success": True,
+                    "consensus": [{"hour": 12, "wind_speed": 15, "wind_direction": 270}]  # W (bad for E site)
+                }
+        else:  # day_index == 3
+            # Day 3: Better conditions at Mont Poupet (E wind)
+            if lat == site2.latitude:
+                return {
+                    "success": True,
+                    "consensus": [{"hour": 12, "wind_speed": 15, "wind_direction": 90}]  # E
+                }
+            else:
+                return {
+                    "success": True,
+                    "consensus": [{"hour": 12, "wind_speed": 15, "wind_direction": 90}]  # E (bad for W site)
+                }
+    
+    with patch('weather_pipeline.get_normalized_forecast', new_callable=AsyncMock) as mock_weather:
+        with patch('para_index.calculate_para_index') as mock_para:
+            mock_weather.side_effect = mock_weather_func
+            mock_para.return_value = {"para_index": 70, "verdict": "BON"}
+            
+            # Calculate for day 0
+            result_day_0 = await calculate_best_spot_from_cache(mock_db, day_index=0)
+            
+            # Calculate for day 3
+            result_day_3 = await calculate_best_spot_from_cache(mock_db, day_index=3)
+            
+            # Both should return results
+            assert result_day_0 is not None
+            assert result_day_3 is not None
+            
+            # The best sites should be different based on wind direction
+            # (This test assumes wind favorability logic works correctly)
+            # Day 0 with W wind should favor W-oriented site (Arguel)
+            # Day 3 with E wind should favor E-oriented site (Mont Poupet)
+            assert result_day_0["site"]["name"] == "Arguel"
+            assert result_day_3["site"]["name"] == "Mont Poupet"
+            assert result_day_0["site"]["name"] != result_day_3["site"]["name"]
