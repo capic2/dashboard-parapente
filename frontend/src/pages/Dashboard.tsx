@@ -75,14 +75,17 @@ export default function Dashboard() {
   return (
     <div>
       <div className="space-y-4">
-        {/* Row 1: 7-Day Forecast (full width) - EN HAUT */}
+        {/* Row 1: Stats Panel (full width) - Juste en dessous du header */}
+        <StatsPanel />
+
+        {/* Row 2: 7-Day Forecast (full width) */}
         <Forecast7Day 
           spotId={selectedSiteId}
           selectedDayIndex={selectedDayIndex}
           onSelectDay={handleSelectDay}
         />
 
-        {/* Row 2: Best Spot Suggestion - Loaded from backend API (cached) */}
+        {/* Row 3: Best Spot Suggestion - Loaded from backend API (cached) */}
         {!bestSpotLoading && !bestSpotError && bestSpot && (
           <BestSpotSuggestion 
             bestSpot={bestSpot}
@@ -91,14 +94,14 @@ export default function Dashboard() {
           />
         )}
         
-        {/* Row 3: Site Selector */}
+        {/* Row 4: Site Selector */}
         <SiteSelector 
           selectedSiteId={selectedSiteId}
           onSelectSite={setSelectedSiteId}
           weatherData={weatherDataMap}
         />
 
-        {/* Row 4: Current Conditions + Emagram Widget (1/3 - 2/3) */}
+        {/* Row 5: Current Conditions + Emagram Widget (1/3 - 2/3) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-1">
             <CurrentConditions spotId={selectedSiteId} />
@@ -107,9 +110,6 @@ export default function Dashboard() {
             <EmagramWidget userLat={userLat} userLon={userLon} />
           </div>
         </div>
-
-        {/* Row 5: Stats Panel (full width) */}
-        <StatsPanel />
 
         {/* Row 6: Hourly Forecast (full width) */}
         <HourlyForecast spotId={selectedSiteId} dayIndex={selectedDayIndex} />
