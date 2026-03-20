@@ -59,7 +59,9 @@ jobs:
             --cov-fail-under=40
         env:
           TESTING: true
-          DATABASE_URL: sqlite:///./test.db
+          BACKEND_DATABASE_URL: sqlite:///./test.db
+          BACKEND_WEATHERAPI_KEY: test_key
+          BACKEND_METEOBLUE_API_KEY: test_key
       
       - name: 📊 Upload coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -96,7 +98,7 @@ jobs:
       - name: 🐍 Set up Python 3.12
         uses: actions/setup-python@v6
         with:
-          python-version: '3.14'
+          python-version: '3.12'
           cache: 'pip'
           cache-dependency-path: backend/requirements.txt
       
@@ -118,9 +120,9 @@ jobs:
             --tb=short \
             --no-cov
         env:
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          WEATHERAPI_KEY: ${{ secrets.WEATHERAPI_KEY }}
+          BACKEND_GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          BACKEND_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BACKEND_WEATHERAPI_KEY: ${{ secrets.WEATHERAPI_KEY }}
         continue-on-error: true
 
   lint:
@@ -138,7 +140,7 @@ jobs:
       - name: 🐍 Set up Python 3.12
         uses: actions/setup-python@v6
         with:
-          python-version: '3.14'
+          python-version: '3.12'
       
       - name: 📦 Install linting tools
         run: |

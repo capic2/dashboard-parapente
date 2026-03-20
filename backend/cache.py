@@ -45,11 +45,11 @@ async def get_redis() -> Any:
     global _redis_pool
     
     if _redis_pool is None:
+        from config import USE_FAKE_REDIS, REDIS_HOST, REDIS_PORT
         environment = os.getenv("ENVIRONMENT", "production")
-        use_fake_redis = os.getenv("USE_FAKE_REDIS", "true").lower() == "true"
         
         # Use fakeredis in development/test mode (unless explicitly disabled)
-        if environment in ["development", "test"] and use_fake_redis:
+        if environment in ["development", "test"] and USE_FAKE_REDIS:
             try:
                 from fakeredis import FakeAsyncRedis
                 _redis_pool = FakeAsyncRedis(decode_responses=True)
@@ -57,26 +57,22 @@ async def get_redis() -> Any:
                 return _redis_pool  # Skip ping test for FakeRedis
             except ImportError:
                 logger.warning("fakeredis not installed, falling back to real Redis. Install with: pip install fakeredis")
-                use_fake_redis = False
         
         # Use real Redis in production or if fakeredis is disabled/unavailable
-        if not use_fake_redis or environment not in ["development", "test"]:
+        if not USE_FAKE_REDIS or environment not in ["development", "test"]:
             # Import redis only when needed
             import redis.asyncio as redis_module
             
-            redis_host = os.getenv("REDIS_HOST", "localhost")
-            redis_port = int(os.getenv("REDIS_PORT", "6379"))
-            
             # Debug: show what we're trying to connect to
             logger.info(f"Environment: {environment}")
-            logger.info(f"USE_FAKE_REDIS: {os.getenv('USE_FAKE_REDIS', 'not set')}")
-            logger.info(f"REDIS_HOST: {os.getenv('REDIS_HOST', 'not set (defaulting to localhost)')}")
-            logger.info(f"REDIS_PORT: {os.getenv('REDIS_PORT', 'not set (defaulting to 6379)')}")
-            logger.info(f"Connecting to Redis at {redis_host}:{redis_port}")
+            logger.info(f"USE_FAKE_REDIS: {USE_FAKE_REDIS}")
+            logger.info(f"REDIS_HOST: {REDIS_HOST}")
+            logger.info(f"REDIS_PORT: {REDIS_PORT}")
+            logger.info(f"Connecting to Redis at {REDIS_HOST}:{REDIS_PORT}")
             
             _redis_pool = redis_module.Redis(
-                host=redis_host,
-                port=redis_port,
+                host=REDIS_HOST,
+                port=REDIS_PORT,
                 db=0,
                 decode_responses=True,
                 socket_connect_timeout=5,
@@ -90,7 +86,7 @@ async def get_redis() -> Any:
             for attempt in range(max_retries):
                 try:
                     await _redis_pool.ping()
-                    logger.info(f"✅ Redis connection established successfully at {redis_host}:{redis_port}")
+                    logger.info(f"✅ Redis connection established successfully at {REDIS_HOST}:{REDIS_PORT}")
                     break
                 except Exception as e:
                     if attempt < max_retries - 1:

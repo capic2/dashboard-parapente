@@ -8,7 +8,14 @@ from pathlib import Path
 
 # Set testing mode before importing config
 os.environ["TESTING"] = "true"
-os.environ["USE_FAKE_REDIS"] = "true"
+os.environ["BACKEND_USE_FAKE_REDIS"] = "true"
+
+# Set dummy API keys for tests
+os.environ["BACKEND_WEATHERAPI_KEY"] = "test_weather_key"
+os.environ["BACKEND_METEOBLUE_API_KEY"] = "test_meteoblue_key"
+os.environ["BACKEND_GOOGLE_API_KEY"] = "test_google_key"
+os.environ["BACKEND_STRAVA_CLIENT_ID"] = "test_strava_client"
+os.environ["BACKEND_STRAVA_CLIENT_SECRET"] = "test_strava_secret"
 
 # Add backend dir to Python path
 sys.path.insert(0, str(Path(__file__).parent))

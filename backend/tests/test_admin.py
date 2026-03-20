@@ -59,30 +59,41 @@ class TestAdminEndpoints:
         count_after = db_session.query(EmagramAnalysis).count()
         assert count_after == 0
     
-    def test_debug_gemini_no_api_key(self, client, monkeypatch):
+    def test_debug_gemini_no_api_key(self, client):
         """Debug Gemini when API key is not set or package not installed"""
-        monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+        # Test by temporarily removing the API key from config
+        import config
+        from unittest.mock import patch
         
-        response = client.get("/api/admin/debug/gemini")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is False
-        # Could fail due to missing package OR missing API key
-        assert ("GOOGLE_API_KEY not set" in data["error"] or 
-                "package not installed" in data["error"])
+        # Save original value
+        original_key = config.GOOGLE_API_KEY
+        
+        try:
+            # Temporarily set to None
+            config.GOOGLE_API_KEY = None
+            
+            response = client.get("/api/admin/debug/gemini")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is False
+            # Could fail due to missing package OR missing API key
+            assert ("GOOGLE_API_KEY not set" in data["error"] or 
+                    "BACKEND_GOOGLE_API_KEY not set" in data["error"] or
+                    "package not installed" in data["error"])
+        finally:
+            # Restore original value
+            config.GOOGLE_API_KEY = original_key
     
     @pytest.mark.integration
-    def test_debug_gemini_with_api_key(self, client, monkeypatch):
+    def test_debug_gemini_with_api_key(self, client):
         """Debug Gemini with API key (integration test)"""
         # This test requires a real API key
         import os
-        api_key = os.getenv("GOOGLE_API_KEY")
+        api_key = os.getenv("BACKEND_GOOGLE_API_KEY")
         if not api_key:
-            pytest.skip("GOOGLE_API_KEY not set")
+            pytest.skip("BACKEND_GOOGLE_API_KEY not set")
         
-        monkeypatch.setenv("GOOGLE_API_KEY", api_key)
-        monkeypatch.setenv("GEMINI_MODEL", "gemini-2.5-flash")
-        
+        # No patching needed - use the real config values loaded from env
         response = client.get("/api/admin/debug/gemini")
         assert response.status_code == 200
         data = response.json()

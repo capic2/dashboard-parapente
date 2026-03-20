@@ -3982,13 +3982,16 @@ async def debug_gemini_api():
         }
     
     try:
-        api_key = os.getenv("GOOGLE_API_KEY")
-        model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        from config import GOOGLE_API_KEY, GEMINI_MODEL
+        
+        # Create local aliases for the success response
+        api_key = GOOGLE_API_KEY
+        model_name = GEMINI_MODEL
         
         if not api_key:
             return {
                 "success": False,
-                "error": "GOOGLE_API_KEY not set in environment"
+                "error": "BACKEND_GOOGLE_API_KEY not set in environment"
             }
         
         # Configure and test

@@ -15,7 +15,6 @@ import hashlib
 import uuid
 from datetime import datetime, date
 import logging
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -23,18 +22,11 @@ from database import get_db, SessionLocal
 from models import Flight, Site
 from strava import download_gpx, parse_gpx, get_activity_details
 from routes import calculate_max_speed, parse_gpx_file_from_string
+from config import STRAVA_VERIFY_TOKEN, STRAVA_CLIENT_SECRET, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
-
-# Strava webhook verification token
-STRAVA_VERIFY_TOKEN = os.getenv("STRAVA_VERIFY_TOKEN", "PARAPENTE_2025")
-STRAVA_CLIENT_SECRET = os.getenv("STRAVA_CLIENT_SECRET", "")
-
-# Telegram notification settings
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "721260037")  # Vincent's ID
 
 
 @router.get("/strava")

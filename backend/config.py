@@ -42,53 +42,66 @@ else:
 # ============================================================================
 # DATABASE
 # ============================================================================
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./db/dashboard.db")
+DATABASE_URL = os.getenv("BACKEND_DATABASE_URL", "sqlite:///./db/dashboard.db")
 
 # ============================================================================
 # REDIS
 # ============================================================================
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
-USE_FAKE_REDIS = os.getenv("USE_FAKE_REDIS", "true").lower() == "true"
-
-# ============================================================================
-# WEATHER API KEYS
-# ============================================================================
-WEATHERAPI_KEY = os.getenv("WEATHERAPI_KEY")
-METEOBLUE_API_KEY = os.getenv("METEOBLUE_API_KEY")
-
-# ============================================================================
-# STRAVA OAUTH
-# ============================================================================
-STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
-STRAVA_CLIENT_SECRET = os.getenv("STRAVA_CLIENT_SECRET")
-STRAVA_REFRESH_TOKEN = os.getenv("STRAVA_REFRESH_TOKEN")
-STRAVA_ACCESS_TOKEN = os.getenv("STRAVA_ACCESS_TOKEN")
-
-# ============================================================================
-# SCHEDULER
-# ============================================================================
-SCHEDULER_ENABLED = os.getenv("SCHEDULER_ENABLED", "true").lower() == "true"
-SCHEDULER_INTERVAL_MINUTES = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", "30"))
-
-# ============================================================================
-# LOGGING
-# ============================================================================
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-LOG_FILE = os.getenv("LOG_FILE", "logs/dashboard.log")
+REDIS_HOST = os.getenv("BACKEND_REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("BACKEND_REDIS_PORT", "6379"))
+USE_FAKE_REDIS = os.getenv("BACKEND_USE_FAKE_REDIS", "true").lower() == "true"
 
 # ============================================================================
 # API
 # ============================================================================
-API_HOST = os.getenv("API_HOST", "0.0.0.0")
-API_PORT = int(os.getenv("API_PORT", "8000"))
-API_DEBUG = os.getenv("API_DEBUG", "false").lower() == "true"
+API_HOST = os.getenv("BACKEND_API_HOST", "0.0.0.0")
+API_PORT = int(os.getenv("BACKEND_API_PORT", "8001"))
+API_DEBUG = os.getenv("BACKEND_API_DEBUG", "false").lower() == "true"
+
+# ============================================================================
+# WEATHER API KEYS
+# ============================================================================
+WEATHERAPI_KEY = os.getenv("BACKEND_WEATHERAPI_KEY")
+METEOBLUE_API_KEY = os.getenv("BACKEND_METEOBLUE_API_KEY")
+
+# ============================================================================
+# STRAVA OAUTH
+# ============================================================================
+STRAVA_CLIENT_ID = os.getenv("BACKEND_STRAVA_CLIENT_ID")
+STRAVA_CLIENT_SECRET = os.getenv("BACKEND_STRAVA_CLIENT_SECRET")
+STRAVA_REFRESH_TOKEN = os.getenv("BACKEND_STRAVA_REFRESH_TOKEN")
+STRAVA_ACCESS_TOKEN = os.getenv("BACKEND_STRAVA_ACCESS_TOKEN")
+STRAVA_VERIFY_TOKEN = os.getenv("BACKEND_STRAVA_VERIFY_TOKEN")
+
+# ============================================================================
+# AI ANALYSIS
+# ============================================================================
+GOOGLE_API_KEY = os.getenv("BACKEND_GOOGLE_API_KEY")
+GEMINI_MODEL = os.getenv("BACKEND_GEMINI_MODEL", "gemini-2.5-flash")
+ANTHROPIC_API_KEY = os.getenv("BACKEND_ANTHROPIC_API_KEY")
+
+# ============================================================================
+# SCHEDULER
+# ============================================================================
+SCHEDULER_ENABLED = os.getenv("BACKEND_SCHEDULER_ENABLED", "true").lower() == "true"
+SCHEDULER_INTERVAL_MINUTES = int(os.getenv("BACKEND_SCHEDULER_INTERVAL_MINUTES", "30"))
+
+# ============================================================================
+# LOGGING
+# ============================================================================
+LOG_LEVEL = os.getenv("BACKEND_LOG_LEVEL", "INFO")
+LOG_FILE = os.getenv("BACKEND_LOG_FILE", "logs/dashboard.log")
 
 # ============================================================================
 # TELEGRAM (Optional)
 # ============================================================================
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+TELEGRAM_BOT_TOKEN = os.getenv("BACKEND_TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("BACKEND_TELEGRAM_CHAT_ID")
+
+# ============================================================================
+# FRONTEND URL (Optional)
+# ============================================================================
+FRONTEND_URL = os.getenv("BACKEND_FRONTEND_URL")
 
 # ============================================================================
 # VALIDATION
@@ -102,8 +115,15 @@ if not TESTING:
     
     if not METEOBLUE_API_KEY:
         logger.warning("⚠️ METEOBLUE_API_KEY is missing")
+    
+    if not STRAVA_VERIFY_TOKEN:
+        logger.error("❌ STRAVA_VERIFY_TOKEN is required")
+        raise ValueError("BACKEND_STRAVA_VERIFY_TOKEN environment variable is required")
 else:
     logger.info("🧪 Testing mode: API key validation skipped")
+    # In test mode, provide a default verify token to avoid breaking tests
+    if not STRAVA_VERIFY_TOKEN:
+        STRAVA_VERIFY_TOKEN = "PARAPENTE_2025"
 
 # Log Strava credentials status
 if STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET and STRAVA_REFRESH_TOKEN:

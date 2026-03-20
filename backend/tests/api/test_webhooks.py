@@ -408,51 +408,31 @@ async def test_process_strava_activity_api_failure(db_session):
 async def test_send_telegram_notification_new_flight(sample_flight):
     """Test Telegram notification for new flight"""
     
-    # Patch environment variables AND reload the module to pick them up
-    import os
-    old_token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    old_chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    # Create proper mock for async context manager
+    mock_post = AsyncMock()
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_post.return_value = mock_response
     
-    try:
-        os.environ["TELEGRAM_BOT_TOKEN"] = "test-token"
-        os.environ["TELEGRAM_CHAT_ID"] = "123"
+    mock_client_instance = MagicMock()
+    mock_client_instance.post = mock_post
+    mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+    mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+    
+    # Patch both the config variables and httpx
+    with patch("webhooks.TELEGRAM_BOT_TOKEN", "test-token"), \
+         patch("webhooks.TELEGRAM_CHAT_ID", "123"), \
+         patch("httpx.AsyncClient", return_value=mock_client_instance):
         
-        # Reload webhooks module to pick up new env vars
-        import importlib
-        import webhooks as webhooks_module
-        importlib.reload(webhooks_module)
-        from webhooks import send_telegram_notification
+        await send_telegram_notification(sample_flight, is_new=True)
         
-        with patch("httpx.AsyncClient") as mock_client:
-            mock_response = MagicMock()
-            mock_response.raise_for_status = MagicMock()
-            
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
-                return_value=mock_response
-            )
-            
-            await send_telegram_notification(sample_flight, is_new=True)
-            
-            # Verify API was called
-            mock_client.return_value.__aenter__.return_value.post.assert_called_once()
-            
-            # Check call arguments
-            call_args = mock_client.return_value.__aenter__.return_value.post.call_args
-            assert "api.telegram.org" in call_args[0][0]
-            assert "NOUVEAU VOL" in call_args[1]["json"]["text"]
-    finally:
-        # Restore original env vars
-        if old_token is None:
-            os.environ.pop("TELEGRAM_BOT_TOKEN", None)
-        else:
-            os.environ["TELEGRAM_BOT_TOKEN"] = old_token
-        if old_chat_id is None:
-            os.environ.pop("TELEGRAM_CHAT_ID", None)
-        else:
-            os.environ["TELEGRAM_CHAT_ID"] = old_chat_id
+        # Verify API was called
+        mock_post.assert_called_once()
         
-        # Reload again to restore original state
-        importlib.reload(webhooks_module)
+        # Check call arguments
+        call_args = mock_post.call_args
+        assert "api.telegram.org" in call_args[0][0]
+        assert "NOUVEAU VOL" in call_args[1]["json"]["text"]
 
 
 @pytest.mark.asyncio

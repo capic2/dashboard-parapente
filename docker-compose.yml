@@ -34,32 +34,52 @@ services:
     ports:
       - "8001:8001"
     environment:
-      # Application
+      # Global
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
       
-      # Redis
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - USE_FAKE_REDIS=${USE_FAKE_REDIS:-false}
+      # Backend - Database
+      - BACKEND_DATABASE_URL=${BACKEND_DATABASE_URL:-sqlite:///./db/dashboard.db}
       
-      # Weather API Keys (set in Portainer)
-      - WEATHERAPI_KEY=${WEATHERAPI_KEY}
-      - METEOBLUE_API_KEY=${METEOBLUE_API_KEY}
+      # Backend - Redis
+      - BACKEND_REDIS_HOST=redis
+      - BACKEND_REDIS_PORT=6379
+      - BACKEND_USE_FAKE_REDIS=${BACKEND_USE_FAKE_REDIS:-false}
       
-      # Google Gemini API (for emagram analysis)
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      # Backend - API
+      - BACKEND_API_HOST=${BACKEND_API_HOST:-0.0.0.0}
+      - BACKEND_API_PORT=${BACKEND_API_PORT:-8001}
+      - BACKEND_API_DEBUG=${BACKEND_API_DEBUG:-false}
       
-      # Strava OAuth (set in Portainer)
-      - STRAVA_CLIENT_ID=${STRAVA_CLIENT_ID}
-      - STRAVA_CLIENT_SECRET=${STRAVA_CLIENT_SECRET}
-      - STRAVA_REFRESH_TOKEN=${STRAVA_REFRESH_TOKEN}
-      - STRAVA_ACCESS_TOKEN=${STRAVA_ACCESS_TOKEN}
+      # Backend - Weather API Keys (set in Portainer)
+      - BACKEND_WEATHERAPI_KEY=${BACKEND_WEATHERAPI_KEY}
+      - BACKEND_METEOBLUE_API_KEY=${BACKEND_METEOBLUE_API_KEY}
       
-      # Scheduler
-      - SCHEDULER_ENABLED=${SCHEDULER_ENABLED:-true}
-      - SCHEDULER_INTERVAL_MINUTES=${SCHEDULER_INTERVAL_MINUTES:-30}
+      # Backend - AI Analysis
+      - BACKEND_GOOGLE_API_KEY=${BACKEND_GOOGLE_API_KEY}
+      - BACKEND_GEMINI_MODEL=${BACKEND_GEMINI_MODEL:-gemini-2.5-flash}
+      - BACKEND_ANTHROPIC_API_KEY=${BACKEND_ANTHROPIC_API_KEY}
+      
+      # Backend - Strava OAuth (set in Portainer)
+      - BACKEND_STRAVA_CLIENT_ID=${BACKEND_STRAVA_CLIENT_ID}
+      - BACKEND_STRAVA_CLIENT_SECRET=${BACKEND_STRAVA_CLIENT_SECRET}
+      - BACKEND_STRAVA_REFRESH_TOKEN=${BACKEND_STRAVA_REFRESH_TOKEN}
+      - BACKEND_STRAVA_ACCESS_TOKEN=${BACKEND_STRAVA_ACCESS_TOKEN}
+      - BACKEND_STRAVA_VERIFY_TOKEN=${BACKEND_STRAVA_VERIFY_TOKEN:-PARAPENTE_2025}
+      
+      # Backend - Scheduler
+      - BACKEND_SCHEDULER_ENABLED=${BACKEND_SCHEDULER_ENABLED:-true}
+      - BACKEND_SCHEDULER_INTERVAL_MINUTES=${BACKEND_SCHEDULER_INTERVAL_MINUTES:-30}
+      
+      # Backend - Logging
+      - BACKEND_LOG_LEVEL=${BACKEND_LOG_LEVEL:-INFO}
+      - BACKEND_LOG_FILE=${BACKEND_LOG_FILE:-logs/dashboard.log}
+      
+      # Backend - Telegram (optional)
+      - BACKEND_TELEGRAM_BOT_TOKEN=${BACKEND_TELEGRAM_BOT_TOKEN}
+      - BACKEND_TELEGRAM_CHAT_ID=${BACKEND_TELEGRAM_CHAT_ID}
+      
+      # Backend - Frontend URL
+      - BACKEND_FRONTEND_URL=${BACKEND_FRONTEND_URL}
     depends_on:
       redis:
         condition: service_healthy
