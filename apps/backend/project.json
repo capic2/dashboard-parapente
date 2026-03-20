@@ -25,7 +25,7 @@
       "outputs": ["{workspaceRoot}/coverage/apps/backend"],
       "options": {
         "commands": [
-          ".venv/bin/pytest tests/ -m 'not integration and not slow' -v --cov=. --cov-config=.coveragerc --cov-report=term-missing --cov-report=xml --cov-fail-under=40"
+          "command -v .venv/bin/pytest >/dev/null 2>&1 && PYTEST=.venv/bin/pytest || PYTEST=pytest; $PYTEST tests/ -m 'not integration and not slow' -v --cov=. --cov-config=.coveragerc --cov-report=term-missing --cov-report=xml --cov-fail-under=40"
         ],
         "cwd": "apps/backend",
         "env": {
@@ -39,7 +39,7 @@
     "test:integration": {
       "executor": "nx:run-commands",
       "options": {
-        "command": ".venv/bin/pytest tests/ -m integration -v --tb=short --no-cov",
+        "command": "command -v .venv/bin/pytest >/dev/null 2>&1 && PYTEST=.venv/bin/pytest || PYTEST=pytest; $PYTEST tests/ -m integration -v --tb=short --no-cov",
         "cwd": "apps/backend"
       }
     },
@@ -47,9 +47,9 @@
       "executor": "nx:run-commands",
       "options": {
         "commands": [
-          ".venv/bin/ruff check . --output-format=github",
-          ".venv/bin/black --check --diff .",
-          ".venv/bin/isort --check-only --diff ."
+          "command -v .venv/bin/ruff >/dev/null 2>&1 && RUFF=.venv/bin/ruff || RUFF=ruff; $RUFF check . --output-format=github",
+          "command -v .venv/bin/black >/dev/null 2>&1 && BLACK=.venv/bin/black || BLACK=black; $BLACK --check --diff .",
+          "command -v .venv/bin/isort >/dev/null 2>&1 && ISORT=.venv/bin/isort || ISORT=isort; $ISORT --check-only --diff ."
         ],
         "cwd": "apps/backend",
         "parallel": false
