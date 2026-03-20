@@ -4,13 +4,15 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import cesium from 'vite-plugin-cesium';
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
+import path from 'path';
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
+  root: __dirname,
   plugins: [
     TanStackRouterVite({
-      routesDirectory: './src/routes',
-      generatedRouteTree: './src/routeTree.gen.ts',
+      routesDirectory: path.resolve(__dirname, './src/routes'),
+      generatedRouteTree: path.resolve(__dirname, './src/routeTree.gen.ts'),
       quoteStyle: 'single',
     }),
     react(),
