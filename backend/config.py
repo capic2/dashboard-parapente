@@ -71,7 +71,7 @@ STRAVA_CLIENT_ID = os.getenv("BACKEND_STRAVA_CLIENT_ID")
 STRAVA_CLIENT_SECRET = os.getenv("BACKEND_STRAVA_CLIENT_SECRET")
 STRAVA_REFRESH_TOKEN = os.getenv("BACKEND_STRAVA_REFRESH_TOKEN")
 STRAVA_ACCESS_TOKEN = os.getenv("BACKEND_STRAVA_ACCESS_TOKEN")
-STRAVA_VERIFY_TOKEN = os.getenv("BACKEND_STRAVA_VERIFY_TOKEN", "PARAPENTE_2025")
+STRAVA_VERIFY_TOKEN = os.getenv("BACKEND_STRAVA_VERIFY_TOKEN")
 
 # ============================================================================
 # AI ANALYSIS
@@ -115,8 +115,15 @@ if not TESTING:
     
     if not METEOBLUE_API_KEY:
         logger.warning("⚠️ METEOBLUE_API_KEY is missing")
+    
+    if not STRAVA_VERIFY_TOKEN:
+        logger.error("❌ STRAVA_VERIFY_TOKEN is required")
+        raise ValueError("BACKEND_STRAVA_VERIFY_TOKEN environment variable is required")
 else:
     logger.info("🧪 Testing mode: API key validation skipped")
+    # In test mode, provide a default verify token to avoid breaking tests
+    if not STRAVA_VERIFY_TOKEN:
+        STRAVA_VERIFY_TOKEN = "PARAPENTE_2025"
 
 # Log Strava credentials status
 if STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET and STRAVA_REFRESH_TOKEN:

@@ -422,7 +422,7 @@ async def test_send_telegram_notification_new_flight(sample_flight):
     # Patch both the config variables and httpx
     with patch("webhooks.TELEGRAM_BOT_TOKEN", "test-token"), \
          patch("webhooks.TELEGRAM_CHAT_ID", "123"), \
-         patch("webhooks.httpx.AsyncClient", return_value=mock_client_instance):
+         patch("httpx.AsyncClient", return_value=mock_client_instance):
         
         await send_telegram_notification(sample_flight, is_new=True)
         

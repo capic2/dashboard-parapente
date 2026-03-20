@@ -38,7 +38,7 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:-production}
       
       # Backend - Database
-      - BACKEND_DATABASE_URL=sqlite:///./db/dashboard.db
+      - BACKEND_DATABASE_URL=${BACKEND_DATABASE_URL:-sqlite:///./db/dashboard.db}
       
       # Backend - Redis
       - BACKEND_REDIS_HOST=redis
