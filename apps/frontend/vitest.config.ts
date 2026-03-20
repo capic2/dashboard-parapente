@@ -53,45 +53,47 @@ export default defineConfig({
           }
         }
       },
-      {
-        plugins: [
-          react(),
-          tailwindcss(),
-          storybookTest({
-            // The location of your Storybook config, main.js|ts
-            configDir: path.join(dirname, '.storybook'),
-            // This should match your package.json script to run Storybook
-            // The --no-open flag will skip the automatic opening of a browser
-            storybookScript: 'yarn storybook --no-open',
-          }),
-        ],
-        test: {
-          name: 'storybook',
-          globals: true,
-          // Exclude stories that require full browser environment (Cesium, etc.)
-          exclude: [
-            'node_modules',
-            'dist',
-            '**/FlightViewer3D.stories.tsx',
-            '**/EmagramWidget.stories.tsx',
-          ],
-          // Enable browser mode
-          browser: {
-            enabled: true,
-            // Make sure to install Playwright
-            provider: playwright({}),
-            headless: true,
-            instances: [{ browser: 'chromium' }],
-          },
-          testTimeout: 15000, // 15s per test (default is 5s)
-          teardownTimeout: 10000, // 10s for cleanup
-          setupFiles: ['./.storybook/vitest.setup.ts'],
-          // Disable coverage for Storybook tests
-          coverage: {
-            enabled: false,
-          }
-        },
-      },
+      // Storybook tests disabled in CI - requires Storybook server running
+      // Run locally with: npm run test-storybook
+      // {
+      //   plugins: [
+      //     react(),
+      //     tailwindcss(),
+      //     storybookTest({
+      //       // The location of your Storybook config, main.js|ts
+      //       configDir: path.join(dirname, '.storybook'),
+      //       // This should match your package.json script to run Storybook
+      //       // The --no-open flag will skip the automatic opening of a browser
+      //       storybookScript: 'yarn storybook --no-open',
+      //     }),
+      //   ],
+      //   test: {
+      //     name: 'storybook',
+      //     globals: true,
+      //     // Exclude stories that require full browser environment (Cesium, etc.)
+      //     exclude: [
+      //       'node_modules',
+      //       'dist',
+      //       '**/FlightViewer3D.stories.tsx',
+      //       '**/EmagramWidget.stories.tsx',
+      //     ],
+      //     // Enable browser mode
+      //     browser: {
+      //       enabled: true,
+      //       // Make sure to install Playwright
+      //       provider: playwright({}),
+      //       headless: true,
+      //       instances: [{ browser: 'chromium' }],
+      //     },
+      //     testTimeout: 15000, // 15s per test (default is 5s)
+      //     teardownTimeout: 10000, // 10s for cleanup
+      //     setupFiles: ['./.storybook/vitest.setup.ts'],
+      //     // Disable coverage for Storybook tests
+      //     coverage: {
+      //       enabled: false,
+      //     }
+      //   },
+      // },
     ],
   },
 })
