@@ -8,15 +8,15 @@
       "executor": "nx:run-commands",
       "defaultConfiguration": "development",
       "options": {
-        "command": "uvicorn main:app --reload --host 0.0.0.0 --port 8001",
+        "command": ".venv/bin/uvicorn main:app --reload --host 0.0.0.0 --port 8001",
         "cwd": "apps/backend"
       },
       "configurations": {
         "development": {
-          "command": "uvicorn main:app --reload --host 0.0.0.0 --port 8001"
+          "command": ".venv/bin/uvicorn main:app --reload --host 0.0.0.0 --port 8001"
         },
         "production": {
-          "command": "uvicorn main:app --host 0.0.0.0 --port 8001 --workers 4"
+          "command": ".venv/bin/uvicorn main:app --host 0.0.0.0 --port 8001 --workers 4"
         }
       }
     },
@@ -25,7 +25,7 @@
       "outputs": ["{workspaceRoot}/coverage/apps/backend"],
       "options": {
         "commands": [
-          "pytest tests/ -m 'not integration and not slow' -v --cov=. --cov-config=.coveragerc --cov-report=term-missing --cov-report=xml --cov-fail-under=40"
+          ".venv/bin/pytest tests/ -m 'not integration and not slow' -v --cov=. --cov-config=.coveragerc --cov-report=term-missing --cov-report=xml --cov-fail-under=40"
         ],
         "cwd": "apps/backend",
         "env": {
@@ -39,7 +39,7 @@
     "test:integration": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "pytest tests/ -m integration -v --tb=short --no-cov",
+        "command": ".venv/bin/pytest tests/ -m integration -v --tb=short --no-cov",
         "cwd": "apps/backend"
       }
     },
@@ -47,9 +47,9 @@
       "executor": "nx:run-commands",
       "options": {
         "commands": [
-          "ruff check . --output-format=github",
-          "black --check --diff .",
-          "isort --check-only --diff ."
+          ".venv/bin/ruff check . --output-format=github",
+          ".venv/bin/black --check --diff .",
+          ".venv/bin/isort --check-only --diff ."
         ],
         "cwd": "apps/backend",
         "parallel": false
@@ -59,9 +59,9 @@
       "executor": "nx:run-commands",
       "options": {
         "commands": [
-          "black .",
-          "isort .",
-          "ruff check --fix ."
+          ".venv/bin/black .",
+          ".venv/bin/isort .",
+          ".venv/bin/ruff check --fix ."
         ],
         "cwd": "apps/backend",
         "parallel": false
