@@ -318,7 +318,7 @@ async def test_calculate_best_spot_from_db_specific_date(db_session, arguel_site
     db_session.add(forecast)
     db_session.commit()
     
-    result = await calculate_best_spot_from_db(db_session, forecast_date=tomorrow)
+    result = await calculate_best_spot_from_db(db_session, day_index=0)
     
     assert result is not None
     assert result["paraIndex"] == 70
@@ -491,9 +491,12 @@ def test_get_wind_favorability_boundary_angles():
 # ============================================================================
 
 @pytest.mark.asyncio
-async def test_get_best_spot_cached_day_0(mock_db):
+async def test_get_best_spot_cached_day_0():
     """Test fetching best spot for today (day 0)"""
     from best_spot import get_best_spot_cached
+    
+    # Mock database
+    mock_db = MagicMock()
     
     # Mock sites
     mock_site = MagicMock(spec=Site)
@@ -516,8 +519,8 @@ async def test_get_best_spot_cached_day_0(mock_db):
         ]
     }
     
-    with patch('best_spot.get_normalized_forecast', new_callable=AsyncMock) as mock_weather:
-        with patch('best_spot.calculate_para_index') as mock_para:
+    with patch('weather_pipeline.get_normalized_forecast', new_callable=AsyncMock) as mock_weather:
+        with patch('para_index.calculate_para_index') as mock_para:
             with patch('best_spot.get_cache_module') as mock_cache_module:
                 # Setup mocks
                 mock_weather.return_value = mock_forecast
@@ -539,9 +542,12 @@ async def test_get_best_spot_cached_day_0(mock_db):
 
 
 @pytest.mark.asyncio
-async def test_get_best_spot_cached_day_3(mock_db):
+async def test_get_best_spot_cached_day_3():
     """Test fetching best spot for day 3"""
     from best_spot import get_best_spot_cached
+    
+    # Mock database
+    mock_db = MagicMock()
     
     mock_site = MagicMock(spec=Site)
     mock_site.id = "site-arguel"
@@ -562,8 +568,8 @@ async def test_get_best_spot_cached_day_3(mock_db):
         ]
     }
     
-    with patch('best_spot.get_normalized_forecast', new_callable=AsyncMock) as mock_weather:
-        with patch('best_spot.calculate_para_index') as mock_para:
+    with patch('weather_pipeline.get_normalized_forecast', new_callable=AsyncMock) as mock_weather:
+        with patch('para_index.calculate_para_index') as mock_para:
             with patch('best_spot.get_cache_module') as mock_cache_module:
                 mock_weather.return_value = mock_forecast
                 mock_para.return_value = {"para_index": 65, "verdict": "MOYEN"}
@@ -581,9 +587,12 @@ async def test_get_best_spot_cached_day_3(mock_db):
 
 
 @pytest.mark.asyncio
-async def test_cache_key_per_day(mock_db):
+async def test_cache_key_per_day():
     """Test that each day has its own cache key"""
     from best_spot import get_best_spot_cached
+    
+    # Mock database
+    mock_db = MagicMock()
     
     mock_site = MagicMock(spec=Site)
     mock_site.id = "site-arguel"
@@ -611,8 +620,8 @@ async def test_cache_key_per_day(mock_db):
     
     cache_ttl = {"summary": 3600}
     
-    with patch('best_spot.get_normalized_forecast', new_callable=AsyncMock) as mock_weather:
-        with patch('best_spot.calculate_para_index') as mock_para:
+    with patch('weather_pipeline.get_normalized_forecast', new_callable=AsyncMock) as mock_weather:
+        with patch('para_index.calculate_para_index') as mock_para:
             with patch('best_spot.get_cache_module') as mock_cache_module:
                 mock_weather.return_value = mock_forecast
                 mock_para.return_value = {"para_index": 75, "verdict": "BON"}
@@ -637,9 +646,12 @@ async def test_cache_key_per_day(mock_db):
 
 
 @pytest.mark.asyncio
-async def test_refresh_cache_only_day_0(mock_db):
+async def test_refresh_cache_only_day_0():
     """Test that scheduler only refreshes day 0 (today)"""
     from best_spot import refresh_best_spot_cache
+    
+    # Mock database
+    mock_db = MagicMock()
     
     mock_site = MagicMock(spec=Site)
     mock_site.id = "site-arguel"
@@ -666,8 +678,8 @@ async def test_refresh_cache_only_day_0(mock_db):
     
     cache_ttl = {"summary": 3600}
     
-    with patch('best_spot.get_normalized_forecast', new_callable=AsyncMock) as mock_weather:
-        with patch('best_spot.calculate_para_index') as mock_para:
+    with patch('weather_pipeline.get_normalized_forecast', new_callable=AsyncMock) as mock_weather:
+        with patch('para_index.calculate_para_index') as mock_para:
             with patch('best_spot.get_cache_module') as mock_cache_module:
                 mock_weather.return_value = mock_forecast
                 mock_para.return_value = {"para_index": 75, "verdict": "BON"}
@@ -688,9 +700,12 @@ async def test_refresh_cache_only_day_0(mock_db):
 
 
 @pytest.mark.asyncio
-async def test_calculate_best_spot_multiple_days_different_results(mock_db):
+async def test_calculate_best_spot_multiple_days_different_results():
     """Test that different days can have different best spots"""
     from best_spot import calculate_best_spot_from_cache
+    
+    # Mock database
+    mock_db = MagicMock()
     
     # Create two sites
     site1 = MagicMock(spec=Site)
@@ -742,8 +757,8 @@ async def test_calculate_best_spot_multiple_days_different_results(mock_db):
                     "consensus": [{"hour": 12, "wind_speed": 15, "wind_direction": 90}]  # E (bad for W site)
                 }
     
-    with patch('best_spot.get_normalized_forecast', new_callable=AsyncMock) as mock_weather:
-        with patch('best_spot.calculate_para_index') as mock_para:
+    with patch('weather_pipeline.get_normalized_forecast', new_callable=AsyncMock) as mock_weather:
+        with patch('para_index.calculate_para_index') as mock_para:
             mock_weather.side_effect = mock_weather_func
             mock_para.return_value = {"para_index": 70, "verdict": "BON"}
             

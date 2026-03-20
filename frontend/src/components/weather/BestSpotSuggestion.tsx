@@ -10,7 +10,7 @@
 import { format, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { WindIndicatorCompact } from '../WindIndicator';
-import type { BestSpotResult } from '../../hooks/useBestSpotAPI';
+import type { BestSpotResult } from '../../schemas.ts';
 
 export interface BestSpotSuggestionProps {
   bestSpot: BestSpotResult | null;

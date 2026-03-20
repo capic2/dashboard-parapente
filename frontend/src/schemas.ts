@@ -264,6 +264,9 @@ export const GeocodeResponseSchema = z.object({
 export const BestSpotSiteSchema = z.object({
   id: z.string(),
   name: z.string(),
+  code: z.string().optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
   rating: z.number().nullable().optional(),
   orientation: z.string().nullable().optional(),
 });
@@ -273,6 +276,9 @@ export const BestSpotResultSchema = z.object({
   paraIndex: z.number(),
   windDirection: z.string().nullable().optional(),
   windSpeed: z.number().nullable().optional(),
+  windFavorability: z.string().optional(),
+  score: z.number().optional(),
+  verdict: z.string().optional(),
   reason: z.string(),
 });
 
