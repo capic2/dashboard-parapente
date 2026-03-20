@@ -56,18 +56,18 @@ jobs:
           main-branch-name: 'main'
       
       - name: 🔨 Run affected builds
-        run: npx nx affected -t build --parallel=2 --exclude=e2e
+        run: npx nx affected -t build --parallel=3 --exclude=e2e
       
       - name: 🎨 Run affected lints
-        run: npx nx affected -t lint --parallel=2 --exclude=e2e
+        run: npx nx affected -t lint --parallel=3 --exclude=e2e
         continue-on-error: true
       
       - name: 📝 Run affected type-check
-        run: npx nx affected -t type-check --parallel=2 --exclude=e2e
+        run: npx nx affected -t type-check --parallel=3 --exclude=e2e
         continue-on-error: true
       
-      - name: 🧪 Run affected tests
-        run: npx nx affected -t test --parallel=2 --exclude=e2e
+      - name: 🧪 Run affected tests (frontend + backend in parallel)
+        run: npx nx affected -t test --parallel=3 --exclude=e2e
         env:
           TESTING: true
           BACKEND_DATABASE_URL: sqlite:///./test.db
