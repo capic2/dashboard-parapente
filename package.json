@@ -1,15 +1,36 @@
 {
   "name": "paragliding-dashboard",
   "version": "1.0.0",
-  "description": "Paragliding Dashboard - Weather, Flights, and Analytics",
+  "description": "Paragliding Dashboard - Weather, Flights, and Analytics - Nx Monorepo",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "libs/*"
+  ],
   "scripts": {
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
-    "test:e2e:debug": "playwright test --debug",
-    "test:e2e:report": "playwright show-report"
+    "dev": "nx run-many -t serve -p frontend,backend --parallel",
+    "build": "nx run-many -t build --all",
+    "build:prod": "nx run-many -t build --all --configuration=production",
+    "test": "nx run-many -t test --all",
+    "test:affected": "nx affected -t test",
+    "test:e2e": "nx e2e e2e",
+    "test:e2e:ui": "nx e2e:ui e2e",
+    "test:e2e:debug": "nx e2e:debug e2e",
+    "test:e2e:report": "nx e2e:report e2e",
+    "lint": "nx run-many -t lint --all",
+    "lint:affected": "nx affected -t lint",
+    "format": "nx run-many -t format --all",
+    "graph": "nx graph"
   },
   "devDependencies": {
-    "@playwright/test": "^1.49.1"
+    "@nx/eslint": "^22.6.0",
+    "@nx/js": "^22.6.0",
+    "@nx/playwright": "^22.6.0",
+    "@nx/react": "^22.6.0",
+    "@nx/vite": "^22.6.0",
+    "@nx/workspace": "^22.6.0",
+    "@nxlv/python": "^22.1.1",
+    "@playwright/test": "^1.49.1",
+    "nx": "^22.6.0"
   }
 }

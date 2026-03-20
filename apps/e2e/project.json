@@ -1,0 +1,44 @@
+{
+  "name": "e2e",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/e2e",
+  "projectType": "application",
+  "implicitDependencies": ["frontend", "backend"],
+  "targets": {
+    "e2e": {
+      "executor": "@nx/playwright:playwright",
+      "outputs": ["{workspaceRoot}/apps/e2e/test-results"],
+      "options": {
+        "config": "apps/e2e/playwright.config.ts"
+      },
+      "configurations": {
+        "ci": {
+          "headed": false,
+          "workers": 3
+        }
+      }
+    },
+    "e2e:ui": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "playwright test --ui",
+        "cwd": "apps/e2e"
+      }
+    },
+    "e2e:debug": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "playwright test --debug",
+        "cwd": "apps/e2e"
+      }
+    },
+    "e2e:report": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "playwright show-report",
+        "cwd": "apps/e2e"
+      }
+    }
+  },
+  "tags": ["type:e2e", "scope:testing"]
+}
