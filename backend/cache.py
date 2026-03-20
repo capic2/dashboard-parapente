@@ -86,7 +86,7 @@ async def get_redis() -> Any:
             for attempt in range(max_retries):
                 try:
                     await _redis_pool.ping()
-                    logger.info(f"✅ Redis connection established successfully at {redis_host}:{redis_port}")
+                    logger.info(f"✅ Redis connection established successfully at {REDIS_HOST}:{REDIS_PORT}")
                     break
                 except Exception as e:
                     if attempt < max_retries - 1:

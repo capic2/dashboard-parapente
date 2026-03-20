@@ -3984,15 +3984,19 @@ async def debug_gemini_api():
     try:
         from config import GOOGLE_API_KEY, GEMINI_MODEL
         
-        if not GOOGLE_API_KEY:
+        # Create local aliases for the success response
+        api_key = GOOGLE_API_KEY
+        model_name = GEMINI_MODEL
+        
+        if not api_key:
             return {
                 "success": False,
                 "error": "BACKEND_GOOGLE_API_KEY not set in environment"
             }
         
         # Configure and test
-        genai.configure(api_key=GOOGLE_API_KEY)
-        model = genai.GenerativeModel(GEMINI_MODEL)
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name)
         
         # Simple test prompt
         response = model.generate_content("Say hello in JSON format: {\"message\": \"...\"}")
