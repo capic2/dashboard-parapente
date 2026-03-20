@@ -61,37 +61,42 @@ class TestAdminEndpoints:
     
     def test_debug_gemini_no_api_key(self, client, monkeypatch):
         """Debug Gemini when API key is not set or package not installed"""
-        monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+        # Patch the config module's GOOGLE_API_KEY instead of os.environ
+        from unittest.mock import patch
         
-        response = client.get("/api/admin/debug/gemini")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is False
-        # Could fail due to missing package OR missing API key
-        assert ("GOOGLE_API_KEY not set" in data["error"] or 
-                "package not installed" in data["error"])
+        with patch("config.GOOGLE_API_KEY", None):
+            response = client.get("/api/admin/debug/gemini")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is False
+            # Could fail due to missing package OR missing API key
+            assert ("GOOGLE_API_KEY not set" in data["error"] or 
+                    "BACKEND_GOOGLE_API_KEY not set" in data["error"] or
+                    "package not installed" in data["error"])
     
     @pytest.mark.integration
     def test_debug_gemini_with_api_key(self, client, monkeypatch):
         """Debug Gemini with API key (integration test)"""
         # This test requires a real API key
         import os
-        api_key = os.getenv("GOOGLE_API_KEY")
+        api_key = os.getenv("BACKEND_GOOGLE_API_KEY")
         if not api_key:
-            pytest.skip("GOOGLE_API_KEY not set")
+            pytest.skip("BACKEND_GOOGLE_API_KEY not set")
         
-        monkeypatch.setenv("GOOGLE_API_KEY", api_key)
-        monkeypatch.setenv("GEMINI_MODEL", "gemini-2.5-flash")
+        from unittest.mock import patch
         
-        response = client.get("/api/admin/debug/gemini")
-        assert response.status_code == 200
-        data = response.json()
-        
-        # Should succeed with valid API key
-        if data["success"]:
-            assert "api_key_set" in data
-            assert data["api_key_set"] is True
-            assert "model_name" in data
-        else:
-            # May fail due to quota or other API issues
-            assert "error" in data
+        with patch("config.GOOGLE_API_KEY", api_key), \
+             patch("config.GEMINI_MODEL", "gemini-2.5-flash"):
+            
+            response = client.get("/api/admin/debug/gemini")
+            assert response.status_code == 200
+            data = response.json()
+            
+            # Should succeed with valid API key
+            if data["success"]:
+                assert "api_key_set" in data
+                assert data["api_key_set"] is True
+                assert "model_name" in data
+            else:
+                # May fail due to quota or other API issues
+                assert "error" in data
