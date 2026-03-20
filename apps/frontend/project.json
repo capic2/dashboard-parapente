@@ -30,7 +30,7 @@
       }
     },
     "test": {
-      "executor": "@nx/vite:test",
+      "executor": "@nx/vitest:test",
       "outputs": ["{workspaceRoot}/coverage/apps/frontend"],
       "options": {
         "config": "apps/frontend/vitest.config.ts",
