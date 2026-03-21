@@ -57,8 +57,10 @@ logs/
 # Testing
 .pytest_cache/
 .coverage
-frontend/coverage
 htmlcov/
+# Coverage reports (Nx structure)
+apps/*/coverage/
+coverage/
 
 # Node
 node_modules/

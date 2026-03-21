@@ -34,8 +34,7 @@
       "outputs": ["{workspaceRoot}/coverage/apps/frontend"],
       "options": {
         "config": "apps/frontend/vitest.config.ts",
-        "coverage": true,
-        "project": "unit"
+        "coverage": true
       }
     },
     "lint": {
