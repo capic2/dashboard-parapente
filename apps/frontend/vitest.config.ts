@@ -66,13 +66,12 @@ export default defineConfig({
           // Enable browser mode
           browser: {
             enabled: true,
-            // Make sure to install Playwright
             provider: playwright({}),
             headless: true,
             instances: [{ browser: 'chromium' }],
           },
-          testTimeout: 30000, // 30s per test (increased for CI)setupFiles: ['./.storybook/vitest.setup.ts'],
-          // Disable coverage for Storybook tests
+          testTimeout: 15000, // 15s per test (default is 5s)
+          setupFiles: ['./.storybook/vitest.setup.ts'],
         },
       },
     ],

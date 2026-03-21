@@ -8,15 +8,15 @@ import { weatherSources } from './data/weatherSources';
 import { getBestSpotForDay } from './data/bestSpot';
 
 // Helper to create handlers that work in both dev, Storybook, and Vitest
-// Use simple relative paths without wildcards (wildcards cause errors in path-to-regexp)
+// Use wildcard pattern */api/... to match any origin
 const createHandler = (
   method: 'get' | 'post' | 'put' | 'patch' | 'delete',
   path: string,
   handler: Parameters<typeof http.get>[1]
 ): HttpHandler[] => {
   return [
-    // Simple relative path - works in all environments
-    http[method](`/api${path}`, handler),
+    // Wildcard pattern - works in all environments (dev, Storybook, Vitest)
+    http[method](`*/api${path}`, handler),
   ];
 };
 
@@ -133,9 +133,34 @@ export const handlers = [
   // IMPORTANT: Must be BEFORE /flights/:flightId to avoid matching "records" as a flightId
   ...createHandler('get', '/flights/records', () => {
     return HttpResponse.json({
-      longest_flight: 180,
-      highest_altitude: 2450,
-      longest_distance: 45.2,
+      longest_duration: {
+        value: 180,
+        flight_id: 'flight1',
+        flight_name: 'Vol record - Durée',
+        flight_date: '2024-06-15',
+        site_name: 'Annecy',
+      },
+      highest_altitude: {
+        value: 2450,
+        flight_id: 'flight2',
+        flight_name: 'Vol record - Altitude',
+        flight_date: '2024-07-20',
+        site_name: 'Chamonix',
+      },
+      longest_distance: {
+        value: 45.2,
+        flight_id: 'flight3',
+        flight_name: 'Vol record - Distance',
+        flight_date: '2024-08-10',
+        site_name: 'Annecy',
+      },
+      max_speed: {
+        value: 65.5,
+        flight_id: 'flight4',
+        flight_name: 'Vol record - Vitesse',
+        flight_date: '2024-09-05',
+        site_name: 'Grenoble',
+      },
     });
   }),
 

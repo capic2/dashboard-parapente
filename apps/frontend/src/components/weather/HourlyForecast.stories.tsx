@@ -1,7 +1,6 @@
 import preview from '../../../.storybook/preview';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
-import { getDefaultHandlers } from '../../../mocks/storyHandlers';
 import HourlyForecast from './HourlyForecast';
 import { expect } from 'storybook/test';
 
@@ -313,8 +312,8 @@ export const GoodConditions = meta.story({
   },
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
-        http.get('/api/weather/:spotId', () => {
+      handlers: [
+        http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockBackendWeatherGood);
         }),
       ],
@@ -395,8 +394,8 @@ export const MixedConditions = meta.story({
   },
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
-        http.get('/api/weather/:spotId', () => {
+      handlers: [
+        http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockBackendWeatherMixed);
         }),
       ],
@@ -445,8 +444,8 @@ export const EmptyForecast = meta.story({
   },
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
-        http.get('/api/weather/:spotId', () => {
+      handlers: [
+        http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json({
             ...mockBackendWeatherGood,
             consensus: [],
@@ -465,8 +464,8 @@ export const Loading = meta.story({
   },
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
-        http.get('/api/weather/:spotId', async () => {
+      handlers: [
+        http.get('*/api/weather/:spotId', async () => {
           await new Promise(() => {}); // Never resolves
         }),
       ],
@@ -482,8 +481,8 @@ export const Error = meta.story({
   },
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
-        http.get('/api/weather/:spotId', () => {
+      handlers: [
+        http.get('*/api/weather/:spotId', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],
@@ -499,8 +498,8 @@ export const NoHourlyData = meta.story({
   },
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
-        http.get('/api/weather/:spotId', () => {
+      handlers: [
+        http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json({
             ...mockBackendWeatherGood,
             consensus: null,
@@ -519,8 +518,8 @@ export const DayTwo = meta.story({
   },
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
-        http.get('/api/weather/:spotId', () => {
+      handlers: [
+        http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockBackendWeatherGood);
         }),
       ],
@@ -538,8 +537,8 @@ export const DisplaysHourlyData = meta.story({
   },
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
-        http.get('/api/weather/:spotId', () => {
+      handlers: [
+        http.get('*!/api/weather/:spotId', () => {
           return HttpResponse.json(mockBackendWeatherGood);
         }),
       ],
@@ -572,8 +571,8 @@ export const ShowsLoadingState = meta.story({
   },
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
-        http.get('/api/weather/:spotId', async () => {
+      handlers: [
+        http.get('*!/api/weather/:spotId', async () => {
           await new Promise(() => {});
         }),
       ],
@@ -594,8 +593,8 @@ export const ShowsErrorState = meta.story({
   },
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
-        http.get('/api/weather/:spotId', () => {
+      handlers: [
+        http.get('*!/api/weather/:spotId', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],
@@ -616,8 +615,8 @@ export const ShowsEmptyState = meta.story({
   },
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
-        http.get('/api/weather/:spotId', () => {
+      handlers: [
+        http.get('*!/api/weather/:spotId', () => {
           return HttpResponse.json({
             ...mockBackendWeatherGood,
             consensus: [],
@@ -641,8 +640,8 @@ export const OpensTooltipOnHover = meta.story({
   },
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
-        http.get('/api/weather/:spotId', () => {
+      handlers: [
+        http.get('*!/api/weather/:spotId', () => {
           return HttpResponse.json(mockBackendWeatherGood);
         }),
       ],
