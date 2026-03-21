@@ -2,6 +2,7 @@ import preview from '../../../.storybook/preview';
 import { expect, waitFor } from 'storybook/test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
+import { getDefaultHandlers } from '../../../mocks/storyHandlers';
 import RecordsDashboard from './RecordsDashboard';
 
 const meta = preview.meta({
@@ -92,7 +93,7 @@ const mockPartialRecords = {
 export const AllRecords = meta.story({
   parameters: {
     msw: {
-      handlers: [
+      handlers: [...getDefaultHandlers(),
         http.get('/api/flights/records', () => {
           return HttpResponse.json(mockRecords);
         }),
@@ -105,7 +106,7 @@ export const AllRecords = meta.story({
 export const PartialRecords = meta.story({
   parameters: {
     msw: {
-      handlers: [
+      handlers: [...getDefaultHandlers(),
         http.get('/api/flights/records', () => {
           return HttpResponse.json(mockPartialRecords);
         }),
@@ -118,7 +119,7 @@ export const PartialRecords = meta.story({
 export const NoRecords = meta.story({
   parameters: {
     msw: {
-      handlers: [
+      handlers: [...getDefaultHandlers(),
         http.get('/api/flights/records', () => {
           return HttpResponse.json({
             longest_duration: null,
@@ -136,7 +137,7 @@ export const NoRecords = meta.story({
 export const Loading = meta.story({
   parameters: {
     msw: {
-      handlers: [
+      handlers: [...getDefaultHandlers(),
         http.get('/api/flights/records', async () => {
           await new Promise(() => {}); // Never resolves
         }),
@@ -149,7 +150,7 @@ export const Loading = meta.story({
 export const Error = meta.story({
   parameters: {
     msw: {
-      handlers: [
+      handlers: [...getDefaultHandlers(),
         http.get('/api/flights/records', () => {
           return new HttpResponse(null, { status: 500 });
         }),
@@ -163,7 +164,7 @@ export const Error = meta.story({
 export const DisplaysAllRecordCards = meta.story({
   parameters: {
     msw: {
-      handlers: [
+      handlers: [...getDefaultHandlers(),
         http.get('/api/flights/records', () => {
           return HttpResponse.json(mockRecords);
         }),
@@ -187,8 +188,8 @@ DisplaysAllRecordCards.test('displays all record cards', async ({ canvas }) => {
 export const DisplaysRecordValues = meta.story({
   parameters: {
     msw: {
-      handlers: [
-        http.get('*!/api/flights/records', () => {
+      handlers: [...getDefaultHandlers(),
+        http.get('/api/flights/records', () => {
           return HttpResponse.json(mockRecords);
         }),
       ],
@@ -209,8 +210,8 @@ DisplaysRecordValues.test('displays record values correctly', async ({ canvas })
 export const ShowsLoadingSkeletons = meta.story({
   parameters: {
     msw: {
-      handlers: [
-        http.get('*!/api/flights/records', async () => {
+      handlers: [...getDefaultHandlers(),
+        http.get('/api/flights/records', async () => {
           await new Promise(() => {});
         }),
       ],
@@ -226,8 +227,8 @@ ShowsLoadingSkeletons.test('shows loading skeletons', async ({ canvasElement }) 
 export const ShowsErrorMessage = meta.story({
   parameters: {
     msw: {
-      handlers: [
-        http.get('*!/api/flights/records', () => {
+      handlers: [...getDefaultHandlers(),
+        http.get('/api/flights/records', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],
@@ -244,8 +245,8 @@ ShowsErrorMessage.test('shows error message on error', async ({ canvas }) => {
 export const ShowsNoDataForMissingRecords = meta.story({
   parameters: {
     msw: {
-      handlers: [
-        http.get('*!/api/flights/records', () => {
+      handlers: [...getDefaultHandlers(),
+        http.get('/api/flights/records', () => {
           return HttpResponse.json(mockPartialRecords);
         }),
       ],

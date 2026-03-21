@@ -26,7 +26,6 @@ export default defineConfig({
         'src/routeTree.gen.ts',
       ],
       // No global thresholds - only applied to unit tests
-      all: false, // Only collect coverage from tested files
     },
     projects: [
       {
@@ -40,17 +39,6 @@ export default defineConfig({
             VITE_API_URL: 'http://localhost:8001',
             VITE_ENABLE_MSW: 'false',
           },
-          coverage: {
-            enabled: true,
-            // Disable thresholds for now - we have mostly Storybook tests
-            // TODO: Re-enable when we have more unit tests
-            // thresholds: {
-            //   statements: 80,
-            //   branches: 80,
-            //   functions: 80,
-            //   lines: 80,
-            // },
-          }
         }
       },
       {
@@ -83,13 +71,8 @@ export default defineConfig({
             headless: true,
             instances: [{ browser: 'chromium' }],
           },
-          testTimeout: 30000, // 30s per test (increased for CI)
-          teardownTimeout: 15000, // 15s for cleanup
-          setupFiles: ['./.storybook/vitest.setup.ts'],
+          testTimeout: 30000, // 30s per test (increased for CI)setupFiles: ['./.storybook/vitest.setup.ts'],
           // Disable coverage for Storybook tests
-          coverage: {
-            enabled: false,
-          }
         },
       },
     ],

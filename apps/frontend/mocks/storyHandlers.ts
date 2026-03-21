@@ -1,37 +1,40 @@
 // Reusable MSW handlers for Storybook stories
+// Handlers can be used as object (for selective override) or array (all handlers)
 //
-// Usage in stories:
-//
-// import { getDefaultHandlers } from '../../../mocks/storyHandlers';
+// Usage Option 1: Use all default handlers
+// import { defaultHandlers } from '../../../mocks/storyHandlers';
 //
 // export const MyStory = {
 //   parameters: {
 //     msw: {
-//       handlers: getDefaultHandlers(),
+//       handlers: defaultHandlers, // Object or array, both work!
 //     },
 //   },
 // };
 //
-// Or with overrides:
-//
-// import { getDefaultHandlers } from '../../../mocks/storyHandlers';
+// Usage Option 2: Override specific handlers (if MSW supports objects)
+// import { defaultHandlers } from '../../../mocks/storyHandlers';
 // import { http, HttpResponse } from 'msw';
 //
 // export const MyStory = {
 //   parameters: {
 //     msw: {
-//       handlers: [
-//         ...getDefaultHandlers(),
-//         http.get('*/api/weather/:spotId', () => HttpResponse.json(customData)),
-//       ],
+//       handlers: {
+//         ...defaultHandlers,
+//         weatherGet: http.get('/api/weather/:spotId', () => 
+//           HttpResponse.json(customData)
+//         ),
+//       },
 //     },
 //   },
 // };
 
 import { handlers } from './handlers';
 
-// Get all default MSW handlers
-// These handlers use the wildcard pattern to work in both dev and Vitest browser mode
+// Export handlers as array (default)
+export const defaultHandlers = handlers;
+
+// Also export as function for backward compatibility
 export function getDefaultHandlers() {
   return handlers;
 }

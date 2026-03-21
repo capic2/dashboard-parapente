@@ -60,6 +60,24 @@ export const handlers = [
     return HttpResponse.json(site);
   }),
 
+  // GET /api/spots/geocode - Recherche géocodage
+  ...createHandler('get', '/spots/geocode', ({ request }) => {
+    const url = new URL(request.url);
+    const query = url.searchParams.get('query') || '';
+    
+    // Mock geocoding results
+    return HttpResponse.json({
+      results: [
+        {
+          name: query,
+          latitude: 47.2382 + Math.random() * 0.1,
+          longitude: 6.0245 + Math.random() * 0.1,
+          country: url.searchParams.get('country') || 'FR',
+        },
+      ],
+    });
+  }),
+
   // POST /api/spots - Créer un nouveau site
   ...createHandler('post', '/spots', async ({ request }) => {
     const body = (await request.json()) as any;
@@ -185,6 +203,37 @@ export const handlers = [
       id: `flight-${Date.now()}`,
       ...body,
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      duration: 45,
+      distance: 12.5,
+      max_altitude: 1850,
+      site_id: body.site_id || '1',
+      site_name: 'Annecy',
+    });
+  }),
+
+  // POST /api/flights/create-from-gpx - Créer un vol depuis un fichier GPX
+  ...createHandler('post', '/flights/create-from-gpx', async ({ request }) => {
+    // Check if GPX is valid (mock validation)
+    const formData = await request.formData();
+    const gpxFile = formData.get('gpx_file');
+    
+    if (!gpxFile || (gpxFile as File).size < 100) {
+      return HttpResponse.json(
+        { error: 'Le fichier GPX ne contient pas de données de vol valides' },
+        { status: 400 }
+      );
+    }
+    
+    return HttpResponse.json({
+      id: `flight-${Date.now()}`,
+      date: new Date().toISOString().split('T')[0],
+      duration: 45,
+      distance: 12.5,
+      max_altitude: 1850,
+      site_id: '1',
+      site_name: 'Annecy',
+      gpx_file: (gpxFile as File).name,
     });
   }),
 
