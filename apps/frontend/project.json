@@ -31,10 +31,18 @@
     },
     "test": {
       "executor": "@nx/vitest:test",
+      "options": {
+        "config": "apps/frontend/vitest.config.ts",
+        "project": "storybook"
+      }
+    },
+    "test:unit": {
+      "executor": "@nx/vitest:test",
       "outputs": ["{workspaceRoot}/coverage/apps/frontend"],
       "options": {
         "config": "apps/frontend/vitest.config.ts",
-        "coverage": true
+        "coverage": true,
+        "project": "unit"
       }
     },
     "lint": {
