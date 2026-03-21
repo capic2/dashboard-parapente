@@ -3,6 +3,7 @@ import { expect, fn, waitFor } from 'storybook/test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import Forecast7Day from './Forecast7Day';
+import { getDefaultHandlers } from '../../../mocks/storyHandlers';
 
 const meta = preview.meta({
   title: 'Components/Weather/Forecast7Day',
@@ -198,7 +199,12 @@ export const MixedConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId/daily-summary', () => {
+        ...getDefaultHandlers(),
+        // Override with specific mock data - try both patterns
+        http.get('/api/weather/:spotId/daily-summary', () => {
+          return HttpResponse.json(mockDailySummaryGood);
+        }),
+        http.get('/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
       ],
@@ -246,7 +252,7 @@ export const AllGoodConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId/daily-summary', () => {
+        http.get('/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryAllGood);
         }),
       ],
@@ -283,7 +289,7 @@ export const AllBadConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId/daily-summary', () => {
+        http.get('/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryAllBad);
         }),
       ],
@@ -320,7 +326,7 @@ export const SecondDaySelected = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId/daily-summary', () => {
+        http.get('/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
       ],
@@ -336,7 +342,7 @@ export const NoSelection = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId/daily-summary', () => {
+        http.get('/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
       ],
@@ -354,7 +360,7 @@ export const WithCallback = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId/daily-summary', () => {
+        http.get('/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
       ],
@@ -370,7 +376,7 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/daily-summary/:spotId', async () => {
+        http.get('/api/weather/daily-summary/:spotId', async () => {
           await new Promise(() => {}); // Never resolves
         }),
       ],
@@ -386,7 +392,7 @@ export const Error = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId/daily-summary', () => {
+        http.get('/api/weather/:spotId/daily-summary', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],
@@ -402,7 +408,7 @@ export const EmptyDays = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId/daily-summary', () => {
+        http.get('/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json({ days: [] });
         }),
       ],
@@ -418,7 +424,7 @@ export const NoDaysField = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId/daily-summary', () => {
+        http.get('/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json({});
         }),
       ],
@@ -469,7 +475,7 @@ export const ShowsLoadingState = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/daily-summary/:spotId', async () => {
+        http.get('/api/weather/daily-summary/:spotId', async () => {
           await new Promise(() => {});
         }),
       ],
@@ -490,7 +496,7 @@ export const ShowsErrorState = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId/daily-summary', () => {
+        http.get('/api/weather/:spotId/daily-summary', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],

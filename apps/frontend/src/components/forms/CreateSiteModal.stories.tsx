@@ -71,7 +71,7 @@ export const Modal = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/spots/geocode', () => {
+        http.get('/api/spots/geocode', () => {
           return HttpResponse.json(mockGeocodeResult);
         }),
       ],
@@ -126,7 +126,7 @@ export const SearchLoading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/spots/geocode', async () => {
+        http.get('/api/spots/geocode', async () => {
           await delay('infinite');
           return HttpResponse.json(mockGeocodeResult);
         }),

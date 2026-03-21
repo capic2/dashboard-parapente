@@ -98,7 +98,7 @@ export const Default = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/emagram', () => {
+        http.get('/api/emagram', () => {
           return HttpResponse.json(mockEmagramData);
         }),
       ],
@@ -114,7 +114,7 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/emagram', async () => {
+        http.get('/api/emagram', async () => {
           await new Promise(() => {});
         }),
       ],
@@ -130,7 +130,7 @@ export const Error = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/emagram', () => {
+        http.get('/api/emagram', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],

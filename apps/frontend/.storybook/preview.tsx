@@ -2,10 +2,13 @@ import { definePreview } from '@storybook/react-vite';
 import { initialize, mswLoader } from 'msw-storybook-addon';
 import addonA11y from '@storybook/addon-a11y';
 import '../src/App.css';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'; // Import Tailwind styles
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { handlers } from '../mocks/handlers'; // Import global MSW handlers
 
 // Initialize MSW
-initialize();
+initialize({
+  onUnhandledRequest: 'warn', // Warn for requests without handlers
+});
 
 const preview = definePreview({
   addons: [addonA11y()],
@@ -31,6 +34,10 @@ const preview = definePreview({
       },
     },
     layout: 'centered',
+    // Global MSW handlers - available to all stories
+    msw: {
+      handlers: handlers,
+    },
   },
 
   // Global decorators

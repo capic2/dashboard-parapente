@@ -313,7 +313,7 @@ export const GoodConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId', () => {
+        http.get('/api/weather/:spotId', () => {
           return HttpResponse.json(mockBackendWeatherGood);
         }),
       ],
@@ -395,7 +395,7 @@ export const MixedConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId', () => {
+        http.get('/api/weather/:spotId', () => {
           return HttpResponse.json(mockBackendWeatherMixed);
         }),
       ],
@@ -445,7 +445,7 @@ export const EmptyForecast = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId', () => {
+        http.get('/api/weather/:spotId', () => {
           return HttpResponse.json({
             ...mockBackendWeatherGood,
             consensus: [],
@@ -465,7 +465,7 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId', async () => {
+        http.get('/api/weather/:spotId', async () => {
           await new Promise(() => {}); // Never resolves
         }),
       ],
@@ -482,7 +482,7 @@ export const Error = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId', () => {
+        http.get('/api/weather/:spotId', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],
@@ -499,7 +499,7 @@ export const NoHourlyData = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId', () => {
+        http.get('/api/weather/:spotId', () => {
           return HttpResponse.json({
             ...mockBackendWeatherGood,
             consensus: null,
@@ -519,7 +519,7 @@ export const DayTwo = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId', () => {
+        http.get('/api/weather/:spotId', () => {
           return HttpResponse.json(mockBackendWeatherGood);
         }),
       ],

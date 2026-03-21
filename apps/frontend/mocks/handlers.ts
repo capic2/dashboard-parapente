@@ -7,14 +7,16 @@ import { flightStats } from './data/stats';
 import { weatherSources } from './data/weatherSources';
 import { getBestSpotForDay } from './data/bestSpot';
 
-// Helper to create handlers that work in both dev and Storybook
+// Helper to create handlers that work in both dev, Storybook, and Vitest
+// Use simple relative paths without wildcards (wildcards cause errors in path-to-regexp)
 const createHandler = (
   method: 'get' | 'post' | 'put' | 'patch' | 'delete',
   path: string,
   handler: Parameters<typeof http.get>[1]
 ): HttpHandler[] => {
   return [
-    http[method](`*/api${path}`, handler),
+    // Simple relative path - works in all environments
+    http[method](`/api${path}`, handler),
   ];
 };
 

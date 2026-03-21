@@ -73,7 +73,7 @@ export const Open = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*/api/strava/sync', () => {
+        http.post('/api/strava/sync', () => {
           return HttpResponse.json(mockSyncResult);
         }),
       ],

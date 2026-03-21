@@ -179,10 +179,10 @@ export const GoodConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId', () => {
+        http.get('/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherGood);
         }),
-        http.get('*/api/spots/:id', () => {
+        http.get('/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
       ],
@@ -198,10 +198,10 @@ export const ModerateConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId', () => {
+        http.get('/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherModerate);
         }),
-        http.get('*/api/spots/:id', () => {
+        http.get('/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
       ],
@@ -230,10 +230,10 @@ export const LimiteConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId', () => {
+        http.get('/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherLimite);
         }),
-        http.get('*/api/spots/:id', () => {
+        http.get('/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
       ],
@@ -262,10 +262,10 @@ export const BadConditions = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId', () => {
+        http.get('/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherBad);
         }),
-        http.get('*/api/spots/:id', () => {
+        http.get('/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
       ],
@@ -293,10 +293,10 @@ export const NoGustsData = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId', () => {
+        http.get('/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherNoGusts);
         }),
-        http.get('*/api/spots/:id', () => {
+        http.get('/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
       ],
@@ -315,7 +315,7 @@ export const Loading = meta.story({
         http.get('http://localhost:5000/api/weather/:spotId', async () => {
           await new Promise(() => {}); // Never resolves
         }),
-        http.get('*/api/spots/:id', () => {
+        http.get('/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
       ],
@@ -331,10 +331,10 @@ export const Error = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId', () => {
+        http.get('/api/weather/:spotId', () => {
           return new HttpResponse(null, { status: 500 });
         }),
-        http.get('*/api/spots/:id', () => {
+        http.get('/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
       ],
@@ -350,10 +350,10 @@ export const NoSiteOrientation = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/weather/:spotId', () => {
+        http.get('/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherGood);
         }),
-        http.get('*/api/spots/:id', () => {
+        http.get('/api/spots/:id', () => {
           return HttpResponse.json({ ...mockSite, orientation: null });
         }),
       ],

@@ -60,7 +60,7 @@ export const FlightModal = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('*/api/flights/create-from-gpx', () => {
+        http.post('/api/flights/create-from-gpx', () => {
           return HttpResponse.json(mockFlightResult);
         }),
       ],
@@ -137,7 +137,7 @@ FlightModal.test('it clears the selected file when click on cancel', async () =>
 FlightModal.test('shows error message when upload fails', {parameters: {
     msw: {
       handlers: [
-        http.post('*/api/flights/create-from-gpx', async () => {
+        http.post('/api/flights/create-from-gpx', async () => {
           await delay(100);
           return new HttpResponse(
               JSON.stringify({

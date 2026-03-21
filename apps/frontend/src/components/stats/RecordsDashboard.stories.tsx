@@ -93,7 +93,7 @@ export const AllRecords = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/records', () => {
+        http.get('/api/flights/records', () => {
           return HttpResponse.json(mockRecords);
         }),
       ],
@@ -106,7 +106,7 @@ export const PartialRecords = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/records', () => {
+        http.get('/api/flights/records', () => {
           return HttpResponse.json(mockPartialRecords);
         }),
       ],
@@ -119,7 +119,7 @@ export const NoRecords = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/records', () => {
+        http.get('/api/flights/records', () => {
           return HttpResponse.json({
             longest_duration: null,
             highest_altitude: null,
@@ -137,7 +137,7 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/records', async () => {
+        http.get('/api/flights/records', async () => {
           await new Promise(() => {}); // Never resolves
         }),
       ],
@@ -150,7 +150,7 @@ export const Error = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/records', () => {
+        http.get('/api/flights/records', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],
@@ -164,7 +164,7 @@ export const DisplaysAllRecordCards = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights/records', () => {
+        http.get('/api/flights/records', () => {
           return HttpResponse.json(mockRecords);
         }),
       ],
