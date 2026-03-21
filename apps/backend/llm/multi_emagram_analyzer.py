@@ -4,13 +4,14 @@ Uses Claude 3.5 Sonnet Vision API to analyze multiple emagram screenshots
 Extracts paragliding-specific metrics and generates flight recommendations
 """
 
-import anthropic
 import base64
-import os
-from typing import Dict, List, Any, Optional
-from pathlib import Path
 import json
 import logging
+import os
+from pathlib import Path
+from typing import Any
+
+import anthropic
 
 logger = logging.getLogger(__name__)
 
@@ -90,18 +91,16 @@ def encode_image_base64(image_path: str) -> str:
 
 
 async def analyze_multiple_emagrammes(
-    image_paths: List[str],
-    spot_name: str,
-    sources: List[str]
-) -> Dict[str, Any]:
+    image_paths: list[str], spot_name: str, sources: list[str]
+) -> dict[str, Any]:
     """
     Analyze multiple emagram screenshots using Claude 3.5 Sonnet Vision
-    
+
     Args:
         image_paths: List of paths to screenshot images (PNG)
         spot_name: Name of the paragliding spot
         sources: List of source names matching image_paths
-    
+
     Returns:
         {
             "success": True/False,
@@ -118,82 +117,64 @@ async def analyze_multiple_emagrammes(
             "error": "..." (if failed)
         }
     """
-    
+
     if not image_paths:
-        return {
-            "success": False,
-            "error": "No images provided for analysis"
-        }
-    
+        return {"success": False, "error": "No images provided for analysis"}
+
     if not os.getenv("ANTHROPIC_API_KEY"):
-        return {
-            "success": False,
-            "error": "ANTHROPIC_API_KEY not configured"
-        }
-    
+        return {"success": False, "error": "ANTHROPIC_API_KEY not configured"}
+
     try:
         # Build image descriptions for prompt
         image_descriptions = []
         for i, (path, source) in enumerate(zip(image_paths, sources), 1):
             image_descriptions.append(f"Image {i}: {source.title()}")
-        
+
         prompt = EMAGRAM_ANALYSIS_PROMPT.format(
-            spot_name=spot_name,
-            image_descriptions="\n".join(image_descriptions)
+            spot_name=spot_name, image_descriptions="\n".join(image_descriptions)
         )
-        
+
         # Prepare image content blocks for Claude
         image_content = []
         for image_path in image_paths:
             if not Path(image_path).exists():
                 logger.warning(f"Image not found: {image_path}, skipping")
                 continue
-            
+
             try:
                 image_data = encode_image_base64(image_path)
-                image_content.append({
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "image/png",
-                        "data": image_data
+                image_content.append(
+                    {
+                        "type": "image",
+                        "source": {"type": "base64", "media_type": "image/png", "data": image_data},
                     }
-                })
+                )
             except Exception as e:
                 logger.error(f"Failed to encode image {image_path}: {e}")
-        
+
         if not image_content:
-            return {
-                "success": False,
-                "error": "No valid images could be encoded"
-            }
-        
+            return {"success": False, "error": "No valid images could be encoded"}
+
         # Add text prompt
-        image_content.append({
-            "type": "text",
-            "text": prompt
-        })
-        
+        image_content.append({"type": "text", "text": prompt})
+
         logger.info(f"🤖 Sending {len(image_paths)} images to Claude for analysis...")
-        
+
         # Call Claude API
         response = client.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=2000,
             temperature=0.3,  # Lower for more consistent factual extraction
-            messages=[
-                {
-                    "role": "user",
-                    "content": image_content
-                }
-            ]
+            messages=[{"role": "user", "content": image_content}],
         )
-        
+
         # Extract response text
         response_text = response.content[0].text
-        
-        logger.info(f"✅ Claude response received ({response.usage.input_tokens} in, {response.usage.output_tokens} out)")
-        
+
+        logger.info(
+            f"✅ Claude response received ({response.usage.input_tokens} in, {response.usage.output_tokens} out)"
+        )
+
         # Parse JSON response
         try:
             # Claude sometimes wraps JSON in markdown code blocks
@@ -201,21 +182,25 @@ async def analyze_multiple_emagrammes(
                 response_text = response_text.split("```json")[1].split("```")[0].strip()
             elif "```" in response_text:
                 response_text = response_text.split("```")[1].split("```")[0].strip()
-            
+
             analysis = json.loads(response_text)
-            
+
             # Add metadata
             analysis["success"] = True
             analysis["llm_provider"] = "anthropic"
             analysis["llm_model"] = "claude-3-5-sonnet-20241022"
             analysis["llm_tokens_used"] = response.usage.input_tokens + response.usage.output_tokens
-            analysis["llm_cost_usd"] = calculate_claude_cost(response.usage.input_tokens, response.usage.output_tokens)
+            analysis["llm_cost_usd"] = calculate_claude_cost(
+                response.usage.input_tokens, response.usage.output_tokens
+            )
             analysis["raw_response"] = response_text  # For debugging
-            
-            logger.info(f"📊 Analysis complete: Score {analysis.get('score_volabilite')}/100, Agreement: {analysis.get('sources_agreement')}")
-            
+
+            logger.info(
+                f"📊 Analysis complete: Score {analysis.get('score_volabilite')}/100, Agreement: {analysis.get('sources_agreement')}"
+            )
+
             return analysis
-            
+
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse Claude JSON response: {e}")
             logger.error(f"Raw response: {response_text[:500]}")
@@ -224,23 +209,20 @@ async def analyze_multiple_emagrammes(
                 "error": f"Failed to parse LLM response: {e}",
                 "raw_response": response_text,
                 "llm_provider": "anthropic",
-                "llm_model": "claude-3-5-sonnet-20241022"
+                "llm_model": "claude-3-5-sonnet-20241022",
             }
-    
+
     except anthropic.APIError as e:
         logger.error(f"Anthropic API error: {e}")
         return {
             "success": False,
             "error": f"Claude API error: {str(e)}",
-            "llm_provider": "anthropic"
+            "llm_provider": "anthropic",
         }
-    
+
     except Exception as e:
         logger.error(f"Unexpected error in emagram analysis: {e}", exc_info=True)
-        return {
-            "success": False,
-            "error": f"Analysis failed: {str(e)}"
-        }
+        return {"success": False, "error": f"Analysis failed: {str(e)}"}
 
 
 def calculate_claude_cost(input_tokens: int, output_tokens: int) -> float:
@@ -256,21 +238,19 @@ def calculate_claude_cost(input_tokens: int, output_tokens: int) -> float:
 
 
 async def analyze_emagrammes_with_fallback(
-    image_paths: List[str],
-    spot_name: str,
-    sources: List[str]
-) -> Dict[str, Any]:
+    image_paths: list[str], spot_name: str, sources: list[str]
+) -> dict[str, Any]:
     """
     Analyze emagrammes with fallback to classic calculation if LLM fails
-    
+
     For now, just wraps analyze_multiple_emagrammes
     In future, could implement classic meteorology fallback
     """
     result = await analyze_multiple_emagrammes(image_paths, spot_name, sources)
-    
+
     if not result.get("success"):
         logger.warning("LLM analysis failed, classic fallback not implemented yet")
         # TODO: Implement classic meteorology analysis as fallback
         # For now, just return the error
-    
+
     return result

@@ -3,31 +3,35 @@
 Seed the database with sample flights for testing
 Creates realistic flight data with GPX files
 """
+
+import random
 import sys
 import uuid
-from datetime import date, timedelta, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
-import random
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from database import SessionLocal, engine
-from models import Base, Site, Flight
+from database import SessionLocal
+from models import Flight, Site
 
-def create_sample_gpx(flight_id: str, start_lat: float, start_lon: float, duration_min: int) -> Path:
+
+def create_sample_gpx(
+    flight_id: str, start_lat: float, start_lon: float, duration_min: int
+) -> Path:
     """
     Create a sample GPX file for testing
     Generates a realistic flight track with elevation changes
     """
     gpx_dir = Path(__file__).parent / "gpx_files"
     gpx_dir.mkdir(exist_ok=True)
-    
+
     gpx_path = gpx_dir / f"flight_{flight_id}.gpx"
-    
+
     # Generate track points (one every 10 seconds)
     num_points = (duration_min * 60) // 10
-    
+
     gpx_content = """<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Dashboard Parapente" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata>
@@ -37,19 +41,19 @@ def create_sample_gpx(flight_id: str, start_lat: float, start_lon: float, durati
   <trk>
     <name>Flight Track</name>
     <trkseg>
-""".format(timestamp=datetime.utcnow().isoformat() + 'Z')
-    
+""".format(timestamp=datetime.utcnow().isoformat() + "Z")
+
     base_time = datetime.utcnow() - timedelta(minutes=duration_min)
     lat, lon = start_lat, start_lon
     elevation = 800  # Start at 800m
     max_elevation = 800
-    
+
     for i in range(num_points):
         # Simulate circular flight pattern with some drift
         angle = (i / num_points) * 2 * 3.14159 * 2  # 2 circles
         lat = start_lat + 0.01 * (i / num_points) + 0.005 * random.uniform(-1, 1)
         lon = start_lon + 0.01 * (i / num_points) + 0.005 * random.uniform(-1, 1)
-        
+
         # Elevation changes - climb first, then descend
         if i < num_points * 0.3:
             elevation += random.uniform(5, 15)  # Climbing
@@ -57,48 +61,47 @@ def create_sample_gpx(flight_id: str, start_lat: float, start_lon: float, durati
             elevation += random.uniform(-3, 3)  # Maintaining
         else:
             elevation -= random.uniform(5, 15)  # Descending
-        
+
         elevation = max(500, min(1800, elevation))  # Clamp between 500-1800m
         max_elevation = max(max_elevation, elevation)
-        
+
         point_time = base_time + timedelta(seconds=i * 10)
-        
+
         gpx_content += f"""      <trkpt lat="{lat:.6f}" lon="{lon:.6f}">
         <ele>{elevation:.1f}</ele>
         <time>{point_time.isoformat()}Z</time>
       </trkpt>
 """
-    
+
     gpx_content += """    </trkseg>
   </trk>
 </gpx>"""
-    
+
     gpx_path.write_text(gpx_content)
-    
+
     return gpx_path
 
 
 def seed_flights():
     """Seed the database with sample flights"""
     db = SessionLocal()
-    
+
     try:
         # Get existing sites
         sites = db.query(Site).all()
         if not sites:
             return
-        
-        
+
         # Check if flights already exist
         existing_flights = db.query(Flight).count()
         if existing_flights > 0:
             response = input("Delete and recreate? (y/N): ")
-            if response.lower() != 'y':
+            if response.lower() != "y":
                 return
             # Delete existing flights
             db.query(Flight).delete()
             db.commit()
-        
+
         # Create sample flights
         flights_to_create = [
             {
@@ -142,28 +145,25 @@ def seed_flights():
                 "max_alt": 1050,
             },
         ]
-        
+
         created_count = 0
-        
+
         for flight_data in flights_to_create:
             flight_id = str(uuid.uuid4())
             flight_date = date.today() - timedelta(days=flight_data["days_ago"])
             site = flight_data["site"]
-            
+
             if not site:
                 continue
-            
+
             # Create GPX file
             gpx_path = create_sample_gpx(
-                flight_id,
-                site.latitude,
-                site.longitude,
-                flight_data["duration"]
+                flight_id, site.latitude, site.longitude, flight_data["duration"]
             )
-            
+
             # Calculate elevation gain (rough estimate)
             elevation_gain = int((flight_data["max_alt"] - site.elevation_m) * 0.7)
-            
+
             flight = Flight(
                 id=flight_id,
                 title=flight_data["title"],
@@ -177,15 +177,15 @@ def seed_flights():
                 gpx_file_path=str(gpx_path),
                 notes=f"Sample flight created for testing. Site: {site.name}",
                 created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                updated_at=datetime.utcnow(),
             )
-            
+
             db.add(flight)
             created_count += 1
-        
+
         db.commit()
-        
-    except Exception as e:
+
+    except Exception:
         db.rollback()
     finally:
         db.close()
