@@ -1,0 +1,131 @@
+name: CI - Nx Monorepo
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  main:
+    name: Nx Cloud - Main Job
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: apps/backend/requirements.txt
+      
+      - name: 📦 Install npm dependencies
+        run: npm ci
+      
+      - name: 📦 Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          cd apps/backend && pip install -r requirements.txt
+      
+      - name: 🎭 Install Playwright (Frontend)
+        run: |
+          cd apps/frontend
+          npx playwright install --with-deps chromium
+      
+      - name: 🎭 Install Playwright (Backend)
+        run: |
+          cd apps/backend
+          playwright install chromium
+          playwright install-deps chromium
+      
+      - name: 🔍 Derive SHAs for Nx affected
+        uses: nrwl/nx-set-shas@v4
+        with:
+          main-branch-name: 'main'
+      
+      - name: 🔨 Run affected builds
+        run: npx nx affected -t build --parallel=3 --exclude=e2e
+      
+      - name: 🎨 Run affected lints
+        run: npx nx affected -t lint --parallel=3 --exclude=e2e
+        continue-on-error: true
+      
+      - name: 📝 Run affected type-check
+        run: npx nx affected -t type-check --parallel=3 --exclude=e2e
+        continue-on-error: true
+      
+      - name: 🧪 Run affected tests (frontend + backend in parallel)
+        run: npx nx affected -t test --parallel=3 --exclude=e2e
+        env:
+          TESTING: true
+          BACKEND_DATABASE_URL: sqlite:///./test.db
+          BACKEND_WEATHERAPI_KEY: test_key
+          BACKEND_METEOBLUE_API_KEY: test_key
+      
+      - name: 📊 Upload frontend coverage
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage/apps/frontend/lcov.info
+          flags: frontend
+          name: frontend-coverage
+        continue-on-error: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      
+      - name: 📊 Upload backend coverage
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage/apps/backend/coverage.xml
+          flags: backend
+          name: backend-coverage
+        continue-on-error: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v6
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+      
+      - name: 📦 Install dependencies
+        run: npm ci
+      
+      - name: 🎭 Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      
+      - name: 🧪 Run E2E tests
+        run: npx nx e2e e2e --configuration=ci
+        continue-on-error: true
+      
+      - name: 📤 Upload E2E artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-results
+          path: apps/e2e/test-results
+          retention-days: 7

@@ -1,21 +1,24 @@
 # ============================================
-# Stage 1: Build Frontend
+# Stage 1: Build Frontend with Nx
 # ============================================
 FROM node:24-alpine AS frontend-builder
 
-WORKDIR /app/frontend
+WORKDIR /workspace
 
-# Copier fichiers de dépendances
-COPY frontend/package*.json ./
+# Copier fichiers de configuration Nx
+COPY package*.json nx.json tsconfig.base.json ./
 
-# Installer dépendances
-RUN npm ci --legacy-peer-deps
+# Copier libs/shared-types (dépendance du frontend)
+COPY libs/shared-types ./libs/shared-types
 
-# Copier code source
-COPY frontend/ ./
+# Copier frontend
+COPY apps/frontend ./apps/frontend
 
-# Build production
-RUN npm run build
+# Installer toutes les dépendances (root + frontend)
+RUN npm ci
+
+# Build frontend avec Nx
+RUN npx nx build frontend --configuration=production
 
 # ============================================
 # Stage 2: Backend Python avec Playwright
@@ -26,8 +29,8 @@ WORKDIR /app
 
 # Métadonnées
 LABEL maintainer="Dashboard Parapente"
-LABEL version="1.0.0"
-LABEL description="Paragliding weather dashboard with Para-Index scoring"
+LABEL version="2.0.0-nx"
+LABEL description="Paragliding weather dashboard - Nx Monorepo"
 
 # Installer dépendances système pour Playwright et FFmpeg
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -58,7 +61,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copier requirements et installer packages Python
-COPY backend/requirements.txt ./
+COPY apps/backend/requirements.txt ./
 
 # Upgrade pip et installer dépendances
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
@@ -68,10 +71,10 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 RUN playwright install --with-deps chromium
 
 # Copier code backend
-COPY backend/ ./
+COPY apps/backend/ ./
 
-# Copier frontend build depuis stage 1
-COPY --from=frontend-builder /app/frontend/dist ./static
+# Copier frontend build depuis stage 1 (Nx output)
+COPY --from=frontend-builder /workspace/dist/apps/frontend ./static
 
 # Créer répertoires pour la base de données et les exports vidéo
 RUN mkdir -p /app/db && chmod 755 /app/db && \

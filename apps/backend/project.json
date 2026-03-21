@@ -1,0 +1,72 @@
+{
+  "name": "backend",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/backend",
+  "projectType": "application",
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "defaultConfiguration": "development",
+      "options": {
+        "command": ".venv/bin/uvicorn main:app --reload --host 0.0.0.0 --port 8001",
+        "cwd": "apps/backend"
+      },
+      "configurations": {
+        "development": {
+          "command": ".venv/bin/uvicorn main:app --reload --host 0.0.0.0 --port 8001"
+        },
+        "production": {
+          "command": ".venv/bin/uvicorn main:app --host 0.0.0.0 --port 8001 --workers 4"
+        }
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/coverage/apps/backend"],
+      "options": {
+        "commands": [
+          "command -v .venv/bin/pytest >/dev/null 2>&1 && PYTEST=.venv/bin/pytest || PYTEST=pytest; $PYTEST tests/ -m 'not integration and not slow' -v --cov=. --cov-config=.coveragerc --cov-report=term-missing --cov-report=xml"
+        ],
+        "cwd": "apps/backend",
+        "env": {
+          "TESTING": "true",
+          "BACKEND_DATABASE_URL": "sqlite:///./test.db",
+          "BACKEND_WEATHERAPI_KEY": "test_key",
+          "BACKEND_METEOBLUE_API_KEY": "test_key"
+        }
+      }
+    },
+    "test:integration": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "command -v .venv/bin/pytest >/dev/null 2>&1 && PYTEST=.venv/bin/pytest || PYTEST=pytest; $PYTEST tests/ -m integration -v --tb=short --no-cov",
+        "cwd": "apps/backend"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "command -v .venv/bin/ruff >/dev/null 2>&1 && RUFF=.venv/bin/ruff || RUFF=ruff; $RUFF check . --output-format=github",
+          "command -v .venv/bin/black >/dev/null 2>&1 && BLACK=.venv/bin/black || BLACK=black; $BLACK --check --diff .",
+          "command -v .venv/bin/isort >/dev/null 2>&1 && ISORT=.venv/bin/isort || ISORT=isort; $ISORT --check-only --diff ."
+        ],
+        "cwd": "apps/backend",
+        "parallel": false
+      }
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          ".venv/bin/black .",
+          ".venv/bin/isort .",
+          ".venv/bin/ruff check --fix ."
+        ],
+        "cwd": "apps/backend",
+        "parallel": false
+      }
+    }
+  },
+  "tags": ["type:app", "scope:backend", "language:python"]
+}

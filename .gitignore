@@ -57,14 +57,20 @@ logs/
 # Testing
 .pytest_cache/
 .coverage
-frontend/coverage
 htmlcov/
+# Coverage reports (Nx structure)
+apps/*/coverage/
+coverage/
 
 # Node
 node_modules/
 npm-debug.log
 yarn-error.log
 dist/
+
+# Nx
+.nx/cache/
+.nx/workspace-data/
 
 # Frontend build (deployed to backend/static)
 backend/static/

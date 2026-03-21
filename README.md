@@ -31,6 +31,8 @@ Tableau de bord météo personnel pour sites de parapente avec agrégation multi
 - **Cesium** 1.139 (cartographie 3D)
 
 ### Infrastructure
+- **Nx** 20.4 (monorepo intelligent)
+- **Nx Cloud** (distributed caching)
 - Docker multi-stage builds
 - Docker Compose 3.9
 - SQLite (base légère)
@@ -102,6 +104,21 @@ docker-compose up --build
 
 ## 📊 Architecture
 
+### Monorepo Structure (Nx)
+
+```
+dashboard-parapente/
+├── apps/
+│   ├── frontend/          # React 19 + Vite
+│   ├── backend/           # FastAPI + Python
+│   └── e2e/              # Playwright E2E tests
+├── libs/
+│   └── shared-types/     # Shared Zod schemas (TypeScript)
+└── tools/scripts/        # Utility scripts
+```
+
+### Infrastructure
+
 ```
 Internet → Nginx (HTTPS) → Docker Network
                               ├── Redis 8.6 (cache)
@@ -148,18 +165,110 @@ METEOBLUE_API_KEY=***
 
 ## 🛠️ Développement
 
-### Frontend
+> **Note:** Ce projet utilise [Nx](https://nx.dev) pour le monorepo. Voir `NX_MIGRATION.md` pour la documentation complète.
+
+### Installation
 
 ```bash
-cd frontend
 npm install
-npm run dev  # http://localhost:5173
 ```
 
-### Backend
+### Commandes Nx
+
+#### Frontend
 
 ```bash
-cd backend
+# Développement
+nx serve frontend              # http://localhost:5173
+
+# Build
+nx build frontend              # Production build
+nx build frontend --configuration=production
+
+# Tests
+nx test frontend               # Unit tests (Vitest)
+nx test frontend --watch       # Watch mode
+nx test frontend --coverage    # With coverage
+
+# Lint & Type-check
+nx lint frontend
+nx type-check frontend
+
+# Storybook
+nx storybook frontend          # http://localhost:6006
+```
+
+#### Backend
+
+```bash
+# Développement
+nx serve backend               # http://localhost:8001
+
+# Tests
+nx test backend                # Unit tests (pytest)
+nx test:integration backend    # Integration tests
+nx test backend --coverage     # With coverage
+
+# Lint & Format
+nx lint backend                # Ruff linting
+nx format backend              # Black formatting
+```
+
+#### E2E Tests
+
+```bash
+nx e2e e2e                     # Run all E2E tests
+nx e2e:ui e2e                  # Interactive UI mode
+nx e2e:debug e2e               # Debug mode
+nx e2e:report e2e              # Show HTML report
+```
+
+#### Shared Types Library
+
+```bash
+nx build shared-types          # Build shared Zod schemas
+nx lint shared-types
+nx type-check shared-types
+```
+
+### Commandes Nx Avancées
+
+```bash
+# Afficher tous les projets
+nx show projects
+
+# Graphe de dépendances
+nx graph
+
+# Exécuter seulement les projets affectés
+nx affected -t build           # Build seulement ce qui a changé
+nx affected -t test            # Test seulement ce qui a changé
+nx affected -t lint            # Lint seulement ce qui a changé
+
+# Exécuter en parallèle
+nx run-many -t build test --parallel=3
+
+# Cache local
+nx reset                       # Clear cache
+```
+
+### Configuration Traditionnelle (alternative)
+
+Si vous préférez les commandes traditionnelles:
+
+#### Frontend (apps/frontend)
+
+```bash
+cd apps/frontend
+npm run dev                    # http://localhost:5173
+npm run build
+npm run test
+```
+
+#### Backend (apps/backend)
+
+```bash
+cd apps/backend
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8001
 ```
@@ -168,6 +277,7 @@ uvicorn main:app --reload --port 8001
 
 ## 📝 Documentation
 
+- **`NX_MIGRATION.md`** : Guide complet du monorepo Nx
 - **`NGINX_CONFIG.md`** : Configuration reverse proxy
 - **`.env.example`** : Variables disponibles
 - **`/docs`** : API Swagger UI

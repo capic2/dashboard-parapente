@@ -1,0 +1,63 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "defaultBase": "main",
+  "parallel": 3,
+  "namedInputs": {
+    "default": [
+      "{projectRoot}/**/*",
+      "sharedGlobals"
+    ],
+    "production": [
+      "default",
+      "!{projectRoot}/**/*.spec.ts",
+      "!{projectRoot}/**/*.spec.tsx",
+      "!{projectRoot}/**/*.test.ts",
+      "!{projectRoot}/**/*.test.py",
+      "!{projectRoot}/.storybook/**/*",
+      "!{projectRoot}/tests/**/*",
+      "!{projectRoot}/**/__pycache__/**/*",
+      "!{projectRoot}/.venv/**/*",
+      "!{projectRoot}/venv/**/*"
+    ],
+    "sharedGlobals": [
+      "{workspaceRoot}/.env"
+    ]
+  },
+  "targetDefaults": {
+    "build": {
+      "cache": true,
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "production",
+        "^production"
+      ]
+    },
+    "test": {
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/.env"
+      ]
+    },
+    "lint": {
+      "cache": true,
+      "inputs": [
+        "default"
+      ]
+    },
+    "type-check": {
+      "cache": true,
+      "inputs": [
+        "production",
+        "^production"
+      ]
+    },
+    "serve": {
+      "cache": false
+    }
+  },
+  "analytics": true
+}

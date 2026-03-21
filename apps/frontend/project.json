@@ -1,0 +1,76 @@
+{
+  "name": "frontend",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/frontend/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nx/vite:build",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "outputPath": "dist/apps/frontend",
+        "configFile": "apps/frontend/vite.config.ts"
+      },
+      "configurations": {
+        "development": {
+          "mode": "development"
+        },
+        "production": {
+          "mode": "production"
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/vite:dev-server",
+      "defaultConfiguration": "development",
+      "options": {
+        "buildTarget": "frontend:build",
+        "port": 5173
+      }
+    },
+    "test": {
+      "executor": "@nx/vitest:test",
+      "options": {
+        "config": "apps/frontend/vitest.config.ts",
+        "project": "storybook"
+      }
+    },
+    "test:unit": {
+      "executor": "@nx/vitest:test",
+      "outputs": ["{workspaceRoot}/coverage/apps/frontend"],
+      "options": {
+        "config": "apps/frontend/vitest.config.ts",
+        "coverage": true,
+        "project": "unit"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    },
+    "type-check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit",
+        "cwd": "apps/frontend"
+      }
+    },
+    "storybook": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "storybook dev -p 6006",
+        "cwd": "apps/frontend"
+      }
+    },
+    "build-storybook": {
+      "executor": "nx:run-commands",
+      "outputs": ["dist/storybook/frontend"],
+      "options": {
+        "command": "storybook build -o ../../dist/storybook/frontend",
+        "cwd": "apps/frontend"
+      }
+    }
+  },
+  "tags": ["type:app", "scope:frontend"],
+  "implicitDependencies": ["shared-types"]
+}

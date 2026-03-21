@@ -28,7 +28,7 @@ services:
       dockerfile: Dockerfile
       args:
         - BUILDKIT_INLINE_CACHE=1
-    image: parapente-backend:latest
+    image: parapente-backend:nx-latest
     container_name: parapente-backend
     restart: unless-stopped
     ports:
@@ -84,7 +84,7 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ./backend/db:/app/db
+      - db-data:/app/db
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/"]
       interval: 30s
@@ -100,6 +100,12 @@ services:
 volumes:
   redis-data:
     driver: local
+    labels:
+      - "com.docker.compose.project=dashboard-parapente"
+  
+  db-data:
+    driver: local
+    name: parapente-db-data
     labels:
       - "com.docker.compose.project=dashboard-parapente"
 
