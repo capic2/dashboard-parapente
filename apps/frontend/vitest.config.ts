@@ -62,20 +62,18 @@ export default defineConfig({
             configDir: path.join(dirname, '.storybook'),
             // This should match your package.json script to run Storybook
             // The --no-open flag will skip the automatic opening of a browser
-            storybookScript: 'npm run storybook -- --no-open --ci',
+            storybookScript: 'npm run storybook -- --no-open',
           }),
         ],
         test: {
           name: 'storybook',
           globals: true,
-          // Exclude stories that require full browser environment (Cesium, etc.)
-          // or cause iframe reload issues
+          // Exclude stories that require full browser environment (Cesium, WebGL, etc.)
           exclude: [
             'node_modules',
             'dist',
             '**/FlightViewer3D.stories.tsx',
             '**/EmagramWidget.stories.tsx',
-            '**/weather/*.stories.tsx', // Weather components cause iframe reload
           ],
           // Enable browser mode
           browser: {

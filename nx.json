@@ -3,7 +3,10 @@
   "defaultBase": "main",
   "parallel": 3,
   "namedInputs": {
-    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "default": [
+      "{projectRoot}/**/*",
+      "sharedGlobals"
+    ],
     "production": [
       "default",
       "!{projectRoot}/**/*.spec.ts",
@@ -16,28 +19,45 @@
       "!{projectRoot}/.venv/**/*",
       "!{projectRoot}/venv/**/*"
     ],
-    "sharedGlobals": ["{workspaceRoot}/.env"]
+    "sharedGlobals": [
+      "{workspaceRoot}/.env"
+    ]
   },
   "targetDefaults": {
     "build": {
       "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "production",
+        "^production"
+      ]
     },
     "test": {
       "cache": true,
-      "inputs": ["default", "^production", "{workspaceRoot}/.env"]
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/.env"
+      ]
     },
     "lint": {
       "cache": true,
-      "inputs": ["default"]
+      "inputs": [
+        "default"
+      ]
     },
     "type-check": {
       "cache": true,
-      "inputs": ["production", "^production"]
+      "inputs": [
+        "production",
+        "^production"
+      ]
     },
     "serve": {
       "cache": false
     }
-  }
+  },
+  "analytics": true
 }
