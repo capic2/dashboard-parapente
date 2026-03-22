@@ -165,7 +165,6 @@ async def process_strava_activity(activity_id: str, db: Session = None):
 
         # Location
         location_city = activity.get("location_city", "")
-        activity.get("location_country", "")
 
         # Extract location from name
         location = extract_location_from_name(activity_name, location_city)

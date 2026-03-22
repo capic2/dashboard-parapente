@@ -76,7 +76,6 @@ async def fetch_and_store_weather(site_code: str, day_index: int = 0):
         if consensus_hours:
             temps = [h["temperature"] for h in consensus_hours if h.get("temperature")]
             winds = [h["wind_speed"] for h in consensus_hours if h.get("wind_speed")]
-            [h["wind_gust"] for h in consensus_hours if h.get("wind_gust")]
             precips = [h["precipitation"] for h in consensus_hours if h.get("precipitation")]
             clouds = [h["cloud_cover"] for h in consensus_hours if h.get("cloud_cover")]
 

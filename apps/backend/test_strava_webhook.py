@@ -110,9 +110,8 @@ async def test_flow():
 
         # Step 4: Format name
         if departure_time:
-            f"{site_name} {departure_time.strftime('%d-%m %Hh%M')}"
-        else:
-            pass
+            flight_name = f"{site_name} {departure_time.strftime('%d-%m %Hh%M')}"
+            print(f"✅ Formatted flight name: {flight_name}")
 
         # Step 5: Verify GPX file exists
         gpx_full_path = Path(__file__).parent / gpx_path
@@ -126,6 +125,7 @@ async def test_flow():
         import traceback
 
         traceback.print_exc()
+        raise
     finally:
         db.close()
 
