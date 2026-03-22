@@ -423,6 +423,28 @@ else:
 DB_PATH = Path(__file__).parent / "db" / "dashboard.db"
 
 
+@app.get("/health")
+def health_check():
+    """
+    Health check endpoint for monitoring and e2e tests.
+
+    Returns a simple status response to verify the API server is running
+    and ready to accept requests. Used by:
+    - Playwright webServer configuration to wait for backend startup
+    - Monitoring and load balancers for health checks
+    - CI/CD pipelines to verify deployment success
+
+    Returns:
+        dict: A dictionary containing the status key with value "ok"
+
+    Example:
+        >>> response = client.get("/health")
+        >>> response.json()
+        {"status": "ok"}
+    """
+    return {"status": "ok"}
+
+
 @app.get("/")
 def read_root():
     return {
