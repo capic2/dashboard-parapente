@@ -71,9 +71,10 @@ jobs:
           main-branch-name: 'main'
       
       # Configure NX Cloud usage based on context
-      # - By default, NX Cloud is ENABLED for all PRs (including Renovate)
-      # - Add 'skip-nx-cloud' label to a PR to disable NX Cloud and conserve credits
-      # - Useful for Renovate PRs or any PR where you want to save credits
+      # - By default, NX Cloud is ENABLED for all PRs
+      # - Renovate automatically adds 'skip-nx-cloud' label (configured in renovate.json)
+      # - Remove the label from a Renovate PR to enable NX Cloud for that specific update
+      # - You can also manually add 'skip-nx-cloud' to any PR to conserve credits
       # When disabled, NX will use the local cache (setup above) as fallback
       # Note: Using NX_NO_CLOUD env var (not --skip-nx-cache flag) to preserve local cache
       - name: 🎛️ Configure NX Cloud execution
