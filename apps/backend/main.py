@@ -6,6 +6,8 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 # Import configuration (loads environment variables automatically)
 import config
@@ -372,12 +374,9 @@ app.add_middleware(
 app.include_router(router)
 app.include_router(webhooks_router)
 
-from fastapi.responses import FileResponse
-
 # ============================================
 # Serve Static Files (Frontend React SPA)
 # ============================================
-from fastapi.staticfiles import StaticFiles
 
 STATIC_DIR = Path(__file__).parent / "static"
 

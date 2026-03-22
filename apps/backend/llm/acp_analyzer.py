@@ -72,17 +72,17 @@ def analyze_emagram_with_acp(
         logger.info(f"Successfully analyzed emagram for {spot_name}")
         return analysis
 
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as e:
         logger.error(f"ACP analysis timed out after {timeout}s")
-        raise TimeoutError(f"OpenClaw ACP analysis timed out after {timeout} seconds")
+        raise TimeoutError(f"OpenClaw ACP analysis timed out after {timeout} seconds") from e
 
     except subprocess.CalledProcessError as e:
         logger.error(f"ACP command failed: {e.stderr.decode('utf-8')}")
-        raise RuntimeError(f"OpenClaw ACP command failed: {e.stderr.decode('utf-8')}")
+        raise RuntimeError(f"OpenClaw ACP command failed: {e.stderr.decode('utf-8')}") from e
 
     except Exception as e:
         logger.error(f"Unexpected error during ACP analysis: {e}")
-        raise
+        raise  # Re-raise as-is to preserve original exception
 
 
 def _build_analysis_prompt(screenshot_paths: list[str], spot_name: str, coordinates: tuple) -> str:

@@ -418,9 +418,9 @@ async def get_activities_by_period(
 
                 # Log les types d'activités trouvées (pour debug)
                 if len(filtered) == 0 and len(activities) > 0:
-                    activity_types = set(
+                    activity_types = {
                         act.get("type") or act.get("sport_type") for act in activities
-                    )
+                    }
                     logger.debug(f"Activity types found on page {page}: {activity_types}")
 
                 all_activities.extend(filtered)

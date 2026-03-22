@@ -29,6 +29,7 @@ async def test_endpoints():
             tests_failed += 1
 
         # Test 2: Get Sites
+        first_site_id = None  # Initialize before use
         try:
             response = await client.get(f"{BASE_URL}/api/spots")
             if response.status_code == 200:
@@ -39,10 +40,8 @@ async def test_endpoints():
                 tests_passed += 1
             else:
                 tests_failed += 1
-                first_site_id = None
         except Exception:
             tests_failed += 1
-            first_site_id = None
 
         # Test 3: Get Weather (requires site)
         if first_site_id:
@@ -98,9 +97,10 @@ async def test_endpoints():
                     gpx_data = data.get("data", {})
                     coords = gpx_data.get("coordinates", [])
                     tests_passed += 1
+                elif response.status_code == 404:
+                    # 404 is expected if no GPX file exists, skip
+                    pass
                 else:
-                    if response.status_code == 404:
-                        pass
                     tests_failed += 1
             except Exception:
                 tests_failed += 1

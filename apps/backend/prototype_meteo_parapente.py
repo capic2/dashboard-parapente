@@ -420,18 +420,18 @@ async def extract_day_forecast(page, elevation_m: int, selectors: dict, debug: b
         logger.info("🎯 Recherche des lignes d'altitude...")
 
         altitude_strategies = [
-            ('tr:has-text("m")', "tr"),
-            ("tr[data-altitude]", "tr"),
-            ("[data-elevation]", None),
-            (".altitude-row", None),
-            (".elevation-row", None),
-            ("tr.elevation", "tr"),
-            ('div:has-text("m")', "div"),
-            ("tr", "tr"),  # Fallback: toutes les lignes
+            'tr:has-text("m")',
+            "tr[data-altitude]",
+            "[data-elevation]",
+            ".altitude-row",
+            ".elevation-row",
+            "tr.elevation",
+            'div:has-text("m")',
+            "tr",  # Fallback: toutes les lignes
         ]
 
         altitude_elements = []
-        for selector, expected_tag in altitude_strategies:
+        for selector in altitude_strategies:
             try:
                 elements = (
                     await forecast_container.locator(selector).all()

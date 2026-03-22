@@ -34,7 +34,7 @@ npx nx build frontend --configuration=production
 
 Le build Vite produit la même structure :
 
-```
+```text
 dist/apps/frontend/
 ├── index.html
 ├── assets/
@@ -187,7 +187,7 @@ Si vous utilisez Git Repository dans Portainer :
 
 ### Avant (Structure Classique)
 
-```
+```text
 dashboard-parapente/
 ├── backend/          # FastAPI
 ├── frontend/         # React (npm run build)
@@ -203,7 +203,7 @@ COPY frontend/dist ./static
 
 ### Après (NX Monorepo)
 
-```
+```text
 dashboard-parapente/
 ├── apps/
 │   ├── backend/      # FastAPI (inchangé)

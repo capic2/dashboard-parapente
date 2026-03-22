@@ -77,9 +77,11 @@ async def test_flow():
     gpx_path = save_gpx_file(SAMPLE_GPX, activity_id)
 
     if gpx_path:
-        pass
+        print(f"✅ GPX saved to: {gpx_path}")
+        assert gpx_path, "GPX path should exist"
     else:
-        pass
+        print("❌ Failed to save GPX file")
+        return
 
     # Step 3: Match site
     db = SessionLocal()
@@ -96,8 +98,7 @@ async def test_flow():
             for site in sites
         ]
 
-        for site in sites_data:
-            pass
+        print(f"📍 Found {len(sites_data)} sites in database")
 
         site_id = match_site_by_coordinates(departure_lat, departure_lon, sites_data)
 
@@ -140,9 +141,10 @@ async def test_flow():
         # Step 6: Verify GPX file exists
         gpx_full_path = Path(__file__).parent / gpx_path
         if gpx_full_path.exists():
-            pass
+            print(f"✅ GPX file verified at: {gpx_full_path}")
         else:
-            pass
+            print(f"❌ GPX file not found at: {gpx_full_path}")
+            assert False, f"GPX file missing at {gpx_full_path}"
 
     except Exception:
         import traceback

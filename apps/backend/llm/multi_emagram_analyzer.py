@@ -127,7 +127,7 @@ async def analyze_multiple_emagrammes(
     try:
         # Build image descriptions for prompt
         image_descriptions = []
-        for i, (path, source) in enumerate(zip(image_paths, sources), 1):
+        for i, (_path, source) in enumerate(zip(image_paths, sources, strict=True), 1):
             image_descriptions.append(f"Image {i}: {source.title()}")
 
         prompt = EMAGRAM_ANALYSIS_PROMPT.format(

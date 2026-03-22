@@ -27,9 +27,6 @@ async def test_pipeline():
     # Calculate para_index
     para_result = calculate_para_index(consensus)
 
-    for key, value in para_result["metrics"].items():
-        pass
-
     # Analyze slots
     slots = analyze_hourly_slots(consensus)
     slots_summary = format_slots_summary(slots)
