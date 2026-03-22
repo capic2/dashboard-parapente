@@ -55,6 +55,8 @@ async def test_endpoints():
             except Exception as e:
                 tests_failed += 1
         else:
+            # No site available to test weather endpoint
+            # Increment failure to track unavailable test scenario
             tests_failed += 1
         
         # Test 4: Get Flights
@@ -96,11 +98,13 @@ async def test_endpoints():
                     coords = gpx_data.get('coordinates', [])
                     tests_passed += 1
                 else:
-                    if response.status_code == 404:
+                    # Include 404s as failures - tracking endpoint availability issues
                     tests_failed += 1
             except Exception as e:
                 tests_failed += 1
         else:
+            # No flight available to test GPX endpoint
+            # Increment failure to track unavailable test scenario
             tests_failed += 1
         
         # Test 7: Get Alerts

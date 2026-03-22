@@ -321,7 +321,8 @@ async def fetch_meteo_parapente(
             lon,
             elevation_m=elevation_m or 500,
             date=date,
-            run=run
+            run=run,
+            site_name=site_name  # Forward site_name for coordinate refinement
         )
     else:
         # Standalone fallback (sans architecture)

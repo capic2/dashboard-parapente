@@ -1,7 +1,7 @@
 """Fonctions utilitaires partagées par les scrapers"""
 
 import re
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Any
 
 
 def convert_kmh_to_ms(kmh: float) -> float:
