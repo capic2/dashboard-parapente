@@ -103,10 +103,22 @@ async def fetch_all_emagrammes_for_spot(
     # Process results
     for (source_name, _), result in zip(tasks, results):
         if isinstance(result, Exception):
-            emagrammes.append({"source": source_name, "success": False, "error": str(result)})
+            emagrammes.append({
+                "source": source_name,
+                "success": False,
+                "error": str(result),
+                "forecast_hour": None  # Provider-specific: no data on error
+            })
         elif isinstance(result, dict):
-            emagrammes.append({"source": source_name, **result})
+            # Extract forecast_hour from result if present, otherwise null
+            forecast_hour_value = result.get("forecast_hour", None)
 
+            emagrammes.append({
+                "source": source_name,
+                "forecast_hour": forecast_hour_value,  # Provider-specific
+                **result
+            })
+    
     # Count successes
     success_count = sum(1 for e in emagrammes if e.get("success"))
 
@@ -115,7 +127,6 @@ async def fetch_all_emagrammes_for_spot(
         "spot_name": spot_name,
         "latitude": spot_latitude,
         "longitude": spot_longitude,
-        "forecast_hour": forecast_hour,
         "emagrammes": emagrammes,
         "sources_available": success_count,
         "sources_total": len(emagrammes),
