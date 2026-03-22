@@ -1,11 +1,11 @@
 """Configuration centralisée pour tous les scrapers"""
 
-from typing import Dict, List
 from enum import Enum
 
 
 class SourceStatus(Enum):
     """Status d'une source de données"""
+
     ACTIVE = "active"
     DISABLED = "disabled"
     MAINTENANCE = "maintenance"
@@ -22,8 +22,16 @@ SOURCES_CONFIG = {
         "coverage": "24h/day",
         "forecast_range": "7 days",
         "model": "ICON/GFS",
-        "provides": ["temperature", "wind_speed", "wind_direction", "wind_gust", 
-                     "precipitation", "cloud_cover", "cape", "lifted_index"]
+        "provides": [
+            "temperature",
+            "wind_speed",
+            "wind_direction",
+            "wind_gust",
+            "precipitation",
+            "cloud_cover",
+            "cape",
+            "lifted_index",
+        ],
     },
     "weatherapi": {
         "status": SourceStatus.ACTIVE,
@@ -36,8 +44,14 @@ SOURCES_CONFIG = {
         "coverage": "24h/day",
         "forecast_range": "3 days",
         "model": "Proprietary",
-        "provides": ["temperature", "wind_speed", "wind_gust", 
-                     "precipitation", "cloud_cover", "humidity"]
+        "provides": [
+            "temperature",
+            "wind_speed",
+            "wind_gust",
+            "precipitation",
+            "cloud_cover",
+            "humidity",
+        ],
     },
     "meteo-parapente": {
         "status": SourceStatus.ACTIVE,  # ✓ Repaired! Now uses REST API
@@ -51,7 +65,7 @@ SOURCES_CONFIG = {
         "coverage": "04:00-21:00",
         "forecast_range": "1-2 days",
         "model": "AROME (Météo-France)",
-        "provides": ["temperature", "wind_speed", "wind_direction"]
+        "provides": ["temperature", "wind_speed", "wind_direction"],
     },
     "meteociel": {
         "status": SourceStatus.ACTIVE,  # ✓ Repaired! Now uses AROME hourly forecasts
@@ -64,8 +78,15 @@ SOURCES_CONFIG = {
         "coverage": "24h/day (~48h forecast)",
         "forecast_range": "2 days",
         "model": "AROME 1.3km (Météo-France)",
-        "provides": ["temperature", "wind_speed", "wind_gust", "precipitation", "humidity", "pressure"],
-        "note": "Requires major French cities with AROME coverage"
+        "provides": [
+            "temperature",
+            "wind_speed",
+            "wind_gust",
+            "precipitation",
+            "humidity",
+            "pressure",
+        ],
+        "note": "Requires major French cities with AROME coverage",
     },
     "meteoblue": {
         "status": SourceStatus.ACTIVE,
@@ -78,20 +99,19 @@ SOURCES_CONFIG = {
         "forecast_range": "7 days (168 hours)",
         "model": "Meteoblue (multi-model ensemble)",
         "provides": ["temperature", "wind_speed", "wind_direction", "precipitation", "cloud_cover"],
-        "note": "Web scraping with Playwright (activates 1h toggle for 24h data)"
-    }
+        "note": "Web scraping with Playwright (activates 1h toggle for 24h data)",
+    },
 }
 
 
-def get_active_sources() -> List[str]:
+def get_active_sources() -> list[str]:
     """Get list of active sources"""
     return [
-        name for name, config in SOURCES_CONFIG.items()
-        if config["status"] == SourceStatus.ACTIVE
+        name for name, config in SOURCES_CONFIG.items() if config["status"] == SourceStatus.ACTIVE
     ]
 
 
-def get_source_config(source_name: str) -> Dict:
+def get_source_config(source_name: str) -> dict:
     """Get configuration for a specific source"""
     return SOURCES_CONFIG.get(source_name, {})
 

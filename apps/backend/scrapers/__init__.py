@@ -1,10 +1,10 @@
 """Weather scrapers for paragliding dashboard"""
 
+from .meteo_parapente import fetch_meteo_parapente
+from .meteoblue import fetch_meteoblue
+from .meteociel import fetch_meteociel
 from .open_meteo import fetch_open_meteo
 from .weatherapi import fetch_weatherapi
-from .meteoblue import fetch_meteoblue
-from .meteo_parapente import fetch_meteo_parapente
-from .meteociel import fetch_meteociel
 
 __all__ = [
     "fetch_open_meteo",

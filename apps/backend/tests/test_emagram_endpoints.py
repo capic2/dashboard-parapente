@@ -1,21 +1,24 @@
 """
 Test emagram analysis endpoints
 """
-import pytest
-from models import EmagramAnalysis, Site
-from datetime import datetime
+
 import json
+from datetime import datetime
+
+import pytest
+
+from models import EmagramAnalysis, Site
 
 
 class TestEmagramEndpoints:
     """Test /api/emagram endpoints"""
-    
+
     def test_get_latest_no_data(self, client, db_session):
         """Get latest emagram when no data exists"""
         response = client.get("/api/emagram/latest?user_lat=47.0&user_lon=6.0&station_name=Test")
         assert response.status_code == 200
         assert response.json() is None  # API returns None (null) when no data, not 404
-    
+
     def test_get_latest_with_data(self, client, db_session):
         """Get latest emagram analysis"""
         # Add a site
@@ -25,11 +28,11 @@ class TestEmagramEndpoints:
             name="Test Site",
             latitude=47.0,
             longitude=6.0,
-            elevation_m=500
+            elevation_m=500,
         )
         db_session.add(site)
         db_session.commit()
-        
+
         # Add emagram analysis
         analysis = EmagramAnalysis(
             id="test-analysis-1",
@@ -49,13 +52,11 @@ class TestEmagramEndpoints:
             score_volabilite=80,
             conseils_vol="Good flying conditions",
             analysis_status="completed",
-            screenshot_paths=json.dumps({
-                "meteo-parapente": "/tmp/test.png"
-            })
+            screenshot_paths=json.dumps({"meteo-parapente": "/tmp/test.png"}),
         )
         db_session.add(analysis)
         db_session.commit()
-        
+
         response = client.get("/api/emagram/latest?user_lat=47.0&user_lon=6.0")
         assert response.status_code == 200
         data = response.json()
@@ -63,7 +64,7 @@ class TestEmagramEndpoints:
         assert data["score_volabilite"] == 80
         assert data["plafond_thermique_m"] == 3500
         assert "screenshot_paths" in data
-    
+
     def test_list_analyses_empty(self, client):
         """List analyses when DB is empty"""
         response = client.get("/api/emagram/history?user_lat=47.0&user_lon=6.0")
@@ -71,7 +72,7 @@ class TestEmagramEndpoints:
         data = response.json()
         assert isinstance(data, list)
         assert data == []
-    
+
     def test_list_analyses_with_data(self, client, db_session):
         """List all emagram analyses"""
         # Add multiple analyses near user location (47.0, 6.0)
@@ -93,17 +94,17 @@ class TestEmagramEndpoints:
                 force_thermique_ms=2.0,
                 score_volabilite=75 + i * 5,
                 conseils_vol=f"Advice {i}",
-                analysis_status="completed"
+                analysis_status="completed",
             )
             db_session.add(analysis)
         db_session.commit()
-        
+
         response = client.get("/api/emagram/history?user_lat=47.0&user_lon=6.0")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
         assert len(data) == 3
-    
+
     def test_list_analyses_with_days_filter(self, client, db_session):
         """List analyses with days filter"""
         # Add 5 analyses at same location
@@ -125,39 +126,42 @@ class TestEmagramEndpoints:
                 force_thermique_ms=2.0,
                 score_volabilite=75,
                 conseils_vol="Test",
-                analysis_status="completed"
+                analysis_status="completed",
             )
             db_session.add(analysis)
         db_session.commit()
-        
+
         # The history endpoint uses days parameter, not limit
         response = client.get("/api/emagram/history?user_lat=47.0&user_lon=6.0&days=7")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
         assert len(data) == 5  # All 5 are within 7 days
-    
+
     def test_analyze_missing_params(self, client):
         """Trigger analysis without required params"""
         response = client.post("/api/emagram/analyze", json={})
         assert response.status_code == 422  # Validation error
-    
+
     def test_analyze_invalid_coordinates(self, client):
         """Trigger analysis with invalid coordinates"""
-        response = client.post("/api/emagram/analyze", json={
-            "user_latitude": 200,  # Invalid latitude
-            "user_longitude": 6.0,
-            "station_name": "Test"
-        })
+        response = client.post(
+            "/api/emagram/analyze",
+            json={
+                "user_latitude": 200,  # Invalid latitude
+                "user_longitude": 6.0,
+                "station_name": "Test",
+            },
+        )
         assert response.status_code == 422
-    
+
     @pytest.mark.slow
     @pytest.mark.integration
     def test_analyze_full_workflow(self, client, db_session):
         """Full emagram analysis workflow (slow integration test)"""
         # This test requires actual scraping and LLM calls
         pytest.skip("Full workflow test requires live APIs and is slow")
-        
+
         # Add a site
         site = Site(
             id="site-test",
@@ -165,18 +169,21 @@ class TestEmagramEndpoints:
             name="Test Site",
             latitude=47.0,
             longitude=6.0,
-            elevation_m=500
+            elevation_m=500,
         )
         db_session.add(site)
         db_session.commit()
-        
-        response = client.post("/api/emagram/analyze", json={
-            "user_latitude": 47.0,
-            "user_longitude": 6.0,
-            "station_name": "Test Site",
-            "force_refresh": True
-        })
-        
+
+        response = client.post(
+            "/api/emagram/analyze",
+            json={
+                "user_latitude": 47.0,
+                "user_longitude": 6.0,
+                "station_name": "Test Site",
+                "force_refresh": True,
+            },
+        )
+
         assert response.status_code == 200
         data = response.json()
         assert "score_volabilite" in data

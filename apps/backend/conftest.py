@@ -1,10 +1,12 @@
 """
 pytest configuration and fixtures
 """
-import pytest
-import sys
+
 import os
+import sys
 from pathlib import Path
+
+import pytest
 
 # Set testing mode before importing config
 os.environ["TESTING"] = "true"
@@ -20,57 +22,53 @@ os.environ["BACKEND_STRAVA_CLIENT_SECRET"] = "test_strava_secret"
 # Add backend dir to Python path
 sys.path.insert(0, str(Path(__file__).parent))
 
+import tempfile
+
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from fastapi.testclient import TestClient
+
+from database import Base, get_db
+from main import app
 
 # IMPORTANT: Import all models BEFORE importing main.app
 # This ensures all tables are registered with SQLAlchemy Base.metadata
 # before Base.metadata.create_all() is called in the test_db fixture
 from models import (
-    Site,
     Flight,
-    WeatherForecast,
-    WeatherSourceConfig,
-    EmagramAnalysis,
-    EmagramFeedback,
-    ParaglidingSpot
+    Site,
 )
 
-from database import Base, get_db
-from main import app
-import tempfile
 
 # Use temporary file SQLite for tests
 @pytest.fixture(scope="function")
 def test_db():
     """Create a test database (temporary SQLite file)"""
-    import tempfile
     import os
-    
+
     # Create temporary DB file
     fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
-    
+
     # Connect to temp DB
     engine = create_engine(f"sqlite:///{db_path}")
     Base.metadata.create_all(bind=engine)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    
+
     def override_get_db():
         db = SessionLocal()
         try:
             yield db
         finally:
             db.close()
-    
+
     app.dependency_overrides[get_db] = override_get_db
     yield SessionLocal
-    
+
     # Cleanup
     app.dependency_overrides.clear()
     engine.dispose()
-    
+
     # Remove temp file
     try:
         os.unlink(db_path)
@@ -96,12 +94,14 @@ def db_session(test_db):
 # ADVANCED FIXTURES - Realistic test data
 # ============================================================================
 
+
 @pytest.fixture
 def sample_sites():
     """Load realistic site data (Arguel, Chalais, Planfait)"""
     import json
+
     fixtures_path = Path(__file__).parent / "tests" / "fixtures" / "sites.json"
-    with open(fixtures_path, "r") as f:
+    with open(fixtures_path) as f:
         data = json.load(f)
     return data["sites"]
 
@@ -110,7 +110,7 @@ def sample_sites():
 def sample_gpx():
     """Load sample GPX file (Arguel flight)"""
     fixtures_path = Path(__file__).parent / "tests" / "fixtures" / "sample_arguel.gpx"
-    with open(fixtures_path, "r") as f:
+    with open(fixtures_path) as f:
         return f.read()
 
 
@@ -118,8 +118,9 @@ def sample_gpx():
 def sample_consensus_weather():
     """Load sample consensus weather data"""
     import json
+
     fixtures_path = Path(__file__).parent / "tests" / "fixtures" / "sample_consensus_weather.json"
-    with open(fixtures_path, "r") as f:
+    with open(fixtures_path) as f:
         return json.load(f)
 
 
@@ -127,8 +128,9 @@ def sample_consensus_weather():
 def sample_strava_activity():
     """Load sample Strava activity response"""
     import json
+
     fixtures_path = Path(__file__).parent / "tests" / "fixtures" / "sample_strava_activity.json"
-    with open(fixtures_path, "r") as f:
+    with open(fixtures_path) as f:
         return json.load(f)
 
 
@@ -136,11 +138,11 @@ def sample_strava_activity():
 def mock_open_meteo_response():
     """Load mock Open-Meteo API response"""
     import json
+
     fixtures_path = (
-        Path(__file__).parent / "tests" / "fixtures" / 
-        "mock_responses" / "open_meteo_response.json"
+        Path(__file__).parent / "tests" / "fixtures" / "mock_responses" / "open_meteo_response.json"
     )
-    with open(fixtures_path, "r") as f:
+    with open(fixtures_path) as f:
         return json.load(f)
 
 
@@ -149,6 +151,7 @@ def fake_redis():
     """FakeRedis instance for cache testing"""
     try:
         from fakeredis import FakeRedis
+
         redis_client = FakeRedis(decode_responses=True)
         yield redis_client
         redis_client.flushall()
@@ -159,7 +162,7 @@ def fake_redis():
 @pytest.fixture
 def arguel_site(db_session):
     """Create Arguel site in test DB"""
-    from models import Site
+
     site = Site(
         id="site-arguel",
         code="ARG",
@@ -171,7 +174,7 @@ def arguel_site(db_session):
         country="France",
         orientation="SW",
         site_type="user_spot",
-        usage_type="takeoff"
+        usage_type="takeoff",
     )
     db_session.add(site)
     db_session.commit()
@@ -182,7 +185,7 @@ def arguel_site(db_session):
 @pytest.fixture
 def chalais_site(db_session):
     """Create Chalais site in test DB"""
-    from models import Site
+
     site = Site(
         id="site-chalais",
         code="CHA",
@@ -194,7 +197,7 @@ def chalais_site(db_session):
         country="France",
         orientation="W",
         site_type="user_spot",
-        usage_type="takeoff"
+        usage_type="takeoff",
     )
     db_session.add(site)
     db_session.commit()
@@ -205,9 +208,9 @@ def chalais_site(db_session):
 @pytest.fixture
 def sample_flight(db_session, arguel_site):
     """Create sample flight in test DB"""
-    from models import Flight
-    from datetime import datetime, date
-    
+    from datetime import date, datetime
+
+
     flight = Flight(
         id="flight-test-001",
         name="Arguel 15-03 14h00",
@@ -218,7 +221,7 @@ def sample_flight(db_session, arguel_site):
         max_altitude_m=1350,
         max_speed_kmh=45.5,
         site_id="site-arguel",
-        strava_id="123456789"
+        strava_id="123456789",
     )
     db_session.add(flight)
     db_session.commit()

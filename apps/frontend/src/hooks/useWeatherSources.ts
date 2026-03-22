@@ -17,7 +17,7 @@ import type {
  * Fetch all weather sources
  * @param enabledOnly - If true, only return enabled sources
  */
-export const useWeatherSources = (enabledOnly: boolean = false) => {
+export const useWeatherSources = (enabledOnly = false) => {
   return useQuery({
     queryKey: ['weather-sources', enabledOnly],
     queryFn: async () => {
