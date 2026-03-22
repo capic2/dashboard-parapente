@@ -23,7 +23,7 @@ if __name__ == "__main__":
         if result is False:
             print("❌ Database schema creation failed!")
             sys.exit(1)
-        
+
         run_migrations()
         print("✅ E2E database initialized successfully!")
         sys.exit(0)
