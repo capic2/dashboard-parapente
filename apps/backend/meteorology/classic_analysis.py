@@ -9,6 +9,12 @@ from typing import Any
 import metpy.calc as mpcalc
 import numpy as np
 from metpy.units import units
+import metpy.calc as mpcalc
+from typing import Dict, List, Optional, Any, Tuple
+from datetime import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_stability_indices(
@@ -97,7 +103,8 @@ def calculate_stability_indices(
                 lfc_height = np.interp(lfc_pressure.magnitude, p.magnitude[::-1], h.magnitude[::-1])
             else:
                 lfc_height = 44330 * (1 - (lfc_pressure.magnitude / surface_p.magnitude) ** 0.1903)
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to calculate LFC: {e}")
             lfc_height = None
 
         try:
@@ -107,7 +114,8 @@ def calculate_stability_indices(
                 el_height = np.interp(el_pressure.magnitude, p.magnitude[::-1], h.magnitude[::-1])
             else:
                 el_height = 44330 * (1 - (el_pressure.magnitude / surface_p.magnitude) ** 0.1903)
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to calculate EL: {e}")
             el_height = None
 
         # --- Lifted Index ---
@@ -118,7 +126,8 @@ def calculate_stability_indices(
             T_500 = T[p_500_idx].magnitude
             parcel_500 = parcel_prof[p_500_idx].magnitude
             lifted_index = T_500 - parcel_500
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to calculate Lifted Index: {e}")
             lifted_index = None
 
         # --- K-Index (Thunderstorm potential) ---
@@ -135,14 +144,16 @@ def calculate_stability_indices(
             Td_700 = Td[p_700_idx].magnitude
 
             k_index = (T_850 - T_500) + Td_850 - (T_700 - Td_700)
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to calculate K-Index: {e}")
             k_index = None
 
         # --- Total Totals Index ---
         # TT = (T850 - T500) + (Td850 - T500)
         try:
             total_totals = (T_850 - T_500) + (Td_850 - T_500)
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to calculate Total Totals: {e}")
             total_totals = None
 
         # --- Showalter Index ---
@@ -150,7 +161,8 @@ def calculate_stability_indices(
         try:
             parcel_850 = mpcalc.parcel_profile(p, T[p_850_idx], Td[p_850_idx])
             showalter = T_500 - parcel_850[p_500_idx].magnitude
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to calculate Showalter Index: {e}")
             showalter = None
 
         # --- Estimate thermal strength (m/s) ---
@@ -242,12 +254,18 @@ def calculate_wind_shear(
         # Validate array lengths match
         arrays = [pressure_hpa, height_m, wind_u_ms, wind_v_ms]
         lengths = [len(arr) for arr in arrays]
-        if len(set(lengths)) != 1:
-            return {
-                "success": False,
-                "error": f"Array length mismatch: {lengths}"
-            }
-        
+        if len(set(lengths)) > 1:
+            logger.warning(
+                f"Wind data arrays have mismatched lengths: "
+                f"pressure={lengths[0]}, height={lengths[1]}, "
+                f"u={lengths[2]}, v={lengths[3]}. Truncating to minimum."
+            )
+            min_len = min(lengths)
+            pressure_hpa = pressure_hpa[:min_len]
+            height_m = height_m[:min_len]
+            wind_u_ms = wind_u_ms[:min_len]
+            wind_v_ms = wind_v_ms[:min_len]
+
         # Filter valid data
         valid = [
             (p, h, u, v)
@@ -269,11 +287,15 @@ def calculate_wind_shear(
             h_3km = h_arr[mask_3km]
             u_3km = u_arr[mask_3km]
             v_3km = v_arr[mask_3km]
-            # Sort by altitude
+
+            # Sort by altitude to ensure correct endpoints
             sort_idx = np.argsort(h_3km)
-            u_sorted = u_3km[sort_idx]
-            v_sorted = v_3km[sort_idx]
-            shear_0_3km = np.sqrt((u_sorted[-1] - u_sorted[0]) ** 2 + (v_sorted[-1] - v_sorted[0]) ** 2)
+
+            # Use min/max altitude points (first and last after sorting)
+            shear_0_3km = np.sqrt(
+                (u_3km[sort_idx[-1]] - u_3km[sort_idx[0]])**2 +
+                (v_3km[sort_idx[-1]] - v_3km[sort_idx[0]])**2
+            )
         else:
             shear_0_3km = None
 
@@ -283,11 +305,15 @@ def calculate_wind_shear(
             h_6km = h_arr[mask_6km]
             u_6km = u_arr[mask_6km]
             v_6km = v_arr[mask_6km]
-            # Sort by altitude
+
+            # Sort by altitude to ensure correct endpoints
             sort_idx = np.argsort(h_6km)
-            u_sorted = u_6km[sort_idx]
-            v_sorted = v_6km[sort_idx]
-            shear_0_6km = np.sqrt((u_sorted[-1] - u_sorted[0]) ** 2 + (v_sorted[-1] - v_sorted[0]) ** 2)
+
+            # Use min/max altitude points (first and last after sorting)
+            shear_0_6km = np.sqrt(
+                (u_6km[sort_idx[-1]] - u_6km[sort_idx[0]])**2 +
+                (v_6km[sort_idx[-1]] - v_6km[sort_idx[0]])**2
+            )
         else:
             shear_0_6km = None
 
