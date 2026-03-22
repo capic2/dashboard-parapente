@@ -6,6 +6,9 @@ const backendDir = path.resolve(__dirname, '..', 'backend');
 const dbPath = path.join(backendDir, 'test.db');
 const absoluteDbUrl = `sqlite:///${dbPath}`;
 
+// Run only Chromium in CI for speed, all browsers locally
+const ciOnly = !!process.env.CI;
+
 export default defineConfig({
   testDir: './',
   fullyParallel: true,
@@ -24,28 +27,31 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    // Disabled mobile/tablet tests for faster CI
-    // TODO: Re-enable when needed
-    // {
-    //   name: 'firefox',
-    //   use: { ...devices['Desktop Firefox'] },
-    // },
-    // {
-    //   name: 'webkit',
-    //   use: { ...devices['Desktop Safari'] },
-    // },
-    // {
-    //   name: 'Mobile Chrome',
-    //   use: { ...devices['Pixel 5'] },
-    // },
-    // {
-    //   name: 'Mobile Safari',
-    //   use: { ...devices['iPhone 12'] },
-    // },
-    // {
-    //   name: 'iPad',
-    //   use: { ...devices['iPad Pro'] },
-    // },
+    // Additional browsers only run locally (not in CI for speed)
+    ...(!ciOnly
+      ? [
+          {
+            name: 'firefox',
+            use: { ...devices['Desktop Firefox'] },
+          },
+          {
+            name: 'webkit',
+            use: { ...devices['Desktop Safari'] },
+          },
+          {
+            name: 'Mobile Chrome',
+            use: { ...devices['Pixel 5'] },
+          },
+          {
+            name: 'Mobile Safari',
+            use: { ...devices['iPhone 12'] },
+          },
+          {
+            name: 'iPad',
+            use: { ...devices['iPad Pro'] },
+          },
+        ]
+      : []),
   ],
   webServer: [
     {
