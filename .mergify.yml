@@ -1,8 +1,227 @@
+# Mergify Configuration - Dashboard Parapente
+# Documentation: https://docs.mergify.com/
+
+# File d'attente pour gérer les merges de manière ordonnée
+queue_rules:
+  - name: default
+    merge_method: squash
+    update_method: merge
+    commit_message_template: |
+      {{ title }} (#{{ number }})
+      
+      {{ body }}
+    queue_conditions:
+      - check-success=main
+      - base=main
+      - "#approved-reviews-by>=0"
+
+# Règles de merge automatique
+pull_request_rules:
+  # 1. Auto-merge pour les PRs avec label "automerge"
+  - name: Auto-merge avec label automerge
+    conditions:
+      - base=main
+      - label=automerge
+      - check-success=main
+      - "#changes-requested-reviews-by=0"
+    actions:
+      queue:
+        name: default
+      label:
+        add:
+          - ready-to-merge
+
+  # 2. Auto-merge Renovate - Patches avec SECURITY
+  - name: Auto-merge Renovate patches SECURITY
+    conditions:
+      - base=main
+      - author=renovate[bot]
+      - check-success=main
+      - "title~=^(fix|chore)\\(deps\\):.*\\[SECURITY\\]"
+    actions:
+      queue:
+        name: default
+      label:
+        add:
+          - renovate
+          - automerge
+      review:
+        type: APPROVE
+        message: |
+          Auto-approuve par Mergify
+          Mise a jour de securite - Tous les tests passent
+
+  # 3. Auto-merge Renovate - Patches sans major
+  - name: Auto-merge Renovate patches
+    conditions:
+      - base=main
+      - author=renovate[bot]
+      - check-success=main
+      - "title~=^fix\\(deps\\):"
+      - "-title~=major"
+    actions:
+      queue:
+        name: default
+      label:
+        add:
+          - renovate
+          - automerge
+      review:
+        type: APPROVE
+        message: |
+          Auto-approuve par Mergify
+          Mise a jour de dependance patch - Tous les tests passent
+
+  # 4. Auto-merge Renovate - Minors
+  - name: Auto-merge Renovate minors
+    conditions:
+      - base=main
+      - author=renovate[bot]
+      - check-success=main
+      - "title~=^chore\\(deps\\):"
+      - "-title~=major"
+    actions:
+      queue:
+        name: default
+      label:
+        add:
+          - renovate
+          - automerge
+      review:
+        type: APPROVE
+        message: |
+          Auto-approuve par Mergify
+          Mise a jour de dependance minor - Tous les tests passent
+
+  # 5. Label automatique pour Renovate majors (review manuelle)
+  - name: Label Renovate PRs majors - review manuelle requise
+    conditions:
+      - base=main
+      - author=renovate[bot]
+      - "title~=major"
+    actions:
+      label:
+        add:
+          - renovate
+          - needs-review
+      comment:
+        message: |
+          Mise a jour majeure detectee
+          
+          Cette PR contient une mise a jour majeure qui necessite une review manuelle.
+          Veuillez verifier les breaking changes avant de merger.
+          
+          Une fois valide, ajoutez le label automerge pour declencher le merge automatique.
+
+  # 6. Auto-update des branches quand main avance
+  - name: Auto-update branch avec main
+    conditions:
+      - base=main
+      - "-closed"
+      - "-draft"
+      - "-conflict"
+      - "#commits-behind>0"
+    actions:
+      update: {}
+
+  # 7. Ajout automatique du label "ready-to-merge"
+  - name: Label ready-to-merge quand conditions remplies
+    conditions:
+      - base=main
+      - check-success=main
+      - "#changes-requested-reviews-by=0"
+      - "-draft"
+      - "-conflict"
+    actions:
+      label:
+        add:
+          - ready-to-merge
+
+  # 8. Retrait du label "ready-to-merge" si conditions non remplies
+  - name: Retirer ready-to-merge si conditions non remplies
+    conditions:
+      - base=main
+      - check-failure=main
+    actions:
+      label:
+        remove:
+          - ready-to-merge
+
+  # 9. Retrait du label si changes requested
+  - name: Retirer ready-to-merge si changes requested
+    conditions:
+      - base=main
+      - "#changes-requested-reviews-by>0"
+    actions:
+      label:
+        remove:
+          - ready-to-merge
+
+  # 10. Retrait du label si draft
+  - name: Retirer ready-to-merge si draft
+    conditions:
+      - base=main
+      - draft
+    actions:
+      label:
+        remove:
+          - ready-to-merge
+
+  # 11. Retrait du label si conflict
+  - name: Retirer ready-to-merge si conflict
+    conditions:
+      - base=main
+      - conflict
+    actions:
+      label:
+        remove:
+          - ready-to-merge
+
+  # 12. Notification quand la PR est prete
+  - name: Notification PR prete a merger
+    conditions:
+      - base=main
+      - label=ready-to-merge
+      - "-label=automerge"
+      - "-label=renovate"
+      - "-draft"
+    actions:
+      comment:
+        message: |
+          Cette PR est prete a etre mergee!
+          
+          Tous les checks sont verts et les conditions de merge sont remplies.
+          
+          Pour activer le merge automatique, ajoutez le label automerge.
+          Sinon, vous pouvez merger manuellement quand vous etes pret.
+
+  # 13. Suppression automatique de la branche apres merge
+  - name: Supprimer la branche apres merge
+    conditions:
+      - merged
+      - base=main
+    actions:
+      delete_head_branch: {}
+
+# Protections de merge - S'assure que les PRs respectent les criteres
 merge_protections:
-  - name: Only merge with validation label
-    description: Make sure PR has a validation label
+  - name: Verification des checks CI
+    description: Les checks main doivent passer
     if:
-      - base = main
+      - base=main
     success_conditions:
-      - or:
-          - label = automerge
+      - check-success=main
+
+  - name: Branche a jour avec main
+    description: La branche doit etre a jour avec main
+    if:
+      - base=main
+    success_conditions:
+      - "#commits-behind=0"
+
+  - name: Pas de changements demandes
+    description: Aucune review avec changements demandes
+    if:
+      - base=main
+    success_conditions:
+      - "#changes-requested-reviews-by=0"
