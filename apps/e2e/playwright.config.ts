@@ -1,4 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
+import * as path from 'path';
+
+// Use absolute path for database to ensure consistency between global-setup and webServer
+const backendDir = path.resolve(__dirname, '..', 'backend');
+const dbPath = path.join(backendDir, 'test.db');
+const absoluteDbUrl = `sqlite:///${dbPath}`;
 
 export default defineConfig({
   testDir: './',
@@ -50,7 +56,7 @@ export default defineConfig({
       timeout: 120 * 1000, // 2 minutes for backend startup
       env: {
         TESTING: 'false',
-        BACKEND_DATABASE_URL: process.env.BACKEND_DATABASE_URL || 'sqlite:///./test.db',
+        BACKEND_DATABASE_URL: process.env.BACKEND_DATABASE_URL || absoluteDbUrl,
         BACKEND_WEATHERAPI_KEY: process.env.BACKEND_WEATHERAPI_KEY || 'test_key',
         BACKEND_METEOBLUE_API_KEY: process.env.BACKEND_METEOBLUE_API_KEY || 'test_key',
         BACKEND_STRAVA_VERIFY_TOKEN: process.env.BACKEND_STRAVA_VERIFY_TOKEN || 'PARAPENTE_E2E_TEST',

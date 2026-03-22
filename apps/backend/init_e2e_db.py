@@ -19,7 +19,11 @@ from main import initialize_database, run_migrations
 if __name__ == "__main__":
     print("🔧 Initializing E2E test database...")
     try:
-        initialize_database()
+        result = initialize_database()
+        if result is False:
+            print("❌ Database schema creation failed!")
+            sys.exit(1)
+        
         run_migrations()
         print("✅ E2E database initialized successfully!")
         sys.exit(0)
