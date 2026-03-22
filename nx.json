@@ -21,6 +21,16 @@
     ],
     "sharedGlobals": [
       "{workspaceRoot}/.env"
+    ],
+    "packageFiles": [
+      "{projectRoot}/package.json",
+      "{workspaceRoot}/package.json",
+      "{workspaceRoot}/package-lock.json"
+    ],
+    "pythonDependencies": [
+      "{projectRoot}/requirements.txt",
+      "{projectRoot}/pyproject.toml",
+      "{projectRoot}/setup.py"
     ]
   },
   "targetDefaults": {
@@ -31,7 +41,8 @@
       ],
       "inputs": [
         "production",
-        "^production"
+        "^production",
+        "packageFiles"
       ]
     },
     "test": {
@@ -39,20 +50,25 @@
       "inputs": [
         "default",
         "^production",
-        "{workspaceRoot}/.env"
+        "{workspaceRoot}/.env",
+        "packageFiles",
+        "pythonDependencies"
       ]
     },
     "lint": {
       "cache": true,
       "inputs": [
-        "default"
+        "default",
+        "packageFiles",
+        "pythonDependencies"
       ]
     },
     "type-check": {
       "cache": true,
       "inputs": [
         "production",
-        "^production"
+        "^production",
+        "packageFiles"
       ]
     },
     "serve": {
