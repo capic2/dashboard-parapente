@@ -101,15 +101,50 @@ jobs:
           GH_TOKEN: ${{ github.token }}
       
       - name: 🔨 Run affected builds
+        id: build
+        continue-on-error: true
         run: npx nx affected -t build --parallel=3 --exclude=e2e
       
+      - name: 💡 Check if NX Cloud credits exhausted
+        if: always() && steps.build.outcome == 'failure'
+        run: |
+          # Check for NX Cloud credits exhaustion (more reliable patterns)
+          if gh run view ${{ github.run_id }} --log 2>&1 | grep -qE "(Workspace is unable to be authorized|exceeding the FREE plan|Workspace is disabled)"; then
+            echo "::error title=NX Cloud Credits Exhausted::Your NX Cloud free tier credits are exhausted. Add the 'skip-nx-cloud' label to this PR to use local cache instead, then re-run the workflow."
+            echo ""
+            echo "=========================================="
+            echo "⚠️  NX CLOUD CREDITS EXHAUSTED"
+            echo "=========================================="
+            echo ""
+            echo "Your NX Cloud organization has exceeded the FREE plan limit."
+            echo ""
+            echo "📋 Quick fix:"
+            echo "  1. Add the 'skip-nx-cloud' label to this PR"
+            echo "  2. Re-run the workflow"
+            echo "  3. The workflow will use local cache instead (slower but functional)"
+            echo ""
+            echo "💡 For Renovate PRs: The label is added automatically by Renovate config"
+            echo ""
+            echo "🔗 More info: https://cloud.nx.app/orgs/65e6f08db35f78b0f34130b8/plans"
+            echo ""
+            exit 1
+          else
+            echo "::error title=Build Failed::The build failed for a reason other than NX Cloud credits."
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      
       - name: 🎨 Run affected lints
+        if: success() || (failure() && steps.build.outcome == 'success')
         run: npx nx affected -t lint --parallel=3 --exclude=e2e
       
       - name: 📝 Run affected type-check
+        if: success() || (failure() && steps.build.outcome == 'success')
         run: npx nx affected -t type-check --parallel=3 --exclude=e2e
       
       - name: 🧪 Run affected tests (frontend + backend in parallel)
+        if: success() || (failure() && steps.build.outcome == 'success')
         run: npx nx affected -t test --parallel=3 --exclude=e2e
         env:
           TESTING: true
