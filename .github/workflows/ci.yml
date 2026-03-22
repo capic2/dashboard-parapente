@@ -75,6 +75,7 @@ jobs:
       # - Add 'skip-nx-cloud' label to a PR to disable NX Cloud and conserve credits
       # - Useful for Renovate PRs or any PR where you want to save credits
       # When disabled, NX will use the local cache (setup above) as fallback
+      # Note: Using NX_NO_CLOUD env var (not --skip-nx-cache flag) to preserve local cache
       - name: 🎛️ Configure NX Cloud execution
         run: |
           # Check if PR has 'skip-nx-cloud' label to disable NX Cloud
@@ -86,28 +87,29 @@ jobs:
             fi
           fi
           
-          # Determine if we should skip NX Cloud
+          # Set NX_NO_CLOUD to disable only remote cache (preserves local cache)
           if [[ "$HAS_SKIP_LABEL" == "true" ]]; then
-            echo "SKIP_NX_CLOUD=--skip-nx-cache" >> $GITHUB_ENV
+            echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
             echo "⚠️  NX Cloud DISABLED (requested by 'skip-nx-cloud' label to conserve credits)"
+            echo "💾 Local cache will still be used"
           else
-            echo "SKIP_NX_CLOUD=" >> $GITHUB_ENV
+            echo "NX_NO_CLOUD=false" >> $GITHUB_ENV
             echo "✅ NX Cloud ENABLED"
           fi
         env:
           GH_TOKEN: ${{ github.token }}
       
       - name: 🔨 Run affected builds
-        run: npx nx affected -t build --parallel=3 --exclude=e2e ${{ env.SKIP_NX_CLOUD }}
+        run: npx nx affected -t build --parallel=3 --exclude=e2e
       
       - name: 🎨 Run affected lints
-        run: npx nx affected -t lint --parallel=3 --exclude=e2e ${{ env.SKIP_NX_CLOUD }}
+        run: npx nx affected -t lint --parallel=3 --exclude=e2e
       
       - name: 📝 Run affected type-check
-        run: npx nx affected -t type-check --parallel=3 --exclude=e2e ${{ env.SKIP_NX_CLOUD }}
+        run: npx nx affected -t type-check --parallel=3 --exclude=e2e
       
       - name: 🧪 Run affected tests (frontend + backend in parallel)
-        run: npx nx affected -t test --parallel=3 --exclude=e2e ${{ env.SKIP_NX_CLOUD }}
+        run: npx nx affected -t test --parallel=3 --exclude=e2e
         env:
           TESTING: true
           BACKEND_DATABASE_URL: sqlite:///./test.db
@@ -192,17 +194,18 @@ jobs:
           fi
           
           if [[ "$HAS_SKIP_LABEL" == "true" ]]; then
-            echo "SKIP_NX_CLOUD=--skip-nx-cache" >> $GITHUB_ENV
+            echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
             echo "⚠️  NX Cloud DISABLED (requested by 'skip-nx-cloud' label to conserve credits)"
+            echo "💾 Local cache will still be used"
           else
-            echo "SKIP_NX_CLOUD=" >> $GITHUB_ENV
+            echo "NX_NO_CLOUD=false" >> $GITHUB_ENV
             echo "✅ NX Cloud ENABLED"
           fi
         env:
           GH_TOKEN: ${{ github.token }}
       
       - name: 🧪 Run E2E tests
-        run: npx nx e2e e2e --configuration=ci ${{ env.SKIP_NX_CLOUD }}
+        run: npx nx e2e e2e --configuration=ci
         env:
           TESTING: false
           BACKEND_DATABASE_URL: sqlite:///./test.db
