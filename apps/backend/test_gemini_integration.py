@@ -27,7 +27,7 @@ def check_gemini_package():
     logger.info("Checking if google-generativeai is installed...")
 
     try:
-        import google.generativeai as genai
+        import google.generativeai as _genai  # noqa: F401 - import check only
 
         logger.info("✅ google-generativeai package is installed")
         return True

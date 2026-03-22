@@ -19,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from database import SessionLocal
-from models import Flight, Site
+from models import Site
 from strava import match_site_by_coordinates, parse_gpx, save_gpx_file
 
 # Sample GPX for testing (Arguel takeoff)
@@ -110,9 +110,9 @@ async def test_flow():
 
         # Step 4: Format name
         if departure_time:
-            flight_name = f"{site_name} {departure_time.strftime('%d-%m %Hh%M')}"
+            f"{site_name} {departure_time.strftime('%d-%m %Hh%M')}"
         else:
-            flight_name = f"{site_name} 27-02"
+            pass
 
         # Step 5: Verify GPX file exists
         gpx_full_path = Path(__file__).parent / gpx_path

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Initialize database for E2E tests - creates tables with test data"""
+
 import os
 import sys
 
@@ -25,5 +26,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ Failed to initialize E2E database: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

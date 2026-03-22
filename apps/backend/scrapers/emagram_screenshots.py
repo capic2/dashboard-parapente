@@ -80,7 +80,7 @@ async def screenshot_meteo_parapente(
                             logger.info(f"✅ Clicked sounding tab: {selector}")
                             emagram_tab_clicked = True
                             break
-                    except:
+                    except Exception:
                         continue
 
             except Exception as e:

@@ -60,7 +60,6 @@ jobs:
       
       - name: 🎨 Run affected lints
         run: npx nx affected -t lint --parallel=3 --exclude=e2e
-        continue-on-error: true  # TODO: Remove after fixing all lint errors (135+ errors in backend)
       
       - name: 📝 Run affected type-check
         run: npx nx affected -t type-check --parallel=3 --exclude=e2e

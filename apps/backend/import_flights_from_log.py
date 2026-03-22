@@ -146,7 +146,7 @@ def generate_gpx_track(flight, site, gpx_path):
 
     # Generate GPX header
     gpx_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Paragliding Dashboard" 
+<gpx version="1.1" creator="Paragliding Dashboard"
      xmlns="http://www.topografix.com/GPX/1/1"
      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
      xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
@@ -268,8 +268,8 @@ def insert_flights(conn):
         cursor.execute(
             """
             INSERT INTO flights (
-                id, site_id, title, description, flight_date, 
-                duration_minutes, max_altitude_m, max_speed_kmh, 
+                id, site_id, title, description, flight_date,
+                duration_minutes, max_altitude_m, max_speed_kmh,
                 distance_km, elevation_gain_m, notes,
                 gpx_file_path, gpx_max_altitude_m, gpx_elevation_gain_m,
                 created_at, updated_at
@@ -313,14 +313,14 @@ def main():
         insert_sites(conn)
 
         # Step 2: Insert flights with GPX generation
-        count = insert_flights(conn)
+        insert_flights(conn)
 
         # Step 3: Verify
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM sites")
-        sites_count = cursor.fetchone()[0]
+        cursor.fetchone()[0]
         cursor.execute("SELECT COUNT(*) FROM flights")
-        flights_count = cursor.fetchone()[0]
+        cursor.fetchone()[0]
 
     except Exception:
         conn.rollback()

@@ -5,8 +5,6 @@ Tests HTTP endpoints in routes.py related to paragliding spots.
 Coverage: GET, POST, PATCH, DELETE for spots/sites.
 """
 
-
-
 from models import Site
 
 # API prefix for all routes

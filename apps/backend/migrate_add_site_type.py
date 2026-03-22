@@ -53,8 +53,8 @@ def migrate_add_site_type():
 
             # Show statistics
             cursor.execute("""
-                SELECT usage_type, COUNT(*) as count 
-                FROM sites 
+                SELECT usage_type, COUNT(*) as count
+                FROM sites
                 GROUP BY usage_type
             """)
             stats = cursor.fetchall()
@@ -70,14 +70,14 @@ def migrate_add_site_type():
         # Add usage_type column
         print("📝 Adding usage_type column...")
         cursor.execute("""
-            ALTER TABLE sites 
+            ALTER TABLE sites
             ADD COLUMN usage_type VARCHAR DEFAULT 'both'
         """)
 
         # Set all existing sites to 'both'
         cursor.execute("""
-            UPDATE sites 
-            SET usage_type = 'both' 
+            UPDATE sites
+            SET usage_type = 'both'
             WHERE usage_type IS NULL
         """)
         updated_count = cursor.rowcount
