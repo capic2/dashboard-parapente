@@ -19,7 +19,7 @@ import { BestSpotResultSchema, type BestSpotResult } from '@dashboard-parapente/
  * @param dayIndex - Day index (0 = today, 1 = tomorrow, ..., 6 = in 6 days)
  * @returns Query result with the best spot data
  */
-export function useBestSpotAPI(dayIndex: number = 0) {
+export function useBestSpotAPI(dayIndex = 0) {
   return useQuery<BestSpotResult, Error>({
     queryKey: ['bestSpot', dayIndex],
     queryFn: async () => {
@@ -43,7 +43,7 @@ export function useBestSpotAPI(dayIndex: number = 0) {
  * @param dayIndex - Day index (0-6)
  * @returns Site ID or null
  */
-export function useBestSiteIdAPI(dayIndex: number = 0): string | null {
+export function useBestSiteIdAPI(dayIndex = 0): string | null {
   const { data: bestSpot } = useBestSpotAPI(dayIndex);
   return bestSpot?.site?.id || null;
 }

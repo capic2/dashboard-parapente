@@ -23,7 +23,7 @@ export const Sites: React.FC = () => {
   
   // Filter & sort logic
   const filteredSites = useMemo(() => {
-    let filtered = sites.filter(site => {
+    const filtered = sites.filter(site => {
       // Search filter
       const matchesSearch = searchQuery === '' || 
         site.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

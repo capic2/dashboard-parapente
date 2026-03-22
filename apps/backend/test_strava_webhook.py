@@ -18,10 +18,9 @@ from pathlib import Path
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from strava import parse_gpx, save_gpx_file, match_site_by_coordinates
 from database import SessionLocal
-from models import Site, Flight
-
+from models import Flight, Site
+from strava import match_site_by_coordinates, parse_gpx, save_gpx_file
 
 # Sample GPX for testing (Arguel takeoff)
 SAMPLE_GPX = """<?xml version="1.0" encoding="UTF-8"?>
@@ -61,31 +60,32 @@ SAMPLE_GPX = """<?xml version="1.0" encoding="UTF-8"?>
 
 async def test_flow():
     """Test complet du flow webhook Strava"""
-    
-    
+
     # Step 1: Parse GPX
     gpx_data = parse_gpx(SAMPLE_GPX)
-    
+
     if not gpx_data.get("success"):
         return
-    
-    
+
     first_tp = gpx_data.get("first_trackpoint", {})
     departure_time = first_tp.get("time")
     departure_lat = first_tp.get("lat")
     departure_lon = first_tp.get("lon")
-    
-    
+
     # Step 2: Save GPX
     activity_id = "test_123456"
     gpx_path = save_gpx_file(SAMPLE_GPX, activity_id)
-    
+
     if gpx_path:
+        print(f"✅ GPX saved to: {gpx_path}")
+        assert gpx_path, "GPX path should exist"
     else:
-    
+        print("❌ Failed to save GPX file")
+        return
+
     # Step 3: Match site
     db = SessionLocal()
-    
+
     try:
         sites = db.query(Site).all()
         sites_data = [
@@ -93,32 +93,32 @@ async def test_flow():
                 "id": site.id,
                 "name": site.name,
                 "latitude": site.latitude,
-                "longitude": site.longitude
+                "longitude": site.longitude,
             }
             for site in sites
         ]
-        
-        for site in sites_data:
-        
+
+        print(f"📍 Found {len(sites_data)} sites in database")
+
         site_id = match_site_by_coordinates(departure_lat, departure_lon, sites_data)
-        
+
         if site_id:
             matched_site = db.query(Site).filter(Site.id == site_id).first()
             site_name = matched_site.name if matched_site else "Inconnu"
         else:
             site_name = "Inconnu"
-        
+
         # Step 4: Format name
         if departure_time:
             flight_name = f"{site_name} {departure_time.strftime('%d-%m %Hh%M')}"
         else:
             flight_name = f"{site_name} 27-02"
-        
+
         # Step 5: Create Flight (test - don't commit)
-        
-        from datetime import datetime, date
+
         import uuid
-        
+        from datetime import date, datetime
+
         flight = Flight(
             id=str(uuid.uuid4()),
             strava_id=activity_id,
@@ -135,20 +135,20 @@ async def test_flow():
             gpx_max_altitude_m=gpx_data.get("max_altitude_m"),
             gpx_elevation_gain_m=gpx_data.get("elevation_gain_m"),
             external_url=f"https://www.strava.com/activities/{activity_id}",
-            created_at=datetime.now()
+            created_at=datetime.now(),
         )
-        
-        
+
         # Step 6: Verify GPX file exists
         gpx_full_path = Path(__file__).parent / gpx_path
         if gpx_full_path.exists():
+            print(f"✅ GPX file verified at: {gpx_full_path}")
         else:
-        
-        
-        
-        
-    except Exception as e:
+            print(f"❌ GPX file not found at: {gpx_full_path}")
+            assert False, f"GPX file missing at {gpx_full_path}"
+
+    except Exception:
         import traceback
+
         traceback.print_exc()
     finally:
         db.close()

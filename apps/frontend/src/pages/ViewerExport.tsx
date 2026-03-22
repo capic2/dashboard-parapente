@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useSearch } from '@tanstack/react-router'
 import { FlightViewer3D } from '../components/complex/FlightViewer3D'
 
@@ -10,24 +11,25 @@ export function ViewerExport() {
   const search = useSearch({ strict: false }) as { flightId?: string }
   const flightId = search?.flightId || new URLSearchParams(window.location.search).get('flightId') || ''
   
+  // Setup export mode for Playwright
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any)._exportMode = 'manual_render'
+      
+      console.log('🎥 Export mode: manual_render')
+      console.log('📍 Flight ID:', flightId)
+      
+      // Expose flight data when viewer is ready
+      // This will be set by FlightViewer3D component
+    }
+  }, [flightId])
+  
   if (!flightId) {
     return (
       <div className="flex items-center justify-center h-screen">
         <p className="text-gray-600">No flight ID provided. Use ?flightId=xxx</p>
       </div>
     )
-  }
-  
-  // Setup export mode for Playwright
-  if (typeof window !== 'undefined') {
-    // @ts-ignore - Export mode flag
-    window._exportMode = 'manual_render'
-    
-    console.log('🎥 Export mode: manual_render')
-    console.log('📍 Flight ID:', flightId)
-    
-    // Expose flight data when viewer is ready
-    // This will be set by FlightViewer3D component
   }
   
   return (

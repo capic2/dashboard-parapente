@@ -21,7 +21,7 @@ export const emagramKeys = {
 export function useLatestEmagram(
   userLat: number | null,
   userLon: number | null,
-  maxDistanceKm: number = 200,
+  maxDistanceKm = 200,
   options?: { enabled?: boolean }
 ) {
   return useQuery({
@@ -57,8 +57,8 @@ export function useLatestEmagram(
 export function useEmagramHistory(
   userLat: number | null,
   userLon: number | null,
-  days: number = 7,
-  maxDistanceKm: number = 200,
+  days = 7,
+  maxDistanceKm = 200,
   options?: { enabled?: boolean }
 ) {
   return useQuery({

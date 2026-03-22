@@ -408,7 +408,7 @@ const SourceDataTooltip = ({
             );
           }
 
-          let value = sourceData[fieldName];
+          const value = sourceData[fieldName];
 
           const sourceUrl = getSourceUrl(sourceKey);
 
