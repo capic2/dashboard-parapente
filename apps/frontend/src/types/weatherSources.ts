@@ -76,3 +76,31 @@ export interface WeatherSourceTestResult {
   sample_data?: Record<string, any>
   tested_at: string  // ISO datetime
 }
+
+/**
+ * Emagram source result in aggregator response
+ * Note: forecast_hour is now provider-specific (not at root level)
+ */
+export interface EmagramSourceResult {
+  source: string
+  success: boolean
+  forecast_hour: number | null  // Provider-specific (e.g., only Open-Meteo provides this)
+  error?: string
+  // Additional provider-specific fields...
+}
+
+/**
+ * Emagram aggregator response structure
+ * Updated: forecast_hour moved from root to per-source level
+ */
+export interface EmagramAggregatorResponse {
+  success: boolean
+  spot_name: string
+  latitude: number
+  longitude: number
+  emagrammes: EmagramSourceResult[]
+  sources_available: number
+  sources_total: number
+  timestamp: string  // ISO datetime
+  // Note: forecast_hour removed from root - now in each emagrammes[].forecast_hour
+}
