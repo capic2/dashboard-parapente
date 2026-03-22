@@ -127,7 +127,7 @@ async def generate_multi_source_emagram_for_spot(
 
         if google_api_key:
             logger.info("🔷 Trying Gemini Vision analysis...")
-            logger.info(f"   API Key found: {google_api_key[:20]}...")
+            logger.info("   API key found (configured)")
             logger.info(f"   Model: {os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')}")
             try:
                 gemini_analysis = analyze_emagram_with_gemini(
@@ -354,12 +354,12 @@ def emagram_analysis_to_dict(emagram: EmagramAnalysis) -> dict[str, Any]:
         external_urls = (
             json.loads(emagram.external_source_urls) if emagram.external_source_urls else {}
         )
-    except:
+    except (ValueError, TypeError, json.JSONDecodeError):
         external_urls = {}
 
     try:
         alertes = json.loads(emagram.alertes_securite) if emagram.alertes_securite else []
-    except:
+    except (ValueError, TypeError, json.JSONDecodeError):
         alertes = []
 
     return {
