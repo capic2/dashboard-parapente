@@ -71,29 +71,25 @@ jobs:
           main-branch-name: 'main'
       
       # Configure NX Cloud usage based on context
-      # - Disable for Renovate PRs to conserve NX Cloud credits (free tier is limited)
-      # - Can be overridden by adding 'use-nx-cloud' label to the PR
-      # - Always enabled for regular PRs and main branch pushes
+      # - By default, NX Cloud is ENABLED for all PRs (including Renovate)
+      # - Add 'skip-nx-cloud' label to a PR to disable NX Cloud and conserve credits
+      # - Useful for Renovate PRs or any PR where you want to save credits
       # When disabled, NX will use the local cache (setup above) as fallback
       - name: 🎛️ Configure NX Cloud execution
         run: |
-          # Check if PR has 'use-nx-cloud' label (override for special cases)
-          HAS_LABEL=false
+          # Check if PR has 'skip-nx-cloud' label to disable NX Cloud
+          HAS_SKIP_LABEL=false
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name' 2>/dev/null || echo "")
-            if echo "$LABELS" | grep -q "use-nx-cloud"; then
-              HAS_LABEL=true
+            if echo "$LABELS" | grep -q "skip-nx-cloud"; then
+              HAS_SKIP_LABEL=true
             fi
           fi
           
           # Determine if we should skip NX Cloud
-          if [[ "$HAS_LABEL" == "true" ]]; then
-            echo "SKIP_NX_CLOUD=" >> $GITHUB_ENV
-            echo "✅ NX Cloud ENABLED (forced by 'use-nx-cloud' label)"
-          elif [[ "${{ github.actor }}" == "renovate[bot]" ]] || [[ "${{ github.head_ref }}" == renovate/* ]]; then
+          if [[ "$HAS_SKIP_LABEL" == "true" ]]; then
             echo "SKIP_NX_CLOUD=--skip-nx-cache" >> $GITHUB_ENV
-            echo "⚠️  NX Cloud DISABLED for Renovate (to conserve credits)"
-            echo "💡 Tip: Add 'use-nx-cloud' label to this PR to enable NX Cloud if needed"
+            echo "⚠️  NX Cloud DISABLED (requested by 'skip-nx-cloud' label to conserve credits)"
           else
             echo "SKIP_NX_CLOUD=" >> $GITHUB_ENV
             echo "✅ NX Cloud ENABLED"
@@ -187,20 +183,17 @@ jobs:
       # Configure NX Cloud for E2E: same logic as main job
       - name: 🎛️ Configure NX Cloud execution
         run: |
-          HAS_LABEL=false
+          HAS_SKIP_LABEL=false
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name' 2>/dev/null || echo "")
-            if echo "$LABELS" | grep -q "use-nx-cloud"; then
-              HAS_LABEL=true
+            if echo "$LABELS" | grep -q "skip-nx-cloud"; then
+              HAS_SKIP_LABEL=true
             fi
           fi
           
-          if [[ "$HAS_LABEL" == "true" ]]; then
-            echo "SKIP_NX_CLOUD=" >> $GITHUB_ENV
-            echo "✅ NX Cloud ENABLED (forced by 'use-nx-cloud' label)"
-          elif [[ "${{ github.actor }}" == "renovate[bot]" ]] || [[ "${{ github.head_ref }}" == renovate/* ]]; then
+          if [[ "$HAS_SKIP_LABEL" == "true" ]]; then
             echo "SKIP_NX_CLOUD=--skip-nx-cache" >> $GITHUB_ENV
-            echo "⚠️  NX Cloud DISABLED for Renovate (to conserve credits)"
+            echo "⚠️  NX Cloud DISABLED (requested by 'skip-nx-cloud' label to conserve credits)"
           else
             echo "SKIP_NX_CLOUD=" >> $GITHUB_ENV
             echo "✅ NX Cloud ENABLED"
