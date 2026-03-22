@@ -51,7 +51,7 @@ jobs:
           playwright install-deps chromium
       
       - name: 🔍 Derive SHAs for Nx affected
-        uses: nrwl/nx-set-shas@v4
+        uses: nrwl/nx-set-shas@v5
         with:
           main-branch-name: 'main'
       
