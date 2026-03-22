@@ -50,7 +50,7 @@ def create_sample_gpx(
 
     for i in range(num_points):
         # Simulate circular flight pattern with some drift
-        angle = (i / num_points) * 2 * 3.14159 * 2  # 2 circles
+        (i / num_points) * 2 * 3.14159 * 2  # 2 circles
         lat = start_lat + 0.01 * (i / num_points) + 0.005 * random.uniform(-1, 1)
         lon = start_lon + 0.01 * (i / num_points) + 0.005 * random.uniform(-1, 1)
 

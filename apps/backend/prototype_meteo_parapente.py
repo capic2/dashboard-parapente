@@ -134,7 +134,7 @@ async def explore_and_extract(page, site_name: str, elevation_m: int, days: int,
                     selectors_found["search_input"] = selector
                     logger.info(f"✓ Champ trouvé: {selector}")
                     break
-            except Exception as e:
+            except Exception:
                 continue
 
         if not search_input:
@@ -194,7 +194,7 @@ async def explore_and_extract(page, site_name: str, elevation_m: int, days: int,
 
         # Escape regex special characters for safe selector usage
         escaped_site_name = re.escape(site_name)
-        
+
         suggestion_selectors = [
             f'text="{site_name}"',
             f"text=/{escaped_site_name}/i",
@@ -217,7 +217,7 @@ async def explore_and_extract(page, site_name: str, elevation_m: int, days: int,
                     selectors_found["suggestion"] = selector
                     logger.info(f"✓ Suggestion trouvée: {selector}")
                     break
-            except Exception as e:
+            except Exception:
                 continue
 
         if not suggestion:
@@ -239,7 +239,7 @@ async def explore_and_extract(page, site_name: str, elevation_m: int, days: int,
                         tag = await match.evaluate("el => el.tagName")
                         text = await match.inner_text()
                         logger.info(f"      [{i}] <{tag}>: {text[:50]}")
-                    except Exception as e:
+                    except Exception:
                         pass
             else:
                 logger.info(f"   ✗ Texte '{site_name}' NON trouvé dans la page")
@@ -302,7 +302,7 @@ async def explore_and_extract(page, site_name: str, elevation_m: int, days: int,
                             selectors_found["next_day_button"] = selector
                             logger.info(f"✓ Bouton suivant: {selector}")
                             break
-                    except Exception as e:
+                    except Exception:
                         continue
 
                 if not next_button:
@@ -314,7 +314,7 @@ async def explore_and_extract(page, site_name: str, elevation_m: int, days: int,
                 await page.wait_for_timeout(2000)
                 try:
                     await page.wait_for_load_state("networkidle", timeout=5000)
-                except Exception as e:
+                except Exception:
                     pass
 
             # Extraire les données du jour
@@ -388,7 +388,7 @@ async def extract_day_forecast(page, elevation_m: int, selectors: dict, debug: b
                             break
                     if forecast_container:
                         break
-            except Exception as e:
+            except Exception:
                 continue
 
         if not forecast_container:
@@ -399,7 +399,7 @@ async def extract_day_forecast(page, elevation_m: int, selectors: dict, debug: b
                 logger.info("📋 Structure principale de la page:")
                 main_divs = await page.locator("div[class]").all()
                 shown = 0
-                for i, div in enumerate(main_divs):
+                for _i, div in enumerate(main_divs):
                     try:
                         if await div.is_visible() and shown < 30:
                             cls = await div.get_attribute("class") or ""
@@ -408,7 +408,7 @@ async def extract_day_forecast(page, elevation_m: int, selectors: dict, debug: b
                                 text_preview = text_preview[:50].replace("\n", " ")
                                 logger.info(f"   [{shown}] div.{cls}: {text_preview}...")
                                 shown += 1
-                    except Exception as e:
+                    except Exception:
                         pass
 
             return None
@@ -443,7 +443,7 @@ async def extract_day_forecast(page, elevation_m: int, selectors: dict, debug: b
                     selectors["altitude_rows"] = selector
                     logger.info(f"✓ {len(elements)} lignes d'altitude ({selector})")
                     break
-            except Exception as e:
+            except Exception:
                 continue
 
         if not altitude_elements:
@@ -459,7 +459,7 @@ async def extract_day_forecast(page, elevation_m: int, selectors: dict, debug: b
                         text = text[:100].replace("\n", " ")
                         tag = await el.evaluate("el => el.tagName")
                         logger.info(f"   [{i}] <{tag}>: {text}")
-                    except Exception as e:
+                    except Exception:
                         pass
 
             return None
@@ -531,7 +531,7 @@ async def extract_day_forecast(page, elevation_m: int, selectors: dict, debug: b
                     selectors["data_cells"] = cell_sel
                     logger.info(f"✓ {len(found_cells)} cellules ({cell_sel})")
                     break
-            except Exception as e:
+            except Exception:
                 continue
 
         if not cells:
@@ -547,7 +547,7 @@ async def extract_day_forecast(page, elevation_m: int, selectors: dict, debug: b
                     text = text.replace("\n", " ").strip()
                     if text:
                         logger.info(f"   Cell[{i}]: {text}")
-                except Exception as e:
+                except Exception:
                     pass
 
         # ============================================================

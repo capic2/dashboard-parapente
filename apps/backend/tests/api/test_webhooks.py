@@ -329,7 +329,6 @@ async def test_process_strava_activity_update_existing(db_session, sample_flight
     """Test updating an existing flight"""
 
     original_name = sample_flight.name
-    original_distance = sample_flight.distance_km
     strava_id = sample_flight.strava_id
 
     activity_data = {

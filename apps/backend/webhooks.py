@@ -86,7 +86,7 @@ async def strava_webhook_handler(request: Request, db: Session = Depends(get_db)
         data = await request.json()
     except Exception as e:
         logger.error(f"Failed to parse webhook payload: {e}")
-        raise HTTPException(status_code=400, detail="Invalid JSON")
+        raise HTTPException(status_code=400, detail="Invalid JSON") from e
 
     logger.info(f"Strava webhook received: {data}")
 
@@ -165,7 +165,6 @@ async def process_strava_activity(activity_id: str, db: Session = None):
 
         # Location
         location_city = activity.get("location_city", "")
-        location_country = activity.get("location_country", "")
 
         # Extract location from name
         location = extract_location_from_name(activity_name, location_city)

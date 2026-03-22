@@ -246,8 +246,6 @@ async def fetch_wyoming_sounding(
         "STNM": station_code,
     }
 
-    last_error = None
-
     for attempt in range(max_retries):
         try:
             async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
@@ -259,7 +257,6 @@ async def fetch_wyoming_sounding(
             break
 
         except (httpx.HTTPStatusError, httpx.TimeoutException, httpx.ConnectError) as e:
-            last_error = e
 
             if attempt < max_retries - 1:
                 # Not last attempt, wait and retry

@@ -48,8 +48,7 @@
       "options": {
         "commands": [
           "command -v .venv/bin/ruff >/dev/null 2>&1 && RUFF=.venv/bin/ruff || RUFF=ruff; $RUFF check . --output-format=github",
-          "command -v .venv/bin/black >/dev/null 2>&1 && BLACK=.venv/bin/black || BLACK=black; $BLACK --check --diff .",
-          "command -v .venv/bin/isort >/dev/null 2>&1 && ISORT=.venv/bin/isort || ISORT=isort; $ISORT --check-only --diff ."
+          "command -v .venv/bin/black >/dev/null 2>&1 && BLACK=.venv/bin/black || BLACK=black; $BLACK --check --diff ."
         ],
         "cwd": "apps/backend",
         "parallel": false

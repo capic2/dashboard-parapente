@@ -72,7 +72,7 @@ def test_db():
     # Remove temp file
     try:
         os.unlink(db_path)
-    except:
+    except OSError:
         pass
 
 
@@ -209,7 +209,6 @@ def chalais_site(db_session):
 def sample_flight(db_session, arguel_site):
     """Create sample flight in test DB"""
     from datetime import date, datetime
-
 
     flight = Flight(
         id="flight-test-001",

@@ -91,7 +91,7 @@ def parse_time_string(time_str: str) -> time | None:
         hour = int(parts[0])
         minute = int(parts[1]) if len(parts) > 1 else 0
         return time(hour=hour, minute=minute)
-    except:
+    except (ValueError, IndexError, AttributeError):
         return None
 
 

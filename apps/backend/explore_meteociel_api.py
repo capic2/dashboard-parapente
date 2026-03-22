@@ -13,19 +13,12 @@ async def main():
     print()
 
     # Coordinates for Arguel
-    lat, lon = 47.012, 6.789
+    _lat, _lon = 47.012, 6.789
 
     # Try to find city code
     # Meteociel uses INSEE codes (French city codes)
     # Arguel postal code: 25720
     # Let's try to search and parse the results
-
-    urls_to_try = [
-        "https://www.meteociel.fr/prevville.php?ville=Arguel&x=0&y=0",
-        "https://www.meteociel.fr/previsions-arome-025/25720.htm",
-        "https://www.meteociel.fr/previsions-arome-hd/25720.htm",
-        "https://www.meteociel.fr/previsions-arome-015/25720.htm",
-    ]
 
     async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
         # First, search for the city

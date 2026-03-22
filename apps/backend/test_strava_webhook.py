@@ -19,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from database import SessionLocal
-from models import Flight, Site
+from models import Site
 from strava import match_site_by_coordinates, parse_gpx, save_gpx_file
 
 # Sample GPX for testing (Arguel takeoff)
@@ -111,45 +111,21 @@ async def test_flow():
         # Step 4: Format name
         if departure_time:
             flight_name = f"{site_name} {departure_time.strftime('%d-%m %Hh%M')}"
-        else:
-            flight_name = f"{site_name} 27-02"
+            print(f"✅ Formatted flight name: {flight_name}")
 
-        # Step 5: Create Flight (test - don't commit)
-
-        import uuid
-        from datetime import date, datetime
-
-        flight = Flight(
-            id=str(uuid.uuid4()),
-            strava_id=activity_id,
-            name=flight_name,
-            title="Vol test Arguel",
-            flight_date=departure_time.date() if departure_time else date.today(),
-            departure_time=departure_time,
-            site_id=site_id,
-            duration_minutes=22,  # 16:08 to 16:30
-            max_altitude_m=gpx_data.get("max_altitude_m"),
-            distance_km=2.5,
-            elevation_gain_m=gpx_data.get("elevation_gain_m"),
-            gpx_file_path=gpx_path,
-            gpx_max_altitude_m=gpx_data.get("max_altitude_m"),
-            gpx_elevation_gain_m=gpx_data.get("elevation_gain_m"),
-            external_url=f"https://www.strava.com/activities/{activity_id}",
-            created_at=datetime.now(),
-        )
-
-        # Step 6: Verify GPX file exists
+        # Step 5: Verify GPX file exists
         gpx_full_path = Path(__file__).parent / gpx_path
         if gpx_full_path.exists():
             print(f"✅ GPX file verified at: {gpx_full_path}")
         else:
             print(f"❌ GPX file not found at: {gpx_full_path}")
-            assert False, f"GPX file missing at {gpx_full_path}"
+            raise AssertionError(f"GPX file missing at {gpx_full_path}")
 
     except Exception:
         import traceback
 
         traceback.print_exc()
+        raise
     finally:
         db.close()
 

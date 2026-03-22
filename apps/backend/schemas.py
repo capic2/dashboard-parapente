@@ -459,9 +459,7 @@ class EmagramAnalysis(EmagramAnalysisBase):
 
     # Multi-source support (for Gemini multi-emagram analysis)
     external_source_urls: str | None = None  # JSON: {"meteo-parapente": "url", ...}
-    screenshot_paths: str | None = (
-        None  # JSON: {"meteo-parapente": "/path/to/screenshot.png", ...}
-    )
+    screenshot_paths: str | None = None  # JSON: {"meteo-parapente": "/path/to/screenshot.png", ...}
     sources_count: int | None = None  # Number of sources analyzed
     sources_agreement: str | None = None  # "high", "medium", "low"
 

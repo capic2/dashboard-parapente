@@ -5,9 +5,6 @@ Tests HTTP endpoints respond correctly without mocking external dependencies.
 Tests may fail if weather APIs are down, which is expected behavior.
 """
 
-
-
-
 # API prefix for all routes
 API_PREFIX = "/api"
 

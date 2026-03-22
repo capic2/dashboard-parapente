@@ -22,14 +22,14 @@ async def test_pipeline():
         return
 
     consensus = result.get("consensus", [])
-    total_sources = result.get("total_sources", 0)
+    result.get("total_sources", 0)
 
     # Calculate para_index
-    para_result = calculate_para_index(consensus)
+    calculate_para_index(consensus)
 
     # Analyze slots
     slots = analyze_hourly_slots(consensus)
-    slots_summary = format_slots_summary(slots)
+    format_slots_summary(slots)
 
     # Show detailed hourly data
     for hour in consensus:

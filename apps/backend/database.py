@@ -6,7 +6,22 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 from config import DATABASE_URL
 
-DB_PATH = Path(__file__).parent / "db" / "dashboard.db"
+# Extract database file path from DATABASE_URL
+# For sqlite URLs like "sqlite:///./test.db" or "sqlite:///./db/dashboard.db"
+if DATABASE_URL.startswith("sqlite:///"):
+    db_file_path = DATABASE_URL.replace("sqlite:///", "")
+    # Handle relative paths (with or without "./" prefix) as script-relative
+    if db_file_path.startswith("./"):
+        DB_PATH = Path(__file__).parent / db_file_path[2:]
+    elif not Path(db_file_path).is_absolute():
+        # Relative paths without "./" are also treated as script-relative
+        DB_PATH = Path(__file__).parent / db_file_path
+    else:
+        # Absolute paths are used as-is
+        DB_PATH = Path(db_file_path)
+else:
+    # Fallback for non-sqlite databases (DB_PATH unused for non-file databases)
+    DB_PATH = Path(__file__).parent / "db" / "dashboard.db"
 
 engine = create_engine(
     DATABASE_URL,
