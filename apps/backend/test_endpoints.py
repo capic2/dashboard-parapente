@@ -97,7 +97,7 @@ async def test_endpoints():
                 if response.status_code == 200:
                     data = response.json()
                     gpx_data = data.get("data", {})
-                    coords = gpx_data.get("coordinates", [])
+                    gpx_data.get("coordinates", [])
                     tests_passed += 1
                 elif response.status_code == 404:
                     # 404 is expected if no GPX file exists, skip
@@ -116,7 +116,7 @@ async def test_endpoints():
         try:
             response = await client.get(f"{BASE_URL}/api/alerts")
             if response.status_code == 200:
-                alerts = response.json()
+                response.json()
                 tests_passed += 1
             else:
                 tests_failed += 1

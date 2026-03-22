@@ -195,7 +195,7 @@ async def _export_video_playwright(
 
                 raise Exception(
                     f"Canvas element not found after 60s. Check if flight viewer loaded correctly. Error: {str(e)}"
-                )
+                ) from e
 
             # Give it a bit more time for initialization
             await asyncio.sleep(3)
@@ -215,21 +215,21 @@ async def _export_video_playwright(
                             return new Promise((resolve, reject) => {
                                 let checkCount = 0;
                                 const maxChecks = 120; // 60 seconds (500ms * 120)
-                                
+
                                 const checkTerrain = () => {
                                     checkCount++;
-                                    
+
                                     // Timeout after maxChecks
                                     if (checkCount >= maxChecks) {
                                         console.log('⚠️ Terrain check timeout after 60s - proceeding anyway');
                                         resolve(false); // Resolve with false to indicate timeout
                                         return;
                                     }
-                                    
+
                                     // Check if terrainReady indicator is visible (hidden when ready)
                                     const loadingIndicator = document.querySelector('[class*="bg-blue-100"]');
                                     const hasLoadingText = loadingIndicator && loadingIndicator.textContent.includes('Chargement des textures');
-                                    
+
                                     if (!hasLoadingText) {
                                         console.log('✅ Terrain textures loaded!');
                                         resolve(true);
@@ -272,7 +272,7 @@ async def _export_video_playwright(
                 async () => {
                     // Wait for React to be ready
                     await new Promise(resolve => setTimeout(resolve, 2000));
-                    
+
                     // Get flight duration from the displayed time
                     const timeElement = document.querySelector('[class*="text-sm"][class*="text-gray-700"]');
                     if (timeElement && timeElement.textContent.includes('Temps:')) {
@@ -307,47 +307,47 @@ async def _export_video_playwright(
                     if (!canvas) {{
                         throw new Error('Canvas not found');
                     }}
-                    
+
                     console.log('✅ Canvas found, dimensions:', canvas.width, 'x', canvas.height);
-                    
+
                     // Force canvas to requested resolution
                     canvas.width = {width};
                     canvas.height = {height};
                     console.log('📐 Canvas resized to {width}x{height}');
-                    
+
                     // Create a stream from the canvas with manual frame capture
                     const stream = canvas.captureStream(0); // 0 = manual mode, we control frame capture
                     const track = stream.getVideoTracks()[0];
-                    
+
                     // Setup MediaRecorder with highest quality
                     const recorder = new MediaRecorder(stream, {{
                         mimeType: 'video/webm;codecs=vp9',
                         videoBitsPerSecond: 20000000 // 20 Mbps for high quality
                     }});
-                    
+
                     const chunks = [];
-                    
+
                     recorder.ondataavailable = (e) => {{
                         if (e.data.size > 0) {{
                             chunks.push(e.data);
                             console.log('📦 Chunk received:', e.data.size, 'bytes');
                         }}
                     }};
-                    
+
                     // Store recorder, chunks, and track globally
                     window._videoRecorder = recorder;
                     window._videoChunks = chunks;
                     window._videoTrack = track;
-                    
+
                     // Start recording
                     recorder.start(100); // Collect data every 100ms for smoother chunks
                     console.log('🎥 Recording started in manual mode');
-                    
+
                     // Setup frame capture at precise FPS
                     const targetFPS = {fps};
                     const msPerFrame = 1000 / targetFPS;
                     let frameCount = 0;
-                    
+
                     window._captureInterval = setInterval(() => {{
                         // Request a new frame to be captured
                         track.requestFrame();
@@ -356,9 +356,9 @@ async def _export_video_playwright(
                             console.log(`📸 Captured ${{frameCount}} frames`);
                         }}
                     }}, msPerFrame);
-                    
+
                     console.log(`⏱️  Frame capture interval: ${{msPerFrame}}ms ({fps} FPS)`);
-                    
+
                     // Click play button to start animation
                     const playButton = Array.from(document.querySelectorAll('button'))
                         .find(btn => btn.textContent.includes('Play') || btn.textContent.includes('▶'));
@@ -368,7 +368,7 @@ async def _export_video_playwright(
                     }} else {{
                         console.warn('⚠️  Play button not found');
                     }}
-                    
+
                     return true;
                 }}
             """)
@@ -402,20 +402,20 @@ async def _export_video_playwright(
                     return new Promise((resolve) => {
                         const recorder = window._videoRecorder;
                         const chunks = window._videoChunks;
-                        
+
                         // Stop frame capture interval
                         if (window._captureInterval) {
                             clearInterval(window._captureInterval);
                             console.log('⏹️  Frame capture stopped');
                         }
-                        
+
                         recorder.onstop = async () => {
                             console.log('✅ Recording stopped, chunks:', chunks.length);
-                            
+
                             // Create blob from chunks
                             const blob = new Blob(chunks, { type: 'video/webm' });
                             console.log('📦 Video blob size:', blob.size, 'bytes');
-                            
+
                             // Convert blob to base64
                             const reader = new FileReader();
                             reader.onloadend = () => {
@@ -425,7 +425,7 @@ async def _export_video_playwright(
                             };
                             reader.readAsDataURL(blob);
                         };
-                        
+
                         recorder.stop();
                         console.log('⏹️  Recorder.stop() called');
                     });

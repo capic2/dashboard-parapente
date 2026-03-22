@@ -3,16 +3,13 @@ Classic meteorology calculations for atmospheric stability analysis
 Fallback calculations when LLM vision is unavailable
 """
 
+import logging
 from datetime import time
 from typing import Any
 
 import metpy.calc as mpcalc
 import numpy as np
 from metpy.units import units
-import metpy.calc as mpcalc
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import time
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +74,7 @@ def calculate_stability_indices(
         # --- CAPE and CIN ---
         cape, cin = mpcalc.cape_cin(p, T, Td, parcel_prof)
         cape_value = float(cape.magnitude) if hasattr(cape, "magnitude") else float(cape)
-        cin_value = float(cin.magnitude) if hasattr(cin, "magnitude") else float(cin)
+        float(cin.magnitude) if hasattr(cin, "magnitude") else float(cin)
 
         # --- LCL (Lifting Condensation Level) ---
         lcl_pressure, lcl_temp = mpcalc.lcl(surface_p, surface_T, surface_Td)
@@ -293,8 +290,8 @@ def calculate_wind_shear(
 
             # Use min/max altitude points (first and last after sorting)
             shear_0_3km = np.sqrt(
-                (u_3km[sort_idx[-1]] - u_3km[sort_idx[0]])**2 +
-                (v_3km[sort_idx[-1]] - v_3km[sort_idx[0]])**2
+                (u_3km[sort_idx[-1]] - u_3km[sort_idx[0]]) ** 2
+                + (v_3km[sort_idx[-1]] - v_3km[sort_idx[0]]) ** 2
             )
         else:
             shear_0_3km = None
@@ -311,8 +308,8 @@ def calculate_wind_shear(
 
             # Use min/max altitude points (first and last after sorting)
             shear_0_6km = np.sqrt(
-                (u_6km[sort_idx[-1]] - u_6km[sort_idx[0]])**2 +
-                (v_6km[sort_idx[-1]] - v_6km[sort_idx[0]])**2
+                (u_6km[sort_idx[-1]] - u_6km[sort_idx[0]]) ** 2
+                + (v_6km[sort_idx[-1]] - v_6km[sort_idx[0]]) ** 2
             )
         else:
             shear_0_6km = None

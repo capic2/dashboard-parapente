@@ -128,7 +128,7 @@ async def fetch_from_enabled_sources(
         # Get enabled sources
         enabled_sources = (
             db.query(WeatherSourceConfig)
-            .filter(WeatherSourceConfig.is_enabled == True)
+            .filter(WeatherSourceConfig.is_enabled)
             .order_by(WeatherSourceConfig.priority.desc())
             .all()
         )
@@ -576,11 +576,11 @@ def calculate_consensus(normalized: dict[str, Any]) -> dict[str, Any]:
         "success": True,
         "consensus": consensus,
         "total_sources": len(
-            set(
+            {
                 source
                 for hour in normalized.get("normalized", [])
                 for source in hour.get("sources", [])
-            )
+            }
         ),
     }
 

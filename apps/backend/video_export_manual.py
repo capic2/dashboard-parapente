@@ -198,28 +198,28 @@ async def _export_video_manual_render(
                     if (!cesiumContainer) {
                         throw new Error('Cesium viewer container not found');
                     }
-                    
+
                     // Wait for viewer to be ready
                     return new Promise((resolve) => {
                         const checkViewer = () => {
                             // Try to find viewer in window or container
-                            const viewer = window._cesiumViewer || 
+                            const viewer = window._cesiumViewer ||
                                           window.viewer ||
                                           cesiumContainer._viewer;
-                            
+
                             if (viewer && viewer.scene) {
                                 // Disable automatic render loop
                                 viewer.useDefaultRenderLoop = false;
                                 viewer.clock.shouldAnimate = false;
-                                
+
                                 // Store viewer globally
                                 window._cesiumViewer = viewer;
                                 window._exportMode = 'manual_render';
-                                
+
                                 console.log('✅ Cesium configured for manual render');
                                 console.log('  - useDefaultRenderLoop: false');
                                 console.log('  - shouldAnimate: false');
-                                
+
                                 resolve({ success: true });
                             } else {
                                 setTimeout(checkViewer, 100);
@@ -272,14 +272,14 @@ async def _export_video_manual_render(
             flight_data = await page.evaluate("""
                 () => {
                     const viewer = window._cesiumViewer;
-                    
+
                     // Try to get GPS data from the page
                     // This depends on how FlightViewer3D stores the data
                     const gpxData = window._gpxData || {};
                     const coordinates = gpxData.coordinates || [];
-                    
+
                     console.log('GPS points found:', coordinates.length);
-                    
+
                     return {
                         totalPoints: coordinates.length,
                         duration: coordinates.length > 0 ? coordinates.length : 300 // Default 5min
@@ -353,10 +353,10 @@ async def _export_video_manual_render(
                 tiles_loaded = await page.evaluate("""
                     () => {
                         const viewer = window._cesiumViewer;
-                        
+
                         // Force render
                         viewer.scene.render(viewer.clock.currentTime);
-                        
+
                         // Check if tiles are loaded
                         return viewer.scene.globe.tilesLoaded;
                     }

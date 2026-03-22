@@ -145,7 +145,7 @@ def generate_skewt_image(
                     transform=skew.ax.transAxes,
                     fontsize=11,
                     verticalalignment="top",
-                    bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
+                    bbox={"boxstyle": "round", "facecolor": "wheat", "alpha": 0.8},
                 )
 
             except Exception as e:

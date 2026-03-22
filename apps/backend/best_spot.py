@@ -110,9 +110,7 @@ def get_wind_score_multiplier(favorability: str) -> float:
     return multipliers.get(favorability, 0.7)
 
 
-async def calculate_best_spot_from_cache(
-    db: Session, day_index: int = 0
-) -> dict[str, Any] | None:
+async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dict[str, Any] | None:
     """
     Calculate the best spot based on cached weather data (from Redis)
 

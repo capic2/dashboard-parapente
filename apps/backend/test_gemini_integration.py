@@ -27,7 +27,7 @@ def check_gemini_package():
     logger.info("Checking if google-generativeai is installed...")
 
     try:
-        import google.generativeai as genai
+        import google.generativeai as _genai  # noqa: F401 - import check only
 
         logger.info("✅ google-generativeai package is installed")
         return True
@@ -128,7 +128,7 @@ def test_gemini_analysis(api_key, screenshot_paths):
                 f"⚠️  plafond_thermique_m should be int, got {type(result['plafond_thermique_m'])}"
             )
 
-        if not isinstance(result["force_thermique_ms"], (int, float)):
+        if not isinstance(result["force_thermique_ms"], int | float):
             logger.warning(
                 f"⚠️  force_thermique_ms should be float, got {type(result['force_thermique_ms'])}"
             )

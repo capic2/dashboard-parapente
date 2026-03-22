@@ -162,8 +162,8 @@ def main():
             flight_date = datetime.strptime(flight["date"], "%Y-%m-%d").date()
             cursor.execute(
                 """
-                INSERT INTO flights 
-                (id, site_id, name, flight_date, departure_time, duration_minutes, distance_km, 
+                INSERT INTO flights
+                (id, site_id, name, flight_date, departure_time, duration_minutes, distance_km,
                  elevation_gain_m, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,

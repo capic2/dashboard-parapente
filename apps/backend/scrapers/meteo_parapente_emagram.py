@@ -167,7 +167,7 @@ async def fetch_windy_sounding(
                 # Sounding tab might not be available for this location
                 # This is expected behavior, not an error
                 pass
-            
+
             await page.screenshot(path=image_path)
 
             await browser.close()

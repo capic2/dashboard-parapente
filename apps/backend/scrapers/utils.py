@@ -1,7 +1,7 @@
 """Fonctions utilitaires partagées par les scrapers"""
 
 import re
-from typing import Optional, Tuple, List, Any
+from typing import Any
 
 
 def convert_kmh_to_ms(kmh: float) -> float:
@@ -25,18 +25,18 @@ def parse_wind_speed(text: str) -> float | None:
         "5-10 km/h" → 7.5 (average in m/s)
     """
     # Check range pattern FIRST (before single value)
-    range_match = re.search(r'(\d+)-(\d+)\s*(?:km/h|kmh)', text, re.IGNORECASE)
+    range_match = re.search(r"(\d+)-(\d+)\s*(?:km/h|kmh)", text, re.IGNORECASE)
     if range_match:
         avg = (float(range_match.group(1)) + float(range_match.group(2))) / 2
         return convert_kmh_to_ms(avg)
 
     # Pattern: number with unit km/h
-    kmh_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:km/h|kmh)', text, re.IGNORECASE)
+    kmh_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:km/h|kmh)", text, re.IGNORECASE)
     if kmh_match:
         return convert_kmh_to_ms(float(kmh_match.group(1)))
-    
+
     # Pattern: number with unit m/s
-    ms_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:m/s|ms)', text, re.IGNORECASE)
+    ms_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:m/s|ms)", text, re.IGNORECASE)
     if ms_match:
         return float(ms_match.group(1))
 
@@ -106,7 +106,7 @@ def parse_wind_direction(text: str) -> int | None:
     for direction in sorted(directions.keys(), key=len, reverse=True):
         if direction in text_upper:
             return directions[direction]
-    
+
     return None
 
 

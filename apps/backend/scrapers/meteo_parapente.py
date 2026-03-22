@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 # Import de la nouvelle architecture si disponible
 try:
     from .base import APIScraper
-    from .utils import convert_kmh_to_ms
 
     USING_NEW_ARCHITECTURE = True
 except ImportError:
@@ -343,7 +342,7 @@ async def fetch_meteo_parapente(
             elevation_m=elevation_m or 500,
             date=date,
             run=run,
-            site_name=site_name  # Forward site_name for coordinate refinement
+            site_name=site_name,  # Forward site_name for coordinate refinement
         )
     else:
         # Standalone fallback (sans architecture)
@@ -436,7 +435,7 @@ def extract_hourly_forecast(data: dict[str, Any], day_index: int = 0) -> list[di
                         "cloud_cover": None,
                     }
                 )
-            except:
+            except Exception:
                 continue
 
         return hourly_forecasts

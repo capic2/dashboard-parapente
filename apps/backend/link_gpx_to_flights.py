@@ -96,7 +96,7 @@ def main():
 
         cursor.execute(
             """
-            UPDATE flights 
+            UPDATE flights
             SET gpx_file_path = ?,
                 max_altitude_m = ?
             WHERE id = ?

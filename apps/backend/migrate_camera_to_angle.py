@@ -61,7 +61,7 @@ def migrate(db_path: str):
         if not has_camera_angle:
             print("📐 Adding camera_angle column...")
             cursor.execute("""
-                ALTER TABLE sites 
+                ALTER TABLE sites
                 ADD COLUMN camera_angle INTEGER
             """)
             print("✅ camera_angle column added")
@@ -93,9 +93,9 @@ def migrate(db_path: str):
         # Step 3: Initialize camera_angle from orientation for sites without camera_angle
         print("🔧 Initializing camera_angle from orientation where needed...")
         cursor.execute("""
-            SELECT id, orientation 
-            FROM sites 
-            WHERE camera_angle IS NULL 
+            SELECT id, orientation
+            FROM sites
+            WHERE camera_angle IS NULL
             AND orientation IS NOT NULL
         """)
         sites_to_init = cursor.fetchall()
@@ -119,7 +119,7 @@ def migrate(db_path: str):
 
             # Get the current table schema
             cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='sites'")
-            create_table_sql = cursor.fetchone()[0]
+            cursor.fetchone()[0]
 
             # Create a temporary table without camera_direction
             cursor.execute("""
@@ -147,8 +147,8 @@ def migrate(db_path: str):
 
             # Copy data (excluding camera_direction)
             cursor.execute("""
-                INSERT INTO sites_new 
-                SELECT id, code, name, elevation_m, latitude, longitude, description, 
+                INSERT INTO sites_new
+                SELECT id, code, name, elevation_m, latitude, longitude, description,
                        region, country, site_type, linked_spot_id, rating, orientation,
                        camera_angle, camera_distance, created_at, updated_at
                 FROM sites

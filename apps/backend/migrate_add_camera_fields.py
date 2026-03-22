@@ -38,7 +38,7 @@ def migrate(db_path: str):
         if needs_camera_direction:
             print("📐 Adding camera_direction column...")
             cursor.execute("""
-                ALTER TABLE sites 
+                ALTER TABLE sites
                 ADD COLUMN camera_direction TEXT
             """)
             print("✅ camera_direction column added")
@@ -49,7 +49,7 @@ def migrate(db_path: str):
         if needs_camera_distance:
             print("📏 Adding camera_distance column...")
             cursor.execute("""
-                ALTER TABLE sites 
+                ALTER TABLE sites
                 ADD COLUMN camera_distance INTEGER DEFAULT 500
             """)
             print("✅ camera_distance column added")
@@ -60,8 +60,8 @@ def migrate(db_path: str):
         if needs_camera_distance:
             print("🔧 Setting default camera_distance (500m) for existing sites...")
             cursor.execute("""
-                UPDATE sites 
-                SET camera_distance = 500 
+                UPDATE sites
+                SET camera_distance = 500
                 WHERE camera_distance IS NULL
             """)
             print(f"✅ Updated {cursor.rowcount} sites with default camera_distance")
@@ -70,9 +70,9 @@ def migrate(db_path: str):
         # This makes camera positioned in the same direction as orientation
         print("🔧 Initializing camera_direction from orientation...")
         cursor.execute("""
-            UPDATE sites 
-            SET camera_direction = orientation 
-            WHERE camera_direction IS NULL 
+            UPDATE sites
+            SET camera_direction = orientation
+            WHERE camera_direction IS NULL
             AND orientation IS NOT NULL
         """)
         updated_count = cursor.rowcount

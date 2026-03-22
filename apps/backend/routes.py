@@ -6,7 +6,6 @@ import uuid
 import xml.etree.ElementTree as ET
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Optional
 from zoneinfo import ZoneInfo
 
 import redis
@@ -17,28 +16,36 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import EmagramAnalysis, Flight, Site, WeatherForecast, WeatherSourceConfig
+from para_index import analyze_hourly_slots, calculate_para_index, format_slots_summary
 from schemas import EmagramAnalysis as EmagramAnalysisSchema
 from schemas import (
     EmagramAnalysisListItem,
     EmagramTriggerRequest,
     FlightUpdate,
+)
+from schemas import Site as SiteSchema
+from schemas import (
     SiteCreate,
     SiteUpdate,
     SpotsResponse,
+)
+from schemas import WeatherSourceConfig as WeatherSourceConfigSchema
+from schemas import (
     WeatherSourceConfigCreate,
     WeatherSourceConfigUpdate,
     WeatherSourceStats,
     WeatherSourceTestResult,
 )
-from schemas import Site as SiteSchema
-from schemas import WeatherSourceConfig as WeatherSourceConfigSchema
+from video_export import get_export_status as get_export_status_stream
+from video_export import list_exports as list_exports_stream
+from video_export import start_video_export_background
+from video_export_manual import cancel_video_export as cancel_video_export_manual
+from video_export_manual import get_export_status as get_export_status_manual
+from video_export_manual import list_exports as list_exports_manual
+from video_export_manual import start_video_export_manual
+from weather_pipeline import get_daily_aggregate, get_normalized_forecast
 
 logger = logging.getLogger(__name__)
-
-from para_index import analyze_hourly_slots, calculate_para_index, format_slots_summary
-
-# Import weather_pipeline and para_index
-from weather_pipeline import get_daily_aggregate, get_normalized_forecast
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -145,7 +152,7 @@ async def geocode_location(query: str, country: str = "FR"):
         response = requests.get(url, params=params, headers=headers, timeout=5)
         data = response.json()
         display_name = data.get("display_name", query)
-    except:
+    except Exception:
         display_name = query
 
     return {"name": query, "latitude": lat, "longitude": lon, "display_name": display_name}
@@ -576,7 +583,7 @@ async def create_site(site_data: SiteCreate, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"Failed to create site: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Site creation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Site creation failed: {str(e)}") from e
 
 
 @router.patch("/sites/{site_id}/orientation")
@@ -646,7 +653,7 @@ def update_site_orientation(site_id: str, orientation: str, db: Session = Depend
     except Exception as e:
         db.rollback()
         logger.error(f"Failed to update site orientation: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}") from e
 
 
 @router.patch("/sites/{site_id}/camera")
@@ -710,7 +717,7 @@ def update_site_camera(
     except Exception as e:
         db.rollback()
         logger.error(f"Failed to update site camera settings: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}") from e
 
 
 @router.patch("/sites/{site_id}")
@@ -757,7 +764,7 @@ def update_site(site_id: str, site_data: SiteUpdate, db: Session = Depends(get_d
     except Exception as e:
         db.rollback()
         logger.error(f"Failed to update site {site_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}") from e
 
 
 @router.delete("/sites/{site_id}")
@@ -803,7 +810,7 @@ def delete_site(site_id: str, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"Failed to delete site {site_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Deletion failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Deletion failed: {str(e)}") from e
 
 
 # ============================================================================
@@ -871,7 +878,9 @@ async def get_best_spot(
         raise
     except Exception as e:
         logger.error(f"Error getting best spot: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to calculate best spot: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to calculate best spot: {str(e)}"
+        ) from e
 
 
 @router.get("/spots/{spot_id}", response_model=SiteSchema)
@@ -1023,7 +1032,7 @@ async def seed_sites_endpoint(db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"Error seeding sites: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to seed sites: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to seed sites: {str(e)}") from e
 
 
 @router.post("/admin/refresh-weather")
@@ -1056,7 +1065,7 @@ async def refresh_weather_cache():
 
     except Exception as e:
         logger.error(f"Error during manual weather refresh: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Weather refresh failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Weather refresh failed: {str(e)}") from e
 
 
 @router.post("/admin/clear-cache")
@@ -1096,7 +1105,7 @@ async def clear_redis_cache():
 
     except Exception as e:
         logger.error(f"Error clearing cache: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}") from e
 
 
 @router.get("/admin/debug-cache/{site_id}")
@@ -1138,7 +1147,7 @@ async def debug_cache_data(site_id: str, day_index: int = 0, db: Session = Depen
             return {"cache_key": cache_key, "found": False}
     except Exception as e:
         logger.error(f"Error debugging cache: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/admin/test-weather/{site_id}")
@@ -1202,7 +1211,7 @@ async def test_weather_fetch(site_id: str, db: Session = Depends(get_db)):
 
     except Exception as e:
         logger.error(f"Error in test-weather: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/admin/sites/link-to-spots")
@@ -1545,7 +1554,7 @@ async def get_daily_summary(spot_id: str, days: int = 7, db: Session = Depends(g
         raise  # Re-raise HTTP exceptions as-is
     except Exception as e:
         logger.error(f"Unexpected error in daily_summary for {spot_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") from e
 
 
 # Flights endpoints
@@ -1575,18 +1584,18 @@ def get_flights(
         try:
             from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
             query = query.filter(Flight.flight_date >= from_date)
-        except ValueError:
+        except ValueError as e:
             raise HTTPException(
                 status_code=400, detail=f"Invalid date_from format: {date_from}. Use YYYY-MM-DD"
-            )
+            ) from e
     if date_to:
         try:
             to_date = datetime.strptime(date_to, "%Y-%m-%d").date()
             query = query.filter(Flight.flight_date <= to_date)
-        except ValueError:
+        except ValueError as e:
             raise HTTPException(
                 status_code=400, detail=f"Invalid date_to format: {date_to}. Use YYYY-MM-DD"
-            )
+            ) from e
 
     flights = query.order_by(Flight.flight_date.desc()).limit(limit).all()
 
@@ -1856,7 +1865,7 @@ async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session =
     except Exception as e:
         db.rollback()
         logger.error(f"Failed to update flight {flight_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}") from e
 
 
 @router.get("/flights/{flight_id}/gpx-data")
@@ -1899,7 +1908,7 @@ def get_flight_gpx_data(flight_id: str, db: Session = Depends(get_db)):
             }
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse GPX file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to parse GPX file: {str(e)}") from e
 
 
 @router.get("/flights/{flight_id}/gpx-data/debug")
@@ -1930,7 +1939,7 @@ def get_flight_gpx_data_debug(flight_id: str, db: Session = Depends(get_db)):
             "file_exists": gpx_path.exists(),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse GPX file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to parse GPX file: {str(e)}") from e
 
 
 @router.get("/flights/{flight_id}/gpx")
@@ -2102,7 +2111,7 @@ async def sync_strava_activities(request: dict, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Sync failed: {e}", exc_info=True)
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}") from e
 
 
 @router.post("/flights/{flight_id}/upload-gpx")
@@ -2167,7 +2176,7 @@ async def upload_gpx_to_flight(
     except Exception as e:
         logger.error(f"Failed to upload GPX to flight {flight_id}: {e}", exc_info=True)
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}") from e
 
 
 @router.post("/flights/create-from-gpx")
@@ -2338,7 +2347,7 @@ async def create_flight_from_gpx(
     except Exception as e:
         logger.error(f"Failed to create flight from GPX: {e}", exc_info=True)
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to create flight: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create flight: {str(e)}") from e
 
 
 @router.delete("/flights/{flight_id}")
@@ -2377,7 +2386,7 @@ async def delete_flight(flight_id: str, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Failed to delete flight {flight_id}: {e}", exc_info=True)
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}") from e
 
 
 # Alerts endpoints
@@ -2815,16 +2824,6 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 # VIDEO EXPORT ENDPOINTS
 # ========================================
 
-from video_export import get_export_status as get_export_status_stream
-from video_export import (
-    start_video_export_background,
-)
-from video_export_manual import cancel_video_export as cancel_video_export_manual
-from video_export_manual import get_export_status as get_export_status_manual
-from video_export_manual import (
-    start_video_export_manual,
-)
-
 
 @router.post("/flights/{flight_id}/export-video")
 def start_flight_video_export(
@@ -2975,7 +2974,11 @@ def download_exported_video(job_id: str):
     """
     Download exported video
     """
-    status = get_export_status(job_id)
+    # Try manual render first, then stream
+    status = get_export_status_manual(job_id)
+    if not status:
+        status = get_export_status_stream(job_id)
+
     if not status:
         raise HTTPException(status_code=404, detail="Export job not found")
 
@@ -3000,7 +3003,10 @@ def list_flight_exports(flight_id: str, db: Session = Depends(get_db)):
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
-    exports = list_exports(flight_id=flight_id)
+    # Combine exports from both manual and stream modes
+    manual_exports = list_exports_manual(flight_id=flight_id)
+    stream_exports = list_exports_stream(flight_id=flight_id)
+    exports = manual_exports + stream_exports
     return {"exports": exports}
 
 
@@ -3023,7 +3029,7 @@ def get_weather_sources(enabled_only: bool = False, db: Session = Depends(get_db
     query = db.query(WeatherSourceConfig)
 
     if enabled_only:
-        query = query.filter(WeatherSourceConfig.is_enabled == True)
+        query = query.filter(WeatherSourceConfig.is_enabled)
 
     sources = query.order_by(WeatherSourceConfig.priority.desc()).all()
 
@@ -3155,9 +3161,7 @@ def update_weather_source(
 
     # Validation: At least 1 source must remain active
     if source_data.is_enabled is False:
-        active_count = (
-            db.query(WeatherSourceConfig).filter(WeatherSourceConfig.is_enabled == True).count()
-        )
+        active_count = db.query(WeatherSourceConfig).filter(WeatherSourceConfig.is_enabled).count()
 
         if active_count <= 1:
             raise HTTPException(
@@ -3348,7 +3352,7 @@ async def test_weather_source(
 # ============================================================================
 
 
-@router.get("/emagram/latest", response_model=Optional[EmagramAnalysisSchema], tags=["Emagram"])
+@router.get("/emagram/latest", response_model=EmagramAnalysisSchema | None, tags=["Emagram"])
 async def get_latest_emagram(
     user_lat: float = Query(..., description="User latitude"),
     user_lon: float = Query(..., description="User longitude"),
@@ -3404,7 +3408,7 @@ async def get_latest_emagram(
 
     except Exception as e:
         logger.error(f"Failed to get latest emagram: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/emagram/history", response_model=list[EmagramAnalysisListItem], tags=["Emagram"])
@@ -3458,7 +3462,7 @@ async def get_emagram_history(
 
     except Exception as e:
         logger.error(f"Failed to get emagram history: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/emagram/export/csv")
@@ -3581,7 +3585,7 @@ async def export_emagram_csv(
 
     except Exception as e:
         logger.error(f"Failed to export CSV: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/emagram/analyze", response_model=EmagramAnalysisSchema, tags=["Emagram"])
@@ -3709,7 +3713,7 @@ async def trigger_emagram_analysis(
         raise
     except Exception as e:
         logger.error(f"Failed to trigger emagram analysis: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # ============================================================================
@@ -3907,8 +3911,8 @@ async def get_emagram_screenshot(analysis_id: str, source: str, db: Session = De
     # Parse screenshot paths JSON
     try:
         screenshot_paths = json.loads(emagram.screenshot_paths)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="Invalid screenshot paths data")
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail="Invalid screenshot paths data") from e
 
     # Get the requested screenshot path
     image_path = screenshot_paths.get(source)
@@ -3969,7 +3973,7 @@ async def clear_emagram_cache(db: Session = Depends(get_db)):
         }
     except Exception as e:
         logger.error(f"Clear cache failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/admin/debug/gemini")

@@ -110,8 +110,8 @@ def seed_sites():
         for site in sites:
             cursor.execute(
                 """
-                INSERT OR REPLACE INTO sites 
-                (id, code, name, latitude, longitude, elevation_m, region, country, 
+                INSERT OR REPLACE INTO sites
+                (id, code, name, latitude, longitude, elevation_m, region, country,
                  rating, orientation, linked_spot_id, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,

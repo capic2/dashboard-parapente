@@ -13,14 +13,21 @@ print("=" * 60)
 # Test 1: Imports
 print("\n1️⃣ Testing imports...")
 try:
-    from meteorology.classic_analysis import calculate_flyability_score, calculate_stability_indices
-    from models import EmagramAnalysis
-    from schemas import EmagramAnalysis as EmagramSchema
-    from schemas import (
+    from meteorology.classic_analysis import (
+        calculate_flyability_score,
+        calculate_stability_indices,
+    )
+    from models import EmagramAnalysis  # noqa: F401 - import validation
+    from schemas import EmagramAnalysis as EmagramSchema  # noqa: F401 - import validation
+    from schemas import (  # noqa: F401 - import validation
         EmagramAnalysisCreate,
         EmagramTriggerRequest,
     )
-    from scrapers.wyoming import EUROPEAN_STATIONS, find_closest_station, haversine_distance
+    from scrapers.wyoming import (  # noqa: F401 - import validation
+        EUROPEAN_STATIONS,
+        find_closest_station,
+        haversine_distance,
+    )
 
     print("   ✅ All imports successful")
 except ImportError as e:

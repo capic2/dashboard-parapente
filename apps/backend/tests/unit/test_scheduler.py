@@ -152,8 +152,6 @@ async def test_fetch_and_cache_weather_exception_handling(db_session, arguel_sit
 async def test_scheduled_weather_fetch(db_session):
     """Test scheduled weather fetch for all default sites"""
 
-    mock_result = {"success": True, "consensus": []}
-
     with (
         patch("scheduler.fetch_and_cache_weather", new=AsyncMock(return_value=True)) as mock_fetch,
         patch("best_spot.refresh_best_spot_cache", new=AsyncMock()),

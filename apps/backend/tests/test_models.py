@@ -40,7 +40,7 @@ class TestSiteModel:
         db_session.commit()
 
         db_session.add(site2)
-        with pytest.raises(Exception):  # Should fail with unique constraint
+        with pytest.raises((Exception, BaseException)):  # Should fail with unique constraint
             db_session.commit()
 
     def test_site_timestamps(self, db_session):

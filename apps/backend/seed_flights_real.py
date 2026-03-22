@@ -178,7 +178,7 @@ def seed_real_flights():
                     try:
                         date_str = flight_data["file"].split("_")[0]
                         flight_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-                    except:
+                    except (ValueError, IndexError):
                         flight_date = datetime.now(ZoneInfo("UTC")).date()
 
                 # Extract departure time

@@ -202,7 +202,7 @@ class MeteoblueScraper(PlaywrightScraper):
                 return []
 
             # Find all rows
-            rows = hourly_table.find_all("tr")
+            hourly_table.find_all("tr")
 
             # Parse times row (has <time datetime="..."> tags)
             times_row = hourly_table.find("tr", class_="times")
@@ -330,7 +330,7 @@ class MeteoblueScraper(PlaywrightScraper):
             return None
 
         text = text.upper()
-        
+
         # Try direct mapping (check longest matches first to avoid "N" matching "NNE")
         for key in sorted(self.DIRECTION_MAP.keys(), key=len, reverse=True):
             if key in text:
@@ -343,11 +343,11 @@ class MeteoblueScraper(PlaywrightScraper):
             "SUD": 180,
             "OUEST": 270,
         }
-        
+
         for key in sorted(french_map.keys(), key=len, reverse=True):
             if key in text:
                 return french_map[key]
-        
+
         return None
 
     def _infer_clouds_from_picto(self, picto_url: str) -> int | None:

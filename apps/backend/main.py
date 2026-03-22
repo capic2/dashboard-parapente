@@ -223,11 +223,11 @@ def initialize_database():
 
 def run_migrations():
     """
-    Run database migrations
-    This handles SQLite's limitations with ALTER TABLE gracefully
+    Run SQL migrations from db/migrations directory
     """
+    from database import DB_PATH
+
     migrations_dir = Path(__file__).parent / "db" / "migrations"
-    db_path = Path(__file__).parent / "db" / "dashboard.db"
 
     if not migrations_dir.exists():
         logger.warning(f"Migrations directory not found: {migrations_dir}")
@@ -242,7 +242,7 @@ def run_migrations():
 
     logger.info(f"Running {len(migration_files)} migration(s)...")
 
-    conn = sqlite3.connect(str(db_path))
+    conn = sqlite3.connect(str(DB_PATH))
     cursor = conn.cursor()
 
     for migration_file in migration_files:

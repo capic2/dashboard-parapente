@@ -68,7 +68,7 @@ class TestParseGPX:
 
         # All elevations should be numbers
         for ele in elevations:
-            assert isinstance(ele, (int, float))
+            assert isinstance(ele, int | float)
             # Reasonable altitude range (not on moon!)
             assert -500 < ele < 10000
 

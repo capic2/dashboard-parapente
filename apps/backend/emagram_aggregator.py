@@ -101,24 +101,28 @@ async def fetch_all_emagrammes_for_spot(
     results = await asyncio.gather(*[task[1] for task in tasks], return_exceptions=True)
 
     # Process results
-    for (source_name, _), result in zip(tasks, results):
+    for (source_name, _), result in zip(tasks, results, strict=False):
         if isinstance(result, Exception):
-            emagrammes.append({
-                "source": source_name,
-                "success": False,
-                "error": str(result),
-                "forecast_hour": None  # Provider-specific: no data on error
-            })
+            emagrammes.append(
+                {
+                    "source": source_name,
+                    "success": False,
+                    "error": str(result),
+                    "forecast_hour": None,  # Provider-specific: no data on error
+                }
+            )
         elif isinstance(result, dict):
             # Extract forecast_hour from result if present, otherwise null
             forecast_hour_value = result.get("forecast_hour", None)
 
-            emagrammes.append({
-                "source": source_name,
-                "forecast_hour": forecast_hour_value,  # Provider-specific
-                **result
-            })
-    
+            emagrammes.append(
+                {
+                    "source": source_name,
+                    "forecast_hour": forecast_hour_value,  # Provider-specific
+                    **result,
+                }
+            )
+
     # Count successes
     success_count = sum(1 for e in emagrammes if e.get("success"))
 

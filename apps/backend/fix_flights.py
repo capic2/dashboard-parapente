@@ -128,7 +128,7 @@ def main():
         print(f"  Title: {title}")
 
         # Find and parse GPX file
-        flight_dt = datetime.fromisoformat(flight_date)
+        datetime.fromisoformat(flight_date)
         gpx_file = find_gpx_for_flight(flight_date, GPX_DIR)
 
         max_altitude = None
