@@ -331,10 +331,10 @@ class MeteoblueScraper(PlaywrightScraper):
 
         text = text.upper()
 
-        # Try direct mapping
-        for key, value in self.DIRECTION_MAP.items():
+        # Try direct mapping (sorted by length descending to match NNE before N)
+        for key in sorted(self.DIRECTION_MAP.keys(), key=len, reverse=True):
             if key in text:
-                return value
+                return self.DIRECTION_MAP[key]
 
         # Try French directions
         french_map = {

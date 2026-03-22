@@ -1,6 +1,7 @@
 """Fonctions utilitaires partagées par les scrapers"""
 
 import re
+from typing import Any
 
 
 def convert_kmh_to_ms(kmh: float) -> float:
@@ -23,6 +24,12 @@ def parse_wind_speed(text: str) -> float | None:
         "10 m/s" → 10.0
         "5-10 km/h" → 7.5 (average in m/s)
     """
+    # Range pattern (take average) - MUST be checked BEFORE single values
+    range_match = re.search(r"(\d+)-(\d+)\s*(?:km/h|kmh)", text, re.IGNORECASE)
+    if range_match:
+        avg = (float(range_match.group(1)) + float(range_match.group(2))) / 2
+        return convert_kmh_to_ms(avg)
+    
     # Pattern: number (optionally with decimal) followed by unit
     kmh_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:km/h|kmh)", text, re.IGNORECASE)
     if kmh_match:
@@ -31,12 +38,6 @@ def parse_wind_speed(text: str) -> float | None:
     ms_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:m/s|ms)", text, re.IGNORECASE)
     if ms_match:
         return float(ms_match.group(1))
-
-    # Range pattern (take average)
-    range_match = re.search(r"(\d+)-(\d+)\s*(?:km/h|kmh)", text, re.IGNORECASE)
-    if range_match:
-        avg = (float(range_match.group(1)) + float(range_match.group(2))) / 2
-        return convert_kmh_to_ms(avg)
 
     # Just a number (assume km/h for meteo sites)
     number_match = re.search(r"(\d+(?:\.\d+)?)", text)
@@ -99,16 +100,17 @@ def parse_wind_direction(text: str) -> int | None:
     }
 
     text_upper = text.upper().strip()
-    for direction, degree in directions.items():
+    # Sort by length descending to match longer directions first (NNE before N)
+    for direction in sorted(directions.keys(), key=len, reverse=True):
         if direction in text_upper:
-            return degree
+            return directions[direction]
 
     return None
 
 
 def find_closest_altitude_row(
-    rows: list[tuple[int, any]], target_altitude: int
-) -> tuple[int | None, any]:
+    rows: list[tuple[int, Any]], target_altitude: int
+) -> tuple[int | None, Any]:
     """
     Find the row with altitude closest to target
 
@@ -131,7 +133,7 @@ def find_closest_altitude_row(
     return closest
 
 
-def get_lowest_altitude_row(rows: list[tuple[int, any]]) -> tuple[int | None, any]:
+def get_lowest_altitude_row(rows: list[tuple[int, Any]]) -> tuple[int | None, Any]:
     """
     Get the row with the lowest altitude
 

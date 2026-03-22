@@ -337,7 +337,9 @@ async def fetch_meteo_parapente(
 
     if USING_NEW_ARCHITECTURE:
         scraper = MeteoParapenteScraper()
-        return await scraper.fetch(lat, lon, elevation_m=elevation_m or 500, date=date, run=run)
+        return await scraper.fetch(
+            lat, lon, elevation_m=elevation_m or 500, date=date, run=run, site_name=site_name
+        )
     else:
         # Standalone fallback (sans architecture)
         import httpx

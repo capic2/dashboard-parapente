@@ -12,10 +12,10 @@ from metpy.units import units
 
 
 def calculate_stability_indices(
-    pressure_hpa: list[float],
-    temperature_c: list[float],
-    dewpoint_c: list[float],
-    height_m: list[float] | None = None,
+    pressure_hpa: list[float | None],
+    temperature_c: list[float | None],
+    dewpoint_c: list[float | None],
+    height_m: list[float | None] | None = None,
 ) -> dict[str, Any]:
     """
     Calculate atmospheric stability indices from sounding data
@@ -97,7 +97,7 @@ def calculate_stability_indices(
                 lfc_height = np.interp(lfc_pressure.magnitude, p.magnitude[::-1], h.magnitude[::-1])
             else:
                 lfc_height = 44330 * (1 - (lfc_pressure.magnitude / surface_p.magnitude) ** 0.1903)
-        except:
+        except Exception:
             lfc_height = None
 
         try:
@@ -107,7 +107,7 @@ def calculate_stability_indices(
                 el_height = np.interp(el_pressure.magnitude, p.magnitude[::-1], h.magnitude[::-1])
             else:
                 el_height = 44330 * (1 - (el_pressure.magnitude / surface_p.magnitude) ** 0.1903)
-        except:
+        except Exception:
             el_height = None
 
         # --- Lifted Index ---
@@ -118,7 +118,7 @@ def calculate_stability_indices(
             T_500 = T[p_500_idx].magnitude
             parcel_500 = parcel_prof[p_500_idx].magnitude
             lifted_index = T_500 - parcel_500
-        except:
+        except Exception:
             lifted_index = None
 
         # --- K-Index (Thunderstorm potential) ---
@@ -135,14 +135,14 @@ def calculate_stability_indices(
             Td_700 = Td[p_700_idx].magnitude
 
             k_index = (T_850 - T_500) + Td_850 - (T_700 - Td_700)
-        except:
+        except Exception:
             k_index = None
 
         # --- Total Totals Index ---
         # TT = (T850 - T500) + (Td850 - T500)
         try:
             total_totals = (T_850 - T_500) + (Td_850 - T_500)
-        except:
+        except Exception:
             total_totals = None
 
         # --- Showalter Index ---
@@ -150,7 +150,7 @@ def calculate_stability_indices(
         try:
             parcel_850 = mpcalc.parcel_profile(p, T[p_850_idx], Td[p_850_idx])
             showalter = T_500 - parcel_850[p_500_idx].magnitude
-        except:
+        except Exception:
             showalter = None
 
         # --- Estimate thermal strength (m/s) ---
@@ -239,36 +239,55 @@ def calculate_wind_shear(
         Dict with wind shear values
     """
     try:
+        # Validate array lengths match
+        arrays = [pressure_hpa, height_m, wind_u_ms, wind_v_ms]
+        lengths = [len(arr) for arr in arrays]
+        if len(set(lengths)) != 1:
+            return {
+                "success": False,
+                "error": f"Array length mismatch: {lengths}"
+            }
+        
         # Filter valid data
         valid = [
             (p, h, u, v)
-            for p, h, u, v in zip(pressure_hpa, height_m, wind_u_ms, wind_v_ms)
+            for p, h, u, v in zip(pressure_hpa, height_m, wind_u_ms, wind_v_ms, strict=True)
             if all(x is not None for x in [p, h, u, v])
         ]
 
         if len(valid) < 5:
             return {"success": False, "error": "Insufficient wind data"}
 
-        p_arr, h_arr, u_arr, v_arr = zip(*valid)
+        p_arr, h_arr, u_arr, v_arr = zip(*valid, strict=True)
         h_arr = np.array(h_arr)
         u_arr = np.array(u_arr)
         v_arr = np.array(v_arr)
 
-        # Calculate shear 0-3km
+        # Calculate shear 0-3km (sort by altitude first)
         mask_3km = h_arr <= 3000
         if np.sum(mask_3km) >= 2:
-            u_0_3km = u_arr[mask_3km]
-            v_0_3km = v_arr[mask_3km]
-            shear_0_3km = np.sqrt((u_0_3km[-1] - u_0_3km[0]) ** 2 + (v_0_3km[-1] - v_0_3km[0]) ** 2)
+            h_3km = h_arr[mask_3km]
+            u_3km = u_arr[mask_3km]
+            v_3km = v_arr[mask_3km]
+            # Sort by altitude
+            sort_idx = np.argsort(h_3km)
+            u_sorted = u_3km[sort_idx]
+            v_sorted = v_3km[sort_idx]
+            shear_0_3km = np.sqrt((u_sorted[-1] - u_sorted[0]) ** 2 + (v_sorted[-1] - v_sorted[0]) ** 2)
         else:
             shear_0_3km = None
 
-        # Calculate shear 0-6km
+        # Calculate shear 0-6km (sort by altitude first)
         mask_6km = h_arr <= 6000
         if np.sum(mask_6km) >= 2:
-            u_0_6km = u_arr[mask_6km]
-            v_0_6km = v_arr[mask_6km]
-            shear_0_6km = np.sqrt((u_0_6km[-1] - u_0_6km[0]) ** 2 + (v_0_6km[-1] - v_0_6km[0]) ** 2)
+            h_6km = h_arr[mask_6km]
+            u_6km = u_arr[mask_6km]
+            v_6km = v_arr[mask_6km]
+            # Sort by altitude
+            sort_idx = np.argsort(h_6km)
+            u_sorted = u_6km[sort_idx]
+            v_sorted = v_6km[sort_idx]
+            shear_0_6km = np.sqrt((u_sorted[-1] - u_sorted[0]) ** 2 + (v_sorted[-1] - v_sorted[0]) ** 2)
         else:
             shear_0_6km = None
 
