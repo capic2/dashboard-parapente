@@ -30,6 +30,58 @@ const BuggyComponent = ({ shouldThrow = false }: { shouldThrow?: boolean }) => {
   );
 };
 
+// Helper component for InteractiveError story
+const InteractiveErrorDemo = () => {
+  const [shouldError, setShouldError] = useState(false);
+
+  return (
+    <ErrorBoundary key={shouldError ? 'error' : 'ok'}>
+      <div className="p-8 bg-white rounded-xl shadow-md">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">
+          Interactive Error Test
+        </h2>
+        <p className="text-gray-600 mb-4">
+          Click the button below to trigger an error and see the ErrorBoundary
+          in action.
+        </p>
+        <button
+          onClick={() => setShouldError(true)}
+          className="px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700"
+        >
+          Trigger Error
+        </button>
+        <BuggyComponent shouldThrow={shouldError} />
+      </div>
+    </ErrorBoundary>
+  );
+};
+
+// Helper component for MultipleComponents story
+const MultipleComponentsDemo = () => {
+  const [errorIndex, setErrorIndex] = useState<number | null>(null);
+
+  return (
+    <div className="space-y-4">
+      <ErrorBoundary key={errorIndex}>
+        <div className="grid grid-cols-3 gap-4 p-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="p-4 bg-white rounded-lg shadow">
+              <h3 className="font-bold mb-2">Component {i}</h3>
+              <button
+                onClick={() => setErrorIndex(i)}
+                className="text-sm px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+              >
+                Break
+              </button>
+              <BuggyComponent shouldThrow={errorIndex === i} />
+            </div>
+          ))}
+        </div>
+      </ErrorBoundary>
+    </div>
+  );
+};
+
 // Default error boundary with error
 export const WithError = meta.story({
   render: () => (
@@ -100,30 +152,7 @@ export const CustomFallback = meta.story({
 // Interactive error trigger
 export const InteractiveError = meta.story({
   name: 'Interactive Error Trigger',
-  render: () => {
-    const [shouldError, setShouldError] = useState(false);
-
-    return (
-      <ErrorBoundary key={shouldError ? 'error' : 'ok'}>
-        <div className="p-8 bg-white rounded-xl shadow-md">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
-            Interactive Error Test
-          </h2>
-          <p className="text-gray-600 mb-4">
-            Click the button below to trigger an error and see the ErrorBoundary
-            in action.
-          </p>
-          <button
-            onClick={() => setShouldError(true)}
-            className="px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700"
-          >
-            Trigger Error
-          </button>
-          <BuggyComponent shouldThrow={shouldError} />
-        </div>
-      </ErrorBoundary>
-    );
-  },
+  render: () => <InteractiveErrorDemo />,
 });
 
 // Error with details visible
@@ -147,30 +176,7 @@ export const WithErrorDetails = meta.story({
 // Multiple components in boundary
 export const MultipleComponents = meta.story({
   name: 'Multiple Components',
-  render: () => {
-    const [errorIndex, setErrorIndex] = useState<number | null>(null);
-
-    return (
-      <div className="space-y-4">
-        <ErrorBoundary key={errorIndex}>
-          <div className="grid grid-cols-3 gap-4 p-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="p-4 bg-white rounded-lg shadow">
-                <h3 className="font-bold mb-2">Component {i}</h3>
-                <button
-                  onClick={() => setErrorIndex(i)}
-                  className="text-sm px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                >
-                  Break
-                </button>
-                <BuggyComponent shouldThrow={errorIndex === i} />
-              </div>
-            ))}
-          </div>
-        </ErrorBoundary>
-      </div>
-    );
-  },
+  render: () => <MultipleComponentsDemo />,
 });
 
 // Nested error boundaries

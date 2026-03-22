@@ -123,7 +123,7 @@ export function getWindScoreMultiplier(favorability: WindFavorability): number {
 /**
  * Get a human-readable description of wind favorability
  */
-export function getWindFavorabilityLabel(favorability: WindFavorability, locale: string = 'fr'): string {
+export function getWindFavorabilityLabel(favorability: WindFavorability, locale = 'fr'): string {
   if (locale === 'fr') {
     switch (favorability) {
       case 'good':

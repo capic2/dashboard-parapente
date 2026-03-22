@@ -7,10 +7,11 @@ Charge les variables d'environnement avec la logique suivante :
 3. Valide les variables critiques
 """
 
+import logging
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +27,9 @@ if ENVIRONMENT != "production":
     # En développement : chercher .env.development puis .env
     env_files = [
         BACKEND_ROOT / ".env.development",  # Dev local (priorité)
-        PROJECT_ROOT / ".env",               # Racine (fallback)
+        PROJECT_ROOT / ".env",  # Racine (fallback)
     ]
-    
+
     for env_file in env_files:
         if env_file.exists():
             logger.info(f"📄 Loading environment from: {env_file}")
@@ -112,10 +113,10 @@ if not TESTING:
     if not WEATHERAPI_KEY:
         logger.error("❌ WEATHERAPI_KEY is required")
         raise ValueError("WEATHERAPI_KEY environment variable is required")
-    
+
     if not METEOBLUE_API_KEY:
         logger.warning("⚠️ METEOBLUE_API_KEY is missing")
-    
+
     if not STRAVA_VERIFY_TOKEN:
         logger.error("❌ STRAVA_VERIFY_TOKEN is required")
         raise ValueError("BACKEND_STRAVA_VERIFY_TOKEN environment variable is required")
@@ -140,4 +141,6 @@ else:
 logger.info(f"🔧 Environment: {ENVIRONMENT}")
 logger.info(f"🗄️ Database: {DATABASE_URL}")
 logger.info(f"🔴 Redis: {REDIS_HOST}:{REDIS_PORT} (fake: {USE_FAKE_REDIS})")
-logger.info(f"📅 Scheduler: {'enabled' if SCHEDULER_ENABLED else 'disabled'} ({SCHEDULER_INTERVAL_MINUTES} min)")
+logger.info(
+    f"📅 Scheduler: {'enabled' if SCHEDULER_ENABLED else 'disabled'} ({SCHEDULER_INTERVAL_MINUTES} min)"
+)

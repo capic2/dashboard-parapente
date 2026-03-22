@@ -4,12 +4,13 @@ Uses OpenClaw proxy to access Claude Sonnet 4.5 for emagram analysis
 Compatible with OpenAI API format
 """
 
-import httpx
 import base64
 import json
-from typing import Dict, List, Any
-from pathlib import Path
 import logging
+from pathlib import Path
+from typing import Any
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -69,93 +70,73 @@ def encode_image_base64(image_path: str) -> str:
 
 
 async def analyze_with_openclaw(
-    image_paths: List[str],
+    image_paths: list[str],
     spot_name: str,
-    sources: List[str],
+    sources: list[str],
     base_url: str = OPENCLAW_BASE_URL,
-    model: str = OPENCLAW_MODEL
-) -> Dict[str, Any]:
+    model: str = OPENCLAW_MODEL,
+) -> dict[str, Any]:
     """
     Analyze emagram screenshots using OpenClaw (Claude via OpenAI-compatible API)
-    
+
     Args:
         image_paths: Paths to screenshot images
         spot_name: Name of paragliding spot
         sources: Source names
         base_url: OpenClaw API base URL
         model: Model name (claude-sonnet-4.5)
-    
+
     Returns:
         Analysis results dict
     """
-    
+
     if not image_paths:
-        return {
-            "success": False,
-            "error": "No images provided"
-        }
-    
+        return {"success": False, "error": "No images provided"}
+
     try:
         # Build image descriptions for prompt
         image_descriptions = []
         for i, source in enumerate(sources, 1):
             image_descriptions.append(f"Image {i}: {source.title()}")
-        
+
         prompt = EMAGRAM_ANALYSIS_PROMPT.format(
-            spot_name=spot_name,
-            image_descriptions="\n".join(image_descriptions)
+            spot_name=spot_name, image_descriptions="\n".join(image_descriptions)
         )
-        
+
         # Prepare OpenAI-compatible messages with vision
-        messages = [{
-            "role": "user",
-            "content": []
-        }]
-        
+        messages = [{"role": "user", "content": []}]
+
         # Add text prompt
-        messages[0]["content"].append({
-            "type": "text",
-            "text": prompt
-        })
-        
+        messages[0]["content"].append({"type": "text", "text": prompt})
+
         # Add images
         for image_path in image_paths:
             if not Path(image_path).exists():
                 logger.warning(f"Image not found: {image_path}")
                 continue
-            
+
             image_data = encode_image_base64(image_path)
-            messages[0]["content"].append({
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/png;base64,{image_data}"
-                }
-            })
-        
+            messages[0]["content"].append(
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_data}"}}
+            )
+
         logger.info(f"🦙 Calling OpenClaw with {len(image_paths)} images...")
-        
+
         # Call OpenClaw API (OpenAI-compatible)
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
                 f"{base_url}/chat/completions",
-                json={
-                    "model": model,
-                    "messages": messages,
-                    "max_tokens": 2000,
-                    "temperature": 0.3
-                },
-                headers={
-                    "Content-Type": "application/json"
-                }
+                json={"model": model, "messages": messages, "max_tokens": 2000, "temperature": 0.3},
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
             result = response.json()
-        
+
         # Extract response
         response_text = result["choices"][0]["message"]["content"]
-        
-        logger.info(f"✅ OpenClaw response received")
-        
+
+        logger.info("✅ OpenClaw response received")
+
         # Parse JSON response
         try:
             # Remove markdown code blocks if present
@@ -163,9 +144,9 @@ async def analyze_with_openclaw(
                 response_text = response_text.split("```json")[1].split("```")[0].strip()
             elif "```" in response_text:
                 response_text = response_text.split("```")[1].split("```")[0].strip()
-            
+
             analysis = json.loads(response_text)
-            
+
             # Add metadata
             analysis["success"] = True
             analysis["llm_provider"] = "openclaw"
@@ -173,32 +154,34 @@ async def analyze_with_openclaw(
             analysis["llm_tokens_used"] = result.get("usage", {}).get("total_tokens", 0)
             analysis["llm_cost_usd"] = 0.0  # OpenClaw is free!
             analysis["raw_response"] = response_text
-            
-            logger.info(f"📊 Analysis: Score {analysis.get('score_volabilite')}/100, Agreement: {analysis.get('sources_agreement')}")
-            
+
+            logger.info(
+                f"📊 Analysis: Score {analysis.get('score_volabilite')}/100, Agreement: {analysis.get('sources_agreement')}"
+            )
+
             return analysis
-            
+
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse OpenClaw response: {e}")
             return {
                 "success": False,
                 "error": f"Failed to parse response: {e}",
                 "raw_response": response_text,
-                "llm_provider": "openclaw"
+                "llm_provider": "openclaw",
             }
-    
+
     except httpx.HTTPStatusError as e:
         logger.error(f"OpenClaw HTTP error: {e}")
         return {
             "success": False,
             "error": f"OpenClaw API error: {e.response.status_code} - {e.response.text}",
-            "llm_provider": "openclaw"
+            "llm_provider": "openclaw",
         }
-    
+
     except Exception as e:
         logger.error(f"OpenClaw error: {e}", exc_info=True)
         return {
             "success": False,
             "error": f"OpenClaw request failed: {str(e)}",
-            "llm_provider": "openclaw"
+            "llm_provider": "openclaw",
         }

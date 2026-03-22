@@ -1,12 +1,15 @@
 """
 Live tests for Meteoblue scraper
 """
+
 import pytest
-from scrapers.meteoblue import fetch_meteoblue
+
 from config import METEOBLUE_API_KEY
+from scrapers.meteoblue import fetch_meteoblue
 
 ARGUEL_LAT = 47.2
 ARGUEL_LON = 6.0
+
 
 @pytest.mark.asyncio
 @pytest.mark.xfail(reason="API key may be missing or API down", strict=False)
@@ -19,10 +22,12 @@ async def test_fetch_meteoblue_success():
     if result["success"]:
         assert "data" in result
 
+
 @pytest.mark.asyncio
 @pytest.mark.skipif(not METEOBLUE_API_KEY, reason="METEOBLUE_API_KEY not configured")
 async def test_fetch_meteoblue_timeout():
     import time
+
     start = time.time()
     result = await fetch_meteoblue(ARGUEL_LAT, ARGUEL_LON)
     duration = time.time() - start

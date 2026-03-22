@@ -242,7 +242,7 @@ export const createWeatherQueryFn =
  */
 export const useWeather = (
   siteId: string | undefined,
-  dayIndex: number = 0
+  dayIndex = 0
 ) => {
   return useQuery({
     queryKey: ['weather', 'combined', siteId, dayIndex],

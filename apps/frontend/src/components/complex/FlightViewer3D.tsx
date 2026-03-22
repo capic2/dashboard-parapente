@@ -138,6 +138,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const cameraHeadingRef = useRef<number>(0);
   const cameraDistanceRef = useRef<number>(500);
   const cameraTargetRef = useRef<Cartesian3 | null>(null);
+  const containerDivRef = useRef<HTMLDivElement>(null);
 
   // Initialize Cesium Viewer
   useEffect(() => {
@@ -648,6 +649,42 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     viewerReady,
   ]);
 
+  // Écouter les changements de fullscreen
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  // Cleanup export polling on unmount
+  useEffect(() => {
+    return () => {
+      if (exportPollingRef.current) {
+        clearInterval(exportPollingRef.current);
+        exportPollingRef.current = null;
+      }
+    };
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!containerDivRef.current) return;
+
+    if (!isFullscreen) {
+      if (containerDivRef.current.requestFullscreen) {
+        containerDivRef.current.requestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
+
   const play = useCallback(() => {
     if (intervalRef.current || allPositionsRef.current.length === 0) return;
 
@@ -1046,43 +1083,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     );
   }
 
-  const containerDivRef = useRef<HTMLDivElement>(null);
 
-  const toggleFullscreen = () => {
-    if (!containerDivRef.current) return;
-
-    if (!isFullscreen) {
-      if (containerDivRef.current.requestFullscreen) {
-        containerDivRef.current.requestFullscreen();
-      }
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      }
-    }
-  };
-
-  // Écouter les changements de fullscreen
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    };
-  }, []);
-
-  // Cleanup export polling on unmount
-  useEffect(() => {
-    return () => {
-      if (exportPollingRef.current) {
-        clearInterval(exportPollingRef.current);
-        exportPollingRef.current = null;
-      }
-    };
-  }, []);
 
   return (
     <div
