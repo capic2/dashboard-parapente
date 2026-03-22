@@ -18,20 +18,38 @@ jobs:
         with:
           fetch-depth: 0
       
+      # Check if package-lock.json changed to determine cache strategy
+      - name: 🔍 Check for dependency changes
+        id: deps-check
+        if: github.event_name == 'pull_request'
+        run: |
+          # Check if any package-lock.json file changed in this PR
+          CHANGED_FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path')
+          if echo "$CHANGED_FILES" | grep -q "package-lock.json"; then
+            echo "deps_changed=true" >> $GITHUB_OUTPUT
+            echo "📦 Dependencies changed - cache burst will be enforced"
+          else
+            echo "deps_changed=false" >> $GITHUB_OUTPUT
+            echo "✅ No dependency changes - cache fallback enabled"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      
       # NX Local Cache: fallback when NX Cloud credits are exhausted
       # This cache is also used for Renovate PRs to conserve NX Cloud credits
       # Cache strategy:
       #   - Primary: OS + package-lock hash + git SHA (exact match)
-      #   - Fallback 1: OS + package-lock hash (recent builds with same deps)
-      #   - Fallback 2: OS only (any recent build)
+      #   - Fallback 1: OS + package-lock hash (recent builds with same deps) - ONLY if deps unchanged
+      #   - Fallback 2: OS only (any recent build) - ONLY if deps unchanged
+      #   - When package-lock.json changes: NO FALLBACK (forces cache burst and full rebuild)
       - name: 💾 Setup NX Cache (local fallback)
         uses: actions/cache@v4
         with:
           path: .nx/cache
           key: nx-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ github.sha }}
           restore-keys: |
-            nx-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
-            nx-${{ runner.os }}-
+            ${{ (github.event_name != 'pull_request' || steps.deps-check.outputs.deps_changed != 'true') && format('nx-{0}-{1}-', runner.os, hashFiles('**/package-lock.json')) || '' }}
+            ${{ (github.event_name != 'pull_request' || steps.deps-check.outputs.deps_changed != 'true') && format('nx-{0}-', runner.os) || '' }}
       
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v6
@@ -184,15 +202,32 @@ jobs:
       - name: 📥 Checkout
         uses: actions/checkout@v6
       
+      # Check if package-lock.json changed to determine cache strategy
+      - name: 🔍 Check for dependency changes
+        id: deps-check
+        run: |
+          # Check if any package-lock.json file changed in this PR
+          CHANGED_FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path')
+          if echo "$CHANGED_FILES" | grep -q "package-lock.json"; then
+            echo "deps_changed=true" >> $GITHUB_OUTPUT
+            echo "📦 Dependencies changed - cache burst will be enforced"
+          else
+            echo "deps_changed=false" >> $GITHUB_OUTPUT
+            echo "✅ No dependency changes - cache fallback enabled"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      
       # NX Local Cache for E2E: same strategy as main job
+      # When package-lock.json changes: NO FALLBACK (forces cache burst and full rebuild)
       - name: 💾 Setup NX Cache (local fallback)
         uses: actions/cache@v4
         with:
           path: .nx/cache
           key: nx-e2e-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ github.sha }}
           restore-keys: |
-            nx-e2e-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
-            nx-e2e-${{ runner.os }}-
+            ${{ steps.deps-check.outputs.deps_changed != 'true' && format('nx-e2e-{0}-{1}-', runner.os, hashFiles('**/package-lock.json')) || '' }}
+            ${{ steps.deps-check.outputs.deps_changed != 'true' && format('nx-e2e-{0}-', runner.os) || '' }}
       
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v6
