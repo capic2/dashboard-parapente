@@ -41,10 +41,20 @@ export default defineConfig({
       use: { ...devices['iPad Pro'] },
     },
   ],
-  webServer: {
-    command: 'nx serve frontend',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-    cwd: '../..',
-  },
+  webServer: [
+    {
+      command: 'nx serve backend',
+      url: 'http://localhost:8001/health',
+      reuseExistingServer: !process.env.CI,
+      cwd: '../..',
+      timeout: 120 * 1000, // 2 minutes for backend startup
+    },
+    {
+      command: 'nx serve frontend',
+      url: 'http://localhost:5173',
+      reuseExistingServer: !process.env.CI,
+      cwd: '../..',
+      timeout: 60 * 1000, // 1 minute for frontend startup
+    },
+  ],
 });

@@ -423,6 +423,12 @@ else:
 DB_PATH = Path(__file__).parent / "db" / "dashboard.db"
 
 
+@app.get("/health")
+def health_check():
+    """Health check endpoint for monitoring and e2e tests"""
+    return {"status": "ok"}
+
+
 @app.get("/")
 def read_root():
     return {
