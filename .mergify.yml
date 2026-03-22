@@ -1,8 +1,206 @@
-merge_protections:
-  - name: Only merge with validation label
-    description: Make sure PR has a validation label
-    if:
-      - base = main
-    success_conditions:
+# Mergify Configuration - Dashboard Parapente
+# Documentation: https://docs.mergify.com/
+
+# File d'attente pour gérer les merges de manière ordonnée
+queue_rules:
+  - name: default
+    merge_method: squash
+    update_method: merge
+    commit_message_template: |
+      {{ title }} (#{{ number }})
+      
+      {{ body }}
+    queue_conditions:
+      - check-success=main
       - or:
-          - label = automerge
+          - check-success=e2e
+          - label=skip-e2e
+      - base=main
+      - "#approved-reviews-by>=0"
+
+# Règles de merge automatique
+pull_request_rules:
+  # 1. Auto-merge pour les PRs avec label "automerge"
+  - name: 🚀 Auto-merge avec label automerge
+    conditions:
+      - base=main
+      - label=automerge
+      - check-success=main
+      - or:
+          - check-success=e2e
+          - label=skip-e2e
+      - "#changes-requested-reviews-by=0"
+    actions:
+      queue:
+        name: default
+      label:
+        add:
+          - ready-to-merge
+
+  # 2. Auto-merge Renovate - Patches (1.0.x)
+  - name: 🤖 Auto-merge Renovate patches
+    conditions:
+      - base=main
+      - author=renovate[bot]
+      - check-success=main
+      - or:
+          - check-success=e2e
+          - label=skip-e2e
+      - or:
+          - title~=^(fix|chore)\(deps\):.*\[SECURITY\]
+          - and:
+              - title~=^(fix|chore)\(deps\):
+              - -title~=major
+    actions:
+      queue:
+        name: default
+      label:
+        add:
+          - renovate
+          - automerge
+      review:
+        type: APPROVE
+        message: |
+          🤖 Auto-approuvé par Mergify
+          Mise à jour de dépendance patch/minor - Tous les tests passent ✅
+
+  # 3. Auto-merge Renovate - Minors (1.x.0)
+  - name: 🤖 Auto-merge Renovate minors
+    conditions:
+      - base=main
+      - author=renovate[bot]
+      - check-success=main
+      - or:
+          - check-success=e2e
+          - label=skip-e2e
+      - title~=^(feat|chore)\(deps\):
+      - -title~=major
+    actions:
+      queue:
+        name: default
+      label:
+        add:
+          - renovate
+          - automerge
+      review:
+        type: APPROVE
+        message: |
+          🤖 Auto-approuvé par Mergify
+          Mise à jour de dépendance minor - Tous les tests passent ✅
+
+  # 4. Label automatique pour Renovate (sans auto-merge pour majors)
+  - name: 🏷️ Label Renovate PRs (majors - review manuelle requise)
+    conditions:
+      - base=main
+      - author=renovate[bot]
+      - title~=major
+    actions:
+      label:
+        add:
+          - renovate
+          - needs-review
+      comment:
+        message: |
+          ⚠️ **Mise à jour majeure détectée**
+          
+          Cette PR contient une mise à jour majeure qui nécessite une review manuelle.
+          Veuillez vérifier les breaking changes avant de merger.
+          
+          Une fois validé, ajoutez le label `automerge` pour déclencher le merge automatique.
+
+  # 5. Auto-update des branches quand main avance
+  - name: 🔄 Auto-update branch avec main
+    conditions:
+      - base=main
+      - -closed
+      - -draft
+      - -conflict
+      - "#commits-behind>0"
+    actions:
+      update:
+        method: merge
+
+  # 6. Ajout automatique du label "ready-to-merge"
+  - name: 🏷️ Label ready-to-merge quand conditions remplies
+    conditions:
+      - base=main
+      - check-success=main
+      - or:
+          - check-success=e2e
+          - label=skip-e2e
+      - "#changes-requested-reviews-by=0"
+      - -draft
+      - -conflict
+    actions:
+      label:
+        add:
+          - ready-to-merge
+
+  # 7. Retrait du label "ready-to-merge" si conditions non remplies
+  - name: 🏷️ Retirer ready-to-merge si conditions non remplies
+    conditions:
+      - base=main
+      - or:
+          - check-failure=main
+          - and:
+              - check-failure=e2e
+              - -label=skip-e2e
+          - "#changes-requested-reviews-by>0"
+          - draft
+          - conflict
+    actions:
+      label:
+        remove:
+          - ready-to-merge
+
+  # 8. Notification quand la PR est prête mais sans label automerge
+  - name: 💬 Notification PR prête à merger
+    conditions:
+      - base=main
+      - label=ready-to-merge
+      - -label=automerge
+      - -label=renovate
+      - -draft
+    actions:
+      comment:
+        message: |
+          ✅ **Cette PR est prête à être mergée!**
+          
+          Tous les checks sont verts et les conditions de merge sont remplies.
+          
+          Pour activer le merge automatique, ajoutez le label `automerge`.
+          Sinon, vous pouvez merger manuellement quand vous êtes prêt.
+
+  # 9. Suppression automatique de la branche après merge
+  - name: 🗑️ Supprimer la branche après merge
+    conditions:
+      - merged
+      - base=main
+    actions:
+      delete_head_branch: {}
+
+# Protections de merge - S'assure que les PRs respectent les critères
+merge_protections:
+  - name: ✅ Vérification des checks CI
+    description: Les checks main et e2e (ou skip-e2e) doivent passer
+    if:
+      - base=main
+    success_conditions:
+      - check-success=main
+      - or:
+          - check-success=e2e
+          - label=skip-e2e
+
+  - name: 🔄 Branche à jour avec main
+    description: La branche doit être à jour avec main
+    if:
+      - base=main
+    success_conditions:
+      - "#commits-behind=0"
+
+  - name: 🚫 Pas de changements demandés
+    description: Aucune review avec changements demandés
+    if:
+      - base=main
+    success_conditions:
+      - "#changes-requested-reviews-by=0"
