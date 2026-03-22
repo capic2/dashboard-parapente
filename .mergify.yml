@@ -1,16 +1,27 @@
 # Mergify Configuration - Dashboard Parapente
 # Documentation: https://docs.mergify.com/
 
+# Configuration globale de la merge queue
+# Compatible avec "Require branches to be up to date before merging"
+merge_queue:
+  max_parallel_checks: 1  # In-place checks: teste les PRs individuellement
+
 # File d'attente pour gérer les merges de manière ordonnée
 queue_rules:
   - name: default
     merge_method: squash
     update_method: merge
+    # In-place checks: batch_size=1 pour tester individuellement
+    batch_size: 1
     commit_message_template: |
       {{ title }} (#{{ number }})
       
       {{ body }}
     queue_conditions:
+      - check-success=main
+      - base=main
+      - "#approved-reviews-by>=0"
+    merge_conditions:
       - check-success=main
       - base=main
       - "#approved-reviews-by>=0"
