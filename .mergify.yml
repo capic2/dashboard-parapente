@@ -37,7 +37,7 @@ pull_request_rules:
       - base=main
       - author=renovate[bot]
       - check-success=main
-      - title~=^\(fix|chore\)\(deps\):.*\[SECURITY\]
+      - "title~=^(fix|chore)\\(deps\\):.*\\[SECURITY\\]"
     actions:
       queue:
         name: default
@@ -57,8 +57,8 @@ pull_request_rules:
       - base=main
       - author=renovate[bot]
       - check-success=main
-      - title~=^fix\(deps\):
-      - -title~=major
+      - "title~=^fix\\(deps\\):"
+      - "-title~=major"
     actions:
       queue:
         name: default
@@ -78,8 +78,8 @@ pull_request_rules:
       - base=main
       - author=renovate[bot]
       - check-success=main
-      - title~=^chore\(deps\):
-      - -title~=major
+      - "title~=^chore\\(deps\\):"
+      - "-title~=major"
     actions:
       queue:
         name: default
@@ -98,7 +98,7 @@ pull_request_rules:
     conditions:
       - base=main
       - author=renovate[bot]
-      - title~=major
+      - "title~=major"
     actions:
       label:
         add:
@@ -117,9 +117,9 @@ pull_request_rules:
   - name: Auto-update branch avec main
     conditions:
       - base=main
-      - -closed
-      - -draft
-      - -conflict
+      - "-closed"
+      - "-draft"
+      - "-conflict"
       - "#commits-behind>0"
     actions:
       update: {}
@@ -130,8 +130,8 @@ pull_request_rules:
       - base=main
       - check-success=main
       - "#changes-requested-reviews-by=0"
-      - -draft
-      - -conflict
+      - "-draft"
+      - "-conflict"
     actions:
       label:
         add:
@@ -182,9 +182,9 @@ pull_request_rules:
     conditions:
       - base=main
       - label=ready-to-merge
-      - -label=automerge
-      - -label=renovate
-      - -draft
+      - "-label=automerge"
+      - "-label=renovate"
+      - "-draft"
     actions:
       comment:
         message: |
