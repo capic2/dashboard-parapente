@@ -131,10 +131,11 @@ jobs:
       - name: 🧪 Run E2E tests
         run: npx nx e2e e2e --configuration=ci
         env:
-          TESTING: true
+          TESTING: false
           BACKEND_DATABASE_URL: sqlite:///./test.db
           BACKEND_WEATHERAPI_KEY: test_key
           BACKEND_METEOBLUE_API_KEY: test_key
+          BACKEND_STRAVA_VERIFY_TOKEN: PARAPENTE_E2E_TEST
       
       - name: 📤 Upload E2E artifacts
         if: failure()
