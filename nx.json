@@ -24,6 +24,7 @@
     ],
     "packageFiles": [
       "{projectRoot}/package.json",
+      "{projectRoot}/package-lock.json",
       "{workspaceRoot}/package.json",
       "{workspaceRoot}/package-lock.json"
     ],
