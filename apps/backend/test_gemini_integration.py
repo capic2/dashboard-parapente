@@ -128,7 +128,7 @@ def test_gemini_analysis(api_key, screenshot_paths):
                 f"⚠️  plafond_thermique_m should be int, got {type(result['plafond_thermique_m'])}"
             )
 
-        if not isinstance(result["force_thermique_ms"], (int, float)):
+        if not isinstance(result["force_thermique_ms"], int | float):
             logger.warning(
                 f"⚠️  force_thermique_ms should be float, got {type(result['force_thermique_ms'])}"
             )
