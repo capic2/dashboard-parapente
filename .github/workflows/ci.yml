@@ -18,6 +18,21 @@ jobs:
         with:
           fetch-depth: 0
       
+      # NX Local Cache: fallback when NX Cloud credits are exhausted
+      # This cache is also used for Renovate PRs to conserve NX Cloud credits
+      # Cache strategy:
+      #   - Primary: OS + package-lock hash + git SHA (exact match)
+      #   - Fallback 1: OS + package-lock hash (recent builds with same deps)
+      #   - Fallback 2: OS only (any recent build)
+      - name: 💾 Setup NX Cache (local fallback)
+        uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            nx-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
+            nx-${{ runner.os }}-
+      
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v6
         with:
@@ -55,17 +70,48 @@ jobs:
         with:
           main-branch-name: 'main'
       
+      # Configure NX Cloud usage based on context
+      # - Disable for Renovate PRs to conserve NX Cloud credits (free tier is limited)
+      # - Can be overridden by adding 'use-nx-cloud' label to the PR
+      # - Always enabled for regular PRs and main branch pushes
+      # When disabled, NX will use the local cache (setup above) as fallback
+      - name: 🎛️ Configure NX Cloud execution
+        run: |
+          # Check if PR has 'use-nx-cloud' label (override for special cases)
+          HAS_LABEL=false
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+            if echo "$LABELS" | grep -q "use-nx-cloud"; then
+              HAS_LABEL=true
+            fi
+          fi
+          
+          # Determine if we should skip NX Cloud
+          if [[ "$HAS_LABEL" == "true" ]]; then
+            echo "SKIP_NX_CLOUD=" >> $GITHUB_ENV
+            echo "✅ NX Cloud ENABLED (forced by 'use-nx-cloud' label)"
+          elif [[ "${{ github.actor }}" == "renovate[bot]" ]] || [[ "${{ github.head_ref }}" == renovate/* ]]; then
+            echo "SKIP_NX_CLOUD=--skip-nx-cache" >> $GITHUB_ENV
+            echo "⚠️  NX Cloud DISABLED for Renovate (to conserve credits)"
+            echo "💡 Tip: Add 'use-nx-cloud' label to this PR to enable NX Cloud if needed"
+          else
+            echo "SKIP_NX_CLOUD=" >> $GITHUB_ENV
+            echo "✅ NX Cloud ENABLED"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      
       - name: 🔨 Run affected builds
-        run: npx nx affected -t build --parallel=3 --exclude=e2e
+        run: npx nx affected -t build --parallel=3 --exclude=e2e ${{ env.SKIP_NX_CLOUD }}
       
       - name: 🎨 Run affected lints
-        run: npx nx affected -t lint --parallel=3 --exclude=e2e
+        run: npx nx affected -t lint --parallel=3 --exclude=e2e ${{ env.SKIP_NX_CLOUD }}
       
       - name: 📝 Run affected type-check
-        run: npx nx affected -t type-check --parallel=3 --exclude=e2e
+        run: npx nx affected -t type-check --parallel=3 --exclude=e2e ${{ env.SKIP_NX_CLOUD }}
       
       - name: 🧪 Run affected tests (frontend + backend in parallel)
-        run: npx nx affected -t test --parallel=3 --exclude=e2e
+        run: npx nx affected -t test --parallel=3 --exclude=e2e ${{ env.SKIP_NX_CLOUD }}
         env:
           TESTING: true
           BACKEND_DATABASE_URL: sqlite:///./test.db
@@ -104,6 +150,16 @@ jobs:
       - name: 📥 Checkout
         uses: actions/checkout@v6
       
+      # NX Local Cache for E2E: same strategy as main job
+      - name: 💾 Setup NX Cache (local fallback)
+        uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-e2e-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            nx-e2e-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
+            nx-e2e-${{ runner.os }}-
+      
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v6
         with:
@@ -128,8 +184,32 @@ jobs:
       - name: 🎭 Install Playwright browsers
         run: npx playwright install --with-deps chromium
       
+      # Configure NX Cloud for E2E: same logic as main job
+      - name: 🎛️ Configure NX Cloud execution
+        run: |
+          HAS_LABEL=false
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+            if echo "$LABELS" | grep -q "use-nx-cloud"; then
+              HAS_LABEL=true
+            fi
+          fi
+          
+          if [[ "$HAS_LABEL" == "true" ]]; then
+            echo "SKIP_NX_CLOUD=" >> $GITHUB_ENV
+            echo "✅ NX Cloud ENABLED (forced by 'use-nx-cloud' label)"
+          elif [[ "${{ github.actor }}" == "renovate[bot]" ]] || [[ "${{ github.head_ref }}" == renovate/* ]]; then
+            echo "SKIP_NX_CLOUD=--skip-nx-cache" >> $GITHUB_ENV
+            echo "⚠️  NX Cloud DISABLED for Renovate (to conserve credits)"
+          else
+            echo "SKIP_NX_CLOUD=" >> $GITHUB_ENV
+            echo "✅ NX Cloud ENABLED"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      
       - name: 🧪 Run E2E tests
-        run: npx nx e2e e2e --configuration=ci
+        run: npx nx e2e e2e --configuration=ci ${{ env.SKIP_NX_CLOUD }}
         env:
           TESTING: false
           BACKEND_DATABASE_URL: sqlite:///./test.db
