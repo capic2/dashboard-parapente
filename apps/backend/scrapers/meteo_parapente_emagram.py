@@ -173,8 +173,10 @@ async def fetch_windy_sounding(
             try:
                 await page.click("text=Sounding", timeout=5000)
                 await page.wait_for_timeout(2000)
-            except:
-                pass  # Sounding might not be available
+            except Exception:
+                # Sounding tab might not be available for this location
+                # This is expected behavior, not an error
+                pass
             
             await page.screenshot(path=image_path)
             

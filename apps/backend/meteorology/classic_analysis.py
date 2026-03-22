@@ -97,7 +97,8 @@ def calculate_stability_indices(
                 )
             else:
                 lfc_height = 44330 * (1 - (lfc_pressure.magnitude / surface_p.magnitude) ** 0.1903)
-        except:
+        except Exception as e:
+            logger.debug(f"Failed to calculate LFC: {e}")
             lfc_height = None
         
         try:
@@ -111,7 +112,8 @@ def calculate_stability_indices(
                 )
             else:
                 el_height = 44330 * (1 - (el_pressure.magnitude / surface_p.magnitude) ** 0.1903)
-        except:
+        except Exception as e:
+            logger.debug(f"Failed to calculate EL: {e}")
             el_height = None
         
         # --- Lifted Index ---
@@ -122,7 +124,8 @@ def calculate_stability_indices(
             T_500 = T[p_500_idx].magnitude
             parcel_500 = parcel_prof[p_500_idx].magnitude
             lifted_index = T_500 - parcel_500
-        except:
+        except Exception as e:
+            logger.debug(f"Failed to calculate Lifted Index: {e}")
             lifted_index = None
         
         # --- K-Index (Thunderstorm potential) ---
@@ -139,14 +142,16 @@ def calculate_stability_indices(
             Td_700 = Td[p_700_idx].magnitude
             
             k_index = (T_850 - T_500) + Td_850 - (T_700 - Td_700)
-        except:
+        except Exception as e:
+            logger.debug(f"Failed to calculate K-Index: {e}")
             k_index = None
         
         # --- Total Totals Index ---
         # TT = (T850 - T500) + (Td850 - T500)
         try:
             total_totals = (T_850 - T_500) + (Td_850 - T_500)
-        except:
+        except Exception as e:
+            logger.debug(f"Failed to calculate Total Totals: {e}")
             total_totals = None
         
         # --- Showalter Index ---
@@ -154,7 +159,8 @@ def calculate_stability_indices(
         try:
             parcel_850 = mpcalc.parcel_profile(p, T[p_850_idx], Td[p_850_idx])
             showalter = T_500 - parcel_850[p_500_idx].magnitude
-        except:
+        except Exception as e:
+            logger.debug(f"Failed to calculate Showalter Index: {e}")
             showalter = None
         
         # --- Estimate thermal strength (m/s) ---
