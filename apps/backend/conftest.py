@@ -226,3 +226,66 @@ def sample_flight(db_session, arguel_site):
     db_session.commit()
     db_session.refresh(flight)
     return flight
+
+
+@pytest.fixture
+def weather_sources(db_session):
+    """Create default weather sources in test DB"""
+    import uuid
+
+    from models import WeatherSourceConfig
+
+    sources_data = [
+        {
+            "id": str(uuid.uuid4()),
+            "source_name": "open-meteo",
+            "display_name": "Open-Meteo",
+            "description": "Test weather source - open-source free API",
+            "is_enabled": True,
+            "requires_api_key": False,
+            "api_key": None,
+            "priority": 10,
+            "scraper_type": "api",
+            "base_url": "https://api.open-meteo.com/v1/forecast",
+            "documentation_url": "https://open-meteo.com/en/docs",
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "source_name": "weatherapi",
+            "display_name": "WeatherAPI.com",
+            "description": "Test weather source - API with key",
+            "is_enabled": True,
+            "requires_api_key": True,
+            "api_key": "test_weather_key",
+            "priority": 9,
+            "scraper_type": "api",
+            "base_url": "https://api.weatherapi.com/v1/forecast.json",
+            "documentation_url": "https://www.weatherapi.com/docs/",
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "source_name": "meteo-parapente",
+            "display_name": "Météo Parapente",
+            "description": "Test weather source - paragliding specific",
+            "is_enabled": True,
+            "requires_api_key": False,
+            "api_key": None,
+            "priority": 8,
+            "scraper_type": "playwright",
+            "base_url": "https://meteo-parapente.com",
+            "documentation_url": None,
+        },
+    ]
+
+    sources = []
+    for data in sources_data:
+        source = WeatherSourceConfig(**data)
+        db_session.add(source)
+        sources.append(source)
+
+    db_session.commit()
+
+    for source in sources:
+        db_session.refresh(source)
+
+    return sources
