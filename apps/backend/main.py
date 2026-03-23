@@ -2,14 +2,16 @@ import asyncio
 import logging
 import sqlite3
 from contextlib import asynccontextmanager
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pathlib import Path
 
 # Import configuration (loads environment variables automatically)
 import config
+
 # Import ALL models to register them with SQLAlchemy Base.metadata
 # This ensures all tables are available for Base.metadata.create_all()
 # even in test mode where initialize_database() is not called
@@ -250,17 +252,21 @@ def seed_weather_sources():
             weatherapi_key = config.WEATHERAPI_KEY
             meteoblue_key = config.METEOBLUE_API_KEY
 
-            wa_source = db.query(WeatherSourceConfig).filter(
-                WeatherSourceConfig.source_name == "weatherapi"
-            ).first()
+            wa_source = (
+                db.query(WeatherSourceConfig)
+                .filter(WeatherSourceConfig.source_name == "weatherapi")
+                .first()
+            )
             if wa_source and weatherapi_key and (not wa_source.api_key or not wa_source.is_enabled):
                 wa_source.api_key = weatherapi_key
                 wa_source.is_enabled = True
                 logger.info("✓ WeatherAPI: updated API key and re-enabled")
 
-            mb_source = db.query(WeatherSourceConfig).filter(
-                WeatherSourceConfig.source_name == "meteoblue"
-            ).first()
+            mb_source = (
+                db.query(WeatherSourceConfig)
+                .filter(WeatherSourceConfig.source_name == "meteoblue")
+                .first()
+            )
             if mb_source and meteoblue_key and not mb_source.api_key:
                 mb_source.api_key = meteoblue_key
                 logger.info("✓ Meteoblue: updated API key")
