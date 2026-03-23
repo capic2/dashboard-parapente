@@ -257,7 +257,9 @@ def seed_weather_sources():
                 .filter(WeatherSourceConfig.source_name == "weatherapi")
                 .first()
             )
-            if wa_source and weatherapi_key and (not wa_source.api_key or not wa_source.is_enabled):
+            if wa_source and weatherapi_key and (
+                wa_source.api_key != weatherapi_key or not wa_source.is_enabled
+            ):
                 wa_source.api_key = weatherapi_key
                 wa_source.is_enabled = True
                 logger.info("✓ WeatherAPI: updated API key and re-enabled")
@@ -267,7 +269,7 @@ def seed_weather_sources():
                 .filter(WeatherSourceConfig.source_name == "meteoblue")
                 .first()
             )
-            if mb_source and meteoblue_key and not mb_source.api_key:
+            if mb_source and meteoblue_key and mb_source.api_key != meteoblue_key:
                 mb_source.api_key = meteoblue_key
                 logger.info("✓ Meteoblue: updated API key")
 
