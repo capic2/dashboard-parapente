@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useWeather } from '../../hooks/useWeather';
 
 interface HourlyForecastProps {
@@ -30,6 +30,7 @@ interface BaseTooltipProps {
   hour: string;
   onClose?: () => void;
   isMobile?: boolean;
+  tooltipRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 interface SourceDataTooltipProps extends BaseTooltipProps {
@@ -200,9 +201,11 @@ const ParaIndexTooltip = ({
   temperature,
   onClose,
   isMobile,
+  tooltipRef,
 }: ParaIndexTooltipProps) => {
   return (
     <div
+      ref={tooltipRef}
       className={`
         ${isMobile ? 'fixed bottom-0 left-0 right-0 mx-4 mb-4' : 'fixed'}
         bg-white border-2 border-sky-500 rounded-lg shadow-xl p-4 z-50 text-sm
@@ -268,6 +271,7 @@ const VerdictTooltip = ({
   precipitation,
   onClose,
   isMobile,
+  tooltipRef,
 }: VerdictTooltipProps) => {
   const criteria = [
     {
@@ -298,6 +302,7 @@ const VerdictTooltip = ({
         ${isMobile ? 'fixed bottom-0 left-0 right-0 mx-4 mb-4' : 'fixed'}
         bg-white border-2 border-emerald-500 rounded-lg shadow-xl p-4 z-50 text-sm
       `}
+      ref={tooltipRef}
       style={
         isMobile
           ? {}
@@ -364,9 +369,11 @@ const SourceDataTooltip = ({
   color,
   onClose,
   isMobile,
+  tooltipRef,
 }: SourceDataTooltipProps) => {
   return (
     <div
+      ref={tooltipRef}
       className={`
         ${isMobile ? 'fixed bottom-0 left-0 right-0 mx-4 mb-4' : 'fixed'}
         bg-white border-2 rounded-lg shadow-xl p-4 z-50 text-sm
@@ -548,6 +555,28 @@ export default function HourlyForecast({
     position: TooltipPosition;
   } | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  // Close tooltip when clicking outside
+  useEffect(() => {
+    if (!activeTooltip) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (tooltipRef.current && !tooltipRef.current.contains(e.target as Node)) {
+        setActiveTooltip(null);
+      }
+    };
+    const handleViewportChange = () => {
+      setActiveTooltip(null);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('scroll', handleViewportChange, true);
+    window.addEventListener('resize', handleViewportChange);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('scroll', handleViewportChange, true);
+      window.removeEventListener('resize', handleViewportChange);
+    };
+  }, [activeTooltip]);
 
   // Detect mobile on mount and window resize
   useEffect(() => {
@@ -615,8 +644,9 @@ export default function HourlyForecast({
     const commonProps = {
       position,
       hour: data.hour,
-      onClose: handleCloseTooltip, // Always show close button
+      onClose: handleCloseTooltip,
       isMobile,
+      tooltipRef,
     };
 
     switch (type) {
@@ -743,20 +773,10 @@ export default function HourlyForecast({
     }
   };
 
-  const cellEventHandlers = (cellType: CellType, hourData: any) => {
-    if (isMobile) {
-      return {
-        onClick: (e: React.MouseEvent) =>
-          handleCellInteraction(cellType, hourData, e),
-      };
-    } else {
-      return {
-        onMouseEnter: (e: React.MouseEvent) =>
-          handleCellInteraction(cellType, hourData, e),
-        // onMouseLeave removed - tooltip stays open until close button clicked
-      };
-    }
-  };
+  const cellEventHandlers = (cellType: CellType, hourData: any) => ({
+    onClick: (e: React.MouseEvent) =>
+      handleCellInteraction(cellType, hourData, e),
+  });
 
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
@@ -828,7 +848,7 @@ export default function HourlyForecast({
                     <td className="py-2.5 px-2 font-medium">{hour.hour}</td>
 
                     <td
-                      className="py-2.5 px-2 cursor-pointer hover:bg-sky-100 transition-colors"
+                      className="py-2.5 px-2 cursor-help hover:bg-sky-100 transition-colors"
                       {...cellEventHandlers('para-index', hour)}
                     >
                       <strong className="text-sky-600">
@@ -837,21 +857,21 @@ export default function HourlyForecast({
                     </td>
 
                     <td
-                      className="py-2.5 px-2 cursor-pointer hover:bg-red-50 transition-colors"
+                      className="py-2.5 px-2 cursor-help hover:bg-red-50 transition-colors"
                       {...cellEventHandlers('temperature', hour)}
                     >
                       {hour.temp}°C
                     </td>
 
                     <td
-                      className="py-2.5 px-2 cursor-pointer hover:bg-blue-50 transition-colors"
+                      className="py-2.5 px-2 cursor-help hover:bg-blue-50 transition-colors"
                       {...cellEventHandlers('wind', hour)}
                     >
                       {hour.wind} km/h
                     </td>
 
                     <td
-                      className="py-2.5 px-2 cursor-pointer hover:bg-red-50 transition-colors"
+                      className="py-2.5 px-2 cursor-help hover:bg-red-50 transition-colors"
                       {...cellEventHandlers('gust', hour)}
                     >
                       {gustValue !== null && gustValue !== undefined
@@ -860,14 +880,14 @@ export default function HourlyForecast({
                     </td>
 
                     <td
-                      className="py-2.5 px-2 cursor-pointer hover:bg-violet-50 transition-colors"
+                      className="py-2.5 px-2 cursor-help hover:bg-violet-50 transition-colors"
                       {...cellEventHandlers('direction', hour)}
                     >
                       {hour.direction}
                     </td>
 
                     <td
-                      className="py-2.5 px-2 cursor-pointer hover:bg-cyan-50 transition-colors"
+                      className="py-2.5 px-2 cursor-help hover:bg-cyan-50 transition-colors"
                       {...cellEventHandlers('precipitation', hour)}
                     >
                       {hour.precipitation !== null &&
@@ -877,7 +897,7 @@ export default function HourlyForecast({
                     </td>
 
                     <td
-                      className="py-2.5 px-2 cursor-pointer hover:bg-slate-50 transition-colors"
+                      className="py-2.5 px-2 cursor-help hover:bg-slate-50 transition-colors"
                       {...cellEventHandlers('cloud-cover', hour)}
                     >
                       {cloudCover !== null && cloudCover !== undefined
