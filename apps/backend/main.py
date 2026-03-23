@@ -246,7 +246,28 @@ def seed_weather_sources():
         source_count = db.query(WeatherSourceConfig).count()
 
         if source_count > 0:
-            logger.info(f"✓ Weather sources already exist ({source_count}) - skipping seed")
+            logger.info(f"✓ Weather sources already exist ({source_count}) - checking API keys...")
+
+            # Update sources with API keys that may have been added after initial seed
+            weatherapi_key = config.WEATHERAPI_KEY
+            meteoblue_key = config.METEOBLUE_API_KEY
+
+            wa_source = db.query(WeatherSourceConfig).filter(
+                WeatherSourceConfig.source_name == "weatherapi"
+            ).first()
+            if wa_source and weatherapi_key and (not wa_source.api_key or not wa_source.is_enabled):
+                wa_source.api_key = weatherapi_key
+                wa_source.is_enabled = True
+                logger.info("✓ WeatherAPI: updated API key and re-enabled")
+
+            mb_source = db.query(WeatherSourceConfig).filter(
+                WeatherSourceConfig.source_name == "meteoblue"
+            ).first()
+            if mb_source and meteoblue_key and not mb_source.api_key:
+                mb_source.api_key = meteoblue_key
+                logger.info("✓ Meteoblue: updated API key")
+
+            db.commit()
             db.close()
             return True
 
