@@ -561,7 +561,10 @@ export default function HourlyForecast({
   useEffect(() => {
     if (!activeTooltip) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (tooltipRef.current && !tooltipRef.current.contains(e.target as Node)) {
+      if (
+        tooltipRef.current &&
+        !tooltipRef.current.contains(e.target as Node)
+      ) {
         setActiveTooltip(null);
       }
     };

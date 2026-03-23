@@ -11,13 +11,13 @@ jobs:
     name: main
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    
+
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      
+
       # NX Local Cache: fallback when NX Cloud credits are exhausted
       # This cache is also used for Renovate PRs to conserve NX Cloud credits
       # Cache strategy:
@@ -32,44 +32,44 @@ jobs:
           restore-keys: |
             nx-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
             nx-${{ runner.os }}-
-      
+
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '24'
-          cache: 'npm'
-      
+          node-version: "24"
+          cache: "npm"
+
       - name: 🐍 Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.14'
-          cache: 'pip'
+          python-version: "3.14"
+          cache: "pip"
           cache-dependency-path: apps/backend/requirements.txt
-      
+
       - name: 📦 Install npm dependencies
         run: npm ci
-      
+
       - name: 📦 Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           cd apps/backend && pip install -r requirements.txt
-      
+
       - name: 🎭 Install Playwright (Frontend)
         run: |
           cd apps/frontend
           npx playwright install --with-deps chromium
-      
+
       - name: 🎭 Install Playwright (Backend)
         run: |
           cd apps/backend
           playwright install chromium
           playwright install-deps chromium
-      
+
       - name: 🔍 Derive SHAs for Nx affected
         uses: nrwl/nx-set-shas@v5
         with:
-          main-branch-name: 'main'
-      
+          main-branch-name: "main"
+
       # Configure NX Cloud usage based on context
       # - By default, NX Cloud is ENABLED for all PRs
       # - Renovate automatically adds 'skip-nx-cloud' label (configured in renovate.json)
@@ -87,7 +87,7 @@ jobs:
               HAS_SKIP_LABEL=true
             fi
           fi
-          
+
           # Set NX_NO_CLOUD to disable only remote cache (preserves local cache)
           if [[ "$HAS_SKIP_LABEL" == "true" ]]; then
             echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
@@ -99,12 +99,12 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ github.token }}
-      
+
       - name: 🔨 Run affected builds
         id: build
         continue-on-error: true
         run: npx nx affected -t build --parallel=3 --exclude=e2e
-      
+
       - name: 💡 Check if NX Cloud credits exhausted
         if: always() && steps.build.outcome == 'failure'
         run: |
@@ -176,15 +176,15 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ github.token }}
-      
+
       - name: 🎨 Run affected lints
         if: success() || (failure() && steps.build.outcome == 'success')
         run: npx nx affected -t lint --parallel=3 --exclude=e2e
-      
+
       - name: 📝 Run affected type-check
         if: success() || (failure() && steps.build.outcome == 'success')
         run: npx nx affected -t type-check --parallel=3 --exclude=e2e
-      
+
       - name: 🧪 Run affected tests (frontend + backend in parallel)
         if: success() || (failure() && steps.build.outcome == 'success')
         run: npx nx affected -t test --parallel=3 --exclude=e2e
@@ -193,7 +193,7 @@ jobs:
           BACKEND_DATABASE_URL: sqlite:///./test.db
           BACKEND_WEATHERAPI_KEY: test_key
           BACKEND_METEOBLUE_API_KEY: test_key
-      
+
       - name: 📊 Upload frontend coverage
         if: always()
         uses: codecov/codecov-action@v5
@@ -204,7 +204,7 @@ jobs:
         continue-on-error: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-      
+
       - name: 📊 Upload backend coverage
         if: always()
         uses: codecov/codecov-action@v5
@@ -221,11 +221,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     if: github.event_name == 'pull_request'
-    
+
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v6
-      
+
       # NX Local Cache for E2E: same strategy as main job
       - name: 💾 Setup NX Cache (local fallback)
         uses: actions/cache@v5
@@ -235,31 +235,31 @@ jobs:
           restore-keys: |
             nx-e2e-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
             nx-e2e-${{ runner.os }}-
-      
+
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '24'
-          cache: 'npm'
-      
+          node-version: "24"
+          cache: "npm"
+
       - name: 🐍 Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.14'
-          cache: 'pip'
+          python-version: "3.14"
+          cache: "pip"
           cache-dependency-path: apps/backend/requirements.txt
-      
+
       - name: 📦 Install npm dependencies
         run: npm ci
-      
+
       - name: 📦 Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           cd apps/backend && pip install -r requirements.txt
-      
+
       - name: 🎭 Install Playwright browsers
         run: npx playwright install --with-deps chromium
-      
+
       # Configure NX Cloud for E2E: same logic as main job
       - name: 🎛️ Configure NX Cloud execution
         run: |
@@ -270,7 +270,7 @@ jobs:
               HAS_SKIP_LABEL=true
             fi
           fi
-          
+
           if [[ "$HAS_SKIP_LABEL" == "true" ]]; then
             echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
             echo "⚠️  NX Cloud DISABLED (requested by 'skip-nx-cloud' label to conserve credits)"
@@ -281,7 +281,7 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ github.token }}
-      
+
       - name: 🧪 Run E2E tests
         run: npx nx e2e e2e --configuration=ci
         env:
@@ -290,7 +290,7 @@ jobs:
           BACKEND_WEATHERAPI_KEY: test_key
           BACKEND_METEOBLUE_API_KEY: test_key
           BACKEND_STRAVA_VERIFY_TOKEN: PARAPENTE_E2E_TEST
-      
+
       - name: 📤 Upload E2E artifacts
         if: failure()
         uses: actions/upload-artifact@v7
