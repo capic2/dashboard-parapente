@@ -565,8 +565,17 @@ export default function HourlyForecast({
         setActiveTooltip(null);
       }
     };
+    const handleViewportChange = () => {
+      setActiveTooltip(null);
+    };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('scroll', handleViewportChange, true);
+    window.addEventListener('resize', handleViewportChange);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('scroll', handleViewportChange, true);
+      window.removeEventListener('resize', handleViewportChange);
+    };
   }, [activeTooltip]);
 
   // Detect mobile on mount and window resize
