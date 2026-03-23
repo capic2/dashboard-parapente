@@ -69,7 +69,7 @@ export default defineConfig({
             '**/EmagramWidget.stories.tsx',
           ],
           testTimeout: 15000,
-          setupFiles: [],
+          setupFiles: ['./.storybook/vitest.setup.ts'],
         },
       },
     ],
