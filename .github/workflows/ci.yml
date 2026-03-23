@@ -136,14 +136,16 @@ jobs:
               EXISTING_COMMENT=$(gh pr view ${{ github.event.pull_request.number }} --json comments --jq '.comments[] | select(.author.login=="github-actions" and (.body | contains("NX Cloud Credits Exhausted"))) | .id' | head -1)
               
               if [[ -z "$EXISTING_COMMENT" ]]; then
-                gh pr comment ${{ github.event.pull_request.number }} --body "## ⚠️ NX Cloud Credits Exhausted
+                # Use heredoc to avoid YAML escaping issues with multi-line content
+                gh pr comment ${{ github.event.pull_request.number }} --body - <<'EOF' && echo "✅ Comment posted successfully" || echo "⚠️ Failed to post comment (non-critical)"
+## ⚠️ NX Cloud Credits Exhausted
 
 Your NX Cloud free tier credits have been exhausted.
 
 ### 📋 Quick fix
 
-1. **Add the \`skip-nx-cloud\` label** to this PR
-2. **Re-run the failed workflow** (click \"Re-run failed jobs\" button)
+1. **Add the `skip-nx-cloud` label** to this PR
+2. **Re-run the failed workflow** (click "Re-run failed jobs" button)
 3. The workflow will use local cache instead (slower but functional)
 
 ### 💡 Note
@@ -158,7 +160,8 @@ Your NX Cloud free tier credits have been exhausted.
 - [Local cache documentation](https://nx.dev/concepts/cache)
 
 ---
-_This is an automated message from the CI workflow. This comment will not be duplicated on re-runs._" && echo "✅ Comment posted successfully" || echo "⚠️ Failed to post comment (non-critical)"
+_This is an automated message from the CI workflow. This comment will not be duplicated on re-runs._
+EOF
               else
                 echo "ℹ️ Comment already exists (ID: $EXISTING_COMMENT), skipping duplicate"
               fi
