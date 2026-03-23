@@ -246,9 +246,7 @@ def seed_weather_sources():
         source_count = db.query(WeatherSourceConfig).count()
 
         if source_count > 0:
-            logger.info(
-                f"✓ Weather sources already exist ({source_count}) - skipping seed"
-            )
+            logger.info(f"✓ Weather sources already exist ({source_count}) - skipping seed")
             db.close()
             return True
 
