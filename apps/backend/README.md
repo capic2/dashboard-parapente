@@ -54,11 +54,9 @@ pip install -r requirements.txt
 # Copy environment template
 cp .env.example .env
 
-# Initialize database
-python -c "from database import Base, engine; import models; Base.metadata.create_all(bind=engine)"
-python seed_sites.py
+# Edit .env with your API keys (at minimum: BACKEND_WEATHERAPI_KEY)
 
-# Start server
+# Start server (database auto-initializes on first run)
 python -m uvicorn main:app --reload
 ```
 
@@ -80,6 +78,25 @@ python -m uvicorn main:app --reload
 # Automatically selects based on ENVIRONMENT
 ENVIRONMENT=development  → FakeRedis
 ENVIRONMENT=production   → Real Redis
+```
+
+### Database Initialization
+
+The application **automatically initializes** the database on first startup:
+
+1. **Schema creation**: All tables are created via SQLAlchemy models
+2. **Default sites**: 6 paragliding sites are seeded (Arguel, Mont Poupet, etc.)
+3. **Weather sources**: 5 weather data sources are configured automatically:
+   - ✅ **Open-Meteo** (always enabled, no API key required)
+   - ✅ **WeatherAPI.com** (enabled if `BACKEND_WEATHERAPI_KEY` is set)
+   - ✅ **Météo Parapente** (always enabled)
+   - ✅ **Météociel** (always enabled)
+   - ✅ **Meteoblue** (always enabled, API key optional)
+
+**Existing database?** Run this to add missing weather sources:
+
+```bash
+python migrate_weather_sources_local.py
 ```
 
 ### Weather Pipeline (`weather_pipeline.py`)

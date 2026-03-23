@@ -207,6 +207,13 @@ def initialize_database():
         db.close()
 
         logger.info(f"✓ Database now contains {final_count} sites")
+
+        # Step 4: Seed weather sources
+        if not seed_weather_sources():
+            logger.warning(
+                "⚠️  Failed to seed weather sources, but continuing (sources can be added later)..."
+            )
+
         logger.info("=" * 60)
         logger.info("✅ DATABASE INITIALIZATION COMPLETE")
         logger.info("=" * 60)
@@ -218,6 +225,130 @@ def initialize_database():
         import traceback
 
         traceback.print_exc()
+        return False
+
+
+def seed_weather_sources():
+    """
+    Seed default weather sources if table is empty
+    This ensures weather data can be fetched on first startup
+    """
+    import uuid
+
+    from models import WeatherSourceConfig
+
+    logger.info("Checking for existing weather sources...")
+
+    try:
+        db = SessionLocal()
+
+        # Check if sources already exist
+        source_count = db.query(WeatherSourceConfig).count()
+
+        if source_count > 0:
+            logger.info(f"✓ Weather sources already exist ({source_count}) - skipping seed")
+            db.close()
+            return True
+
+        logger.info("No weather sources found - seeding defaults...")
+
+        # Get API keys from config
+        weatherapi_key = config.WEATHERAPI_KEY
+        meteoblue_key = config.METEOBLUE_API_KEY
+
+        # Define default sources (5 sources)
+        default_sources = [
+            {
+                "id": str(uuid.uuid4()),
+                "source_name": "open-meteo",
+                "display_name": "Open-Meteo",
+                "description": "API météo open-source gratuite, aucune clé requise. Données mondiales avec haute précision.",
+                "is_enabled": True,
+                "requires_api_key": False,
+                "api_key": None,
+                "priority": 10,
+                "scraper_type": "api",
+                "base_url": "https://api.open-meteo.com/v1/forecast",
+                "documentation_url": "https://open-meteo.com/en/docs",
+            },
+            {
+                "id": str(uuid.uuid4()),
+                "source_name": "weatherapi",
+                "display_name": "WeatherAPI.com",
+                "description": "API météo mondiale avec données détaillées. Clé API requise (plan gratuit disponible).",
+                "is_enabled": bool(weatherapi_key),  # Enabled only if API key present
+                "requires_api_key": True,
+                "api_key": weatherapi_key,
+                "priority": 9,
+                "scraper_type": "api",
+                "base_url": "https://api.weatherapi.com/v1/forecast.json",
+                "documentation_url": "https://www.weatherapi.com/docs/",
+            },
+            {
+                "id": str(uuid.uuid4()),
+                "source_name": "meteo-parapente",
+                "display_name": "Météo Parapente",
+                "description": "Prévisions spécialisées parapente avec thermiques et conditions de vol.",
+                "is_enabled": True,
+                "requires_api_key": False,
+                "api_key": None,
+                "priority": 8,
+                "scraper_type": "playwright",
+                "base_url": "https://meteo-parapente.com",
+                "documentation_url": None,
+            },
+            {
+                "id": str(uuid.uuid4()),
+                "source_name": "meteociel",
+                "display_name": "Météociel",
+                "description": "Prévisions AROME haute résolution pour la France. Scraping de données HTML.",
+                "is_enabled": True,
+                "requires_api_key": False,
+                "api_key": None,
+                "priority": 7,
+                "scraper_type": "playwright",
+                "base_url": "https://www.meteociel.fr",
+                "documentation_url": None,
+            },
+            {
+                "id": str(uuid.uuid4()),
+                "source_name": "meteoblue",
+                "display_name": "Meteoblue",
+                "description": "Prévisions météo professionnelles avec modèles multiples. API key optionnelle.",
+                "is_enabled": True,
+                "requires_api_key": False,
+                "api_key": meteoblue_key,
+                "priority": 6,
+                "scraper_type": "stealth",
+                "base_url": "https://www.meteoblue.com",
+                "documentation_url": "https://docs.meteoblue.com/",
+            },
+        ]
+
+        # Insert sources using ORM
+        for source_data in default_sources:
+            source = WeatherSourceConfig(**source_data)
+            db.add(source)
+            status = "✅" if source.is_enabled else "⚠️  (disabled - no API key)"
+            logger.info(f"  {status} Seeded: {source.display_name}")
+
+        db.commit()
+
+        # Verify
+        final_count = db.query(WeatherSourceConfig).count()
+        logger.info(f"✓ Database now contains {final_count} weather sources")
+
+        db.close()
+        return True
+
+    except Exception as e:
+        logger.error(f"✗ Error seeding weather sources: {e}")
+        import traceback
+
+        traceback.print_exc()
+        if "db" in locals():
+            db.rollback()
+            db.close()
         return False
 
 
