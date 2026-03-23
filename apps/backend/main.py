@@ -257,8 +257,10 @@ def seed_weather_sources():
                 .filter(WeatherSourceConfig.source_name == "weatherapi")
                 .first()
             )
-            if wa_source and weatherapi_key and (
-                wa_source.api_key != weatherapi_key or not wa_source.is_enabled
+            if (
+                wa_source
+                and weatherapi_key
+                and (wa_source.api_key != weatherapi_key or not wa_source.is_enabled)
             ):
                 wa_source.api_key = weatherapi_key
                 wa_source.is_enabled = True
