@@ -44,7 +44,7 @@ const mockDailySummaryGood = {
   days: [
     {
       day_index: 0,
-      date: new Date().toISOString().split('T')[0],
+      date: '2025-06-15',
       para_index: 85,
       verdict: 'bon',
       emoji: '🟢',
@@ -54,7 +54,7 @@ const mockDailySummaryGood = {
     },
     {
       day_index: 1,
-      date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+      date: '2025-06-16',
       para_index: 90,
       verdict: 'bon',
       emoji: '🟢',
@@ -64,7 +64,7 @@ const mockDailySummaryGood = {
     },
     {
       day_index: 2,
-      date: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0],
+      date: '2025-06-17',
       para_index: 75,
       verdict: 'moyen',
       emoji: '🟡',
@@ -74,7 +74,7 @@ const mockDailySummaryGood = {
     },
     {
       day_index: 3,
-      date: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
+      date: '2025-06-18',
       para_index: 50,
       verdict: 'limite',
       emoji: '🟠',
@@ -84,7 +84,7 @@ const mockDailySummaryGood = {
     },
     {
       day_index: 4,
-      date: new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0],
+      date: '2025-06-19',
       para_index: 30,
       verdict: 'mauvais',
       emoji: '🔴',
@@ -94,7 +94,7 @@ const mockDailySummaryGood = {
     },
     {
       day_index: 5,
-      date: new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0],
+      date: '2025-06-20',
       para_index: 65,
       verdict: 'moyen',
       emoji: '🟡',
@@ -104,7 +104,7 @@ const mockDailySummaryGood = {
     },
     {
       day_index: 6,
-      date: new Date(Date.now() + 6 * 86400000).toISOString().split('T')[0],
+      date: '2025-06-21',
       para_index: 80,
       verdict: 'bon',
       emoji: '🟢',
@@ -121,7 +121,7 @@ const mockDailySummaryAllGood = {
   days: [
     {
       day_index: 0,
-      date: new Date().toISOString().split('T')[0],
+      date: '2025-06-15',
       para_index: 85,
       verdict: 'bon',
       emoji: '🟢',
@@ -131,7 +131,7 @@ const mockDailySummaryAllGood = {
     },
     {
       day_index: 1,
-      date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+      date: '2025-06-16',
       para_index: 90,
       verdict: 'bon',
       emoji: '🟢',
@@ -141,7 +141,7 @@ const mockDailySummaryAllGood = {
     },
     {
       day_index: 2,
-      date: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0],
+      date: '2025-06-17',
       para_index: 88,
       verdict: 'bon',
       emoji: '🟢',
@@ -158,7 +158,7 @@ const mockDailySummaryAllBad = {
   days: [
     {
       day_index: 0,
-      date: new Date().toISOString().split('T')[0],
+      date: '2025-06-15',
       para_index: 25,
       verdict: 'mauvais',
       emoji: '🔴',
@@ -168,7 +168,7 @@ const mockDailySummaryAllBad = {
     },
     {
       day_index: 1,
-      date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+      date: '2025-06-16',
       para_index: 30,
       verdict: 'mauvais',
       emoji: '🔴',
@@ -178,7 +178,7 @@ const mockDailySummaryAllBad = {
     },
     {
       day_index: 2,
-      date: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0],
+      date: '2025-06-17',
       para_index: 20,
       verdict: 'mauvais',
       emoji: '🔴',
