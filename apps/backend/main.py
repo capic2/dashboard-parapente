@@ -2,16 +2,14 @@ import asyncio
 import logging
 import sqlite3
 from contextlib import asynccontextmanager
-from pathlib import Path
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 # Import configuration (loads environment variables automatically)
 import config
-
 # Import ALL models to register them with SQLAlchemy Base.metadata
 # This ensures all tables are available for Base.metadata.create_all()
 # even in test mode where initialize_database() is not called
