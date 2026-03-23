@@ -14,7 +14,7 @@ export default function Dashboard() {
   const { data: sites, isLoading: sitesLoading, error } = useSites();
   const [selectedSiteId, setSelectedSiteId] = useState<string>('');
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
-  const { data: bestSpot, isLoading: bestSpotLoading, isError: bestSpotError } = useBestSpotAPI(selectedDayIndex);
+  const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
   const [weatherDataMap] = useState<Map<string, any>>(new Map()); // Pas utilisé mais gardé pour SiteSelector
   
   // Get selected site coordinates for emagram
@@ -75,43 +75,37 @@ export default function Dashboard() {
   return (
     <div>
       <div className="space-y-4">
-        {/* Row 1: Stats Panel (full width) - Juste en dessous du header */}
+        {/* 1. Stats Panel (full width) */}
         <StatsPanel />
 
-        {/* Row 2: 7-Day Forecast (full width) */}
-        <Forecast7Day 
-          spotId={selectedSiteId}
-          selectedDayIndex={selectedDayIndex}
-          onSelectDay={handleSelectDay}
-        />
-
-        {/* Row 3: Best Spot Suggestion - Loaded from backend API (cached) */}
-        {!bestSpotLoading && !bestSpotError && bestSpot && (
-          <BestSpotSuggestion 
-            bestSpot={bestSpot}
-            onSelectSite={setSelectedSiteId}
-            selectedDayIndex={selectedDayIndex}
-          />
-        )}
-        
-        {/* Row 4: Site Selector */}
+        {/* 2. Site Selector (full width) */}
         <SiteSelector 
           selectedSiteId={selectedSiteId}
           onSelectSite={setSelectedSiteId}
           weatherData={weatherDataMap}
         />
 
-        {/* Row 5: Current Conditions + Emagram Widget (1/3 - 2/3) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-1">
-            <CurrentConditions spotId={selectedSiteId} />
-          </div>
-          <div className="lg:col-span-2">
-            <EmagramWidget userLat={userLat} userLon={userLon} />
-          </div>
+        {/* 3. Current Conditions (full width) */}
+        <CurrentConditions spotId={selectedSiteId} />
+
+        {/* 4. Day Selector - 7-Day Forecast (full width) */}
+        <Forecast7Day 
+          spotId={selectedSiteId}
+          selectedDayIndex={selectedDayIndex}
+          onSelectDay={handleSelectDay}
+        />
+
+        {/* 5. Best Spot | Emagram (40% / 60%) */}
+        <div className="grid grid-cols-1 lg:grid-cols-[40%_60%] gap-4">
+          <BestSpotSuggestion 
+            bestSpot={bestSpot ?? null}
+            onSelectSite={setSelectedSiteId}
+            selectedDayIndex={selectedDayIndex}
+          />
+          <EmagramWidget userLat={userLat} userLon={userLon} />
         </div>
 
-        {/* Row 6: Hourly Forecast (full width) */}
+        {/* 6. Hourly Forecast (full width) */}
         <HourlyForecast spotId={selectedSiteId} dayIndex={selectedDayIndex} />
       </div>
     </div>
