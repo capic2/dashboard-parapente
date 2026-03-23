@@ -20,7 +20,7 @@ const mockOpenMeteo: WeatherSource = {
   scraper_type: 'api',
   base_url: 'https://api.open-meteo.com',
   documentation_url: 'https://open-meteo.com/en/docs',
-  last_success_at: new Date(Date.now() - 5 * 60000).toISOString(), // 5 minutes ago
+  last_success_at: '2025-06-15T09:55:00.000Z', // 5 minutes ago
   last_error_at: null,
   last_error_message: null,
   success_count: 245,
@@ -29,7 +29,7 @@ const mockOpenMeteo: WeatherSource = {
   avg_response_time_ms: 145,
   status: 'active',
   created_at: '2024-01-01T00:00:00Z',
-  updated_at: new Date().toISOString(),
+  updated_at: '2025-06-15T10:00:00.000Z',
 };
 
 const mockWeatherAPI: WeatherSource = {
@@ -44,7 +44,7 @@ const mockWeatherAPI: WeatherSource = {
   scraper_type: 'api',
   base_url: 'https://api.weatherapi.com',
   documentation_url: 'https://www.weatherapi.com/docs/',
-  last_success_at: new Date(Date.now() - 15 * 60000).toISOString(), // 15 minutes ago
+  last_success_at: '2025-06-15T09:45:00.000Z', // 15 minutes ago
   last_error_at: null,
   last_error_message: null,
   success_count: 180,
@@ -53,7 +53,7 @@ const mockWeatherAPI: WeatherSource = {
   avg_response_time_ms: 230,
   status: 'active',
   created_at: '2024-01-01T00:00:00Z',
-  updated_at: new Date().toISOString(),
+  updated_at: '2025-06-15T10:00:00.000Z',
 };
 
 const mockMeteoParapente: WeatherSource = {
@@ -68,8 +68,8 @@ const mockMeteoParapente: WeatherSource = {
   scraper_type: 'playwright',
   base_url: 'https://meteo-parapente.com',
   documentation_url: null,
-  last_success_at: new Date(Date.now() - 2 * 60 * 60000).toISOString(), // 2 hours ago
-  last_error_at: new Date(Date.now() - 30 * 60000).toISOString(), // 30 minutes ago
+  last_success_at: '2025-06-15T08:00:00.000Z', // 2 hours ago
+  last_error_at: '2025-06-15T09:30:00.000Z', // 30 minutes ago
   last_error_message: "Timeout: La page n'a pas répondu dans le délai imparti",
   success_count: 120,
   error_count: 15,
@@ -77,7 +77,7 @@ const mockMeteoParapente: WeatherSource = {
   avg_response_time_ms: 1850,
   status: 'active',
   created_at: '2024-01-01T00:00:00Z',
-  updated_at: new Date().toISOString(),
+  updated_at: '2025-06-15T10:00:00.000Z',
 };
 
 const mockDisabledSource: WeatherSource = {
@@ -92,7 +92,7 @@ const mockDisabledSource: WeatherSource = {
   scraper_type: 'stealth',
   base_url: 'https://meteociel.fr',
   documentation_url: null,
-  last_success_at: new Date(Date.now() - 24 * 60 * 60000).toISOString(), // 1 day ago
+  last_success_at: '2025-06-14T10:00:00.000Z', // 1 day ago
   last_error_at: null,
   last_error_message: null,
   success_count: 45,
@@ -101,7 +101,7 @@ const mockDisabledSource: WeatherSource = {
   avg_response_time_ms: 2100,
   status: 'disabled',
   created_at: '2024-01-01T00:00:00Z',
-  updated_at: new Date().toISOString(),
+  updated_at: '2025-06-15T10:00:00.000Z',
 };
 
 const mockErrorSource: WeatherSource = {
@@ -117,7 +117,7 @@ const mockErrorSource: WeatherSource = {
   base_url: 'https://api.meteoblue.com',
   documentation_url: 'https://docs.meteoblue.com',
   last_success_at: null,
-  last_error_at: new Date(Date.now() - 10 * 60000).toISOString(), // 10 minutes ago
+  last_error_at: '2025-06-15T09:50:00.000Z', // 10 minutes ago
   last_error_message: 'Authentication failed: Invalid API key',
   success_count: 0,
   error_count: 12,
@@ -125,7 +125,7 @@ const mockErrorSource: WeatherSource = {
   avg_response_time_ms: null,
   status: 'error',
   created_at: '2024-01-01T00:00:00Z',
-  updated_at: new Date().toISOString(),
+  updated_at: '2025-06-15T10:00:00.000Z',
 };
 
 const mockUnknownSource: WeatherSource = {
@@ -148,8 +148,8 @@ const mockUnknownSource: WeatherSource = {
   success_rate: 0,
   avg_response_time_ms: null,
   status: 'unknown',
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
+  created_at: '2025-06-15T10:00:00.000Z',
+  updated_at: '2025-06-15T10:00:00.000Z',
 };
 
 const meta = preview.meta({
@@ -202,7 +202,7 @@ export const Default = meta.story({
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
             response_time_ms: 145,
-            tested_at: new Date().toISOString(),
+            tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
       ],
@@ -246,7 +246,7 @@ export const ActiveAPISource = meta.story({
           await delay(300);
           return HttpResponse.json({
             ...mockOpenMeteo,
-            updated_at: new Date().toISOString(),
+            updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
         // POST /api/weather-sources/{sourceName}/test
@@ -255,7 +255,7 @@ export const ActiveAPISource = meta.story({
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
             response_time_ms: 145,
-            tested_at: new Date().toISOString(),
+            tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
       ],
@@ -285,7 +285,7 @@ export const WithAPIKey = meta.story({
             api_key_configured: body.api_key
               ? true
               : mockWeatherAPI.api_key_configured,
-            updated_at: new Date().toISOString(),
+            updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
         http.post('/api/weather-sources/:sourceName/test', async () => {
@@ -293,7 +293,7 @@ export const WithAPIKey = meta.story({
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
             response_time_ms: 230,
-            tested_at: new Date().toISOString(),
+            tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
       ],
@@ -318,7 +318,7 @@ export const PlaywrightScraper = meta.story({
           await delay(300);
           return HttpResponse.json({
             ...mockMeteoParapente,
-            updated_at: new Date().toISOString(),
+            updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
         http.post('/api/weather-sources/:sourceName/test', async () => {
@@ -329,13 +329,13 @@ export const PlaywrightScraper = meta.story({
               success: false,
               response_time_ms: 1850,
               error: "Timeout: La page n'a pas répondu dans le délai imparti",
-              tested_at: new Date().toISOString(),
+              tested_at: '2025-06-15T10:00:00.000Z',
             });
           }
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
             response_time_ms: 1850,
-            tested_at: new Date().toISOString(),
+            tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
       ],
@@ -363,7 +363,7 @@ export const DisabledSource = meta.story({
             ...mockDisabledSource,
             ...body,
             status: body.is_enabled ? 'active' : 'disabled',
-            updated_at: new Date().toISOString(),
+            updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
       ],
@@ -394,7 +394,7 @@ export const ErrorSource = meta.story({
               ? true
               : mockErrorSource.api_key_configured,
             status: body.api_key ? 'active' : 'error',
-            updated_at: new Date().toISOString(),
+            updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
         http.post('/api/weather-sources/:sourceName/test', async () => {
@@ -403,7 +403,7 @@ export const ErrorSource = meta.story({
             success: false,
             response_time_ms: 0,
             error: 'Authentication failed: Invalid API key',
-            tested_at: new Date().toISOString(),
+            tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
       ],
@@ -428,7 +428,7 @@ export const UnknownSource = meta.story({
           await delay(300);
           return HttpResponse.json({
             ...mockUnknownSource,
-            updated_at: new Date().toISOString(),
+            updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
         http.post('/api/weather-sources/:sourceName/test', async () => {
@@ -436,7 +436,7 @@ export const UnknownSource = meta.story({
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
             response_time_ms: 450,
-            tested_at: new Date().toISOString(),
+            tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
       ],
@@ -468,7 +468,7 @@ export const LastActiveSource = meta.story({
           // Should not reach here as the UI prevents toggling
           return HttpResponse.json({
             ...mockOpenMeteo,
-            updated_at: new Date().toISOString(),
+            updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
         http.post('/api/weather-sources/:sourceName/test', async () => {
@@ -476,7 +476,7 @@ export const LastActiveSource = meta.story({
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
             response_time_ms: 145,
-            tested_at: new Date().toISOString(),
+            tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
       ],
@@ -495,7 +495,7 @@ export const LowSuccessRate = meta.story({
       success_rate: 65,
       success_count: 65,
       error_count: 35,
-      last_error_at: new Date(Date.now() - 2 * 60000).toISOString(),
+      last_error_at: '2025-06-15T09:58:00.000Z',
       last_error_message: 'Connection timeout after 30 seconds',
     },
     isLastActive: false,
@@ -508,7 +508,7 @@ export const LowSuccessRate = meta.story({
           return HttpResponse.json({
             ...mockMeteoParapente,
             success_rate: 65,
-            updated_at: new Date().toISOString(),
+            updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
         http.post('/api/weather-sources/:sourceName/test', async () => {
@@ -519,13 +519,13 @@ export const LowSuccessRate = meta.story({
               success: false,
               response_time_ms: 0,
               error: 'Connection timeout after 30 seconds',
-              tested_at: new Date().toISOString(),
+              tested_at: '2025-06-15T10:00:00.000Z',
             });
           }
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
             response_time_ms: 2100,
-            tested_at: new Date().toISOString(),
+            tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
       ],
@@ -553,7 +553,7 @@ export const StealthScraper = meta.story({
             ...mockDisabledSource,
             ...body,
             status: body.is_enabled ? 'active' : 'disabled',
-            updated_at: new Date().toISOString(),
+            updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
         http.post('/api/weather-sources/:sourceName/test', async () => {
@@ -561,7 +561,7 @@ export const StealthScraper = meta.story({
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
             response_time_ms: 2100,
-            tested_at: new Date().toISOString(),
+            tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
       ],
@@ -589,7 +589,7 @@ export const HighResponseTime = meta.story({
           return HttpResponse.json({
             ...mockMeteoParapente,
             avg_response_time_ms: 5420,
-            updated_at: new Date().toISOString(),
+            updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
         http.post('/api/weather-sources/:sourceName/test', async () => {
@@ -597,7 +597,7 @@ export const HighResponseTime = meta.story({
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
             response_time_ms: 5420,
-            tested_at: new Date().toISOString(),
+            tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
       ],
@@ -648,7 +648,7 @@ export const AllSourceTypes = meta.story({
             return HttpResponse.json({
               ...(mockMap[sourceName] || mockOpenMeteo),
               ...body,
-              updated_at: new Date().toISOString(),
+              updated_at: '2025-06-15T10:00:00.000Z',
             });
           }
         ),
@@ -664,14 +664,14 @@ export const AllSourceTypes = meta.story({
                 success: false,
                 response_time_ms: 0,
                 error: 'Authentication failed: Invalid API key',
-                tested_at: new Date().toISOString(),
+                tested_at: '2025-06-15T10:00:00.000Z',
               });
             }
 
             return HttpResponse.json<WeatherSourceTestResult>({
               success: true,
               response_time_ms: Math.floor(Math.random() * 2000) + 100,
-              tested_at: new Date().toISOString(),
+              tested_at: '2025-06-15T10:00:00.000Z',
             });
           }
         ),

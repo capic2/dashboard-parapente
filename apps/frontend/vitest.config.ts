@@ -10,7 +10,10 @@ import {fileURLToPath} from "node:url";
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+  ],
   test: {
     globals: true,
     coverage: {
@@ -25,7 +28,6 @@ export default defineConfig({
         'src/main.tsx',
         'src/routeTree.gen.ts',
       ],
-      // No global thresholds - only applied to unit tests
     },
     projects: [
       {
@@ -46,31 +48,27 @@ export default defineConfig({
           react(),
           tailwindcss(),
           storybookTest({
-            // The location of your Storybook config, main.js|ts
             configDir: path.join(dirname, '.storybook'),
-            // This should match your package.json script to run Storybook
-            // The --no-open flag will skip the automatic opening of a browser
-            storybookScript: 'npm run storybook -- --no-open',
           }),
         ],
         test: {
           name: 'storybook',
           globals: true,
-          // Exclude stories that require full browser environment (Cesium, WebGL, etc.)
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright(),
+            instances: [
+              { browser: 'chromium', launch: { headless: true } },
+            ],
+          },
           exclude: [
             'node_modules',
             'dist',
             '**/FlightViewer3D.stories.tsx',
             '**/EmagramWidget.stories.tsx',
           ],
-          // Enable browser mode
-          browser: {
-            enabled: true,
-            provider: playwright({}),
-            headless: true,
-            instances: [{ browser: 'chromium' }],
-          },
-          testTimeout: 15000, // 15s per test (default is 5s)
+          testTimeout: 15000,
           setupFiles: ['./.storybook/vitest.setup.ts'],
         },
       },

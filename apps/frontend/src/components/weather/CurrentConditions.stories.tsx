@@ -39,7 +39,7 @@ export default meta;
 
 // Mock data - matches BackendWeatherResponseSchema
 // Current hour is used for CurrentConditions display
-const currentHour = new Date().getHours();
+const currentHour = 10;
 
 const mockWeatherGood = {
   site_id: '1',

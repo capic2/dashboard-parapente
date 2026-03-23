@@ -30,10 +30,17 @@
       }
     },
     "test": {
-      "executor": "@nx/vitest:test",
+      "executor": "nx:run-commands",
       "options": {
-        "config": "apps/frontend/vitest.config.ts",
-        "project": "storybook"
+        "command": "vitest run --config vitest.config.ts",
+        "cwd": "apps/frontend"
+      }
+    },
+    "test:storybook": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --config vitest.config.ts --project storybook",
+        "cwd": "apps/frontend"
       }
     },
     "test:unit": {
