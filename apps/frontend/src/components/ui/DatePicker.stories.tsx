@@ -69,7 +69,7 @@ export const Today = meta.story({
   name: 'Today',
   args: {
     label: 'Date',
-    value: new Date().toISOString().split('T')[0],
+    value: '2025-06-15',
     onChange: fn(),
   },
 })

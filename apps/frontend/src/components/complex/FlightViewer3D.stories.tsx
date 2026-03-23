@@ -44,7 +44,7 @@ const mockGPXData = {
     lat: 45.9 + i * 0.001,
     lon: 6.1 + i * 0.001,
     elevation: 1200 + Math.sin(i / 10) * 300,
-    time: new Date(Date.now() + i * 60000).toISOString(),
+    time: new Date(1750000800000 + i * 60000).toISOString(),
   })),
 };
 

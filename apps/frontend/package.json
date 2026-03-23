@@ -13,8 +13,7 @@
     "lint": "eslint src --fix",
     "type-check": "tsc --noEmit",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build",
-    "test-storybook": "vitest --project=storybook"
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
