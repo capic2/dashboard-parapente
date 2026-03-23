@@ -45,37 +45,32 @@ export default function CurrentConditions({ spotId }: CurrentConditionsProps) {
   }
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow-md border-l-4 border-sky-600">
+    <div className="bg-white rounded-xl p-4 shadow-md border-l-4 border-sky-600 flex-1 flex flex-col">
       <h2 className="text-sm text-gray-600 mb-3.5 font-semibold">
         Conditions Actuelles - {weather.spot_name}
       </h2>
-      
-      {/* Grid horizontal responsive */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        {/* Colonne 1: Para-index + Verdict */}
-        <div className="flex flex-col justify-center">
-          <div className="text-4xl font-bold text-sky-600 leading-none mb-2">
-            {weather.para_index}/100
-          </div>
-          <div className={`px-3 py-1.5 rounded-full text-xs font-semibold text-center ${getVerdictClass(weather.verdict)}`}>
-            {getVerdictEmoji(weather.verdict)} {weather.verdict.toUpperCase()}
-          </div>
-        </div>
 
-        {/* Colonne 2: Température */}
-        <div className="flex flex-col justify-center lg:border-l-2 lg:border-gray-100 lg:pl-4">
-          <span className="text-xs text-gray-500 mb-1">🌡️ Température</span>
-          <span className="text-2xl font-bold text-gray-900">{weather.temperature}°C</span>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="text-4xl sm:text-3xl font-bold text-sky-600 leading-none">
+          {weather.para_index}/100
         </div>
+        <div className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap ${getVerdictClass(weather.verdict)}`}>
+          {getVerdictEmoji(weather.verdict)} {weather.verdict.toUpperCase()}
+        </div>
+      </div>
 
-        {/* Colonne 3: Vent */}
-        <div className="flex flex-col justify-center lg:border-l-2 lg:border-gray-100 lg:pl-4">
-          <span className="text-xs text-gray-500 mb-1">💨 Vent</span>
-          <span className="text-2xl font-bold text-gray-900">{weather.wind_speed} km/h</span>
-          <span className="text-xs text-gray-600 mt-1">{weather.wind_direction}</span>
-          {site?.orientation && (
-            <div className="mt-1">
+      <div className="flex flex-col gap-2">
+        <div className="flex justify-between text-sm py-1.5 border-b border-gray-100">
+          <span className="text-gray-600 font-medium">🌡️ Température</span>
+          <span className="font-semibold text-gray-900 text-right">{weather.temperature}°C</span>
+        </div>
+        <div className="flex justify-between text-sm py-1.5 border-b border-gray-100">
+          <span className="text-gray-600 font-medium">💨 Vent</span>
+          <div className="flex flex-col items-end gap-1">
+            <span className="font-semibold text-gray-900 text-right">
+              {weather.wind_speed} km/h {weather.wind_direction}
+            </span>
+            {site?.orientation && (
               <WindIndicator
                 windDirection={weather.wind_direction}
                 siteOrientation={Array.isArray(site.orientation) ? site.orientation[0] : site.orientation}
@@ -83,20 +78,18 @@ export default function CurrentConditions({ spotId }: CurrentConditionsProps) {
                 showLabel={false}
                 size="sm"
               />
-            </div>
-          )}
+            )}
+          </div>
         </div>
-
-        {/* Colonne 4: Conditions + Rafales */}
-        <div className="flex flex-col justify-center lg:border-l-2 lg:border-gray-100 lg:pl-4">
-          <span className="text-xs text-gray-500 mb-1">☁️ Conditions</span>
-          <span className="text-sm font-semibold text-gray-900">{weather.conditions}</span>
-          {weather.wind_gusts && (
-            <>
-              <span className="text-xs text-gray-500 mt-2">🌪️ Rafales</span>
-              <span className="text-sm font-semibold text-gray-900">{weather.wind_gusts} km/h</span>
-            </>
-          )}
+        {weather.wind_gusts && (
+          <div className="flex justify-between text-sm py-1.5 border-b border-gray-100">
+            <span className="text-gray-600 font-medium">🌪️ Rafales</span>
+            <span className="font-semibold text-gray-900 text-right">{weather.wind_gusts} km/h</span>
+          </div>
+        )}
+        <div className="flex justify-between text-sm py-1.5">
+          <span className="text-gray-600 font-medium">☁️ Conditions</span>
+          <span className="font-semibold text-gray-900 text-right">{weather.conditions}</span>
         </div>
       </div>
 
