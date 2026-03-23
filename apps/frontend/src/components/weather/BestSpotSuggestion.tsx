@@ -25,13 +25,6 @@ export function BestSpotSuggestion({
   selectedDayIndex = 0,
   className = '',
 }: BestSpotSuggestionProps) {
-  // Don't show if no data available
-  if (!bestSpot || !bestSpot.site) {
-    return null;
-  }
-
-  const { site, paraIndex, windDirection, windSpeed, reason } = bestSpot;
-
   // Calculate the date label based on selectedDayIndex
   const selectedDate = addDays(new Date(), selectedDayIndex);
   const dateLabel = selectedDayIndex === 0
@@ -39,6 +32,27 @@ export function BestSpotSuggestion({
     : selectedDayIndex === 1
     ? "demain"
     : format(selectedDate, 'EEEE d MMMM', { locale: fr });
+
+  // Show loading state if no data available
+  if (!bestSpot || !bestSpot.site) {
+    return (
+      <div className="bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="text-3xl">🎯</div>
+          <div>
+            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              Meilleur spot pour {dateLabel}
+            </h3>
+            <div className="text-lg text-gray-500 dark:text-gray-500 mt-1">
+              Calcul en cours...
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const { site, paraIndex, windDirection, windSpeed, reason } = bestSpot;
 
   // Consistent sky blue theme for best spot card
   const bgColor = 'bg-sky-50 dark:bg-sky-900/20';
