@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import preview from '../../.storybook/preview';
-import { expect } from 'storybook/test';
 import FlightHistory from './FlightHistory';
 
 const meta = preview.meta({

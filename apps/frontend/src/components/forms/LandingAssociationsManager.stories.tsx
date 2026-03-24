@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import preview from '../../../.storybook/preview';
-import { expect, userEvent, waitFor } from 'storybook/test';
+import { expect, userEvent } from 'storybook/test';
 import LandingAssociationsManager from './LandingAssociationsManager';
 
 const meta = preview.meta({

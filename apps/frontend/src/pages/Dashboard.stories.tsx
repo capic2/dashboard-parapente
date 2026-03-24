@@ -124,17 +124,6 @@ const mockBestSpot = {
   explanation: 'Vent compatible avec orientation du site',
 };
 
-const mockForecast7Days = Array.from({ length: 7 }, (_, i) => ({
-  site_id: 'site-arguel',
-  site_name: 'Arguel',
-  day_index: i,
-  days: 1,
-  para_index: 70 + Math.floor(Math.random() * 20),
-  verdict: i < 3 ? 'bon' : 'moyen',
-  emoji: i < 3 ? '🟢' : '🟡',
-  consensus: [],
-}));
-
 const mockDailySummary = {
   site_id: 'site-arguel',
   site_name: 'Arguel',
