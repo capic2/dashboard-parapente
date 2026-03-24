@@ -129,7 +129,6 @@ class TestUpdateLandingAssociation:
             f"{API_PREFIX}/sites/site-arguel/landings",
             json={"landing_site_id": "site-chalais"},
         )
-        assoc1_id = r1.json()["id"]
         assoc2_id = r2.json()["id"]
 
         # Set second as primary
