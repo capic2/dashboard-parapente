@@ -78,96 +78,50 @@ jobs:
       - name: 🎛️ Configure NX Cloud execution
         run: |
           # Pushes to main: always use local cache (NX Cloud credits are limited)
-          # PRs: use NX Cloud unless 'skip-nx-cloud' label is present
           if [[ "${{ github.event_name }}" == "push" ]]; then
             echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
-            echo "💾 Push to main: using local cache (NX Cloud reserved for PRs)"
-          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "Push to main: using local cache (NX Cloud reserved for PRs)"
+            exit 0
+          fi
+
+          # Check for skip-nx-cloud label on PRs
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name' 2>/dev/null || echo "")
             if echo "$LABELS" | grep -q "skip-nx-cloud"; then
               echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
-              echo "⚠️  NX Cloud DISABLED (skip-nx-cloud label)"
-            else
-              echo "NX_NO_CLOUD=false" >> $GITHUB_ENV
-              echo "✅ NX Cloud ENABLED"
+              echo "NX Cloud DISABLED (skip-nx-cloud label)"
+              exit 0
+            fi
+          fi
+
+          # Test NX Cloud connectivity with a dry-run
+          echo "Testing NX Cloud connectivity..."
+          if npx nx show projects 2>&1 | grep -qE "(Workspace is unable to be authorized|exceeding the FREE plan|Workspace is disabled)"; then
+            echo "NX Cloud credits exhausted, falling back to local cache"
+            echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
+
+            if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+              gh pr edit ${{ github.event.pull_request.number }} \
+                --add-label "nx-cloud-no-credit" \
+                --add-label "skip-nx-cloud" 2>/dev/null || true
             fi
           else
-            echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
+            echo "NX_NO_CLOUD=false" >> $GITHUB_ENV
+            echo "NX Cloud ENABLED"
           fi
         env:
           GH_TOKEN: ${{ github.token }}
 
       - name: 🔨 Run affected builds
-        id: build
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          npx nx affected -t build --parallel=3 --exclude=e2e 2>&1 | tee /tmp/nx-build.log
-
-      - name: 💡 Handle NX Cloud credits exhaustion
-        if: always() && steps.build.outcome == 'failure'
-        run: |
-          # Check for NX Cloud credits exhaustion patterns in captured build output
-          if grep -qE "(Workspace is unable to be authorized|exceeding the FREE plan|Workspace is disabled)" /tmp/nx-build.log 2>/dev/null; then
-            echo "=========================================="
-            echo "⚠️  NX CLOUD CREDITS EXHAUSTED"
-            echo "=========================================="
-
-            if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-              # Add labels to PR for the retry
-              echo "Adding labels to PR #${{ github.event.pull_request.number }}..."
-              gh pr edit ${{ github.event.pull_request.number }} \
-                --add-label "nx-cloud-no-credit" \
-                --add-label "skip-nx-cloud" \
-                && echo "✅ Labels added" || echo "⚠️ Failed to add labels"
-
-              # Post comment (avoid duplicates)
-              EXISTING_COMMENT=$(gh pr view ${{ github.event.pull_request.number }} --json comments --jq '.comments[] | select(.author.login=="github-actions" and (.body | contains("NX Cloud credits exhausted"))) | .id' | head -1)
-              if [[ -z "$EXISTING_COMMENT" ]]; then
-                printf '%s\n' \
-                  '## ⚠️ NX Cloud credits exhausted' \
-                  '' \
-                  'NX Cloud free tier credits are exhausted.' \
-                  'Labels `skip-nx-cloud` + `nx-cloud-no-credit` added automatically.' \
-                  '' \
-                  '**Retrying with local cache...** No action needed.' \
-                  '' \
-                  '---' \
-                  '_Automated message. Will not be duplicated on re-runs._' \
-                  > /tmp/pr_comment.md
-                gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/pr_comment.md \
-                  && echo "✅ Comment posted" || echo "⚠️ Failed to post comment"
-              fi
-
-              # Auto-retry: re-run failed jobs (will now see skip-nx-cloud label)
-              echo "🔄 Re-running failed jobs with local cache..."
-              gh run rerun ${{ github.run_id }} --failed \
-                && echo "✅ Re-run triggered" || echo "⚠️ Failed to trigger re-run"
-              exit 0
-            else
-              # Push to main (no PR) - auto-retry with local cache
-              echo "⚠️ NX Cloud credits exhausted on main push - auto-retrying with local cache..."
-              gh run rerun ${{ github.run_id }} --failed \
-                && echo "✅ Re-run triggered" || echo "⚠️ Failed to trigger re-run"
-              exit 0
-            fi
-          else
-            echo "::error title=Build Failed::The build failed for a reason other than NX Cloud credits."
-            exit 1
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
+        run: npx nx affected -t build --parallel=3 --exclude=e2e
 
       - name: 🎨 Run affected lints
-        if: success() || (failure() && steps.build.outcome == 'success')
         run: npx nx affected -t lint --parallel=3 --exclude=e2e
 
       - name: 📝 Run affected type-check
-        if: success() || (failure() && steps.build.outcome == 'success')
         run: npx nx affected -t type-check --parallel=3 --exclude=e2e
 
       - name: 🧪 Run affected tests (frontend + backend in parallel)
-        if: success() || (failure() && steps.build.outcome == 'success')
         run: npx nx affected -t test --parallel=3 --exclude=e2e
         env:
           TESTING: true
@@ -244,13 +198,24 @@ jobs:
       # Configure NX Cloud for E2E: same logic as main job
       - name: 🎛️ Configure NX Cloud execution
         run: |
+          # Check for skip-nx-cloud label
           LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name' 2>/dev/null || echo "")
           if echo "$LABELS" | grep -q "skip-nx-cloud"; then
             echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
-            echo "⚠️  NX Cloud DISABLED (skip-nx-cloud label)"
+            echo "NX Cloud DISABLED (skip-nx-cloud label)"
+            exit 0
+          fi
+
+          # Test NX Cloud connectivity
+          if npx nx show projects 2>&1 | grep -qE "(Workspace is unable to be authorized|exceeding the FREE plan|Workspace is disabled)"; then
+            echo "NX Cloud credits exhausted, falling back to local cache"
+            echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
+            gh pr edit ${{ github.event.pull_request.number }} \
+              --add-label "nx-cloud-no-credit" \
+              --add-label "skip-nx-cloud" 2>/dev/null || true
           else
             echo "NX_NO_CLOUD=false" >> $GITHUB_ENV
-            echo "✅ NX Cloud ENABLED"
+            echo "NX Cloud ENABLED"
           fi
         env:
           GH_TOKEN: ${{ github.token }}
