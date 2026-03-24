@@ -77,57 +77,81 @@ jobs:
       # - Renovate PRs always have 'skip-nx-cloud' (configured in renovate.json)
       - name: 🎛️ Configure NX Cloud execution
         run: |
-          # Pushes to main: always use local cache (NX Cloud credits are limited)
           if [[ "${{ github.event_name }}" == "push" ]]; then
             echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
-            echo "Push to main: using local cache (NX Cloud reserved for PRs)"
-            exit 0
-          fi
-
-          # Check for skip-nx-cloud label on PRs
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "Push to main: using local cache"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name' 2>/dev/null || echo "")
             if echo "$LABELS" | grep -q "skip-nx-cloud"; then
               echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
               echo "NX Cloud DISABLED (skip-nx-cloud label)"
-              exit 0
-            fi
-          fi
-
-          # Test NX Cloud connectivity with a dry-run
-          echo "Testing NX Cloud connectivity..."
-          if npx nx show projects 2>&1 | grep -qE "(Workspace is unable to be authorized|exceeding the FREE plan|Workspace is disabled)"; then
-            echo "NX Cloud credits exhausted, falling back to local cache"
-            echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
-
-            if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-              gh pr edit ${{ github.event.pull_request.number }} \
-                --add-label "nx-cloud-no-credit" \
-                --add-label "skip-nx-cloud" 2>/dev/null || true
+            else
+              echo "NX_NO_CLOUD=false" >> $GITHUB_ENV
+              echo "NX Cloud ENABLED"
             fi
           else
-            echo "NX_NO_CLOUD=false" >> $GITHUB_ENV
-            echo "NX Cloud ENABLED"
+            echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
           fi
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: 🔨 Run affected builds
-        run: npx nx affected -t build --parallel=3 --exclude=e2e
+      - name: 🔨 Run affected (build, lint, type-check, test)
+        id: nx_tasks
+        run: |
+          run_nx() {
+            local output
+            output=$(npx "$@" 2>&1) || {
+              echo "$output"
+              if echo "$output" | grep -qE "(Workspace is unable to be authorized|exceeding the FREE plan|Workspace is disabled)"; then
+                echo "NX_CLOUD_EXHAUSTED=true" >> $GITHUB_ENV
+                return 1
+              fi
+              return 1
+            }
+            echo "$output"
+          }
 
-      - name: 🎨 Run affected lints
-        run: npx nx affected -t lint --parallel=3 --exclude=e2e
+          run_nx nx affected -t build --parallel=3 --exclude=e2e
+          run_nx nx affected -t lint --parallel=3 --exclude=e2e
+          run_nx nx affected -t type-check --parallel=3 --exclude=e2e
 
-      - name: 📝 Run affected type-check
-        run: npx nx affected -t type-check --parallel=3 --exclude=e2e
+          TESTING=true \
+          BACKEND_DATABASE_URL=sqlite:///./test.db \
+          BACKEND_WEATHERAPI_KEY=test_key \
+          BACKEND_METEOBLUE_API_KEY=test_key \
+            run_nx nx affected -t test --parallel=3 --exclude=e2e
+        continue-on-error: true
 
-      - name: 🧪 Run affected tests (frontend + backend in parallel)
-        run: npx nx affected -t test --parallel=3 --exclude=e2e
+      - name: 💡 Handle NX Cloud credits exhaustion
+        if: steps.nx_tasks.outcome == 'failure' && env.NX_CLOUD_EXHAUSTED == 'true'
+        run: |
+          echo "NX Cloud credits exhausted - retrying with local cache"
+          echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            gh pr edit ${{ github.event.pull_request.number }} \
+              --add-label "nx-cloud-no-credit" \
+              --add-label "skip-nx-cloud" 2>/dev/null || true
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: 🔄 Retry with local cache
+        if: steps.nx_tasks.outcome == 'failure' && env.NX_CLOUD_EXHAUSTED == 'true'
+        run: |
+          npx nx affected -t build --parallel=3 --exclude=e2e
+          npx nx affected -t lint --parallel=3 --exclude=e2e
+          npx nx affected -t type-check --parallel=3 --exclude=e2e
+          npx nx affected -t test --parallel=3 --exclude=e2e
         env:
           TESTING: true
           BACKEND_DATABASE_URL: sqlite:///./test.db
           BACKEND_WEATHERAPI_KEY: test_key
           BACKEND_METEOBLUE_API_KEY: test_key
+
+      - name: ❌ Fail if non-NX-Cloud error
+        if: steps.nx_tasks.outcome == 'failure' && env.NX_CLOUD_EXHAUSTED != 'true'
+        run: exit 1
 
       - name: 📊 Upload frontend coverage
         if: always()
@@ -198,21 +222,10 @@ jobs:
       # Configure NX Cloud for E2E: same logic as main job
       - name: 🎛️ Configure NX Cloud execution
         run: |
-          # Check for skip-nx-cloud label
           LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name' 2>/dev/null || echo "")
           if echo "$LABELS" | grep -q "skip-nx-cloud"; then
             echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
             echo "NX Cloud DISABLED (skip-nx-cloud label)"
-            exit 0
-          fi
-
-          # Test NX Cloud connectivity
-          if npx nx show projects 2>&1 | grep -qE "(Workspace is unable to be authorized|exceeding the FREE plan|Workspace is disabled)"; then
-            echo "NX Cloud credits exhausted, falling back to local cache"
-            echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
-            gh pr edit ${{ github.event.pull_request.number }} \
-              --add-label "nx-cloud-no-credit" \
-              --add-label "skip-nx-cloud" 2>/dev/null || true
           else
             echo "NX_NO_CLOUD=false" >> $GITHUB_ENV
             echo "NX Cloud ENABLED"
@@ -221,8 +234,33 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: 🧪 Run E2E tests
-        run: npx nx e2e e2e --configuration=ci
+        id: e2e
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npx nx e2e e2e --configuration=ci 2>&1 | tee /tmp/e2e.log
         env:
+          TESTING: false
+          BACKEND_DATABASE_URL: sqlite:///./test.db
+          BACKEND_WEATHERAPI_KEY: test_key
+          BACKEND_METEOBLUE_API_KEY: test_key
+          BACKEND_STRAVA_VERIFY_TOKEN: PARAPENTE_E2E_TEST
+
+      - name: 🔄 Retry E2E with local cache (if NX Cloud exhausted)
+        if: steps.e2e.outcome == 'failure'
+        run: |
+          if grep -qE "(Workspace is unable to be authorized|exceeding the FREE plan|Workspace is disabled)" /tmp/e2e.log; then
+            echo "NX Cloud credits exhausted - retrying with local cache"
+            gh pr edit ${{ github.event.pull_request.number }} \
+              --add-label "nx-cloud-no-credit" \
+              --add-label "skip-nx-cloud" 2>/dev/null || true
+            NX_NO_CLOUD=true npx nx e2e e2e --configuration=ci
+          else
+            echo "E2E failed for non-NX-Cloud reason"
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
           TESTING: false
           BACKEND_DATABASE_URL: sqlite:///./test.db
           BACKEND_WEATHERAPI_KEY: test_key
