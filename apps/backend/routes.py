@@ -3648,6 +3648,8 @@ async def get_latest_emagram(
             site = db.query(Site).filter(Site.id == site_id).first()
             if not site:
                 raise HTTPException(status_code=404, detail="Site not found")
+            if site.latitude is None or site.longitude is None:
+                raise HTTPException(status_code=400, detail="Site has no coordinates configured")
             target_lat, target_lon = site.latitude, site.longitude
         elif user_lat is not None and user_lon is not None:
             target_lat, target_lon = user_lat, user_lon
@@ -3655,9 +3657,6 @@ async def get_latest_emagram(
             raise HTTPException(
                 status_code=400, detail="Either site_id or user_lat/user_lon required"
             )
-
-        if target_lat is None or target_lon is None:
-            return None
 
         # Time window based on day_index
         target_date = (datetime.utcnow() + timedelta(days=day_index)).date()
