@@ -3678,10 +3678,12 @@ async def get_latest_emagram(
         if not recent_analyses:
             return None
 
-        # If site_id provided, prefer analyses for that exact site
+        # If site_id provided, prefer multi-source analyses for that exact site.
+        # Note: station_code stores site.id for multi-source (llm_vision) analyses,
+        # but WMO codes for Wyoming analyses — only match multi-source here.
         if site_id:
             for analysis in recent_analyses:
-                if analysis.station_code == site_id:
+                if analysis.station_code == site_id and analysis.analysis_method == "llm_vision":
                     return analysis
 
         # Fallback: filter by distance and find closest
@@ -3966,6 +3968,7 @@ async def trigger_emagram_analysis(
                 db.query(EmagramAnalysis)
                 .filter(
                     EmagramAnalysis.station_code == closest_site.id,
+                    EmagramAnalysis.analysis_method == "llm_vision",
                     EmagramAnalysis.analysis_datetime >= cutoff_time,
                     EmagramAnalysis.analysis_status == "completed",
                 )
@@ -4061,6 +4064,7 @@ async def get_latest_emagram_for_spot(site_id: str, db: Session = Depends(get_db
         db.query(EmagramAnalysis)
         .filter(
             EmagramAnalysis.station_code == site_id,
+            EmagramAnalysis.analysis_method == "llm_vision",
             EmagramAnalysis.analysis_datetime >= cutoff_time,
             EmagramAnalysis.analysis_status == "completed",
         )
@@ -4154,6 +4158,7 @@ async def get_all_spots_latest_emagrammes(db: Session = Depends(get_db)):
             db.query(EmagramAnalysis)
             .filter(
                 EmagramAnalysis.station_code == site.id,
+                EmagramAnalysis.analysis_method == "llm_vision",
                 EmagramAnalysis.analysis_datetime >= cutoff_time,
                 EmagramAnalysis.analysis_status == "completed",
             )

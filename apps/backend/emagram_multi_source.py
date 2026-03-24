@@ -74,6 +74,7 @@ async def generate_multi_source_emagram_for_spot(
                 db.query(EmagramAnalysis)
                 .filter(
                     EmagramAnalysis.station_code == site_id,
+                    EmagramAnalysis.analysis_method == "llm_vision",
                     EmagramAnalysis.analysis_datetime >= cutoff_time,
                     EmagramAnalysis.analysis_status == "completed",
                 )

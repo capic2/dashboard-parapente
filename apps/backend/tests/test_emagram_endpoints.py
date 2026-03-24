@@ -94,7 +94,7 @@ class TestEmagramEndpoints:
             distance_km=0.0,
             data_source="test",
             sounding_time="12Z",
-            analysis_method="test",
+            analysis_method="llm_vision",
             plafond_thermique_m=2800,
             force_thermique_ms=2.0,
             score_volabilite=72,
@@ -140,7 +140,7 @@ class TestEmagramEndpoints:
             distance_km=0.0,
             data_source="test",
             sounding_time="12Z",
-            analysis_method="test",
+            analysis_method="llm_vision",
             score_volabilite=80,
             analysis_status="completed",
         )
