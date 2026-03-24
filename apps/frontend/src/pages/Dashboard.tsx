@@ -8,7 +8,6 @@ import EmagramWidget from '../components/complex/EmagramWidget';
 import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
 import WeatherMultiLanding from '../components/weather/WeatherMultiLanding';
 import { useSites } from '../hooks/useSites';
-import { useSite } from '../hooks/useSites';
 import { useBestSpotAPI } from '../hooks/useBestSpotAPI';
 
 export default function Dashboard() {
@@ -18,10 +17,6 @@ export default function Dashboard() {
   const selectedSiteId = userSelectedSiteId || (sites && sites.length > 0 ? sites[0].id : '');
   const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
   const [weatherDataMap] = useState<Map<string, Record<string, unknown>>>(new Map());
-
-  const { data: selectedSite } = useSite(selectedSiteId);
-  const userLat = selectedSite?.latitude || null;
-  const userLon = selectedSite?.longitude || null;
 
   // Handler for day selection (no scroll)
   const handleSelectDay = (dayIndex: number) => {
@@ -91,7 +86,7 @@ export default function Dashboard() {
             onSelectSite={setSelectedSiteId}
             selectedDayIndex={selectedDayIndex}
           />
-          <EmagramWidget userLat={userLat} userLon={userLon} />
+          <EmagramWidget siteId={selectedSiteId} dayIndex={selectedDayIndex} />
         </div>
 
         {/* 6. Hourly Forecast (full width) */}

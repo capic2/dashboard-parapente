@@ -8,8 +8,8 @@ import { parseAlerts, getScoreColor, getScoreCategory } from '../../types/emagra
 import { useState } from 'react';
 
 interface EmagramWidgetProps {
-  userLat: number | null;
-  userLon: number | null;
+  siteId: string;
+  dayIndex?: number;
 }
 
 const getStabilityEmoji = (stabilite: string | null): string => {
@@ -30,26 +30,24 @@ const getRiskEmoji = (risque: string | null): string => {
   return '';
 };
 
-export default function EmagramWidget({ userLat, userLon }: EmagramWidgetProps) {
+export default function EmagramWidget({ siteId, dayIndex = 0 }: EmagramWidgetProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
-  const { data: emagram, isLoading, error, refetch } = useLatestEmagram(userLat, userLon);
+
+  const { data: emagram, isLoading, error, refetch } = useLatestEmagram(siteId, dayIndex);
   const triggerMutation = useTriggerEmagram();
 
-  // Handle manual refresh
   const handleRefresh = async () => {
-    if (!userLat || !userLon || isRefreshing) return;
-    
+    if (!siteId || isRefreshing) return;
+
     setIsRefreshing(true);
     try {
       await triggerMutation.mutateAsync({
-        user_latitude: userLat,
-        user_longitude: userLon,
+        site_id: siteId,
         force_refresh: true,
       });
       await refetch();
-    } catch (err) {
-      console.error('Failed to refresh emagram:', err);
+    } catch {
+      // Error handled by mutation state
     } finally {
       setIsRefreshing(false);
     }
@@ -71,7 +69,7 @@ export default function EmagramWidget({ userLat, userLon }: EmagramWidgetProps) 
           <h2 className="text-sm text-gray-600 font-semibold">🌡️ Analyse Thermique (Émagramme)</h2>
           <button
             onClick={handleRefresh}
-            disabled={isRefreshing || !userLat || !userLon}
+            disabled={isRefreshing || !siteId}
             className="p-1.5 rounded-full hover:bg-gray-100 transition-colors disabled:opacity-50"
             title="Actualiser"
           >
@@ -81,11 +79,11 @@ export default function EmagramWidget({ userLat, userLon }: EmagramWidgetProps) 
           </button>
         </div>
         <div className="py-5 text-center text-gray-500 text-sm">
-          {!userLat || !userLon
-            ? 'Position utilisateur requise'
-            : 'Aucune analyse récente disponible. Cliquez pour analyser.'}
+          {!siteId
+            ? 'Aucun site selectionne'
+            : 'Aucune analyse recente disponible. Cliquez pour analyser.'}
         </div>
-        {userLat && userLon && (
+        {siteId && (
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
