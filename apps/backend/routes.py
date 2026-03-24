@@ -15,7 +15,14 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import EmagramAnalysis, Flight, Site, SiteLandingAssociation, WeatherForecast, WeatherSourceConfig
+from models import (
+    EmagramAnalysis,
+    Flight,
+    Site,
+    SiteLandingAssociation,
+    WeatherForecast,
+    WeatherSourceConfig,
+)
 from para_index import analyze_hourly_slots, calculate_para_index, format_slots_summary
 from schemas import EmagramAnalysis as EmagramAnalysisSchema
 from schemas import (
@@ -905,12 +912,12 @@ def create_landing_association(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="This landing association already exists") from None
+        raise HTTPException(
+            status_code=409, detail="This landing association already exists"
+        ) from None
     db.refresh(assoc)
 
-    logger.info(
-        f"Created landing association: {takeoff.name} -> {landing.name} ({distance} km)"
-    )
+    logger.info(f"Created landing association: {takeoff.name} -> {landing.name} ({distance} km)")
 
     result = LandingAssociationSchema.model_validate(assoc)
     result.landing_site = SiteSchema.model_validate(landing)

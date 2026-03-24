@@ -180,9 +180,7 @@ class TestDeleteLandingAssociation:
         )
         assoc_id = r.json()["id"]
 
-        response = client.delete(
-            f"{API_PREFIX}/sites/site-arguel/landings/{assoc_id}"
-        )
+        response = client.delete(f"{API_PREFIX}/sites/site-arguel/landings/{assoc_id}")
         assert response.status_code == 200
 
         # Verify deleted
@@ -191,7 +189,5 @@ class TestDeleteLandingAssociation:
 
     def test_delete_not_found(self, client, db_session, arguel_site):
         """Returns 404 for non-existent association"""
-        response = client.delete(
-            f"{API_PREFIX}/sites/site-arguel/landings/nonexistent"
-        )
+        response = client.delete(f"{API_PREFIX}/sites/site-arguel/landings/nonexistent")
         assert response.status_code == 404

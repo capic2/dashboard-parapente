@@ -106,7 +106,9 @@ class SiteLandingAssociation(Base):
     notes = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    takeoff_site = relationship("Site", foreign_keys=[takeoff_site_id], back_populates="landing_associations")
+    takeoff_site = relationship(
+        "Site", foreign_keys=[takeoff_site_id], back_populates="landing_associations"
+    )
     landing_site = relationship("Site", foreign_keys=[landing_site_id])
 
 
