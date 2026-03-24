@@ -73,7 +73,7 @@ export interface WeatherSourceTestResult {
   success: boolean
   response_time_ms: number
   error?: string
-  sample_data?: Record<string, any>
+  sample_data?: Record<string, unknown>
   tested_at: string  // ISO datetime
 }
 

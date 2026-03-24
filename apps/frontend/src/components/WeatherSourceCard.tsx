@@ -93,8 +93,8 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
         sourceName: source.source_name,
         data: { is_enabled: !source.is_enabled }
       })
-    } catch (error: any) {
-      showNotification('error', error?.message || 'Impossible de modifier la source')
+    } catch (error: unknown) {
+      showNotification('error', (error instanceof Error ? error.message : null) || 'Impossible de modifier la source')
     }
   }
   
@@ -113,8 +113,8 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       setIsEditingApiKey(false)
       setApiKeyValue('')
       showNotification('success', 'Clé API sauvegardée avec succès')
-    } catch (error: any) {
-      showNotification('error', error?.message || 'Impossible de sauvegarder la clé API')
+    } catch (error: unknown) {
+      showNotification('error', (error instanceof Error ? error.message : null) || 'Impossible de sauvegarder la clé API')
     }
   }
   
@@ -142,10 +142,10 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
           message: `❌ Échec: ${result.error || 'Erreur inconnue'}`
         })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       setTestResult({
         success: false,
-        message: `❌ Erreur: ${error?.message || 'Test échoué'}`
+        message: `❌ Erreur: ${error instanceof Error ? error.message : 'Test échoué'}`
       })
     } finally {
       setIsTesting(false)

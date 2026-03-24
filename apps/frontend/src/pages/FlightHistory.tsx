@@ -239,7 +239,7 @@ export default function FlightHistory() {
         toast.success('GPX ajouté avec succès');
         queryClient.invalidateQueries({ queryKey: ['flights'] });
       },
-      onError: (error: any) => {
+      onError: (error: Error) => {
         toast.error(`Échec de l'upload: ${error.message}`);
       }
     });
@@ -267,7 +267,7 @@ export default function FlightHistory() {
         <div className="bg-white rounded-xl p-8 shadow-md text-center max-w-md mx-auto">
           <h2 className="text-xl font-bold text-red-600 mb-3">❌ Erreur</h2>
           <p className="text-gray-700 mb-4">
-            Impossible de charger l'historique des vols
+            Impossible de charger l&apos;historique des vols
           </p>
           <button
             onClick={() => window.location.reload()}

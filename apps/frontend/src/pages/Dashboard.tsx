@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import SiteSelector from '../components/SiteSelector';
 import CurrentConditions from '../components/weather/CurrentConditions';
 import Forecast7Day from '../components/weather/Forecast7Day';
@@ -13,30 +13,15 @@ import { useBestSpotAPI } from '../hooks/useBestSpotAPI';
 
 export default function Dashboard() {
   const { data: sites, isLoading: sitesLoading, error } = useSites();
-  const [selectedSiteId, setSelectedSiteId] = useState<string>('');
+  const [userSelectedSiteId, setSelectedSiteId] = useState<string>('');
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
+  const selectedSiteId = userSelectedSiteId || (sites && sites.length > 0 ? sites[0].id : '');
   const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
-  const [weatherDataMap] = useState<Map<string, any>>(new Map()); // Pas utilisé mais gardé pour SiteSelector
-  
-  // Get selected site coordinates for emagram
+  const [weatherDataMap] = useState<Map<string, Record<string, unknown>>>(new Map());
+
   const { data: selectedSite } = useSite(selectedSiteId);
   const userLat = selectedSite?.latitude || null;
   const userLon = selectedSite?.longitude || null;
-
-  // OPTIMISATION: Ne charge PAS les données pour tous les sites au démarrage
-  // Seul le site sélectionné charge ses données (via CurrentConditions et HourlyForecast)
-  // Cela évite 6 requêtes inutiles de ~50s chacune au chargement initial
-  // Les autres sites seront préchargés au hover grâce au prefetch dans SiteSelector
-  
-  // Pas de fetchAllWeatherSummaries() - supprimé pour optimisation
-
-  // OPTIMISATION: Pas de calcul de "best spot" au chargement (nécessiterait de charger tous les sites)
-  // Auto-sélection du premier site uniquement
-  useEffect(() => {
-    if (sites && sites.length > 0 && !selectedSiteId) {
-      setSelectedSiteId(sites[0].id);
-    }
-  }, [sites, selectedSiteId]);
 
   // Handler for day selection (no scroll)
   const handleSelectDay = (dayIndex: number) => {

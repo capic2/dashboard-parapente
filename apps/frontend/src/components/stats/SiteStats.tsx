@@ -32,7 +32,7 @@ export default function SiteStats() {
       if (!siteMap.has(siteId)) {
         siteMap.set(siteId, { flights: [], name: siteName });
       }
-      siteMap.get(siteId)!.flights.push(flight);
+      siteMap.get(siteId)?.flights.push(flight);
     });
 
     // Calculate stats per site

@@ -52,7 +52,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           <div className="max-w-2xl w-full bg-white rounded-xl shadow-2xl p-8">
             <h2 className="text-2xl font-bold text-red-600 mb-4">❌ Une erreur est survenue</h2>
             <p className="text-gray-700 mb-6">
-              Quelque chose s'est mal passé. L'équipe technique a été notifiée.
+              Quelque chose s&apos;est mal passé. L&apos;équipe technique a été notifiée.
             </p>
             
             {this.state.error && (
@@ -84,7 +84,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                 onClick={() => window.location.href = '/'} 
                 className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-all"
               >
-                🏠 Retour à l'accueil
+                🏠 Retour à l&apos;accueil
               </button>
             </div>
           </div>

@@ -48,7 +48,7 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
         }
         setTimeout(() => onClose(), 2000); // Fermer après 2s
       },
-      onError: (error: any) => {
+      onError: (error: Error) => {
         const errorMessage = error.message || 'Une erreur est survenue lors de la création du vol';
         setError(errorMessage);
         toast.error(`Échec de la création : ${errorMessage}`);

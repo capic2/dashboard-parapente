@@ -9,18 +9,18 @@ interface WeatherStore {
   // State
   sites: Site[]
   currentSite: string | null
-  conditions: Record<string, any> // Previously WeatherConditions
-  forecast: any[] // Previously ForecastDay[]
-  sources: any[] // Previously WeatherSource[]
+  conditions: Record<string, unknown> // Previously WeatherConditions
+  forecast: Record<string, unknown>[] // Previously ForecastDay[]
+  sources: Record<string, unknown>[] // Previously WeatherSource[]
   loading: boolean
   error: Error | null
 
   // Actions
   setCurrentSite: (siteId: string | null) => void
-  setConditions: (conditions: Record<string, any>) => void
-  setForecast: (forecast: any[]) => void
+  setConditions: (conditions: Record<string, unknown>) => void
+  setForecast: (forecast: Record<string, unknown>[]) => void
   setSites: (sites: Site[]) => void
-  setSources: (sources: any[]) => void
+  setSources: (sources: Record<string, unknown>[]) => void
   setLoading: (loading: boolean) => void
   setError: (error: Error | null) => void
   reset: () => void

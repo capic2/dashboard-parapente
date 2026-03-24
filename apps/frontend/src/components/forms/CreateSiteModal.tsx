@@ -23,7 +23,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
   
   // Search mode
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResult, setSearchResult] = useState<any>(null);
+  const [searchResult, setSearchResult] = useState<{ latitude: number; longitude: number; display_name: string } | null>(null);
   
   // Manual mode
   const [siteName, setSiteName] = useState('');
@@ -60,7 +60,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
       setSiteName(searchQuery);
       setLatitude(result.latitude.toString());
       setLongitude(result.longitude.toString());
-    } catch (error) {
+    } catch {
       setError('Ville non trouvée. Veuillez vérifier l\'orthographe ou essayer une autre recherche.');
       setSearchResult(null);
     }
@@ -102,8 +102,8 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
       setSearchQuery('');
       setSearchResult(null);
       setError(null);
-    } catch (error: any) {
-      setError(error?.message || 'Erreur lors de la création du site. Veuillez réessayer.');
+    } catch (error: unknown) {
+      setError((error instanceof Error ? error.message : null) || 'Erreur lors de la création du site. Veuillez réessayer.');
     }
   };
 

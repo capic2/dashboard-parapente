@@ -315,12 +315,15 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       visiblePositionsRef.current = [positions[0]];
 
       // Expose data globally for video export (Playwright)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Playwright export interop
       if (typeof window !== 'undefined' && (window as any)._exportMode) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any)._gpxData = {
           coordinates: gpxData.coordinates,
           positions: positions,
           timestamps: timestamps,
         };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any)._cesiumViewer = viewer;
       }
 
@@ -435,8 +438,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
           if (hasSavedCameraSettings) {
             // Read camera settings directly from flight.site
-            const cameraAngle = flight!.site!.camera_angle!;
-            distance = flight!.site!.camera_distance || 500;
+            const cameraAngle = flight?.site?.camera_angle ?? 0;
+            distance = flight?.site?.camera_distance || 500;
             heading = CesiumMath.toRadians(cameraAngle);
 
             // Also update refs for replay mode
@@ -513,7 +516,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       currentIndexRef.current = 0;
       visiblePositionsRef.current = [];
     };
-  }, [gpxData, elevationOffset, viewerReady]);
+  }, [gpxData, elevationOffset, viewerReady, flight]);
 
   // Initialize camera settings from flight data
   useEffect(() => {
@@ -1067,10 +1070,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     return (
       <div className="bg-red-50 border-2 border-red-400 rounded-xl p-8 text-center">
         <p className="text-lg font-bold text-red-800 mb-2">
-          ❌ Erreur d'initialisation Cesium
+          ❌ Erreur d&apos;initialisation Cesium
         </p>
         <p className="text-sm text-red-700 mb-4">
-          Le viewer 3D n'a pas pu être créé.
+          Le viewer 3D n&apos;a pas pu être créé.
         </p>
         <div className="bg-white p-4 rounded text-left text-xs font-mono">
           <p className="font-bold mb-2">Erreur:</p>
@@ -1486,8 +1489,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                       </button>
 
                       <p className="text-xs text-gray-600 mt-2">
-                        💡 Ces réglages seront sauvegardés pour le site "
-                        {flight.site.name}" et appliqués à tous ses vols
+                        💡 Ces réglages seront sauvegardés pour le site &quot;
+                        {flight.site.name}&quot; et appliqués à tous ses vols
                       </p>
                     </div>
                   </AccordionSection>

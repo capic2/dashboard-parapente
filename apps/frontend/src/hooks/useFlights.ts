@@ -221,7 +221,7 @@ export function useStravaSyncMutation() {
         imported: number;
         skipped: number;
         failed: number;
-        flights: any[];
+        flights: unknown[];
       }>();
       return data;
     },

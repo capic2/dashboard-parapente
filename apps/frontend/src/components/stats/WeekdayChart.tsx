@@ -43,7 +43,7 @@ export default function WeekdayChart() {
         const date = parseISO(flight.flight_date);
         const dayIndex = getDay(date);
         dayCounts[dayIndex]++;
-      } catch (e) {
+      } catch {
         console.warn('Invalid flight_date format:', flight.flight_date);
       }
     });

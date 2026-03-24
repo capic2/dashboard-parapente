@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSites } from '../hooks/useSites';
 import { useWeatherSources, useWeatherSourceStats, useDeleteWeatherSource } from '../hooks/useWeatherSources';
 import { WeatherSourceCard } from '../components/WeatherSourceCard';
@@ -66,8 +66,8 @@ function WeatherSourcesTab() {
     try {
       await deleteSource.mutateAsync(source.source_name)
       alert(`Source "${source.display_name}" supprimée avec succès`)
-    } catch (error: any) {
-      const errorMessage = error?.message || 'Erreur lors de la suppression'
+    } catch (error: unknown) {
+      const errorMessage = (error as Error)?.message || 'Erreur lors de la suppression'
       alert(errorMessage)
     }
   }
@@ -159,21 +159,19 @@ function WeatherSourcesTab() {
 
 export default function Settings() {
   const { data: sites = [], isLoading: sitesLoading } = useSites();
-  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
-  const [saved, setSaved] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'sites' | 'weather' | 'data'>('general');
-
-  // Load settings from localStorage on mount
-  useEffect(() => {
+  const [settings, setSettings] = useState<AppSettings>(() => {
     const stored = localStorage.getItem('paragliding-settings');
     if (stored) {
       try {
-        setSettings(JSON.parse(stored));
-      } catch (err) {
-        console.error('Failed to parse settings:', err);
+        return JSON.parse(stored) as AppSettings;
+      } catch {
+        // Invalid JSON in localStorage, keep defaults
       }
     }
-  }, []);
+    return DEFAULT_SETTINGS;
+  });
+  const [saved, setSaved] = useState(false);
+  const [activeTab, setActiveTab] = useState<'general' | 'sites' | 'weather' | 'data'>('general');
 
   // Save settings to localStorage
   const saveSettings = () => {
@@ -222,7 +220,7 @@ export default function Settings() {
           saveSettings();
           alert('✅ Paramètres importés avec succès !');
         }
-      } catch (err) {
+      } catch {
         alert('❌ Erreur lors de l\'import : fichier invalide');
       }
     };
@@ -580,7 +578,7 @@ export default function Settings() {
                 </label>
               </div>
               <div className="mt-4 p-3 bg-yellow-50 rounded-lg text-sm text-yellow-800">
-                ⚠️ L'import remplacera vos paramètres actuels
+                ⚠️ L&apos;import remplacera vos paramètres actuels
               </div>
             </div>
 
@@ -604,7 +602,7 @@ export default function Settings() {
               <div className="p-8 bg-gray-50 rounded-lg text-center">
                 <p className="text-gray-600 mb-2">🚧 Fonctionnalité en développement</p>
                 <p className="text-sm text-gray-500">
-                  Bientôt : avatar, bio, statistiques personnelles, historique d'activité
+                  Bientôt : avatar, bio, statistiques personnelles, historique d&apos;activité
                 </p>
               </div>
             </div>

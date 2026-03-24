@@ -11,11 +11,8 @@ interface StravaSyncModalProps {
 }
 
 export function StravaSyncModal({ isOpen, onClose, onSyncComplete }: StravaSyncModalProps) {
-  const today = new Date().toISOString().split('T')[0];
-  const threeMonthsAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-  
-  const [dateFrom, setDateFrom] = useState(threeMonthsAgo);
-  const [dateTo, setDateTo] = useState(today);
+  const [dateFrom, setDateFrom] = useState(() => new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0]);
   
   const { mutate: syncStrava, isPending, data } = useStravaSyncMutation();
   const toast = useToast();
@@ -31,7 +28,7 @@ export function StravaSyncModal({ isOpen, onClose, onSyncComplete }: StravaSyncM
           onSyncComplete();
           setTimeout(() => onClose(), 2000); // Fermer après 2s
         },
-        onError: (error: any) => {
+        onError: (error: Error) => {
           toast.error(`Échec de la synchronisation: ${error.message}`);
         }
       }

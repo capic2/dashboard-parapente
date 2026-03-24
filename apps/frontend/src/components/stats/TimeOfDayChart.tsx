@@ -67,7 +67,7 @@ export default function TimeOfDayChart() {
         } else {
           timeSlots['Soirée (18h-24h)']++;
         }
-      } catch (e) {
+      } catch {
         console.warn('Invalid departure_time format:', flight.departure_time);
       }
     });
@@ -109,7 +109,7 @@ export default function TimeOfDayChart() {
           ⏰ Heures de vol préférées
         </h3>
         <p className="text-gray-500 text-center py-8">
-          Aucune donnée d'heure de décollage disponible
+          Aucune donnée d&apos;heure de décollage disponible
         </p>
       </div>
     );

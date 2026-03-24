@@ -51,7 +51,7 @@ export const useSite = (siteId: string) => {
         throw new Error(`Invalid site data: ${validation.error.message}`);
       }
       
-      return validation.data as any;
+      return validation.data as Site;
     },
     enabled: !!siteId,
     staleTime: 1000 * 60 * 30,
@@ -73,7 +73,7 @@ export const useNearbySites = (lat: number, lng: number, radius = 50) => {
         throw new Error(`Invalid nearby sites data: ${validation.error.message}`);
       }
       
-      return validation.data as any;
+      return validation.data as Site[];
     },
     enabled: !!lat && !!lng,
   });
