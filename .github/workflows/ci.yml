@@ -77,23 +77,22 @@ jobs:
       # - Renovate PRs always have 'skip-nx-cloud' (configured in renovate.json)
       - name: 🎛️ Configure NX Cloud execution
         run: |
-          # Check if PR has 'skip-nx-cloud' label to disable NX Cloud
-          HAS_SKIP_LABEL=false
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          # Pushes to main: always use local cache (NX Cloud credits are limited)
+          # PRs: use NX Cloud unless 'skip-nx-cloud' label is present
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
+            echo "💾 Push to main: using local cache (NX Cloud reserved for PRs)"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name' 2>/dev/null || echo "")
             if echo "$LABELS" | grep -q "skip-nx-cloud"; then
-              HAS_SKIP_LABEL=true
+              echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
+              echo "⚠️  NX Cloud DISABLED (skip-nx-cloud label)"
+            else
+              echo "NX_NO_CLOUD=false" >> $GITHUB_ENV
+              echo "✅ NX Cloud ENABLED"
             fi
-          fi
-
-          # Set NX_NO_CLOUD to disable only remote cache (preserves local cache)
-          if [[ "$HAS_SKIP_LABEL" == "true" ]]; then
-            echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
-            echo "⚠️  NX Cloud DISABLED (requested by 'skip-nx-cloud' label to conserve credits)"
-            echo "💾 Local cache will still be used"
           else
-            echo "NX_NO_CLOUD=false" >> $GITHUB_ENV
-            echo "✅ NX Cloud ENABLED"
+            echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
           fi
         env:
           GH_TOKEN: ${{ github.token }}
@@ -144,9 +143,11 @@ jobs:
                 && echo "✅ Re-run triggered" || echo "⚠️ Failed to trigger re-run"
               exit 0
             else
-              # Push to main (no PR to label) - just fail
-              echo "::error title=NX Cloud Credits Exhausted::Add 'skip-nx-cloud' label and re-run."
-              exit 1
+              # Push to main (no PR) - auto-retry with local cache
+              echo "⚠️ NX Cloud credits exhausted on main push - auto-retrying with local cache..."
+              gh run rerun ${{ github.run_id }} --failed \
+                && echo "✅ Re-run triggered" || echo "⚠️ Failed to trigger re-run"
+              exit 0
             fi
           else
             echo "::error title=Build Failed::The build failed for a reason other than NX Cloud credits."
@@ -241,18 +242,10 @@ jobs:
       # Configure NX Cloud for E2E: same logic as main job
       - name: 🎛️ Configure NX Cloud execution
         run: |
-          HAS_SKIP_LABEL=false
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name' 2>/dev/null || echo "")
-            if echo "$LABELS" | grep -q "skip-nx-cloud"; then
-              HAS_SKIP_LABEL=true
-            fi
-          fi
-
-          if [[ "$HAS_SKIP_LABEL" == "true" ]]; then
+          LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+          if echo "$LABELS" | grep -q "skip-nx-cloud"; then
             echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
-            echo "⚠️  NX Cloud DISABLED (requested by 'skip-nx-cloud' label to conserve credits)"
-            echo "💾 Local cache will still be used"
+            echo "⚠️  NX Cloud DISABLED (skip-nx-cloud label)"
           else
             echo "NX_NO_CLOUD=false" >> $GITHUB_ENV
             echo "✅ NX Cloud ENABLED"
