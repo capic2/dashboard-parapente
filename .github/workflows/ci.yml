@@ -100,7 +100,9 @@ jobs:
       - name: 🔨 Run affected builds
         id: build
         continue-on-error: true
-        run: npx nx affected -t build --parallel=3 --exclude=e2e 2>&1 | tee /tmp/nx-build.log
+        run: |
+          set -o pipefail
+          npx nx affected -t build --parallel=3 --exclude=e2e 2>&1 | tee /tmp/nx-build.log
 
       - name: 💡 Handle NX Cloud credits exhaustion
         if: always() && steps.build.outcome == 'failure'
