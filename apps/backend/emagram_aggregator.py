@@ -196,7 +196,7 @@ def get_emagram_external_links(latitude: float, longitude: float) -> list[dict[s
         },
         {
             "source": "Meteociel Emagram",
-            "url": f"https://www.meteociel.fr/temps-reel/obs_visu.php?mode=emagramme&lat={latitude}&lon={longitude}",
+            "url": f"https://www.meteociel.fr/modeles/sondage2.php?mode=0&lon={longitude}&lat={latitude}&ech=3&map=0",
             "description": "Emagramme Meteociel",
         },
     ]
