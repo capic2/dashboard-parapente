@@ -4,7 +4,7 @@ import { afterEach, beforeAll, afterAll, vi } from 'vitest'
 import { server } from '../../mocks/server'
 
 // Setup MSW
-beforeAll(() => server.listen({ onUnhandledRequest: 'warn' }))
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => {
   server.resetHandlers()
   cleanup()

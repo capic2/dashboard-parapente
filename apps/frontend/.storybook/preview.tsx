@@ -22,7 +22,7 @@ const initializeMsw = (options?: Parameters<typeof initialize>[0]) => {
   initialize(options)
 }
 // Initialize MSW
-initializeMsw();
+initializeMsw({ onUnhandledRequest: 'error', quiet: true });
 
 
 const preview = definePreview({
