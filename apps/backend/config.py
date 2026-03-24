@@ -80,6 +80,7 @@ STRAVA_VERIFY_TOKEN = os.getenv("BACKEND_STRAVA_VERIFY_TOKEN")
 GOOGLE_API_KEY = os.getenv("BACKEND_GOOGLE_API_KEY")
 GEMINI_MODEL = os.getenv("BACKEND_GEMINI_MODEL", "gemini-2.5-flash")
 ANTHROPIC_API_KEY = os.getenv("BACKEND_ANTHROPIC_API_KEY")
+GROQ_API_KEY = os.getenv("BACKEND_GROQ_API_KEY")
 
 # ============================================================================
 # SCHEDULER

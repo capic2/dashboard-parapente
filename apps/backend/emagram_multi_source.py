@@ -13,8 +13,10 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+import config
 from llm.acp_analyzer import analyze_emagram_with_acp
 from llm.gemini_analyzer import analyze_emagram_with_gemini
+from llm.groq_analyzer import analyze_emagram_with_groq
 from llm.multi_emagram_analyzer import analyze_emagrammes_with_fallback
 from models import EmagramAnalysis, Site
 from scrapers.emagram_screenshots import fetch_all_emagram_screenshots
@@ -121,7 +123,7 @@ async def generate_multi_source_emagram_for_spot(
         analysis_result = None
 
         # Priority 1: Try Gemini if API key is available
-        google_api_key = os.getenv("GOOGLE_API_KEY")
+        google_api_key = config.GOOGLE_API_KEY
         logger.info(
             f"🔍 Checking Gemini availability: API Key = {'SET' if google_api_key else 'NOT SET'}"
         )
@@ -158,7 +160,34 @@ async def generate_multi_source_emagram_for_spot(
                 logger.warning(f"Gemini analysis failed: {e}")
                 analysis_result = None
 
-        # Priority 2: Try OpenClaw ACP if enabled and Gemini failed
+        # Priority 2: Try Groq (free, Llama Vision)
+        if not analysis_result and config.GROQ_API_KEY:
+            try:
+                logger.info("🟢 Trying Groq Llama Vision analysis (free)...")
+                groq_analysis = analyze_emagram_with_groq(
+                    screenshot_paths=image_paths,
+                    spot_name=site.name,
+                    coordinates=(site.latitude, site.longitude),
+                )
+
+                analysis_result = {
+                    "success": True,
+                    "plafond_thermique_m": groq_analysis["plafond_thermique_m"],
+                    "force_thermique_ms": groq_analysis["force_thermique_ms"],
+                    "heures_volables": groq_analysis["heures_volables"],
+                    "score_volabilite": groq_analysis["score_volabilite"],
+                    "conseils_vol": groq_analysis["conseils_vol"],
+                    "alertes_securite": groq_analysis["alertes_securite"],
+                    "details_analyse": groq_analysis["details_analyse"],
+                    "analyzer": "groq",
+                }
+                logger.info("🟢 Groq analysis successful!")
+
+            except Exception as e:
+                logger.warning(f"Groq analysis failed: {e}")
+                analysis_result = None
+
+        # Priority 3: Try OpenClaw ACP if enabled
         if not analysis_result and os.getenv("OPENCLAW_ACP_ENABLED", "false").lower() == "true":
             try:
                 logger.info("🦞 Trying OpenClaw ACP analysis...")
@@ -171,7 +200,6 @@ async def generate_multi_source_emagram_for_spot(
                     timeout=int(os.getenv("OPENCLAW_TIMEOUT", "120")),
                 )
 
-                # Convert to expected format
                 analysis_result = {
                     "success": True,
                     "plafond_thermique_m": acp_analysis["plafond_thermique_m"],
@@ -189,7 +217,7 @@ async def generate_multi_source_emagram_for_spot(
                 logger.warning(f"OpenClaw ACP failed: {e}")
                 analysis_result = None
 
-        # Priority 3: Fallback to Anthropic direct API
+        # Priority 4: Fallback to Anthropic direct API (paid)
         if not analysis_result:
             logger.info("🤖 Using Anthropic direct API (fallback)...")
             analysis_result = await analyze_emagrammes_with_fallback(

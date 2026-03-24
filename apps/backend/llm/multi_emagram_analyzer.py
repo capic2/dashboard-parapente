@@ -7,16 +7,17 @@ Extracts paragliding-specific metrics and generates flight recommendations
 import base64
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
 import anthropic
 
+import config
+
 logger = logging.getLogger(__name__)
 
-# Claude API client
-client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+# Claude API client (lazy init to avoid import-time failure)
+client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY or "")
 
 EMAGRAM_ANALYSIS_PROMPT = """Tu es un expert météorologue spécialisé en parapente. Analyse ces emagrammes pour le spot de parapente "{spot_name}":
 
@@ -121,7 +122,7 @@ async def analyze_multiple_emagrammes(
     if not image_paths:
         return {"success": False, "error": "No images provided for analysis"}
 
-    if not os.getenv("ANTHROPIC_API_KEY"):
+    if not config.ANTHROPIC_API_KEY:
         return {"success": False, "error": "ANTHROPIC_API_KEY not configured"}
 
     try:
@@ -162,7 +163,7 @@ async def analyze_multiple_emagrammes(
 
         # Call Claude API
         response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-6",
             max_tokens=2000,
             temperature=0.3,  # Lower for more consistent factual extraction
             messages=[{"role": "user", "content": image_content}],
