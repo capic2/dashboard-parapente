@@ -177,7 +177,7 @@ export const BackendWeatherResponseSchema = z.object({
   sunrise: z.string().optional(),
   sunset: z.string().optional(),
   sources_metadata: z.record(z.string(), z.any()).optional(),
-  consensus: z.array(ConsensusHourSchema).optional(),
+  consensus: z.array(ConsensusHourSchema).nullable().optional(),
   para_index: z.number().catch(0),
   verdict: z.string().catch(''),
   emoji: z.string().catch(''),
