@@ -71,7 +71,7 @@ export const FlightStatsSchema = z.object({
   avg_distance_km: z.number().catch(0),
   max_altitude_m: z.number().catch(0),
   favorite_spot: z.string().nullable().optional(),
-  favorite_site: SiteSchema.nullable(),
+  favorite_site: SiteSchema.nullable().optional(),
   last_flight_date: z.string().nullable().optional(),
 });
 
