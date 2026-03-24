@@ -37,7 +37,6 @@ from main import app
 from models import (
     Flight,
     Site,
-    SiteLandingAssociation,
 )
 
 
