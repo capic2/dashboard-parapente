@@ -240,7 +240,7 @@ AddingAssociation.test(
     const addButton = await canvas.findByText('+ Ajouter un atterrissage');
     await user.click(addButton);
 
-    await expect(canvas.getByText('Choisir un site...')).toBeInTheDocument();
+    await expect(await canvas.findByText('Choisir un site...')).toBeInTheDocument();
     await expect(
       canvas.getByPlaceholderText('Notes (optionnel)')
     ).toBeInTheDocument();

@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient, type UseQueryResult, type UseMutationResult } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, queryOptions, type UseQueryResult, type UseMutationResult } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import type { Flight, FlightFilters, FlightStats, FlightFormData, ApiResponse, Site, FlightRecords } from '../types'
 import {
@@ -18,33 +18,59 @@ interface SiteStats {
   avg_distance_km: number
 }
 
-/**
- * Fetch list of flights with optional filtering
- */
-export const useFlights = (filters: FlightFilters = {}): UseQueryResult<Flight[], Error> => {
+export const flightsQueryOptions = (filters: FlightFilters = {}) => {
   const searchParams = Object.entries(filters).reduce((acc, [key, value]) => {
     if (value !== undefined) {
       acc[key] = String(value)
     }
     return acc
   }, {} as Record<string, string>)
-  
-  return useQuery({
+
+  return queryOptions<Flight[]>({
     queryKey: ['flights', filters],
     queryFn: async () => {
       const data = await api.get('flights', { searchParams }).json()
-      
-      // Validate API response with Zod
       const validation = FlightsApiResponseSchema.safeParse(data)
       if (!validation.success) {
-        console.error('❌ Flights validation failed:', validation.error)
         throw new Error(`Invalid flights data: ${validation.error.message}`)
       }
-      
       return validation.data.flights
     },
-    staleTime: 1000 * 60 * 10, // 10 minutes
+    staleTime: 1000 * 60 * 10,
   })
+}
+
+export const flightStatsQueryOptions = () => queryOptions<FlightStats>({
+  queryKey: ['flights', 'stats'],
+  queryFn: async () => {
+    const data = await api.get('flights/stats').json()
+    const validation = FlightStatsSchema.safeParse(data)
+    if (!validation.success) {
+      throw new Error(`Invalid flight stats: ${validation.error.message}`)
+    }
+    return validation.data
+  },
+  staleTime: 1000 * 60 * 60,
+})
+
+export const flightRecordsQueryOptions = () => queryOptions<FlightRecords>({
+  queryKey: ['flights', 'records'],
+  queryFn: async () => {
+    const data = await api.get('flights/records').json()
+    const validation = FlightRecordsSchema.safeParse(data)
+    if (!validation.success) {
+      throw new Error(`Invalid flight records: ${validation.error.message}`)
+    }
+    return validation.data
+  },
+  staleTime: 1000 * 60 * 60,
+})
+
+/**
+ * Fetch list of flights with optional filtering
+ */
+export const useFlights = (filters: FlightFilters = {}): UseQueryResult<Flight[], Error> => {
+  return useQuery(flightsQueryOptions(filters))
 }
 
 /**
@@ -56,14 +82,10 @@ export const useFlight = (flightId: string | undefined): UseQueryResult<Flight, 
     queryFn: async () => {
       if (!flightId) throw new Error('Flight ID is required')
       const data = await api.get(`flights/${flightId}`).json()
-      
-      // Validate API response with Zod
       const validation = ApiResponseSchema(FlightSchema).safeParse(data)
       if (!validation.success) {
-        console.error('❌ Flight validation failed:', validation.error)
         throw new Error(`Invalid flight data: ${validation.error.message}`)
       }
-      
       return validation.data.data
     },
     enabled: !!flightId,
@@ -75,45 +97,14 @@ export const useFlight = (flightId: string | undefined): UseQueryResult<Flight, 
  * Fetch learning statistics
  */
 export const useFlightStats = (): UseQueryResult<FlightStats, Error> => {
-  return useQuery({
-    queryKey: ['flights', 'stats'],
-    queryFn: async () => {
-      const data = await api.get('flights/stats').json()
-      
-      // Validate API response with Zod
-      const validation = FlightStatsSchema.safeParse(data)
-      if (!validation.success) {
-        console.error('❌ Flight stats validation failed:', validation.error)
-        throw new Error(`Invalid flight stats: ${validation.error.message}`)
-      }
-      
-      return validation.data
-    },
-    staleTime: 1000 * 60 * 60, // 1 hour
-  })
+  return useQuery(flightStatsQueryOptions())
 }
 
 /**
  * Fetch personal flight records
- * Uses FlightRecordsSchema from schemas.ts for validation
  */
 export const useFlightRecords = (): UseQueryResult<FlightRecords, Error> => {
-  return useQuery({
-    queryKey: ['flights', 'records'],
-    queryFn: async () => {
-      const data = await api.get('flights/records').json()
-      
-      // Validate with Zod
-      const validation = FlightRecordsSchema.safeParse(data)
-      if (!validation.success) {
-        console.error('❌ Flight records validation failed:', validation.error)
-        throw new Error(`Invalid flight records: ${validation.error.message}`)
-      }
-      
-      return validation.data
-    },
-    staleTime: 1000 * 60 * 60, // 1 hour - records don't change often,
-  })
+  return useQuery(flightRecordsQueryOptions())
 }
 
 /**

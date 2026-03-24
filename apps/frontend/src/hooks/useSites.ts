@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { SitesApiResponseSchema, SiteSchema } from '@dashboard-parapente/shared-types';
 import type { Site } from '../types';
@@ -19,23 +19,21 @@ interface GeocodeResult {
   display_name: string;
 }
 
+export const sitesQueryOptions = () => queryOptions<Site[]>({
+  queryKey: ['sites'],
+  queryFn: async () => {
+    const data = await api.get('spots').json();
+    const validation = SitesApiResponseSchema.safeParse(data);
+    if (!validation.success) {
+      throw new Error(`Invalid sites data: ${validation.error.message}`);
+    }
+    return validation.data.sites;
+  },
+  staleTime: 1000 * 60 * 30,
+});
+
 export const useSites = () => {
-  return useQuery<Site[]>({
-    queryKey: ['sites'],
-    queryFn: async () => {
-      const data = await api.get('spots').json();
-      
-      // Validate API response with Zod
-      const validation = SitesApiResponseSchema.safeParse(data);
-      if (!validation.success) {
-        console.error('❌ Sites validation failed:', validation.error);
-        throw new Error(`Invalid sites data: ${validation.error.message}`);
-      }
-      
-      return validation.data.sites
-    },
-    staleTime: 1000 * 60 * 30, // 30 minutes - sites don't change often
-  });
+  return useQuery(sitesQueryOptions());
 };
 
 export const useSite = (siteId: string) => {
