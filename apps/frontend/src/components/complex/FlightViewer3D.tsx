@@ -1246,7 +1246,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                               }
 
                               // Refresh flight data to get updated status
-                              window.location.reload();
+                              queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
                             } catch (error) {
                               console.error(
                                 '❌ Failed to start video generation:',
@@ -1319,7 +1319,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                                 }
 
                                 // Refresh flight data to get updated status
-                                window.location.reload();
+                                queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
                               } catch (error) {
                                 console.error(
                                   'Failed to cancel video generation:',
@@ -1364,7 +1364,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                               }
 
                               // Refresh flight data to get updated status
-                              window.location.reload();
+                              queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
                             } catch (error) {
                               console.error(
                                 'Failed to regenerate video:',
