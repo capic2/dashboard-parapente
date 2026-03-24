@@ -83,6 +83,32 @@ class Site(SiteBase):
         from_attributes = True
 
 
+# Landing Associations
+class LandingAssociationCreate(BaseModel):
+    landing_site_id: str
+    is_primary: bool = False
+    notes: str | None = None
+
+
+class LandingAssociationUpdate(BaseModel):
+    is_primary: bool | None = None
+    notes: str | None = None
+
+
+class LandingAssociation(BaseModel):
+    id: str
+    takeoff_site_id: str
+    landing_site_id: str
+    is_primary: bool = False
+    distance_km: float | None = None
+    notes: str | None = None
+    landing_site: Site | None = None
+    created_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
 # Flights
 class FlightBase(BaseModel):
     title: str | None = None

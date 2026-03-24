@@ -33,6 +33,19 @@ export const SiteSchema = z.object({
   is_active: z.boolean().optional().default(true),
 });
 
+export const LandingAssociationSchema = z.object({
+  id: z.string(),
+  takeoff_site_id: z.string(),
+  landing_site_id: z.string(),
+  is_primary: z.boolean().default(false),
+  distance_km: z.number().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  landing_site: SiteSchema.optional(),
+  created_at: z.string().nullable().optional(),
+});
+
+export type LandingAssociation = z.infer<typeof LandingAssociationSchema>;
+
 export const FlightSchema = z.object({
   id: z.string(),
   strava_id: z.string().nullable().optional(),

@@ -15,7 +15,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import EmagramAnalysis, Flight, Site, WeatherForecast, WeatherSourceConfig
+from models import EmagramAnalysis, Flight, Site, SiteLandingAssociation, WeatherForecast, WeatherSourceConfig
 from para_index import analyze_hourly_slots, calculate_para_index, format_slots_summary
 from schemas import EmagramAnalysis as EmagramAnalysisSchema
 from schemas import (
@@ -25,6 +25,9 @@ from schemas import (
 )
 from schemas import Site as SiteSchema
 from schemas import (
+    LandingAssociation as LandingAssociationSchema,
+    LandingAssociationCreate,
+    LandingAssociationUpdate,
     SiteCreate,
     SiteUpdate,
     SpotsResponse,
@@ -811,6 +814,237 @@ def delete_site(site_id: str, db: Session = Depends(get_db)):
         db.rollback()
         logger.error(f"Failed to delete site {site_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Deletion failed: {str(e)}") from e
+
+
+# ============================================================================
+# LANDING ASSOCIATIONS ENDPOINTS
+# ============================================================================
+
+
+@router.get("/sites/{site_id}/landings")
+def get_landing_associations(site_id: str, db: Session = Depends(get_db)):
+    """List all landing sites associated with a takeoff site"""
+    site = db.query(Site).filter(Site.id == site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    associations = (
+        db.query(SiteLandingAssociation)
+        .filter(SiteLandingAssociation.takeoff_site_id == site_id)
+        .all()
+    )
+
+    result = []
+    for assoc in associations:
+        landing_site = db.query(Site).filter(Site.id == assoc.landing_site_id).first()
+        assoc_data = LandingAssociationSchema.model_validate(assoc)
+        if landing_site:
+            assoc_data.landing_site = SiteSchema.model_validate(landing_site)
+        result.append(assoc_data)
+
+    return result
+
+
+@router.post("/sites/{site_id}/landings", status_code=201)
+def create_landing_association(
+    site_id: str, data: LandingAssociationCreate, db: Session = Depends(get_db)
+):
+    """Associate a landing site with a takeoff site"""
+    from spots.distance import haversine_distance
+
+    takeoff = db.query(Site).filter(Site.id == site_id).first()
+    if not takeoff:
+        raise HTTPException(status_code=404, detail="Takeoff site not found")
+
+    if data.landing_site_id == site_id:
+        raise HTTPException(status_code=400, detail="A site cannot be its own landing")
+
+    landing = db.query(Site).filter(Site.id == data.landing_site_id).first()
+    if not landing:
+        raise HTTPException(status_code=404, detail="Landing site not found")
+
+    existing = (
+        db.query(SiteLandingAssociation)
+        .filter(
+            SiteLandingAssociation.takeoff_site_id == site_id,
+            SiteLandingAssociation.landing_site_id == data.landing_site_id,
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail="This landing association already exists")
+
+    distance = haversine_distance(
+        takeoff.latitude, takeoff.longitude, landing.latitude, landing.longitude
+    )
+
+    if data.is_primary:
+        db.query(SiteLandingAssociation).filter(
+            SiteLandingAssociation.takeoff_site_id == site_id,
+            SiteLandingAssociation.is_primary == True,
+        ).update({"is_primary": False})
+
+    assoc = SiteLandingAssociation(
+        id=str(uuid.uuid4()),
+        takeoff_site_id=site_id,
+        landing_site_id=data.landing_site_id,
+        is_primary=data.is_primary,
+        distance_km=distance,
+        notes=data.notes,
+    )
+    db.add(assoc)
+    db.commit()
+    db.refresh(assoc)
+
+    logger.info(
+        f"Created landing association: {takeoff.name} -> {landing.name} ({distance} km)"
+    )
+
+    result = LandingAssociationSchema.model_validate(assoc)
+    result.landing_site = SiteSchema.model_validate(landing)
+    return result
+
+
+@router.patch("/sites/{site_id}/landings/{assoc_id}")
+def update_landing_association(
+    site_id: str,
+    assoc_id: str,
+    data: LandingAssociationUpdate,
+    db: Session = Depends(get_db),
+):
+    """Update a landing association (is_primary, notes)"""
+    assoc = (
+        db.query(SiteLandingAssociation)
+        .filter(
+            SiteLandingAssociation.id == assoc_id,
+            SiteLandingAssociation.takeoff_site_id == site_id,
+        )
+        .first()
+    )
+    if not assoc:
+        raise HTTPException(status_code=404, detail="Landing association not found")
+
+    if data.is_primary is True:
+        db.query(SiteLandingAssociation).filter(
+            SiteLandingAssociation.takeoff_site_id == site_id,
+            SiteLandingAssociation.is_primary == True,
+            SiteLandingAssociation.id != assoc_id,
+        ).update({"is_primary": False})
+        assoc.is_primary = True
+    elif data.is_primary is False:
+        assoc.is_primary = False
+
+    if data.notes is not None:
+        assoc.notes = data.notes
+
+    db.commit()
+    db.refresh(assoc)
+
+    landing = db.query(Site).filter(Site.id == assoc.landing_site_id).first()
+    result = LandingAssociationSchema.model_validate(assoc)
+    if landing:
+        result.landing_site = SiteSchema.model_validate(landing)
+    return result
+
+
+@router.delete("/sites/{site_id}/landings/{assoc_id}")
+def delete_landing_association(site_id: str, assoc_id: str, db: Session = Depends(get_db)):
+    """Remove a landing association"""
+    assoc = (
+        db.query(SiteLandingAssociation)
+        .filter(
+            SiteLandingAssociation.id == assoc_id,
+            SiteLandingAssociation.takeoff_site_id == site_id,
+        )
+        .first()
+    )
+    if not assoc:
+        raise HTTPException(status_code=404, detail="Landing association not found")
+
+    db.delete(assoc)
+    db.commit()
+    logger.info(f"Deleted landing association {assoc_id}")
+    return {"success": True, "message": "Landing association deleted"}
+
+
+@router.get("/sites/{site_id}/landings/weather")
+async def get_landing_associations_weather(
+    site_id: str, day_index: int = 0, db: Session = Depends(get_db)
+):
+    """Get weather for all landing sites associated with a takeoff"""
+    from para_index import calculate_hourly_para_index, get_hourly_verdict, get_thermal_strength
+
+    site = db.query(Site).filter(Site.id == site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    associations = (
+        db.query(SiteLandingAssociation)
+        .filter(SiteLandingAssociation.takeoff_site_id == site_id)
+        .limit(10)
+        .all()
+    )
+
+    if not associations:
+        return []
+
+    landing_sites = {}
+    for assoc in associations:
+        landing = db.query(Site).filter(Site.id == assoc.landing_site_id).first()
+        if landing:
+            landing_sites[assoc.id] = (assoc, landing)
+
+    tasks = []
+    assoc_ids = []
+    for assoc_id, (assoc, landing) in landing_sites.items():
+        tasks.append(
+            get_normalized_forecast(
+                landing.latitude,
+                landing.longitude,
+                day_index,
+                site_name=landing.name,
+                elevation_m=landing.elevation_m,
+                db=db,
+            )
+        )
+        assoc_ids.append(assoc_id)
+
+    results = await asyncio.gather(*tasks)
+
+    weather_data = []
+    for assoc_id, day_result in zip(assoc_ids, results):
+        assoc, landing = landing_sites[assoc_id]
+        entry = {
+            "landing_site_id": landing.id,
+            "landing_site_name": landing.name,
+            "distance_km": assoc.distance_km,
+            "is_primary": assoc.is_primary,
+        }
+
+        if day_result.get("success"):
+            consensus = day_result.get("consensus", [])
+            for hour in consensus:
+                hour["para_index"] = calculate_hourly_para_index(hour)
+                hour["verdict"] = get_hourly_verdict(hour["para_index"])
+                cape = hour.get("cape")
+                li = hour.get("lifted_index")
+                hour["thermal_strength"] = get_thermal_strength(cape, li)
+
+            para_result = calculate_para_index(consensus)
+            entry["weather"] = {
+                "consensus": consensus,
+                "para_index": para_result["para_index"],
+                "verdict": para_result["verdict"],
+                "emoji": para_result["emoji"],
+                "sunrise": day_result.get("sunrise"),
+                "sunset": day_result.get("sunset"),
+            }
+        else:
+            entry["weather"] = {"error": day_result.get("error", "Failed to fetch weather")}
+
+        weather_data.append(entry)
+
+    return weather_data
 
 
 # ============================================================================

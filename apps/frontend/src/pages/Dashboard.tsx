@@ -6,6 +6,7 @@ import HourlyForecast from '../components/weather/HourlyForecast';
 import StatsPanel from '../components/StatsPanel';
 import EmagramWidget from '../components/complex/EmagramWidget';
 import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
+import WeatherMultiLanding from '../components/weather/WeatherMultiLanding';
 import { useSites } from '../hooks/useSites';
 import { useSite } from '../hooks/useSites';
 import { useBestSpotAPI } from '../hooks/useBestSpotAPI';
@@ -87,6 +88,9 @@ export default function Dashboard() {
 
         {/* 3. Current Conditions (full width) */}
         <CurrentConditions spotId={selectedSiteId} />
+
+        {/* 3.5. Landing Sites Weather (if any) */}
+        <WeatherMultiLanding spotId={selectedSiteId} dayIndex={selectedDayIndex} />
 
         {/* 4. Day Selector - 7-Day Forecast (full width) */}
         <Forecast7Day 

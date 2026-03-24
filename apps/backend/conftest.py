@@ -37,6 +37,7 @@ from main import app
 from models import (
     Flight,
     Site,
+    SiteLandingAssociation,
 )
 
 
@@ -198,6 +199,28 @@ def chalais_site(db_session):
         orientation="W",
         site_type="user_spot",
         usage_type="takeoff",
+    )
+    db_session.add(site)
+    db_session.commit()
+    db_session.refresh(site)
+    return site
+
+
+@pytest.fixture
+def landing_site(db_session):
+    """Create a landing site in test DB"""
+
+    site = Site(
+        id="site-plaine-arguel",
+        code="PLA",
+        name="Plaine d'Arguel",
+        latitude=47.19,
+        longitude=5.99,
+        elevation_m=250,
+        region="Doubs",
+        country="France",
+        site_type="user_spot",
+        usage_type="landing",
     )
     db_session.add(site)
     db_session.commit()

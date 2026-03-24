@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Site } from '@dashboard-parapente/shared-types';
 import { SiteUpdate } from '../../hooks/useSiteMutations';
+import LandingAssociationsManager from './LandingAssociationsManager';
 
 interface EditSiteModalProps {
   site: Site | null; // null = create mode, Site = edit mode
@@ -423,6 +424,11 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               placeholder="Informations complémentaires sur le site..."
             />
           </div>
+
+          {/* Landing Associations - only for takeoff sites in edit mode */}
+          {site && (formData.usage_type === 'takeoff' || formData.usage_type === 'both') && (
+            <LandingAssociationsManager takeoffSiteId={site.id} />
+          )}
 
           {/* Actions */}
           <div className="flex gap-3 pt-4 border-t">
