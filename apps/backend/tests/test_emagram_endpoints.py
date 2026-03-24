@@ -15,9 +15,14 @@ class TestEmagramEndpoints:
 
     def test_get_latest_no_data(self, client, db_session):
         """Get latest emagram when no data exists"""
-        response = client.get("/api/emagram/latest?user_lat=47.0&user_lon=6.0&station_name=Test")
+        response = client.get("/api/emagram/latest?user_lat=47.0&user_lon=6.0")
         assert response.status_code == 200
-        assert response.json() is None  # API returns None (null) when no data, not 404
+        assert response.json() is None
+
+    def test_get_latest_requires_params(self, client, db_session):
+        """Get latest emagram without any location params returns 400"""
+        response = client.get("/api/emagram/latest")
+        assert response.status_code == 400
 
     def test_get_latest_with_data(self, client, db_session):
         """Get latest emagram analysis"""
@@ -64,6 +69,109 @@ class TestEmagramEndpoints:
         assert data["score_volabilite"] == 80
         assert data["plafond_thermique_m"] == 3500
         assert "screenshot_paths" in data
+
+    def test_get_latest_with_site_id(self, client, db_session):
+        """Get latest emagram by site_id"""
+        site = Site(
+            id="site-arguel",
+            code="ARG",
+            name="Arguel",
+            latitude=47.2,
+            longitude=6.0,
+            elevation_m=427,
+        )
+        db_session.add(site)
+
+        analysis = EmagramAnalysis(
+            id="test-site-analysis",
+            station_code="site-arguel",
+            station_name="Arguel",
+            station_latitude=47.2,
+            station_longitude=6.0,
+            analysis_date=datetime(2026, 3, 24).date(),
+            analysis_time=datetime(2026, 3, 24, 12, 0).time(),
+            analysis_datetime=datetime.utcnow(),
+            distance_km=0.0,
+            data_source="test",
+            sounding_time="12Z",
+            analysis_method="test",
+            plafond_thermique_m=2800,
+            force_thermique_ms=2.0,
+            score_volabilite=72,
+            analysis_status="completed",
+        )
+        db_session.add(analysis)
+        db_session.commit()
+
+        response = client.get("/api/emagram/latest?site_id=site-arguel")
+        assert response.status_code == 200
+        data = response.json()
+        assert data is not None
+        assert data["station_code"] == "site-arguel"
+        assert data["score_volabilite"] == 72
+
+    def test_get_latest_with_site_id_not_found(self, client, db_session):
+        """Get latest emagram with non-existent site_id returns 404"""
+        response = client.get("/api/emagram/latest?site_id=nonexistent")
+        assert response.status_code == 404
+
+    def test_get_latest_with_day_index(self, client, db_session):
+        """Get latest emagram with day_index filters by date"""
+        site = Site(
+            id="site-test-day",
+            code="TSD",
+            name="Test Day",
+            latitude=47.0,
+            longitude=6.0,
+            elevation_m=500,
+        )
+        db_session.add(site)
+
+        # Analysis for today
+        analysis = EmagramAnalysis(
+            id="today-analysis",
+            station_code="site-test-day",
+            station_name="Test Day",
+            station_latitude=47.0,
+            station_longitude=6.0,
+            analysis_date=datetime.utcnow().date(),
+            analysis_time=datetime.utcnow().time(),
+            analysis_datetime=datetime.utcnow(),
+            distance_km=0.0,
+            data_source="test",
+            sounding_time="12Z",
+            analysis_method="test",
+            score_volabilite=80,
+            analysis_status="completed",
+        )
+        db_session.add(analysis)
+        db_session.commit()
+
+        # day_index=0 should find today's analysis
+        response = client.get("/api/emagram/latest?site_id=site-test-day&day_index=0")
+        assert response.status_code == 200
+        assert response.json() is not None
+
+        # day_index=3 should not find anything (no future analyses)
+        response = client.get("/api/emagram/latest?site_id=site-test-day&day_index=3")
+        assert response.status_code == 200
+        assert response.json() is None
+
+    def test_analyze_with_site_id(self, client, db_session):
+        """Trigger analysis accepts site_id without lat/lon"""
+        response = client.post(
+            "/api/emagram/analyze",
+            json={"site_id": "nonexistent"},
+        )
+        assert response.status_code == 404
+
+    def test_analyze_requires_location(self, client, db_session):
+        """Trigger analysis without site_id or lat/lon returns 400"""
+        response = client.post(
+            "/api/emagram/analyze",
+            json={"force_refresh": True},
+        )
+        assert response.status_code == 400
 
     def test_list_analyses_empty(self, client):
         """List analyses when DB is empty"""
@@ -139,9 +247,9 @@ class TestEmagramEndpoints:
         assert len(data) == 5  # All 5 are within 7 days
 
     def test_analyze_missing_params(self, client):
-        """Trigger analysis without required params"""
+        """Trigger analysis without any location params returns 400"""
         response = client.post("/api/emagram/analyze", json={})
-        assert response.status_code == 422  # Validation error
+        assert response.status_code == 400
 
     def test_analyze_invalid_coordinates(self, client):
         """Trigger analysis with invalid coordinates"""

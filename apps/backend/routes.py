@@ -3621,50 +3621,80 @@ async def test_weather_source(
 
 @router.get("/emagram/latest", response_model=EmagramAnalysisSchema | None, tags=["Emagram"])
 async def get_latest_emagram(
-    user_lat: float = Query(..., description="User latitude"),
-    user_lon: float = Query(..., description="User longitude"),
+    site_id: str | None = Query(None, description="Site ID (preferred over lat/lon)"),
+    user_lat: float | None = Query(None, description="User latitude"),
+    user_lon: float | None = Query(None, description="User longitude"),
+    day_index: int = Query(0, description="Day index (0=today, 1=tomorrow, ...)"),
     max_distance_km: float = Query(200, description="Maximum station distance in km"),
     db: Session = Depends(get_db),
 ):
     """
-    Get most recent emagram analysis for user location
+    Get most recent emagram analysis for a site or location.
+
+    Supports two modes:
+    - By site_id: looks up analyses for that specific site
+    - By lat/lon: finds closest analysis within max_distance_km
 
     Args:
-        user_lat: User latitude
-        user_lon: User longitude
+        site_id: Site ID to get emagram for (preferred)
+        user_lat: User latitude (fallback if no site_id)
+        user_lon: User longitude (fallback if no site_id)
+        day_index: Day offset (0=today, 1=tomorrow, etc.)
         max_distance_km: Maximum acceptable station distance (default: 200km)
-
-    Returns:
-        Most recent emagram analysis within distance threshold, or None
-
-    Example:
-        GET /api/emagram/latest?user_lat=45.76&user_lon=4.84
     """
     try:
-        # Get all analyses from last 24 hours
-        cutoff_time = datetime.utcnow() - timedelta(hours=24)
+        # Determine target coordinates
+        if site_id:
+            site = db.query(Site).filter(Site.id == site_id).first()
+            if not site:
+                raise HTTPException(status_code=404, detail="Site not found")
+            target_lat, target_lon = site.latitude, site.longitude
+        elif user_lat is not None and user_lon is not None:
+            target_lat, target_lon = user_lat, user_lon
+        else:
+            raise HTTPException(
+                status_code=400, detail="Either site_id or user_lat/user_lon required"
+            )
+
+        if target_lat is None or target_lon is None:
+            return None
+
+        # Time window based on day_index
+        target_date = (datetime.utcnow() + timedelta(days=day_index)).date()
+        window_start = datetime.combine(target_date, datetime.min.time()) - timedelta(hours=12)
+        window_end = datetime.combine(target_date, datetime.min.time()) + timedelta(hours=36)
 
         recent_analyses = (
             db.query(EmagramAnalysis)
             .filter(
-                EmagramAnalysis.analysis_datetime >= cutoff_time,
+                EmagramAnalysis.analysis_datetime >= window_start,
+                EmagramAnalysis.analysis_datetime <= window_end,
                 EmagramAnalysis.analysis_status == "completed",
             )
+            .order_by(EmagramAnalysis.analysis_datetime.desc())
             .all()
         )
 
         if not recent_analyses:
             return None
 
-        # Filter by distance and find closest
+        # If site_id provided, prefer analyses for that exact site
+        if site_id:
+            for analysis in recent_analyses:
+                if analysis.station_code == site_id:
+                    return analysis
+
+        # Fallback: filter by distance and find closest
         from scrapers.wyoming import haversine_distance
 
         closest_analysis = None
         min_distance = float("inf")
 
         for analysis in recent_analyses:
+            if analysis.station_latitude is None or analysis.station_longitude is None:
+                continue
             dist = haversine_distance(
-                user_lat, user_lon, analysis.station_latitude, analysis.station_longitude
+                target_lat, target_lon, analysis.station_latitude, analysis.station_longitude
             )
 
             if dist <= max_distance_km and dist < min_distance:
@@ -3673,6 +3703,8 @@ async def get_latest_emagram(
 
         return closest_analysis
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get latest emagram: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -3886,47 +3918,45 @@ async def trigger_emagram_analysis(
             generate_multi_source_emagram_for_spot,
         )
 
-        # Step 1: Find closest site
-        logger.info(f"Finding closest site to ({request.user_latitude}, {request.user_longitude})")
+        # Step 1: Find target site
+        if request.site_id:
+            closest_site = db.query(Site).filter(Site.id == request.site_id).first()
+            if not closest_site:
+                raise HTTPException(status_code=404, detail="Site not found")
+            logger.info(f"Using site directly: {closest_site.name} ({closest_site.id})")
+        elif request.user_latitude is not None and request.user_longitude is not None:
+            logger.info(
+                f"Finding closest site to ({request.user_latitude}, {request.user_longitude})"
+            )
+            from spots.distance import haversine_distance as hav_dist
 
-        # Query all sites with coordinates
-        sites = db.query(Site).filter(Site.latitude.isnot(None), Site.longitude.isnot(None)).all()
+            sites = (
+                db.query(Site).filter(Site.latitude.isnot(None), Site.longitude.isnot(None)).all()
+            )
+            if not sites:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No paragliding sites found in database.",
+                )
 
-        if not sites:
+            closest_site = None
+            min_distance = float("inf")
+            for site in sites:
+                distance = hav_dist(
+                    request.user_latitude, request.user_longitude, site.latitude, site.longitude
+                )
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_site = site
+
+            logger.info(
+                f"Closest site: {closest_site.name} ({closest_site.id}) at {min_distance:.1f}km"
+            )
+        else:
             raise HTTPException(
-                status_code=404,
-                detail="No paragliding sites found in database. Please add sites first.",
+                status_code=400,
+                detail="Either site_id or user_latitude/user_longitude required",
             )
-
-        # Calculate distance to each site using haversine
-        def haversine_distance(lat1, lon1, lat2, lon2):
-            from math import atan2, cos, radians, sin, sqrt
-
-            R = 6371  # Earth radius in km
-
-            lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
-            dlat = lat2 - lat1
-            dlon = lon2 - lon1
-
-            a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
-            c = 2 * atan2(sqrt(a), sqrt(1 - a))
-
-            return R * c
-
-        closest_site = None
-        min_distance = float("inf")
-
-        for site in sites:
-            distance = haversine_distance(
-                request.user_latitude, request.user_longitude, site.latitude, site.longitude
-            )
-            if distance < min_distance:
-                min_distance = distance
-                closest_site = site
-
-        logger.info(
-            f"Closest site: {closest_site.name} ({closest_site.id}) at {min_distance:.1f}km"
-        )
 
         # Step 2: Check for recent analysis (unless force_refresh)
         if not request.force_refresh:

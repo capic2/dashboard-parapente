@@ -22,22 +22,21 @@ export default function ThermalAnalysis() {
     data: latest,
     isLoading,
     refetch,
-  } = useLatestEmagram(userLat, userLon);
+  } = useLatestEmagram(selectedSiteId);
   const { data: history } = useEmagramHistory(userLat, userLon, 7);
   const triggerMutation = useTriggerEmagram();
 
   const handleRefresh = async () => {
-    if (!userLat || !userLon) return;
+    if (!selectedSiteId) return;
 
     try {
       await triggerMutation.mutateAsync({
-        user_latitude: userLat,
-        user_longitude: userLon,
+        site_id: selectedSiteId,
         force_refresh: true,
       });
       await refetch();
-    } catch (err) {
-      console.error('Failed to refresh:', err);
+    } catch {
+      // Error handled by mutation state
     }
   };
 

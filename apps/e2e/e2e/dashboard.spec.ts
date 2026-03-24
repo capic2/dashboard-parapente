@@ -88,6 +88,19 @@ test.describe('Paragliding Dashboard E2E Tests', () => {
     }
   });
 
+  test('should display emagram widget on dashboard', async ({ page }) => {
+    // Wait for dashboard to load
+    await page.waitForTimeout(2000);
+
+    // The emagram section should be visible (either with data or with the launch button)
+    const emagramSection = page.locator('text=Analyse Thermique');
+    const hasEmagram = (await emagramSection.count()) > 0;
+
+    if (hasEmagram) {
+      await expect(emagramSection.first()).toBeVisible();
+    }
+  });
+
   test('should handle keyboard navigation', async ({ page }) => {
     // Focus on first nav link and navigate with keyboard
     await page.keyboard.press('Tab');

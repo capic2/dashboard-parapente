@@ -520,18 +520,19 @@ class EmagramAnalysisListItem(BaseModel):
 class EmagramTriggerRequest(BaseModel):
     """Request schema for manually triggering emagram analysis"""
 
-    user_latitude: float
-    user_longitude: float
-    force_refresh: bool = False  # Force new analysis even if recent one exists
+    site_id: str | None = None
+    user_latitude: float | None = None
+    user_longitude: float | None = None
+    force_refresh: bool = False
 
     @validator("user_latitude")
     def validate_latitude(cls, v):
-        if not -90 <= v <= 90:
+        if v is not None and not -90 <= v <= 90:
             raise ValueError("Latitude must be between -90 and 90")
         return v
 
     @validator("user_longitude")
     def validate_longitude(cls, v):
-        if not -180 <= v <= 180:
+        if v is not None and not -180 <= v <= 180:
             raise ValueError("Longitude must be between -180 and 180")
         return v
