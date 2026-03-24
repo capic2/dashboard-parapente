@@ -121,7 +121,7 @@ class TestUpdateLandingAssociation:
     def test_update_primary(self, client, db_session, arguel_site, landing_site, chalais_site):
         """Setting primary unsets previous primary"""
         # Create two associations
-        r1 = client.post(
+        client.post(
             f"{API_PREFIX}/sites/site-arguel/landings",
             json={"landing_site_id": "site-plaine-arguel", "is_primary": True},
         )
