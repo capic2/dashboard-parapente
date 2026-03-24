@@ -4,8 +4,26 @@ import addonA11y from '@storybook/addon-a11y';
 import '../src/App.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+declare global {
+  interface Window {
+    __mswInitialized?: boolean
+  }
+}
+
+const initializeMsw = (options?: Parameters<typeof initialize>[0]) => {
+  if (typeof window !== 'undefined' && window.__mswInitialized) {
+    return
+  }
+
+  if (typeof window !== 'undefined') {
+    window.__mswInitialized = true
+  }
+
+  initialize(options)
+}
 // Initialize MSW
-initialize({ onUnhandledRequest: 'error', quiet: true });
+initializeMsw({ onUnhandledRequest: 'error', quiet: true });
+
 
 const preview = definePreview({
   addons: [addonA11y()],
