@@ -71,7 +71,7 @@ export default function WeatherMultiLanding({
                     {entry.landing_site_name}
                   </h3>
                   <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2">
-                    {entry.distance_km} km
+                    {entry.distance_km != null ? `${entry.distance_km} km` : ''}
                   </span>
                 </div>
 

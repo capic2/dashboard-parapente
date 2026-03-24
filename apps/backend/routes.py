@@ -874,9 +874,23 @@ def create_landing_association(
     if existing:
         raise HTTPException(status_code=409, detail="This landing association already exists")
 
+    landing = db.query(Site).filter(Site.id == data.landing_site_id).first()
+    if not landing:
+        raise HTTPException(status_code=404, detail="Landing site not found")
+
+    if None in (takeoff.latitude, takeoff.longitude, landing.latitude, landing.longitude):
+        raise HTTPException(
+            status_code=400,
+            detail="Both takeoff and landing sites must have coordinates",
+        )
+
     distance = haversine_distance(
         takeoff.latitude, takeoff.longitude, landing.latitude, landing.longitude
     )
+
+    existing = (
+        db.query(SiteLandingAssociation)
+        .filter(
 
     if data.is_primary:
         db.query(SiteLandingAssociation).filter(
@@ -1004,7 +1018,6 @@ async def get_landing_associations_weather(
                 day_index,
                 site_name=landing.name,
                 elevation_m=landing.elevation_m,
-                db=db,
             )
         )
         assoc_ids.append(assoc_id)
