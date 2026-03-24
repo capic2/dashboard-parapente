@@ -100,13 +100,13 @@ jobs:
       - name: 🔨 Run affected builds
         id: build
         continue-on-error: true
-        run: npx nx affected -t build --parallel=3 --exclude=e2e
+        run: npx nx affected -t build --parallel=3 --exclude=e2e 2>&1 | tee /tmp/nx-build.log
 
       - name: 💡 Handle NX Cloud credits exhaustion
         if: always() && steps.build.outcome == 'failure'
         run: |
-          # Check for NX Cloud credits exhaustion patterns in logs
-          if gh run view ${{ github.run_id }} --log 2>&1 | grep -qE "(Workspace is unable to be authorized|exceeding the FREE plan|Workspace is disabled)"; then
+          # Check for NX Cloud credits exhaustion patterns in captured build output
+          if grep -qE "(Workspace is unable to be authorized|exceeding the FREE plan|Workspace is disabled)" /tmp/nx-build.log 2>/dev/null; then
             echo "=========================================="
             echo "⚠️  NX CLOUD CREDITS EXHAUSTED"
             echo "=========================================="

@@ -168,18 +168,18 @@ async def screenshot_topmeteo(
         }
 
 
-async def screenshot_meteociel_arome(
+async def screenshot_meteociel_emagram(
     latitude: float, longitude: float, spot_name: str, timeout: int = 25000
 ) -> dict[str, Any]:
     """
-    Screenshot emagram from Meteociel - AROME model (French high-res)
-    URL: https://www.meteociel.fr/modeles/sondage_arome.php?lat={lat}&lon={lon}
+    Screenshot emagram from Meteociel
+    URL: https://www.meteociel.fr/modeles/sondage2.php?mode=0&lon={lon}&lat={lat}&ech=3&map=0
 
-    AROME is the French high-resolution weather model (1.3km resolution)
+    mode=0 = emagram display, ech=3 = forecast step (+3h)
     """
-    url = f"https://www.meteociel.fr/modeles/sondage_arome.php?lat={latitude}&lon={longitude}"
+    url = f"https://www.meteociel.fr/modeles/sondage2.php?mode=0&lon={longitude}&lat={latitude}&ech=3&map=0"
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{spot_name.replace(' ', '_')}_meteociel-arome_{timestamp}.png"
+    filename = f"{spot_name.replace(' ', '_')}_meteociel_{timestamp}.png"
     image_path = EMAGRAM_CACHE_DIR / filename
 
     try:
@@ -187,7 +187,7 @@ async def screenshot_meteociel_arome(
             browser = await p.chromium.launch(headless=True)
             page = await browser.new_page(viewport={"width": 1600, "height": 1200})
 
-            logger.info(f"📸 Meteociel AROME: Loading {url}")
+            logger.info(f"Meteociel emagram: Loading {url}")
             await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
 
             # Wait for emagram image to load
@@ -195,70 +195,10 @@ async def screenshot_meteociel_arome(
 
             # Meteociel shows emagram as an image - try to screenshot just that
             try:
-                # Look for the emagram image
                 emagram_img = page.locator("img[src*='sondage'], img[src*='emagram']").first
                 if await emagram_img.count() > 0:
                     await emagram_img.screenshot(path=str(image_path))
-                    logger.info("✅ Captured emagram image directly")
-                else:
-                    # Fallback: screenshot the main content area
-                    await page.screenshot(path=str(image_path), full_page=False)
-                    logger.warning("Emagram image not found, took full screenshot")
-            except Exception as e:
-                logger.warning(f"Could not find emagram element: {e}, taking full screenshot")
-                await page.screenshot(path=str(image_path), full_page=False)
-
-            logger.info(f"✅ Meteociel AROME screenshot saved: {image_path}")
-            await browser.close()
-
-        return {
-            "success": True,
-            "source": "meteociel-arome",
-            "image_path": str(image_path),
-            "external_url": url,
-            "timestamp": datetime.now().isoformat(),
-        }
-
-    except Exception as e:
-        logger.error(f"❌ Meteociel AROME screenshot failed: {e}")
-        return {
-            "success": False,
-            "source": "meteociel-arome",
-            "error": str(e),
-            "external_url": url,
-            "timestamp": datetime.now().isoformat(),
-        }
-
-
-async def screenshot_meteociel_gfs(
-    latitude: float, longitude: float, spot_name: str, timeout: int = 25000
-) -> dict[str, Any]:
-    """
-    Screenshot emagram from Meteociel - GFS model
-    URL: https://www.meteociel.fr/modeles/gfse_sondage.php?lat={lat}&lon={lon}
-    """
-    url = f"https://www.meteociel.fr/modeles/gfse_sondage.php?lat={latitude}&lon={longitude}"
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{spot_name.replace(' ', '_')}_meteociel-gfs_{timestamp}.png"
-    image_path = EMAGRAM_CACHE_DIR / filename
-
-    try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page(viewport={"width": 1600, "height": 1200})
-
-            logger.info(f"📸 Meteociel GFS: Loading {url}")
-            await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
-
-            # Wait for emagram image to load
-            await page.wait_for_timeout(5000)
-
-            # Try to screenshot just the emagram
-            try:
-                emagram_img = page.locator("img[src*='sondage'], img[src*='emagram']").first
-                if await emagram_img.count() > 0:
-                    await emagram_img.screenshot(path=str(image_path))
-                    logger.info("✅ Captured emagram image directly")
+                    logger.info("Captured emagram image directly")
                 else:
                     await page.screenshot(path=str(image_path), full_page=False)
                     logger.warning("Emagram image not found, took full screenshot")
@@ -266,22 +206,22 @@ async def screenshot_meteociel_gfs(
                 logger.warning(f"Could not find emagram element: {e}, taking full screenshot")
                 await page.screenshot(path=str(image_path), full_page=False)
 
-            logger.info(f"✅ Meteociel GFS screenshot saved: {image_path}")
+            logger.info(f"Meteociel emagram screenshot saved: {image_path}")
             await browser.close()
 
         return {
             "success": True,
-            "source": "meteociel-gfs",
+            "source": "meteociel",
             "image_path": str(image_path),
             "external_url": url,
             "timestamp": datetime.now().isoformat(),
         }
 
     except Exception as e:
-        logger.error(f"❌ Meteociel GFS screenshot failed: {e}")
+        logger.error(f"Meteociel emagram screenshot failed: {e}")
         return {
             "success": False,
-            "source": "meteociel-gfs",
+            "source": "meteociel",
             "error": str(e),
             "external_url": url,
             "timestamp": datetime.now().isoformat(),
@@ -319,11 +259,10 @@ async def fetch_all_emagram_screenshots(
     logger.info(f"🎬 Starting screenshot fetch for {spot_name} ({spot_id})")
     logger.info(f"   Coordinates: {latitude}, {longitude}")
 
-    # Fetch 3 sources in parallel
+    # Fetch sources in parallel
     tasks = [
         screenshot_meteo_parapente(latitude, longitude, spot_name),
-        screenshot_meteociel_arome(latitude, longitude, spot_name),
-        screenshot_meteociel_gfs(latitude, longitude, spot_name),
+        screenshot_meteociel_emagram(latitude, longitude, spot_name),
     ]
 
     screenshots = await asyncio.gather(*tasks, return_exceptions=True)
@@ -340,8 +279,9 @@ async def fetch_all_emagram_screenshots(
 
     # Count successes
     success_count = sum(1 for s in processed_screenshots if s.get("success"))
+    total = len(processed_screenshots)
 
-    logger.info(f"✅ Screenshot fetch complete: {success_count}/3 successful")
+    logger.info(f"Screenshot fetch complete: {success_count}/{total} successful")
 
     return {
         "success": success_count > 0,  # At least one must succeed
@@ -351,7 +291,7 @@ async def fetch_all_emagram_screenshots(
         "longitude": longitude,
         "screenshots": processed_screenshots,
         "sources_successful": success_count,
-        "sources_total": 3,
+        "sources_total": total,
         "timestamp": datetime.now().isoformat(),
     }
 
