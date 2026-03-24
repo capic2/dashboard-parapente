@@ -124,7 +124,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
           <div className="bg-yellow-100 border border-yellow-400 rounded p-3 mb-4">
             <p className="text-sm text-yellow-800">
               ⚠️ Vidéo longue détectée ({formatTime(estimatedDuration)}). 
-              L'export peut prendre plusieurs minutes et générer un fichier volumineux.
+              L&apos;export peut prendre plusieurs minutes et générer un fichier volumineux.
             </p>
           </div>
         )}

@@ -85,6 +85,31 @@ class Site(Base):
     flights = relationship("Flight", back_populates="site")
     weather_forecasts = relationship("WeatherForecast", back_populates="site")
     linked_spot = relationship("ParaglidingSpot", back_populates="linked_sites")
+    landing_associations = relationship(
+        "SiteLandingAssociation",
+        foreign_keys="SiteLandingAssociation.takeoff_site_id",
+        back_populates="takeoff_site",
+        cascade="all, delete-orphan",
+    )
+
+
+class SiteLandingAssociation(Base):
+    """Junction table linking a takeoff site to its landing sites"""
+
+    __tablename__ = "site_landing_associations"
+
+    id = Column(String, primary_key=True)
+    takeoff_site_id = Column(String, ForeignKey("sites.id", ondelete="CASCADE"), nullable=False)
+    landing_site_id = Column(String, ForeignKey("sites.id", ondelete="CASCADE"), nullable=False)
+    is_primary = Column(Boolean, default=False)
+    distance_km = Column(Float)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    takeoff_site = relationship(
+        "Site", foreign_keys=[takeoff_site_id], back_populates="landing_associations"
+    )
+    landing_site = relationship("Site", foreign_keys=[landing_site_id])
 
 
 class Flight(Base):

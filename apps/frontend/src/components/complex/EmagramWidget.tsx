@@ -307,7 +307,7 @@ export default function EmagramWidget({ userLat, userLon }: EmagramWidgetProps) 
               </div>
             );
           }
-        } catch (e) {
+        } catch {
           // Invalid JSON, skip
         }
         return null;

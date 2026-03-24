@@ -82,6 +82,7 @@ export interface HourlyForecastItem {
   precipitation: number;
   para_index: number;
   verdict: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sources?: Record<string, any>;
   thermal_strength?: 'faible' | 'modérée' | 'forte';
   cape?: number;

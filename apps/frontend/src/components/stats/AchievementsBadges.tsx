@@ -25,7 +25,7 @@ interface Badge {
  * - Consistance (streak)
  */
 export default function AchievementsBadges() {
-  const { data: flights = [], isLoading: flightsLoading } = useFlights({ limit: 500 });
+  const { isLoading: flightsLoading } = useFlights({ limit: 500 });
   const { data: stats, isLoading: statsLoading } = useFlightStats();
 
   const badges = useMemo(() => {
@@ -141,7 +141,7 @@ export default function AchievementsBadges() {
     ];
 
     return allBadges;
-  }, [stats, flights]);
+  }, [stats]);
 
   const unlockedBadges = badges.filter((b) => b.unlocked);
   const lockedBadges = badges.filter((b) => !b.unlocked);

@@ -206,6 +206,28 @@ def chalais_site(db_session):
 
 
 @pytest.fixture
+def landing_site(db_session):
+    """Create a landing site in test DB"""
+
+    site = Site(
+        id="site-plaine-arguel",
+        code="PLA",
+        name="Plaine d'Arguel",
+        latitude=47.19,
+        longitude=5.99,
+        elevation_m=250,
+        region="Doubs",
+        country="France",
+        site_type="user_spot",
+        usage_type="landing",
+    )
+    db_session.add(site)
+    db_session.commit()
+    db_session.refresh(site)
+    return site
+
+
+@pytest.fixture
 def sample_flight(db_session, arguel_site):
     """Create sample flight in test DB"""
     from datetime import date, datetime

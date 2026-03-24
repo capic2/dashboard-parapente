@@ -14,6 +14,7 @@ export function ViewerExport() {
   // Setup export mode for Playwright
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any)._exportMode = 'manual_render'
       
       console.log('🎥 Export mode: manual_render')

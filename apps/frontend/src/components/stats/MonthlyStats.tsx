@@ -40,7 +40,7 @@ export default function MonthlyStats() {
         monthMap.set(monthKey, { count: 0, totalMinutes: 0 });
       }
 
-      const month = monthMap.get(monthKey)!;
+      const month = monthMap.get(monthKey) ?? { count: 0, totalMinutes: 0 };
       month.count += 1;
       month.totalMinutes += flight.duration_minutes || 0;
     });

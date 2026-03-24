@@ -1,3 +1,4 @@
+import { http, HttpResponse } from 'msw';
 import preview from '../../../.storybook/preview';
 import { expect, userEvent, waitFor } from 'storybook/test';
 import { fn } from 'storybook/test';
@@ -9,6 +10,12 @@ const meta = preview.meta({
   component: EditSiteModal,
   parameters: {
     layout: 'centered',
+    msw: {
+      handlers: [
+        http.get('*/api/sites/:siteId/landings', () => HttpResponse.json([])),
+        http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
+      ],
+    },
   },
   tags: ['autodocs'],
 });

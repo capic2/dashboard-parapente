@@ -353,7 +353,7 @@ CompactCallsOnSelectSite.test('should call onSelectSite callback in compact vari
   const button = canvas.getByText('Annecy').closest('button');
   await expect(button).toBeInTheDocument();
 
-  await user.click(button!);
+  if (button) await user.click(button);
 
   // Note: In CSF3 with .test(), we can't easily check the callback
   // This test verifies the button is clickable and doesn't error

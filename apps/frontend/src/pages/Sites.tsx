@@ -82,15 +82,15 @@ export const Sites: React.FC = () => {
     try {
       await deleteSite.mutateAsync(site.id)
       alert(`Site "${site.name}" supprimé avec succès`)
-    } catch (error: any) {
-      const errorMessage = error?.message || 'Erreur lors de la suppression'
+    } catch (error: unknown) {
+      const errorMessage = (error as Error)?.message || 'Erreur lors de la suppression'
       alert(errorMessage)
     }
   }
   
   const handleViewFlights = (_site: Site) => {
     // Navigate to flights page with site filter
-    void navigate({ to: '/flights' as any })
+    void navigate({ to: '/flights' as string })
   }
   
   if (isLoading) {
@@ -139,7 +139,7 @@ export const Sites: React.FC = () => {
           {/* Type Filter */}
           <select
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as any)}
+            onChange={(e) => setTypeFilter(e.target.value as 'all' | 'takeoff' | 'landing' | 'both')}
             className="px-3 py-2 border rounded"
           >
             <option value="all">Tous les types</option>
@@ -151,7 +151,7 @@ export const Sites: React.FC = () => {
           {/* Sort */}
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
+            onChange={(e) => setSortBy(e.target.value as 'name' | 'created_at' | 'region')}
             className="px-3 py-2 border rounded"
           >
             <option value="name">Trier par nom</option>

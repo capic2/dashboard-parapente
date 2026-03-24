@@ -28,17 +28,18 @@ Object.defineProperty(window, 'matchMedia', {
 
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
-  constructor() {}
-  disconnect() {}
-  observe() {}
-  takeRecords() { return [] }
-  unobserve() {}
-} as any
+  root = null;
+  rootMargin = '';
+  thresholds = [] as number[];
+  disconnect() { /* noop */ }
+  observe() { /* noop */ }
+  takeRecords(): IntersectionObserverEntry[] { return [] }
+  unobserve() { /* noop */ }
+} as unknown as typeof IntersectionObserver;
 
 // Mock ResizeObserver
 global.ResizeObserver = class ResizeObserver {
-  constructor() {}
-  disconnect() {}
-  observe() {}
-  unobserve() {}
-} as any
+  disconnect() { /* noop */ }
+  observe() { /* noop */ }
+  unobserve() { /* noop */ }
+} as unknown as typeof ResizeObserver;
