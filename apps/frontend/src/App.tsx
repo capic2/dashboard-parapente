@@ -9,6 +9,9 @@ import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
 import { ViewerExport } from './pages/ViewerExport'
 import { Sites } from './pages/Sites'
+import { sitesQueryOptions } from './hooks/useSites'
+import { flightsQueryOptions, flightStatsQueryOptions, flightRecordsQueryOptions } from './hooks/useFlights'
+import { bestSpotQueryOptions } from './hooks/useBestSpotAPI'
 
 // Create query client for TanStack Query
 const queryClient = new QueryClient({
@@ -43,24 +46,40 @@ const dashboardRoute = new Route({
   getParentRoute: () => rootRoute,
   path: '/',
   component: Dashboard,
+  loader: () => {
+    queryClient.ensureQueryData(sitesQueryOptions())
+    queryClient.ensureQueryData(bestSpotQueryOptions(0))
+  },
 })
 
 const flightHistoryRoute = new Route({
   getParentRoute: () => rootRoute,
   path: '/flights',
   component: FlightHistory,
+  loader: () => {
+    queryClient.ensureQueryData(flightsQueryOptions({ limit: 50 }))
+    queryClient.ensureQueryData(sitesQueryOptions())
+  },
 })
 
 const analyticsRoute = new Route({
   getParentRoute: () => rootRoute,
   path: '/analytics',
   component: Analytics,
+  loader: () => {
+    queryClient.ensureQueryData(flightStatsQueryOptions())
+    queryClient.ensureQueryData(flightRecordsQueryOptions())
+    queryClient.ensureQueryData(flightsQueryOptions())
+  },
 })
 
 const settingsRoute = new Route({
   getParentRoute: () => rootRoute,
   path: '/settings',
   component: Settings,
+  loader: () => {
+    queryClient.ensureQueryData(sitesQueryOptions())
+  },
 })
 
 const exportViewerRoute = new Route({
@@ -73,6 +92,9 @@ const sitesRoute = new Route({
   getParentRoute: () => rootRoute,
   path: '/sites',
   component: Sites,
+  loader: () => {
+    queryClient.ensureQueryData(sitesQueryOptions())
+  },
 })
 
 // Create router
