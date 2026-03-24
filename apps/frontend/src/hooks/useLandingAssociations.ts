@@ -101,7 +101,7 @@ export const useRemoveLandingAssociation = () => {
 interface LandingWeatherEntry {
   landing_site_id: string;
   landing_site_name: string;
-  distance_km: number;
+  distance_km: number | null;
   is_primary: boolean;
   weather: {
     consensus?: Array<Record<string, unknown>>;

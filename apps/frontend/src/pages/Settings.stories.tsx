@@ -87,8 +87,10 @@ const mockWeatherSources = [
 const mockWeatherStats = {
   total_sources: 3,
   active_sources: 2,
-  total_forecasts: 1250,
-  avg_response_time_ms: 450,
+  disabled_sources: 1,
+  sources_with_errors: 0,
+  global_success_rate: 95.5,
+  global_avg_response_time_ms: 450,
 };
 
 const defaultHandlers = [
