@@ -905,7 +905,7 @@ def create_landing_association(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="This landing association already exists")
+        raise HTTPException(status_code=409, detail="This landing association already exists") from None
     db.refresh(assoc)
 
     logger.info(
@@ -1008,7 +1008,7 @@ async def get_landing_associations_weather(
 
     tasks = []
     assoc_ids = []
-    for assoc_id, (assoc, landing) in landing_sites.items():
+    for assoc_id, (_assoc, landing) in landing_sites.items():
         tasks.append(
             get_normalized_forecast(
                 landing.latitude,
@@ -1023,7 +1023,7 @@ async def get_landing_associations_weather(
     results = await asyncio.gather(*tasks)
 
     weather_data = []
-    for assoc_id, day_result in zip(assoc_ids, results):
+    for assoc_id, day_result in zip(assoc_ids, results, strict=True):
         assoc, landing = landing_sites[assoc_id]
         entry = {
             "landing_site_id": landing.id,
