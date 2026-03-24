@@ -5,7 +5,7 @@ import '../src/App.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Initialize MSW
-initialize();
+initialize({ onUnhandledRequest: 'error', quiet: true });
 
 const preview = definePreview({
   addons: [addonA11y()],

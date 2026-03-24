@@ -41,6 +41,9 @@ export default defineConfig({
             VITE_API_URL: 'http://localhost:8001',
             VITE_ENABLE_MSW: 'false',
           },
+          onConsoleLog(log, type) {
+            if (type === 'stdout') return false;
+          },
         }
       },
       {
