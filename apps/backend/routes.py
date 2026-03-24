@@ -852,6 +852,8 @@ def create_landing_association(
     """Associate a landing site with a takeoff site"""
     from spots.distance import haversine_distance
 
+    from sqlalchemy.exc import IntegrityError
+
     takeoff = db.query(Site).filter(Site.id == site_id).first()
     if not takeoff:
         raise HTTPException(status_code=404, detail="Takeoff site not found")
@@ -862,6 +864,12 @@ def create_landing_association(
     landing = db.query(Site).filter(Site.id == data.landing_site_id).first()
     if not landing:
         raise HTTPException(status_code=404, detail="Landing site not found")
+
+    if None in (takeoff.latitude, takeoff.longitude, landing.latitude, landing.longitude):
+        raise HTTPException(
+            status_code=400,
+            detail="Both takeoff and landing sites must have coordinates",
+        )
 
     existing = (
         db.query(SiteLandingAssociation)
@@ -874,28 +882,14 @@ def create_landing_association(
     if existing:
         raise HTTPException(status_code=409, detail="This landing association already exists")
 
-    landing = db.query(Site).filter(Site.id == data.landing_site_id).first()
-    if not landing:
-        raise HTTPException(status_code=404, detail="Landing site not found")
-
-    if None in (takeoff.latitude, takeoff.longitude, landing.latitude, landing.longitude):
-        raise HTTPException(
-            status_code=400,
-            detail="Both takeoff and landing sites must have coordinates",
-        )
-
     distance = haversine_distance(
         takeoff.latitude, takeoff.longitude, landing.latitude, landing.longitude
     )
 
-    existing = (
-        db.query(SiteLandingAssociation)
-        .filter(
-
     if data.is_primary:
         db.query(SiteLandingAssociation).filter(
             SiteLandingAssociation.takeoff_site_id == site_id,
-            SiteLandingAssociation.is_primary == True,
+            SiteLandingAssociation.is_primary.is_(True),
         ).update({"is_primary": False})
 
     assoc = SiteLandingAssociation(
@@ -907,7 +901,11 @@ def create_landing_association(
         notes=data.notes,
     )
     db.add(assoc)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="This landing association already exists")
     db.refresh(assoc)
 
     logger.info(
@@ -941,7 +939,7 @@ def update_landing_association(
     if data.is_primary is True:
         db.query(SiteLandingAssociation).filter(
             SiteLandingAssociation.takeoff_site_id == site_id,
-            SiteLandingAssociation.is_primary == True,
+            SiteLandingAssociation.is_primary.is_(True),
             SiteLandingAssociation.id != assoc_id,
         ).update({"is_primary": False})
         assoc.is_primary = True
@@ -1036,6 +1034,9 @@ async def get_landing_associations_weather(
 
         if day_result.get("success"):
             consensus = day_result.get("consensus", [])
+            sunrise_time = day_result.get("sunrise")
+            sunset_time = day_result.get("sunset")
+
             for hour in consensus:
                 hour["para_index"] = calculate_hourly_para_index(hour)
                 hour["verdict"] = get_hourly_verdict(hour["para_index"])
@@ -1043,14 +1044,26 @@ async def get_landing_associations_weather(
                 li = hour.get("lifted_index")
                 hour["thermal_strength"] = get_thermal_strength(cape, li)
 
-            para_result = calculate_para_index(consensus)
+            # Filter to flyable hours (sunrise to sunset) like the main weather endpoint
+            flyable_consensus = consensus
+            if sunrise_time and sunset_time:
+                try:
+                    sunrise_hour = int(sunrise_time.split(":")[0])
+                    sunset_hour = int(sunset_time.split(":")[0])
+                    flyable_consensus = [
+                        h for h in consensus if sunrise_hour <= h.get("hour", 0) <= sunset_hour
+                    ]
+                except (ValueError, IndexError):
+                    pass
+
+            para_result = calculate_para_index(flyable_consensus)
             entry["weather"] = {
                 "consensus": consensus,
                 "para_index": para_result["para_index"],
                 "verdict": para_result["verdict"],
                 "emoji": para_result["emoji"],
-                "sunrise": day_result.get("sunrise"),
-                "sunset": day_result.get("sunset"),
+                "sunrise": sunrise_time,
+                "sunset": sunset_time,
             }
         else:
             entry["weather"] = {"error": day_result.get("error", "Failed to fetch weather")}

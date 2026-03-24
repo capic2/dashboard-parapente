@@ -69,7 +69,7 @@ const defaultHandlers = [
   http.get('*/api/spots/:id', () => HttpResponse.json(mockSite)),
   http.get('*/api/emagram/latest', () => HttpResponse.json(mockEmagramLatest)),
   http.get('*/api/emagram/history', () => HttpResponse.json(mockEmagramHistory)),
-  http.post('*/api/emagram/trigger', () =>
+  http.post('*/api/emagram/analyze', () =>
     HttpResponse.json({ success: true, id: 'emagram-new' })
   ),
 ];

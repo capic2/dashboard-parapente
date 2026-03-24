@@ -37,6 +37,9 @@ export const useAddLandingAssociation = () => {
       void queryClient.invalidateQueries({
         queryKey: ['landings', variables.siteId],
       });
+      void queryClient.invalidateQueries({
+        queryKey: ['landings-weather', variables.siteId],
+      });
     },
   });
 };
@@ -61,6 +64,9 @@ export const useUpdateLandingAssociation = () => {
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
         queryKey: ['landings', variables.siteId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['landings-weather', variables.siteId],
       });
     },
   });
