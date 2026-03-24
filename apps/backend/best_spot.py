@@ -167,8 +167,26 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
                 if not consensus_hours:
                     continue
 
-                # Calculate Para-Index
-                para_result = calculate_para_index(consensus_hours)
+                # Filter to flyable hours (sunrise/sunset) for consistent para_index
+                sunrise_time = forecast.get("sunrise")
+                sunset_time = forecast.get("sunset")
+                flyable_hours = consensus_hours
+                if sunrise_time and sunset_time:
+                    try:
+                        sunrise_hour = int(sunrise_time.split(":")[0])
+                        sunset_hour = int(sunset_time.split(":")[0])
+                        flyable_hours = [
+                            h
+                            for h in consensus_hours
+                            if sunrise_hour <= h.get("hour", 0) <= sunset_hour
+                        ]
+                    except (ValueError, IndexError, AttributeError):
+                        pass
+                if not flyable_hours:
+                    continue
+
+                # Calculate Para-Index on flyable hours only
+                para_result = calculate_para_index(flyable_hours)
                 para_index = para_result.get("para_index", 0)
 
                 # Get current or average wind data

@@ -176,9 +176,11 @@ def test_get_wind_score_multiplier():
 async def test_calculate_best_spot_from_cache_success(db_session, arguel_site, chalais_site):
     """Test calculating best spot from cache with multiple sites"""
 
-    # Mock weather forecasts for both sites
+    # Mock weather forecasts for both sites (with sunrise/sunset for realistic filtering)
     mock_arguel_forecast = {
         "success": True,
+        "sunrise": "07:00",
+        "sunset": "19:00",
         "consensus": [
             {"hour": 10, "wind_speed": 15, "wind_direction": 225},  # SW
             {"hour": 11, "wind_speed": 18, "wind_direction": 225},
@@ -188,6 +190,8 @@ async def test_calculate_best_spot_from_cache_success(db_session, arguel_site, c
 
     mock_chalais_forecast = {
         "success": True,
+        "sunrise": "07:00",
+        "sunset": "19:00",
         "consensus": [
             {"hour": 10, "wind_speed": 25, "wind_direction": 90},  # E - bad for SW site
             {"hour": 11, "wind_speed": 28, "wind_direction": 90},
@@ -259,6 +263,8 @@ async def test_calculate_best_spot_from_cache_low_scores(db_session, arguel_site
 
     mock_forecast = {
         "success": True,
+        "sunrise": "07:00",
+        "sunset": "19:00",
         "consensus": [{"hour": 12, "wind_speed": 5, "wind_direction": 0}],  # Too weak
     }
 
@@ -275,6 +281,52 @@ async def test_calculate_best_spot_from_cache_low_scores(db_session, arguel_site
 
     assert result is not None
     assert "défavorables" in result["reason"].lower()
+
+
+@pytest.mark.asyncio
+async def test_calculate_best_spot_filters_night_hours(db_session, arguel_site):
+    """Test that best spot calculation filters out night hours using sunrise/sunset"""
+
+    # Forecast with night hours (bad weather) and day hours (good weather)
+    # Without filtering, the night hours would drag the score down
+    mock_forecast = {
+        "success": True,
+        "sunrise": "07:00",
+        "sunset": "19:00",
+        "consensus": [
+            {"hour": 3, "wind_speed": 40, "wind_direction": 0, "precipitation": 10},  # Night: bad
+            {"hour": 5, "wind_speed": 35, "wind_direction": 0, "precipitation": 8},  # Night: bad
+            {"hour": 10, "wind_speed": 12, "wind_direction": 225},  # Day: good
+            {"hour": 12, "wind_speed": 15, "wind_direction": 225},  # Day: good
+            {"hour": 14, "wind_speed": 14, "wind_direction": 225},  # Day: good
+            {"hour": 22, "wind_speed": 50, "wind_direction": 0, "precipitation": 15},  # Night: bad
+        ],
+    }
+
+    captured_hours = []
+
+    def mock_calculate_para_index(hours):
+        captured_hours.extend(hours)
+        return {"para_index": 80, "verdict": "Bon"}
+
+    with (
+        patch(
+            "weather_pipeline.get_normalized_forecast",
+            new=AsyncMock(return_value=mock_forecast),
+        ),
+        patch("para_index.calculate_para_index", side_effect=mock_calculate_para_index),
+    ):
+        result = await calculate_best_spot_from_cache(db_session)
+
+    assert result is not None
+    # Verify only daylight hours (7-19) were passed to calculate_para_index
+    hours_used = [h["hour"] for h in captured_hours]
+    assert 3 not in hours_used, "Night hour 3 should be filtered out"
+    assert 5 not in hours_used, "Night hour 5 should be filtered out"
+    assert 22 not in hours_used, "Night hour 22 should be filtered out"
+    assert 10 in hours_used, "Day hour 10 should be included"
+    assert 12 in hours_used, "Day hour 12 should be included"
+    assert 14 in hours_used, "Day hour 14 should be included"
 
 
 # ============================================================================
