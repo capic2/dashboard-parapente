@@ -1,4 +1,4 @@
-import preview from '../../.storybook/preview';
+import preview from '../.storybook/preview';
 import { expect, within } from 'storybook/test';
 import { useState } from 'react';
 import ErrorBoundary from './ErrorBoundary';
