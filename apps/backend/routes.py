@@ -3619,6 +3619,9 @@ async def test_weather_source(
 # ============================================================================
 
 
+_pending_emagram_analyses: set[str] = set()
+
+
 def _auto_emagram_analysis(site_id: str):
     """Background task: auto-trigger emagram analysis for a site."""
     import asyncio
@@ -3626,11 +3629,16 @@ def _auto_emagram_analysis(site_id: str):
     from database import get_db_context
     from emagram_multi_source import generate_multi_source_emagram_for_spot
 
+    if site_id in _pending_emagram_analyses:
+        return
+    _pending_emagram_analyses.add(site_id)
     try:
         with get_db_context() as db:
             asyncio.run(generate_multi_source_emagram_for_spot(site_id=site_id, db=db))
     except Exception as e:
         logger.error(f"Auto emagram analysis failed for {site_id}: {e}")
+    finally:
+        _pending_emagram_analyses.discard(site_id)
 
 
 @router.get("/emagram/latest", response_model=EmagramAnalysisSchema | None, tags=["Emagram"])
