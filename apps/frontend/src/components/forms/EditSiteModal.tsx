@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Site } from '@dashboard-parapente/shared-types';
 import { SiteUpdate } from '../../hooks/useSiteMutations';
 import LandingAssociationsManager from './LandingAssociationsManager';
@@ -16,6 +17,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
   onClose,
   onSave,
 }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState<SiteUpdate>({
     name: '',
     code: '',
@@ -80,21 +82,21 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
     const newErrors: Record<string, string> = {};
 
     if (!formData.name || formData.name.length < 2) {
-      newErrors.name = 'Le nom doit contenir au moins 2 caractères';
+      newErrors.name = t('editSite.nameMinLength');
     }
 
     if (
       formData.latitude !== undefined &&
       (formData.latitude < -90 || formData.latitude > 90)
     ) {
-      newErrors.latitude = 'Latitude invalide (-90 à 90)';
+      newErrors.latitude = t('editSite.invalidLatitude');
     }
 
     if (
       formData.longitude !== undefined &&
       (formData.longitude < -180 || formData.longitude > 180)
     ) {
-      newErrors.longitude = 'Longitude invalide (-180 à 180)';
+      newErrors.longitude = t('editSite.invalidLongitude');
     }
 
     setErrors(newErrors);

@@ -1,13 +1,15 @@
+import { useTranslation } from 'react-i18next';
 import { useFlightStats } from '../hooks/useFlights';
 
 export default function StatsPanel() {
+  const { t } = useTranslation();
   const { data: stats, isLoading, error } = useFlightStats();
 
   if (isLoading) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md">
-        <h2 className="text-sm text-gray-600 mb-3 font-semibold">📊 Statistiques</h2>
-        <div className="py-5 text-center text-gray-500 text-sm">Chargement...</div>
+        <h2 className="text-sm text-gray-600 mb-3 font-semibold">📊 {t('stats.title')}</h2>
+        <div className="py-5 text-center text-gray-500 text-sm">{t('common.loading')}</div>
       </div>
     );
   }
@@ -15,8 +17,8 @@ export default function StatsPanel() {
   if (error || !stats) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md">
-        <h2 className="text-sm text-gray-600 mb-3 font-semibold">📊 Statistiques</h2>
-        <div className="py-5 text-center text-red-500 text-sm">Données non disponibles</div>
+        <h2 className="text-sm text-gray-600 mb-3 font-semibold">📊 {t('stats.title')}</h2>
+        <div className="py-5 text-center text-red-500 text-sm">{t('common.dataUnavailable')}</div>
       </div>
     );
   }
@@ -37,7 +39,7 @@ export default function StatsPanel() {
 
   return (
     <div className="bg-white rounded-xl p-4 shadow-md flex-1 flex flex-col">
-      <h2 className="text-sm text-gray-600 mb-3 font-semibold">📊 Statistiques</h2>
+      <h2 className="text-sm text-gray-600 mb-3 font-semibold">📊 {t('stats.title')}</h2>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 flex-1">
         {/* Row 1 */}
@@ -45,7 +47,7 @@ export default function StatsPanel() {
           <div className="text-2xl leading-none shrink-0">🪂</div>
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">{stats.total_flights}</div>
-            <div className="text-[10px] text-gray-600 font-medium mt-0.5">Vols totaux</div>
+            <div className="text-[10px] text-gray-600 font-medium mt-0.5">{t('stats.totalFlights')}</div>
           </div>
         </div>
 
@@ -53,7 +55,7 @@ export default function StatsPanel() {
           <div className="text-2xl leading-none shrink-0">⏱️</div>
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">{formatDuration(stats.total_hours)}</div>
-            <div className="text-[10px] text-gray-600 font-medium mt-0.5">Temps total</div>
+            <div className="text-[10px] text-gray-600 font-medium mt-0.5">{t('stats.totalTime')}</div>
           </div>
         </div>
 
@@ -61,7 +63,7 @@ export default function StatsPanel() {
           <div className="text-2xl leading-none shrink-0">📏</div>
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">{stats.total_distance_km.toFixed(1)} km</div>
-            <div className="text-[10px] text-gray-600 font-medium mt-0.5">Distance totale</div>
+            <div className="text-[10px] text-gray-600 font-medium mt-0.5">{t('stats.totalDistance')}</div>
           </div>
         </div>
 
@@ -69,7 +71,7 @@ export default function StatsPanel() {
           <div className="text-2xl leading-none shrink-0">⌀</div>
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">{formatDuration(stats.avg_duration_minutes / 60)}</div>
-            <div className="text-[10px] text-gray-600 font-medium mt-0.5">Durée moyenne</div>
+            <div className="text-[10px] text-gray-600 font-medium mt-0.5">{t('stats.avgDuration')}</div>
           </div>
         </div>
 
@@ -78,7 +80,7 @@ export default function StatsPanel() {
           <div className="text-2xl leading-none shrink-0">📍</div>
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">{avgDistancePerFlight} km</div>
-            <div className="text-[10px] text-gray-600 font-medium mt-0.5">Dist. moyenne</div>
+            <div className="text-[10px] text-gray-600 font-medium mt-0.5">{t('stats.avgDistance')}</div>
           </div>
         </div>
 
@@ -86,7 +88,7 @@ export default function StatsPanel() {
           <div className="text-2xl leading-none shrink-0">🕐</div>
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">{avgHoursPerFlight}h</div>
-            <div className="text-[10px] text-gray-600 font-medium mt-0.5">Temps moyen</div>
+            <div className="text-[10px] text-gray-600 font-medium mt-0.5">{t('stats.avgTime')}</div>
           </div>
         </div>
 
@@ -94,7 +96,7 @@ export default function StatsPanel() {
           <div className="text-2xl leading-none shrink-0">⭐</div>
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">{stats.favorite_spot || 'N/A'}</div>
-            <div className="text-[10px] text-gray-600 font-medium mt-0.5">Site favori</div>
+            <div className="text-[10px] text-gray-600 font-medium mt-0.5">{t('stats.favoriteSite')}</div>
           </div>
         </div>
 
@@ -106,7 +108,7 @@ export default function StatsPanel() {
                 ? new Date(stats.last_flight_date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
                 : 'N/A'}
             </div>
-            <div className="text-[10px] text-gray-600 font-medium mt-0.5">Dernier vol</div>
+            <div className="text-[10px] text-gray-600 font-medium mt-0.5">{t('stats.lastFlight')}</div>
           </div>
         </div>
       </div>

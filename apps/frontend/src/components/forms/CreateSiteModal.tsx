@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label, Input, TextField, Button } from 'react-aria-components';
 import { Modal } from '@dashboard-parapente/design-system';
 import { useCreateSite, useGeocode } from '../../hooks/useSites';
@@ -18,6 +19,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
   onSiteCreated,
   flightId,
 }) => {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<'auto' | 'search' | 'manual'>('search');
   const [error, setError] = useState<string | null>(null);
   
@@ -37,7 +39,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
 
   const handleAutoDetect = () => {
     if (!gpxData?.coordinates || gpxData.coordinates.length === 0) {
-      setError('Aucune trace GPX disponible pour auto-détection');
+      setError(t('createSite.noGpxAvailable'));
       return;
     }
 
@@ -61,7 +63,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
       setLatitude(result.latitude.toString());
       setLongitude(result.longitude.toString());
     } catch {
-      setError('Ville non trouvée. Veuillez vérifier l\'orthographe ou essayer une autre recherche.');
+      setError(t('createSite.cityNotFound'));
       setSearchResult(null);
     }
   };
@@ -72,12 +74,12 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
     const elev = elevation ? parseInt(elevation) : undefined;
 
     if (!siteName.trim()) {
-      setError('Le nom du site est requis');
+      setError(t('createSite.nameRequired'));
       return;
     }
 
     if (isNaN(lat) || isNaN(lon)) {
-      setError('Coordonnées invalides. Veuillez entrer des nombres valides pour la latitude et longitude.');
+      setError(t('createSite.invalidCoordinates'));
       return;
     }
 
@@ -103,12 +105,12 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
       setSearchResult(null);
       setError(null);
     } catch (error: unknown) {
-      setError((error instanceof Error ? error.message : null) || 'Erreur lors de la création du site. Veuillez réessayer.');
+      setError((error instanceof Error ? error.message : null) || t('createSite.createError'));
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Créer un nouveau site">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('createSite.title')}>
       <div className="space-y-4">
         {/* Mode selector */}
         <div className="flex gap-2">
@@ -119,7 +121,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
                 mode === 'auto' ? 'bg-blue-500 text-white' : 'bg-gray-200'
               }`}
             >
-              Auto-détection
+              {t('createSite.autoDetect')}
             </Button>
           )}
           <Button
@@ -128,7 +130,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
               mode === 'search' ? 'bg-blue-500 text-white' : 'bg-gray-200'
             }`}
           >
-            Recherche
+            {t('createSite.search')}
           </Button>
           <Button
             onPress={() => { setMode('manual'); setError(null); }}
@@ -136,7 +138,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
               mode === 'manual' ? 'bg-blue-500 text-white' : 'bg-gray-200'
             }`}
           >
-            Saisie manuelle
+            {t('createSite.manualEntry')}
           </Button>
         </div>
 

@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useFlightStats } from '../../hooks/useFlights';
 
 export default function StatsDashboard() {
+  const { t } = useTranslation();
   const { data: stats, isLoading, error } = useFlightStats();
 
   const formattedStats = useMemo(() => {
@@ -37,7 +39,7 @@ export default function StatsDashboard() {
   if (error || !formattedStats) {
     return (
       <div className="bg-white rounded-xl p-6 shadow-md text-center text-red-600">
-        <p>❌ Impossible de charger les statistiques</p>
+        <p>❌ {t('stats.statsLoadError')}</p>
       </div>
     );
   }
@@ -48,7 +50,7 @@ export default function StatsDashboard() {
       <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
         <div className="text-3xl mb-2">🪂</div>
         <div className="text-2xl font-bold text-gray-900">{formattedStats.totalFlights}</div>
-        <div className="text-sm text-gray-600">Vols</div>
+        <div className="text-sm text-gray-600">{t('stats.flights')}</div>
       </div>
 
       {/* Total Hours */}
@@ -57,49 +59,49 @@ export default function StatsDashboard() {
         <div className="text-2xl font-bold text-gray-900">
           {formattedStats.totalHours}h{formattedStats.totalMinutes}m
         </div>
-        <div className="text-sm text-gray-600">Temps total</div>
+        <div className="text-sm text-gray-600">{t('stats.totalTime')}</div>
       </div>
 
       {/* Total Distance */}
       <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
         <div className="text-3xl mb-2">📏</div>
         <div className="text-2xl font-bold text-gray-900">{formattedStats.totalDistance} km</div>
-        <div className="text-sm text-gray-600">Distance totale</div>
+        <div className="text-sm text-gray-600">{t('stats.totalDistance')}</div>
       </div>
 
       {/* Elevation Gain */}
       <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
         <div className="text-3xl mb-2">📈</div>
         <div className="text-2xl font-bold text-gray-900">{formattedStats.totalElevation} m</div>
-        <div className="text-sm text-gray-600">Dénivelé total</div>
+        <div className="text-sm text-gray-600">{t('stats.totalElevation')}</div>
       </div>
 
       {/* Average Duration */}
       <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-gray-300">
         <div className="text-3xl mb-2">⌛</div>
         <div className="text-2xl font-bold text-gray-900">{formattedStats.avgDuration} min</div>
-        <div className="text-sm text-gray-600">Durée moyenne</div>
+        <div className="text-sm text-gray-600">{t('stats.avgDuration')}</div>
       </div>
 
       {/* Average Distance */}
       <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-gray-300">
         <div className="text-3xl mb-2">🎯</div>
         <div className="text-2xl font-bold text-gray-900">{formattedStats.avgDistance} km</div>
-        <div className="text-sm text-gray-600">Distance moyenne</div>
+        <div className="text-sm text-gray-600">{t('stats.avgDistance')}</div>
       </div>
 
       {/* Max Altitude */}
       <div className="bg-gradient-to-br from-sky-600 to-indigo-700 rounded-xl p-4 shadow-md hover:shadow-lg transition-all text-white">
         <div className="text-3xl mb-2">⛰️</div>
         <div className="text-2xl font-bold">{formattedStats.maxAltitude} m</div>
-        <div className="text-sm opacity-90">Altitude max</div>
+        <div className="text-sm opacity-90">{t('records.highestAltitude')}</div>
       </div>
 
       {/* Favorite Site */}
       <div className="bg-gradient-to-br from-sky-600 to-indigo-700 rounded-xl p-4 shadow-md hover:shadow-lg transition-all text-white">
         <div className="text-3xl mb-2">📍</div>
         <div className="text-lg font-bold truncate">{formattedStats.favoriteSite}</div>
-        <div className="text-sm opacity-90">Site favori</div>
+        <div className="text-sm opacity-90">{t('stats.favoriteSite')}</div>
       </div>
     </div>
   );

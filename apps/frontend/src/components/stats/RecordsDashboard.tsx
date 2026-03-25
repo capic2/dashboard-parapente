@@ -1,6 +1,8 @@
+import { useTranslation } from 'react-i18next';
 import { useFlightRecords } from '../../hooks/useFlights';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
 
 /**
  * Dashboard des records personnels
@@ -12,6 +14,7 @@ import { fr } from 'date-fns/locale';
  * - Vitesse maximale
  */
 export default function RecordsDashboard() {
+  const { t, i18n } = useTranslation();
   const { data: records, isLoading, error } = useFlightRecords();
 
   if (isLoading) {
@@ -31,8 +34,8 @@ export default function RecordsDashboard() {
   if (error) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md">
-        <h3 className="text-lg font-semibold mb-2 text-gray-900">🏆 Records Personnels</h3>
-        <div className="text-red-600">Erreur : {error.message}</div>
+        <h3 className="text-lg font-semibold mb-2 text-gray-900">🏆 {t('records.title')}</h3>
+        <div className="text-red-600">{t('common.error') + ' : '}{error.message}</div>
       </div>
     );
   }
@@ -40,28 +43,28 @@ export default function RecordsDashboard() {
   const recordCards = [
     {
       icon: '⏱️',
-      title: 'Vol le plus long',
+      title: t('records.longestFlight'),
       record: records?.longest_duration,
       format: (value: number) => `${value} min`,
       color: 'sky',
     },
     {
       icon: '⛰️',
-      title: 'Plus haute altitude',
+      title: t('records.highestAltitude'),
       record: records?.highest_altitude,
       format: (value: number) => `${value} m`,
       color: 'emerald',
     },
     {
       icon: '🛤️',
-      title: 'Plus longue distance',
+      title: t('records.longestDistance'),
       record: records?.longest_distance,
       format: (value: number) => `${value.toFixed(2)} km`,
       color: 'amber',
     },
     {
       icon: '⚡',
-      title: 'Vitesse maximale',
+      title: t('records.maxSpeed'),
       record: records?.max_speed,
       format: (value: number) => `${value.toFixed(1)} km/h`,
       color: 'violet',
@@ -71,7 +74,7 @@ export default function RecordsDashboard() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900">🏆 Records Personnels</h2>
+        <h2 className="text-xl font-bold text-gray-900">🏆 {t('records.title')}</h2>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -101,7 +104,7 @@ export default function RecordsDashboard() {
                   <div className="text-xs text-gray-600">
                     <div className="font-medium">{record.flight_name}</div>
                     <div className="mt-1">
-                      {format(parseISO(record.flight_date), 'dd MMMM yyyy', { locale: fr })}
+                      {format(parseISO(record.flight_date), 'dd MMMM yyyy', { locale: i18n.language === 'en' ? enUS : fr })}
                     </div>
                     {record.site_name && (
                       <div className="mt-1 text-gray-500">📍 {record.site_name}</div>
@@ -110,7 +113,7 @@ export default function RecordsDashboard() {
                 </>
               ) : (
                 <div className="text-gray-400 text-sm py-4">
-                  Aucune donnée disponible
+                  {t('achievements.noData')}
                 </div>
               )}
             </div>

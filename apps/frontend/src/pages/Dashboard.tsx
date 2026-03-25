@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import SiteSelector from '../components/SiteSelector';
 import CurrentConditions from '../components/weather/CurrentConditions';
 import Forecast7Day from '../components/weather/Forecast7Day';
@@ -11,6 +12,7 @@ import { useSites } from '../hooks/useSites';
 import { useBestSpotAPI } from '../hooks/useBestSpotAPI';
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const { data: sites, isLoading: sitesLoading, error } = useSites();
   const [userSelectedSiteId, setSelectedSiteId] = useState<string>('');
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
@@ -28,13 +30,13 @@ export default function Dashboard() {
     return (
       <div className="py-8">
         <div className="bg-white rounded-xl p-8 shadow-md text-center max-w-md mx-auto">
-          <h2 className="text-xl font-bold text-red-600 mb-3">❌ Erreur de chargement</h2>
+          <h2 className="text-xl font-bold text-red-600 mb-3">❌ {t('dashboard.loadingError')}</h2>
           <p className="text-gray-700 mb-4">{error.message}</p>
           <button 
             onClick={() => window.location.reload()}
             className="px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-all"
           >
-            Réessayer
+            {t('common.retry')}
           </button>
         </div>
       </div>
@@ -46,8 +48,8 @@ export default function Dashboard() {
     return (
       <div className="py-8">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center max-w-md mx-auto">
-          <div className="text-gray-600 dark:text-gray-300 mb-3">Chargement du tableau de bord...</div>
-          {sites && <p className="text-sm text-gray-500 dark:text-gray-400">Sites chargés: {sites.length}</p>}
+          <div className="text-gray-600 dark:text-gray-300 mb-3">{t('dashboard.loadingMessage')}</div>
+          {sites && <p className="text-sm text-gray-500 dark:text-gray-400">{t('dashboard.sitesLoaded', { count: sites.length })}</p>}
         </div>
       </div>
     );

@@ -1,33 +1,32 @@
 import { Link } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
 
-interface HeaderProps {
-  title?: string;
-}
+export default function Header() {
+  const { t } = useTranslation();
 
-export default function Header({ title = '🪂 Tableau de Bord Parapente' }: HeaderProps) {
   return (
     <header className="bg-white rounded-xl p-4 mb-4 shadow-lg flex justify-between items-center flex-wrap gap-2.5">
       <h1 className="text-2xl sm:text-xl text-sky-600 font-semibold flex-1 min-w-[200px] m-0">
-        {title}
+        🪂 {t('header.title')}
       </h1>
       <nav className="flex gap-2 flex-wrap items-center w-full sm:w-auto justify-center sm:justify-start">
         <Link
           to="/"
           className="px-3.5 py-2 rounded-md text-gray-600 text-sm transition-all hover:bg-gray-100 hover:text-sky-600 [&.active]:bg-sky-600 [&.active]:text-white"
         >
-          Dashboard
+          {t('header.dashboard')}
         </Link>
         <Link
           to="/flights"
           className="px-3.5 py-2 rounded-md text-gray-600 text-sm transition-all hover:bg-gray-100 hover:text-sky-600 [&.active]:bg-sky-600 [&.active]:text-white"
         >
-          Vols
+          {t('header.flights')}
         </Link>
         <Link
           to="/analytics"
           className="px-3.5 py-2 rounded-md text-gray-600 text-sm transition-all hover:bg-gray-100 hover:text-sky-600 [&.active]:bg-sky-600 [&.active]:text-white"
         >
-          Analyses
+          {t('header.analytics')}
         </Link>
        {/* <Link
           to="/thermal"
@@ -39,13 +38,13 @@ export default function Header({ title = '🪂 Tableau de Bord Parapente' }: Hea
           to="/sites"
           className="px-3.5 py-2 rounded-md text-gray-600 text-sm transition-all hover:bg-gray-100 hover:text-sky-600 [&.active]:bg-sky-600 [&.active]:text-white"
         >
-          Sites
+          {t('header.sites')}
         </Link>
         <Link
           to="/settings"
           className="px-3.5 py-2 rounded-md text-gray-600 text-sm transition-all hover:bg-gray-100 hover:text-sky-600 [&.active]:bg-sky-600 [&.active]:text-white"
         >
-          Paramètres
+          {t('header.settings')}
         </Link>
         <a
           href="http://portainer.local:9000"

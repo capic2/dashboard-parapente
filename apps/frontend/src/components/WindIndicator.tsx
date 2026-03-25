@@ -5,8 +5,9 @@
  * for a specific takeoff orientation.
  */
 
-import { 
-  getWindFavorability, 
+import { useTranslation } from 'react-i18next';
+import {
+  getWindFavorability,
   getWindFavorabilityEmoji,
   getWindFavorabilityLabel,
   getWindFavorabilityColor
@@ -29,9 +30,10 @@ export function WindIndicator({
   size = 'md',
   className = '',
 }: WindIndicatorProps) {
+  const { t, i18n } = useTranslation();
   const favorability = getWindFavorability(windDirection, siteOrientation, windSpeed);
   const emoji = getWindFavorabilityEmoji(favorability);
-  const label = getWindFavorabilityLabel(favorability, 'fr');
+  const label = getWindFavorabilityLabel(favorability, i18n.language);
   const colorClass = getWindFavorabilityColor(favorability);
 
   // Size classes
@@ -46,7 +48,7 @@ export function WindIndicator({
     return (
       <div className={`flex items-center gap-2 ${sizeClasses[size]} ${className}`}>
         <span className="text-gray-400">⚪</span>
-        {showLabel && <span className="text-gray-400">Données vent indisponibles</span>}
+        {showLabel && <span className="text-gray-400">{t('weather.windUnavailable')}</span>}
       </div>
     );
   }
@@ -77,9 +79,10 @@ export function WindIndicatorCompact({
   windSpeed,
   className = '',
 }: WindIndicatorProps) {
+  const { i18n } = useTranslation();
   const favorability = getWindFavorability(windDirection, siteOrientation, windSpeed);
   const emoji = getWindFavorabilityEmoji(favorability);
-  const label = getWindFavorabilityLabel(favorability, 'fr');
+  const label = getWindFavorabilityLabel(favorability, i18n.language);
 
   const tooltipText = windDirection && windSpeed 
     ? `${label} - ${windDirection} ${windSpeed}km/h`

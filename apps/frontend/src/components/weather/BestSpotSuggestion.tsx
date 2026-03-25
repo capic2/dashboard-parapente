@@ -7,8 +7,10 @@
  * Updated to support displaying the date for different days
  */
 
+import { useTranslation } from 'react-i18next';
 import { format, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
 import { WindIndicatorCompact } from '../WindIndicator';
 import type { BestSpotResult } from '@dashboard-parapente/shared-types';
 
@@ -25,13 +27,16 @@ export function BestSpotSuggestion({
   selectedDayIndex = 0,
   className = '',
 }: BestSpotSuggestionProps) {
+  const { t, i18n } = useTranslation();
+
   // Calculate the date label based on selectedDayIndex
   const selectedDate = addDays(new Date(), selectedDayIndex);
+  const dateFnsLocale = i18n.language === 'en' ? enUS : fr;
   const dateLabel = selectedDayIndex === 0
-    ? "aujourd'hui"
+    ? t('common.today').toLowerCase()
     : selectedDayIndex === 1
-    ? "demain"
-    : format(selectedDate, 'EEEE d MMMM', { locale: fr });
+    ? t('common.tomorrow').toLowerCase()
+    : format(selectedDate, 'EEEE d MMMM', { locale: dateFnsLocale });
 
   // Show loading state if no data available
   if (!bestSpot || !bestSpot.site) {
@@ -41,10 +46,10 @@ export function BestSpotSuggestion({
           <div className="text-3xl">🎯</div>
           <div>
             <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
-              Meilleur spot pour {dateLabel}
+              {t('weather.bestSpotFor', { date: dateLabel })}
             </h3>
             <div className="text-lg text-gray-500 dark:text-gray-500 mt-1">
-              Calcul en cours...
+              {t('weather.calculating')}
             </div>
           </div>
         </div>
@@ -66,7 +71,7 @@ export function BestSpotSuggestion({
           <div className="text-3xl">🎯</div>
           <div>
             <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
-              Meilleur spot pour {dateLabel}
+              {t('weather.bestSpotFor', { date: dateLabel })}
             </h3>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xl font-bold text-gray-900 dark:text-white">
@@ -95,13 +100,13 @@ export function BestSpotSuggestion({
       {/* Metrics row */}
       <div className="flex items-center gap-4 mt-3">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600 dark:text-gray-400">Para-Index:</span>
+          <span className="text-sm text-gray-600 dark:text-gray-400">{t('weather.paraIndex')}</span>
           <span className="text-lg font-bold text-sky-600">{paraIndex}/100</span>
         </div>
 
         {windDirection && windSpeed != null && (
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Vent:</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">{t('common.wind')}:</span>
             <span className="text-sm font-medium text-gray-900 dark:text-white">
               {windDirection} {windSpeed}km/h
             </span>
@@ -119,7 +124,7 @@ export function BestSpotSuggestion({
         onClick={() => onSelectSite(site.id)}
         className="mt-3 w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors"
       >
-        Voir les prévisions →
+        {t('weather.viewForecast')}
       </button>
     </div>
   );
@@ -133,6 +138,8 @@ export function BestSpotSuggestionCompact({
   onSelectSite,
   className = '',
 }: BestSpotSuggestionProps) {
+  const { t } = useTranslation();
+
   if (!bestSpot || !bestSpot.site) {
     return null;
   }
@@ -146,7 +153,7 @@ export function BestSpotSuggestionCompact({
     >
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-          🎯 Recommandé
+          🎯 {t('weather.recommended')}
         </span>
         {windDirection && windSpeed != null && (
           <WindIndicatorCompact
@@ -158,7 +165,7 @@ export function BestSpotSuggestionCompact({
       </div>
       <div className="font-bold text-gray-900 dark:text-white">{site.name}</div>
       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-        Para-Index: {paraIndex}
+        {t('weather.paraIndex')} {paraIndex}
       </div>
     </button>
   );

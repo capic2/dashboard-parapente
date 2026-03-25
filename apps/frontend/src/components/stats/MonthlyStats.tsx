@@ -9,12 +9,14 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { useTranslation } from 'react-i18next';
 import { useFlights } from '../../hooks/useFlights';
 import { useFiltersStore } from '../../stores/filtersStore';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { enUS, fr } from 'date-fns/locale';
 
 export default function MonthlyStats() {
+  const { t, i18n } = useTranslation();
   const { filters } = useFiltersStore();
   const {
     data: flights = [],
@@ -49,8 +51,8 @@ export default function MonthlyStats() {
     return Array.from(monthMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, stats]) => ({
-        month: format(new Date(key + '-01'), 'MMM yy', { locale: fr }),
-        fullMonth: format(new Date(key + '-01'), 'MMMM yyyy', { locale: fr }),
+        month: format(new Date(key + '-01'), 'MMM yy', { locale: i18n.language === 'en' ? enUS : fr }),
+        fullMonth: format(new Date(key + '-01'), 'MMMM yyyy', { locale: i18n.language === 'en' ? enUS : fr }),
         count: stats.count,
         hours: Math.round((stats.totalMinutes / 60) * 10) / 10,
       }));
@@ -71,9 +73,9 @@ export default function MonthlyStats() {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md text-center">
         <h3 className="text-lg font-bold text-gray-900 mb-4">
-          📅 Statistiques Mensuelles
+          📅 {t('charts.monthlyStats')}
         </h3>
-        <p className="text-red-600 text-sm">Pas de données disponibles</p>
+        <p className="text-red-600 text-sm">{t('charts.noData')}</p>
       </div>
     );
   }
@@ -81,7 +83,7 @@ export default function MonthlyStats() {
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
       <h3 className="text-lg font-bold text-gray-900 mb-4">
-        📅 Statistiques Mensuelles
+        📅 {t('charts.monthlyStats')}
       </h3>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart
@@ -97,7 +99,7 @@ export default function MonthlyStats() {
           <YAxis
             yAxisId="left"
             label={{
-              value: 'Nombre de vols',
+              value: t('charts.flightCount'),
               angle: -90,
               position: 'insideLeft',
               style: { fontSize: 12, fill: '#666' },
@@ -109,7 +111,7 @@ export default function MonthlyStats() {
             yAxisId="right"
             orientation="right"
             label={{
-              value: 'Heures de vol',
+              value: t('charts.flightHours'),
               angle: 90,
               position: 'insideRight',
               style: { fontSize: 12, fill: '#666' },
@@ -130,9 +132,9 @@ export default function MonthlyStats() {
               if (name === 'count')
                 return [
                   `${val} vol${Number(val) > 1 ? 's' : ''}`,
-                  'Nombre de vols',
+                  t('charts.flightCount'),
                 ];
-              return [`${val}h`, 'Heures de vol'];
+              return [`${val}h`, t('charts.flightHours')];
             }}
             labelFormatter={(label, payload) => {
               if (payload && payload.length > 0) {
@@ -144,7 +146,7 @@ export default function MonthlyStats() {
           <Legend
             wrapperStyle={{ paddingTop: '20px' }}
             formatter={(value) =>
-              value === 'count' ? 'Nombre de vols' : 'Heures de vol'
+              value === 'count' ? t('charts.flightCount') : t('charts.flightHours')
             }
           />
           <Bar

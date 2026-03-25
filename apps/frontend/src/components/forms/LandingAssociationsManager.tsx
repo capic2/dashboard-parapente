@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSites } from '../../hooks/useSites';
 import {
   useLandingAssociations,
@@ -14,6 +15,7 @@ interface LandingAssociationsManagerProps {
 export default function LandingAssociationsManager({
   takeoffSiteId,
 }: LandingAssociationsManagerProps) {
+  const { t } = useTranslation();
   const { data: associations = [], isLoading } =
     useLandingAssociations(takeoffSiteId);
   const { data: allSites = [] } = useSites();
@@ -68,7 +70,7 @@ export default function LandingAssociationsManager({
   if (isLoading) {
     return (
       <div className="text-sm text-gray-500 dark:text-gray-400">
-        Chargement des atterrissages...
+        {t('landings.loading')}
       </div>
     );
   }
@@ -76,13 +78,13 @@ export default function LandingAssociationsManager({
   return (
     <div className="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3">
       <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-        Atterrissages associes
+        {t('landings.associated')}
       </h4>
 
       {/* List of current associations */}
       {associations.length === 0 ? (
         <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-          Aucun atterrissage associe
+          {t('landings.none')}
         </p>
       ) : (
         <ul className="space-y-2 mb-3">
