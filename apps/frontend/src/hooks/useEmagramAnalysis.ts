@@ -35,6 +35,7 @@ export function useLatestEmagram(
       const url = new URL(`${API_BASE}/api/emagram/latest`);
       url.searchParams.set('site_id', siteId);
       url.searchParams.set('day_index', dayIndex.toString());
+      url.searchParams.set('auto_analyze', 'true');
 
       const response = await fetch(url.toString());
 
@@ -48,7 +49,8 @@ export function useLatestEmagram(
     },
     enabled: !!siteId && (options?.enabled !== false),
     staleTime: 5 * 60 * 1000,
-    refetchInterval: 10 * 60 * 1000,
+    refetchInterval: (query) =>
+      query.state.data ? 10 * 60 * 1000 : 30 * 1000,
   });
 }
 
