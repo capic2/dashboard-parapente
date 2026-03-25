@@ -81,7 +81,7 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - /home/capic/docker-data/dashboard-parapente:/app/db
+      - /home/capic/docker-data/dashboard-parapente/db:/app/db
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/"]
       interval: 30s
