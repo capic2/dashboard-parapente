@@ -3,8 +3,7 @@ import { defineMain } from '@storybook/react-vite/node';
 
 export default defineMain({
   stories: [
-    "../src/**/*.stories.@(js|jsx|mjs|ts|tsx)",
-    "../../../libs/design-system/src/**/*.stories.@(js|jsx|mjs|ts|tsx)"
+    "../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"
   ],
   addons: [
     "@chromatic-com/storybook",

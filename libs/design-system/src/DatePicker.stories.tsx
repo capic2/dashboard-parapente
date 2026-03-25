@@ -1,4 +1,4 @@
-import preview from '../../../apps/frontend/.storybook/preview'
+import preview from '../.storybook/preview'
 import { fn, within, expect } from 'storybook/test'
 import { DatePicker } from './DatePicker'
 

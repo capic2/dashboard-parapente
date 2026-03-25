@@ -1,4 +1,4 @@
-import preview from '../../../apps/frontend/.storybook/preview';
+import preview from '../.storybook/preview';
 import { fn, userEvent, within, expect } from 'storybook/test';
 import { Toast } from './Toast';
 
