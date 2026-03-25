@@ -15,7 +15,8 @@ import {
   Dialog,
   Popover,
 } from 'react-aria-components';
-import { parseDate, today, getLocalTimeZone, CalendarDate } from '@internationalized/date';
+import { parseDate, CalendarDate } from '@internationalized/date';
+import { getToday } from './utils/dateUtils';
 
 interface DatePickerProps {
   label: string;
@@ -25,7 +26,7 @@ interface DatePickerProps {
 
 export function DatePicker({ label, value, onChange }: DatePickerProps) {
   const calendarValue = value ? parseDate(value) : null;
-  const todayDate = today(getLocalTimeZone());
+  const todayDate = getToday();
 
   const handleChange = (date: CalendarDate | null) => {
     if (date) {
@@ -52,7 +53,7 @@ export function DatePicker({ label, value, onChange }: DatePickerProps) {
           )}
         </DateInput>
         <Button
-          className="px-3 py-2 border-l border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-r-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="cursor-pointer px-3 py-2 border-l border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-r-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           aria-label="Open calendar"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
