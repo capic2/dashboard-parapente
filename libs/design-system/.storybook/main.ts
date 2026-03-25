@@ -11,6 +11,9 @@ export default defineMain({
       },
     },
   },
+  features: {
+    experimentalTestSyntax: true,
+  },
   typescript: {
     reactDocgen: 'react-docgen-typescript',
     reactDocgenTypescriptOptions: {
