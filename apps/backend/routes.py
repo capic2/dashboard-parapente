@@ -3619,6 +3619,28 @@ async def test_weather_source(
 # ============================================================================
 
 
+_pending_emagram_analyses: set[str] = set()
+
+
+def _auto_emagram_analysis(site_id: str):
+    """Background task: auto-trigger emagram analysis for a site."""
+    import asyncio
+
+    from database import get_db_context
+    from emagram_multi_source import generate_multi_source_emagram_for_spot
+
+    if site_id in _pending_emagram_analyses:
+        return
+    _pending_emagram_analyses.add(site_id)
+    try:
+        with get_db_context() as db:
+            asyncio.run(generate_multi_source_emagram_for_spot(site_id=site_id, db=db))
+    except Exception as e:
+        logger.error(f"Auto emagram analysis failed for {site_id}: {e}")
+    finally:
+        _pending_emagram_analyses.discard(site_id)
+
+
 @router.get("/emagram/latest", response_model=EmagramAnalysisSchema | None, tags=["Emagram"])
 async def get_latest_emagram(
     site_id: str | None = Query(None, description="Site ID (preferred over lat/lon)"),
@@ -3626,6 +3648,8 @@ async def get_latest_emagram(
     user_lon: float | None = Query(None, description="User longitude"),
     day_index: int = Query(0, description="Day index (0=today, 1=tomorrow, ...)"),
     max_distance_km: float = Query(200, description="Maximum station distance in km"),
+    auto_analyze: bool = Query(False, description="Auto-trigger analysis if none found"),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
 ):
     """
@@ -3674,35 +3698,56 @@ async def get_latest_emagram(
             .all()
         )
 
-        if not recent_analyses:
-            return None
+        result = None
 
-        # If site_id provided, prefer multi-source analyses for that exact site.
-        # Note: station_code stores site.id for multi-source (llm_vision) analyses,
-        # but WMO codes for Wyoming analyses — only match multi-source here.
-        if site_id:
+        if not recent_analyses:
+            pass
+        elif site_id:
+            # If site_id provided, prefer multi-source analyses for that exact site.
+            # Note: station_code stores site.id for multi-source (llm_vision) analyses,
+            # but WMO codes for Wyoming analyses — only match multi-source here.
             for analysis in recent_analyses:
                 if analysis.station_code == site_id and analysis.analysis_method == "llm_vision":
-                    return analysis
+                    result = analysis
+                    break
 
-        # Fallback: filter by distance and find closest
-        from scrapers.wyoming import haversine_distance
+            if result is None:
+                # Fallback: filter by distance and find closest
+                from scrapers.wyoming import haversine_distance
 
-        closest_analysis = None
-        min_distance = float("inf")
+                min_distance = float("inf")
+                for analysis in recent_analyses:
+                    if analysis.station_latitude is None or analysis.station_longitude is None:
+                        continue
+                    dist = haversine_distance(
+                        target_lat,
+                        target_lon,
+                        analysis.station_latitude,
+                        analysis.station_longitude,
+                    )
+                    if dist <= max_distance_km and dist < min_distance:
+                        min_distance = dist
+                        result = analysis
+        else:
+            # No site_id: filter by distance and find closest
+            from scrapers.wyoming import haversine_distance
 
-        for analysis in recent_analyses:
-            if analysis.station_latitude is None or analysis.station_longitude is None:
-                continue
-            dist = haversine_distance(
-                target_lat, target_lon, analysis.station_latitude, analysis.station_longitude
-            )
+            min_distance = float("inf")
+            for analysis in recent_analyses:
+                if analysis.station_latitude is None or analysis.station_longitude is None:
+                    continue
+                dist = haversine_distance(
+                    target_lat, target_lon, analysis.station_latitude, analysis.station_longitude
+                )
+                if dist <= max_distance_km and dist < min_distance:
+                    min_distance = dist
+                    result = analysis
 
-            if dist <= max_distance_km and dist < min_distance:
-                min_distance = dist
-                closest_analysis = analysis
+        # Auto-trigger analysis in background if no data found
+        if result is None and auto_analyze and site_id:
+            background_tasks.add_task(_auto_emagram_analysis, site_id)
 
-        return closest_analysis
+        return result
 
     except HTTPException:
         raise

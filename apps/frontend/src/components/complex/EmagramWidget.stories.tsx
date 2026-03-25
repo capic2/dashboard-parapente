@@ -90,7 +90,7 @@ Default.test('displays emagram score and metrics', async ({ canvas }) => {
   await expect(canvas.getByText(/Arguel/)).toBeInTheDocument();
 });
 
-export const NoData = meta.story({
+export const AnalysisInProgress = meta.story({
   args: { siteId: 'site-arguel', dayIndex: 0 },
   parameters: {
     msw: {
@@ -104,22 +104,8 @@ export const NoData = meta.story({
   },
 });
 
-NoData.test('shows launch analysis button', async ({ canvas }) => {
-  await canvas.findByText(/Lancer une analyse/);
-});
-
-export const DifferentDay = meta.story({
-  args: { siteId: 'site-arguel', dayIndex: 2 },
-  parameters: { msw: { handlers: defaultHandlers } },
-});
-
-export const NoSite = meta.story({
-  args: { siteId: '', dayIndex: 0 },
-  parameters: { msw: { handlers: defaultHandlers } },
-});
-
-NoSite.test('shows no site message', async ({ canvas }) => {
-  await canvas.findByText(/Aucun site/);
+AnalysisInProgress.test('shows analysis in progress', async ({ canvas }) => {
+  await canvas.findByText(/Analyse en cours/);
 });
 
 export const Error = meta.story({
@@ -140,6 +126,20 @@ export const Error = meta.story({
 
 Error.test('displays error message', async ({ canvas }) => {
   await canvas.findByText(/Erreur/);
+});
+
+export const DifferentDay = meta.story({
+  args: { siteId: 'site-arguel', dayIndex: 2 },
+  parameters: { msw: { handlers: defaultHandlers } },
+});
+
+export const NoSite = meta.story({
+  args: { siteId: '', dayIndex: 0 },
+  parameters: { msw: { handlers: defaultHandlers } },
+});
+
+NoSite.test('shows no site message', async ({ canvas }) => {
+  await canvas.findByText(/Aucun site/);
 });
 
 export const Loading = meta.story({

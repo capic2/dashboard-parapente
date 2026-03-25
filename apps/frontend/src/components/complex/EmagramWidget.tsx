@@ -90,16 +90,12 @@ export default function EmagramWidget({ siteId, dayIndex = 0 }: EmagramWidgetPro
         <div className="py-5 text-center text-gray-500 text-sm">
           {!siteId
             ? 'Aucun site selectionne'
-            : 'Aucune analyse recente disponible. Cliquez pour analyser.'}
+            : 'Analyse en cours...'}
         </div>
         {siteId && (
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="w-full mt-3 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
-          >
-            {isRefreshing ? 'Analyse en cours...' : 'Lancer une analyse'}
-          </button>
+          <div className="flex justify-center mt-2">
+            <div className="animate-spin h-6 w-6 border-2 border-purple-600 border-t-transparent rounded-full" />
+          </div>
         )}
       </div>
     );
