@@ -1,13 +1,10 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "composite": true,
-    "declaration": true,
-    "declarationMap": false,
-    "noEmit": false,
-    "emitDeclarationOnly": true,
-    "outDir": "./dist/storybook-types"
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false
   },
-  "include": ["src/**/*.stories.tsx", ".storybook/**/*"],
+  "include": ["src/**/*", ".storybook/**/*"],
   "exclude": ["node_modules"]
 }

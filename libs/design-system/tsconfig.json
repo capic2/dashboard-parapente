@@ -10,8 +10,5 @@
     "declarationMap": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/**/*.stories.tsx"],
-  "references": [
-    { "path": "./tsconfig.storybook.json" }
-  ]
+  "exclude": ["node_modules", "dist", "src/**/*.stories.tsx", ".storybook"]
 }
