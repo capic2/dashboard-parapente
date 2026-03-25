@@ -3712,7 +3712,10 @@ async def get_latest_emagram(
                     if analysis.station_latitude is None or analysis.station_longitude is None:
                         continue
                     dist = haversine_distance(
-                        target_lat, target_lon, analysis.station_latitude, analysis.station_longitude
+                        target_lat,
+                        target_lon,
+                        analysis.station_latitude,
+                        analysis.station_longitude,
                     )
                     if dist <= max_distance_km and dist < min_distance:
                         min_distance = dist
