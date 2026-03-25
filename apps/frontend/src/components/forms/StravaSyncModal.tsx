@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Modal } from '../ui/Modal';
-import { DatePicker } from '../ui/DatePicker';
+import { Modal, DatePicker } from '@dashboard-parapente/design-system';
 import { useStravaSyncMutation } from '../../hooks/useFlights';
 import { useToast } from '../../hooks/useToast';
 

@@ -5,6 +5,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "dependencies": {
+    "@internationalized/date": "^3.7.0",
     "react-aria-components": "^1.5.0",
     "tailwindcss": "^4.2.1"
   },
