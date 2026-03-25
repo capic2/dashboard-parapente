@@ -62,7 +62,16 @@ export default function EmagramWidget({ siteId, dayIndex = 0 }: EmagramWidgetPro
     );
   }
 
-  if (error || !emagram) {
+  if (error) {
+    return (
+      <div className="bg-white rounded-xl p-4 shadow-md border-l-4 border-red-500">
+        <h2 className="text-sm text-gray-600 mb-3 font-semibold">🌡️ Analyse Thermique (Émagramme)</h2>
+        <div className="text-red-600 text-sm">Erreur : {error.message}</div>
+      </div>
+    );
+  }
+
+  if (!emagram) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md border-l-4 border-purple-600">
         <div className="flex items-center justify-between mb-3">
