@@ -1,4 +1,4 @@
-import preview from '../../../.storybook/preview';
+import preview from '../.storybook/preview';
 import { fn, userEvent, expect, screen } from 'storybook/test';
 import { Modal } from './Modal';
 

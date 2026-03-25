@@ -12,7 +12,7 @@ import { StravaSyncModal } from '../components/forms/StravaSyncModal';
 import { CreateFlightModal } from '../components/forms/CreateFlightModal';
 import { CreateSiteModal } from '../components/forms/CreateSiteModal';
 import { useSites } from '../hooks/useSites';
-import { ToastContainer } from '../components/ui/Toast';
+import { ToastContainer } from '@dashboard-parapente/design-system';
 import { useToast, useToastStore } from '../hooks/useToast';
 import { api } from '../lib/api';
 
