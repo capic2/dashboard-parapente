@@ -2016,7 +2016,7 @@ def get_flight_records(db: Session = Depends(get_db)):
             "value": getattr(flight, value_key),
             "flight_id": flight.id,
             "flight_name": flight.name or flight.title,
-            "date": flight.flight_date.isoformat() if flight.flight_date else None,
+            "flight_date": flight.flight_date.isoformat() if flight.flight_date else None,
             "site_name": flight.site.name if flight.site else None,
             "site_id": flight.site_id,
         }
