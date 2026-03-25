@@ -341,5 +341,8 @@
     "loading": "Loading landings...",
     "associated": "Associated landings",
     "none": "No associated landing"
+  },
+  "datepicker": {
+    "openCalendar": "Open calendar"
   }
 }

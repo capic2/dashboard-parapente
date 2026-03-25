@@ -341,5 +341,8 @@
     "loading": "Chargement des atterrissages...",
     "associated": "Atterrissages associés",
     "none": "Aucun atterrissage associé"
+  },
+  "datepicker": {
+    "openCalendar": "Ouvrir le calendrier"
   }
 }

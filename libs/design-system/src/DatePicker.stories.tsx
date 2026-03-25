@@ -1,18 +1,15 @@
 import preview from '../.storybook/preview'
-import {fn, mocked, screen} from 'storybook/test'
+import {expect, fn, screen} from 'storybook/test'
 import {DatePicker} from './DatePicker'
-import {getToday} from './utils/dateUtils'
 import {CalendarDate} from '@internationalized/date'
 
-const MOCK_TODAY = new CalendarDate(2026, 1, 15)
+const FROZEN_DATE = new Date(2026, 0, 15)
 
 const meta = preview.meta({
   title: 'Components/UI/DatePicker',
   component: DatePicker,
-  beforeEach: () => {
-    mocked(getToday).mockReturnValue(MOCK_TODAY)
-  },
   parameters: {
+    frozenDate: FROZEN_DATE,
     layout: 'centered',
     docs: {
       description: {
@@ -70,10 +67,10 @@ export const Empty = meta.story({
     onChange: fn(),
   },
 })
-Empty.test('it is possible to select a date', async ({canvas, userEvent}) => {
-  await userEvent.click(canvas.getByRole('button', {name: 'Open calendar', exact: false}))
-  await userEvent.click(screen.getByRole('button', {name: 'jeudi 15 janvier 2026'}))
-
+Empty.test('it is possible to select a date', async ({canvas, userEvent, args}) => {
+  await userEvent.click(canvas.getByLabelText('Select Date', {selector: 'button'}))
+  await userEvent.click(screen.getByRole('button', {name: 'Aujourd\'hui, jeudi 15 janvier 2026'}))
+  await expect(args.onChange).toHaveBeenCalledWith('2026-01-15')
 })
 
 // Today's date

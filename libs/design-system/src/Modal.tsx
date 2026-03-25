@@ -5,6 +5,7 @@ import {
   Button,
   Heading
 } from 'react-aria-components';
+import { useTranslation } from 'react-i18next';
 import { tv } from 'tailwind-variants';
 
 const modal = tv({
@@ -31,6 +32,7 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
+  const { t } = useTranslation();
   return (
     <ModalOverlay
       isOpen={isOpen}
@@ -44,7 +46,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
               {title}
             </Heading>
             <Button
-                aria-label="Fermer"
+                aria-label={t('common.close', 'Close')}
               onPress={onClose}
               className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
             >

@@ -1,6 +1,7 @@
 import { definePreview } from '@storybook/react-vite';
 import { initialize, mswLoader } from 'msw-storybook-addon';
 import addonA11y from '@storybook/addon-a11y';
+import i18n from '../src/i18n';
 import '../src/App.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -29,6 +30,12 @@ const preview = definePreview({
   addons: [addonA11y()],
 
   parameters: {
+    i18n,
+    locale: 'fr',
+    locales: {
+      fr: 'Français',
+      en: 'English',
+    },
     controls: {
       matchers: {
         color: /(background|color)$/i,
