@@ -1,0 +1,22 @@
+{
+  "name": "design-system",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/design-system/src",
+  "projectType": "library",
+  "targets": {
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/design-system/**/*.{ts,tsx}"]
+      }
+    },
+    "type-check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit -p libs/design-system/tsconfig.json"
+      }
+    }
+  },
+  "tags": ["type:lib", "scope:ui"]
+}
