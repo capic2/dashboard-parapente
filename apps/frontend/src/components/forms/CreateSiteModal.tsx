@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Label, Input, TextField, Button } from 'react-aria-components';
-import { Modal } from '../ui/Modal';
+import { Modal } from '@dashboard-parapente/design-system';
 import { useCreateSite, useGeocode } from '../../hooks/useSites';
 import { useFlightGPX } from '../../hooks/useFlightGPX';
 import type { Site } from '../../types';

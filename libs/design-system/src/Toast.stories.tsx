@@ -1,4 +1,4 @@
-import preview from '../../../.storybook/preview';
+import preview from '../.storybook/preview';
 import { fn, userEvent, within, expect } from 'storybook/test';
 import { Toast } from './Toast';
 
@@ -116,19 +116,19 @@ export const AllTypes = meta.story({
         id="success-compare"
         title="Success: Operation completed"
         type="success"
-        onClose={() => {}}
+        onClose={fn()}
       />
       <Toast
         id="error-compare"
         title="Error: Something went wrong"
         type="error"
-        onClose={() => {}}
+        onClose={fn()}
       />
       <Toast
         id="info-compare"
         title="Info: New notification"
         type="info"
-        onClose={() => {}}
+        onClose={fn()}
       />
     </div>
   ),
