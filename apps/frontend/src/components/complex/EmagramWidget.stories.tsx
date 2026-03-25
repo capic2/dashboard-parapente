@@ -122,6 +122,26 @@ NoSite.test('shows no site message', async ({ canvas }) => {
   await canvas.findByText(/Aucun site/);
 });
 
+export const Error = meta.story({
+  args: { siteId: 'site-arguel', dayIndex: 0 },
+  parameters: {
+    msw: {
+      handlers: [
+        http.get('*/api/emagram/latest', () => {
+          return new HttpResponse(null, { status: 500 });
+        }),
+        http.post('*/api/emagram/analyze', () =>
+          HttpResponse.json(mockEmagramData)
+        ),
+      ],
+    },
+  },
+});
+
+Error.test('displays error message', async ({ canvas }) => {
+  await canvas.findByText(/Erreur/);
+});
+
 export const Loading = meta.story({
   args: { siteId: 'site-arguel', dayIndex: 0 },
   parameters: {
