@@ -1,6 +1,6 @@
 import { useSites } from '../hooks/useSites';
 import { useFiltersStore } from '../stores/filtersStore';
-import { DatePicker } from './ui/DatePicker';
+import { DatePicker } from '@dashboard-parapente/design-system';
 
 /**
  * Barre de filtres pour les analyses de vols

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Modal } from '../ui/Modal';
+import { Modal } from '@dashboard-parapente/design-system';
 import { useCreateFlightFromGPX } from '../../hooks/useFlights';
 import { useToast } from '../../hooks/useToast';
 
