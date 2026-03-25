@@ -7,9 +7,12 @@ export default defineMain({
     name: '@storybook/react-vite',
     options: {
       builder: {
-        viteConfigPath: '../vite.config.ts',
+        viteConfigPath: './vite.config.ts',
       },
     },
+  },
+  features: {
+    experimentalTestSyntax: true,
   },
   typescript: {
     reactDocgen: 'react-docgen-typescript',
