@@ -8,7 +8,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis-data:/data
+      - /home/capic/docker-data/dashboard-parapente/redis:/data
     command: redis-server --save 60 1 --loglevel warning --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -81,7 +81,7 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - db-data:/app/db
+      - /home/capic/docker-data/dashboard-parapente/db:/app/db
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/"]
       interval: 30s
@@ -90,14 +90,6 @@ services:
       start_period: 40s
     networks:
       - parapente-network
-
-volumes:
-  redis-data:
-    driver: local
-
-  db-data:
-    driver: local
-    name: parapente-db-data
 
 networks:
   parapente-network:
