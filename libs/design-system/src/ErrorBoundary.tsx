@@ -1,5 +1,4 @@
 import { Component, ReactNode, ErrorInfo } from 'react';
-import i18n from '../i18n';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
