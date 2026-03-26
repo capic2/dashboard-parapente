@@ -166,7 +166,7 @@ jobs:
 
       - name: 📊 Upload frontend coverage
         if: always()
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: ./coverage/apps/frontend/lcov.info
           flags: frontend
@@ -177,7 +177,7 @@ jobs:
 
       - name: 📊 Upload backend coverage
         if: always()
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: ./coverage/apps/backend/coverage.xml
           flags: backend
