@@ -78,12 +78,8 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml', 'apps/backend/requirements.txt') }}
 
-      - name: 🎭 Install Playwright browsers
-        if: steps.playwright-cache-main.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install chromium
-
-      - name: 🎭 Install Playwright system dependencies
-        run: pnpm exec playwright install-deps chromium
+      - name: 🎭 Install Playwright
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: 🔍 Derive SHAs for Nx affected
         uses: nrwl/nx-set-shas@v5
@@ -245,12 +241,8 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
 
-      - name: 🎭 Install Playwright browsers
-        if: steps.playwright-cache-e2e.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install chromium
-
-      - name: 🎭 Install Playwright system dependencies
-        run: pnpm exec playwright install-deps chromium
+      - name: 🎭 Install Playwright
+        run: pnpm exec playwright install --with-deps chromium
 
       # Configure NX Cloud for E2E: same logic as main job
       - name: 🎛️ Configure NX Cloud execution
