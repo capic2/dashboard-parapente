@@ -74,6 +74,8 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       cwd: '../..',
       timeout: 60 * 1000, // 1 minute for frontend startup
+      stdout: 'pipe',
+      stderr: 'pipe',
     },
   ],
 });
