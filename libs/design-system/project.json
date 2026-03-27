@@ -8,7 +8,7 @@
       "executor": "@nx/eslint:lint",
       "outputs": ["{options.outputFile}"],
       "options": {
-        "lintFilePatterns": ["libs/design-system/**/*.{ts,tsx}"]
+        "lintFilePatterns": ["libs/design-system/src/**/*.{ts,tsx}"]
       }
     },
     "type-check": {
@@ -20,14 +20,14 @@
     "storybook": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "npx storybook dev -p 6007",
+        "command": "pnpm exec storybook dev -p 6007",
         "cwd": "libs/design-system"
       }
     },
     "build-storybook": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "npx storybook build",
+        "command": "pnpm exec storybook build",
         "cwd": "libs/design-system"
       }
     }
