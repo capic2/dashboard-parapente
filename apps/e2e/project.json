@@ -21,21 +21,21 @@
     "e2e:ui": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "playwright test --ui",
+        "command": "pnpm exec playwright test --ui",
         "cwd": "apps/e2e"
       }
     },
     "e2e:debug": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "playwright test --debug",
+        "command": "pnpm exec playwright test --debug",
         "cwd": "apps/e2e"
       }
     },
     "e2e:report": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "playwright show-report",
+        "command": "pnpm exec playwright show-report",
         "cwd": "apps/e2e"
       }
     }
