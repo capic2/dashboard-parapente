@@ -16,6 +16,8 @@
     "build-storybook": "storybook build"
   },
   "dependencies": {
+    "@dashboard-parapente/design-system": "workspace:*",
+    "@dashboard-parapente/shared-types": "workspace:*",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@tanstack/react-form": "^1.28.3",
