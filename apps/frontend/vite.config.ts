@@ -35,13 +35,13 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: false,
     // Code splitting for TanStack Router routes
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks: {
-          'tanstack-router': ['@tanstack/react-router'],
-          'tanstack-query': ['@tanstack/react-query'],
-          'tanstack-table': ['@tanstack/react-table'],
-          'tanstack-form': ['@tanstack/react-form']
+        manualChunks(id) {
+          if (id.includes('@tanstack/react-router')) return 'tanstack-router';
+          if (id.includes('@tanstack/react-query')) return 'tanstack-query';
+          if (id.includes('@tanstack/react-table')) return 'tanstack-table';
+          if (id.includes('@tanstack/react-form')) return 'tanstack-form';
         }
       }
     }
