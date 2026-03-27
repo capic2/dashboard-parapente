@@ -3,10 +3,6 @@
   "version": "1.0.0",
   "description": "Paragliding Dashboard - Weather, Flights, and Analytics - Nx Monorepo",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "libs/*"
-  ],
   "scripts": {
     "dev": "nx run-many -t serve -p frontend,backend --parallel",
     "build": "nx run-many -t build --all",
@@ -37,5 +33,13 @@
     "eslint": "^8.57.1",
     "eslint-plugin-storybook": "^10.3.1",
     "nx": "^22.6.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "msw",
+      "nx",
+      "protobufjs"
+    ]
   }
 }
