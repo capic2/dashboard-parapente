@@ -4,5 +4,5 @@
     "config:recommended"
   ],
   "description": "Add 'skip-nx-cloud' label to all PRs to conserve NX Cloud credits. Remove the label from a PR to enable NX Cloud for that specific update.",
-  "labels": ["skip-nx-cloud"]
+  "labels": ["renovate","skip-nx-cloud"]
 }
