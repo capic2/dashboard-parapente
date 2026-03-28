@@ -35,23 +35,26 @@ jobs:
       # NX Local Cache: fallback when NX Cloud credits are exhausted
       # This cache is also used for Renovate PRs to conserve NX Cloud credits
       # Cache strategy:
-      #   - Primary: OS + package-lock hash + git SHA (exact match)
-      #   - Fallback 1: OS + package-lock hash (recent builds with same deps)
+      #   - Primary: OS + pnpm-lock hash + git SHA (exact match)
+      #   - Fallback 1: OS + pnpm-lock hash (recent builds with same deps)
       #   - Fallback 2: OS only (any recent build)
       - name: 💾 Setup NX Cache (local fallback)
         uses: actions/cache@v5
         with:
           path: .nx/cache
-          key: nx-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ github.sha }}
+          key: nx-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
-            nx-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
+            nx-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-
             nx-${{ runner.os }}-
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
 
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "24"
-          cache: "npm"
+          cache: "pnpm"
 
       - name: 🐍 Setup Python
         uses: actions/setup-python@v6
@@ -60,8 +63,8 @@ jobs:
           cache: "pip"
           cache-dependency-path: apps/backend/requirements.txt
 
-      - name: 📦 Install npm dependencies
-        run: npm ci
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: 📦 Install Python dependencies
         run: |
@@ -69,13 +72,14 @@ jobs:
           cd apps/backend && pip install -r requirements.txt
 
       - name: 💾 Cache Playwright browsers
+        id: playwright-cache-main
         uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('**/package-lock.json', 'apps/backend/requirements.txt') }}
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml', 'apps/backend/requirements.txt') }}
 
       - name: 🎭 Install Playwright
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: 🔍 Derive SHAs for Nx affected
         uses: nrwl/nx-set-shas@v5
@@ -112,7 +116,7 @@ jobs:
         run: |
           run_nx() {
             local output
-            output=$(npx "$@" 2>&1) || {
+            output=$(pnpm exec "$@" 2>&1) || {
               echo "$output"
               if echo "$output" | grep -qE "(Workspace is unable to be authorized|exceeding the FREE plan|Workspace is disabled)"; then
                 echo "NX_CLOUD_EXHAUSTED=true" >> $GITHUB_ENV
@@ -150,10 +154,10 @@ jobs:
       - name: 🔄 Retry with local cache
         if: steps.nx_tasks.outcome == 'failure' && env.NX_CLOUD_EXHAUSTED == 'true'
         run: |
-          npx nx affected -t build --parallel=3 --exclude=e2e
-          npx nx affected -t lint --parallel=3 --exclude=e2e
-          npx nx affected -t type-check --parallel=3 --exclude=e2e
-          npx nx affected -t test --parallel=3 --exclude=e2e
+          pnpm exec nx affected -t build --parallel=3 --exclude=e2e
+          pnpm exec nx affected -t lint --parallel=3 --exclude=e2e
+          pnpm exec nx affected -t type-check --parallel=3 --exclude=e2e
+          pnpm exec nx affected -t test --parallel=3 --exclude=e2e
         env:
           TESTING: true
           BACKEND_DATABASE_URL: sqlite:///./test.db
@@ -201,16 +205,19 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .nx/cache
-          key: nx-e2e-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ github.sha }}
+          key: nx-e2e-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
-            nx-e2e-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
+            nx-e2e-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-
             nx-e2e-${{ runner.os }}-
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
 
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "24"
-          cache: "npm"
+          cache: "pnpm"
 
       - name: 🐍 Setup Python
         uses: actions/setup-python@v6
@@ -219,8 +226,8 @@ jobs:
           cache: "pip"
           cache-dependency-path: apps/backend/requirements.txt
 
-      - name: 📦 Install npm dependencies
-        run: npm ci
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: 📦 Install Python dependencies
         run: |
@@ -228,13 +235,14 @@ jobs:
           cd apps/backend && pip install -r requirements.txt
 
       - name: 💾 Cache Playwright browsers
+        id: playwright-cache-e2e
         uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
 
-      - name: 🎭 Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+      - name: 🎭 Install Playwright
+        run: pnpm exec playwright install --with-deps chromium
 
       # Configure NX Cloud for E2E: same logic as main job
       - name: 🎛️ Configure NX Cloud execution
@@ -255,7 +263,7 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          npx nx e2e e2e --configuration=ci 2>&1 | tee /tmp/e2e.log
+          pnpm exec nx e2e e2e --configuration=ci 2>&1 | tee /tmp/e2e.log
         env:
           TESTING: false
           BACKEND_DATABASE_URL: sqlite:///./test.db
@@ -270,7 +278,7 @@ jobs:
             echo "NX Cloud credits exhausted - retrying with local cache"
             gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels \
               -f "labels[]=nx-cloud-no-credit" -f "labels[]=skip-nx-cloud" || true
-            NX_NO_CLOUD=true npx nx e2e e2e --configuration=ci
+            NX_NO_CLOUD=true pnpm exec nx e2e e2e --configuration=ci
           else
             echo "E2E failed for non-NX-Cloud reason"
             exit 1

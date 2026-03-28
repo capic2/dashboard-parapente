@@ -57,7 +57,7 @@ def calculate_para_index(wind_speed: float, wind_direction: str) -> int:
 - **Types**: Strict TypeScript, no `any`
 - **Components**: One component per file
 - **Naming**: PascalCase for components, camelCase for functions
-- **Linting**: Run `npm run lint` before committing
+- **Linting**: Run `pnpm run lint` before committing
 - **Testing**: Write tests with Vitest + Testing Library
 
 ```typescript
@@ -105,8 +105,8 @@ docs(readme): update installation instructions
 
 1. **Update tests**: Ensure all tests pass
 2. **Update documentation**: If you changed functionality
-3. **Run linters**: `flake8` (backend), `npm run lint` (frontend)
-4. **Type check**: `npm run type-check` (frontend)
+3. **Run linters**: `flake8` (backend), `pnpm run lint` (frontend)
+4. **Type check**: `pnpm run type-check` (frontend)
 5. **Create PR** with clear description:
    - What problem does it solve?
    - How did you test it?
@@ -137,9 +137,9 @@ Write tests for:
 
 ```bash
 cd frontend
-npm run test              # Run all tests
-npm run test:watch        # Watch mode
-npm run test:coverage     # Coverage report
+pnpm run test              # Run all tests
+pnpm run test:watch        # Watch mode
+pnpm run test:coverage     # Coverage report
 ```
 
 Write tests for:
@@ -245,7 +245,7 @@ def calculate_para_index(wind_speed: float, wind_direction: str) -> int:
 - **Types** : TypeScript strict, pas de `any`
 - **Composants** : Un composant par fichier
 - **Nommage** : PascalCase pour composants, camelCase pour fonctions
-- **Linting** : Lancer `npm run lint` avant de commit
+- **Linting** : Lancer `pnpm run lint` avant de commit
 - **Tests** : Écrire des tests avec Vitest + Testing Library
 
 ```typescript
@@ -293,8 +293,8 @@ docs(readme): mise à jour instructions installation
 
 1. **Mettre à jour les tests** : S'assurer que tous les tests passent
 2. **Mettre à jour la documentation** : Si vous avez changé des fonctionnalités
-3. **Lancer les linters** : `flake8` (backend), `npm run lint` (frontend)
-4. **Vérification des types** : `npm run type-check` (frontend)
+3. **Lancer les linters** : `flake8` (backend), `pnpm run lint` (frontend)
+4. **Vérification des types** : `pnpm run type-check` (frontend)
 5. **Créer une PR** avec description claire :
    - Quel problème résout-elle ?
    - Comment l'avez-vous testée ?
@@ -325,9 +325,9 @@ pytest --cov              # Rapport de couverture
 
 ```bash
 cd frontend
-npm run test              # Lancer tous les tests
-npm run test:watch        # Mode watch
-npm run test:coverage     # Rapport de couverture
+pnpm run test              # Lancer tous les tests
+pnpm run test:watch        # Mode watch
+pnpm run test:coverage     # Rapport de couverture
 ```
 
 Écrire des tests pour :

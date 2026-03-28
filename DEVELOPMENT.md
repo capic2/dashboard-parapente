@@ -21,7 +21,7 @@
 
 2. Lancer le frontend :
    ```bash
-   npm run dev
+   pnpm run dev
    ```
 
 3. Ouvrir http://localhost:5173
@@ -66,7 +66,7 @@
 
 4. Lancer le frontend :
    ```bash
-   npm run dev
+   pnpm run dev
    ```
 
 5. Ouvrir http://localhost:5173 (ou 5174)
@@ -174,16 +174,16 @@ curl http://localhost:8001/api/flights
 
 ```bash
 # Installer les dépendances
-npm install
+pnpm install
 
 # Lancer en dev
-npm run dev
+pnpm run dev
 
 # Build pour production
-npm run build
+pnpm run build
 
 # Preview du build
-npm run preview
+pnpm run preview
 ```
 
 ### Basculer entre mocks et API
@@ -198,7 +198,7 @@ echo "VITE_ENABLE_MSW=false" > .env
 echo "VITE_API_URL=http://localhost:8001/api" >> .env
 
 # Redémarrer Vite après changement
-npm run dev
+pnpm run dev
 ```
 
 ---

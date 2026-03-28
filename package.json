@@ -3,10 +3,7 @@
   "version": "1.0.0",
   "description": "Paragliding Dashboard - Weather, Flights, and Analytics - Nx Monorepo",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "libs/*"
-  ],
+  "packageManager": "pnpm@10.14.0",
   "scripts": {
     "dev": "nx run-many -t serve -p frontend,backend --parallel",
     "build": "nx run-many -t build --all",
@@ -90,5 +87,13 @@
     "vite": "^8.0.0",
     "vite-plugin-cesium": "^1.2.23",
     "vitest": "^4.0.18"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "msw",
+      "nx",
+      "protobufjs"
+    ]
   }
 }
