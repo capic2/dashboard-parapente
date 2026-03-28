@@ -11,8 +11,9 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 # Copier fichiers de configuration Nx et pnpm
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig.base.json ./
 
-# Copier libs/shared-types (dépendance du frontend)
+# Copier libs (dépendances du frontend)
 COPY libs/shared-types ./libs/shared-types
+COPY libs/design-system ./libs/design-system
 
 # Copier frontend
 COPY apps/frontend ./apps/frontend
