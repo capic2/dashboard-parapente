@@ -31,7 +31,13 @@ interface ModalProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
-export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
+export function Modal({
+  isOpen,
+  onClose,
+  title,
+  children,
+  size = 'md',
+}: ModalProps) {
   const { t } = useTranslation();
   return (
     <ModalOverlay
@@ -46,7 +52,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
               {title}
             </Heading>
             <Button
-                aria-label={t('common.close', 'Close')}
+              aria-label={t('common.close', 'Close')}
               onPress={onClose}
               className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
             >

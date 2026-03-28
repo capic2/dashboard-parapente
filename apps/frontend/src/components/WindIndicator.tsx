@@ -31,7 +31,11 @@ export function WindIndicator({
   className = '',
 }: WindIndicatorProps) {
   const { t, i18n } = useTranslation();
-  const favorability = getWindFavorability(windDirection, siteOrientation, windSpeed);
+  const favorability = getWindFavorability(
+    windDirection,
+    siteOrientation,
+    windSpeed
+  );
   const emoji = getWindFavorabilityEmoji(favorability);
   const label = getWindFavorabilityLabel(favorability, i18n.language);
   const colorClass = getWindFavorabilityColor(favorability);
@@ -50,7 +54,9 @@ export function WindIndicator({
         className={`flex items-center gap-2 ${sizeClasses[size]} ${className}`}
       >
         <span className="text-gray-400">⚪</span>
-        {showLabel && <span className="text-gray-400">{t('weather.windUnavailable')}</span>}
+        {showLabel && (
+          <span className="text-gray-400">{t('weather.windUnavailable')}</span>
+        )}
       </div>
     );
   }
@@ -84,7 +90,11 @@ export function WindIndicatorCompact({
   className = '',
 }: WindIndicatorProps) {
   const { i18n } = useTranslation();
-  const favorability = getWindFavorability(windDirection, siteOrientation, windSpeed);
+  const favorability = getWindFavorability(
+    windDirection,
+    siteOrientation,
+    windSpeed
+  );
   const emoji = getWindFavorabilityEmoji(favorability);
   const label = getWindFavorabilityLabel(favorability, i18n.language);
 

@@ -1,13 +1,13 @@
-import type { Decorator, StoryContext } from '@storybook/react-vite'
+import type { Decorator, StoryContext } from '@storybook/react-vite';
 import type {
   AnyContext,
   LoaderFnContext,
   RootRoute,
   Route,
   RouteComponent,
-} from '@tanstack/react-router'
+} from '@tanstack/react-router';
 
-import { QueryClient } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/react-query';
 import {
   createMemoryHistory,
   createRootRouteWithContext,
@@ -16,14 +16,14 @@ import {
   ErrorComponent,
   Outlet,
   RouterProvider,
-} from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
+} from '@tanstack/react-router';
+import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 
 interface RouteConfig {
-  path: string
-  element: RouteComponent | 'story' //story is a special value that will render the story
+  path: string;
+  element: RouteComponent | 'story'; //story is a special value that will render the story
   loader?: /* eslint-disable @typescript-eslint/no-explicit-any */
-  | ((
+    | ((
         ctx: LoaderFnContext<
           RootRoute<undefined, object, AnyContext, AnyContext, object>,
           any,
@@ -32,13 +32,13 @@ interface RouteConfig {
           AnyContext,
           any,
           any
-        >,
+        >
       ) => any)
-    | undefined
+    | undefined;
   /* eslint-enable @typescript-eslint/no-explicit-any */
-  children?: RouteConfig[]
+  children?: RouteConfig[];
   beforeLoad?: /* eslint-disable @typescript-eslint/no-explicit-any */
-  | ((
+    | ((
         ctx: LoaderFnContext<
           RootRoute<undefined, object, AnyContext, AnyContext, object>,
           any,
@@ -47,39 +47,39 @@ interface RouteConfig {
           AnyContext,
           any,
           any
-        >,
+        >
       ) => any)
-    | undefined
+    | undefined;
   /* eslint-enable @typescript-eslint/no-explicit-any */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  validateSearch?: (search: Record<string, unknown>) => any
-  loaderDeps?: (deps: Record<string, unknown>) => Record<string, unknown>
+  validateSearch?: (search: Record<string, unknown>) => any;
+  loaderDeps?: (deps: Record<string, unknown>) => Record<string, unknown>;
 }
 
 interface TanstackRouterDecoratorContext extends StoryContext {
   parameters: {
     router?: {
-      initialPath?: string
-      renderRootRoute?: (Story: Parameters<Decorator>[0]) => React.ReactNode
-      routes: RouteConfig[]
-    }
-    enableTanstackRouterDevTools?: boolean
-  }
+      initialPath?: string;
+      renderRootRoute?: (Story: Parameters<Decorator>[0]) => React.ReactNode;
+      routes: RouteConfig[];
+    };
+    enableTanstackRouterDevTools?: boolean;
+  };
 }
 
 export const TanstackRouterDecorator: Decorator = (
   Story,
-  context: TanstackRouterDecoratorContext,
+  context: TanstackRouterDecoratorContext
 ) => {
   const {
     initialPath = '/',
     routes = [
       { path: '/', element: Story, loader: undefined, children: undefined },
     ],
-  } = context.parameters.router ?? {}
+  } = context.parameters.router ?? {};
 
   const rootRoute = createRootRouteWithContext<{
-    queryClient: QueryClient
+    queryClient: QueryClient;
   }>()({
     errorComponent: ErrorComponent,
     component: context.parameters.router?.renderRootRoute
@@ -91,7 +91,7 @@ export const TanstackRouterDecorator: Decorator = (
                 <TanStackRouterDevtools />
               )}
             </>
-          )
+          );
         }
       : () => (
           <div className="uy:grid uy:grid-cols-[auto_1fr] uy:gap-100">
@@ -110,12 +110,12 @@ export const TanstackRouterDecorator: Decorator = (
             )}
           </div>
         ),
-  })
+  });
   // Create routes and handle nested structure
 
   function createRouteLoop(
     parentRoute: Route,
-    children?: RouteConfig[],
+    children?: RouteConfig[]
   ): Route {
     if (children && children.length > 0) {
       const childRoutes = children.map((child: RouteConfig) => {
@@ -131,16 +131,16 @@ export const TanstackRouterDecorator: Decorator = (
           validateSearch: child.validateSearch,
           // @ts-expect-error impossible to type correctly
           loaderDeps: child.loaderDeps,
-        }) as unknown as Route
+        }) as unknown as Route;
 
         if (child.children && child.children.length > 0) {
-          createRouteLoop(childRoute, child.children)
+          createRouteLoop(childRoute, child.children);
         }
-        return childRoute
-      })
-      parentRoute.addChildren(childRoutes)
+        return childRoute;
+      });
+      parentRoute.addChildren(childRoutes);
     }
-    return parentRoute
+    return parentRoute;
   }
   const createdRoutes = routes.map(
     ({ path, element, loader, children, ...rest }) => {
@@ -157,37 +157,37 @@ export const TanstackRouterDecorator: Decorator = (
         // @ts-expect-error impossible to type correctly
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         loaderDeps: rest.loaderDeps,
-      }) as unknown as Route
+      }) as unknown as Route;
 
       // If this route has children, create and add them
       if (children && children.length > 0) {
-        createRouteLoop(parentRoute, children)
+        createRouteLoop(parentRoute, children);
       }
 
-      return parentRoute
-    },
-  )
+      return parentRoute;
+    }
+  );
 
-  rootRoute.addChildren(createdRoutes)
+  rootRoute.addChildren(createdRoutes);
 
   // Collect all route paths including child routes for history
-  const allPaths: string[] = []
+  const allPaths: string[] = [];
   routes.forEach((route: RouteConfig) => {
-    allPaths.push(route.path)
+    allPaths.push(route.path);
     if (route.children) {
       route.children.forEach((child: RouteConfig) => {
         // Construct full path for child routes
         const fullChildPath =
-          route.path === '/' ? child.path : route.path + child.path
-        allPaths.push(fullChildPath)
-      })
+          route.path === '/' ? child.path : route.path + child.path;
+        allPaths.push(fullChildPath);
+      });
     }
-  })
+  });
 
   const history = createMemoryHistory({
     initialEntries: allPaths,
-    initialIndex: allPaths.findIndex(path => path === initialPath),
-  })
+    initialIndex: allPaths.findIndex((path) => path === initialPath),
+  });
 
   const router = createRouter({
     history,
@@ -204,7 +204,7 @@ export const TanstackRouterDecorator: Decorator = (
         },
       }),
     },
-  })
+  });
 
-  return <RouterProvider router={router} />
-}
+  return <RouterProvider router={router} />;
+};

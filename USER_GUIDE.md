@@ -24,17 +24,18 @@ The Paragliding Weather Dashboard provides real-time and forecasted flying condi
 
 The **Para-Index** is a 0-100 score that indicates how good conditions are for flying:
 
-| Score | Verdict | Meaning |
-|-------|---------|---------|
-| **80-100** | 🟢 **EXCELLENT** | Perfect conditions, go fly! |
-| **60-79** | 🟡 **GOOD** | Good conditions with minor issues |
-| **40-59** | 🟠 **MARGINAL** | Flyable but challenging |
-| **20-39** | 🔴 **POOR** | Not recommended |
-| **0-19** | ⛔ **DANGEROUS** | Do not fly |
+| Score      | Verdict          | Meaning                           |
+| ---------- | ---------------- | --------------------------------- |
+| **80-100** | 🟢 **EXCELLENT** | Perfect conditions, go fly!       |
+| **60-79**  | 🟡 **GOOD**      | Good conditions with minor issues |
+| **40-59**  | 🟠 **MARGINAL**  | Flyable but challenging           |
+| **20-39**  | 🔴 **POOR**      | Not recommended                   |
+| **0-19**   | ⛔ **DANGEROUS** | Do not fly                        |
 
 #### Para-Index Factors
 
 The score considers:
+
 - ✅ **Wind Speed** (ideal: 5-20 km/h)
 - ✅ **Wind Direction** (matching site orientation)
 - ✅ **Temperature** (flyable range)
@@ -51,6 +52,7 @@ At the top of the dashboard, you'll see buttons for each flying site:
 - **Multi-orientation sites** (e.g., Mont Poupet) → Dropdown with N/S/W/E options
 
 **Features:**
+
 - Shows altitude for each site
 - Displays current wind direction indicator
 - Hover to prefetch weather data (instant switching)
@@ -67,6 +69,7 @@ Displays real-time conditions for the selected site:
 - **Last Updated** timestamp
 
 **Wind Direction Arrows:**
+
 - 🟢 Green arrow = Wind favorable for this takeoff
 - 🟠 Orange arrow = Wind partially favorable
 - 🔴 Red arrow = Wind unfavorable
@@ -88,6 +91,7 @@ Shows detailed hour-by-hour predictions:
 #### 4. 7-Day Forecast
 
 Weekly overview with:
+
 - Daily Para-Index range
 - Temperature min/max
 - Average wind speed
@@ -99,11 +103,13 @@ Click any day to see hourly details.
 #### 5. Best Spot Recommendation
 
 If multiple sites are configured, the dashboard suggests the **best flying site today** based on:
+
 - Current Para-Index scores
 - Wind direction matching site orientation
 - Weather trends
 
 **Displayed info:**
+
 - Recommended site name
 - Para-Index score
 - Current wind conditions
@@ -112,6 +118,7 @@ If multiple sites are configured, the dashboard suggests the **best flying site 
 #### 6. Stats Panel
 
 Quick statistics:
+
 - **Total Flights** logged
 - **Total Flight Time** (hours)
 - **Favorite Site** (most flights)
@@ -122,17 +129,20 @@ Quick statistics:
 For sites with **multiple takeoffs** (different orientations):
 
 **Example: Mont Poupet**
+
 - **Nord (N)** - Best for south winds
 - **Sud (S)** - Best for north winds
 - **Ouest (W)** - Best for east winds
 
 The system:
+
 1. Groups sites by base name automatically
 2. Shows dropdown with all orientations
 3. Displays wind favorability for each option
 4. Calculates adjusted Para-Index based on wind direction match
 
 **Wind Matching Logic:**
+
 - ✅ **Perfect match** (±30°): Full Para-Index
 - 🟡 **Partial match** (±60°): Reduced score
 - 🔴 **Opposite wind** (>90°): Heavily penalized
@@ -142,6 +152,7 @@ The system:
 Track your flying progress:
 
 #### Features
+
 - **Flight log** with date, duration, altitude, distance
 - **Statistics** (total flights, hours, distance)
 - **Site breakdown** (where you fly most)
@@ -172,6 +183,7 @@ Set up notifications for perfect conditions:
 ### Tips for Best Results
 
 #### ✅ Do's
+
 - Check **multiple sources** via tooltips
 - Review **hourly forecast** for timing your flight
 - Consider **wind trends** (is it increasing or decreasing?)
@@ -179,6 +191,7 @@ Set up notifications for perfect conditions:
 - Compare **multiple sites** to find best conditions
 
 #### ❌ Don'ts
+
 - Don't fly based on Para-Index alone (use your judgment!)
 - Don't ignore local knowledge and current observations
 - Don't fly in conditions outside your skill level
@@ -198,6 +211,7 @@ The dashboard aggregates data from:
 8. **Planète-voile** - Local conditions
 
 **Consensus Algorithm:**
+
 - Calculates median values across all sources
 - Weighs sources by historical accuracy
 - Flags outliers and low-confidence predictions
@@ -239,17 +253,18 @@ Le Dashboard Météo Parapente fournit les conditions de vol en temps réel et p
 
 Le **Para-Index** est un score de 0 à 100 qui indique la qualité des conditions de vol :
 
-| Score | Verdict | Signification |
-|-------|---------|---------------|
-| **80-100** | 🟢 **EXCELLENT** | Conditions parfaites, allez voler ! |
-| **60-79** | 🟡 **BON** | Bonnes conditions avec problèmes mineurs |
-| **40-59** | 🟠 **LIMITE** | Volable mais challengeant |
-| **20-39** | 🔴 **MAUVAIS** | Non recommandé |
-| **0-19** | ⛔ **DANGEREUX** | Ne volez pas |
+| Score      | Verdict          | Signification                            |
+| ---------- | ---------------- | ---------------------------------------- |
+| **80-100** | 🟢 **EXCELLENT** | Conditions parfaites, allez voler !      |
+| **60-79**  | 🟡 **BON**       | Bonnes conditions avec problèmes mineurs |
+| **40-59**  | 🟠 **LIMITE**    | Volable mais challengeant                |
+| **20-39**  | 🔴 **MAUVAIS**   | Non recommandé                           |
+| **0-19**   | ⛔ **DANGEREUX** | Ne volez pas                             |
 
 #### Facteurs du Para-Index
 
 Le score considère :
+
 - ✅ **Vitesse du vent** (idéal : 5-20 km/h)
 - ✅ **Direction du vent** (correspondant à l'orientation du site)
 - ✅ **Température** (plage volable)
@@ -266,6 +281,7 @@ En haut du dashboard, vous verrez des boutons pour chaque site de vol :
 - **Sites multi-orientation** (ex: Mont Poupet) → Menu déroulant avec options N/S/O/E
 
 **Fonctionnalités :**
+
 - Affiche l'altitude de chaque site
 - Affiche l'indicateur de direction du vent actuel
 - Survol pour précharger les données météo (changement instantané)
@@ -282,6 +298,7 @@ Affiche les conditions en temps réel pour le site sélectionné :
 - **Dernière mise à jour**
 
 **Flèches de Direction du Vent :**
+
 - 🟢 Flèche verte = Vent favorable pour ce décollage
 - 🟠 Flèche orange = Vent partiellement favorable
 - 🔴 Flèche rouge = Vent défavorable
@@ -303,6 +320,7 @@ Affiche les prédictions détaillées heure par heure :
 #### 4. Prévisions 7 Jours
 
 Vue d'ensemble hebdomadaire avec :
+
 - Plage de Para-Index journalier
 - Température min/max
 - Vitesse moyenne du vent
@@ -314,11 +332,13 @@ Cliquez sur n'importe quel jour pour voir les détails horaires.
 #### 5. Recommandation du Meilleur Site
 
 Si plusieurs sites sont configurés, le dashboard suggère le **meilleur site de vol aujourd'hui** basé sur :
+
 - Scores Para-Index actuels
 - Correspondance direction du vent avec orientation du site
 - Tendances météo
 
 **Informations affichées :**
+
 - Nom du site recommandé
 - Score Para-Index
 - Conditions de vent actuelles
@@ -327,6 +347,7 @@ Si plusieurs sites sont configurés, le dashboard suggère le **meilleur site de
 #### 6. Panneau de Statistiques
 
 Statistiques rapides :
+
 - **Total de Vols** enregistrés
 - **Temps de Vol Total** (heures)
 - **Site Favori** (le plus de vols)
@@ -337,17 +358,20 @@ Statistiques rapides :
 Pour les sites avec **plusieurs décollages** (orientations différentes) :
 
 **Exemple : Mont Poupet**
+
 - **Nord (N)** - Meilleur pour vents du sud
 - **Sud (S)** - Meilleur pour vents du nord
 - **Ouest (O)** - Meilleur pour vents d'est
 
 Le système :
+
 1. Groupe les sites par nom de base automatiquement
 2. Affiche un menu déroulant avec toutes les orientations
 3. Affiche la favorabilité du vent pour chaque option
 4. Calcule un Para-Index ajusté basé sur la correspondance de direction du vent
 
 **Logique de Correspondance du Vent :**
+
 - ✅ **Correspondance parfaite** (±30°) : Para-Index complet
 - 🟡 **Correspondance partielle** (±60°) : Score réduit
 - 🔴 **Vent opposé** (>90°) : Fortement pénalisé
@@ -357,6 +381,7 @@ Le système :
 Suivez votre progression en vol :
 
 #### Fonctionnalités
+
 - **Journal de vols** avec date, durée, altitude, distance
 - **Statistiques** (total vols, heures, distance)
 - **Répartition par site** (où vous volez le plus)
@@ -387,6 +412,7 @@ Configurez des notifications pour les conditions parfaites :
 ### Conseils pour de Meilleurs Résultats
 
 #### ✅ À Faire
+
 - Vérifiez **plusieurs sources** via les infobulles
 - Consultez les **prévisions horaires** pour planifier votre vol
 - Considérez les **tendances du vent** (augmente-t-il ou diminue-t-il ?)
@@ -394,6 +420,7 @@ Configurez des notifications pour les conditions parfaites :
 - Comparez **plusieurs sites** pour trouver les meilleures conditions
 
 #### ❌ À Ne Pas Faire
+
 - Ne volez pas basé uniquement sur le Para-Index (utilisez votre jugement !)
 - N'ignorez pas les connaissances locales et observations actuelles
 - Ne volez pas dans des conditions hors de votre niveau de compétence
@@ -413,6 +440,7 @@ Le dashboard agrège les données de :
 8. **Planète-voile** - Conditions locales
 
 **Algorithme de Consensus :**
+
 - Calcule les valeurs médianes entre toutes les sources
 - Pondère les sources selon leur précision historique
 - Signale les valeurs aberrantes et prédictions peu fiables

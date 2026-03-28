@@ -61,9 +61,9 @@ Target coverage: **>80%** for all metrics
 All components should have corresponding `.stories.tsx` files using the CSF Next format:
 
 ```typescript
-import preview from '../../.storybook/preview'
-import { fn, userEvent, within, expect } from 'storybook/test'
-import MyComponent from './MyComponent'
+import preview from '../../.storybook/preview';
+import { fn, userEvent, within, expect } from 'storybook/test';
+import MyComponent from './MyComponent';
 
 const meta = preview.meta({
   title: 'Components/MyComponent',
@@ -80,20 +80,20 @@ const meta = preview.meta({
   argTypes: {
     // ... argTypes
   },
-})
+});
 
 // Story with variant
 export const Default = meta.story({
   args: {
     // ... args
   },
-})
+});
 
 // Story with interaction test
 Default.test('should do something', async ({ canvasElement, args }) => {
-  const canvas = within(canvasElement)
+  const canvas = within(canvasElement);
   // ... test assertions
-})
+});
 ```
 
 ### Unit Tests
@@ -122,12 +122,12 @@ export const WithData = meta.story({
     msw: {
       handlers: [
         http.get('/api/data', () => {
-          return HttpResponse.json({ data: 'mock' })
+          return HttpResponse.json({ data: 'mock' });
         }),
       ],
     },
   },
-})
+});
 ```
 
 ## 📁 Test File Structure
@@ -168,11 +168,13 @@ frontend/
 ### ✅ Completed
 
 **Group A: UI Primitives (3/3)**
+
 - Modal (11 stories, 3 tests)
 - Toast + ToastContainer (12 stories, 3 tests)
 - DatePicker (11 stories, 3 tests)
 
 **Group B: Display Components (4/4)**
+
 - LoadingSkeleton (14 stories, 3 tests)
 - ErrorBoundary (7 stories, 1 test)
 - SiteCard (9 stories, 1 test)
@@ -185,12 +187,14 @@ frontend/
 The following components should follow the same pattern:
 
 **Group C: Weather (4 components)**
+
 - CurrentConditions
 - HourlyForecast
 - Forecast7Day
 - BestSpotSuggestion
 
 **Group D: Forms (4 components)**
+
 - MultiOrientationSelector
 - CreateSiteModal
 - EditSiteModal
@@ -198,6 +202,7 @@ The following components should follow the same pattern:
 - StravaSyncModal
 
 **Group E: Stats/Charts (9 components)**
+
 - RecordsDashboard
 - AchievementsBadges
 - AltitudeChart
@@ -209,6 +214,7 @@ The following components should follow the same pattern:
 - StatsDashboard
 
 **Group F: Complex (3 components)**
+
 - EmagramWidget
 - FlightViewer3D
 - ExportVideoModal
@@ -216,6 +222,7 @@ The following components should follow the same pattern:
 ## 🚦 CI/CD
 
 Tests run automatically on:
+
 - Push to `main` or `develop` branches
 - Pull requests targeting `main` or `develop`
 - Only when `frontend/**` files change
@@ -237,24 +244,29 @@ Tests run automatically on:
 ## 🐛 Troubleshooting
 
 ### Tests failing with "Cannot find module"
+
 - Ensure `vitest.config.ts` is properly configured
 - Check import paths (use relative imports, not aliases)
 
 ### MSW handlers not working
+
 - Verify handlers are registered in `src/test/mocks/handlers.ts`
 - Check that the MSW server is started in `setup.ts`
 
 ### Storybook not loading
+
 - Clear cache: `rm -rf node_modules/.cache`
 - Rebuild: `npm run build-storybook`
 
 ### Type errors in tests
+
 - Run `npm run type-check` to see all errors
 - Ensure test files import from correct paths
 
 ## 📞 Support
 
 For questions or issues, check:
+
 1. This documentation
 2. Existing component stories for examples
 3. Project maintainers

@@ -9,15 +9,15 @@ on:
   pull_request_target:
     types: [opened, reopened, closed]
   workflow_run:
-    workflows: ["CI - Nx Monorepo"]
+    workflows: ['CI - Nx Monorepo']
     types: [completed]
 
 env:
-  PROJECT_ID: "PVT_kwHOCaf4ns4BTClc"
-  STATUS_FIELD_ID: "PVTSSF_lAHOCaf4ns4BTClczhAZiAA"
-  STATUS_IN_PROGRESS: "47fc9ee4"
-  STATUS_BLOCKED: "c31aa57b"
-  STATUS_DONE: "98236657"
+  PROJECT_ID: 'PVT_kwHOCaf4ns4BTClc'
+  STATUS_FIELD_ID: 'PVTSSF_lAHOCaf4ns4BTClczhAZiAA'
+  STATUS_IN_PROGRESS: '47fc9ee4'
+  STATUS_BLOCKED: 'c31aa57b'
+  STATUS_DONE: '98236657'
 
 jobs:
   # Job 1: When Renovate opens/reopens a PR, add it to the project as "In progress"

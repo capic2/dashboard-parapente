@@ -109,7 +109,10 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
       setSearchResult(null);
       setError(null);
     } catch (error: unknown) {
-      setError((error instanceof Error ? error.message : null) || t('createSite.createError'));
+      setError(
+        (error instanceof Error ? error.message : null) ||
+          t('createSite.createError')
+      );
     }
   };
 

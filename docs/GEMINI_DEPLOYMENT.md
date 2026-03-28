@@ -36,7 +36,7 @@ git pull origin main
 ```yaml
 environment:
   # ... variables existantes ...
-  
+
   # Google Gemini API
   - GOOGLE_API_KEY=your_google_api_key_here
   - GEMINI_MODEL=gemini-2.5-flash
@@ -76,6 +76,7 @@ docker-compose logs -f backend
 Attendre la prochaine exécution du scheduler (toutes les 3h: 00:15, 03:15, 06:15, etc.)
 
 Vous devriez voir dans les logs:
+
 ```
 INFO: 🔷 Trying Gemini Vision analysis...
 INFO: 🔷 Gemini analysis successful!
@@ -95,11 +96,13 @@ curl http://192.168.1.106:8001/api/emagram/spot/arguel/latest | jq
 ### 5. Monitorer l'utilisation
 
 **Vérifier les quotas Gemini:**
+
 1. Aller sur https://aistudio.google.com/app/apikey
 2. Cliquer sur votre clé API
 3. Voir l'utilisation quotidienne
 
 **Votre usage attendu:**
+
 - 6 spots × 8 analyses/jour = **48 requêtes/jour**
 - Limite gratuite: **1500 requêtes/jour**
 - Marge: **97% de marge** 🎉
@@ -114,6 +117,7 @@ docker-compose exec backend printenv GOOGLE_API_KEY
 ```
 
 Si vide ou incorrecte:
+
 1. Vérifier dans Portainer que la variable est bien définie
 2. Redémarrer le stack
 
@@ -142,6 +146,7 @@ Augmenter le timeout ou vérifier les quotas:
 Si Gemini échoue, le système utilise automatiquement l'API Anthropic (si configurée).
 
 Logs:
+
 ```
 WARNING: Gemini analysis failed: ...
 INFO: 🤖 Using Anthropic direct API (fallback)...
@@ -210,11 +215,13 @@ Le système utilisera automatiquement le fallback (Anthropic API si configurée)
 ## Coûts
 
 ### Gemini (actuel)
+
 - **Gratuit**: 1500 requêtes/jour
 - Usage: 48 requêtes/jour
 - **Coût: 0€/mois** ✅
 
 ### Anthropic (fallback)
+
 - 48 requêtes/jour × 30 jours = 1440 requêtes/mois
 - ~0.03€/requête (Claude Opus 4)
 - **Coût estimé: ~43€/mois** ⚠️

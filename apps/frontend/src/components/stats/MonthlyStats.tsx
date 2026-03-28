@@ -51,8 +51,12 @@ export default function MonthlyStats() {
     return Array.from(monthMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, stats]) => ({
-        month: format(new Date(key + '-01'), 'MMM yy', { locale: i18n.language === 'en' ? enUS : fr }),
-        fullMonth: format(new Date(key + '-01'), 'MMMM yyyy', { locale: i18n.language === 'en' ? enUS : fr }),
+        month: format(new Date(key + '-01'), 'MMM yy', {
+          locale: i18n.language === 'en' ? enUS : fr,
+        }),
+        fullMonth: format(new Date(key + '-01'), 'MMMM yyyy', {
+          locale: i18n.language === 'en' ? enUS : fr,
+        }),
         count: stats.count,
         hours: Math.round((stats.totalMinutes / 60) * 10) / 10,
       }));
@@ -146,7 +150,9 @@ export default function MonthlyStats() {
           <Legend
             wrapperStyle={{ paddingTop: '20px' }}
             formatter={(value) =>
-              value === 'count' ? t('charts.flightCount') : t('charts.flightHours')
+              value === 'count'
+                ? t('charts.flightCount')
+                : t('charts.flightHours')
             }
           />
           <Bar

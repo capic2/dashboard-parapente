@@ -23,9 +23,15 @@ export const SiteCard: React.FC<SiteCardProps> = ({
   const getTypeBadge = () => {
     switch (site.usage_type) {
       case 'takeoff':
-        return { label: t('sites.takeoff'), color: 'bg-green-100 text-green-800' };
+        return {
+          label: t('sites.takeoff'),
+          color: 'bg-green-100 text-green-800',
+        };
       case 'landing':
-        return { label: t('sites.landing'), color: 'bg-blue-100 text-blue-800' };
+        return {
+          label: t('sites.landing'),
+          color: 'bg-blue-100 text-blue-800',
+        };
       case 'both':
       default:
         return {
@@ -44,7 +50,9 @@ export const SiteCard: React.FC<SiteCardProps> = ({
         <div className="flex-1">
           <h3 className="text-lg font-bold text-gray-900">{site.name}</h3>
           {site.code && (
-            <p className="text-sm text-gray-500">{t('sites.code')} {site.code}</p>
+            <p className="text-sm text-gray-500">
+              {t('sites.code')} {site.code}
+            </p>
           )}
         </div>
         <span

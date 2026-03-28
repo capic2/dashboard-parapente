@@ -20,7 +20,9 @@ export function FilterBar() {
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">{t('filters.title')}</h3>
+          <h3 className="text-lg font-semibold text-gray-900">
+            {t('filters.title')}
+          </h3>
           <button
             onClick={resetFilters}
             className="text-sm text-sky-600 hover:text-sky-700 font-medium"
@@ -76,12 +78,14 @@ export function FilterBar() {
             )}
             {filters.dateFrom && (
               <span className="px-2 py-1 bg-sky-100 text-sky-700 rounded">
-                {t('filters.from')} {new Date(filters.dateFrom).toLocaleDateString('fr-FR')}
+                {t('filters.from')}{' '}
+                {new Date(filters.dateFrom).toLocaleDateString('fr-FR')}
               </span>
             )}
             {filters.dateTo && (
               <span className="px-2 py-1 bg-sky-100 text-sky-700 rounded">
-                {t('filters.to')} {new Date(filters.dateTo).toLocaleDateString('fr-FR')}
+                {t('filters.to')}{' '}
+                {new Date(filters.dateTo).toLocaleDateString('fr-FR')}
               </span>
             )}
           </div>

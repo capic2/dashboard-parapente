@@ -37,8 +37,13 @@ export default function RecordsDashboard() {
   if (error) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md">
-        <h3 className="text-lg font-semibold mb-2 text-gray-900">🏆 {t('records.title')}</h3>
-        <div className="text-red-600">{t('common.error') + ' : '}{error.message}</div>
+        <h3 className="text-lg font-semibold mb-2 text-gray-900">
+          🏆 {t('records.title')}
+        </h3>
+        <div className="text-red-600">
+          {t('common.error') + ' : '}
+          {error.message}
+        </div>
       </div>
     );
   }
@@ -77,7 +82,9 @@ export default function RecordsDashboard() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900">🏆 {t('records.title')}</h2>
+        <h2 className="text-xl font-bold text-gray-900">
+          🏆 {t('records.title')}
+        </h2>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -111,7 +118,9 @@ export default function RecordsDashboard() {
                   <div className="text-xs text-gray-600">
                     <div className="font-medium">{record.flight_name}</div>
                     <div className="mt-1">
-                      {format(parseISO(record.flight_date), 'dd MMMM yyyy', { locale: i18n.language === 'en' ? enUS : fr })}
+                      {format(parseISO(record.flight_date), 'dd MMMM yyyy', {
+                        locale: i18n.language === 'en' ? enUS : fr,
+                      })}
                     </div>
                     {record.site_name && (
                       <div className="mt-1 text-gray-500">

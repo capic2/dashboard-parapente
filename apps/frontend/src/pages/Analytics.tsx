@@ -31,7 +31,9 @@ export default function Analytics() {
   return (
     <div>
       <div className="mb-4 bg-white rounded-xl p-4 shadow-md">
-        <h1 className="text-xl font-bold text-gray-900">📊 {t('analytics.title')}</h1>
+        <h1 className="text-xl font-bold text-gray-900">
+          📊 {t('analytics.title')}
+        </h1>
         <p className="text-sm text-gray-600 mt-1">{t('analytics.subtitle')}</p>
       </div>
 

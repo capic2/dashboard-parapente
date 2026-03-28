@@ -1,19 +1,23 @@
-import React, { useState, useMemo } from 'react'
-import { useTranslation } from 'react-i18next'
-import { useNavigate } from '@tanstack/react-router'
-import { useSites } from '../hooks/useSites'
-import { useUpdateSite, useDeleteSite, SiteUpdate } from '../hooks/useSiteMutations'
-import type { Site } from '@dashboard-parapente/shared-types'
-import { SiteCard } from '../components/SiteCard'
-import { EditSiteModal } from '../components/forms/EditSiteModal'
+import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useNavigate } from '@tanstack/react-router';
+import { useSites } from '../hooks/useSites';
+import {
+  useUpdateSite,
+  useDeleteSite,
+  SiteUpdate,
+} from '../hooks/useSiteMutations';
+import type { Site } from '@dashboard-parapente/shared-types';
+import { SiteCard } from '../components/SiteCard';
+import { EditSiteModal } from '../components/forms/EditSiteModal';
 
 export const Sites: React.FC = () => {
-  const { t } = useTranslation()
-  const navigate = useNavigate()
-  const { data: sites = [], isLoading, error } = useSites()
-  const updateSite = useUpdateSite()
-  const deleteSite = useDeleteSite()
-  
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { data: sites = [], isLoading, error } = useSites();
+  const updateSite = useUpdateSite();
+  const deleteSite = useDeleteSite();
+
   // Filters & search
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<
@@ -77,22 +81,22 @@ export const Sites: React.FC = () => {
     } else {
       // Create mode - would need a createSite mutation
       // For now, this would use the existing CreateSiteModal workflow
-      console.log('Create site:', data)
-      alert(t('sites.createViaButton'))
+      console.log('Create site:', data);
+      alert(t('sites.createViaButton'));
     }
   };
 
   const handleDelete = async (site: Site) => {
     if (!confirm(t('sites.deleteSiteConfirm', { name: site.name }))) {
-      return
+      return;
     }
 
     try {
-      await deleteSite.mutateAsync(site.id)
-      alert(t('sites.siteDeleted', { name: site.name }))
+      await deleteSite.mutateAsync(site.id);
+      alert(t('sites.siteDeleted', { name: site.name }));
     } catch (error: unknown) {
-      const errorMessage = (error as Error)?.message || t('sites.deleteError')
-      alert(errorMessage)
+      const errorMessage = (error as Error)?.message || t('sites.deleteError');
+      alert(errorMessage);
     }
   };
 

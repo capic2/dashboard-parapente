@@ -1,5 +1,15 @@
 import { useMemo } from 'react';
-import { Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, ComposedChart } from 'recharts';
+import {
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Line,
+  ComposedChart,
+} from 'recharts';
 import { useTranslation } from 'react-i18next';
 import { useFlights } from '../../hooks/useFlights';
 import { useFiltersStore } from '../../stores/filtersStore';
@@ -46,8 +56,12 @@ export default function ProgressChart() {
         rollingFlights.length;
 
       return {
-        date: format(new Date(flight.flight_date), 'dd MMM', { locale: i18n.language === 'en' ? enUS : fr }),
-        fullDate: format(new Date(flight.flight_date), 'dd MMMM yyyy', { locale: i18n.language === 'en' ? enUS : fr }),
+        date: format(new Date(flight.flight_date), 'dd MMM', {
+          locale: i18n.language === 'en' ? enUS : fr,
+        }),
+        fullDate: format(new Date(flight.flight_date), 'dd MMMM yyyy', {
+          locale: i18n.language === 'en' ? enUS : fr,
+        }),
         duration: flight.duration_minutes,
         average: Math.round(avgDuration),
         rollingAvg: Math.round(rollingAvg),
@@ -69,7 +83,9 @@ export default function ProgressChart() {
   if (error || !chartData.length) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md text-center">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">📈 {t('charts.flightProgress')}</h3>
+        <h3 className="text-lg font-bold text-gray-900 mb-4">
+          📈 {t('charts.flightProgress')}
+        </h3>
         <p className="text-red-600 text-sm">{t('charts.noData')}</p>
       </div>
     );
@@ -78,7 +94,9 @@ export default function ProgressChart() {
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
       <div className="mb-4">
-        <h3 className="text-lg font-bold text-gray-900">📈 {t('charts.flightProgress')}</h3>
+        <h3 className="text-lg font-bold text-gray-900">
+          📈 {t('charts.flightProgress')}
+        </h3>
         <p className="text-sm text-gray-600 mt-1">
           {t('charts.flightProgressDesc')}
         </p>
@@ -101,7 +119,12 @@ export default function ProgressChart() {
             stroke="#999"
           />
           <YAxis
-            label={{ value: t('charts.durationMin'), angle: -90, position: 'insideLeft', style: { fontSize: 12, fill: '#666' } }}
+            label={{
+              value: t('charts.durationMin'),
+              angle: -90,
+              position: 'insideLeft',
+              style: { fontSize: 12, fill: '#666' },
+            }}
             tick={{ fontSize: 12, fill: '#666' }}
             stroke="#999"
           />

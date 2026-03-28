@@ -166,16 +166,23 @@ export default function AchievementsBadges() {
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">🏆 {t('achievements.title')}</h3>
+        <h3 className="text-lg font-semibold text-gray-900">
+          🏆 {t('achievements.title')}
+        </h3>
         <p className="text-sm text-gray-600 mt-1">
-          {t('achievements.badgesUnlocked', { unlocked: unlockedBadges.length, total: badges.length })}
+          {t('achievements.badgesUnlocked', {
+            unlocked: unlockedBadges.length,
+            total: badges.length,
+          })}
         </p>
       </div>
 
       {/* Unlocked Badges */}
       {unlockedBadges.length > 0 && (
         <div className="mb-6">
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">{t('achievements.unlocked')}</h4>
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+            {t('achievements.unlocked')}
+          </h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {unlockedBadges.map((badge) => (
               <div
@@ -198,7 +205,9 @@ export default function AchievementsBadges() {
       {/* Locked Badges with Progress */}
       {lockedBadges.length > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">{t('achievements.locked')}</h4>
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+            {t('achievements.locked')}
+          </h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {lockedBadges.map((badge) => (
               <div

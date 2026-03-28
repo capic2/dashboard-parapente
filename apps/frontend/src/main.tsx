@@ -1,8 +1,8 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import './i18n'
-import App from './App'
-import './App.css'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import './i18n';
+import App from './App';
+import './App.css';
 
 // Initialiser MSW en mode développement (peut être désactivé via VITE_ENABLE_MSW=false)
 async function enableMocking() {

@@ -33,7 +33,9 @@ export default function Dashboard() {
     return (
       <div className="py-8">
         <div className="bg-white rounded-xl p-8 shadow-md text-center max-w-md mx-auto">
-          <h2 className="text-xl font-bold text-red-600 mb-3">❌ {t('dashboard.loadingError')}</h2>
+          <h2 className="text-xl font-bold text-red-600 mb-3">
+            ❌ {t('dashboard.loadingError')}
+          </h2>
           <p className="text-gray-700 mb-4">{error.message}</p>
           <button
             onClick={() => window.location.reload()}
@@ -51,8 +53,14 @@ export default function Dashboard() {
     return (
       <div className="py-8">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center max-w-md mx-auto">
-          <div className="text-gray-600 dark:text-gray-300 mb-3">{t('dashboard.loadingMessage')}</div>
-          {sites && <p className="text-sm text-gray-500 dark:text-gray-400">{t('dashboard.sitesLoaded', { count: sites.length })}</p>}
+          <div className="text-gray-600 dark:text-gray-300 mb-3">
+            {t('dashboard.loadingMessage')}
+          </div>
+          {sites && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {t('dashboard.sitesLoaded', { count: sites.length })}
+            </p>
+          )}
         </div>
       </div>
     );

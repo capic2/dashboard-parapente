@@ -3,7 +3,7 @@
 **Status:** Ready for Phase 2 Implementation  
 **Date:** 2026-02-26  
 **For:** Vincent (Developer + Paragliding Enthusiast)  
-**By:** Claw (AI Assistant)  
+**By:** Claw (AI Assistant)
 
 ---
 
@@ -15,7 +15,7 @@ This folder contains the **complete architectural design** for Vincent's persona
 ✅ **API Specification** — 50+ RESTful endpoints with examples  
 ✅ **Frontend Prototype** — Interactive HTML/CSS mockup (6 dashboard sections)  
 ✅ **Scraping Strategy** — How to integrate 8 weather data sources  
-✅ **Implementation Plan** — Detailed timeline, team roles, success criteria  
+✅ **Implementation Plan** — Detailed timeline, team roles, success criteria
 
 **No code yet.** This is pure design—specs ready for development.
 
@@ -24,9 +24,11 @@ This folder contains the **complete architectural design** for Vincent's persona
 ## 📚 Design Documents
 
 ### 1. **dashboard-schema.sql** (19 KB)
-*PostgreSQL database schema — ready to execute*
+
+_PostgreSQL database schema — ready to execute_
 
 **Contains:**
+
 - 12 tables (sites, flights, weather_forecasts, weather_history, alerts, stats, etc.)
 - Relationships & foreign keys
 - 20+ indexes for performance
@@ -38,6 +40,7 @@ This folder contains the **complete architectural design** for Vincent's persona
 **Use:** `psql < dashboard-schema.sql` on Proxmox PostgreSQL container
 
 **Key Tables:**
+
 ```
 sites                      → Flying locations (Arguel, Mont Poupet, La Côte)
 flights                    → Flight history (synced from Strava)
@@ -51,9 +54,11 @@ scraping_jobs              → Track data sync operations
 ---
 
 ### 2. **dashboard-api-spec.md** (21 KB)
-*Complete REST API specification with examples*
+
+_Complete REST API specification with examples_
 
 **Contains:**
+
 - 50+ endpoints (GET, POST, PATCH, DELETE)
 - Request/response formats (JSON)
 - Query parameters & filters
@@ -67,6 +72,7 @@ scraping_jobs              → Track data sync operations
 **Use:** As reference during Phase 3 frontend development
 
 **API Categories:**
+
 ```
 /sites                     → List/get flying locations
 /flights                   → Flight history, Strava sync
@@ -80,6 +86,7 @@ scraping_jobs              → Track data sync operations
 ```
 
 **Example Request:**
+
 ```bash
 curl -H "Authorization: Bearer API_KEY" \
   "https://dashboard.parapente.local/api/v1/weather/forecast/uuid-arguel?days=7"
@@ -88,9 +95,11 @@ curl -H "Authorization: Bearer API_KEY" \
 ---
 
 ### 3. **dashboard-frontend-structure.html** (37 KB)
-*Interactive HTML/CSS prototype — ready to inspect in browser*
+
+_Interactive HTML/CSS prototype — ready to inspect in browser_
 
 **Contains:**
+
 - 6 dashboard sections (all functional)
 - Responsive design (mobile + desktop)
 - 100% CSS (no frameworks needed yet)
@@ -102,6 +111,7 @@ curl -H "Authorization: Bearer API_KEY" \
 **Use:** Open in browser: `open dashboard-frontend-structure.html`
 
 **Dashboard Sections:**
+
 ```
 1. Header & Navigation       → Logo, user info, main menu
 2. Current Conditions        → Real-time weather (7 metrics)
@@ -114,6 +124,7 @@ curl -H "Authorization: Bearer API_KEY" \
 ```
 
 **Features:**
+
 - Site selector (Arguel, Mont Poupet, La Côte)
 - Real-time data updates (30-second refresh)
 - Para-Index color scale (red → yellow → green → blue)
@@ -125,9 +136,11 @@ curl -H "Authorization: Bearer API_KEY" \
 ---
 
 ### 4. **dashboard-scraping-strategy.md** (32 KB)
-*Multi-source weather data strategy*
+
+_Multi-source weather data strategy_
 
 **Contains:**
+
 - Architecture for 4 scraping methods (API, HTML, RSS, hybrid)
 - Source-by-source implementation guide
 - Data extraction code (Python pseudocode)
@@ -142,20 +155,18 @@ curl -H "Authorization: Bearer API_KEY" \
 **8 Weather Sources:**
 
 **Phase 1 (Active):**
+
 1. ✅ **Open-Meteo** — REST API (free, unlimited)
 2. ✅ **WeatherAPI** — REST API (1k calls/day)
 3. ✅ **Meteoblue** — HTML scraping + Playwright (professional)
 4. ✅ **Météo-parapente** — RSS feed + HTML (paragliding-specific)
 
-**Phase 2 (Planned):**
-5. 🔄 **Météociel** — HTML scraping (French meteorological data)
+**Phase 2 (Planned):** 5. 🔄 **Météociel** — HTML scraping (French meteorological data)
 
-**Phase 3+ (Future):**
-6. ⏸️ **Parapente.net** — Forum scraping (user-reported conditions)
-7. ⏸️ **Windy** — API + visualization (wind maps)
-8. ⏸️ **Planète-Voile** — HTML scraping (marine wind data)
+**Phase 3+ (Future):** 6. ⏸️ **Parapente.net** — Forum scraping (user-reported conditions) 7. ⏸️ **Windy** — API + visualization (wind maps) 8. ⏸️ **Planète-Voile** — HTML scraping (marine wind data)
 
 **Key Concepts:**
+
 - **Para-Index:** Composite 0-100 score combining wind, clouds, temperature, thermals
 - **Consensus:** Multi-source averaging reduces individual source errors
 - **Rate Limiting:** Respects ToS (1-3 requests/hour per source)
@@ -164,9 +175,11 @@ curl -H "Authorization: Bearer API_KEY" \
 ---
 
 ### 5. **dashboard-implementation-plan.md** (33 KB)
-*Detailed roadmap from design to production*
+
+_Detailed roadmap from design to production_
 
 **Contains:**
+
 - Project charter & goals
 - Team roles & responsibilities (Vincent + Claw)
 - 3-phase timeline (8-10 weeks total)
@@ -188,7 +201,7 @@ Phase 2: Backend Data      [Mar 1 - Apr 15]     6 weeks  → NEXT
   ├─ Week 2: API clients (Open-Meteo, WeatherAPI, Meteoblue, Météo-parapente)
   ├─ Week 3: Data pipeline & normalization
   └─ Week 4: Scheduler, Strava sync, full testing
-  
+
 Phase 3: Frontend + Deploy [Apr 15 - May 10]    4 weeks
   ├─ Week 1: FastAPI backend
   ├─ Week 2: Vue.js frontend
@@ -198,11 +211,13 @@ Buffer & Launch            [May 10 - May 24]    2 weeks
 ```
 
 **Effort Estimates:**
+
 - **Backend (Phase 2):** 50-60 hours (~3-4 hrs/week for Vincent)
 - **Frontend (Phase 3):** 40-50 hours (~5-6 hrs/week for Vincent)
 - **Total:** ~100-110 hours over 10 weeks
 
 **Key Decisions:**
+
 - Python + FastAPI (backend)
 - Vue 3 + Vite (frontend)
 - PostgreSQL + SQLAlchemy (database)
@@ -249,6 +264,7 @@ Buffer & Launch            [May 10 - May 24]    2 weeks
 ### For Team Syncs:
 
 **Every Monday 10:00 GMT+1:**
+
 - Review progress vs. timeline
 - Discuss blockers
 - Approve PRs
@@ -318,16 +334,13 @@ Dashboard.vue                    Main layout
 ### Scraping Priority
 
 **Phase 2 (Week 2-3):**
+
 1. Open-Meteo (easiest, API)
 2. WeatherAPI (API with key)
 3. Meteoblue (Playwright HTML scraping)
 4. Météo-parapente (RSS + fallback HTML)
 
-**Phase 3+ (later):**
-5. Météociel (HTML)
-6. Parapente.net (forum scraping)
-7. Windy (visualization scraping)
-8. Planète-Voile (marine data)
+**Phase 3+ (later):** 5. Météociel (HTML) 6. Parapente.net (forum scraping) 7. Windy (visualization scraping) 8. Planète-Voile (marine data)
 
 ---
 
@@ -374,11 +387,13 @@ Dashboard.vue                    Main layout
 ## 📞 Support & Questions
 
 **Questions about design?**
+
 - Create GitHub Issue with label `[design-phase-1]`
 - Ask Claw in Telegram
 - Discuss in weekly sync
 
 **Need clarifications?**
+
 - Specific parts of schema → See `dashboard-schema.sql` comments
 - API behavior → See `dashboard-api-spec.md` examples
 - Frontend layout → Open `dashboard-frontend-structure.html` in browser
@@ -386,6 +401,7 @@ Dashboard.vue                    Main layout
 - Timeline/effort → See `dashboard-implementation-plan.md` timeline
 
 **Found issues?**
+
 - Document exact issue + location
 - Provide context/example
 - Propose fix if possible
@@ -394,28 +410,29 @@ Dashboard.vue                    Main layout
 
 ## 📊 Design Quality Metrics
 
-| Metric | Target | Actual |
-|--------|--------|--------|
-| **Documentation Completeness** | 100% | ✅ 100% |
-| **Code Examples** | >10 | ✅ 25+ |
-| **Architecture Clarity** | Clear | ✅ Clear |
-| **Timeline Realism** | Achievable | ✅ Conservative estimates |
-| **Error Handling Coverage** | 80%+ | ✅ 85%+ |
-| **Team Capacity** | Realistic | ✅ Realistic |
+| Metric                         | Target     | Actual                    |
+| ------------------------------ | ---------- | ------------------------- |
+| **Documentation Completeness** | 100%       | ✅ 100%                   |
+| **Code Examples**              | >10        | ✅ 25+                    |
+| **Architecture Clarity**       | Clear      | ✅ Clear                  |
+| **Timeline Realism**           | Achievable | ✅ Conservative estimates |
+| **Error Handling Coverage**    | 80%+       | ✅ 85%+                   |
+| **Team Capacity**              | Realistic  | ✅ Realistic              |
 
 ---
 
 ## 📝 Version History
 
-| Version | Date | Status | Notes |
-|---------|------|--------|-------|
-| 1.0 | 2026-02-26 | Complete | Initial design, ready for Phase 2 |
+| Version | Date       | Status   | Notes                             |
+| ------- | ---------- | -------- | --------------------------------- |
+| 1.0     | 2026-02-26 | Complete | Initial design, ready for Phase 2 |
 
 ---
 
 ## 🎓 Technology Stack Summary
 
 **Backend Stack:**
+
 - Python 3.10+ with FastAPI
 - PostgreSQL 14 for persistence
 - Async/await for concurrency
@@ -424,6 +441,7 @@ Dashboard.vue                    Main layout
 - SQLAlchemy for ORM
 
 **Frontend Stack:**
+
 - Vue 3 with Vite
 - Responsive CSS (Tailwind/custom)
 - Axios for API calls
@@ -431,6 +449,7 @@ Dashboard.vue                    Main layout
 - Vue Router for navigation
 
 **Infrastructure:**
+
 - OpenClaw 2026.2.24
 - Proxmox + LXC containers
 - Docker for deployment
@@ -446,13 +465,14 @@ Dashboard.vue                    Main layout
 ✅ **SQL Injection Prevention** — SQLAlchemy ORM prevents injection  
 ✅ **CORS Configured** — Limited to dashboard.parapente.local  
 ✅ **Rate Limiting** — Per-source, per-endpoint  
-✅ **Input Validation** — All forms validated before processing  
+✅ **Input Validation** — All forms validated before processing
 
 ---
 
 ## 📈 Success Metrics (Phase 2 + 3)
 
 **Backend Success:**
+
 - [ ] 5 data sources working (Open-Meteo, WeatherAPI, Meteoblue, Météo-parapente, Météociel)
 - [ ] Database has 7+ days of complete forecast data
 - [ ] Scheduler runs 24/7 without errors (<0.1% failure rate)
@@ -460,6 +480,7 @@ Dashboard.vue                    Main layout
 - [ ] Test coverage >80%
 
 **Frontend Success:**
+
 - [ ] All 8 dashboard sections rendering
 - [ ] Data updates every 30 seconds
 - [ ] Page load time <2 seconds
@@ -467,6 +488,7 @@ Dashboard.vue                    Main layout
 - [ ] Alerts trigger properly
 
 **Overall Success:**
+
 - [ ] Dashboard live at https://dashboard.parapente.local
 - [ ] Vincent can check flying conditions daily
 - [ ] Alerts notify via Telegram
@@ -484,14 +506,14 @@ This design is **complete, practical, and ready for development.** No shortcuts 
 ✓ Realistic timeline (100-110 hours, 10 weeks)  
 ✓ Achievable scope (3 sites, 5 initial sources, basic ML later)  
 ✓ Team-friendly (Claw handles boilerplate, Vincent owns architecture)  
-✓ Deployed on existing infrastructure (no new hardware needed)  
+✓ Deployed on existing infrastructure (no new hardware needed)
 
 **Ready when Vincent is.** Design phase complete. Phase 2 begins March 1st.
 
 ---
 
 **Questions? Ideas? Found an issue?**  
-→ Create GitHub Issue or message Claw on Telegram  
+→ Create GitHub Issue or message Claw on Telegram
 
 **Let's build this! 🪂⛅📊**
 

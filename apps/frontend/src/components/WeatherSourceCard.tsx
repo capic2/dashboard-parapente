@@ -3,8 +3,8 @@
  * Displays individual weather source configuration with stats and controls
  */
 
-import React, { useState } from 'react'
-import { useTranslation } from 'react-i18next'
+import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Switch,
@@ -30,26 +30,32 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
   isLastActive,
   onDelete,
 }) => {
-  const { t } = useTranslation()
-  const updateSource = useUpdateWeatherSource()
-  const testSource = useTestWeatherSource()
-  
-  const [showApiKey, setShowApiKey] = useState(false)
-  const [apiKeyValue, setApiKeyValue] = useState('')
-  const [isEditingApiKey, setIsEditingApiKey] = useState(false)
-  const [isTesting, setIsTesting] = useState(false)
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
-  const [notification, setNotification] = useState<{ type: 'error' | 'success' | 'warning'; message: string } | null>(null)
-  
+  const { t } = useTranslation();
+  const updateSource = useUpdateWeatherSource();
+  const testSource = useTestWeatherSource();
+
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [apiKeyValue, setApiKeyValue] = useState('');
+  const [isEditingApiKey, setIsEditingApiKey] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
+  const [notification, setNotification] = useState<{
+    type: 'error' | 'success' | 'warning';
+    message: string;
+  } | null>(null);
+
   // Status badge styling
   const getStatusBadge = () => {
     const statusLabels = {
       active: t('settings.weatherSources.active'),
       error: t('settings.weatherSources.error'),
       disabled: t('settings.weatherSources.disabled'),
-      unknown: t('settings.weatherSources.untested')
-    }
-    
+      unknown: t('settings.weatherSources.untested'),
+    };
+
     const statusClasses = {
       active: 'bg-green-100 text-green-800',
       error: 'bg-red-100 text-red-800',
@@ -108,8 +114,11 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
   // Toggle enabled/disabled
   const handleToggleEnabled = async () => {
     if (isLastActive && source.is_enabled) {
-      showNotification('warning', t('settings.weatherSources.cannotDisableLast'))
-      return
+      showNotification(
+        'warning',
+        t('settings.weatherSources.cannotDisableLast')
+      );
+      return;
     }
 
     try {
@@ -118,27 +127,38 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
         data: { is_enabled: !source.is_enabled },
       });
     } catch (error: unknown) {
-      showNotification('error', (error instanceof Error ? error.message : null) || t('settings.weatherSources.cannotModify'))
+      showNotification(
+        'error',
+        (error instanceof Error ? error.message : null) ||
+          t('settings.weatherSources.cannotModify')
+      );
     }
-  }
+  };
 
   // Save API key
   const handleSaveApiKey = async () => {
     if (!apiKeyValue.trim()) {
-      showNotification('warning', t('settings.weatherSources.enterApiKeyWarning'))
-      return
+      showNotification(
+        'warning',
+        t('settings.weatherSources.enterApiKeyWarning')
+      );
+      return;
     }
 
     try {
       await updateSource.mutateAsync({
         sourceName: source.source_name,
-        data: { api_key: apiKeyValue }
-      })
-      setIsEditingApiKey(false)
-      setApiKeyValue('')
-      showNotification('success', t('settings.weatherSources.apiKeySaved'))
+        data: { api_key: apiKeyValue },
+      });
+      setIsEditingApiKey(false);
+      setApiKeyValue('');
+      showNotification('success', t('settings.weatherSources.apiKeySaved'));
     } catch (error: unknown) {
-      showNotification('error', (error instanceof Error ? error.message : null) || t('settings.weatherSources.apiKeySaveError'))
+      showNotification(
+        'error',
+        (error instanceof Error ? error.message : null) ||
+          t('settings.weatherSources.apiKeySaveError')
+      );
     }
   };
 
@@ -158,19 +178,19 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       if (result.success) {
         setTestResult({
           success: true,
-          message: `✅ ${t('settings.weatherSources.testSuccess', { time: result.response_time_ms })}`
-        })
+          message: `✅ ${t('settings.weatherSources.testSuccess', { time: result.response_time_ms })}`,
+        });
       } else {
         setTestResult({
           success: false,
-          message: `❌ ${t('settings.weatherSources.testFailure', { error: result.error || t('settings.weatherSources.unknownError') })}`
-        })
+          message: `❌ ${t('settings.weatherSources.testFailure', { error: result.error || t('settings.weatherSources.unknownError') })}`,
+        });
       }
     } catch (error: unknown) {
       setTestResult({
         success: false,
-        message: `❌ ${t('settings.weatherSources.testError', { error: error instanceof Error ? error.message : t('settings.weatherSources.testFailed') })}`
-      })
+        message: `❌ ${t('settings.weatherSources.testError', { error: error instanceof Error ? error.message : t('settings.weatherSources.testFailed') })}`,
+      });
     } finally {
       setIsTesting(false);
       // Clear test result after 5 seconds
@@ -181,18 +201,19 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
 
   // Format timestamp
   const formatTimestamp = (timestamp: string | null) => {
-    if (!timestamp) return t('common.never')
-    const date = new Date(timestamp)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
+    if (!timestamp) return t('common.never');
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
 
-    if (diffMins < 1) return t('common.justNow')
-    if (diffMins < 60) return t('common.minutesAgo', { count: diffMins })
-    if (diffMins < 1440) return t('common.hoursAgo', { count: Math.floor(diffMins / 60) })
-    return t('common.daysAgo', { count: Math.floor(diffMins / 1440) })
-  }
-  
+    if (diffMins < 1) return t('common.justNow');
+    if (diffMins < 60) return t('common.minutesAgo', { count: diffMins });
+    if (diffMins < 1440)
+      return t('common.hoursAgo', { count: Math.floor(diffMins / 60) });
+    return t('common.daysAgo', { count: Math.floor(diffMins / 1440) });
+  };
+
   return (
     <article
       className={`bg-white rounded-lg shadow-md p-5 border-2 transition-all ${
@@ -262,9 +283,21 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
               🔑 Clé API
             </span>
             {source.api_key_configured ? (
-              <span className="text-xs text-green-600 font-semibold" role="status" aria-label={t('settings.weatherSources.apiKeyConfigured')}>✓ {t('settings.weatherSources.apiKeyConfigured')}</span>
+              <span
+                className="text-xs text-green-600 font-semibold"
+                role="status"
+                aria-label={t('settings.weatherSources.apiKeyConfigured')}
+              >
+                ✓ {t('settings.weatherSources.apiKeyConfigured')}
+              </span>
             ) : (
-              <span className="text-xs text-red-600 font-semibold" role="status" aria-label={t('settings.weatherSources.apiKeyMissing')}>✗ {t('settings.weatherSources.apiKeyMissing')}</span>
+              <span
+                className="text-xs text-red-600 font-semibold"
+                role="status"
+                aria-label={t('settings.weatherSources.apiKeyMissing')}
+              >
+                ✗ {t('settings.weatherSources.apiKeyMissing')}
+              </span>
             )}
           </div>
 
@@ -315,7 +348,9 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
               onPress={() => setIsEditingApiKey(true)}
               className="w-full px-3 py-1 text-sm bg-white border rounded hover:bg-gray-50 pressed:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
             >
-              {source.api_key_configured ? t('settings.weatherSources.modifyApiKey') : t('settings.weatherSources.configureApiKey')}
+              {source.api_key_configured
+                ? t('settings.weatherSources.modifyApiKey')
+                : t('settings.weatherSources.configureApiKey')}
             </Button>
           )}
 
@@ -326,7 +361,8 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
               rel="noopener noreferrer"
               className="text-xs text-blue-600 hover:underline mt-1 inline-block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 rounded"
             >
-              <span aria-hidden="true">📖 </span>{t('settings.weatherSources.documentation')}
+              <span aria-hidden="true">📖 </span>
+              {t('settings.weatherSources.documentation')}
             </Link>
           )}
         </div>
@@ -339,8 +375,13 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
         aria-label="Statistiques de performance"
       >
         <div className="p-2 bg-gray-50 rounded">
-          <div className="text-xs text-gray-600" id={`success-rate-label-${source.source_name}`}>{t('settings.weatherSources.successRate')}</div>
-          <div 
+          <div
+            className="text-xs text-gray-600"
+            id={`success-rate-label-${source.source_name}`}
+          >
+            {t('settings.weatherSources.successRate')}
+          </div>
+          <div
             className={`text-lg font-bold ${
               source.success_rate >= 95
                 ? 'text-green-600'
@@ -355,8 +396,13 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
           </div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
-          <div className="text-xs text-gray-600" id={`response-time-label-${source.source_name}`}>{t('settings.weatherSources.avgResponseTime')}</div>
-          <div 
+          <div
+            className="text-xs text-gray-600"
+            id={`response-time-label-${source.source_name}`}
+          >
+            {t('settings.weatherSources.avgResponseTime')}
+          </div>
+          <div
             className="text-lg font-bold text-gray-900"
             aria-labelledby={`response-time-label-${source.source_name}`}
             aria-live="polite"
@@ -367,8 +413,13 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
           </div>
         </div>
         <div className="p-2 bg-gray-50 rounded">
-          <div className="text-xs text-gray-600" id={`calls-count-label-${source.source_name}`}>{t('settings.weatherSources.calls')}</div>
-          <div 
+          <div
+            className="text-xs text-gray-600"
+            id={`calls-count-label-${source.source_name}`}
+          >
+            {t('settings.weatherSources.calls')}
+          </div>
+          <div
             className="text-lg font-bold text-gray-900"
             aria-labelledby={`calls-count-label-${source.source_name}`}
             aria-live="polite"
@@ -386,12 +437,16 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       >
         {source.last_success_at && (
           <div role="status">
-            <span aria-hidden="true">✓ </span>{t('settings.weatherSources.lastSuccess')} {formatTimestamp(source.last_success_at)}
+            <span aria-hidden="true">✓ </span>
+            {t('settings.weatherSources.lastSuccess')}{' '}
+            {formatTimestamp(source.last_success_at)}
           </div>
         )}
         {source.last_error_at && (
           <div className="text-red-600" role="alert">
-            <span aria-hidden="true">✗ </span>{t('settings.weatherSources.lastError')} {formatTimestamp(source.last_error_at)}
+            <span aria-hidden="true">✗ </span>
+            {t('settings.weatherSources.lastError')}{' '}
+            {formatTimestamp(source.last_error_at)}
             {source.last_error_message && (
               <div
                 className="text-xs mt-1 p-1 bg-red-50 rounded truncate"

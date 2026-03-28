@@ -17,11 +17,13 @@ Switched from **PostgreSQL** to **SQLite** for the dashboard database. This mean
 ### Phase 2 Timeline: 6 weeks → 4 weeks
 
 **Before (PostgreSQL):**
+
 - Week 1: PostgreSQL server setup, LXC container, extensions, migrations system
 - Week 2-4: Scrapers + pipeline
 - Total: 50-60 hours, 6 weeks
 
 **After (SQLite):**
+
 - Week 1: `sqlite3 < schema.sql` (done in 10 minutes!)
 - Week 1-3: Scrapers + pipeline
 - Total: 30-40 hours, 4 weeks ⚡
@@ -29,9 +31,11 @@ Switched from **PostgreSQL** to **SQLite** for the dashboard database. This mean
 ### Database Files
 
 **OLD:**
+
 - `dashboard-schema.sql` (PostgreSQL syntax)
 
 **NEW:**
+
 - `dashboard-schema-sqlite.sql` (SQLite syntax) ✅ Use this now!
 
 ### Connection String (Python)
@@ -49,6 +53,7 @@ SQLAlchemy handles both → migration is trivial later.
 ## Infrastructure Changes
 
 ### Before (PostgreSQL)
+
 ```
 Proxmox
 ├── LXC: dashboard-db (PostgreSQL server)
@@ -57,6 +62,7 @@ Proxmox
 ```
 
 ### After (SQLite)
+
 ```
 /workspace/paragliding/
 ├── db/dashboard.db       ← Single file!
@@ -114,15 +120,15 @@ DATABASE_URL = "postgresql://user:pass@localhost/db"
 
 ## Benefits Summary
 
-| Aspect | PostgreSQL | SQLite |
-|--------|-----------|--------|
-| **Setup time** | 30-60 min | 2 min ⚡ |
-| **Infrastructure** | Server + LXC | File ⚡ |
-| **Backup** | pg_dump + restore | cp file ⚡ |
-| **Dev/test** | Overkill | Perfect ⚡ |
-| **Scaling** | Necessary | Later ⚡ |
-| **Single user** | Works | Ideal ⚡ |
-| **Concurrent writes** | Required | Limited |
+| Aspect                | PostgreSQL        | SQLite     |
+| --------------------- | ----------------- | ---------- |
+| **Setup time**        | 30-60 min         | 2 min ⚡   |
+| **Infrastructure**    | Server + LXC      | File ⚡    |
+| **Backup**            | pg_dump + restore | cp file ⚡ |
+| **Dev/test**          | Overkill          | Perfect ⚡ |
+| **Scaling**           | Necessary         | Later ⚡   |
+| **Single user**       | Works             | Ideal ⚡   |
+| **Concurrent writes** | Required          | Limited    |
 
 ## Updated Plan Files
 

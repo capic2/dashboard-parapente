@@ -32,11 +32,12 @@ export function BestSpotSuggestion({
   // Calculate the date label based on selectedDayIndex
   const selectedDate = addDays(new Date(), selectedDayIndex);
   const dateFnsLocale = i18n.language === 'en' ? enUS : fr;
-  const dateLabel = selectedDayIndex === 0
-    ? t('common.today').toLowerCase()
-    : selectedDayIndex === 1
-    ? t('common.tomorrow').toLowerCase()
-    : format(selectedDate, 'EEEE d MMMM', { locale: dateFnsLocale });
+  const dateLabel =
+    selectedDayIndex === 0
+      ? t('common.today').toLowerCase()
+      : selectedDayIndex === 1
+        ? t('common.tomorrow').toLowerCase()
+        : format(selectedDate, 'EEEE d MMMM', { locale: dateFnsLocale });
 
   // Show loading state if no data available
   if (!bestSpot || !bestSpot.site) {
@@ -102,13 +103,19 @@ export function BestSpotSuggestion({
       {/* Metrics row */}
       <div className="flex items-center gap-4 mt-3">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600 dark:text-gray-400">{t('weather.paraIndex')}</span>
-          <span className="text-lg font-bold text-sky-600">{paraIndex}/100</span>
+          <span className="text-sm text-gray-600 dark:text-gray-400">
+            {t('weather.paraIndex')}
+          </span>
+          <span className="text-lg font-bold text-sky-600">
+            {paraIndex}/100
+          </span>
         </div>
 
         {windDirection && windSpeed != null && (
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">{t('common.wind')}:</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {t('common.wind')}:
+            </span>
             <span className="text-sm font-medium text-gray-900 dark:text-white">
               {windDirection} {windSpeed}km/h
             </span>

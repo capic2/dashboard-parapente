@@ -56,10 +56,10 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           role="alert"
         >
           <div className="max-w-2xl w-full bg-white rounded-xl shadow-2xl p-8">
-            <h2 className="text-2xl font-bold text-red-600 mb-4">❌ {t('errors.errorOccurred')}</h2>
-            <p className="text-gray-700 mb-6">
-              {t('errors.errorMessage')}
-            </p>
+            <h2 className="text-2xl font-bold text-red-600 mb-4">
+              ❌ {t('errors.errorOccurred')}
+            </h2>
+            <p className="text-gray-700 mb-6">{t('errors.errorMessage')}</p>
 
             {this.state.error && (
               <details className="mb-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -67,7 +67,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                   {t('errors.technicalDetails')}
                 </summary>
                 <pre className="mt-3 text-xs text-gray-800 overflow-auto max-h-64 bg-white p-3 rounded border border-gray-200">
-                  <strong>{t('errors.errorLabel')}</strong> {this.state.error.toString()}
+                  <strong>{t('errors.errorLabel')}</strong>{' '}
+                  {this.state.error.toString()}
                   {this.state.errorInfo && (
                     <>
                       {'\n\n'}
@@ -102,5 +103,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 }
 
-const ErrorBoundaryWithTranslation: React.ComponentType<Omit<ErrorBoundaryProps, keyof WithTranslation>> = withTranslation()(ErrorBoundary);
+const ErrorBoundaryWithTranslation: React.ComponentType<
+  Omit<ErrorBoundaryProps, keyof WithTranslation>
+> = withTranslation()(ErrorBoundary);
 export default ErrorBoundaryWithTranslation;

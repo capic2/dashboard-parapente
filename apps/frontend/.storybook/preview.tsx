@@ -7,24 +7,23 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 declare global {
   interface Window {
-    __mswInitialized?: boolean
+    __mswInitialized?: boolean;
   }
 }
 
 const initializeMsw = (options?: Parameters<typeof initialize>[0]) => {
   if (typeof window !== 'undefined' && window.__mswInitialized) {
-    return
+    return;
   }
 
   if (typeof window !== 'undefined') {
-    window.__mswInitialized = true
+    window.__mswInitialized = true;
   }
 
-  initialize(options)
-}
+  initialize(options);
+};
 // Initialize MSW
 initializeMsw({ onUnhandledRequest: 'error', quiet: true });
-
 
 const preview = definePreview({
   addons: [addonA11y()],

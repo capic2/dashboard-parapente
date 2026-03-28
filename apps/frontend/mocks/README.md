@@ -30,6 +30,7 @@ frontend/mocks/
 ## 🔌 Endpoints mockés
 
 ### Sites (Spots)
+
 - `GET /api/spots` → Liste des 3 sites (Arguel, Mont Poupet, La Côte)
 - `GET /api/spots/:spotId` → Détails d'un site spécifique
 - `POST /api/spots` → Créer un nouveau site
@@ -38,6 +39,7 @@ frontend/mocks/
 - `GET /api/spots/best` → Retourne le meilleur spot du jour
 
 ### Vols (Flights)
+
 - `GET /api/flights?limit=10` → Liste des vols récents (7 vols mockés, dont 1 sans GPX)
 - `GET /api/flights/:flightId` → Détails d'un vol
 - `GET /api/flights/:flightId/gpx-data` → Coordonnées GPX d'un vol (pour Cesium 3D)
@@ -50,11 +52,13 @@ frontend/mocks/
 - `POST /api/flights/:flightId/upload-gpx` → Uploader un GPX sur un vol existant
 
 ### Météo (Weather)
+
 - `GET /api/weather/:spotId?day_index=0` → Prévisions météo pour un site
 - `GET /api/weather/:spotId/today` → Météo d'aujourd'hui
 - `GET /api/weather/:spotId/summary` → Résumé météo
 
 ### Sources météo (Weather Sources)
+
 - `GET /api/weather-sources` → Liste des sources météo
 - `GET /api/weather-sources/stats` → Statistiques des sources météo
 - `GET /api/weather-sources/:sourceName` → Détails d'une source spécifique
@@ -64,6 +68,7 @@ frontend/mocks/
 - `POST /api/weather-sources/:sourceName/test` → Tester une source météo
 
 ### Alertes (Alerts)
+
 - `GET /api/alerts` → Liste des alertes
 - `POST /api/alerts` → Créer une nouvelle alerte
 
@@ -83,6 +88,7 @@ Les données dans `data/` sont **basées sur les données réelles de la base de
 ### Dans le navigateur
 
 1. Lancer le frontend en dev :
+
    ```bash
    npm run dev
    ```
@@ -90,6 +96,7 @@ Les données dans `data/` sont **basées sur les données réelles de la base de
 2. Ouvrir la console du navigateur (F12)
 
 3. Vous devriez voir dans la console :
+
    ```
    [MSW] Mocking enabled.
    ```
@@ -139,6 +146,7 @@ Redémarrer le serveur Vite après modification.
 ### Désactiver MSW temporairement (dans le code)
 
 Dans `src/main.tsx`, commenter l'import et l'appel :
+
 ```typescript
 // await enableMocking() // ← Commenter cette ligne
 ```

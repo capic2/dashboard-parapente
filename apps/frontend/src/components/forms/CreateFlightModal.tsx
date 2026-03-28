@@ -10,7 +10,11 @@ interface CreateFlightModalProps {
   onCreateComplete: () => void;
 }
 
-export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateFlightModalProps) {
+export function CreateFlightModal({
+  isOpen,
+  onClose,
+  onCreateComplete,
+}: CreateFlightModalProps) {
   const { t } = useTranslation();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +45,9 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
 
     createFlight(formData, {
       onSuccess: (result) => {
-        toast.success(t('flights.createdSuccess') + ` ${result.flight.name || 'Sans nom'}`);
+        toast.success(
+          t('flights.createdSuccess') + ` ${result.flight.name || 'Sans nom'}`
+        );
         onCreateComplete();
         setSelectedFile(null);
         setError(null);
@@ -54,7 +60,7 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
         const errorMessage = error.message || t('flights.createGenericError');
         setError(errorMessage);
         toast.error(t('flights.createFailure') + ` ${errorMessage}`);
-      }
+      },
     });
   };
 
@@ -70,7 +76,12 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title={`📤 ${t('flights.createFromGpx')}`} size="md">
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title={`📤 ${t('flights.createFromGpx')}`}
+      size="md"
+    >
       <div className="space-y-4">
         <p className="text-sm text-gray-600">
           {t('flights.createDescription')}
@@ -78,7 +89,10 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
 
         {/* File Input */}
         <div className="space-y-2">
-          <label htmlFor="gpx-file-input" className="block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="gpx-file-input"
+            className="block text-sm font-medium text-gray-700"
+          >
             {t('flights.gpxFile')}
           </label>
           <div className="flex items-center gap-3">
@@ -109,25 +123,41 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
           <p className="text-sm text-blue-800">
-            💡 <strong>{t('flights.autoDetection')}</strong> {t('flights.autoDetectionText')}
+            💡 <strong>{t('flights.autoDetection')}</strong>{' '}
+            {t('flights.autoDetectionText')}
           </p>
         </div>
 
         {/* Résultat de la création */}
         {data && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <p className="font-semibold text-green-800 mb-2">✅ {t('flights.createSuccess')}</p>
+            <p className="font-semibold text-green-800 mb-2">
+              ✅ {t('flights.createSuccess')}
+            </p>
             <ul className="text-sm text-green-700 space-y-1">
-              <li>• <strong>{t('flights.name')}</strong> {data.flight.name || 'Sans nom'}</li>
-              <li>• <strong>{t('flights.date')}</strong> {data.flight.flight_date}</li>
+              <li>
+                • <strong>{t('flights.name')}</strong>{' '}
+                {data.flight.name || 'Sans nom'}
+              </li>
+              <li>
+                • <strong>{t('flights.date')}</strong> {data.flight.flight_date}
+              </li>
               {data.flight.site_name && (
-                <li>• <strong>{t('flights.site')}</strong> {data.flight.site_name}</li>
+                <li>
+                  • <strong>{t('flights.site')}</strong> {data.flight.site_name}
+                </li>
               )}
               {data.flight.duration_minutes && (
-                <li>• <strong>{t('flights.duration')}</strong> {data.flight.duration_minutes} min</li>
+                <li>
+                  • <strong>{t('flights.duration')}</strong>{' '}
+                  {data.flight.duration_minutes} min
+                </li>
               )}
               {data.flight.distance_km && (
-                <li>• <strong>{t('flights.distance')}</strong> {data.flight.distance_km.toFixed(2)} km</li>
+                <li>
+                  • <strong>{t('flights.distance')}</strong>{' '}
+                  {data.flight.distance_km.toFixed(2)} km
+                </li>
               )}
             </ul>
           </div>
@@ -136,7 +166,9 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
         {/* Affichage de l'erreur */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="font-semibold text-red-800 mb-2">❌ {t('flights.createError')}</p>
+            <p className="font-semibold text-red-800 mb-2">
+              ❌ {t('flights.createError')}
+            </p>
             <p className="text-sm text-red-700">{error}</p>
           </div>
         )}

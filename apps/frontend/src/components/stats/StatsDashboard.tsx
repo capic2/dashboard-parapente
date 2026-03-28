@@ -52,7 +52,9 @@ export default function StatsDashboard() {
       {/* Total Flights */}
       <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
         <div className="text-3xl mb-2">🪂</div>
-        <div className="text-2xl font-bold text-gray-900">{formattedStats.totalFlights}</div>
+        <div className="text-2xl font-bold text-gray-900">
+          {formattedStats.totalFlights}
+        </div>
         <div className="text-sm text-gray-600">{t('stats.flights')}</div>
       </div>
 
@@ -68,28 +70,36 @@ export default function StatsDashboard() {
       {/* Total Distance */}
       <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
         <div className="text-3xl mb-2">📏</div>
-        <div className="text-2xl font-bold text-gray-900">{formattedStats.totalDistance} km</div>
+        <div className="text-2xl font-bold text-gray-900">
+          {formattedStats.totalDistance} km
+        </div>
         <div className="text-sm text-gray-600">{t('stats.totalDistance')}</div>
       </div>
 
       {/* Elevation Gain */}
       <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
         <div className="text-3xl mb-2">📈</div>
-        <div className="text-2xl font-bold text-gray-900">{formattedStats.totalElevation} m</div>
+        <div className="text-2xl font-bold text-gray-900">
+          {formattedStats.totalElevation} m
+        </div>
         <div className="text-sm text-gray-600">{t('stats.totalElevation')}</div>
       </div>
 
       {/* Average Duration */}
       <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-gray-300">
         <div className="text-3xl mb-2">⌛</div>
-        <div className="text-2xl font-bold text-gray-900">{formattedStats.avgDuration} min</div>
+        <div className="text-2xl font-bold text-gray-900">
+          {formattedStats.avgDuration} min
+        </div>
         <div className="text-sm text-gray-600">{t('stats.avgDuration')}</div>
       </div>
 
       {/* Average Distance */}
       <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-gray-300">
         <div className="text-3xl mb-2">🎯</div>
-        <div className="text-2xl font-bold text-gray-900">{formattedStats.avgDistance} km</div>
+        <div className="text-2xl font-bold text-gray-900">
+          {formattedStats.avgDistance} km
+        </div>
         <div className="text-sm text-gray-600">{t('stats.avgDistance')}</div>
       </div>
 
@@ -103,7 +113,9 @@ export default function StatsDashboard() {
       {/* Favorite Site */}
       <div className="bg-gradient-to-br from-sky-600 to-indigo-700 rounded-xl p-4 shadow-md hover:shadow-lg transition-all text-white">
         <div className="text-3xl mb-2">📍</div>
-        <div className="text-lg font-bold truncate">{formattedStats.favoriteSite}</div>
+        <div className="text-lg font-bold truncate">
+          {formattedStats.favoriteSite}
+        </div>
         <div className="text-sm opacity-90">{t('stats.favoriteSite')}</div>
       </div>
     </div>

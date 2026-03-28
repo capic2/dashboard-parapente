@@ -3,6 +3,7 @@
 ## 🎯 Objectifs
 
 Cette migration transforme le projet en un monorepo Nx moderne avec :
+
 - ✅ **Cache intelligent** pour builds et tests
 - ✅ **Affected commands** pour CI/CD optimisé
 - ✅ **Bibliothèque partagée** de types entre frontend/backend
@@ -96,23 +97,25 @@ nx show projects --affected
 
 ### 1. Structure Filesystem
 
-| Avant | Après |
-|-------|-------|
-| `frontend/` | `apps/frontend/` |
-| `backend/` | `apps/backend/` |
-| `test/` | `apps/e2e/` |
-| `scripts/` | `tools/scripts/` |
-| - | `libs/shared-types/` ⭐ NEW |
+| Avant       | Après                       |
+| ----------- | --------------------------- |
+| `frontend/` | `apps/frontend/`            |
+| `backend/`  | `apps/backend/`             |
+| `test/`     | `apps/e2e/`                 |
+| `scripts/`  | `tools/scripts/`            |
+| -           | `libs/shared-types/` ⭐ NEW |
 
 ### 2. Schemas Partagés
 
 **Avant** :
+
 ```typescript
 // frontend/src/schemas.ts
 export const SiteSchema = z.object({...});
 ```
 
 **Après** :
+
 ```typescript
 // libs/shared-types/src/index.ts
 export const SiteSchema = z.object({...});
@@ -123,28 +126,31 @@ import { SiteSchema } from '@dashboard-parapente/shared-types';
 
 ### 3. Scripts npm
 
-| Avant | Après |
-|-------|-------|
-| - | `npm run dev` (frontend + backend parallèle) |
-| - | `npm run build` (build tout avec Nx) |
-| - | `npm run test:affected` (teste seulement affected) |
-| - | `npm run graph` (visualise dépendances) |
+| Avant | Après                                              |
+| ----- | -------------------------------------------------- |
+| -     | `npm run dev` (frontend + backend parallèle)       |
+| -     | `npm run build` (build tout avec Nx)               |
+| -     | `npm run test:affected` (teste seulement affected) |
+| -     | `npm run graph` (visualise dépendances)            |
 
 ### 4. Docker
 
 **Dockerfile** mis à jour pour :
+
 - Build frontend avec `nx build frontend --configuration=production`
 - Output dans `dist/apps/frontend/`
 - Copie depuis workspace Nx
 - Support de `libs/shared-types`
 
 **docker-compose.yml** :
+
 - Volume mappé vers `./apps/backend/db`
 - Image taguée `parapente-backend:nx-latest`
 
 ### 5. CI/CD
 
 **Nouveau workflow** `.github/workflows/ci.yml` :
+
 - Utilise `nx affected` pour optimiser
 - Teste seulement ce qui a changé
 - Build en parallèle (--parallel=2)
@@ -152,6 +158,7 @@ import { SiteSchema } from '@dashboard-parapente/shared-types';
 - Job E2E séparé pour PR
 
 **Anciens workflows** backupés :
+
 - `backend-tests.yml.bak`
 - `frontend-tests.yml.bak`
 
@@ -159,16 +166,17 @@ import { SiteSchema } from '@dashboard-parapente/shared-types';
 
 ### Gains de Performance
 
-| Métrique | Avant | Après Nx | Gain |
-|----------|-------|----------|------|
-| CI (PR changement frontend) | ~8 min | ~2-3 min | **60-70%** |
-| CI (full build) | ~15 min | ~4-6 min | **60%** |
-| Rebuild local (pas de changement) | ~30s | < 1s (cache) | **99%** |
-| Re-test local (pas de changement) | ~45s | < 1s (cache) | **99%** |
+| Métrique                          | Avant   | Après Nx     | Gain       |
+| --------------------------------- | ------- | ------------ | ---------- |
+| CI (PR changement frontend)       | ~8 min  | ~2-3 min     | **60-70%** |
+| CI (full build)                   | ~15 min | ~4-6 min     | **60%**    |
+| Rebuild local (pas de changement) | ~30s    | < 1s (cache) | **99%**    |
+| Re-test local (pas de changement) | ~45s    | < 1s (cache) | **99%**    |
 
 ### Cache Intelligent
 
 Nx cache automatiquement :
+
 - ✅ `build` - Builds frontend/backend
 - ✅ `test` - Tests Vitest et pytest
 - ✅ `lint` - ESLint, Ruff, Black
@@ -192,6 +200,7 @@ nx affected -t lint
 ### Frontend (`apps/frontend/project.json`)
 
 Targets disponibles :
+
 - `build` - Build Vite (dev/production)
 - `serve` - Dev server sur port 5173
 - `test` - Tests Vitest avec coverage
@@ -203,6 +212,7 @@ Targets disponibles :
 ### Backend (`apps/backend/project.json`)
 
 Targets disponibles :
+
 - `serve` - Uvicorn (dev/production)
 - `test` - Pytest avec coverage (40% minimum)
 - `test:integration` - Tests d'intégration
@@ -212,6 +222,7 @@ Targets disponibles :
 ### E2E (`apps/e2e/project.json`)
 
 Targets disponibles :
+
 - `e2e` - Tests Playwright
 - `e2e:ui` - Mode UI
 - `e2e:debug` - Mode debug
@@ -220,6 +231,7 @@ Targets disponibles :
 ### Shared Types (`libs/shared-types/project.json`)
 
 Targets disponibles :
+
 - `lint` - ESLint
 - `type-check` - TypeScript validation
 
@@ -232,6 +244,7 @@ docker build -t parapente-backend:nx-latest .
 ```
 
 Le Dockerfile :
+
 1. **Stage 1** : Build frontend avec Nx
    - Copie `libs/shared-types` (dépendance)
    - Build avec `nx build frontend --configuration=production`
@@ -264,6 +277,7 @@ docker-compose up -d --build
 ### "Cannot find module '@dashboard-parapente/shared-types'"
 
 Solution : Vérifier que `tsconfig.base.json` contient :
+
 ```json
 {
   "compilerOptions": {
@@ -309,6 +323,7 @@ docker build --no-cache -t parapente-backend:nx-latest .
 ## 🚦 Prochaines Étapes
 
 1. **Tester localement** :
+
    ```bash
    npm run dev
    npm test
@@ -316,6 +331,7 @@ docker build --no-cache -t parapente-backend:nx-latest .
    ```
 
 2. **Visualiser le graphe** :
+
    ```bash
    nx graph
    ```

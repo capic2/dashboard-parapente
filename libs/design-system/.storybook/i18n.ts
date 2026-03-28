@@ -1,7 +1,7 @@
-import i18n from 'i18next'
-import { initReactI18next } from 'react-i18next'
-import fr from '../src/locales/fr/translation.json'
-import en from '../src/locales/en/translation.json'
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+import fr from '../src/locales/fr/translation.json';
+import en from '../src/locales/en/translation.json';
 
 i18n.use(initReactI18next).init({
   fallbackLng: 'fr',
@@ -11,6 +11,6 @@ i18n.use(initReactI18next).init({
     fr: { translation: fr },
     en: { translation: en },
   },
-})
+});
 
-export default i18n
+export default i18n;

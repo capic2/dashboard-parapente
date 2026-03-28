@@ -10,12 +10,14 @@
 ### Problème Identifié
 
 Les tests Storybook via Vitest échouaient avec l'erreur :
+
 ```
 [MSW] Warning: intercepted a request without a matching request handler:
   • GET /api/weather/1/daily-summary?days=7
 ```
 
 **Cause racine** : Le pattern d'URL `*/api/...` dans les handlers MSW causait une erreur dans `path-to-regexp` :
+
 ```
 TypeError: Missing parameter name at 17
 ```
@@ -43,6 +45,7 @@ const createHandler = (method, path, handler) => {
 ### 2. Correction de Toutes les Stories
 
 Remplacement en masse dans **18 fichiers** `.stories.tsx` :
+
 - Pattern `*/api/...` → `/api/...`
 - Fichiers modifiés : CurrentConditions, Forecast7Day, HourlyForecast, RecordsDashboard, CreateSiteModal, CreateFlightModal, etc.
 
@@ -79,6 +82,7 @@ beforeAll(preview.composed.beforeAll);
 Pour déboguer les problèmes MSW :
 
 1. **Créer un test simple** :
+
    ```typescript
    const TestComponent = () => {
      const [data, setData] = useState('loading...');
@@ -92,6 +96,7 @@ Pour déboguer les problèmes MSW :
    ```
 
 2. **Tester le handler** :
+
    ```typescript
    export const Test = {
      parameters: {
@@ -157,11 +162,13 @@ Ces problèmes peuvent être résolus individuellement en analysant chaque test.
 ## 📚 Fichiers Créés/Modifiés
 
 ### Créés
+
 - `mocks/storyHandlers.ts` - Helper pour réutiliser les handlers globaux
 - `MSW_STORYBOOK_GUIDE.md` - Documentation complète
 - `MSW_FIX_SUMMARY.md` - Ce fichier
 
 ### Modifiés
+
 - `mocks/handlers.ts` - Pattern `*/api` → `/api`
 - `.storybook/vitest.setup.ts` - Initialisation MSW worker
 - `.storybook/preview.tsx` - Import des handlers globaux
@@ -176,6 +183,7 @@ npm run test-storybook
 ```
 
 **Résultat attendu** :
+
 ```
 Test Files  25 passed (32)
 Tests  267 passed (279)

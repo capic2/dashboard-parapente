@@ -116,6 +116,7 @@ Le Dashboard Parapente intègre maintenant un système complet d'analyse d'emagr
 #### 1. **Endpoints API** (`backend/routes.py`)
 
 **User-location based** (pour le widget):
+
 ```python
 GET  /api/emagram/latest?user_lat=47.2167&user_lon=6.0833
 POST /api/emagram/analyze
@@ -123,6 +124,7 @@ GET  /api/emagram/history?user_lat=47.2167&user_lon=6.0833&days=7
 ```
 
 **Spot-based** (pour admin):
+
 ```python
 GET  /api/emagram/spot/{site_id}/latest
 POST /api/emagram/spot/{site_id}/refresh
@@ -171,7 +173,7 @@ class EmagramAnalysis:
     score_volabilite: int
     conseils_vol: str
     alertes_securite: str  # JSON
-    
+
     # NEW: Multi-source
     external_source_urls: str  # JSON
     sources_count: int
@@ -194,6 +196,7 @@ await triggerMutation.mutateAsync({ user_latitude, user_longitude });
 #### 2. **Composant** (`frontend/src/components/EmagramWidget.tsx`)
 
 **Affichage:**
+
 - ⭕ Score de volabilité avec gauge circulaire
 - ☁️ Plafond thermique
 - 📈 Force thermique
@@ -205,6 +208,7 @@ await triggerMutation.mutateAsync({ user_latitude, user_longitude });
 - 🔄 Bouton refresh manuel
 
 **Déjà intégré dans:**
+
 - `frontend/src/pages/Dashboard.tsx`
 
 #### 3. **Types** (`frontend/src/types/emagram.ts`)
@@ -223,6 +227,7 @@ interface EmagramAnalysis {
 ### Variables d'environnement
 
 **Backend (.env):**
+
 ```bash
 # Google Gemini API (Priority 1)
 # Obtenir votre clé sur: https://aistudio.google.com/app/apikey
@@ -237,6 +242,7 @@ ANTHROPIC_API_KEY=your_anthropic_key_here
 ```
 
 **Frontend (.env):**
+
 ```bash
 VITE_API_URL=http://localhost:8001
 ```
@@ -244,6 +250,7 @@ VITE_API_URL=http://localhost:8001
 ## 📦 Dépendances
 
 **Backend:**
+
 ```
 google-generativeai==0.8.3
 playwright==1.58.0
@@ -252,6 +259,7 @@ pillow==11.1.0
 ```
 
 **Frontend:**
+
 ```json
 {
   "@tanstack/react-query": "^5.x",
@@ -312,6 +320,7 @@ npm run dev
 ### Backend
 
 **Gemini API Error:**
+
 ```bash
 # Vérifier la clé
 echo $GOOGLE_API_KEY
@@ -322,6 +331,7 @@ curl -H "Content-Type: application/json" \
 ```
 
 **Playwright Error:**
+
 ```bash
 # Installer les navigateurs
 playwright install chromium
@@ -329,6 +339,7 @@ playwright install-deps
 ```
 
 **Database Error:**
+
 ```bash
 # Vérifier que la migration a été appliquée
 python backend/migrations/003_add_multi_source_emagram_fields.py
@@ -337,10 +348,12 @@ python backend/migrations/003_add_multi_source_emagram_fields.py
 ### Frontend
 
 **API not reachable:**
+
 - Vérifier `VITE_API_URL` dans `.env`
 - Vérifier que le backend tourne sur le bon port
 
 **Widget not showing:**
+
 - Ouvrir DevTools → Console
 - Chercher erreurs réseau ou React Query
 - Vérifier que `userLat` et `userLon` sont définis
@@ -348,28 +361,33 @@ python backend/migrations/003_add_multi_source_emagram_fields.py
 ## 📊 Utilisation & Quotas
 
 **Gemini Free Tier:**
+
 - 1500 requêtes/jour
 - Votre usage: ~48/jour (6 spots × 8 analyses)
 - **Marge: 97%** ✅
 
 **Coûts évités:**
+
 - Anthropic Claude Opus: ~43€/mois
 - **Économie annuelle: ~516€** 💰
 
 ## 📈 Prochaines Étapes
 
 ### Déploiement (Priorité 1)
+
 1. Push code sur serveur `192.168.1.106`
 2. Ajouter `GOOGLE_API_KEY` dans Portainer
 3. Rebuild container backend
 4. Vérifier logs
 
 ### Optimisations (Priorité 2)
+
 1. Affiner le prompt Gemini après tests réels
 2. Ajuster timeout si nécessaire
 3. Monitorer taux de succès
 
 ### Améliorations UI (Priorité 3)
+
 1. Graphique historique du score
 2. Comparaison multi-spots
 3. Notifications push si score > 80
@@ -389,6 +407,7 @@ git log --oneline --graph -10
 ## 🎯 Résultat Final
 
 ✅ **Système complet et opérationnel:**
+
 - Backend: API + Scheduler + Analyseur Gemini
 - Frontend: Widget intégré avec liens sources
 - Database: Migration appliquée

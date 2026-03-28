@@ -55,7 +55,11 @@ function groupSitesByBaseName(sites: Site[]): Record<string, Site[]> {
   return groups;
 }
 
-export default function SiteSelector({ selectedSiteId, onSelectSite, weatherData }: SiteSelectorProps) {
+export default function SiteSelector({
+  selectedSiteId,
+  onSelectSite,
+  weatherData,
+}: SiteSelectorProps) {
   const { t } = useTranslation();
   const { data: sites, isLoading, error } = useSites();
   const queryClient = useQueryClient();

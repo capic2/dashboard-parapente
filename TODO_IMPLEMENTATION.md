@@ -7,10 +7,12 @@
 ## 🎯 PHASE 1 : FONDATIONS ESSENTIELLES (4-6 semaines)
 
 ### Sprint 1 : Multi-Atterrissages avec Météo (15-21h)
+
 **Statut :** 🔴 À faire  
 **Priorité :** ⭐⭐⭐ Haute
 
 #### Backend
+
 - [ ] Migration SQL : `apps/backend/db/migrations/006_add_landing_associations.sql`
 - [ ] Modèle `SiteLandingAssociation` dans `models.py`
 - [ ] Schemas Pydantic dans `schemas.py`
@@ -22,6 +24,7 @@
 - [ ] Tests backend (6 tests minimum)
 
 #### Frontend
+
 - [ ] Types TypeScript dans `libs/shared-types/src/index.ts`
 - [ ] Hook `useLandingAssociations` dans `hooks/useLandingAssociations.ts`
 - [ ] Hook `useAddLandingAssociation`
@@ -34,6 +37,7 @@
 - [ ] Tests frontend (3 tests minimum)
 
 **Critères de succès :**
+
 - ✅ Un site peut avoir 3+ atterrissages
 - ✅ Distance auto-calculée
 - ✅ Météo affichée en 2 colonnes
@@ -42,10 +46,12 @@
 ---
 
 ### Sprint 2 : Données Complètes Sites (14-20h)
+
 **Statut :** 🔴 À faire  
 **Priorité :** ⭐⭐⭐ Haute
 
 #### A. Élévations (4-6h)
+
 - [ ] Module `apps/backend/spots/kmz_parser.py`
 - [ ] Fonction `download_pgs_kmz()`
 - [ ] Fonction `parse_kmz()`
@@ -54,6 +60,7 @@
 - [ ] Tests parsing KMZ
 
 #### B. Orientations (4-6h)
+
 - [ ] Modèle `UserOrientationContribution` dans `models.py`
 - [ ] Endpoint `POST /api/spots/{spot_id}/orientation-contribution`
 - [ ] Endpoint `GET /api/spots/{spot_id}/orientation-contributions`
@@ -61,6 +68,7 @@
 - [ ] Vote system (upvote/downvote)
 
 #### C. Photos & Descriptions (6-8h)
+
 - [ ] Module `apps/backend/spots/media_scraper.py`
 - [ ] Fonction `scrape_pgs_site_details()`
 - [ ] Champs BDD : `photos`, `description_detail`, `access_info`
@@ -69,6 +77,7 @@
 - [ ] Background task scraping batch
 
 **Critères de succès :**
+
 - ✅ 90%+ sites PGS ont élévation
 - ✅ Système contribution orientations fonctionnel
 - ✅ Photos affichées pour sites principaux
@@ -76,10 +85,12 @@
 ---
 
 ### Sprint 3 : Recherche "Où Voler Maintenant" (6-8h)
+
 **Statut :** 🔴 À faire  
 **Priorité :** ⭐⭐⭐ Haute
 
 #### Backend
+
 - [ ] Module `apps/backend/flyability.py`
 - [ ] Fonction `calculate_flyability_score()`
 - [ ] Fonction `is_wind_compatible()`
@@ -88,6 +99,7 @@
 - [ ] Tests calcul scores (5 tests)
 
 #### Frontend
+
 - [ ] Composant `FlyableNowButton.tsx` (bouton flottant)
 - [ ] Composant `FlyableSiteCard.tsx`
 - [ ] Hook `useFlyableNow` dans `hooks/useFlyableNow.ts`
@@ -95,6 +107,7 @@
 - [ ] Géolocalisation navigateur
 
 **Critères de succès :**
+
 - ✅ Bouton visible en permanence
 - ✅ Résultats < 2 secondes
 - ✅ Score pertinent (tests manuels)
@@ -105,10 +118,12 @@
 ## 🎯 PHASE 2 : INTELLIGENCE & ALERTES (3-4 semaines)
 
 ### Sprint 4 : Alertes Météo Intelligentes (14-20h)
+
 **Statut :** 🔴 À faire  
 **Priorité :** ⭐⭐⭐ Haute
 
 #### Backend
+
 - [ ] Modèle `WeatherAlert` dans `models.py`
 - [ ] Module `apps/backend/alert_scheduler.py`
 - [ ] Fonction `check_weather_alerts()` (scheduler)
@@ -124,6 +139,7 @@
 - [ ] Tests évaluation alertes
 
 #### Frontend
+
 - [ ] Composant `AlertManager.tsx`
 - [ ] Composant `CreateAlertModal.tsx`
 - [ ] Composant `AlertCard.tsx`
@@ -133,12 +149,14 @@
 - [ ] Hook `useDeleteAlert`
 
 #### Configuration
+
 - [ ] Variables `.env` (TELEGRAM_BOT_TOKEN, etc.)
 - [ ] Création bot Telegram
 - [ ] Configuration SMTP email
 - [ ] Documentation setup alertes
 
 **Critères de succès :**
+
 - ✅ Alertes vérifiées toutes les heures
 - ✅ Notifications Telegram fonctionnelles
 - ✅ Notifications Email fonctionnelles
@@ -148,10 +166,12 @@
 ---
 
 ### Sprint 5 : Analytics & Statistiques (18-27h)
+
 **Statut :** 🔴 À faire  
 **Priorité :** ⭐⭐ Moyenne-Haute
 
 #### Backend
+
 - [ ] Modèle `FlightStatistics` dans `models.py`
 - [ ] Modèle `UserActivityLog` dans `models.py`
 - [ ] Module `apps/backend/analytics.py`
@@ -163,6 +183,7 @@
 - [ ] Tests calculs stats
 
 #### Frontend
+
 - [ ] Page `Analytics.tsx`
 - [ ] Composant `StatCard.tsx`
 - [ ] Composant `ChartCard.tsx`
@@ -175,10 +196,12 @@
 - [ ] Hook `useAnalyticsCharts`
 
 #### Dépendances
+
 - [ ] Backend : `pip install numpy pandas`
 - [ ] Frontend : `npm install recharts`
 
 **Critères de succès :**
+
 - ✅ Dashboard charge < 1 seconde
 - ✅ Insights pertinents générés
 - ✅ Graphiques interactifs
@@ -190,6 +213,7 @@
 ## 🛠️ SETUP INITIAL (1-2h)
 
 ### Environnement
+
 - [ ] Créer branche `feature/multi-landing-and-improvements`
 - [ ] Installer dépendances backend :
   ```bash
@@ -203,6 +227,7 @@
   ```
 
 ### Configuration
+
 - [ ] Créer `.env.example` avec variables requises
 - [ ] Documenter configuration Telegram Bot
 - [ ] Documenter configuration Email SMTP
@@ -213,12 +238,14 @@
 ## 📊 MÉTRIQUES & VALIDATION
 
 ### Phase 1
+
 - [ ] Tests unitaires : 90%+ coverage
 - [ ] Tests E2E : Scénarios principaux
 - [ ] Performance : Recherche < 2s
 - [ ] UI : Responsive mobile/desktop
 
 ### Phase 2
+
 - [ ] Alertes : Latence < 5min
 - [ ] Analytics : Charge < 1s
 - [ ] Notifications : 99% delivery
@@ -229,12 +256,14 @@
 ## 📝 DOCUMENTATION
 
 ### Pendant Développement
+
 - [ ] Mise à jour `CHANGELOG.md` par sprint
 - [ ] Documentation API (`docs/API.md`)
 - [ ] Docstrings Python (Google style)
 - [ ] Comments TypeScript (JSDoc)
 
 ### Post-Implémentation
+
 - [ ] `docs/ALERTES.md` : Guide configuration
 - [ ] `docs/ANALYTICS.md` : Explication métriques
 - [ ] `docs/MULTI_LANDING.md` : Guide associations
@@ -261,6 +290,7 @@
 ## 🚀 COMMANDES RAPIDES
 
 ### Démarrer Sprint 1
+
 ```bash
 git checkout -b feature/sprint-1-multi-landing
 cd apps/backend
@@ -269,6 +299,7 @@ touch db/migrations/006_add_landing_associations.sql
 ```
 
 ### Tester localement
+
 ```bash
 # Backend
 cd apps/backend
@@ -280,6 +311,7 @@ npm test -- LandingAssociations
 ```
 
 ### Commit pattern
+
 ```bash
 git commit -m "feat(landing): Add SiteLandingAssociation model"
 git commit -m "feat(landing): Add CRUD endpoints for associations"

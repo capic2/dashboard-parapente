@@ -10,11 +10,22 @@ interface StravaSyncModalProps {
   onSyncComplete: () => void;
 }
 
-export function StravaSyncModal({ isOpen, onClose, onSyncComplete }: StravaSyncModalProps) {
+export function StravaSyncModal({
+  isOpen,
+  onClose,
+  onSyncComplete,
+}: StravaSyncModalProps) {
   const { t } = useTranslation();
-  const [dateFrom, setDateFrom] = useState(() => new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0]);
-  
+  const [dateFrom, setDateFrom] = useState(
+    () =>
+      new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split('T')[0]
+  );
+  const [dateTo, setDateTo] = useState(
+    () => new Date().toISOString().split('T')[0]
+  );
+
   const { mutate: syncStrava, isPending, data } = useStravaSyncMutation();
   const toast = useToast();
 
@@ -31,17 +42,20 @@ export function StravaSyncModal({ isOpen, onClose, onSyncComplete }: StravaSyncM
         },
         onError: (error: Error) => {
           toast.error(`${t('strava.syncFailure')}: ${error.message}`);
-        }
+        },
       }
     );
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`🔄 ${t('strava.title')}`} size="md">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`🔄 ${t('strava.title')}`}
+      size="md"
+    >
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">
-          {t('strava.description')}
-        </p>
+        <p className="text-sm text-gray-600">{t('strava.description')}</p>
 
         <div className="grid grid-cols-2 gap-4">
           <DatePicker
@@ -59,11 +73,23 @@ export function StravaSyncModal({ isOpen, onClose, onSyncComplete }: StravaSyncM
         {/* Résultat de la sync */}
         {data && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <p className="font-semibold text-green-800 mb-2">✅ {t('strava.syncComplete')}</p>
+            <p className="font-semibold text-green-800 mb-2">
+              ✅ {t('strava.syncComplete')}
+            </p>
             <ul className="text-sm text-green-700 space-y-1">
-              <li>• {data.imported} {t('strava.imported')}</li>
-              {data.skipped > 0 && <li>• {data.skipped} {t('strava.skipped')}</li>}
-              {data.failed > 0 && <li className="text-orange-700">• {data.failed} {t('strava.failures')}</li>}
+              <li>
+                • {data.imported} {t('strava.imported')}
+              </li>
+              {data.skipped > 0 && (
+                <li>
+                  • {data.skipped} {t('strava.skipped')}
+                </li>
+              )}
+              {data.failed > 0 && (
+                <li className="text-orange-700">
+                  • {data.failed} {t('strava.failures')}
+                </li>
+              )}
             </ul>
           </div>
         )}
