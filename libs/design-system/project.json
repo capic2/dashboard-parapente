@@ -25,7 +25,7 @@
     "type-check": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsc --noEmit -p libs/design-system/tsconfig.json"
+        "command": "tsc --noEmit -p libs/design-system/tsconfig.json && tsc --noEmit -p libs/design-system/tsconfig.node.json"
       }
     },
     "storybook": {
