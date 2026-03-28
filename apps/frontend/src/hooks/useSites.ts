@@ -56,27 +56,6 @@ export const useSite = (siteId: string) => {
   });
 };
 
-export const useNearbySites = (lat: number, lng: number, radius = 50) => {
-  return useQuery<Site[]>({
-    queryKey: ['sites', 'nearby', lat, lng, radius],
-    queryFn: async () => {
-      const data = await api.get(`spots/nearby`, {
-        searchParams: { lat, lng, radius }
-      }).json();
-      
-      // Validate API response with Zod
-      const validation = SiteSchema.array().safeParse(data);
-      if (!validation.success) {
-        console.error('❌ Nearby sites validation failed:', validation.error);
-        throw new Error(`Invalid nearby sites data: ${validation.error.message}`);
-      }
-      
-      return validation.data as Site[];
-    },
-    enabled: !!lat && !!lng,
-  });
-};
-
 /**
  * Create a new site
  */

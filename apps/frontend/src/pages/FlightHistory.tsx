@@ -7,7 +7,7 @@ import {
 } from '../hooks/useFlights';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Flight, Site } from '../types';
-import FlightViewer3D from '../components/complex/FlightViewer3D';
+import { FlightViewer3D } from '../components/complex/FlightViewer3D';
 import { StravaSyncModal } from '../components/forms/StravaSyncModal';
 import { CreateFlightModal } from '../components/forms/CreateFlightModal';
 import { CreateSiteModal } from '../components/forms/CreateSiteModal';

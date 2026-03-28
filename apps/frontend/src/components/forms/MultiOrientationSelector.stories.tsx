@@ -2,7 +2,7 @@ import preview from '../../../.storybook/preview';
 import { expect, userEvent, waitFor } from 'storybook/test';
 import { fn } from 'storybook/test';
 import { MultiOrientationSelector } from './MultiOrientationSelector';
-import {Site} from "../../schemas.ts";
+import type {Site} from "@dashboard-parapente/shared-types";
 
 
 const meta = preview.meta({

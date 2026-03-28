@@ -168,6 +168,9 @@ jobs:
         if: steps.nx_tasks.outcome == 'failure' && env.NX_CLOUD_EXHAUSTED != 'true'
         run: exit 1
 
+      - name: 🔍 Check unused code (knip)
+        run: pnpm knip
+
       - name: 📊 Upload frontend coverage
         if: always()
         uses: codecov/codecov-action@v6

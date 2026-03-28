@@ -31,10 +31,7 @@
 
 import { handlers } from './handlers';
 
-// Export handlers as array (default)
-export const defaultHandlers = handlers;
-
-// Also export as function for backward compatibility
+// Export as function for backward compatibility
 export function getDefaultHandlers() {
   return handlers;
 }

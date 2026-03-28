@@ -36,15 +36,5 @@ export function useBestSpotAPI(dayIndex = 0) {
   return useQuery(bestSpotQueryOptions(dayIndex));
 }
 
-/**
- * Get just the best site ID for a specific day (useful for auto-selecting on dashboard)
- * @param dayIndex - Day index (0-6)
- * @returns Site ID or null
- */
-export function useBestSiteIdAPI(dayIndex = 0): string | null {
-  const { data: bestSpot } = useBestSpotAPI(dayIndex);
-  return bestSpot?.site?.id || null;
-}
-
 // Re-export the type for convenience
 export type { BestSpotResult } from '@dashboard-parapente/shared-types';

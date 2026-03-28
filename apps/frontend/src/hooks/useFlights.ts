@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, queryOptions, type UseQueryResult, type UseMutationResult } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import type { Flight, FlightFilters, FlightStats, FlightFormData, ApiResponse, Site, FlightRecords } from '../types'
+import type { Flight, FlightFilters, FlightStats, FlightFormData, FlightRecords } from '../types'
 import {
   FlightsApiResponseSchema,
   FlightSchema,
@@ -9,14 +9,6 @@ import {
   ApiResponseSchema,
 } from '@dashboard-parapente/shared-types'
 import { HTTPError } from 'ky'
-
-interface SiteStats {
-  site: Site
-  total_flights: number
-  total_duration_minutes: number
-  avg_max_altitude_m: number
-  avg_distance_km: number
-}
 
 export const flightsQueryOptions = (filters: FlightFilters = {}) => {
   const searchParams = Object.entries(filters).reduce((acc, [key, value]) => {
@@ -74,26 +66,6 @@ export const useFlights = (filters: FlightFilters = {}): UseQueryResult<Flight[]
 }
 
 /**
- * Fetch single flight details
- */
-export const useFlight = (flightId: string | undefined): UseQueryResult<Flight, Error> => {
-  return useQuery({
-    queryKey: ['flights', flightId],
-    queryFn: async () => {
-      if (!flightId) throw new Error('Flight ID is required')
-      const data = await api.get(`flights/${flightId}`).json()
-      const validation = ApiResponseSchema(FlightSchema).safeParse(data)
-      if (!validation.success) {
-        throw new Error(`Invalid flight data: ${validation.error.message}`)
-      }
-      return validation.data.data
-    },
-    enabled: !!flightId,
-    staleTime: 1000 * 60 * 30,
-  })
-}
-
-/**
  * Fetch learning statistics
  */
 export const useFlightStats = (): UseQueryResult<FlightStats, Error> => {
@@ -105,49 +77,6 @@ export const useFlightStats = (): UseQueryResult<FlightStats, Error> => {
  */
 export const useFlightRecords = (): UseQueryResult<FlightRecords, Error> => {
   return useQuery(flightRecordsQueryOptions())
-}
-
-/**
- * Fetch statistics per site
- */
-export const useSiteStats = (siteId: string | undefined): UseQueryResult<SiteStats, Error> => {
-  return useQuery({
-    queryKey: ['stats', 'sites', siteId],
-    queryFn: async () => {
-      if (!siteId) throw new Error('Site ID is required')
-      const data: ApiResponse<SiteStats> = await api.get(`stats/sites/${siteId}`).json()
-      return data.data
-    },
-    enabled: !!siteId,
-    staleTime: 1000 * 60 * 60,
-  })
-}
-
-/**
- * Create new flight (manual entry)
- */
-export const useCreateFlight = (): UseMutationResult<Flight, Error, FlightFormData> => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (flightData: FlightFormData) => {
-      const data = await api.post('flights', { json: flightData }).json()
-      
-      // Validate API response with Zod
-      const validation = ApiResponseSchema(FlightSchema).safeParse(data)
-      if (!validation.success) {
-        console.error('❌ Create flight validation failed:', validation.error)
-        throw new Error(`Invalid flight creation response: ${validation.error.message}`)
-      }
-      
-      return validation.data.data
-    },
-    onSuccess: () => {
-      // Invalidate flights query to refetch
-      queryClient.invalidateQueries({ queryKey: ['flights'] })
-      queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] })
-    },
-  })
 }
 
 /**

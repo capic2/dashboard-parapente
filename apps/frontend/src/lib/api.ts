@@ -29,29 +29,3 @@ export const api = ky.create({
     ]
   }
 });
-
-// Helper pour GET avec parsing JSON automatique
-export const getJSON = async <T = unknown>(endpoint: string): Promise<T> => {
-  return api.get(endpoint).json<T>();
-};
-
-// Helper pour POST
-export const postJSON = async <T = unknown>(
-  endpoint: string, 
-  data: Record<string, unknown>
-): Promise<T> => {
-  return api.post(endpoint, { json: data }).json<T>();
-};
-
-// Helper pour PUT
-export const putJSON = async <T = unknown>(
-  endpoint: string, 
-  data: Record<string, unknown>
-): Promise<T> => {
-  return api.put(endpoint, { json: data }).json<T>();
-};
-
-// Helper pour DELETE
-export const deleteJSON = async <T = unknown>(endpoint: string): Promise<T> => {
-  return api.delete(endpoint).json<T>();
-};

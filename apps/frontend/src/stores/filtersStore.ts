@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware'
 /**
  * Filtres pour les analyses de vols
  */
-export interface FlightFilters {
+interface FlightFilters {
   siteId: string | null
   dateFrom: string | null  // Format: YYYY-MM-DD
   dateTo: string | null    // Format: YYYY-MM-DD

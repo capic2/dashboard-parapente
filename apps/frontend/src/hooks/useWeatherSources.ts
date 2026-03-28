@@ -8,7 +8,6 @@ import { api } from '../lib/api'
 import type {
   WeatherSource,
   WeatherSourceUpdate,
-  WeatherSourceCreate,
   WeatherSourceStats,
   WeatherSourceTestResult
 } from '../types/weatherSources'
@@ -38,36 +37,6 @@ export const useWeatherSourceStats = () => {
       return await api.get('weather-sources/stats').json<WeatherSourceStats>()
     },
     staleTime: 30000,
-  })
-}
-
-/**
- * Fetch a specific weather source by name
- */
-export const useWeatherSource = (sourceName: string) => {
-  return useQuery({
-    queryKey: ['weather-sources', sourceName],
-    queryFn: async () => {
-      return await api.get(`weather-sources/${sourceName}`).json<WeatherSource>()
-    },
-    staleTime: 30000,
-    enabled: !!sourceName,
-  })
-}
-
-/**
- * Create a new weather source
- */
-export const useCreateWeatherSource = () => {
-  const queryClient = useQueryClient()
-  
-  return useMutation({
-    mutationFn: async (data: WeatherSourceCreate) => {
-      return await api.post('weather-sources', { json: data }).json<WeatherSource>()
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['weather-sources'] })
-    },
   })
 }
 

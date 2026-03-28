@@ -56,7 +56,7 @@ interface RouteConfig {
   loaderDeps?: (deps: Record<string, unknown>) => Record<string, unknown>
 }
 
-export interface TanstackRouterDecoratorContext extends StoryContext {
+interface TanstackRouterDecoratorContext extends StoryContext {
   parameters: {
     router?: {
       initialPath?: string
