@@ -103,10 +103,14 @@ WithError.test(
     ).toBeInTheDocument();
 
     // Verify reset button is present
-    await expect(canvas.getByText(/Réessayer/i)).toBeInTheDocument();
+    await expect(
+      canvas.getByRole('button', { name: /Réessayer/i })
+    ).toBeInTheDocument();
 
     // Verify home button is present
-    await expect(canvas.getByText(/Retour à l'accueil/i)).toBeInTheDocument();
+    await expect(
+      canvas.getByRole('button', { name: /Retour à l'accueil/i })
+    ).toBeInTheDocument();
   }
 );
 

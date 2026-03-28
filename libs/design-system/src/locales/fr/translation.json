@@ -1,8 +1,17 @@
 {
   "common": {
-    "close": "Fermer"
+    "close": "Fermer",
+    "retry": "Réessayer",
+    "backToHome": "Retour à l'accueil"
   },
   "datepicker": {
     "openCalendar": "Ouvrir le calendrier"
+  },
+  "errors": {
+    "errorOccurred": "Une erreur est survenue",
+    "errorMessage": "L'application a rencontré une erreur inattendue. Veuillez réessayer ou revenir à la page d'accueil.",
+    "technicalDetails": "Détails techniques",
+    "errorLabel": "Erreur :",
+    "stackTrace": "Pile d'appels :"
   }
 }

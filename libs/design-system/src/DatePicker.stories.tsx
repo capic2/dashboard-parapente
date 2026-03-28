@@ -1,5 +1,5 @@
 import preview from '../.storybook/preview';
-import { expect, fn } from 'storybook/test';
+import { expect, fn, within } from 'storybook/test';
 import { DatePicker } from './DatePicker';
 
 
@@ -71,10 +71,12 @@ Empty.test(
   'it is possible to select a date',
   async ({ canvas, userEvent, args }) => {
     await userEvent.click(
-      canvas.getByLabelText('Select Date', { selector: 'button' })
+      canvas.getByRole('button', { name: /ouvrir le calendrier/i })
     );
+    // Calendar popover renders in a portal outside canvasElement
+    const body = within(document.body);
     await userEvent.click(
-      canvas.getByRole('button', { name: /15/ })
+      body.getByRole('button', { name: /15/ })
     );
     await expect(args.onChange).toHaveBeenCalledWith('2026-01-15');
   }
