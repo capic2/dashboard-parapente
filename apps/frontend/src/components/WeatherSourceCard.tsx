@@ -3,7 +3,7 @@
  * Displays individual weather source configuration with stats and controls
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,

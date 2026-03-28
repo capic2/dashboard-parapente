@@ -11,7 +11,8 @@ import { DatePicker } from '@dashboard-parapente/design-system';
  * - Plage de dates (date de début et fin)
  */
 export function FilterBar() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language === 'en' ? 'en-US' : 'fr-FR';
   const { data: sites = [], isLoading } = useSites();
   const { filters, setSiteId, setDateFrom, setDateTo, resetFilters } =
     useFiltersStore();
@@ -79,13 +80,13 @@ export function FilterBar() {
             {filters.dateFrom && (
               <span className="px-2 py-1 bg-sky-100 text-sky-700 rounded">
                 {t('filters.from')}{' '}
-                {new Date(filters.dateFrom).toLocaleDateString('fr-FR')}
+                {t('filters.from')} {new Date(filters.dateFrom).toLocaleDateString(dateLocale)}
               </span>
             )}
             {filters.dateTo && (
               <span className="px-2 py-1 bg-sky-100 text-sky-700 rounded">
                 {t('filters.to')}{' '}
-                {new Date(filters.dateTo).toLocaleDateString('fr-FR')}
+                {t('filters.to')} {new Date(filters.dateTo).toLocaleDateString(dateLocale)}
               </span>
             )}
           </div>
