@@ -11,7 +11,7 @@ const API_BASE =
     ? `${window.location.protocol}//${window.location.hostname}:8001`
     : 'http://localhost:8001');
 
-export const emagramKeys = {
+const emagramKeys = {
   all: ['emagram'] as const,
   latest: (siteId: string, dayIndex: number) =>
     ['emagram', 'latest', siteId, dayIndex] as const,

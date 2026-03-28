@@ -94,14 +94,8 @@ export interface EmagramListItem {
   created_at: string;
 }
 
-export interface EmagramTriggerRequest {
-  user_latitude: number;
-  user_longitude: number;
-  force_refresh?: boolean;
-}
-
 // Parsed alerts (from JSON string)
-export type SafetyAlert = string;
+type SafetyAlert = string;
 
 // Helper to parse alertes_securite
 export function parseAlerts(alertes_securite: string | null): SafetyAlert[] {
@@ -116,7 +110,7 @@ export function parseAlerts(alertes_securite: string | null): SafetyAlert[] {
 }
 
 // Score categories
-export type ScoreCategory = 'excellent' | 'good' | 'moderate' | 'poor' | 'unflyable';
+type ScoreCategory = 'excellent' | 'good' | 'moderate' | 'poor' | 'unflyable';
 
 export function getScoreCategory(score: number | null): ScoreCategory {
   if (score === null) return 'unflyable';

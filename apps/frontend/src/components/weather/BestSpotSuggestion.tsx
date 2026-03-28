@@ -12,7 +12,7 @@ import { fr } from 'date-fns/locale';
 import { WindIndicatorCompact } from '../WindIndicator';
 import type { BestSpotResult } from '@dashboard-parapente/shared-types';
 
-export interface BestSpotSuggestionProps {
+interface BestSpotSuggestionProps {
   bestSpot: BestSpotResult | null;
   onSelectSite: (siteId: string) => void;
   selectedDayIndex?: number;
