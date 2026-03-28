@@ -211,17 +211,18 @@ export function useCreateFlightFromGPX() {
           }>();
         return data;
       } catch (error) {
-        console.log({ error });
         // Handle HTTPError from ky
         if (error instanceof HTTPError) {
-          const errorData = (await error.response.json()) as {
-            message?: string;
-            error?: string;
-          };
-          const errorMessage =
-            errorData.message ||
-            errorData.error ||
-            'Erreur lors de la création du vol';
+          let errorMessage = 'Erreur lors de la création du vol';
+          try {
+            const errorData = (await error.response.json()) as {
+              message?: string;
+              error?: string;
+            };
+            errorMessage = errorData.message || errorData.error || errorMessage;
+          } catch {
+            // Response is not JSON, use default message
+          }
           throw new Error(errorMessage);
         }
         // Re-throw other errors

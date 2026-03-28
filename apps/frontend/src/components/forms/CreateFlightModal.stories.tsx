@@ -96,7 +96,7 @@ FlightModal.test('It can upload a file', async ({ args }) => {
   const uploadButton = await screen.findByText('📤 Créer le vol');
   await userEvent.click(uploadButton);
 
-  // Verify success message appears{
+  // Verify success message appears
   await expect(
     await screen.findByText('✅ Vol créé avec succès')
   ).toBeInTheDocument();

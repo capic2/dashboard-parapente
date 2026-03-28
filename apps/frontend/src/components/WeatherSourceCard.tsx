@@ -3,7 +3,7 @@
  * Displays individual weather source configuration with stats and controls
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Button,
   Switch,
@@ -84,13 +84,29 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
     }
   };
 
+  const notificationTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const testResultTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  useEffect(() => {
+    return () => {
+      if (notificationTimerRef.current)
+        clearTimeout(notificationTimerRef.current);
+      if (testResultTimerRef.current) clearTimeout(testResultTimerRef.current);
+    };
+  }, []);
+
   // Show notification helper
   const showNotification = (
     type: 'error' | 'success' | 'warning',
     message: string
   ) => {
     setNotification({ type, message });
-    setTimeout(() => setNotification(null), 5000);
+    if (notificationTimerRef.current)
+      clearTimeout(notificationTimerRef.current);
+    notificationTimerRef.current = setTimeout(
+      () => setNotification(null),
+      5000
+    );
   };
 
   // Toggle enabled/disabled
@@ -173,7 +189,8 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
     } finally {
       setIsTesting(false);
       // Clear test result after 5 seconds
-      setTimeout(() => setTestResult(null), 5000);
+      if (testResultTimerRef.current) clearTimeout(testResultTimerRef.current);
+      testResultTimerRef.current = setTimeout(() => setTestResult(null), 5000);
     }
   };
 

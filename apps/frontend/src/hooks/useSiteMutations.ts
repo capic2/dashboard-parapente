@@ -37,7 +37,7 @@ export const useUpdateSite = () => {
       void queryClient.invalidateQueries({ queryKey: ['sites'] });
       // Invalidate specific site query
       void queryClient.invalidateQueries({
-        queryKey: ['sites', variables.siteId],
+        queryKey: ['site', variables.siteId],
       });
     },
   });

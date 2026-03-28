@@ -96,7 +96,7 @@ export function WindIndicatorCompact({
   const label = getWindFavorabilityLabel(favorability, 'fr');
 
   const tooltipText =
-    windDirection && windSpeed
+    windDirection && windSpeed != null
       ? `${label} - ${windDirection} ${windSpeed}km/h`
       : label;
 

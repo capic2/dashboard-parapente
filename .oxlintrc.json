@@ -37,7 +37,7 @@
     "**/*.config.js",
     "**/*.config.ts",
     "public/mockServiceWorker.js",
-    "src/routeTree.gen.ts",
+    "**/routeTree.gen.ts",
     ".storybook",
     "storybook-static"
   ]
