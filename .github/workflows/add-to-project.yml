@@ -1,0 +1,196 @@
+# Automatically track Renovate PRs in the GitHub Project kanban board
+# - PR opened → "In progress"
+# - PR merged → "Done"
+# - CI failed → "blocked"
+
+name: Track Renovate PRs in Project
+
+on:
+  pull_request_target:
+    types: [opened, reopened, closed]
+  workflow_run:
+    workflows: ["CI - Nx Monorepo"]
+    types: [completed]
+
+env:
+  PROJECT_ID: "PVT_kwHOCaf4ns4BTClc"
+  STATUS_FIELD_ID: "PVTSSF_lAHOCaf4ns4BTClczhAZiAA"
+  STATUS_IN_PROGRESS: "47fc9ee4"
+  STATUS_BLOCKED: "c31aa57b"
+  STATUS_DONE: "98236657"
+
+jobs:
+  # Job 1: When Renovate opens/reopens a PR, add it to the project as "In progress"
+  add-to-project:
+    name: Add PR to project
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      (github.event.action == 'opened' || github.event.action == 'reopened') &&
+      github.event.pull_request.user.login == 'renovate[bot]'
+    steps:
+      - name: Add to project
+        uses: actions/add-to-project@v1
+        id: add
+        with:
+          project-url: https://github.com/users/capic2/projects/2
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+
+      - name: Set status to "In progress"
+        if: steps.add.outputs.itemId
+        env:
+          GH_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
+        run: |
+          gh api graphql -f query='
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+              updateProjectV2ItemFieldValue(
+                input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: { singleSelectOptionId: $optionId }
+                }
+              ) {
+                projectV2Item { id }
+              }
+            }
+          ' \
+            -f projectId="$PROJECT_ID" \
+            -f itemId="${{ steps.add.outputs.itemId }}" \
+            -f fieldId="$STATUS_FIELD_ID" \
+            -f optionId="$STATUS_IN_PROGRESS"
+
+  # Job 2: When a Renovate PR is merged, move it to "Done"
+  mark-done:
+    name: Mark merged PR as done
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.user.login == 'renovate[bot]'
+    steps:
+      - name: Get project item ID and update status
+        env:
+          GH_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          PR_NODE_ID: ${{ github.event.pull_request.node_id }}
+        run: |
+          # Find the item ID for this PR in the project
+          ITEM_ID=$(gh api graphql -f query='
+            query($projectId: ID!, $cursor: String) {
+              node(id: $projectId) {
+                ... on ProjectV2 {
+                  items(first: 100, after: $cursor) {
+                    nodes {
+                      id
+                      content {
+                        ... on PullRequest { id }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ' -f projectId="$PROJECT_ID" --jq ".data.node.items.nodes[] | select(.content.id == \"$PR_NODE_ID\") | .id")
+
+          if [ -z "$ITEM_ID" ]; then
+            echo "PR not found in project, skipping"
+            exit 0
+          fi
+
+          # Update status to "Done"
+          gh api graphql -f query='
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+              updateProjectV2ItemFieldValue(
+                input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: { singleSelectOptionId: $optionId }
+                }
+              ) {
+                projectV2Item { id }
+              }
+            }
+          ' \
+            -f projectId="$PROJECT_ID" \
+            -f itemId="$ITEM_ID" \
+            -f fieldId="$STATUS_FIELD_ID" \
+            -f optionId="$STATUS_DONE"
+
+          echo "Moved PR to Done"
+
+  # Job 3: When CI fails on a Renovate PR, move it to "blocked"
+  mark-blocked:
+    name: Mark failed PR as blocked
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'pull_request'
+    steps:
+      - name: Check if Renovate PR and update status
+        env:
+          GH_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          # Find the PR for this workflow run
+          PR_DATA=$(gh pr view "$HEAD_BRANCH" --repo "${{ github.repository }}" --json author,nodeId 2>/dev/null || echo "")
+
+          if [ -z "$PR_DATA" ]; then
+            echo "No PR found for branch $HEAD_BRANCH, skipping"
+            exit 0
+          fi
+
+          PR_AUTHOR=$(echo "$PR_DATA" | jq -r '.author.login')
+          PR_NODE_ID=$(echo "$PR_DATA" | jq -r '.nodeId')
+
+          if [ "$PR_AUTHOR" != "renovate" ]; then
+            echo "PR is not from Renovate (author: $PR_AUTHOR), skipping"
+            exit 0
+          fi
+
+          # Find the item ID for this PR in the project
+          ITEM_ID=$(gh api graphql -f query='
+            query($projectId: ID!, $cursor: String) {
+              node(id: $projectId) {
+                ... on ProjectV2 {
+                  items(first: 100, after: $cursor) {
+                    nodes {
+                      id
+                      content {
+                        ... on PullRequest { id }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ' -f projectId="$PROJECT_ID" --jq ".data.node.items.nodes[] | select(.content.id == \"$PR_NODE_ID\") | .id")
+
+          if [ -z "$ITEM_ID" ]; then
+            echo "PR not found in project, skipping"
+            exit 0
+          fi
+
+          # Update status to "blocked"
+          gh api graphql -f query='
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+              updateProjectV2ItemFieldValue(
+                input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: { singleSelectOptionId: $optionId }
+                }
+              ) {
+                projectV2Item { id }
+              }
+            }
+          ' \
+            -f projectId="$PROJECT_ID" \
+            -f itemId="$ITEM_ID" \
+            -f fieldId="$STATUS_FIELD_ID" \
+            -f optionId="$STATUS_BLOCKED"
+
+          echo "Moved PR to blocked"
