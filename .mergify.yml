@@ -19,10 +19,12 @@ queue_rules:
       {{ body }}
     queue_conditions:
       - check-success=main
+      - check-success=E2E Tests
       - base=main
       - "#approved-reviews-by>=0"
     merge_conditions:
       - check-success=main
+      - check-success=E2E Tests
       - base=main
       - "#approved-reviews-by>=0"
 
@@ -34,6 +36,7 @@ pull_request_rules:
       - base=main
       - label=automerge
       - check-success=main
+      - check-success=E2E Tests
       - "#changes-requested-reviews-by=0"
     actions:
       queue:
@@ -48,6 +51,7 @@ pull_request_rules:
       - base=main
       - author=renovate[bot]
       - check-success=main
+      - check-success=E2E Tests
       - "title~=^(fix|chore)\\(deps\\):.*\\[SECURITY\\]"
     actions:
       queue:
@@ -68,6 +72,7 @@ pull_request_rules:
       - base=main
       - author=renovate[bot]
       - check-success=main
+      - check-success=E2E Tests
       - "title~=^fix\\(deps\\):"
       - "-title~=major"
     actions:
@@ -89,6 +94,7 @@ pull_request_rules:
       - base=main
       - author=renovate[bot]
       - check-success=main
+      - check-success=E2E Tests
       - "title~=^chore\\(deps\\):"
       - "-title~=major"
     actions:
@@ -140,6 +146,7 @@ pull_request_rules:
     conditions:
       - base=main
       - check-success=main
+      - check-success=E2E Tests
       - "#changes-requested-reviews-by=0"
       - "-draft"
       - "-conflict"
@@ -152,7 +159,9 @@ pull_request_rules:
   - name: Retirer ready-to-merge si conditions non remplies
     conditions:
       - base=main
-      - check-failure=main
+      - or:
+        - check-failure=main
+        - check-failure=E2E Tests
     actions:
       label:
         remove:
@@ -222,6 +231,13 @@ merge_protections:
       - base=main
     success_conditions:
       - check-success=main
+
+  - name: Verification des tests E2E
+    description: Les tests E2E doivent passer
+    if:
+      - base=main
+    success_conditions:
+      - check-success=E2E Tests
 
   - name: Branche a jour avec main
     description: La branche doit etre a jour avec main
