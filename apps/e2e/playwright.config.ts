@@ -69,11 +69,11 @@ export default defineConfig({
       },
     },
     {
-      command: 'nx serve frontend',
+      command: 'nx build frontend && npx vite preview --config apps/frontend/vite.config.ts',
       url: 'http://localhost:5173',
       reuseExistingServer: !process.env.CI,
       cwd: '../..',
-      timeout: 60 * 1000, // 1 minute for frontend startup
+      timeout: 120 * 1000, // 2 minutes for build + preview startup
     },
   ],
 });
