@@ -75,9 +75,7 @@ const mockEmagramData = {
 
 const defaultHandlers = [
   http.get('*/api/emagram/latest', () => HttpResponse.json(mockEmagramData)),
-  http.post('*/api/emagram/analyze', () =>
-    HttpResponse.json(mockEmagramData)
-  ),
+  http.post('*/api/emagram/analyze', () => HttpResponse.json(mockEmagramData)),
 ];
 
 export const Default = meta.story({

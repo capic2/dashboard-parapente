@@ -9,11 +9,15 @@ interface CreateFlightModalProps {
   onCreateComplete: () => void;
 }
 
-export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateFlightModalProps) {
+export function CreateFlightModal({
+  isOpen,
+  onClose,
+  onCreateComplete,
+}: CreateFlightModalProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const { mutate: createFlight, isPending, data } = useCreateFlightFromGPX();
   const toast = useToast();
 
@@ -39,7 +43,9 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
 
     createFlight(formData, {
       onSuccess: (result) => {
-        toast.success(`Vol créé avec succès : ${result.flight.name || 'Sans nom'}`);
+        toast.success(
+          `Vol créé avec succès : ${result.flight.name || 'Sans nom'}`
+        );
         onCreateComplete();
         setSelectedFile(null);
         setError(null);
@@ -49,10 +55,11 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
         setTimeout(() => onClose(), 2000); // Fermer après 2s
       },
       onError: (error: Error) => {
-        const errorMessage = error.message || 'Une erreur est survenue lors de la création du vol';
+        const errorMessage =
+          error.message || 'Une erreur est survenue lors de la création du vol';
         setError(errorMessage);
         toast.error(`Échec de la création : ${errorMessage}`);
-      }
+      },
     });
   };
 
@@ -68,16 +75,25 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="📤 Créer un vol depuis GPX/IGC" size="md">
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="📤 Créer un vol depuis GPX/IGC"
+      size="md"
+    >
       <div className="space-y-4">
         <p className="text-sm text-gray-600">
-          Uploadez un fichier GPX ou IGC pour créer automatiquement un nouveau vol.
-          Les statistiques (durée, altitude, distance, vitesse) seront extraites du fichier.
+          Uploadez un fichier GPX ou IGC pour créer automatiquement un nouveau
+          vol. Les statistiques (durée, altitude, distance, vitesse) seront
+          extraites du fichier.
         </p>
-        
+
         {/* File Input */}
         <div className="space-y-2">
-          <label htmlFor="gpx-file-input" className="block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="gpx-file-input"
+            className="block text-sm font-medium text-gray-700"
+          >
             Fichier GPX ou IGC
           </label>
           <div className="flex items-center gap-3">
@@ -100,33 +116,48 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
           </div>
           {selectedFile && (
             <p className="text-sm text-gray-600">
-              📄 {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+              📄 {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)}{' '}
+              KB)
             </p>
           )}
         </div>
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
           <p className="text-sm text-blue-800">
-            💡 <strong>Détection automatique :</strong> Le site de décollage sera détecté automatiquement
-            à partir des coordonnées GPS du fichier GPX.
+            💡 <strong>Détection automatique :</strong> Le site de décollage
+            sera détecté automatiquement à partir des coordonnées GPS du fichier
+            GPX.
           </p>
         </div>
 
         {/* Résultat de la création */}
         {data && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <p className="font-semibold text-green-800 mb-2">✅ Vol créé avec succès</p>
+            <p className="font-semibold text-green-800 mb-2">
+              ✅ Vol créé avec succès
+            </p>
             <ul className="text-sm text-green-700 space-y-1">
-              <li>• <strong>Nom :</strong> {data.flight.name || 'Sans nom'}</li>
-              <li>• <strong>Date :</strong> {data.flight.flight_date}</li>
+              <li>
+                • <strong>Nom :</strong> {data.flight.name || 'Sans nom'}
+              </li>
+              <li>
+                • <strong>Date :</strong> {data.flight.flight_date}
+              </li>
               {data.flight.site_name && (
-                <li>• <strong>Site :</strong> {data.flight.site_name}</li>
+                <li>
+                  • <strong>Site :</strong> {data.flight.site_name}
+                </li>
               )}
               {data.flight.duration_minutes && (
-                <li>• <strong>Durée :</strong> {data.flight.duration_minutes} min</li>
+                <li>
+                  • <strong>Durée :</strong> {data.flight.duration_minutes} min
+                </li>
               )}
               {data.flight.distance_km && (
-                <li>• <strong>Distance :</strong> {data.flight.distance_km.toFixed(2)} km</li>
+                <li>
+                  • <strong>Distance :</strong>{' '}
+                  {data.flight.distance_km.toFixed(2)} km
+                </li>
               )}
             </ul>
           </div>
@@ -135,7 +166,9 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
         {/* Affichage de l'erreur */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="font-semibold text-red-800 mb-2">❌ Erreur lors de la création</p>
+            <p className="font-semibold text-red-800 mb-2">
+              ❌ Erreur lors de la création
+            </p>
             <p className="text-sm text-red-700">{error}</p>
           </div>
         )}

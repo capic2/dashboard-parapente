@@ -111,9 +111,7 @@ export default function LandingAssociationsManager({
                     {assoc.landing_site?.name || assoc.landing_site_id}
                   </span>
                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {assoc.distance_km != null
-                      ? `${assoc.distance_km} km`
-                      : ''}
+                    {assoc.distance_km != null ? `${assoc.distance_km} km` : ''}
                     {assoc.notes && ` - ${assoc.notes}`}
                   </span>
                 </div>

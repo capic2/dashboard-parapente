@@ -1,6 +1,6 @@
 /**
  * Wind Matching Utility
- * 
+ *
  * Determines how favorable wind conditions are for a specific takeoff orientation.
  * Used to show green/yellow/red indicators for each takeoff based on wind direction.
  */
@@ -13,24 +13,24 @@ type WindFavorability = 'good' | 'moderate' | 'bad';
  */
 function cardinalToDegrees(direction: string): number {
   const directions: Record<string, number> = {
-    'N': 0,
-    'NNE': 22.5,
-    'NE': 45,
-    'ENE': 67.5,
-    'E': 90,
-    'ESE': 112.5,
-    'SE': 135,
-    'SSE': 157.5,
-    'S': 180,
-    'SSW': 202.5,
-    'SW': 225,
-    'WSW': 247.5,
-    'W': 270,
-    'WNW': 292.5,
-    'NW': 315,
-    'NNW': 337.5,
+    N: 0,
+    NNE: 22.5,
+    NE: 45,
+    ENE: 67.5,
+    E: 90,
+    ESE: 112.5,
+    SE: 135,
+    SSE: 157.5,
+    S: 180,
+    SSW: 202.5,
+    SW: 225,
+    WSW: 247.5,
+    W: 270,
+    WNW: 292.5,
+    NW: 315,
+    NNW: 337.5,
   };
-  
+
   return directions[direction.toUpperCase()] ?? 0;
 }
 
@@ -40,23 +40,23 @@ function cardinalToDegrees(direction: string): number {
  */
 function getAngularDifference(degrees1: number, degrees2: number): number {
   let diff = Math.abs(degrees1 - degrees2);
-  
+
   // Handle wrap-around (e.g., 350° and 10° are only 20° apart)
   if (diff > 180) {
     diff = 360 - diff;
   }
-  
+
   return diff;
 }
 
 /**
  * Determine if wind direction is favorable for a takeoff orientation
- * 
+ *
  * Logic:
  * - GOOD (🟢): Wind within ±45° of takeoff orientation
  * - MODERATE (🟡): Wind within ±45-90° of takeoff orientation
  * - BAD (🔴): Wind more than 90° off, or directly from behind (tailwind)
- * 
+ *
  * @param windDirection - Current wind direction (e.g., "SW", "N", "ESE")
  * @param siteOrientation - Direction the takeoff faces (e.g., "W", "N", "NW")
  * @param windSpeed - Wind speed in km/h (used for additional checks)
@@ -71,32 +71,32 @@ export function getWindFavorability(
   if (!windDirection || !siteOrientation) {
     return 'moderate';
   }
-  
+
   // If wind is too light (<5 km/h), it's always favorable
   if (windSpeed !== undefined && windSpeed < 5) {
     return 'good';
   }
-  
+
   // If wind is dangerously strong (>40 km/h), it's always bad
   if (windSpeed !== undefined && windSpeed > 40) {
     return 'bad';
   }
-  
+
   const windDeg = cardinalToDegrees(windDirection);
   const siteDeg = cardinalToDegrees(siteOrientation);
-  
+
   const angularDiff = getAngularDifference(windDeg, siteDeg);
-  
+
   // Good: Wind within ±45° of takeoff orientation (headwind or slight crosswind)
   if (angularDiff <= 45) {
     return 'good';
   }
-  
+
   // Moderate: Wind within ±45-90° (crosswind)
   if (angularDiff <= 90) {
     return 'moderate';
   }
-  
+
   // Bad: Wind more than 90° off (tailwind or very strong crosswind)
   return 'bad';
 }
@@ -104,7 +104,10 @@ export function getWindFavorability(
 /**
  * Get a human-readable description of wind favorability
  */
-export function getWindFavorabilityLabel(favorability: WindFavorability, locale = 'fr'): string {
+export function getWindFavorabilityLabel(
+  favorability: WindFavorability,
+  locale = 'fr'
+): string {
   if (locale === 'fr') {
     switch (favorability) {
       case 'good':
@@ -117,7 +120,7 @@ export function getWindFavorabilityLabel(favorability: WindFavorability, locale 
         return 'Vent inconnu';
     }
   }
-  
+
   // English fallback
   switch (favorability) {
     case 'good':
@@ -134,7 +137,9 @@ export function getWindFavorabilityLabel(favorability: WindFavorability, locale 
 /**
  * Get emoji indicator for wind favorability
  */
-export function getWindFavorabilityEmoji(favorability: WindFavorability): string {
+export function getWindFavorabilityEmoji(
+  favorability: WindFavorability
+): string {
   switch (favorability) {
     case 'good':
       return '🟢';
@@ -150,7 +155,9 @@ export function getWindFavorabilityEmoji(favorability: WindFavorability): string
 /**
  * Get Tailwind color class for wind favorability
  */
-export function getWindFavorabilityColor(favorability: WindFavorability): string {
+export function getWindFavorabilityColor(
+  favorability: WindFavorability
+): string {
   switch (favorability) {
     case 'good':
       return 'text-green-500';

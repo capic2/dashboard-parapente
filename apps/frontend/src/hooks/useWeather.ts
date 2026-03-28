@@ -1,8 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  useQuery,
-  type UseQueryResult,
-} from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import type { DailySummary, WeatherData } from '../types';
 import {
@@ -239,10 +235,7 @@ export const createWeatherQueryFn =
  * Transforms backend API response to frontend WeatherData format
  * OPTIMIZED: Loads selected day immediately, prefetches others in background
  */
-export const useWeather = (
-  siteId: string | undefined,
-  dayIndex = 0
-) => {
+export const useWeather = (siteId: string | undefined, dayIndex = 0) => {
   return useQuery({
     queryKey: ['weather', 'combined', siteId, dayIndex],
     queryFn: siteId

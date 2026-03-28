@@ -20,17 +20,21 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
 }) => {
   const [mode, setMode] = useState<'auto' | 'search' | 'manual'>('search');
   const [error, setError] = useState<string | null>(null);
-  
+
   // Search mode
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResult, setSearchResult] = useState<{ latitude: number; longitude: number; display_name: string } | null>(null);
-  
+  const [searchResult, setSearchResult] = useState<{
+    latitude: number;
+    longitude: number;
+    display_name: string;
+  } | null>(null);
+
   // Manual mode
   const [siteName, setSiteName] = useState('');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [elevation, setElevation] = useState('');
-  
+
   const createSite = useCreateSite();
   const geocode = useGeocode();
   const { data: gpxData } = useFlightGPX(flightId || '');
@@ -61,7 +65,9 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
       setLatitude(result.latitude.toString());
       setLongitude(result.longitude.toString());
     } catch {
-      setError('Ville non trouvée. Veuillez vérifier l\'orthographe ou essayer une autre recherche.');
+      setError(
+        "Ville non trouvée. Veuillez vérifier l'orthographe ou essayer une autre recherche."
+      );
       setSearchResult(null);
     }
   };
@@ -77,7 +83,9 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
     }
 
     if (isNaN(lat) || isNaN(lon)) {
-      setError('Coordonnées invalides. Veuillez entrer des nombres valides pour la latitude et longitude.');
+      setError(
+        'Coordonnées invalides. Veuillez entrer des nombres valides pour la latitude et longitude.'
+      );
       return;
     }
 
@@ -93,7 +101,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
 
       onSiteCreated(newSite);
       onClose();
-      
+
       // Reset form
       setSiteName('');
       setLatitude('');
@@ -103,7 +111,10 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
       setSearchResult(null);
       setError(null);
     } catch (error: unknown) {
-      setError((error instanceof Error ? error.message : null) || 'Erreur lors de la création du site. Veuillez réessayer.');
+      setError(
+        (error instanceof Error ? error.message : null) ||
+          'Erreur lors de la création du site. Veuillez réessayer.'
+      );
     }
   };
 
@@ -114,7 +125,10 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
         <div className="flex gap-2">
           {flightId && gpxData?.coordinates && (
             <Button
-              onPress={() => { setMode('auto'); setError(null); }}
+              onPress={() => {
+                setMode('auto');
+                setError(null);
+              }}
               className={`px-4 py-2 rounded ${
                 mode === 'auto' ? 'bg-blue-500 text-white' : 'bg-gray-200'
               }`}
@@ -123,7 +137,10 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
             </Button>
           )}
           <Button
-            onPress={() => { setMode('search'); setError(null); }}
+            onPress={() => {
+              setMode('search');
+              setError(null);
+            }}
             className={`px-4 py-2 rounded ${
               mode === 'search' ? 'bg-blue-500 text-white' : 'bg-gray-200'
             }`}
@@ -131,7 +148,10 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
             Recherche
           </Button>
           <Button
-            onPress={() => { setMode('manual'); setError(null); }}
+            onPress={() => {
+              setMode('manual');
+              setError(null);
+            }}
             className={`px-4 py-2 rounded ${
               mode === 'manual' ? 'bg-blue-500 text-white' : 'bg-gray-200'
             }`}
@@ -190,13 +210,16 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
                 </Button>
               </div>
             </TextField>
-            
+
             {searchResult && (
               <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
                 <p className="text-sm font-medium text-green-800">✓ Trouvé !</p>
-                <p className="text-sm text-gray-600">{searchResult.display_name}</p>
+                <p className="text-sm text-gray-600">
+                  {searchResult.display_name}
+                </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {searchResult.latitude.toFixed(5)}, {searchResult.longitude.toFixed(5)}
+                  {searchResult.latitude.toFixed(5)},{' '}
+                  {searchResult.longitude.toFixed(5)}
                 </p>
               </div>
             )}
@@ -207,9 +230,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
         {(mode === 'manual' || searchResult) && (
           <div className="space-y-3">
             <TextField className="flex flex-col gap-1">
-              <Label className="block text-sm font-medium">
-                Nom du site *
-              </Label>
+              <Label className="block text-sm font-medium">Nom du site *</Label>
               <Input
                 type="text"
                 value={siteName}
@@ -221,9 +242,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
 
             <div className="grid grid-cols-2 gap-3">
               <TextField className="flex flex-col gap-1">
-                <Label className="block text-sm font-medium">
-                  Latitude *
-                </Label>
+                <Label className="block text-sm font-medium">Latitude *</Label>
                 <Input
                   type="number"
                   step="0.000001"
@@ -235,9 +254,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
               </TextField>
 
               <TextField className="flex flex-col gap-1">
-                <Label className="block text-sm font-medium">
-                  Longitude *
-                </Label>
+                <Label className="block text-sm font-medium">Longitude *</Label>
                 <Input
                   type="number"
                   step="0.000001"
@@ -250,9 +267,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
             </div>
 
             <TextField className="flex flex-col gap-1">
-              <Label className="block text-sm font-medium">
-                Altitude (m)
-              </Label>
+              <Label className="block text-sm font-medium">Altitude (m)</Label>
               <Input
                 type="number"
                 value={elevation}
@@ -274,7 +289,9 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
           </Button>
           <Button
             onPress={handleCreate}
-            isDisabled={createSite.isPending || !siteName || !latitude || !longitude}
+            isDisabled={
+              createSite.isPending || !siteName || !latitude || !longitude
+            }
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
           >
             {createSite.isPending ? 'Création...' : 'Créer le site'}

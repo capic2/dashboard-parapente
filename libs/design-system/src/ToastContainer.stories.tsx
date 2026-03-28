@@ -1,6 +1,6 @@
-import preview from '../.storybook/preview'
-import { fn, userEvent, within, expect } from 'storybook/test'
-import { ToastContainer } from './Toast'
+import preview from '../.storybook/preview';
+import { fn, userEvent, within, expect } from 'storybook/test';
+import { ToastContainer } from './Toast';
 
 const meta = preview.meta({
   title: 'Components/UI/Toast/Container',
@@ -24,7 +24,7 @@ const meta = preview.meta({
       description: 'Callback when a toast is closed',
     },
   },
-})
+});
 
 // Empty container (should not render)
 export const Empty = meta.story({
@@ -36,11 +36,12 @@ export const Empty = meta.story({
   parameters: {
     docs: {
       description: {
-        story: 'When there are no toasts, the container does not render anything.',
+        story:
+          'When there are no toasts, the container does not render anything.',
       },
     },
   },
-})
+});
 
 // Container with single toast
 export const SingleToast = meta.story({
@@ -55,19 +56,22 @@ export const SingleToast = meta.story({
     ],
     onClose: fn(),
   },
-})
+});
 
 // Test single toast close
-SingleToast.test('should close toast when close button clicked', async ({ canvasElement, args }) => {
-  const canvas = within(canvasElement)
-  
-  // Find and click the close button
-  const closeButton = canvas.getByRole('button', { name: /×/i })
-  await userEvent.click(closeButton)
-  
-  // Verify onClose was called with the correct ID
-  await expect(args.onClose).toHaveBeenCalledWith('toast-1')
-})
+SingleToast.test(
+  'should close toast when close button clicked',
+  async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+
+    // Find and click the close button
+    const closeButton = canvas.getByRole('button', { name: /×/i });
+    await userEvent.click(closeButton);
+
+    // Verify onClose was called with the correct ID
+    await expect(args.onClose).toHaveBeenCalledWith('toast-1');
+  }
+);
 
 // Container with multiple toasts
 export const MultipleToasts = meta.story({
@@ -92,17 +96,19 @@ export const MultipleToasts = meta.story({
     ],
     onClose: fn(),
   },
-})
+});
 
 // Test multiple toasts rendering
 MultipleToasts.test('should render all toasts', async ({ canvasElement }) => {
-  const canvas = within(canvasElement)
-  
+  const canvas = within(canvasElement);
+
   // Verify all three toasts are present
-  await expect(canvas.getByText(/File uploaded successfully/i)).toBeInTheDocument()
-  await expect(canvas.getByText(/Connection lost/i)).toBeInTheDocument()
-  await expect(canvas.getByText(/New message received/i)).toBeInTheDocument()
-})
+  await expect(
+    canvas.getByText(/File uploaded successfully/i)
+  ).toBeInTheDocument();
+  await expect(canvas.getByText(/Connection lost/i)).toBeInTheDocument();
+  await expect(canvas.getByText(/New message received/i)).toBeInTheDocument();
+});
 
 // Container with many toasts (stacking)
 export const ManyToasts = meta.story({
@@ -117,7 +123,7 @@ export const ManyToasts = meta.story({
     ],
     onClose: fn(),
   },
-})
+});
 
 // Container with mixed types
 export const MixedTypes = meta.story({
@@ -147,7 +153,7 @@ export const MixedTypes = meta.story({
     ],
     onClose: fn(),
   },
-})
+});
 
 // Realistic use case: Sequential notifications
 export const RealisticFlow = meta.story({
@@ -175,8 +181,9 @@ export const RealisticFlow = meta.story({
   parameters: {
     docs: {
       description: {
-        story: 'Example of a realistic flow showing multiple sequential notifications.',
+        story:
+          'Example of a realistic flow showing multiple sequential notifications.',
       },
     },
   },
-})
+});

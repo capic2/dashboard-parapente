@@ -1,5 +1,13 @@
 import { useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 import { useFlights } from '../../hooks/useFlights';
 import { useFiltersStore } from '../../stores/filtersStore';
 import { parseISO, getDay } from 'date-fns';
@@ -17,13 +25,17 @@ const WEEKDAY_LABELS = [
 
 /**
  * Graphique des jours de semaine préférés pour voler
- * 
+ *
  * Analyse les dates de vol (flight_date) pour identifier
  * les jours de la semaine où le pilote vole le plus
  */
 export default function WeekdayChart() {
   const { filters } = useFiltersStore();
-  const { data: flights = [], isLoading, error } = useFlights({
+  const {
+    data: flights = [],
+    isLoading,
+    error,
+  } = useFlights({
     limit: 300,
     siteId: filters.siteId || undefined,
     dateFrom: filters.dateFrom || undefined,
@@ -53,7 +65,8 @@ export default function WeekdayChart() {
       day: WEEKDAY_LABELS[index],
       dayShort: WEEKDAY_LABELS[index].substring(0, 3),
       count,
-      percentage: flights.length > 0 ? Math.round((count / flights.length) * 100) : 0,
+      percentage:
+        flights.length > 0 ? Math.round((count / flights.length) * 100) : 0,
     }));
   }, [flights]);
 
@@ -71,7 +84,9 @@ export default function WeekdayChart() {
   if (error) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md">
-        <h3 className="text-lg font-semibold mb-2 text-gray-900">📅 Jours de vol préférés</h3>
+        <h3 className="text-lg font-semibold mb-2 text-gray-900">
+          📅 Jours de vol préférés
+        </h3>
         <div className="text-red-600">Erreur : {error.message}</div>
       </div>
     );
@@ -80,7 +95,9 @@ export default function WeekdayChart() {
   if (!chartData.length || flights.length === 0) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md">
-        <h3 className="text-lg font-semibold mb-2 text-gray-900">📅 Jours de vol préférés</h3>
+        <h3 className="text-lg font-semibold mb-2 text-gray-900">
+          📅 Jours de vol préférés
+        </h3>
         <p className="text-gray-500 text-center py-8">
           Aucune donnée de vol disponible
         </p>
@@ -89,24 +106,33 @@ export default function WeekdayChart() {
   }
 
   const totalFlights = chartData.reduce((sum, d) => sum + d.count, 0);
-  const maxDay = chartData.reduce((max, d) => (d.count > max.count ? d : max), chartData[0]);
+  const maxDay = chartData.reduce(
+    (max, d) => (d.count > max.count ? d : max),
+    chartData[0]
+  );
 
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">📅 Jours de vol préférés</h3>
+        <h3 className="text-lg font-semibold text-gray-900">
+          📅 Jours de vol préférés
+        </h3>
         <p className="text-sm text-gray-600 mt-1">
           Répartition de vos {totalFlights} vols par jour de la semaine
         </p>
         {maxDay && maxDay.count > 0 && (
           <p className="text-sm text-sky-600 font-medium mt-1">
-            Jour favori : {maxDay.day} ({maxDay.count} vols, {maxDay.percentage}%)
+            Jour favori : {maxDay.day} ({maxDay.count} vols, {maxDay.percentage}
+            %)
           </p>
         )}
       </div>
 
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <BarChart
+          data={chartData}
+          margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis
             dataKey="dayShort"
@@ -117,7 +143,12 @@ export default function WeekdayChart() {
             tick={{ fill: '#6b7280', fontSize: 12 }}
             tickLine={false}
             axisLine={false}
-            label={{ value: 'Nombre de vols', angle: -90, position: 'insideLeft', style: { fill: '#6b7280', fontSize: 12 } }}
+            label={{
+              value: 'Nombre de vols',
+              angle: -90,
+              position: 'insideLeft',
+              style: { fill: '#6b7280', fontSize: 12 },
+            }}
           />
           <Tooltip
             contentStyle={{
@@ -131,11 +162,7 @@ export default function WeekdayChart() {
               props.payload.day,
             ]}
           />
-          <Bar
-            dataKey="count"
-            fill="#4a90e2"
-            radius={[8, 8, 0, 0]}
-          />
+          <Bar dataKey="count" fill="#4a90e2" radius={[8, 8, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
 

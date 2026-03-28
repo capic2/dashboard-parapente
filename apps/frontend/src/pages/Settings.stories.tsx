@@ -95,10 +95,16 @@ const mockWeatherStats = {
 
 const defaultHandlers = [
   http.get('*/api/spots', () => HttpResponse.json(mockSites)),
-  http.get('*/api/weather-sources', () => HttpResponse.json(mockWeatherSources)),
-  http.get('*/api/weather-sources/stats', () => HttpResponse.json(mockWeatherStats)),
+  http.get('*/api/weather-sources', () =>
+    HttpResponse.json(mockWeatherSources)
+  ),
+  http.get('*/api/weather-sources/stats', () =>
+    HttpResponse.json(mockWeatherStats)
+  ),
   http.patch('*/api/weather-sources/:name', async ({ params }) => {
-    const source = mockWeatherSources.find((s) => s.source_name === params.name);
+    const source = mockWeatherSources.find(
+      (s) => s.source_name === params.name
+    );
     return HttpResponse.json(source || mockWeatherSources[0]);
   }),
   http.delete('*/api/weather-sources/:name', () =>

@@ -14,9 +14,12 @@ export default function Dashboard() {
   const { data: sites, isLoading: sitesLoading, error } = useSites();
   const [userSelectedSiteId, setSelectedSiteId] = useState<string>('');
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
-  const selectedSiteId = userSelectedSiteId || (sites && sites.length > 0 ? sites[0].id : '');
+  const selectedSiteId =
+    userSelectedSiteId || (sites && sites.length > 0 ? sites[0].id : '');
   const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
-  const [weatherDataMap] = useState<Map<string, Record<string, unknown>>>(new Map());
+  const [weatherDataMap] = useState<Map<string, Record<string, unknown>>>(
+    new Map()
+  );
 
   // Handler for day selection (no scroll)
   const handleSelectDay = (dayIndex: number) => {
@@ -28,9 +31,11 @@ export default function Dashboard() {
     return (
       <div className="py-8">
         <div className="bg-white rounded-xl p-8 shadow-md text-center max-w-md mx-auto">
-          <h2 className="text-xl font-bold text-red-600 mb-3">❌ Erreur de chargement</h2>
+          <h2 className="text-xl font-bold text-red-600 mb-3">
+            ❌ Erreur de chargement
+          </h2>
           <p className="text-gray-700 mb-4">{error.message}</p>
-          <button 
+          <button
             onClick={() => window.location.reload()}
             className="px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-all"
           >
@@ -46,8 +51,14 @@ export default function Dashboard() {
     return (
       <div className="py-8">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center max-w-md mx-auto">
-          <div className="text-gray-600 dark:text-gray-300 mb-3">Chargement du tableau de bord...</div>
-          {sites && <p className="text-sm text-gray-500 dark:text-gray-400">Sites chargés: {sites.length}</p>}
+          <div className="text-gray-600 dark:text-gray-300 mb-3">
+            Chargement du tableau de bord...
+          </div>
+          {sites && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Sites chargés: {sites.length}
+            </p>
+          )}
         </div>
       </div>
     );
@@ -60,7 +71,7 @@ export default function Dashboard() {
         <StatsPanel />
 
         {/* 2. Site Selector (full width) */}
-        <SiteSelector 
+        <SiteSelector
           selectedSiteId={selectedSiteId}
           onSelectSite={setSelectedSiteId}
           weatherData={weatherDataMap}
@@ -70,10 +81,13 @@ export default function Dashboard() {
         <CurrentConditions spotId={selectedSiteId} />
 
         {/* 3.5. Landing Sites Weather (if any) */}
-        <WeatherMultiLanding spotId={selectedSiteId} dayIndex={selectedDayIndex} />
+        <WeatherMultiLanding
+          spotId={selectedSiteId}
+          dayIndex={selectedDayIndex}
+        />
 
         {/* 4. Day Selector - 7-Day Forecast (full width) */}
-        <Forecast7Day 
+        <Forecast7Day
           spotId={selectedSiteId}
           selectedDayIndex={selectedDayIndex}
           onSelectDay={handleSelectDay}
@@ -81,7 +95,7 @@ export default function Dashboard() {
 
         {/* 5. Best Spot | Emagram (40% / 60%) */}
         <div className="grid grid-cols-1 lg:grid-cols-[40%_60%] gap-4">
-          <BestSpotSuggestion 
+          <BestSpotSuggestion
             bestSpot={bestSpot ?? null}
             onSelectSite={setSelectedSiteId}
             selectedDayIndex={selectedDayIndex}

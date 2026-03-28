@@ -9,10 +9,21 @@ interface StravaSyncModalProps {
   onSyncComplete: () => void;
 }
 
-export function StravaSyncModal({ isOpen, onClose, onSyncComplete }: StravaSyncModalProps) {
-  const [dateFrom, setDateFrom] = useState(() => new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0]);
-  
+export function StravaSyncModal({
+  isOpen,
+  onClose,
+  onSyncComplete,
+}: StravaSyncModalProps) {
+  const [dateFrom, setDateFrom] = useState(
+    () =>
+      new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split('T')[0]
+  );
+  const [dateTo, setDateTo] = useState(
+    () => new Date().toISOString().split('T')[0]
+  );
+
   const { mutate: syncStrava, isPending, data } = useStravaSyncMutation();
   const toast = useToast();
 
@@ -29,40 +40,43 @@ export function StravaSyncModal({ isOpen, onClose, onSyncComplete }: StravaSyncM
         },
         onError: (error: Error) => {
           toast.error(`Échec de la synchronisation: ${error.message}`);
-        }
+        },
       }
     );
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="🔄 Synchroniser avec Strava" size="md">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="🔄 Synchroniser avec Strava"
+      size="md"
+    >
       <div className="space-y-4">
         <p className="text-sm text-gray-600">
-          Importe tous les vols paragliding depuis Strava pour la période sélectionnée.
-          Les vols déjà importés seront ignorés.
+          Importe tous les vols paragliding depuis Strava pour la période
+          sélectionnée. Les vols déjà importés seront ignorés.
         </p>
-        
+
         <div className="grid grid-cols-2 gap-4">
-          <DatePicker
-            label="Du"
-            value={dateFrom}
-            onChange={setDateFrom}
-          />
-          <DatePicker
-            label="Au"
-            value={dateTo}
-            onChange={setDateTo}
-          />
+          <DatePicker label="Du" value={dateFrom} onChange={setDateFrom} />
+          <DatePicker label="Au" value={dateTo} onChange={setDateTo} />
         </div>
 
         {/* Résultat de la sync */}
         {data && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <p className="font-semibold text-green-800 mb-2">✅ Synchronisation terminée</p>
+            <p className="font-semibold text-green-800 mb-2">
+              ✅ Synchronisation terminée
+            </p>
             <ul className="text-sm text-green-700 space-y-1">
               <li>• {data.imported} vols importés</li>
-              {data.skipped > 0 && <li>• {data.skipped} vols ignorés (doublons)</li>}
-              {data.failed > 0 && <li className="text-orange-700">• {data.failed} échecs</li>}
+              {data.skipped > 0 && (
+                <li>• {data.skipped} vols ignorés (doublons)</li>
+              )}
+              {data.failed > 0 && (
+                <li className="text-orange-700">• {data.failed} échecs</li>
+              )}
             </ul>
           </div>
         )}

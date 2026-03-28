@@ -11,14 +11,14 @@ const meta = preview.meta({
       // Create a new QueryClient for each story to avoid cache conflicts
       const queryClient = new QueryClient({
         defaultOptions: {
-          queries: { 
+          queries: {
             retry: false,
-            gcTime: 0,  // Disable cache
-            staleTime: 0,  // Always consider data stale
+            gcTime: 0, // Disable cache
+            staleTime: 0, // Always consider data stale
           },
         },
       });
-      
+
       return (
         <QueryClientProvider client={queryClient}>
           <div style={{ maxWidth: '600px', padding: '20px' }}>
@@ -37,10 +37,22 @@ const meta = preview.meta({
 export default meta;
 
 const mockFlights = [
-  ...Array.from({ length: 5 }, (_, i) => ({ id: `${i}`, flight_date: '2024-01-06' })), // Saturday
-  ...Array.from({ length: 8 }, (_, i) => ({ id: `${i + 5}`, flight_date: '2024-01-07' })), // Sunday
-  ...Array.from({ length: 2 }, (_, i) => ({ id: `${i + 13}`, flight_date: '2024-01-08' })), // Monday
-  ...Array.from({ length: 3 }, (_, i) => ({ id: `${i + 15}`, flight_date: '2024-01-10' })), // Wednesday
+  ...Array.from({ length: 5 }, (_, i) => ({
+    id: `${i}`,
+    flight_date: '2024-01-06',
+  })), // Saturday
+  ...Array.from({ length: 8 }, (_, i) => ({
+    id: `${i + 5}`,
+    flight_date: '2024-01-07',
+  })), // Sunday
+  ...Array.from({ length: 2 }, (_, i) => ({
+    id: `${i + 13}`,
+    flight_date: '2024-01-08',
+  })), // Monday
+  ...Array.from({ length: 3 }, (_, i) => ({
+    id: `${i + 15}`,
+    flight_date: '2024-01-10',
+  })), // Wednesday
 ];
 
 export const Default = meta.story({

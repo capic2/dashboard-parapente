@@ -131,81 +131,53 @@ const mockBestSpotNoRating: BestSpotResult = {
 // Default story - Excellent conditions
 export const ExcellentConditions = meta.story({
   render: () => (
-    <BestSpotSuggestion
-      bestSpot={mockBestSpotExcellent}
-      onSelectSite={fn()}
-    />
+    <BestSpotSuggestion bestSpot={mockBestSpotExcellent} onSelectSite={fn()} />
   ),
 });
 
 // Good conditions
 export const GoodConditions = meta.story({
   render: () => (
-    <BestSpotSuggestion
-      bestSpot={mockBestSpotGood}
-      onSelectSite={fn()}
-    />
+    <BestSpotSuggestion bestSpot={mockBestSpotGood} onSelectSite={fn()} />
   ),
 });
 
 // Moderate conditions
 export const ModerateConditions = meta.story({
   render: () => (
-    <BestSpotSuggestion
-      bestSpot={mockBestSpotModerate}
-      onSelectSite={fn()}
-    />
+    <BestSpotSuggestion bestSpot={mockBestSpotModerate} onSelectSite={fn()} />
   ),
 });
 
 // Poor conditions
 export const PoorConditions = meta.story({
   render: () => (
-    <BestSpotSuggestion
-      bestSpot={mockBestSpotPoor}
-      onSelectSite={fn()}
-    />
+    <BestSpotSuggestion bestSpot={mockBestSpotPoor} onSelectSite={fn()} />
   ),
 });
 
 // No wind data
 export const NoWindData = meta.story({
   render: () => (
-    <BestSpotSuggestion
-      bestSpot={mockBestSpotNoWind}
-      onSelectSite={fn()}
-    />
+    <BestSpotSuggestion bestSpot={mockBestSpotNoWind} onSelectSite={fn()} />
   ),
 });
 
 // No rating
 export const NoRating = meta.story({
   render: () => (
-    <BestSpotSuggestion
-      bestSpot={mockBestSpotNoRating}
-      onSelectSite={fn()}
-    />
+    <BestSpotSuggestion bestSpot={mockBestSpotNoRating} onSelectSite={fn()} />
   ),
 });
 
 // Null data (renders nothing)
 export const NullData = meta.story({
-  render: () => (
-    <BestSpotSuggestion
-      bestSpot={null}
-      onSelectSite={fn()}
-    />
-  ),
+  render: () => <BestSpotSuggestion bestSpot={null} onSelectSite={fn()} />,
 });
 
 // No site in bestSpot (renders nothing) - using null for the whole bestSpot
 export const NoSite = meta.story({
-  render: () => (
-    <BestSpotSuggestion
-      bestSpot={null}
-      onSelectSite={fn()}
-    />
-  ),
+  render: () => <BestSpotSuggestion bestSpot={null} onSelectSite={fn()} />,
 });
 
 // With custom className
@@ -242,10 +214,7 @@ export const CompactNoWind = meta.story({
 // Compact variant - Null data
 export const CompactNullData = meta.story({
   render: () => (
-    <BestSpotSuggestionCompact
-      bestSpot={null}
-      onSelectSite={fn()}
-    />
+    <BestSpotSuggestionCompact bestSpot={null} onSelectSite={fn()} />
   ),
 });
 
@@ -253,52 +222,56 @@ export const CompactNullData = meta.story({
 
 export const DisplaysBestSpotData = meta.story({
   render: () => (
-    <BestSpotSuggestion
-      bestSpot={mockBestSpotExcellent}
-      onSelectSite={fn()}
-    />
+    <BestSpotSuggestion bestSpot={mockBestSpotExcellent} onSelectSite={fn()} />
   ),
 });
 
-DisplaysBestSpotData.test('should display best spot data correctly', async ({ canvas }) => {
-  await expect(canvas.getByText("Meilleur spot pour aujourd'hui")).toBeInTheDocument();
-  await expect(canvas.getByText('Annecy')).toBeInTheDocument();
-  await expect(canvas.getByText('90/100')).toBeInTheDocument();
-  await expect(canvas.getByText('Vent:')).toBeInTheDocument();
-  await expect(canvas.getAllByText(/NW 12km\/h/).length).toBeGreaterThan(0);
-  await expect(canvas.getByText(/Excellentes conditions/)).toBeInTheDocument();
-  await expect(canvas.getByText('Voir les prévisions →')).toBeInTheDocument();
-});
+DisplaysBestSpotData.test(
+  'should display best spot data correctly',
+  async ({ canvas }) => {
+    await expect(
+      canvas.getByText("Meilleur spot pour aujourd'hui")
+    ).toBeInTheDocument();
+    await expect(canvas.getByText('Annecy')).toBeInTheDocument();
+    await expect(canvas.getByText('90/100')).toBeInTheDocument();
+    await expect(canvas.getByText('Vent:')).toBeInTheDocument();
+    await expect(canvas.getAllByText(/NW 12km\/h/).length).toBeGreaterThan(0);
+    await expect(
+      canvas.getByText(/Excellentes conditions/)
+    ).toBeInTheDocument();
+    await expect(canvas.getByText('Voir les prévisions →')).toBeInTheDocument();
+  }
+);
 
 export const ShowsRatingStars = meta.story({
   render: () => (
-    <BestSpotSuggestion
-      bestSpot={mockBestSpotExcellent}
-      onSelectSite={fn()}
-    />
+    <BestSpotSuggestion bestSpot={mockBestSpotExcellent} onSelectSite={fn()} />
   ),
 });
 
-ShowsRatingStars.test('should show rating stars when available', async ({ canvas }) => {
-  // Rating stars should be displayed
-  const ratingText = canvas.queryByText('⭐⭐⭐⭐⭐');
-  await expect(ratingText).toBeInTheDocument();
-});
+ShowsRatingStars.test(
+  'should show rating stars when available',
+  async ({ canvas }) => {
+    // Rating stars should be displayed
+    const ratingText = canvas.queryByText('⭐⭐⭐⭐⭐');
+    await expect(ratingText).toBeInTheDocument();
+  }
+);
 
 export const HidesWindWhenNotAvailable = meta.story({
   render: () => (
-    <BestSpotSuggestion
-      bestSpot={mockBestSpotNoWind}
-      onSelectSite={fn()}
-    />
+    <BestSpotSuggestion bestSpot={mockBestSpotNoWind} onSelectSite={fn()} />
   ),
 });
 
-HidesWindWhenNotAvailable.test('should hide wind info when not available', async ({ canvas }) => {
-  await expect(canvas.getByText('Les Contamines')).toBeInTheDocument();
-  await expect(canvas.getByText('80/100')).toBeInTheDocument();
-  await expect(canvas.queryByText(/Vent:/)).not.toBeInTheDocument();
-});
+HidesWindWhenNotAvailable.test(
+  'should hide wind info when not available',
+  async ({ canvas }) => {
+    await expect(canvas.getByText('Les Contamines')).toBeInTheDocument();
+    await expect(canvas.getByText('80/100')).toBeInTheDocument();
+    await expect(canvas.queryByText(/Vent:/)).not.toBeInTheDocument();
+  }
+);
 
 export const CallsOnSelectSiteCallback = meta.story({
   render: () => {
@@ -312,28 +285,31 @@ export const CallsOnSelectSiteCallback = meta.story({
   },
 });
 
-CallsOnSelectSiteCallback.test('should call onSelectSite callback when button clicked', async ({ canvas }) => {
-  const user = userEvent.setup();
+CallsOnSelectSiteCallback.test(
+  'should call onSelectSite callback when button clicked',
+  async ({ canvas }) => {
+    const user = userEvent.setup();
 
-  const button = canvas.getByText('Voir les prévisions →');
-  await user.click(button);
+    const button = canvas.getByText('Voir les prévisions →');
+    await user.click(button);
 
-  // Note: In CSF3 with .test(), we can't easily check the callback
-  // This test verifies the button is clickable and doesn't error
-});
+    // Note: In CSF3 with .test(), we can't easily check the callback
+    // This test verifies the button is clickable and doesn't error
+  }
+);
 
 export const RendersNothingWhenNull = meta.story({
-  render: () => (
-    <BestSpotSuggestion
-      bestSpot={null}
-      onSelectSite={fn()}
-    />
-  ),
+  render: () => <BestSpotSuggestion bestSpot={null} onSelectSite={fn()} />,
 });
 
-RendersNothingWhenNull.test('should render nothing when bestSpot is null', async ({ canvas }) => {
-  await expect(canvas.queryByText("Meilleur spot aujourd'hui")).not.toBeInTheDocument();
-});
+RendersNothingWhenNull.test(
+  'should render nothing when bestSpot is null',
+  async ({ canvas }) => {
+    await expect(
+      canvas.queryByText("Meilleur spot aujourd'hui")
+    ).not.toBeInTheDocument();
+  }
+);
 
 export const CompactCallsOnSelectSite = meta.story({
   render: () => {
@@ -347,17 +323,20 @@ export const CompactCallsOnSelectSite = meta.story({
   },
 });
 
-CompactCallsOnSelectSite.test('should call onSelectSite callback in compact variant', async ({ canvas }) => {
-  const user = userEvent.setup();
+CompactCallsOnSelectSite.test(
+  'should call onSelectSite callback in compact variant',
+  async ({ canvas }) => {
+    const user = userEvent.setup();
 
-  const button = canvas.getByText('Annecy').closest('button');
-  await expect(button).toBeInTheDocument();
+    const button = canvas.getByText('Annecy').closest('button');
+    await expect(button).toBeInTheDocument();
 
-  if (button) await user.click(button);
+    if (button) await user.click(button);
 
-  // Note: In CSF3 with .test(), we can't easily check the callback
-  // This test verifies the button is clickable and doesn't error
-});
+    // Note: In CSF3 with .test(), we can't easily check the callback
+    // This test verifies the button is clickable and doesn't error
+  }
+);
 
 // ==========================================
 // NEW STORIES - DAY INDEX SUPPORT

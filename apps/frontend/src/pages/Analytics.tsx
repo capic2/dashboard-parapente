@@ -9,8 +9,12 @@ const SiteStats = lazy(() => import('../components/stats/SiteStats'));
 const MonthlyStats = lazy(() => import('../components/stats/MonthlyStats'));
 const TimeOfDayChart = lazy(() => import('../components/stats/TimeOfDayChart'));
 const WeekdayChart = lazy(() => import('../components/stats/WeekdayChart'));
-const RecordsDashboard = lazy(() => import('../components/stats/RecordsDashboard'));
-const AchievementsBadges = lazy(() => import('../components/stats/AchievementsBadges'));
+const RecordsDashboard = lazy(
+  () => import('../components/stats/RecordsDashboard')
+);
+const AchievementsBadges = lazy(
+  () => import('../components/stats/AchievementsBadges')
+);
 
 // Loading fallback component
 function ChartSkeleton() {
@@ -25,8 +29,12 @@ export default function Analytics() {
   return (
     <div>
       <div className="mb-4 bg-white rounded-xl p-4 shadow-md">
-        <h1 className="text-xl font-bold text-gray-900">📊 Analyses et Statistiques</h1>
-        <p className="text-sm text-gray-600 mt-1">Vue d&apos;ensemble de votre progression en parapente</p>
+        <h1 className="text-xl font-bold text-gray-900">
+          📊 Analyses et Statistiques
+        </h1>
+        <p className="text-sm text-gray-600 mt-1">
+          Vue d&apos;ensemble de votre progression en parapente
+        </p>
       </div>
 
       {/* Filtres dynamiques */}

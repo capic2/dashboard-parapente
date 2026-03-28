@@ -13,14 +13,14 @@ const meta = preview.meta({
       // Create a new QueryClient for each story to avoid cache conflicts
       const queryClient = new QueryClient({
         defaultOptions: {
-          queries: { 
+          queries: {
             retry: false,
-            gcTime: 0,  // Disable cache
-            staleTime: 0,  // Always consider data stale
+            gcTime: 0, // Disable cache
+            staleTime: 0, // Always consider data stale
           },
         },
       });
-      
+
       return (
         <QueryClientProvider client={queryClient}>
           <Story />
@@ -50,7 +50,6 @@ const mockFlightResult = {
   },
 };
 
-
 export const FlightModal = meta.story({
   args: {
     isOpen: true,
@@ -68,20 +67,27 @@ export const FlightModal = meta.story({
   },
 });
 
-FlightModal.test('The upload button is disabled when no file selected', async() => {
-  const uploadButton = await screen.getByText('📤 Créer le vol');
-  await expect(uploadButton).toBeDisabled()
-})
+FlightModal.test(
+  'The upload button is disabled when no file selected',
+  async () => {
+    const uploadButton = await screen.getByText('📤 Créer le vol');
+    await expect(uploadButton).toBeDisabled();
+  }
+);
 
-FlightModal.test('It can upload a file', async ({args}) => {
+FlightModal.test('It can upload a file', async ({ args }) => {
   // Create a mock GPX file
-  const file = new File(['<?xml version="1.0"?><gpx></gpx>'], 'test-flight.gpx', {
-    type: 'application/gpx+xml',
-  });
+  const file = new File(
+    ['<?xml version="1.0"?><gpx></gpx>'],
+    'test-flight.gpx',
+    {
+      type: 'application/gpx+xml',
+    }
+  );
 
   // Find the file input
   const input = screen.getByLabelText('Fichier GPX ou IGC') as HTMLInputElement;
-  
+
   // Upload the file
   await userEvent.upload(input, file);
   await expect(await screen.findByText(/test-flight.gpx/)).toBeInTheDocument();
@@ -89,35 +95,51 @@ FlightModal.test('It can upload a file', async ({args}) => {
   // Click the upload button
   const uploadButton = await screen.findByText('📤 Créer le vol');
   await userEvent.click(uploadButton);
-  
-  // Verify success message appears{
-  await expect(await screen.findByText('✅ Vol créé avec succès')).toBeInTheDocument();
 
-  await expect(args.onCreateComplete).toHaveBeenCalled()
-  await waitFor(async () => {
-    await expect(args.onClose).toHaveBeenCalled()
-  }, {timeout: 3000})
-})
+  // Verify success message appears
+  await expect(
+    await screen.findByText('✅ Vol créé avec succès')
+  ).toBeInTheDocument();
 
-FlightModal.test('it clears the selected file when click on cancel', async () => {
-  // Create a mock GPX file
-  const file = new File(['<?xml version="1.0"?><gpx></gpx>'], 'test-flight.gpx', {
-    type: 'application/gpx+xml',
-  });
+  await expect(args.onCreateComplete).toHaveBeenCalled();
+  await waitFor(
+    async () => {
+      await expect(args.onClose).toHaveBeenCalled();
+    },
+    { timeout: 3000 }
+  );
+});
 
-  // Find the file input
-  const input = await screen.findByLabelText('Fichier GPX ou IGC') as HTMLInputElement;
+FlightModal.test(
+  'it clears the selected file when click on cancel',
+  async () => {
+    // Create a mock GPX file
+    const file = new File(
+      ['<?xml version="1.0"?><gpx></gpx>'],
+      'test-flight.gpx',
+      {
+        type: 'application/gpx+xml',
+      }
+    );
 
-  // Upload the file
-  await userEvent.upload(input, file);
-  await expect(await screen.findByText(/test-flight.gpx/)).toBeInTheDocument();
+    // Find the file input
+    const input = (await screen.findByLabelText(
+      'Fichier GPX ou IGC'
+    )) as HTMLInputElement;
 
-  // Click the upload button
-  const cancelButton = screen.getByText('Annuler');
-  await userEvent.click(cancelButton);
+    // Upload the file
+    await userEvent.upload(input, file);
+    await expect(
+      await screen.findByText(/test-flight.gpx/)
+    ).toBeInTheDocument();
 
-  await expect(screen.queryByText(/test-flight.gpx/)).not.toBeInTheDocument();
-})
+    // Click the upload button
+    const cancelButton = screen.getByText('Annuler');
+    await userEvent.click(cancelButton);
+
+    await expect(screen.queryByText(/test-flight.gpx/)).not.toBeInTheDocument();
+  }
+);
 
 /*FlightModal.test('It displays uploading state', async () => {
   const file = new File(['<?xml version="1.0"?><gpx></gpx>'], 'test-flight.gpx', {
@@ -134,62 +156,89 @@ FlightModal.test('it clears the selected file when click on cancel', async () =>
     await expect(await screen.findByText(/Création en cours.../)).toBeInTheDocument();
 })*/
 
-FlightModal.test('shows error message when upload fails', {parameters: {
-    msw: {
-      handlers: [
-        http.post('/api/flights/create-from-gpx', async () => {
-          await delay(100);
-          return new HttpResponse(
+FlightModal.test(
+  'shows error message when upload fails',
+  {
+    parameters: {
+      msw: {
+        handlers: [
+          http.post('/api/flights/create-from-gpx', async () => {
+            await delay(100);
+            return new HttpResponse(
               JSON.stringify({
                 error: 'Fichier GPX invalide',
-                message: 'Le fichier GPX ne contient pas de données de vol valides',
+                message:
+                  'Le fichier GPX ne contient pas de données de vol valides',
               }),
-              { 
+              {
                 status: 400,
                 headers: {
                   'Content-Type': 'application/json',
                 },
               }
-          );
-        }),
-      ],
+            );
+          }),
+        ],
+      },
     },
-  }}, async ({args}) => {
-  // Create a mock GPX file
-  const file = new File(['<?xml version="1.0"?><gpx></gpx>'], 'invalid-flight.gpx', {
-    type: 'application/gpx+xml',
-  });
+  },
+  async ({ args }) => {
+    // Create a mock GPX file
+    const file = new File(
+      ['<?xml version="1.0"?><gpx></gpx>'],
+      'invalid-flight.gpx',
+      {
+        type: 'application/gpx+xml',
+      }
+    );
 
-  // Find the file input and upload
-  const input = await screen.findByLabelText('Fichier GPX ou IGC') as HTMLInputElement;
-  await userEvent.upload(input, file);
-  
-  // Verify file is selected
-  await expect(await screen.findByText(/invalid-flight.gpx/)).toBeInTheDocument();
+    // Find the file input and upload
+    const input = (await screen.findByLabelText(
+      'Fichier GPX ou IGC'
+    )) as HTMLInputElement;
+    await userEvent.upload(input, file);
 
-  // Click the upload button
-  const uploadButton = await screen.findByText('📤 Créer le vol');
-  await userEvent.click(uploadButton);
+    // Verify file is selected
+    await expect(
+      await screen.findByText(/invalid-flight.gpx/)
+    ).toBeInTheDocument();
 
-  // Wait for error message to appear
-  await waitFor(async () => {
-    expect(await screen.findByText('❌ Erreur lors de la création')).toBeInTheDocument();
-  }, { timeout: 5000 });
+    // Click the upload button
+    const uploadButton = await screen.findByText('📤 Créer le vol');
+    await userEvent.click(uploadButton);
 
-  // Verify the error message contains helpful text
-  await expect(await screen.findByText(/données de vol valides/i)).toBeInTheDocument();
+    // Wait for error message to appear
+    await waitFor(
+      async () => {
+        expect(
+          await screen.findByText('❌ Erreur lors de la création')
+        ).toBeInTheDocument();
+      },
+      { timeout: 5000 }
+    );
 
-  // Verify that onCreateComplete was NOT called (since upload failed)
-  await expect(args.onCreateComplete).not.toHaveBeenCalled();
-  
-  // Verify that onClose was NOT called (modal should stay open on error)
-  await expect(args.onClose).not.toHaveBeenCalled();
-  
-  // The success message should NOT appear
-  await expect(screen.queryByText('✅ Vol créé avec succès')).not.toBeInTheDocument();
-});
+    // Verify the error message contains helpful text
+    await expect(
+      await screen.findByText(/données de vol valides/i)
+    ).toBeInTheDocument();
 
-FlightModal.test('it calls onClose when click on close button', async ({args}) => {
-  await userEvent.click(screen.getByRole('button', {name: /fermer/i}))
-  await expect(args.onClose).toHaveBeenCalled()
-})
+    // Verify that onCreateComplete was NOT called (since upload failed)
+    await expect(args.onCreateComplete).not.toHaveBeenCalled();
+
+    // Verify that onClose was NOT called (modal should stay open on error)
+    await expect(args.onClose).not.toHaveBeenCalled();
+
+    // The success message should NOT appear
+    await expect(
+      screen.queryByText('✅ Vol créé avec succès')
+    ).not.toBeInTheDocument();
+  }
+);
+
+FlightModal.test(
+  'it calls onClose when click on close button',
+  async ({ args }) => {
+    await userEvent.click(screen.getByRole('button', { name: /fermer/i }));
+    await expect(args.onClose).toHaveBeenCalled();
+  }
+);

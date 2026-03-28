@@ -11,14 +11,14 @@ const meta = preview.meta({
       // Create a new QueryClient for each story to avoid cache conflicts
       const queryClient = new QueryClient({
         defaultOptions: {
-          queries: { 
+          queries: {
             retry: false,
-            gcTime: 0,  // Disable cache
-            staleTime: 0,  // Always consider data stale
+            gcTime: 0, // Disable cache
+            staleTime: 0, // Always consider data stale
           },
         },
       });
-      
+
       return (
         <QueryClientProvider client={queryClient}>
           <div style={{ maxWidth: '600px', padding: '20px' }}>
@@ -38,9 +38,18 @@ export default meta;
 
 const mockFlights = [
   ...Array.from({ length: 3 }, (_, i) => ({ id: `${i}`, start_time: '09:30' })),
-  ...Array.from({ length: 5 }, (_, i) => ({ id: `${i + 3}`, start_time: '11:45' })),
-  ...Array.from({ length: 8 }, (_, i) => ({ id: `${i + 8}`, start_time: '14:15' })),
-  ...Array.from({ length: 4 }, (_, i) => ({ id: `${i + 16}`, start_time: '16:30' })),
+  ...Array.from({ length: 5 }, (_, i) => ({
+    id: `${i + 3}`,
+    start_time: '11:45',
+  })),
+  ...Array.from({ length: 8 }, (_, i) => ({
+    id: `${i + 8}`,
+    start_time: '14:15',
+  })),
+  ...Array.from({ length: 4 }, (_, i) => ({
+    id: `${i + 16}`,
+    start_time: '16:30',
+  })),
 ];
 
 export const Default = meta.story({

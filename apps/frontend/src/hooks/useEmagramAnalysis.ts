@@ -47,10 +47,9 @@ export function useLatestEmagram(
 
       return response.json();
     },
-    enabled: !!siteId && (options?.enabled !== false),
+    enabled: !!siteId && options?.enabled !== false,
     staleTime: 5 * 60 * 1000,
-    refetchInterval: (query) =>
-      query.state.data ? 10 * 60 * 1000 : 30 * 1000,
+    refetchInterval: (query) => (query.state.data ? 10 * 60 * 1000 : 30 * 1000),
   });
 }
 
@@ -87,8 +86,7 @@ export function useEmagramHistory(
 
       return response.json();
     },
-    enabled:
-      userLat !== null && userLon !== null && (options?.enabled !== false),
+    enabled: userLat !== null && userLon !== null && options?.enabled !== false,
     staleTime: 10 * 60 * 1000,
   });
 }
@@ -114,9 +112,7 @@ export function useTriggerEmagram() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(
-          error.detail || 'Failed to trigger emagram analysis'
-        );
+        throw new Error(error.detail || 'Failed to trigger emagram analysis');
       }
 
       return response.json();

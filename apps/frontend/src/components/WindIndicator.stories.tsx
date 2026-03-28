@@ -21,7 +21,8 @@ const meta = preview.meta({
     },
     siteOrientation: {
       control: 'text',
-      description: 'Takeoff site orientation (e.g., N, NE, E, SE, S, SW, W, NW)',
+      description:
+        'Takeoff site orientation (e.g., N, NE, E, SE, S, SW, W, NW)',
     },
     windSpeed: {
       control: 'number',
@@ -251,7 +252,8 @@ export const Compact = meta.story({
   parameters: {
     docs: {
       description: {
-        story: 'Compact version showing only emoji with tooltip (hover to see details)',
+        story:
+          'Compact version showing only emoji with tooltip (hover to see details)',
       },
     },
   },
@@ -299,7 +301,8 @@ export const AllCompactStates = meta.story({
   parameters: {
     docs: {
       description: {
-        story: 'All favorability states in compact mode (hover each to see tooltip)',
+        story:
+          'All favorability states in compact mode (hover each to see tooltip)',
       },
     },
   },

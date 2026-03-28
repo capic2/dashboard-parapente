@@ -5,16 +5,27 @@
   "projectType": "library",
   "targets": {
     "lint": {
-      "executor": "@nx/eslint:lint",
-      "outputs": ["{options.outputFile}"],
+      "executor": "nx:run-commands",
       "options": {
-        "lintFilePatterns": ["libs/design-system/src/**/*.{ts,tsx}"]
+        "command": "oxlint -c .oxlintrc.json libs/design-system/src"
+      }
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "oxfmt -c .oxfmtrc.json libs/design-system/src"
+      }
+    },
+    "format:check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "oxfmt -c .oxfmtrc.json --check libs/design-system/src"
       }
     },
     "type-check": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsc --noEmit -p libs/design-system/tsconfig.json"
+        "command": "tsc --noEmit -p libs/design-system/tsconfig.json && tsc --noEmit -p libs/design-system/tsconfig.node.json"
       }
     },
     "storybook": {

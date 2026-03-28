@@ -426,9 +426,11 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           </div>
 
           {/* Landing Associations - only for takeoff sites in edit mode */}
-          {site && (formData.usage_type === 'takeoff' || formData.usage_type === 'both') && (
-            <LandingAssociationsManager takeoffSiteId={site.id} />
-          )}
+          {site &&
+            (formData.usage_type === 'takeoff' ||
+              formData.usage_type === 'both') && (
+              <LandingAssociationsManager takeoffSiteId={site.id} />
+            )}
 
           {/* Actions */}
           <div className="flex gap-3 pt-4 border-t">

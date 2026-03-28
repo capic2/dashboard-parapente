@@ -53,10 +53,21 @@
       }
     },
     "lint": {
-      "executor": "@nx/eslint:lint",
-      "outputs": ["{options.outputFile}"],
+      "executor": "nx:run-commands",
       "options": {
-        "lintFilePatterns": ["apps/frontend/**/*.{ts,tsx,js,jsx}"]
+        "command": "oxlint -c .oxlintrc.json apps/frontend/src"
+      }
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "oxfmt -c .oxfmtrc.json apps/frontend/src"
+      }
+    },
+    "format:check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "oxfmt -c .oxfmtrc.json --check apps/frontend/src"
       }
     },
     "type-check": {

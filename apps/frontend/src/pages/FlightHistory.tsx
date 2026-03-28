@@ -18,16 +18,18 @@ import { api } from '../lib/api';
 
 export default function FlightHistory() {
   const { data: flightsRaw = [], isLoading, error } = useFlights({ limit: 50 });
-  
+
   // Trier les vols par date (plus récent en premier) côté frontend en backup du tri backend
   const flights = [...flightsRaw].sort((a, b) => {
     const dateA = new Date(a.flight_date);
     const dateB = new Date(b.flight_date);
     return dateB.getTime() - dateA.getTime();
   });
-  
+
   const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null);
-  const [selectedFlightIds, setSelectedFlightIds] = useState<Set<string>>(new Set());
+  const [selectedFlightIds, setSelectedFlightIds] = useState<Set<string>>(
+    new Set()
+  );
   const [selectionMode, setSelectionMode] = useState(false);
   const [editingMode, setEditingMode] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
@@ -37,7 +39,7 @@ export default function FlightHistory() {
   const [showCreateFlightModal, setShowCreateFlightModal] = useState(false);
   const [showCreateSiteModal, setShowCreateSiteModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // États pour les champs éditables
   const [editedName, setEditedName] = useState('');
   const [editedTitle, setEditedTitle] = useState('');
@@ -60,43 +62,46 @@ export default function FlightHistory() {
   const toast = useToast();
   const { toasts, removeToast } = useToastStore();
 
-  const handleSelectFlight = useCallback((flight: Flight) => {
-    if (selectionMode) {
-      // Mode sélection multiple : toggle la sélection
-      setSelectedFlightIds(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(flight.id)) {
-          newSet.delete(flight.id);
-        } else {
-          newSet.add(flight.id);
-        }
-        return newSet;
-      });
-    } else {
-      // Mode normal : afficher les détails
-      setSelectedFlightId(flight.id);
-      setNotesText(flight.notes || '');
-      setEditingNotes(false);
-      setEditingMode(false);
-      setShowDeleteConfirm(false);
-      
-      // Initialiser les champs éditables
-      setEditedName(flight.name || '');
-      setEditedTitle(flight.title || flight.name || '');
-      setEditedSiteId(flight.site_id || '');
-      setEditedFlightDate(flight.flight_date);
-      setEditedDepartureTime(flight.departure_time || '');
-      setEditedDuration(flight.duration_minutes || 0);
-      setEditedDistance(flight.distance_km || 0);
-      setEditedMaxAltitude(flight.max_altitude_m || 0);
-      setEditedElevationGain(flight.elevation_gain_m || 0);
-      setEditedMaxSpeed(flight.max_speed_kmh || 0);
-      setEditedNotes(flight.notes || '');
-    }
-  }, [selectionMode]);
+  const handleSelectFlight = useCallback(
+    (flight: Flight) => {
+      if (selectionMode) {
+        // Mode sélection multiple : toggle la sélection
+        setSelectedFlightIds((prev) => {
+          const newSet = new Set(prev);
+          if (newSet.has(flight.id)) {
+            newSet.delete(flight.id);
+          } else {
+            newSet.add(flight.id);
+          }
+          return newSet;
+        });
+      } else {
+        // Mode normal : afficher les détails
+        setSelectedFlightId(flight.id);
+        setNotesText(flight.notes || '');
+        setEditingNotes(false);
+        setEditingMode(false);
+        setShowDeleteConfirm(false);
+
+        // Initialiser les champs éditables
+        setEditedName(flight.name || '');
+        setEditedTitle(flight.title || flight.name || '');
+        setEditedSiteId(flight.site_id || '');
+        setEditedFlightDate(flight.flight_date);
+        setEditedDepartureTime(flight.departure_time || '');
+        setEditedDuration(flight.duration_minutes || 0);
+        setEditedDistance(flight.distance_km || 0);
+        setEditedMaxAltitude(flight.max_altitude_m || 0);
+        setEditedElevationGain(flight.elevation_gain_m || 0);
+        setEditedMaxSpeed(flight.max_speed_kmh || 0);
+        setEditedNotes(flight.notes || '');
+      }
+    },
+    [selectionMode]
+  );
 
   const handleToggleSelectionMode = useCallback(() => {
-    setSelectionMode(prev => !prev);
+    setSelectionMode((prev) => !prev);
     setSelectedFlightIds(new Set());
     setSelectedFlightId(null);
   }, []);
@@ -150,15 +155,31 @@ export default function FlightHistory() {
       console.error('Failed to update flight:', err);
       toast.error('Échec de la mise à jour');
     }
-  }, [selectedFlight, updateFlight, editedName, editedTitle, editedSiteId, editedFlightDate, 
-      editedDepartureTime, editedDuration, editedDistance, editedMaxAltitude, editedElevationGain, 
-      editedMaxSpeed, editedNotes, toast]);
+  }, [
+    selectedFlight,
+    updateFlight,
+    editedName,
+    editedTitle,
+    editedSiteId,
+    editedFlightDate,
+    editedDepartureTime,
+    editedDuration,
+    editedDistance,
+    editedMaxAltitude,
+    editedElevationGain,
+    editedMaxSpeed,
+    editedNotes,
+    toast,
+  ]);
 
-  const handleSiteCreated = useCallback((newSite: Site) => {
-    setEditedSiteId(newSite.id);
-    setShowCreateSiteModal(false);
-    toast.success(`Site "${newSite.name}" créé avec succès`);
-  }, [toast]);
+  const handleSiteCreated = useCallback(
+    (newSite: Site) => {
+      setEditedSiteId(newSite.id);
+      setShowCreateSiteModal(false);
+      toast.success(`Site "${newSite.name}" créé avec succès`);
+    },
+    [toast]
+  );
 
   const handleSaveNotes = useCallback(async () => {
     if (!selectedFlight) return;
@@ -202,9 +223,13 @@ export default function FlightHistory() {
         queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] });
 
         if (failCount === 0) {
-          toast.success(`${successCount} vol${successCount > 1 ? 's' : ''} supprimé${successCount > 1 ? 's' : ''} avec succès`);
+          toast.success(
+            `${successCount} vol${successCount > 1 ? 's' : ''} supprimé${successCount > 1 ? 's' : ''} avec succès`
+          );
         } else {
-          toast.error(`${successCount} réussi${successCount > 1 ? 's' : ''}, ${failCount} échec${failCount > 1 ? 's' : ''}`);
+          toast.error(
+            `${successCount} réussi${successCount > 1 ? 's' : ''}, ${failCount} échec${failCount > 1 ? 's' : ''}`
+          );
         }
 
         setSelectedFlightIds(new Set());
@@ -222,10 +247,19 @@ export default function FlightHistory() {
         setShowDeleteConfirm(false);
       } catch (err) {
         console.error('Failed to delete flight:', err);
-        toast.error(`Échec de la suppression: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+        toast.error(
+          `Échec de la suppression: ${err instanceof Error ? err.message : 'Erreur inconnue'}`
+        );
       }
     }
-  }, [selectedFlightId, selectedFlightIds, selectionMode, deleteFlight, toast, queryClient]);
+  }, [
+    selectedFlightId,
+    selectedFlightIds,
+    selectionMode,
+    deleteFlight,
+    toast,
+    queryClient,
+  ]);
 
   const handleGPXUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -241,7 +275,7 @@ export default function FlightHistory() {
       },
       onError: (error: Error) => {
         toast.error(`Échec de l'upload: ${error.message}`);
-      }
+      },
     });
 
     // Reset input
@@ -284,7 +318,7 @@ export default function FlightHistory() {
     <div>
       {/* Toast notifications */}
       <ToastContainer toasts={toasts} onClose={removeToast} />
-      
+
       <div className="mb-4 bg-white rounded-xl p-4 shadow-md">
         <div className="flex justify-between items-center mb-3">
           <div>
@@ -294,7 +328,9 @@ export default function FlightHistory() {
             <div className="text-sm text-gray-600 mt-1">
               {selectionMode && selectedFlightIds.size > 0 ? (
                 <span className="text-sky-600 font-semibold">
-                  {selectedFlightIds.size} vol{selectedFlightIds.size > 1 ? 's' : ''} sélectionné{selectedFlightIds.size > 1 ? 's' : ''}
+                  {selectedFlightIds.size} vol
+                  {selectedFlightIds.size > 1 ? 's' : ''} sélectionné
+                  {selectedFlightIds.size > 1 ? 's' : ''}
                 </span>
               ) : (
                 <>
@@ -304,34 +340,34 @@ export default function FlightHistory() {
               )}
             </div>
           </div>
-          
+
           <div className="flex gap-2">
             {/* Bouton Créer un vol depuis GPX */}
             {!selectionMode && (
-              <button 
+              <button
                 onClick={() => setShowCreateFlightModal(true)}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all flex items-center gap-2"
               >
                 📤 Créer un vol
               </button>
             )}
-            
+
             {/* Bouton Sync Strava */}
             {!selectionMode && (
-              <button 
+              <button
                 onClick={() => setShowStravaSyncModal(true)}
                 className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-all flex items-center gap-2"
               >
                 🔄 Sync Strava
               </button>
             )}
-            
+
             {/* Bouton Mode Sélection */}
-            <button 
+            <button
               onClick={handleToggleSelectionMode}
               className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
-                selectionMode 
-                  ? 'bg-gray-600 text-white hover:bg-gray-700' 
+                selectionMode
+                  ? 'bg-gray-600 text-white hover:bg-gray-700'
                   : 'bg-sky-600 text-white hover:bg-sky-700'
               }`}
             >
@@ -339,23 +375,23 @@ export default function FlightHistory() {
             </button>
           </div>
         </div>
-        
+
         {/* Actions de sélection multiple */}
         {selectionMode && (
           <div className="flex gap-2 pt-3 border-t border-gray-200">
-            <button 
+            <button
               onClick={handleSelectAll}
               className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
             >
               Tout sélectionner
             </button>
-            <button 
+            <button
               onClick={handleDeselectAll}
               className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
             >
               Tout désélectionner
             </button>
-            <button 
+            <button
               onClick={() => setShowDeleteConfirm(true)}
               disabled={selectedFlightIds.size === 0}
               className="ml-auto px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed"
@@ -384,8 +420,8 @@ export default function FlightHistory() {
                   selectionMode && selectedFlightIds.has(flight.id)
                     ? 'border-sky-600 shadow-md bg-sky-50'
                     : selectedFlightId === flight.id
-                    ? 'border-sky-600 shadow-md'
-                    : 'border-gray-200 hover:border-sky-400'
+                      ? 'border-sky-600 shadow-md'
+                      : 'border-gray-200 hover:border-sky-400'
                 }`}
                 onClick={() => handleSelectFlight(flight)}
                 role="button"
@@ -406,11 +442,11 @@ export default function FlightHistory() {
                       onClick={(e) => e.stopPropagation()}
                     />
                   )}
-                  
+
                   <h3 className="font-semibold text-sm text-gray-900 truncate flex-1">
                     {flight.title || 'Vol sans titre'}
                   </h3>
-                  
+
                   {/* Badge GPX manquant */}
                   {!flight.gpx_file_path && !selectionMode && (
                     <span className="ml-2 px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full shrink-0">
@@ -418,14 +454,18 @@ export default function FlightHistory() {
                     </span>
                   )}
                 </div>
-                
+
                 {/* Date et heure */}
                 <div className="text-xs text-gray-500 mb-2">
                   <span className="font-medium">
                     {(() => {
                       // Parse date comme date locale pour éviter les problèmes de timezone
                       const [year, month, day] = flight.flight_date.split('-');
-                      const localDate = new Date(Number(year), Number(month) - 1, Number(day));
+                      const localDate = new Date(
+                        Number(year),
+                        Number(month) - 1,
+                        Number(day)
+                      );
                       return localDate.toLocaleDateString('fr-FR', {
                         day: '2-digit',
                         month: 'short',
@@ -435,14 +475,18 @@ export default function FlightHistory() {
                   </span>
                   {flight.departure_time && (
                     <span className="ml-2">
-                      à {new Date(flight.departure_time).toLocaleTimeString('fr-FR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      à{' '}
+                      {new Date(flight.departure_time).toLocaleTimeString(
+                        'fr-FR',
+                        {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        }
+                      )}
                     </span>
                   )}
                 </div>
-                
+
                 <div className="flex flex-wrap gap-2 text-xs text-gray-600">
                   {flight.duration_minutes && (
                     <div className="flex items-center gap-1">
@@ -489,7 +533,9 @@ export default function FlightHistory() {
                   {editingMode ? (
                     <div className="flex-1 space-y-2">
                       <div>
-                        <label className="text-xs text-gray-600">Nom du vol (identifiant)</label>
+                        <label className="text-xs text-gray-600">
+                          Nom du vol (identifiant)
+                        </label>
                         <input
                           type="text"
                           value={editedName}
@@ -499,7 +545,9 @@ export default function FlightHistory() {
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-600">Titre du vol</label>
+                        <label className="text-xs text-gray-600">
+                          Titre du vol
+                        </label>
                         <input
                           type="text"
                           value={editedTitle}
@@ -514,7 +562,7 @@ export default function FlightHistory() {
                       {selectedFlight.title || 'Vol sans titre'}
                     </h2>
                   )}
-                  
+
                   <div className="flex gap-2 ml-4">
                     {editingMode ? (
                       <>
@@ -523,7 +571,9 @@ export default function FlightHistory() {
                           onClick={handleSaveEdit}
                           disabled={updateFlight.isPending}
                         >
-                          {updateFlight.isPending ? '⏳ Enregistrement...' : '✓ Enregistrer'}
+                          {updateFlight.isPending
+                            ? '⏳ Enregistrement...'
+                            : '✓ Enregistrer'}
                         </button>
                         <button
                           className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-all"
@@ -541,7 +591,7 @@ export default function FlightHistory() {
                         >
                           ✏️ Modifier
                         </button>
-                        
+
                         {/* Bouton Upload GPX */}
                         <button
                           className={`px-3 py-1.5 text-sm rounded-md transition-all ${
@@ -560,7 +610,7 @@ export default function FlightHistory() {
                             <>📎 Ajouter GPX</>
                           )}
                         </button>
-                        
+
                         <button
                           className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 transition-all"
                           onClick={() => setShowDeleteConfirm(true)}
@@ -571,7 +621,7 @@ export default function FlightHistory() {
                       </>
                     )}
                   </div>
-                  
+
                   {/* Input file caché */}
                   <input
                     ref={fileInputRef}
@@ -597,8 +647,13 @@ export default function FlightHistory() {
                       <span className="block text-sm font-medium text-gray-900 mt-1">
                         {(() => {
                           // Parse date comme date locale pour éviter les problèmes de timezone
-                          const [year, month, day] = selectedFlight.flight_date.split('-');
-                          const localDate = new Date(Number(year), Number(month) - 1, Number(day));
+                          const [year, month, day] =
+                            selectedFlight.flight_date.split('-');
+                          const localDate = new Date(
+                            Number(year),
+                            Number(month) - 1,
+                            Number(day)
+                          );
                           return localDate.toLocaleDateString('fr-FR', {
                             weekday: 'long',
                             day: 'numeric',
@@ -609,19 +664,33 @@ export default function FlightHistory() {
                       </span>
                     )}
                   </div>
-                  
+
                   {/* Heure de départ */}
                   <div>
-                    <span className="text-xs text-gray-600">🕐 Heure de départ</span>
+                    <span className="text-xs text-gray-600">
+                      🕐 Heure de départ
+                    </span>
                     {editingMode ? (
                       <input
                         type="time"
-                        value={editedDepartureTime ? new Date(editedDepartureTime).toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'}) : ''}
+                        value={
+                          editedDepartureTime
+                            ? new Date(editedDepartureTime).toLocaleTimeString(
+                                'en-GB',
+                                { hour: '2-digit', minute: '2-digit' }
+                              )
+                            : ''
+                        }
                         onChange={(e) => {
                           if (e.target.value) {
                             const [hours, minutes] = e.target.value.split(':');
                             const newDateTime = new Date(editedFlightDate);
-                            newDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                            newDateTime.setHours(
+                              parseInt(hours),
+                              parseInt(minutes),
+                              0,
+                              0
+                            );
                             setEditedDepartureTime(newDateTime.toISOString());
                           } else {
                             setEditedDepartureTime('');
@@ -631,15 +700,18 @@ export default function FlightHistory() {
                       />
                     ) : (
                       <span className="block text-sm font-medium text-gray-900 mt-1">
-                        {selectedFlight.departure_time ? 
-                          new Date(selectedFlight.departure_time).toLocaleTimeString('fr-FR', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          }) : 'N/A'}
+                        {selectedFlight.departure_time
+                          ? new Date(
+                              selectedFlight.departure_time
+                            ).toLocaleTimeString('fr-FR', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : 'N/A'}
                       </span>
                     )}
                   </div>
-                  
+
                   {/* Site */}
                   <div className="col-span-2 md:col-span-3">
                     <span className="text-xs text-gray-600">📍 Site</span>
@@ -667,19 +739,25 @@ export default function FlightHistory() {
                       </div>
                     ) : (
                       <span className="block text-sm font-medium text-gray-900 mt-1">
-                        {selectedFlight.site_name || selectedFlight.site_id || 'Non spécifié'}
+                        {selectedFlight.site_name ||
+                          selectedFlight.site_id ||
+                          'Non spécifié'}
                       </span>
                     )}
                   </div>
-                  
+
                   {/* Durée */}
                   <div>
-                    <span className="text-xs text-gray-600">⏱️ Durée (min)</span>
+                    <span className="text-xs text-gray-600">
+                      ⏱️ Durée (min)
+                    </span>
                     {editingMode ? (
                       <input
                         type="number"
                         value={editedDuration}
-                        onChange={(e) => setEditedDuration(Number(e.target.value))}
+                        onChange={(e) =>
+                          setEditedDuration(Number(e.target.value))
+                        }
                         min="0"
                         className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
                       />
@@ -696,15 +774,19 @@ export default function FlightHistory() {
                       </span>
                     )}
                   </div>
-                  
+
                   {/* Distance */}
                   <div>
-                    <span className="text-xs text-gray-600">📏 Distance (km)</span>
+                    <span className="text-xs text-gray-600">
+                      📏 Distance (km)
+                    </span>
                     {editingMode ? (
                       <input
                         type="number"
                         value={editedDistance}
-                        onChange={(e) => setEditedDistance(Number(e.target.value))}
+                        onChange={(e) =>
+                          setEditedDistance(Number(e.target.value))
+                        }
                         min="0"
                         step="0.1"
                         className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
@@ -715,15 +797,19 @@ export default function FlightHistory() {
                       </span>
                     )}
                   </div>
-                  
+
                   {/* Altitude max */}
                   <div>
-                    <span className="text-xs text-gray-600">⛰️ Altitude max (m)</span>
+                    <span className="text-xs text-gray-600">
+                      ⛰️ Altitude max (m)
+                    </span>
                     {editingMode ? (
                       <input
                         type="number"
                         value={editedMaxAltitude}
-                        onChange={(e) => setEditedMaxAltitude(Number(e.target.value))}
+                        onChange={(e) =>
+                          setEditedMaxAltitude(Number(e.target.value))
+                        }
                         min="0"
                         className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
                       />
@@ -733,15 +819,19 @@ export default function FlightHistory() {
                       </span>
                     )}
                   </div>
-                  
+
                   {/* Dénivelé */}
                   <div>
-                    <span className="text-xs text-gray-600">📈 Dénivelé (m)</span>
+                    <span className="text-xs text-gray-600">
+                      📈 Dénivelé (m)
+                    </span>
                     {editingMode ? (
                       <input
                         type="number"
                         value={editedElevationGain}
-                        onChange={(e) => setEditedElevationGain(Number(e.target.value))}
+                        onChange={(e) =>
+                          setEditedElevationGain(Number(e.target.value))
+                        }
                         min="0"
                         className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
                       />
@@ -751,15 +841,19 @@ export default function FlightHistory() {
                       </span>
                     )}
                   </div>
-                  
+
                   {/* Vitesse max */}
                   <div>
-                    <span className="text-xs text-gray-600">🏃 Vitesse max (km/h)</span>
+                    <span className="text-xs text-gray-600">
+                      🏃 Vitesse max (km/h)
+                    </span>
                     {editingMode ? (
                       <input
                         type="number"
                         value={editedMaxSpeed}
-                        onChange={(e) => setEditedMaxSpeed(Number(e.target.value))}
+                        onChange={(e) =>
+                          setEditedMaxSpeed(Number(e.target.value))
+                        }
                         min="0"
                         step="0.1"
                         className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
@@ -845,7 +939,8 @@ export default function FlightHistory() {
                       <div>
                         <p className="font-medium">Fichier GPX manquant</p>
                         <p className="text-xs text-orange-600">
-                          Ajoutez un fichier GPX pour activer la visualisation 3D
+                          Ajoutez un fichier GPX pour activer la visualisation
+                          3D
                         </p>
                       </div>
                     </div>
@@ -900,7 +995,7 @@ export default function FlightHistory() {
           )}
         </div>
       </div>
-      
+
       {/* Modal Sync Strava */}
       <StravaSyncModal
         isOpen={showStravaSyncModal}
@@ -909,7 +1004,7 @@ export default function FlightHistory() {
           queryClient.invalidateQueries({ queryKey: ['flights'] });
         }}
       />
-      
+
       {/* Modal Créer un vol depuis GPX */}
       <CreateFlightModal
         isOpen={showCreateFlightModal}
@@ -918,7 +1013,7 @@ export default function FlightHistory() {
           queryClient.invalidateQueries({ queryKey: ['flights'] });
         }}
       />
-      
+
       {/* Modal Créer un site */}
       <CreateSiteModal
         isOpen={showCreateSiteModal}
@@ -926,7 +1021,7 @@ export default function FlightHistory() {
         onSiteCreated={handleSiteCreated}
         flightId={selectedFlightId || undefined}
       />
-      
+
       {/* Modal de confirmation suppression multiple */}
       {showDeleteConfirm && selectionMode && selectedFlightIds.size > 0 && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -937,7 +1032,8 @@ export default function FlightHistory() {
             <p className="text-gray-700 mb-4">
               Vous êtes sur le point de supprimer définitivement{' '}
               <span className="font-bold text-red-600">
-                {selectedFlightIds.size} vol{selectedFlightIds.size > 1 ? 's' : ''}
+                {selectedFlightIds.size} vol
+                {selectedFlightIds.size > 1 ? 's' : ''}
               </span>
               . Cette action est irréversible.
             </p>
@@ -952,7 +1048,8 @@ export default function FlightHistory() {
                 onClick={handleDeleteFlight}
                 className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all"
               >
-                🗑️ Supprimer {selectedFlightIds.size} vol{selectedFlightIds.size > 1 ? 's' : ''}
+                🗑️ Supprimer {selectedFlightIds.size} vol
+                {selectedFlightIds.size > 1 ? 's' : ''}
               </button>
             </div>
           </div>

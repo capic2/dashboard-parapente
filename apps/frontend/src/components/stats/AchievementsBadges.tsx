@@ -17,7 +17,7 @@ interface Badge {
 
 /**
  * Système de badges d'achievements
- * 
+ *
  * Affiche les accomplissements du pilote basés sur :
  * - Nombre de vols
  * - Heures de vol totales
@@ -114,7 +114,7 @@ export default function AchievementsBadges() {
       {
         id: 'altitude_1000',
         title: 'Grimpeur',
-        description: 'Atteindre 1000m d\'altitude',
+        description: "Atteindre 1000m d'altitude",
         icon: '⛰️',
         unlocked: maxAltitude >= 1000,
         progress: Math.min(100, (maxAltitude / 1000) * 100),
@@ -123,7 +123,7 @@ export default function AchievementsBadges() {
       {
         id: 'altitude_2000',
         title: 'Alpiniste',
-        description: 'Atteindre 2000m d\'altitude',
+        description: "Atteindre 2000m d'altitude",
         icon: '🏔️',
         unlocked: maxAltitude >= 2000,
         progress: Math.min(100, (maxAltitude / 2000) * 100),
@@ -132,7 +132,7 @@ export default function AchievementsBadges() {
       {
         id: 'altitude_3000',
         title: 'Aigle',
-        description: 'Atteindre 3000m d\'altitude',
+        description: "Atteindre 3000m d'altitude",
         icon: '🦅',
         unlocked: maxAltitude >= 3000,
         progress: Math.min(100, (maxAltitude / 3000) * 100),
@@ -173,7 +173,9 @@ export default function AchievementsBadges() {
       {/* Unlocked Badges */}
       {unlockedBadges.length > 0 && (
         <div className="mb-6">
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">Débloqués</h4>
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+            Débloqués
+          </h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {unlockedBadges.map((badge) => (
               <div
@@ -196,7 +198,9 @@ export default function AchievementsBadges() {
       {/* Locked Badges with Progress */}
       {lockedBadges.length > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">À débloquer</h4>
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+            À débloquer
+          </h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {lockedBadges.map((badge) => (
               <div
@@ -207,7 +211,11 @@ export default function AchievementsBadges() {
                 {badge.progress !== undefined && (
                   <div
                     className="absolute inset-0 bg-gradient-to-t from-sky-100 to-transparent opacity-50"
-                    style={{ height: `${badge.progress}%`, bottom: 0, top: 'auto' }}
+                    style={{
+                      height: `${badge.progress}%`,
+                      bottom: 0,
+                      top: 'auto',
+                    }}
                   ></div>
                 )}
 
