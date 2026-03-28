@@ -30,6 +30,15 @@ export default defineConfig({
       }
     }
   },
+  preview: {
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8001',
+        changeOrigin: true
+      }
+    }
+  },
   build: {
     outDir: '../../dist/apps/frontend',
     emptyOutDir: true,
