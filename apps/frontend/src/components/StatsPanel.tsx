@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useFlightStats } from '../hooks/useFlights';
 
 export default function StatsPanel() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { data: stats, isLoading, error } = useFlightStats();
 
   if (isLoading) {
@@ -145,7 +145,7 @@ export default function StatsPanel() {
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">
               {stats.last_flight_date
-                ? new Date(stats.last_flight_date).toLocaleDateString('fr-FR', {
+                ? new Date(stats.last_flight_date).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR', {
                     day: '2-digit',
                     month: '2-digit',
                   })

@@ -74,7 +74,7 @@ export function FilterBar() {
             <span className="font-medium">{t('filters.activeFilters')}</span>
             {filters.siteId && (
               <span className="px-2 py-1 bg-sky-100 text-sky-700 rounded">
-                {sites.find((s) => s.id === filters.siteId)?.name || 'Site'}
+                {sites.find((s) => s.id === filters.siteId)?.name || t('common.site')}
               </span>
             )}
             {filters.dateFrom && (

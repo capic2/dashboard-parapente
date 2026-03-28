@@ -41,7 +41,7 @@ export function StravaSyncModal({
           setTimeout(() => onClose(), 2000); // Fermer après 2s
         },
         onError: (error: Error) => {
-          toast.error(`${t('strava.syncFailure')}: ${error.message}`);
+          toast.error(`${t('strava.syncError')} ${error.message}`);
         },
       }
     );

@@ -60,7 +60,7 @@ export default function MonthlyStats() {
         count: stats.count,
         hours: Math.round((stats.totalMinutes / 60) * 10) / 10,
       }));
-  }, [flights]);
+  }, [flights, i18n.language]);
 
   if (isLoading) {
     return (
@@ -135,7 +135,7 @@ export default function MonthlyStats() {
               const val = value || 0;
               if (name === 'count')
                 return [
-                  `${val} vol${Number(val) > 1 ? 's' : ''}`,
+                  `${val} ${t('common.flight', { count: Number(val) })}`,
                   t('charts.flightCount'),
                 ];
               return [`${val}h`, t('charts.flightHours')];

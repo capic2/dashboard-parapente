@@ -295,7 +295,10 @@
     "selectValidFile": "Please select a valid GPX or IGC file",
     "createdSuccess": "Flight created successfully:",
     "createGenericError": "An error occurred while creating the flight",
-    "createFailure": "Creation failed:"
+    "createFailure": "Creation failed:",
+    "unnamed": "Unnamed",
+    "creating": "Creating...",
+    "createButton": "Create flight"
   },
   "createSite": {
     "title": "Create a new site",
@@ -311,7 +314,34 @@
   "editSite": {
     "nameMinLength": "Name must be at least 2 characters",
     "invalidLatitude": "Invalid latitude (-90 to 90)",
-    "invalidLongitude": "Invalid longitude (-180 to 180)"
+    "invalidLongitude": "Invalid longitude (-180 to 180)",
+    "title": "Edit",
+    "newSite": "New site",
+    "siteName": "Site name",
+    "code": "Code",
+    "codeReadonly": "Code cannot be modified after creation",
+    "siteType": "Site type",
+    "takeoffAndLanding": "Takeoff and Landing",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "elevation": "Elevation (m)",
+    "region": "Region",
+    "country": "Country",
+    "regionPlaceholder": "e.g.: Alps",
+    "france": "France",
+    "switzerland": "Switzerland",
+    "italy": "Italy",
+    "spain": "Spain",
+    "orientation": "Orientation",
+    "undefined": "Undefined",
+    "camera3D": "3D Camera Position",
+    "angle": "Angle",
+    "distance": "Distance",
+    "description": "Description",
+    "additionalInfo": "Additional information about the site...",
+    "saving": "Saving...",
+    "saveButton": "Save",
+    "saveError": "Error saving site"
   },
   "strava": {
     "title": "Sync with Strava",
@@ -340,7 +370,13 @@
   "landings": {
     "loading": "Loading landings...",
     "associated": "Associated landings",
-    "none": "No associated landing"
+    "none": "No associated landing",
+    "mainLanding": "Main landing",
+    "setAsMain": "Set as main",
+    "addLanding": "Add a landing",
+    "chooseSite": "Choose a site...",
+    "notesOptional": "Notes (optional)",
+    "adding": "Adding..."
   },
   "datepicker": {
     "openCalendar": "Open calendar"

@@ -46,7 +46,7 @@ export function CreateFlightModal({
     createFlight(formData, {
       onSuccess: (result) => {
         toast.success(
-          t('flights.createdSuccess') + ` ${result.flight.name || 'Sans nom'}`
+          t('flights.createdSuccess') + ` ${result.flight.name || t('flights.unnamed')}`
         );
         onCreateComplete();
         setSelectedFile(null);
@@ -137,7 +137,7 @@ export function CreateFlightModal({
             <ul className="text-sm text-green-700 space-y-1">
               <li>
                 • <strong>{t('flights.name')}</strong>{' '}
-                {data.flight.name || 'Sans nom'}
+                {data.flight.name || t('flights.unnamed')}
               </li>
               <li>
                 • <strong>{t('flights.date')}</strong> {data.flight.flight_date}
@@ -190,10 +190,10 @@ export function CreateFlightModal({
             {isPending ? (
               <>
                 <span className="inline-block animate-spin mr-2">⏳</span>
-                Création en cours...
+                {t('flights.creating')}
               </>
             ) : (
-              '📤 Créer le vol'
+              `📤 ${t('flights.createButton')}`
             )}
           </button>
         </div>

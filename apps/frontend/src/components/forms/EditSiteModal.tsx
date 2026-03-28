@@ -138,7 +138,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
       onClose();
     } catch (error) {
       console.error('Failed to save site:', error);
-      alert('Erreur lors de la sauvegarde');
+      alert(t('editSite.saveError'));
     } finally {
       setIsSaving(false);
     }
@@ -150,14 +150,14 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <h2 className="text-2xl font-bold mb-4">
-          {site ? `Modifier ${site.name}` : 'Nouveau site'}
+          {site ? `${t('editSite.title')} ${site.name}` : t('editSite.newSite')}
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Nom */}
           <div>
             <label className="block text-sm font-medium mb-1">
-              Nom du site *
+              {t('editSite.siteName')} *
             </label>
             <input
               type="text"
@@ -175,7 +175,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
 
           {/* Code */}
           <div>
-            <label className="block text-sm font-medium mb-1">Code</label>
+            <label className="block text-sm font-medium mb-1">{t('editSite.code')}</label>
             <input
               type="text"
               value={formData.code}
@@ -187,7 +187,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
             />
             {site && (
               <p className="text-xs text-gray-500 mt-1">
-                Le code ne peut pas être modifié après création
+                {t('editSite.codeReadonly')}
               </p>
             )}
           </div>
@@ -195,7 +195,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           {/* Type de site */}
           <div>
             <label className="block text-sm font-medium mb-2">
-              Type de site *
+              {t('editSite.siteType')} *
             </label>
             <div className="space-y-2">
               <label className="flex items-center cursor-pointer">
@@ -208,7 +208,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                   }
                   className="mr-2"
                 />
-                <span>Décollage uniquement</span>
+                <span>{t('sites.takeoffOnly')}</span>
               </label>
               <label className="flex items-center cursor-pointer">
                 <input
@@ -220,7 +220,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                   }
                   className="mr-2"
                 />
-                <span>Atterrissage uniquement</span>
+                <span>{t('sites.landingOnly')}</span>
               </label>
               <label className="flex items-center cursor-pointer">
                 <input
@@ -232,7 +232,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                   }
                   className="mr-2"
                 />
-                <span>Décollage et Atterrissage</span>
+                <span>{t('editSite.takeoffAndLanding')}</span>
               </label>
             </div>
           </div>
@@ -241,7 +241,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium mb-1">
-                Latitude *
+                {t('editSite.latitude')} *
               </label>
               <input
                 type="number"
@@ -262,7 +262,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
-                Longitude *
+                {t('editSite.longitude')} *
               </label>
               <input
                 type="number"
@@ -283,7 +283,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
-                Élévation (m)
+                {t('editSite.elevation')}
               </label>
               <input
                 type="number"
@@ -302,7 +302,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           {/* Region & Country */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium mb-1">Région</label>
+              <label className="block text-sm font-medium mb-1">{t('editSite.region')}</label>
               <input
                 type="text"
                 value={formData.region}
@@ -310,11 +310,11 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                   setFormData({ ...formData, region: e.target.value })
                 }
                 className="w-full px-3 py-2 border rounded"
-                placeholder="Ex: Franche-Comté"
+                placeholder={t('editSite.regionPlaceholder')}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Pays</label>
+              <label className="block text-sm font-medium mb-1">{t('editSite.country')}</label>
               <select
                 value={formData.country}
                 onChange={(e) =>
@@ -322,10 +322,10 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                 }
                 className="w-full px-3 py-2 border rounded"
               >
-                <option value="FR">France</option>
-                <option value="CH">Suisse</option>
-                <option value="IT">Italie</option>
-                <option value="ES">Espagne</option>
+                <option value="FR">{t('editSite.france')}</option>
+                <option value="CH">{t('editSite.switzerland')}</option>
+                <option value="IT">{t('editSite.italy')}</option>
+                <option value="ES">{t('editSite.spain')}</option>
               </select>
             </div>
           </div>
@@ -333,7 +333,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           {/* Orientation */}
           <div>
             <label className="block text-sm font-medium mb-1">
-              Orientation
+              {t('editSite.orientation')}
             </label>
             <select
               value={formData.orientation}
@@ -342,7 +342,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               }
               className="w-full px-3 py-2 border rounded"
             >
-              <option value="">Non définie</option>
+              <option value="">{t('editSite.undefined')}</option>
               <option value="N">Nord (N)</option>
               <option value="NE">Nord-Est (NE)</option>
               <option value="E">Est (E)</option>
@@ -357,12 +357,12 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           {/* Camera Settings */}
           <div className="p-3 bg-blue-50 rounded border border-blue-200">
             <h4 className="text-sm font-semibold mb-3">
-              📷 Position Caméra 3D
+              📷 {t('editSite.camera3D')}
             </h4>
 
             <div className="mb-3">
               <label className="block text-sm mb-1">
-                Angle: {formData.camera_angle}°
+                {t('editSite.angle')}: {formData.camera_angle}°
               </label>
               <input
                 type="range"
@@ -388,7 +388,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
 
             <div>
               <label className="block text-sm mb-1">
-                Distance: {formData.camera_distance}m
+                {t('editSite.distance')}: {formData.camera_distance}m
               </label>
               <input
                 type="range"
@@ -414,7 +414,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           {/* Description */}
           <div>
             <label className="block text-sm font-medium mb-1">
-              Description
+              {t('editSite.description')}
             </label>
             <textarea
               value={formData.description}
@@ -423,7 +423,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               }
               className="w-full px-3 py-2 border rounded"
               rows={3}
-              placeholder="Informations complémentaires sur le site..."
+              placeholder={t('editSite.additionalInfo')}
             />
           </div>
 
@@ -442,14 +442,14 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
               disabled={isSaving}
             >
-              Annuler
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
               disabled={isSaving}
             >
-              {isSaving ? '⏳ Enregistrement...' : '💾 Enregistrer'}
+              {isSaving ? `⏳ ${t('editSite.saving')}` : `💾 ${t('editSite.saveButton')}`}
             </button>
           </div>
         </form>

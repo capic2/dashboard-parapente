@@ -24,7 +24,7 @@ const getVerdictEmoji = (verdict: string): string => {
 };
 
 export default function CurrentConditions({ spotId }: CurrentConditionsProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { data: weather, isLoading, error } = useWeather(spotId);
   const { data: site } = useSite(spotId);
 
@@ -125,7 +125,7 @@ export default function CurrentConditions({ spotId }: CurrentConditionsProps) {
 
       <div className="mt-3 text-xs text-gray-400 text-center pt-2 border-t border-gray-100">
         {t('weather.updatedAt')}{' '}
-        {new Date(weather.forecast_time).toLocaleString('fr-FR')}
+        {new Date(weather.forecast_time).toLocaleString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR')}
       </div>
     </div>
   );

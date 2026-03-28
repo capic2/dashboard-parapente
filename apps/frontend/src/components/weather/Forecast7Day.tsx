@@ -29,7 +29,7 @@ export default function Forecast7Day({
   selectedDayIndex = 0,
   onSelectDay,
 }: Forecast7DayProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
@@ -41,7 +41,7 @@ export default function Forecast7Day({
     if (date.toDateString() === tomorrow.toDateString())
       return t('common.tomorrow');
 
-    return date.toLocaleDateString('fr-FR', {
+    return date.toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR', {
       weekday: 'short',
       day: 'numeric',
       month: 'short',

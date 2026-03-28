@@ -1,7 +1,7 @@
 import preview from '../.storybook/preview';
-import { expect, fn, screen } from 'storybook/test';
+import { expect, fn } from 'storybook/test';
 import { DatePicker } from './DatePicker';
-import { CalendarDate } from '@internationalized/date';
+
 
 const FROZEN_DATE = new Date(2026, 0, 15);
 
@@ -74,7 +74,7 @@ Empty.test(
       canvas.getByLabelText('Select Date', { selector: 'button' })
     );
     await userEvent.click(
-      screen.getByRole('button', { name: "Aujourd'hui, jeudi 15 janvier 2026" })
+      canvas.getByRole('button', { name: /15/ })
     );
     await expect(args.onChange).toHaveBeenCalledWith('2026-01-15');
   }

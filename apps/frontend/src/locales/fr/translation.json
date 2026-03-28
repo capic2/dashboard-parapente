@@ -295,7 +295,10 @@
     "selectValidFile": "Veuillez sélectionner un fichier GPX ou IGC valide",
     "createdSuccess": "Vol créé avec succès :",
     "createGenericError": "Une erreur est survenue lors de la création du vol",
-    "createFailure": "Échec de la création :"
+    "createFailure": "Échec de la création :",
+    "unnamed": "Sans nom",
+    "creating": "Création en cours...",
+    "createButton": "Créer le vol"
   },
   "createSite": {
     "title": "Créer un nouveau site",
@@ -311,7 +314,34 @@
   "editSite": {
     "nameMinLength": "Le nom doit contenir au moins 2 caractères",
     "invalidLatitude": "Latitude invalide (-90 à 90)",
-    "invalidLongitude": "Longitude invalide (-180 à 180)"
+    "invalidLongitude": "Longitude invalide (-180 à 180)",
+    "title": "Modifier",
+    "newSite": "Nouveau site",
+    "siteName": "Nom du site",
+    "code": "Code",
+    "codeReadonly": "Le code ne peut pas être modifié après création",
+    "siteType": "Type de site",
+    "takeoffAndLanding": "Décollage et Atterrissage",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "elevation": "Élévation (m)",
+    "region": "Région",
+    "country": "Pays",
+    "regionPlaceholder": "Ex: Franche-Comté",
+    "france": "France",
+    "switzerland": "Suisse",
+    "italy": "Italie",
+    "spain": "Espagne",
+    "orientation": "Orientation",
+    "undefined": "Non définie",
+    "camera3D": "Position Caméra 3D",
+    "angle": "Angle",
+    "distance": "Distance",
+    "description": "Description",
+    "additionalInfo": "Informations complémentaires sur le site...",
+    "saving": "Enregistrement...",
+    "saveButton": "Enregistrer",
+    "saveError": "Erreur lors de la sauvegarde"
   },
   "strava": {
     "title": "Synchroniser avec Strava",
@@ -340,7 +370,13 @@
   "landings": {
     "loading": "Chargement des atterrissages...",
     "associated": "Atterrissages associés",
-    "none": "Aucun atterrissage associé"
+    "none": "Aucun atterrissage associé",
+    "mainLanding": "Atterrissage principal",
+    "setAsMain": "Définir comme principal",
+    "addLanding": "Ajouter un atterrissage",
+    "chooseSite": "Choisir un site...",
+    "notesOptional": "Notes (optionnel)",
+    "adding": "Ajout..."
   },
   "datepicker": {
     "openCalendar": "Ouvrir le calendrier"

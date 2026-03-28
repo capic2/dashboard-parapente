@@ -28,8 +28,7 @@ export default defineConfig({
         { browser: 'chromium', launch: { headless: true } },
       ],
     },
-    setupFiles: ['./.storybook/vitest.setup.ts'],
     testTimeout: 15000,
-    setupFiles: ['./.storybook/vitest.setup.ts'],
+    setupFiles: [path.join(dirname, '.storybook/vitest.setup.ts')],
   },
 })

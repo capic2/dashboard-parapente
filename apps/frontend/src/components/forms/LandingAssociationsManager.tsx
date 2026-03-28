@@ -104,8 +104,8 @@ export default function LandingAssociationsManager({
                   }`}
                   title={
                     assoc.is_primary
-                      ? 'Atterrissage principal'
-                      : 'Definir comme principal'
+                      ? t('landings.mainLanding')
+                      : t('landings.setAsMain')
                   }
                 />
                 <div className="min-w-0">
@@ -139,7 +139,7 @@ export default function LandingAssociationsManager({
           className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
           disabled={availableLandings.length === 0}
         >
-          + Ajouter un atterrissage
+          + {t('landings.addLanding')}
         </button>
       ) : (
         <div className="space-y-2 bg-gray-50 dark:bg-gray-700 rounded p-2">
@@ -148,7 +148,7 @@ export default function LandingAssociationsManager({
             onChange={(e) => setSelectedLandingId(e.target.value)}
             className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 rounded px-2 py-1"
           >
-            <option value="">Choisir un site...</option>
+            <option value="">{t('landings.chooseSite')}</option>
             {availableLandings.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -158,7 +158,7 @@ export default function LandingAssociationsManager({
           </select>
           <input
             type="text"
-            placeholder="Notes (optionnel)"
+            placeholder={t('landings.notesOptional')}
             value={newNotes}
             onChange={(e) => setNewNotes(e.target.value)}
             className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 rounded px-2 py-1"
@@ -170,7 +170,7 @@ export default function LandingAssociationsManager({
               disabled={!selectedLandingId || addMutation.isPending}
               className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
             >
-              {addMutation.isPending ? 'Ajout...' : 'Ajouter'}
+              {addMutation.isPending ? t('landings.adding') : t('common.add')}
             </button>
             <button
               type="button"
@@ -181,7 +181,7 @@ export default function LandingAssociationsManager({
               }}
               className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             >
-              Annuler
+              {t('common.cancel')}
             </button>
           </div>
         </div>

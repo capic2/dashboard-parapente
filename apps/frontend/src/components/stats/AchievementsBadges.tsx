@@ -143,7 +143,7 @@ export default function AchievementsBadges() {
     ];
 
     return allBadges;
-  }, [stats]);
+  }, [stats, t]);
 
   const unlockedBadges = badges.filter((b) => b.unlocked);
   const lockedBadges = badges.filter((b) => !b.unlocked);
