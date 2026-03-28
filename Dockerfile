@@ -60,12 +60,18 @@ COPY apps/backend/ ./
 # Copier frontend build depuis stage 1 (Nx output)
 COPY --from=frontend-builder /workspace/dist/apps/frontend ./static
 
+# Créer un utilisateur non-root pour le runtime
+RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
+
 # Créer répertoires pour la base de données et les exports vidéo
-RUN mkdir -p /app/db && chmod 755 /app/db && \
-    mkdir -p /app/exports/videos && chmod 755 /app/exports/videos
+RUN mkdir -p /app/db && mkdir -p /app/exports/videos && \
+    chown -R appuser:appgroup /app/db /app/exports/videos
 
 # Rendre le script d'entrypoint exécutable
 RUN chmod +x entrypoint.sh
+
+# Passer en utilisateur non-root
+USER appuser
 
 # Exposer port
 EXPOSE 8001

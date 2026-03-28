@@ -4,8 +4,11 @@ import {defineMain} from '@storybook/react-vite/node';
 
 export default defineMain({
     stories: ['../src/**/*.stories.@(js|jsx|mjs|ts|tsx)'],
-    addons: [getAbsolutePath("@storybook/addon-a11y"), getAbsolutePath("@storybook/addon-docs"),
-        getAbsolutePath("@storybook/addon-vitest"),],
+    addons: [
+        getAbsolutePath("@storybook/addon-a11y"),
+        getAbsolutePath("@storybook/addon-docs"),
+        getAbsolutePath("@storybook/addon-vitest"),
+    ],
     framework: {
         name: getAbsolutePath("@storybook/react-vite"),
         options: {
