@@ -34,7 +34,6 @@ interface BaseTooltipProps {
 }
 
 interface SourceDataTooltipProps extends BaseTooltipProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sources: Record<string, any>;
   consensus: number | string | null;
   unit: string;
@@ -89,7 +88,6 @@ const getSourceUrl = (sourceKey: string): string | null => {
  * Format: "🟢 BON" or "🟡 MOYEN — Vent faible" or "🔴 MAUVAIS — Vent insuffisant"
  */
 const getFlyabilityDisplay = (
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   hour: any
 ): { emoji: string; text: string; color: string } => {
   const verdict = hour.verdict?.toLowerCase();
@@ -553,7 +551,6 @@ export default function HourlyForecast({
   const { data: weather, isLoading, error } = useWeather(spotId, dayIndex);
   const [activeTooltip, setActiveTooltip] = useState<{
     type: CellType;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     data: any;
     position: TooltipPosition;
   } | null>(null);
@@ -625,7 +622,6 @@ export default function HourlyForecast({
 
   const handleCellInteraction = (
     cellType: CellType,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     hourData: any,
     event: React.MouseEvent
   ) => {
@@ -780,7 +776,6 @@ export default function HourlyForecast({
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cellEventHandlers = (cellType: CellType, hourData: any) => ({
     onClick: (e: React.MouseEvent) =>
       handleCellInteraction(cellType, hourData, e),

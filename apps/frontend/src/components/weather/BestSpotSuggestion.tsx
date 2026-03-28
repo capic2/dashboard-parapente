@@ -1,9 +1,9 @@
 /**
  * BestSpotSuggestion Component
- * 
+ *
  * Prominent card at the top of the dashboard showing the best spot to fly
  * Based on Para-Index and wind favorability
- * 
+ *
  * Updated to support displaying the date for different days
  */
 
@@ -27,11 +27,12 @@ export function BestSpotSuggestion({
 }: BestSpotSuggestionProps) {
   // Calculate the date label based on selectedDayIndex
   const selectedDate = addDays(new Date(), selectedDayIndex);
-  const dateLabel = selectedDayIndex === 0
-    ? "aujourd'hui"
-    : selectedDayIndex === 1
-    ? "demain"
-    : format(selectedDate, 'EEEE d MMMM', { locale: fr });
+  const dateLabel =
+    selectedDayIndex === 0
+      ? "aujourd'hui"
+      : selectedDayIndex === 1
+        ? 'demain'
+        : format(selectedDate, 'EEEE d MMMM', { locale: fr });
 
   // Show loading state if no data available
   if (!bestSpot || !bestSpot.site) {
@@ -59,7 +60,9 @@ export function BestSpotSuggestion({
   const borderColor = 'border-sky-200 dark:border-sky-700';
 
   return (
-    <div className={`${bgColor} border ${borderColor} rounded-lg p-4 shadow-sm ${className}`}>
+    <div
+      className={`${bgColor} border ${borderColor} rounded-lg p-4 shadow-sm ${className}`}
+    >
       <div className="flex items-center justify-between">
         {/* Left side: Icon and title */}
         <div className="flex items-center gap-3">
@@ -95,13 +98,19 @@ export function BestSpotSuggestion({
       {/* Metrics row */}
       <div className="flex items-center gap-4 mt-3">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600 dark:text-gray-400">Para-Index:</span>
-          <span className="text-lg font-bold text-sky-600">{paraIndex}/100</span>
+          <span className="text-sm text-gray-600 dark:text-gray-400">
+            Para-Index:
+          </span>
+          <span className="text-lg font-bold text-sky-600">
+            {paraIndex}/100
+          </span>
         </div>
 
         {windDirection && windSpeed != null && (
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Vent:</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Vent:
+            </span>
             <span className="text-sm font-medium text-gray-900 dark:text-white">
               {windDirection} {windSpeed}km/h
             </span>
@@ -110,9 +119,7 @@ export function BestSpotSuggestion({
       </div>
 
       {/* Reason text */}
-      <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-        {reason}
-      </p>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{reason}</p>
 
       {/* Action button */}
       <button

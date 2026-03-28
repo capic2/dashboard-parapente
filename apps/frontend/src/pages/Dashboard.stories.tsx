@@ -144,9 +144,13 @@ const defaultHandlers = [
   http.get('*/api/spots/best', () => HttpResponse.json(mockBestSpot)),
   http.get('*/api/spots/:id', ({ params }) => {
     const site = mockSites.sites.find((s) => s.id === params.id);
-    return site ? HttpResponse.json(site) : new HttpResponse(null, { status: 404 });
+    return site
+      ? HttpResponse.json(site)
+      : new HttpResponse(null, { status: 404 });
   }),
-  http.get('*/api/weather/:spotId/daily-summary', () => HttpResponse.json(mockDailySummary)),
+  http.get('*/api/weather/:spotId/daily-summary', () =>
+    HttpResponse.json(mockDailySummary)
+  ),
   http.get('*/api/weather/:spotId', () => HttpResponse.json(mockWeather)),
   http.get('*/api/flights/stats', () => HttpResponse.json(mockStats)),
   http.get('*/api/sites/:siteId/landings', () => HttpResponse.json([])),
@@ -159,10 +163,13 @@ export const Default = meta.story({
   parameters: { msw: { handlers: defaultHandlers } },
 });
 
-Default.test('renders dashboard with site selector and weather', async ({ canvas }) => {
-  await canvas.findByText('Arguel');
-  await expect(canvas.getByText('Chalais')).toBeInTheDocument();
-});
+Default.test(
+  'renders dashboard with site selector and weather',
+  async ({ canvas }) => {
+    await canvas.findByText('Arguel');
+    await expect(canvas.getByText('Chalais')).toBeInTheDocument();
+  }
+);
 
 export const Loading = meta.story({
   parameters: {

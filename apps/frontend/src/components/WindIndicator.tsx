@@ -1,15 +1,15 @@
 /**
  * WindIndicator Component
- * 
+ *
  * Shows a visual indicator (🟢/🟡/🔴) based on wind favorability
  * for a specific takeoff orientation.
  */
 
-import { 
-  getWindFavorability, 
+import {
+  getWindFavorability,
   getWindFavorabilityEmoji,
   getWindFavorabilityLabel,
-  getWindFavorabilityColor
+  getWindFavorabilityColor,
 } from '../utils/windMatcher';
 
 interface WindIndicatorProps {
@@ -29,7 +29,11 @@ export function WindIndicator({
   size = 'md',
   className = '',
 }: WindIndicatorProps) {
-  const favorability = getWindFavorability(windDirection, siteOrientation, windSpeed);
+  const favorability = getWindFavorability(
+    windDirection,
+    siteOrientation,
+    windSpeed
+  );
   const emoji = getWindFavorabilityEmoji(favorability);
   const label = getWindFavorabilityLabel(favorability, 'fr');
   const colorClass = getWindFavorabilityColor(favorability);
@@ -44,15 +48,21 @@ export function WindIndicator({
   // If no wind data, show unknown state
   if (!windDirection || windDirection === 'N/A') {
     return (
-      <div className={`flex items-center gap-2 ${sizeClasses[size]} ${className}`}>
+      <div
+        className={`flex items-center gap-2 ${sizeClasses[size]} ${className}`}
+      >
         <span className="text-gray-400">⚪</span>
-        {showLabel && <span className="text-gray-400">Données vent indisponibles</span>}
+        {showLabel && (
+          <span className="text-gray-400">Données vent indisponibles</span>
+        )}
       </div>
     );
   }
 
   return (
-    <div className={`flex items-center gap-2 ${sizeClasses[size]} ${className}`}>
+    <div
+      className={`flex items-center gap-2 ${sizeClasses[size]} ${className}`}
+    >
       <span className="text-xl">{emoji}</span>
       {showLabel && (
         <div className="flex flex-col">
@@ -77,16 +87,21 @@ export function WindIndicatorCompact({
   windSpeed,
   className = '',
 }: WindIndicatorProps) {
-  const favorability = getWindFavorability(windDirection, siteOrientation, windSpeed);
+  const favorability = getWindFavorability(
+    windDirection,
+    siteOrientation,
+    windSpeed
+  );
   const emoji = getWindFavorabilityEmoji(favorability);
   const label = getWindFavorabilityLabel(favorability, 'fr');
 
-  const tooltipText = windDirection && windSpeed 
-    ? `${label} - ${windDirection} ${windSpeed}km/h`
-    : label;
+  const tooltipText =
+    windDirection && windSpeed
+      ? `${label} - ${windDirection} ${windSpeed}km/h`
+      : label;
 
   return (
-    <span 
+    <span
       className={`text-xl cursor-help ${className}`}
       title={tooltipText}
       aria-label={tooltipText}

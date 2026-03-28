@@ -1,7 +1,7 @@
 import preview from '../../.storybook/preview';
 import { TanstackRouterDecorator } from '../../.storybook/decorators';
 import Header from './Header';
-import {ComponentType} from "react";
+import { ComponentType } from 'react';
 
 const meta = preview.meta({
   title: 'Components/Header',

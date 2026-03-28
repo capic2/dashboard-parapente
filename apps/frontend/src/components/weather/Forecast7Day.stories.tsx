@@ -12,14 +12,14 @@ const meta = preview.meta({
       // Create a new QueryClient for each story to avoid cache conflicts
       const queryClient = new QueryClient({
         defaultOptions: {
-          queries: { 
+          queries: {
             retry: false,
-            gcTime: 0,  // Disable cache
-            staleTime: 0,  // Always consider data stale
+            gcTime: 0, // Disable cache
+            staleTime: 0, // Always consider data stale
           },
         },
       });
-      
+
       return (
         <QueryClientProvider client={queryClient}>
           <div style={{ maxWidth: '1200px' }}>
@@ -206,36 +206,39 @@ export const MixedConditions = meta.story({
   },
 });
 
-MixedConditions.test('displays mixed conditions correctly', async ({ canvas }) => {
-  // Wait for data to load
-  await canvas.findByText(/85/);
-  
-  // Verify para_index values for all 7 days (these are unique identifiers)
-  await expect(canvas.getByText('85')).toBeInTheDocument();
-  await expect(canvas.getByText('90')).toBeInTheDocument();
-  await expect(canvas.getByText('75')).toBeInTheDocument();
-  await expect(canvas.getByText('50')).toBeInTheDocument();
-  await expect(canvas.getByText('30')).toBeInTheDocument();
-  await expect(canvas.getByText('65')).toBeInTheDocument();
-  await expect(canvas.getByText('80')).toBeInTheDocument();
-  
-  // Verify temperature range for first day
-  await expect(canvas.getByText('15° - 25°')).toBeInTheDocument();
-  
-  // Verify wind speed for first day
-  await expect(canvas.getByText(/12 km\/h/)).toBeInTheDocument();
-  
-  // Verify mixed verdicts exist (multiple instances expected)
-  const bonElements = canvas.getAllByText('bon');
-  const moyenElements = canvas.getAllByText('moyen');
-  const limiteElements = canvas.getAllByText('limite');
-  const mauvaisElements = canvas.getAllByText('mauvais');
-  
-  await expect(bonElements.length).toBeGreaterThan(0);
-  await expect(moyenElements.length).toBeGreaterThan(0);
-  await expect(limiteElements.length).toBeGreaterThan(0);
-  await expect(mauvaisElements.length).toBeGreaterThan(0);
-});
+MixedConditions.test(
+  'displays mixed conditions correctly',
+  async ({ canvas }) => {
+    // Wait for data to load
+    await canvas.findByText(/85/);
+
+    // Verify para_index values for all 7 days (these are unique identifiers)
+    await expect(canvas.getByText('85')).toBeInTheDocument();
+    await expect(canvas.getByText('90')).toBeInTheDocument();
+    await expect(canvas.getByText('75')).toBeInTheDocument();
+    await expect(canvas.getByText('50')).toBeInTheDocument();
+    await expect(canvas.getByText('30')).toBeInTheDocument();
+    await expect(canvas.getByText('65')).toBeInTheDocument();
+    await expect(canvas.getByText('80')).toBeInTheDocument();
+
+    // Verify temperature range for first day
+    await expect(canvas.getByText('15° - 25°')).toBeInTheDocument();
+
+    // Verify wind speed for first day
+    await expect(canvas.getByText(/12 km\/h/)).toBeInTheDocument();
+
+    // Verify mixed verdicts exist (multiple instances expected)
+    const bonElements = canvas.getAllByText('bon');
+    const moyenElements = canvas.getAllByText('moyen');
+    const limiteElements = canvas.getAllByText('limite');
+    const mauvaisElements = canvas.getAllByText('mauvais');
+
+    await expect(bonElements.length).toBeGreaterThan(0);
+    await expect(moyenElements.length).toBeGreaterThan(0);
+    await expect(limiteElements.length).toBeGreaterThan(0);
+    await expect(mauvaisElements.length).toBeGreaterThan(0);
+  }
+);
 
 // All good conditions
 export const AllGoodConditions = meta.story({
@@ -254,25 +257,28 @@ export const AllGoodConditions = meta.story({
   },
 });
 
-AllGoodConditions.test('displays all good conditions correctly', async ({ canvas }) => {
-  // Wait for data to load
-  await canvas.findByText(/85/);
-  
-  // Verify all days show "bon" verdict (should appear 3 times)
-  const bonElements = canvas.getAllByText('bon');
-  await expect(bonElements).toHaveLength(3);
-  
-  // Verify para_index values for all 3 days
-  await expect(canvas.getByText('85')).toBeInTheDocument();
-  await expect(canvas.getByText('90')).toBeInTheDocument();
-  await expect(canvas.getByText('88')).toBeInTheDocument();
-  
-  // Verify temperature range for first day
-  await expect(canvas.getByText('18° - 28°')).toBeInTheDocument();
-  
-  // Verify wind speed for first day
-  await expect(canvas.getByText(/12 km\/h/)).toBeInTheDocument();
-});
+AllGoodConditions.test(
+  'displays all good conditions correctly',
+  async ({ canvas }) => {
+    // Wait for data to load
+    await canvas.findByText(/85/);
+
+    // Verify all days show "bon" verdict (should appear 3 times)
+    const bonElements = canvas.getAllByText('bon');
+    await expect(bonElements).toHaveLength(3);
+
+    // Verify para_index values for all 3 days
+    await expect(canvas.getByText('85')).toBeInTheDocument();
+    await expect(canvas.getByText('90')).toBeInTheDocument();
+    await expect(canvas.getByText('88')).toBeInTheDocument();
+
+    // Verify temperature range for first day
+    await expect(canvas.getByText('18° - 28°')).toBeInTheDocument();
+
+    // Verify wind speed for first day
+    await expect(canvas.getByText(/12 km\/h/)).toBeInTheDocument();
+  }
+);
 
 // All bad conditions
 export const AllBadConditions = meta.story({
@@ -291,25 +297,28 @@ export const AllBadConditions = meta.story({
   },
 });
 
-AllBadConditions.test('displays all bad conditions correctly', async ({ canvas }) => {
-  // Wait for data to load
-  await canvas.findByText(/25/);
-  
-  // Verify all days show "mauvais" verdict (should appear 3 times)
-  const mauvaisElements = canvas.getAllByText('mauvais');
-  await expect(mauvaisElements).toHaveLength(3);
-  
-  // Verify para_index values for all 3 days
-  await expect(canvas.getByText('25')).toBeInTheDocument();
-  await expect(canvas.getByText('30')).toBeInTheDocument();
-  await expect(canvas.getByText('20')).toBeInTheDocument();
-  
-  // Verify temperature range for first day
-  await expect(canvas.getByText('8° - 15°')).toBeInTheDocument();
-  
-  // Verify wind speed for first day
-  await expect(canvas.getByText(/40 km\/h/)).toBeInTheDocument();
-});
+AllBadConditions.test(
+  'displays all bad conditions correctly',
+  async ({ canvas }) => {
+    // Wait for data to load
+    await canvas.findByText(/25/);
+
+    // Verify all days show "mauvais" verdict (should appear 3 times)
+    const mauvaisElements = canvas.getAllByText('mauvais');
+    await expect(mauvaisElements).toHaveLength(3);
+
+    // Verify para_index values for all 3 days
+    await expect(canvas.getByText('25')).toBeInTheDocument();
+    await expect(canvas.getByText('30')).toBeInTheDocument();
+    await expect(canvas.getByText('20')).toBeInTheDocument();
+
+    // Verify temperature range for first day
+    await expect(canvas.getByText('8° - 15°')).toBeInTheDocument();
+
+    // Verify wind speed for first day
+    await expect(canvas.getByText(/40 km\/h/)).toBeInTheDocument();
+  }
+);
 
 // Second day selected
 export const SecondDaySelected = meta.story({

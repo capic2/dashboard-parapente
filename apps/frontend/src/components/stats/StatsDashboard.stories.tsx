@@ -11,14 +11,14 @@ const meta = preview.meta({
       // Create a new QueryClient for each story to avoid cache conflicts
       const queryClient = new QueryClient({
         defaultOptions: {
-          queries: { 
+          queries: {
             retry: false,
-            gcTime: 0,  // Disable cache
-            staleTime: 0,  // Always consider data stale
+            gcTime: 0, // Disable cache
+            staleTime: 0, // Always consider data stale
           },
         },
       });
-      
+
       return (
         <QueryClientProvider client={queryClient}>
           <div style={{ maxWidth: '1400px', padding: '20px' }}>
@@ -47,7 +47,9 @@ const mockStats = {
 
 const mockFlights = Array.from({ length: 42 }, (_, i) => ({
   id: `flight-${i}`,
-  flight_date: new Date(2024, Math.floor(i / 5), (i % 28) + 1).toISOString().split('T')[0],
+  flight_date: new Date(2024, Math.floor(i / 5), (i % 28) + 1)
+    .toISOString()
+    .split('T')[0],
   duration_minutes: 90 + Math.random() * 60,
   distance_km: 8 + Math.random() * 15,
   max_altitude_m: 1200 + Math.random() * 1000,

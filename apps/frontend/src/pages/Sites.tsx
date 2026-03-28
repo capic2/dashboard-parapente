@@ -1,106 +1,123 @@
-import React, { useState, useMemo } from 'react'
-import { useNavigate } from '@tanstack/react-router'
-import { useSites } from '../hooks/useSites'
-import { useUpdateSite, useDeleteSite, SiteUpdate } from '../hooks/useSiteMutations'
-import type { Site } from '@dashboard-parapente/shared-types'
-import { SiteCard } from '../components/SiteCard'
-import { EditSiteModal } from '../components/forms/EditSiteModal'
+import React, { useState, useMemo } from 'react';
+import { useNavigate } from '@tanstack/react-router';
+import { useSites } from '../hooks/useSites';
+import {
+  useUpdateSite,
+  useDeleteSite,
+  SiteUpdate,
+} from '../hooks/useSiteMutations';
+import type { Site } from '@dashboard-parapente/shared-types';
+import { SiteCard } from '../components/SiteCard';
+import { EditSiteModal } from '../components/forms/EditSiteModal';
 
 export const Sites: React.FC = () => {
-  const navigate = useNavigate()
-  const { data: sites = [], isLoading, error } = useSites()
-  const updateSite = useUpdateSite()
-  const deleteSite = useDeleteSite()
-  
+  const navigate = useNavigate();
+  const { data: sites = [], isLoading, error } = useSites();
+  const updateSite = useUpdateSite();
+  const deleteSite = useDeleteSite();
+
   // Filters & search
-  const [searchQuery, setSearchQuery] = useState('')
-  const [typeFilter, setTypeFilter] = useState<'all' | 'takeoff' | 'landing' | 'both'>('all')
-  const [sortBy, setSortBy] = useState<'name' | 'created_at' | 'region'>('name')
-  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<
+    'all' | 'takeoff' | 'landing' | 'both'
+  >('all');
+  const [sortBy, setSortBy] = useState<'name' | 'created_at' | 'region'>(
+    'name'
+  );
+
   // Modals
-  const [editingSite, setEditingSite] = useState<Site | null>(null)
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  
+  const [editingSite, setEditingSite] = useState<Site | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
   // Filter & sort logic
   const filteredSites = useMemo(() => {
-    const filtered = sites.filter(site => {
+    const filtered = sites.filter((site) => {
       // Search filter
-      const matchesSearch = searchQuery === '' || 
+      const matchesSearch =
+        searchQuery === '' ||
         site.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         site.code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        site.region?.toLowerCase().includes(searchQuery.toLowerCase())
-      
+        site.region?.toLowerCase().includes(searchQuery.toLowerCase());
+
       // Type filter
-      const matchesType = typeFilter === 'all' || site.usage_type === typeFilter
-      
-      return matchesSearch && matchesType
-    })
-    
+      const matchesType =
+        typeFilter === 'all' || site.usage_type === typeFilter;
+
+      return matchesSearch && matchesType;
+    });
+
     // Sort
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'name':
-          return a.name.localeCompare(b.name)
+          return a.name.localeCompare(b.name);
         case 'region':
-          return (a.region || '').localeCompare(b.region || '')
+          return (a.region || '').localeCompare(b.region || '');
         default:
-          return 0
+          return 0;
       }
-    })
-    
-    return filtered
-  }, [sites, searchQuery, typeFilter, sortBy])
-  
+    });
+
+    return filtered;
+  }, [sites, searchQuery, typeFilter, sortBy]);
+
   // Handlers
   const handleEdit = (site: Site) => {
-    setEditingSite(site)
-    setIsEditModalOpen(true)
-  }
-  
+    setEditingSite(site);
+    setIsEditModalOpen(true);
+  };
+
   const handleCreate = () => {
-    setEditingSite(null)
-    setIsEditModalOpen(true)
-  }
-  
+    setEditingSite(null);
+    setIsEditModalOpen(true);
+  };
+
   const handleSave = async (data: SiteUpdate) => {
     if (editingSite) {
       // Edit mode
-      await updateSite.mutateAsync({ siteId: editingSite.id, data })
+      await updateSite.mutateAsync({ siteId: editingSite.id, data });
     } else {
       // Create mode - would need a createSite mutation
       // For now, this would use the existing CreateSiteModal workflow
-      console.log('Create site:', data)
-      alert('La création de sites est disponible via le bouton "Nouveau site" dans l\'historique des vols')
+      console.log('Create site:', data);
+      alert(
+        'La création de sites est disponible via le bouton "Nouveau site" dans l\'historique des vols'
+      );
     }
-  }
-  
+  };
+
   const handleDelete = async (site: Site) => {
-    if (!confirm(`Supprimer le site "${site.name}" ?\n\nCette action est irréversible.`)) {
-      return
+    if (
+      !confirm(
+        `Supprimer le site "${site.name}" ?\n\nCette action est irréversible.`
+      )
+    ) {
+      return;
     }
-    
+
     try {
-      await deleteSite.mutateAsync(site.id)
-      alert(`Site "${site.name}" supprimé avec succès`)
+      await deleteSite.mutateAsync(site.id);
+      alert(`Site "${site.name}" supprimé avec succès`);
     } catch (error: unknown) {
-      const errorMessage = (error as Error)?.message || 'Erreur lors de la suppression'
-      alert(errorMessage)
+      const errorMessage =
+        (error as Error)?.message || 'Erreur lors de la suppression';
+      alert(errorMessage);
     }
-  }
-  
+  };
+
   const handleViewFlights = (_site: Site) => {
     // Navigate to flights page with site filter
-    void navigate({ to: '/flights' as string })
-  }
-  
+    void navigate({ to: '/flights' as string });
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
-    )
+    );
   }
-  
+
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -108,9 +125,9 @@ export const Sites: React.FC = () => {
           ❌ Erreur lors du chargement des sites
         </div>
       </div>
-    )
+    );
   }
-  
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
@@ -123,7 +140,7 @@ export const Sites: React.FC = () => {
           ➕ Nouveau site
         </button>
       </div>
-      
+
       {/* Filters Bar */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -135,11 +152,15 @@ export const Sites: React.FC = () => {
             placeholder="Rechercher par nom, code ou région..."
             className="px-3 py-2 border rounded"
           />
-          
+
           {/* Type Filter */}
           <select
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as 'all' | 'takeoff' | 'landing' | 'both')}
+            onChange={(e) =>
+              setTypeFilter(
+                e.target.value as 'all' | 'takeoff' | 'landing' | 'both'
+              )
+            }
             className="px-3 py-2 border rounded"
           >
             <option value="all">Tous les types</option>
@@ -147,11 +168,13 @@ export const Sites: React.FC = () => {
             <option value="landing">Atterrissage uniquement</option>
             <option value="both">Déco/Atterro</option>
           </select>
-          
+
           {/* Sort */}
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'name' | 'created_at' | 'region')}
+            onChange={(e) =>
+              setSortBy(e.target.value as 'name' | 'created_at' | 'region')
+            }
             className="px-3 py-2 border rounded"
           >
             <option value="name">Trier par nom</option>
@@ -159,20 +182,21 @@ export const Sites: React.FC = () => {
           </select>
         </div>
       </div>
-      
+
       {/* Results count */}
       <p className="text-sm text-gray-600 mb-4">
-        {filteredSites.length} site{filteredSites.length !== 1 ? 's' : ''} trouvé{filteredSites.length !== 1 ? 's' : ''}
+        {filteredSites.length} site{filteredSites.length !== 1 ? 's' : ''}{' '}
+        trouvé{filteredSites.length !== 1 ? 's' : ''}
       </p>
-      
+
       {/* Sites Grid */}
       {filteredSites.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredSites.map(site => (
+          {filteredSites.map((site) => (
             <SiteCard
               key={site.id}
               site={site}
-              flightCount={0}  // TODO: could fetch from API if needed
+              flightCount={0} // TODO: could fetch from API if needed
               onEdit={handleEdit}
               onDelete={handleDelete}
               onViewFlights={handleViewFlights}
@@ -183,7 +207,9 @@ export const Sites: React.FC = () => {
         <div className="text-center py-12">
           <p className="text-gray-500 text-lg mb-4">Aucun site trouvé</p>
           {searchQuery || typeFilter !== 'all' ? (
-            <p className="text-gray-400">Essayez de modifier vos filtres de recherche</p>
+            <p className="text-gray-400">
+              Essayez de modifier vos filtres de recherche
+            </p>
           ) : (
             <button
               onClick={handleCreate}
@@ -194,17 +220,17 @@ export const Sites: React.FC = () => {
           )}
         </div>
       )}
-      
+
       {/* Edit Modal */}
       <EditSiteModal
         site={editingSite}
         isOpen={isEditModalOpen}
         onClose={() => {
-          setIsEditModalOpen(false)
-          setEditingSite(null)
+          setIsEditModalOpen(false);
+          setEditingSite(null);
         }}
         onSave={handleSave}
       />
     </div>
-  )
-}
+  );
+};

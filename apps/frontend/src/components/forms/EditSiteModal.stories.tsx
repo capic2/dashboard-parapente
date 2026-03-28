@@ -152,12 +152,12 @@ export const SavingState = meta.story({
     isOpen: true,
     onClose: fn(),
     onSave: fn(async () => {
-      await new Promise(resolve => setTimeout(resolve, 10000));
+      await new Promise((resolve) => setTimeout(resolve, 10000));
     }),
   },
 });
 
-SavingState.test("interaction test", async ({ canvas }) => {
+SavingState.test('interaction test', async ({ canvas }) => {
   const saveButton = canvas.getByText('💾 Enregistrer');
   await userEvent.click(saveButton);
 });
@@ -173,13 +173,16 @@ export const DisplaysSiteData = meta.story({
   },
 });
 
-DisplaysSiteData.test('displays site data in form fields', async ({ canvas }) => {
-  await expect(canvas.getByText('Modifier Mont Poupet')).toBeInTheDocument();
-  await expect(canvas.getByDisplayValue('Mont Poupet')).toBeInTheDocument();
-  await expect(canvas.getByDisplayValue('POUPET')).toBeInTheDocument();
-  await expect(canvas.getByDisplayValue('47.238')).toBeInTheDocument();
-  await expect(canvas.getByDisplayValue('6.024')).toBeInTheDocument();
-});
+DisplaysSiteData.test(
+  'displays site data in form fields',
+  async ({ canvas }) => {
+    await expect(canvas.getByText('Modifier Mont Poupet')).toBeInTheDocument();
+    await expect(canvas.getByDisplayValue('Mont Poupet')).toBeInTheDocument();
+    await expect(canvas.getByDisplayValue('POUPET')).toBeInTheDocument();
+    await expect(canvas.getByDisplayValue('47.238')).toBeInTheDocument();
+    await expect(canvas.getByDisplayValue('6.024')).toBeInTheDocument();
+  }
+);
 
 export const ShowsCreateModeTitle = meta.story({
   args: {
@@ -203,11 +206,16 @@ export const DisablesCodeInEditMode = meta.story({
   },
 });
 
-DisablesCodeInEditMode.test('disables code field in edit mode', async ({ canvas }) => {
-  const codeInput = canvas.getByDisplayValue('POUPET');
-  await expect(codeInput).toBeDisabled();
-  await expect(canvas.getByText(/Le code ne peut pas être modifié/)).toBeInTheDocument();
-});
+DisablesCodeInEditMode.test(
+  'disables code field in edit mode',
+  async ({ canvas }) => {
+    const codeInput = canvas.getByDisplayValue('POUPET');
+    await expect(codeInput).toBeDisabled();
+    await expect(
+      canvas.getByText(/Le code ne peut pas être modifié/)
+    ).toBeInTheDocument();
+  }
+);
 
 /*
 export const AllowsCodeInCreateMode = meta.story({
@@ -318,14 +326,17 @@ export const CallsOnCloseWhenCancelled = meta.story({
   },
 });
 
-CallsOnCloseWhenCancelled.test('calls onClose when cancelled', async ({ args, canvas }) => {
-  const user = userEvent.setup();
+CallsOnCloseWhenCancelled.test(
+  'calls onClose when cancelled',
+  async ({ args, canvas }) => {
+    const user = userEvent.setup();
 
-  const cancelButton = canvas.getByText('Annuler');
-  await user.click(cancelButton);
+    const cancelButton = canvas.getByText('Annuler');
+    await user.click(cancelButton);
 
-  await expect(args.onClose).toHaveBeenCalled();
-});
+    await expect(args.onClose).toHaveBeenCalled();
+  }
+);
 
 /*
 export const ValidatesRequiredFields = meta.story({
@@ -355,29 +366,32 @@ export const SavesSuccessfully = meta.story({
     isOpen: true,
     onClose: fn(),
     onSave: fn(async () => {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }),
   },
 });
 
-SavesSuccessfully.test('saves successfully and closes', async ({ args, canvas }) => {
-  const user = userEvent.setup();
+SavesSuccessfully.test(
+  'saves successfully and closes',
+  async ({ args, canvas }) => {
+    const user = userEvent.setup();
 
-  const nameInput = canvas.getByDisplayValue('Mont Poupet');
-  await user.clear(nameInput);
-  await user.type(nameInput, 'Nouveau Nom');
+    const nameInput = canvas.getByDisplayValue('Mont Poupet');
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Nouveau Nom');
 
-  const saveButton = canvas.getByText('💾 Enregistrer');
-  await user.click(saveButton);
+    const saveButton = canvas.getByText('💾 Enregistrer');
+    await user.click(saveButton);
 
-  await waitFor(() => {
-    expect(args.onSave).toHaveBeenCalled();
-  });
+    await waitFor(() => {
+      expect(args.onSave).toHaveBeenCalled();
+    });
 
-  await waitFor(() => {
-    expect(args.onClose).toHaveBeenCalled();
-  });
-});
+    await waitFor(() => {
+      expect(args.onClose).toHaveBeenCalled();
+    });
+  }
+);
 
 export const ShowsSavingState = meta.story({
   args: {
@@ -385,7 +399,7 @@ export const ShowsSavingState = meta.story({
     isOpen: true,
     onClose: fn(),
     onSave: fn(async () => {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }),
   },
 });

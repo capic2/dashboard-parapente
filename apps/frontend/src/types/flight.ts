@@ -3,8 +3,8 @@
  */
 
 export interface GeoPoint {
-  lat: number
-  lon: number
-  elevation: number
-  timestamp: number
+  lat: number;
+  lon: number;
+  elevation: number;
+  timestamp: number;
 }

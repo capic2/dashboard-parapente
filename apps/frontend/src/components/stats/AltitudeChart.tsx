@@ -1,5 +1,14 @@
 import { useMemo } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 import { useFlights } from '../../hooks/useFlights';
 import { useFiltersStore } from '../../stores/filtersStore';
 import { format } from 'date-fns';
@@ -7,7 +16,11 @@ import { fr } from 'date-fns/locale';
 
 export default function AltitudeChart() {
   const { filters } = useFiltersStore();
-  const { data: flights = [], isLoading, error } = useFlights({ 
+  const {
+    data: flights = [],
+    isLoading,
+    error,
+  } = useFlights({
     limit: 100,
     siteId: filters.siteId || undefined,
     dateFrom: filters.dateFrom || undefined,
@@ -19,10 +32,15 @@ export default function AltitudeChart() {
 
     return flights
       .filter((f) => f.max_altitude_m && f.flight_date)
-      .sort((a, b) => new Date(a.flight_date).getTime() - new Date(b.flight_date).getTime())
+      .sort(
+        (a, b) =>
+          new Date(a.flight_date).getTime() - new Date(b.flight_date).getTime()
+      )
       .map((flight) => ({
         date: format(new Date(flight.flight_date), 'dd MMM', { locale: fr }),
-        fullDate: format(new Date(flight.flight_date), 'dd MMMM yyyy', { locale: fr }),
+        fullDate: format(new Date(flight.flight_date), 'dd MMMM yyyy', {
+          locale: fr,
+        }),
         altitude: flight.max_altitude_m,
         site: flight.site_name || flight.site_id,
       }));
@@ -42,7 +60,9 @@ export default function AltitudeChart() {
   if (error || !chartData.length) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md text-center">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">⛰️ Progression d&apos;Altitude</h3>
+        <h3 className="text-lg font-bold text-gray-900 mb-4">
+          ⛰️ Progression d&apos;Altitude
+        </h3>
         <p className="text-red-600 text-sm">Pas de données disponibles</p>
       </div>
     );
@@ -50,9 +70,14 @@ export default function AltitudeChart() {
 
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
-      <h3 className="text-lg font-bold text-gray-900 mb-4">⛰️ Progression d&apos;Altitude</h3>
+      <h3 className="text-lg font-bold text-gray-900 mb-4">
+        ⛰️ Progression d&apos;Altitude
+      </h3>
       <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+        <LineChart
+          data={chartData}
+          margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
           <XAxis
             dataKey="date"
@@ -60,7 +85,12 @@ export default function AltitudeChart() {
             stroke="#999"
           />
           <YAxis
-            label={{ value: 'Altitude (m)', angle: -90, position: 'insideLeft', style: { fontSize: 12, fill: '#666' } }}
+            label={{
+              value: 'Altitude (m)',
+              angle: -90,
+              position: 'insideLeft',
+              style: { fontSize: 12, fill: '#666' },
+            }}
             tick={{ fontSize: 12, fill: '#666' }}
             stroke="#999"
           />
@@ -72,7 +102,10 @@ export default function AltitudeChart() {
               padding: '8px',
             }}
             labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
-            formatter={(value, name) => [`${value || 0} m`, name === 'altitude' ? 'Altitude max' : (name || '')]}
+            formatter={(value, name) => [
+              `${value || 0} m`,
+              name === 'altitude' ? 'Altitude max' : name || '',
+            ]}
             labelFormatter={(label, payload) => {
               if (payload && payload.length > 0) {
                 return payload[0].payload.fullDate;

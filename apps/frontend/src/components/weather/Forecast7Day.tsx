@@ -29,24 +29,32 @@ const formatDate = (dateStr: string): string => {
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  if (date.toDateString() === today.toDateString()) return 'Aujourd\'hui';
+  if (date.toDateString() === today.toDateString()) return "Aujourd'hui";
   if (date.toDateString() === tomorrow.toDateString()) return 'Demain';
-  
-  return date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+
+  return date.toLocaleDateString('fr-FR', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
 };
 
-export default function Forecast7Day({ spotId, selectedDayIndex = 0, onSelectDay }: Forecast7DayProps) {
+export default function Forecast7Day({
+  spotId,
+  selectedDayIndex = 0,
+  onSelectDay,
+}: Forecast7DayProps) {
   // OPTIMISATION: Use daily summary instead of full weather data
   // This loads 7 days of aggregate data (para_index, temps, wind) WITHOUT hourly details
   // → 2-3x faster than loading full hourly forecasts
   const { data: dailySummary, isLoading, error } = useDailySummary(spotId);
   const queryClient = useQueryClient();
-  
+
   // Prefetch full hourly data on hover for instant navigation
   // Uses the SAME transformation logic as useWeather (shared queryFn)
   const handleMouseEnter = (dayIndex: number) => {
     if (!spotId || dayIndex === selectedDayIndex) return;
-    
+
     queryClient.prefetchQuery({
       queryKey: ['weather', 'combined', spotId, dayIndex],
       queryFn: createWeatherQueryFn(spotId, dayIndex),
@@ -57,8 +65,12 @@ export default function Forecast7Day({ spotId, selectedDayIndex = 0, onSelectDay
   if (isLoading) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md">
-        <h2 className="text-sm text-gray-600 mb-3 font-semibold">Prévisions 7 Jours</h2>
-        <div className="py-5 text-center text-gray-500 text-sm">Chargement...</div>
+        <h2 className="text-sm text-gray-600 mb-3 font-semibold">
+          Prévisions 7 Jours
+        </h2>
+        <div className="py-5 text-center text-gray-500 text-sm">
+          Chargement...
+        </div>
       </div>
     );
   }
@@ -66,28 +78,34 @@ export default function Forecast7Day({ spotId, selectedDayIndex = 0, onSelectDay
   if (error || !dailySummary || !dailySummary.days) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md">
-        <h2 className="text-sm text-gray-600 mb-3 font-semibold">Prévisions 7 Jours</h2>
-        <div className="py-5 text-center text-red-500 text-sm">Données non disponibles</div>
+        <h2 className="text-sm text-gray-600 mb-3 font-semibold">
+          Prévisions 7 Jours
+        </h2>
+        <div className="py-5 text-center text-red-500 text-sm">
+          Données non disponibles
+        </div>
       </div>
     );
   }
 
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
-      <h2 className="text-sm text-gray-600 mb-3 font-semibold">Prévisions 7 Jours</h2>
-      
+      <h2 className="text-sm text-gray-600 mb-3 font-semibold">
+        Prévisions 7 Jours
+      </h2>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
         {dailySummary.days.map((day, index) => {
           const isSelected = index === selectedDayIndex;
-          
+
           return (
-            <button 
+            <button
               key={index}
               onClick={() => onSelectDay?.(index)}
               onMouseEnter={() => handleMouseEnter(index)}
               className={`bg-gray-50 rounded-lg p-3 border-2 transition-all hover:border-sky-600 hover:-translate-y-1 hover:shadow-md cursor-pointer relative ${
-                isSelected 
-                  ? 'border-sky-600 shadow-lg bg-sky-50 ring-2 ring-sky-200' 
+                isSelected
+                  ? 'border-sky-600 shadow-lg bg-sky-50 ring-2 ring-sky-200'
                   : 'border-gray-200'
               }`}
             >
@@ -98,8 +116,12 @@ export default function Forecast7Day({ spotId, selectedDayIndex = 0, onSelectDay
                 {formatDate(day.date)}
               </div>
               <div className="flex items-center justify-center gap-2 mb-2">
-                <span className="text-2xl font-bold text-sky-600">{day.para_index}</span>
-                <span className={`text-xl ${getVerdictClass(day.verdict)} px-1.5 py-0.5 rounded-full`}>
+                <span className="text-2xl font-bold text-sky-600">
+                  {day.para_index}
+                </span>
+                <span
+                  className={`text-xl ${getVerdictClass(day.verdict)} px-1.5 py-0.5 rounded-full`}
+                >
                   {getVerdictEmoji(day.verdict)}
                 </span>
               </div>

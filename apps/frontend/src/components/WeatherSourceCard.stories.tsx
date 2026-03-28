@@ -198,7 +198,6 @@ export const Default = meta.story({
     msw: {
       handlers: [
         http.post('/api/weather-sources/other/test', () => {
-
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
             response_time_ms: 145,
@@ -216,17 +215,14 @@ Default.test('It calls the onDelete function', async ({ canvasElement }) => {
     canvas.getByRole('button', { name: 'Supprimer la source Open-Meteo' })
   );
 });
-Default.test(
-  'It calls the test endpoint api',
-  async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await userEvent.click(
-      canvas.getByRole('button', {
-        name: 'Tester la source Open-Meteo',
-      })
-    );
-  }
-);
+Default.test('It calls the test endpoint api', async ({ canvasElement }) => {
+  const canvas = within(canvasElement);
+  await userEvent.click(
+    canvas.getByRole('button', {
+      name: 'Tester la source Open-Meteo',
+    })
+  );
+});
 
 /**
  * Active API source without API key requirement (Open-Meteo)

@@ -316,17 +316,14 @@ export const MinimalContent = meta.story({
 });
 
 // Test confirmation buttons
-MinimalContent.test(
-  'should have confirmation buttons',
-  async () => {
-    // Verify both action buttons are present
-    const noButton = screen.getByText('No');
-    const deleteButton = screen.getByText('Yes, Delete');
+MinimalContent.test('should have confirmation buttons', async () => {
+  // Verify both action buttons are present
+  const noButton = screen.getByText('No');
+  const deleteButton = screen.getByText('Yes, Delete');
 
-    await expect(noButton).toBeInTheDocument();
-    await expect(deleteButton).toBeInTheDocument();
-  }
-);
+  await expect(noButton).toBeInTheDocument();
+  await expect(deleteButton).toBeInTheDocument();
+});
 
 // Modal with rich content (images, lists, etc.)
 export const RichContent = meta.story({

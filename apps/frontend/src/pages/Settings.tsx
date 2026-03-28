@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { useSites } from '../hooks/useSites';
-import { useWeatherSources, useWeatherSourceStats, useDeleteWeatherSource } from '../hooks/useWeatherSources';
+import {
+  useWeatherSources,
+  useWeatherSourceStats,
+  useDeleteWeatherSource,
+} from '../hooks/useWeatherSources';
 import { WeatherSourceCard } from '../components/WeatherSourceCard';
 import type { WeatherSource } from '../types/weatherSources';
 
@@ -54,76 +58,100 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 // Weather Sources Tab Component
 function WeatherSourcesTab() {
-  const { data: sources = [], isLoading, error } = useWeatherSources()
-  const { data: stats } = useWeatherSourceStats()
-  const deleteSource = useDeleteWeatherSource()
-  
+  const { data: sources = [], isLoading, error } = useWeatherSources();
+  const { data: stats } = useWeatherSourceStats();
+  const deleteSource = useDeleteWeatherSource();
+
   const handleDelete = async (source: WeatherSource) => {
-    if (!confirm(`Supprimer la source "${source.display_name}" ?\n\nCette action est irréversible.`)) {
-      return
+    if (
+      !confirm(
+        `Supprimer la source "${source.display_name}" ?\n\nCette action est irréversible.`
+      )
+    ) {
+      return;
     }
-    
+
     try {
-      await deleteSource.mutateAsync(source.source_name)
-      alert(`Source "${source.display_name}" supprimée avec succès`)
+      await deleteSource.mutateAsync(source.source_name);
+      alert(`Source "${source.display_name}" supprimée avec succès`);
     } catch (error: unknown) {
-      const errorMessage = (error as Error)?.message || 'Erreur lors de la suppression'
-      alert(errorMessage)
+      const errorMessage =
+        (error as Error)?.message || 'Erreur lors de la suppression';
+      alert(errorMessage);
     }
-  }
-  
+  };
+
   // Count active sources
-  const activeSources = sources.filter(s => s.is_enabled)
-  
+  const activeSources = sources.filter((s) => s.is_enabled);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
-    )
+    );
   }
-  
+
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
         ❌ Erreur lors du chargement des sources météo
       </div>
-    )
+    );
   }
-  
+
   return (
     <div className="space-y-4">
       {/* Header with stats */}
       <div className="bg-white rounded-xl p-6 shadow-md">
-        <h2 className="text-xl font-bold text-gray-900 mb-2">🌦️ Gestion des Sources Météo</h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">
+          🌦️ Gestion des Sources Météo
+        </h2>
         <p className="text-sm text-gray-600 mb-4">
-          Configurez les sources utilisées pour les prévisions météo. Au moins une source doit rester active.
+          Configurez les sources utilisées pour les prévisions météo. Au moins
+          une source doit rester active.
         </p>
-        
+
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="p-3 bg-blue-50 rounded-lg">
-              <div className="text-xs text-blue-600 font-semibold mb-1">Sources actives</div>
-              <div className="text-2xl font-bold text-blue-900">{stats.active_sources}/{stats.total_sources}</div>
+              <div className="text-xs text-blue-600 font-semibold mb-1">
+                Sources actives
+              </div>
+              <div className="text-2xl font-bold text-blue-900">
+                {stats.active_sources}/{stats.total_sources}
+              </div>
             </div>
             <div className="p-3 bg-green-50 rounded-lg">
-              <div className="text-xs text-green-600 font-semibold mb-1">Taux de succès global</div>
-              <div className="text-2xl font-bold text-green-900">{stats.global_success_rate.toFixed(0)}%</div>
+              <div className="text-xs text-green-600 font-semibold mb-1">
+                Taux de succès global
+              </div>
+              <div className="text-2xl font-bold text-green-900">
+                {stats.global_success_rate.toFixed(0)}%
+              </div>
             </div>
             <div className="p-3 bg-purple-50 rounded-lg">
-              <div className="text-xs text-purple-600 font-semibold mb-1">Temps moyen</div>
+              <div className="text-xs text-purple-600 font-semibold mb-1">
+                Temps moyen
+              </div>
               <div className="text-2xl font-bold text-purple-900">
-                {stats.global_avg_response_time_ms ? `${stats.global_avg_response_time_ms}ms` : '-'}
+                {stats.global_avg_response_time_ms
+                  ? `${stats.global_avg_response_time_ms}ms`
+                  : '-'}
               </div>
             </div>
             <div className="p-3 bg-red-50 rounded-lg">
-              <div className="text-xs text-red-600 font-semibold mb-1">Sources en erreur</div>
-              <div className="text-2xl font-bold text-red-900">{stats.sources_with_errors}</div>
+              <div className="text-xs text-red-600 font-semibold mb-1">
+                Sources en erreur
+              </div>
+              <div className="text-2xl font-bold text-red-900">
+                {stats.sources_with_errors}
+              </div>
             </div>
           </div>
         )}
       </div>
-      
+
       {/* Sources Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {sources.map((source) => (
@@ -135,26 +163,43 @@ function WeatherSourcesTab() {
           />
         ))}
       </div>
-      
+
       {sources.length === 0 && (
         <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-600">
           Aucune source météo configurée
         </div>
       )}
-      
+
       {/* Info Box */}
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <h3 className="font-semibold text-yellow-900 mb-2">ℹ️ À propos des sources météo</h3>
+        <h3 className="font-semibold text-yellow-900 mb-2">
+          ℹ️ À propos des sources météo
+        </h3>
         <ul className="text-sm text-yellow-800 space-y-1">
-          <li>• <strong>Open-Meteo</strong>: API gratuite et fiable, recommandée comme source principale</li>
-          <li>• <strong>WeatherAPI</strong>: Nécessite une clé API (plan gratuit disponible)</li>
-          <li>• <strong>Météo Parapente</strong>: Spécialisée parapente avec prévisions de thermiques</li>
-          <li>• <strong>Météociel</strong>: Modèle AROME haute résolution pour la France</li>
-          <li>• <strong>Meteoblue</strong>: Prévisions professionnelles multi-modèles</li>
+          <li>
+            • <strong>Open-Meteo</strong>: API gratuite et fiable, recommandée
+            comme source principale
+          </li>
+          <li>
+            • <strong>WeatherAPI</strong>: Nécessite une clé API (plan gratuit
+            disponible)
+          </li>
+          <li>
+            • <strong>Météo Parapente</strong>: Spécialisée parapente avec
+            prévisions de thermiques
+          </li>
+          <li>
+            • <strong>Météociel</strong>: Modèle AROME haute résolution pour la
+            France
+          </li>
+          <li>
+            • <strong>Meteoblue</strong>: Prévisions professionnelles
+            multi-modèles
+          </li>
         </ul>
       </div>
     </div>
-  )
+  );
 }
 
 export default function Settings() {
@@ -171,7 +216,9 @@ export default function Settings() {
     return DEFAULT_SETTINGS;
   });
   const [saved, setSaved] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'sites' | 'weather' | 'data'>('general');
+  const [activeTab, setActiveTab] = useState<
+    'general' | 'sites' | 'weather' | 'data'
+  >('general');
 
   // Save settings to localStorage
   const saveSettings = () => {
@@ -197,7 +244,9 @@ export default function Settings() {
       exportDate: new Date().toISOString(),
       version: '1.0',
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: 'application/json',
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -221,7 +270,7 @@ export default function Settings() {
           alert('✅ Paramètres importés avec succès !');
         }
       } catch {
-        alert('❌ Erreur lors de l\'import : fichier invalide');
+        alert("❌ Erreur lors de l'import : fichier invalide");
       }
     };
     reader.readAsText(file);
@@ -229,7 +278,11 @@ export default function Settings() {
 
   // Clear all data
   const clearData = () => {
-    if (window.confirm('⚠️ Êtes-vous sûr de vouloir réinitialiser tous les paramètres ?')) {
+    if (
+      window.confirm(
+        '⚠️ Êtes-vous sûr de vouloir réinitialiser tous les paramètres ?'
+      )
+    ) {
       setSettings(DEFAULT_SETTINGS);
       localStorage.removeItem('paragliding-settings');
       alert('✅ Paramètres réinitialisés !');
@@ -240,7 +293,9 @@ export default function Settings() {
     <div>
       <div className="mb-4 bg-white rounded-xl p-4 shadow-md">
         <h1 className="text-xl font-bold text-gray-900">⚙️ Paramètres</h1>
-        <p className="text-sm text-gray-600 mt-1">Configuration de votre dashboard parapente</p>
+        <p className="text-sm text-gray-600 mt-1">
+          Configuration de votre dashboard parapente
+        </p>
       </div>
 
       {/* Tabs Navigation */}
@@ -294,13 +349,22 @@ export default function Settings() {
           <>
             {/* Units Section */}
             <div className="bg-white rounded-xl p-6 shadow-md">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">📏 Unités de Mesure</h2>
+              <h2 className="text-lg font-bold text-gray-900 mb-4">
+                📏 Unités de Mesure
+              </h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Distance</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Distance
+                  </label>
                   <div className="flex gap-4">
                     <button
-                      onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, distance: 'km' } }))}
+                      onClick={() =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          units: { ...prev.units, distance: 'km' },
+                        }))
+                      }
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.distance === 'km'
                           ? 'bg-sky-600 text-white shadow-md'
@@ -310,7 +374,12 @@ export default function Settings() {
                       Kilomètres (km)
                     </button>
                     <button
-                      onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, distance: 'miles' } }))}
+                      onClick={() =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          units: { ...prev.units, distance: 'miles' },
+                        }))
+                      }
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.distance === 'miles'
                           ? 'bg-sky-600 text-white shadow-md'
@@ -323,10 +392,17 @@ export default function Settings() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Altitude</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Altitude
+                  </label>
                   <div className="flex gap-4">
                     <button
-                      onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, altitude: 'm' } }))}
+                      onClick={() =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          units: { ...prev.units, altitude: 'm' },
+                        }))
+                      }
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.altitude === 'm'
                           ? 'bg-sky-600 text-white shadow-md'
@@ -336,7 +412,12 @@ export default function Settings() {
                       Mètres (m)
                     </button>
                     <button
-                      onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, altitude: 'ft' } }))}
+                      onClick={() =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          units: { ...prev.units, altitude: 'ft' },
+                        }))
+                      }
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.altitude === 'ft'
                           ? 'bg-sky-600 text-white shadow-md'
@@ -349,10 +430,17 @@ export default function Settings() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Vitesse</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Vitesse
+                  </label>
                   <div className="flex gap-4">
                     <button
-                      onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, speed: 'kmh' } }))}
+                      onClick={() =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          units: { ...prev.units, speed: 'kmh' },
+                        }))
+                      }
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.speed === 'kmh'
                           ? 'bg-sky-600 text-white shadow-md'
@@ -362,7 +450,12 @@ export default function Settings() {
                       km/h
                     </button>
                     <button
-                      onClick={() => setSettings((prev) => ({ ...prev, units: { ...prev.units, speed: 'mph' } }))}
+                      onClick={() =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          units: { ...prev.units, speed: 'mph' },
+                        }))
+                      }
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.units.speed === 'mph'
                           ? 'bg-sky-600 text-white shadow-md'
@@ -378,13 +471,19 @@ export default function Settings() {
 
             {/* Language & Theme Section */}
             <div className="bg-white rounded-xl p-6 shadow-md">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">🌐 Langue & Thème</h2>
+              <h2 className="text-lg font-bold text-gray-900 mb-4">
+                🌐 Langue & Thème
+              </h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Langue</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Langue
+                  </label>
                   <div className="flex gap-4">
                     <button
-                      onClick={() => setSettings((prev) => ({ ...prev, language: 'fr' }))}
+                      onClick={() =>
+                        setSettings((prev) => ({ ...prev, language: 'fr' }))
+                      }
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.language === 'fr'
                           ? 'bg-sky-600 text-white shadow-md'
@@ -394,7 +493,9 @@ export default function Settings() {
                       🇫🇷 Français
                     </button>
                     <button
-                      onClick={() => setSettings((prev) => ({ ...prev, language: 'en' }))}
+                      onClick={() =>
+                        setSettings((prev) => ({ ...prev, language: 'en' }))
+                      }
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.language === 'en'
                           ? 'bg-sky-600 text-white shadow-md'
@@ -407,10 +508,14 @@ export default function Settings() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Thème</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Thème
+                  </label>
                   <div className="flex gap-4">
                     <button
-                      onClick={() => setSettings((prev) => ({ ...prev, theme: 'light' }))}
+                      onClick={() =>
+                        setSettings((prev) => ({ ...prev, theme: 'light' }))
+                      }
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.theme === 'light'
                           ? 'bg-sky-600 text-white shadow-md'
@@ -420,7 +525,9 @@ export default function Settings() {
                       ☀️ Clair
                     </button>
                     <button
-                      onClick={() => setSettings((prev) => ({ ...prev, theme: 'dark' }))}
+                      onClick={() =>
+                        setSettings((prev) => ({ ...prev, theme: 'dark' }))
+                      }
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.theme === 'dark'
                           ? 'bg-sky-600 text-white shadow-md'
@@ -430,7 +537,9 @@ export default function Settings() {
                       🌙 Sombre
                     </button>
                     <button
-                      onClick={() => setSettings((prev) => ({ ...prev, theme: 'auto' }))}
+                      onClick={() =>
+                        setSettings((prev) => ({ ...prev, theme: 'auto' }))
+                      }
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.theme === 'auto'
                           ? 'bg-sky-600 text-white shadow-md'
@@ -446,45 +555,62 @@ export default function Settings() {
 
             {/* Notifications Section */}
             <div className="bg-white rounded-xl p-6 shadow-md">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">🔔 Notifications</h2>
+              <h2 className="text-lg font-bold text-gray-900 mb-4">
+                🔔 Notifications
+              </h2>
               <div className="space-y-3">
                 <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all cursor-pointer">
-                  <span className="text-sm font-medium text-gray-700">Alertes météo</span>
+                  <span className="text-sm font-medium text-gray-700">
+                    Alertes météo
+                  </span>
                   <input
                     type="checkbox"
                     checked={settings.notifications.weather}
                     onChange={(e) =>
                       setSettings((prev) => ({
                         ...prev,
-                        notifications: { ...prev.notifications, weather: e.target.checked },
+                        notifications: {
+                          ...prev.notifications,
+                          weather: e.target.checked,
+                        },
                       }))
                     }
                     className="w-5 h-5 text-sky-600 rounded focus:ring-2 focus:ring-sky-600"
                   />
                 </label>
                 <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all cursor-pointer">
-                  <span className="text-sm font-medium text-gray-700">Nouveaux vols</span>
+                  <span className="text-sm font-medium text-gray-700">
+                    Nouveaux vols
+                  </span>
                   <input
                     type="checkbox"
                     checked={settings.notifications.flights}
                     onChange={(e) =>
                       setSettings((prev) => ({
                         ...prev,
-                        notifications: { ...prev.notifications, flights: e.target.checked },
+                        notifications: {
+                          ...prev.notifications,
+                          flights: e.target.checked,
+                        },
                       }))
                     }
                     className="w-5 h-5 text-sky-600 rounded focus:ring-2 focus:ring-sky-600"
                   />
                 </label>
                 <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all cursor-pointer">
-                  <span className="text-sm font-medium text-gray-700">Alertes personnalisées</span>
+                  <span className="text-sm font-medium text-gray-700">
+                    Alertes personnalisées
+                  </span>
                   <input
                     type="checkbox"
                     checked={settings.notifications.alerts}
                     onChange={(e) =>
                       setSettings((prev) => ({
                         ...prev,
-                        notifications: { ...prev.notifications, alerts: e.target.checked },
+                        notifications: {
+                          ...prev.notifications,
+                          alerts: e.target.checked,
+                        },
                       }))
                     }
                     className="w-5 h-5 text-sky-600 rounded focus:ring-2 focus:ring-sky-600"
@@ -498,7 +624,9 @@ export default function Settings() {
         {/* SITES TAB */}
         {activeTab === 'sites' && (
           <div className="bg-white rounded-xl p-6 shadow-md">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">📍 Gérer vos Sites Favoris</h2>
+            <h2 className="text-lg font-bold text-gray-900 mb-4">
+              📍 Gérer vos Sites Favoris
+            </h2>
             {sitesLoading ? (
               <div className="animate-pulse space-y-3">
                 {[...Array(4)].map((_, i) => (
@@ -506,7 +634,9 @@ export default function Settings() {
                 ))}
               </div>
             ) : sites.length === 0 ? (
-              <p className="text-gray-600 text-center py-8">Aucun site disponible</p>
+              <p className="text-gray-600 text-center py-8">
+                Aucun site disponible
+              </p>
             ) : (
               <div className="space-y-3">
                 {(sites as unknown as ApiSite[]).map((site: ApiSite) => (
@@ -519,14 +649,19 @@ export default function Settings() {
                     }`}
                   >
                     <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">{site.name}</h3>
-                      {(site.latitude && site.longitude && site.elevation_m) && (
+                      <h3 className="font-semibold text-gray-900">
+                        {site.name}
+                      </h3>
+                      {site.latitude && site.longitude && site.elevation_m && (
                         <div className="text-sm text-gray-600 mt-1">
-                          📍 {site.latitude.toFixed(4)}, {site.longitude.toFixed(4)} • ⛰️ {site.elevation_m}m
+                          📍 {site.latitude.toFixed(4)},{' '}
+                          {site.longitude.toFixed(4)} • ⛰️ {site.elevation_m}m
                         </div>
                       )}
                       {site.description && (
-                        <p className="text-xs text-gray-500 mt-1">{site.description}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {site.description}
+                        </p>
                       )}
                     </div>
                     <button
@@ -537,14 +672,17 @@ export default function Settings() {
                           : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                       }`}
                     >
-                      {settings.favoriteSites.includes(site.id) ? '⭐ Favori' : '☆ Ajouter'}
+                      {settings.favoriteSites.includes(site.id)
+                        ? '⭐ Favori'
+                        : '☆ Ajouter'}
                     </button>
                   </div>
                 ))}
               </div>
             )}
             <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
-              💡 <strong>Astuce :</strong> Les sites favoris apparaîtront en priorité dans les sélecteurs
+              💡 <strong>Astuce :</strong> Les sites favoris apparaîtront en
+              priorité dans les sélecteurs
             </div>
           </div>
         )}
@@ -557,7 +695,9 @@ export default function Settings() {
           <div className="space-y-4">
             {/* Export/Import Section */}
             <div className="bg-white rounded-xl p-6 shadow-md">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">💾 Sauvegarde & Restauration</h2>
+              <h2 className="text-lg font-bold text-gray-900 mb-4">
+                💾 Sauvegarde & Restauration
+              </h2>
               <div className="space-y-3">
                 <button
                   onClick={exportData}
@@ -584,7 +724,9 @@ export default function Settings() {
 
             {/* Clear Data Section */}
             <div className="bg-white rounded-xl p-6 shadow-md">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">🗑️ Réinitialisation</h2>
+              <h2 className="text-lg font-bold text-gray-900 mb-4">
+                🗑️ Réinitialisation
+              </h2>
               <button
                 onClick={clearData}
                 className="w-full px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"
@@ -592,17 +734,23 @@ export default function Settings() {
                 Réinitialiser tous les paramètres
               </button>
               <div className="mt-4 p-3 bg-red-50 rounded-lg text-sm text-red-800">
-                ⚠️ Cette action est irréversible (sauf si vous avez exporté une sauvegarde)
+                ⚠️ Cette action est irréversible (sauf si vous avez exporté une
+                sauvegarde)
               </div>
             </div>
 
             {/* User Profile Placeholder */}
             <div className="bg-white rounded-xl p-6 shadow-md">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">👤 Profil Utilisateur</h2>
+              <h2 className="text-lg font-bold text-gray-900 mb-4">
+                👤 Profil Utilisateur
+              </h2>
               <div className="p-8 bg-gray-50 rounded-lg text-center">
-                <p className="text-gray-600 mb-2">🚧 Fonctionnalité en développement</p>
+                <p className="text-gray-600 mb-2">
+                  🚧 Fonctionnalité en développement
+                </p>
                 <p className="text-sm text-gray-500">
-                  Bientôt : avatar, bio, statistiques personnelles, historique d&apos;activité
+                  Bientôt : avatar, bio, statistiques personnelles, historique
+                  d&apos;activité
                 </p>
               </div>
             </div>
@@ -620,7 +768,9 @@ export default function Settings() {
               : 'bg-sky-600 text-white hover:bg-sky-700 hover:shadow-xl'
           }`}
         >
-          {saved ? '✅ Paramètres sauvegardés !' : '💾 Sauvegarder les modifications'}
+          {saved
+            ? '✅ Paramètres sauvegardés !'
+            : '💾 Sauvegarder les modifications'}
         </button>
       </div>
     </div>

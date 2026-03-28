@@ -9,17 +9,19 @@ export function Toast({ id, title, type, onClose }: ToastProps) {
   const colors = {
     success: 'bg-green-600',
     error: 'bg-red-600',
-    info: 'bg-blue-600'
+    info: 'bg-blue-600',
   };
 
   const icons = {
     success: '✓',
     error: '✕',
-    info: 'ℹ'
+    info: 'ℹ',
   };
 
   return (
-    <div className={`${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px]`}>
+    <div
+      className={`${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px]`}
+    >
       <span className="text-xl font-bold">{icons[type]}</span>
       <span className="font-medium flex-1">{title}</span>
       <button
@@ -34,7 +36,11 @@ export function Toast({ id, title, type, onClose }: ToastProps) {
 
 // Container pour tous les toasts
 interface ToastContainerProps {
-  toasts: Array<{ id: string; title: string; type: 'success' | 'error' | 'info' }>;
+  toasts: Array<{
+    id: string;
+    title: string;
+    type: 'success' | 'error' | 'info';
+  }>;
   onClose: (id: string) => void;
 }
 

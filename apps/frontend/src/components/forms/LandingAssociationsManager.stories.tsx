@@ -16,7 +16,9 @@ const meta = preview.meta({
       });
       return (
         <QueryClientProvider client={queryClient}>
-          <div style={{ maxWidth: '400px', padding: '1rem', background: '#fff' }}>
+          <div
+            style={{ maxWidth: '400px', padding: '1rem', background: '#fff' }}
+          >
             <Story />
           </div>
         </QueryClientProvider>
@@ -240,7 +242,9 @@ AddingAssociation.test(
     const addButton = await canvas.findByText('+ Ajouter un atterrissage');
     await user.click(addButton);
 
-    await expect(await canvas.findByText('Choisir un site...')).toBeInTheDocument();
+    await expect(
+      await canvas.findByText('Choisir un site...')
+    ).toBeInTheDocument();
     await expect(
       canvas.getByPlaceholderText('Notes (optionnel)')
     ).toBeInTheDocument();
