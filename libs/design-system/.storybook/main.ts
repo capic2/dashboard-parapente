@@ -1,35 +1,35 @@
-import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
-import { defineMain } from '@storybook/react-vite/node';
+import {fileURLToPath} from "node:url";
+import {dirname} from "node:path";
+import {defineMain} from '@storybook/react-vite/node';
 
 export default defineMain({
-  stories: ['../src/**/*.stories.@(js|jsx|mjs|ts|tsx)'],
-  addons: [
-    getAbsolutePath('@storybook/addon-a11y'),
-    getAbsolutePath('@storybook/addon-docs'),
-    getAbsolutePath('storybook-react-i18next'),
-  ],
-  framework: {
-    name: getAbsolutePath('@storybook/react-vite'),
-    options: {
-      builder: {
-        viteConfigPath: './vite.config.ts',
-      },
+    stories: ['../src/**/*.stories.@(js|jsx|mjs|ts|tsx)'],
+    addons: [
+        getAbsolutePath("@storybook/addon-a11y"),
+        getAbsolutePath("@storybook/addon-docs"),
+        getAbsolutePath("@storybook/addon-vitest"),
+    ],
+    framework: {
+        name: getAbsolutePath("@storybook/react-vite"),
+        options: {
+            builder: {
+                viteConfigPath: './vite.config.ts',
+            },
+        },
     },
-  },
-  features: {
-    experimentalTestSyntax: true,
-  },
-  typescript: {
-    reactDocgen: 'react-docgen-typescript',
-    reactDocgenTypescriptOptions: {
-      shouldExtractLiteralValuesFromEnum: true,
-      propFilter: (prop) =>
-        prop.parent ? !/node_modules/.test(prop.parent.fileName) : true,
+    features: {
+        experimentalTestSyntax: true,
     },
-  },
+    typescript: {
+        reactDocgen: 'react-docgen-typescript',
+        reactDocgenTypescriptOptions: {
+            shouldExtractLiteralValuesFromEnum: true,
+            propFilter: (prop) =>
+                prop.parent ? !/node_modules/.test(prop.parent.fileName) : true,
+        },
+    },
 });
 
 function getAbsolutePath(value: string): any {
-  return dirname(fileURLToPath(import.meta.resolve(`${value}/package.json`)));
+    return dirname(fileURLToPath(import.meta.resolve(`${value}/package.json`)));
 }
