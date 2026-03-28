@@ -30,20 +30,18 @@ export default defineConfig({
       }
     }
   },
+  preview: {
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8001',
+        changeOrigin: true
+      }
+    }
+  },
   build: {
     outDir: '../../dist/apps/frontend',
     emptyOutDir: true,
-    sourcemap: false,
-    // Code splitting for TanStack Router routes
-    rolldownOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes('@tanstack/react-router')) return 'tanstack-router';
-          if (id.includes('@tanstack/react-query')) return 'tanstack-query';
-          if (id.includes('@tanstack/react-table')) return 'tanstack-table';
-          if (id.includes('@tanstack/react-form')) return 'tanstack-form';
-        }
-      }
-    }
+    sourcemap: false
   }
 });

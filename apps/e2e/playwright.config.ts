@@ -55,7 +55,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'pnpm exec nx serve backend',
+      command: 'nx serve backend',
       url: 'http://localhost:8001/health',
       reuseExistingServer: !process.env.CI,
       cwd: '../..',
@@ -69,13 +69,11 @@ export default defineConfig({
       },
     },
     {
-      command: 'pnpm exec nx serve frontend',
+      command: 'nx build frontend && npx vite preview --config apps/frontend/vite.config.ts',
       url: 'http://localhost:5173',
       reuseExistingServer: !process.env.CI,
       cwd: '../..',
-      timeout: 60 * 1000, // 1 minute for frontend startup
-      stdout: 'pipe',
-      stderr: 'pipe',
+      timeout: 120 * 1000, // 2 minutes for build + preview startup
     },
   ],
 });
