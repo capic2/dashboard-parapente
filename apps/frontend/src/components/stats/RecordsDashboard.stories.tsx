@@ -13,14 +13,14 @@ const meta = preview.meta({
       // Create a new QueryClient for each story to avoid cache conflicts
       const queryClient = new QueryClient({
         defaultOptions: {
-          queries: { 
+          queries: {
             retry: false,
-            gcTime: 0,  // Disable cache
-            staleTime: 0,  // Always consider data stale
+            gcTime: 0, // Disable cache
+            staleTime: 0, // Always consider data stale
           },
         },
       });
-      
+
       return (
         <QueryClientProvider client={queryClient}>
           <div style={{ maxWidth: '1200px', padding: '20px' }}>
@@ -93,7 +93,8 @@ const mockPartialRecords = {
 export const AllRecords = meta.story({
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
+      handlers: [
+        ...getDefaultHandlers(),
         http.get('/api/flights/records', () => {
           return HttpResponse.json(mockRecords);
         }),
@@ -106,7 +107,8 @@ export const AllRecords = meta.story({
 export const PartialRecords = meta.story({
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
+      handlers: [
+        ...getDefaultHandlers(),
         http.get('/api/flights/records', () => {
           return HttpResponse.json(mockPartialRecords);
         }),
@@ -119,7 +121,8 @@ export const PartialRecords = meta.story({
 export const NoRecords = meta.story({
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
+      handlers: [
+        ...getDefaultHandlers(),
         http.get('/api/flights/records', () => {
           return HttpResponse.json({
             longest_duration: null,
@@ -137,7 +140,8 @@ export const NoRecords = meta.story({
 export const Loading = meta.story({
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
+      handlers: [
+        ...getDefaultHandlers(),
         http.get('/api/flights/records', async () => {
           await new Promise(() => {}); // Never resolves
         }),
@@ -150,7 +154,8 @@ export const Loading = meta.story({
 export const Error = meta.story({
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
+      handlers: [
+        ...getDefaultHandlers(),
         http.get('/api/flights/records', () => {
           return new HttpResponse(null, { status: 500 });
         }),
@@ -164,7 +169,8 @@ export const Error = meta.story({
 export const DisplaysAllRecordCards = meta.story({
   parameters: {
     msw: {
-      handlers: [...getDefaultHandlers(),
+      handlers: [
+        ...getDefaultHandlers(),
         http.get('/api/flights/records', () => {
           return HttpResponse.json(mockRecords);
         }),

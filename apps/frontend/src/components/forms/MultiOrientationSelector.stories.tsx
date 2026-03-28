@@ -2,8 +2,7 @@ import preview from '../../../.storybook/preview';
 import { expect, userEvent, waitFor } from 'storybook/test';
 import { fn } from 'storybook/test';
 import { MultiOrientationSelector } from './MultiOrientationSelector';
-import type {Site} from "@dashboard-parapente/shared-types";
-
+import type { Site } from '@dashboard-parapente/shared-types';
 
 const meta = preview.meta({
   title: 'Components/Forms/MultiOrientationSelector',
@@ -213,7 +212,7 @@ export const DropdownOpen = meta.story({
   },
 });
 
-DropdownOpen.test("interaction test", async ({ canvas }) => {
+DropdownOpen.test('interaction test', async ({ canvas }) => {
   const button = canvas.getByRole('button');
   await userEvent.click(button);
 });
@@ -228,10 +227,13 @@ export const DisplaysSiteName = meta.story({
   },
 });
 
-DisplaysSiteName.test('displays site name and orientation', async ({ canvas }) => {
-  await expect(canvas.getByText('Mont Poupet')).toBeInTheDocument();
-  await expect(canvas.getByText('(N)')).toBeInTheDocument();
-});
+DisplaysSiteName.test(
+  'displays site name and orientation',
+  async ({ canvas }) => {
+    await expect(canvas.getByText('Mont Poupet')).toBeInTheDocument();
+    await expect(canvas.getByText('(N)')).toBeInTheDocument();
+  }
+);
 
 export const OpensDropdownOnClick = meta.story({
   args: {
@@ -248,9 +250,7 @@ OpensDropdownOnClick.test('opens dropdown on click', async ({ canvas }) => {
   await user.click(button);
 
   await waitFor(() => {
-    expect(
-      canvas.getByText('Choisir un décollage')
-    ).toBeInTheDocument();
+    expect(canvas.getByText('Choisir un décollage')).toBeInTheDocument();
   });
 
   await expect(canvas.getByText('Nord')).toBeInTheDocument();
@@ -266,24 +266,27 @@ export const SelectsSiteFromDropdown = meta.story({
   },
 });
 
-SelectsSiteFromDropdown.test('selects site from dropdown', async ({ args, canvas }) => {
-  const user = userEvent.setup();
+SelectsSiteFromDropdown.test(
+  'selects site from dropdown',
+  async ({ args, canvas }) => {
+    const user = userEvent.setup();
 
-  // Open dropdown
-  const button = canvas.getByRole('button');
-  await user.click(button);
+    // Open dropdown
+    const button = canvas.getByRole('button');
+    await user.click(button);
 
-  await waitFor(() => {
-    expect(canvas.getByText('Sud')).toBeInTheDocument();
-  });
+    await waitFor(() => {
+      expect(canvas.getByText('Sud')).toBeInTheDocument();
+    });
 
-  // Click on "Sud" option
-  const sudOption = canvas.getByText('Sud');
-  await user.click(sudOption);
+    // Click on "Sud" option
+    const sudOption = canvas.getByText('Sud');
+    await user.click(sudOption);
 
-  // Callback should be called with site id '2'
-  await expect(args.onSelectSite).toHaveBeenCalledWith('2');
-});
+    // Callback should be called with site id '2'
+    await expect(args.onSelectSite).toHaveBeenCalledWith('2');
+  }
+);
 
 export const DisplaysWeatherData = meta.story({
   args: {
@@ -294,17 +297,20 @@ export const DisplaysWeatherData = meta.story({
   },
 });
 
-DisplaysWeatherData.test('displays weather data in dropdown', async ({ canvas }) => {
-  const user = userEvent.setup();
+DisplaysWeatherData.test(
+  'displays weather data in dropdown',
+  async ({ canvas }) => {
+    const user = userEvent.setup();
 
-  // Open dropdown
-  const button = canvas.getByRole('button');
-  await user.click(button);
+    // Open dropdown
+    const button = canvas.getByRole('button');
+    await user.click(button);
 
-  await waitFor(() => {
-    expect(canvas.getByText(/Para-Index: 85/)).toBeInTheDocument();
-  });
-});
+    await waitFor(() => {
+      expect(canvas.getByText(/Para-Index: 85/)).toBeInTheDocument();
+    });
+  }
+);
 
 export const HighlightsSelectedSite = meta.story({
   args: {
@@ -338,28 +344,29 @@ export const ClosesOnOutsideClick = meta.story({
   },
 });
 
-ClosesOnOutsideClick.test('closes dropdown on outside click', async ({ canvas }) => {
-  const user = userEvent.setup();
+ClosesOnOutsideClick.test(
+  'closes dropdown on outside click',
+  async ({ canvas }) => {
+    const user = userEvent.setup();
 
-  // Open dropdown
-  const button = canvas.getByRole('button');
-  await user.click(button);
+    // Open dropdown
+    const button = canvas.getByRole('button');
+    await user.click(button);
 
-  await waitFor(() => {
-    expect(
-      canvas.getByText('Choisir un décollage')
-    ).toBeInTheDocument();
-  });
+    await waitFor(() => {
+      expect(canvas.getByText('Choisir un décollage')).toBeInTheDocument();
+    });
 
-  // Click outside (on document body)
-  await user.click(document.body);
+    // Click outside (on document body)
+    await user.click(document.body);
 
-  await waitFor(() => {
-    expect(
-      canvas.queryByText('Choisir un décollage')
-    ).not.toBeInTheDocument();
-  });
-});
+    await waitFor(() => {
+      expect(
+        canvas.queryByText('Choisir un décollage')
+      ).not.toBeInTheDocument();
+    });
+  }
+);
 
 export const ShowsRatingStars = meta.story({
   args: {

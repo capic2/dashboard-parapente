@@ -15,7 +15,7 @@ export default function StatsDashboard() {
       totalMinutes: (stats.total_duration_minutes || 0) % 60,
       totalDistance: (stats.total_distance_km || 0).toFixed(1),
       totalElevation: stats.total_elevation_gain_m || 0,
-      avgDuration: Math.floor((stats.avg_duration_minutes || 0)),
+      avgDuration: Math.floor(stats.avg_duration_minutes || 0),
       avgDistance: (stats.avg_distance_km || 0).toFixed(1),
       maxAltitude: stats.max_altitude_m || 0,
       favoriteSite: stats.favorite_site?.name || stats.favorite_spot || 'N/A',
@@ -26,7 +26,10 @@ export default function StatsDashboard() {
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[...Array(8)].map((_, i) => (
-          <div key={i} className="bg-white rounded-xl p-4 shadow-md animate-pulse">
+          <div
+            key={i}
+            className="bg-white rounded-xl p-4 shadow-md animate-pulse"
+          >
             <div className="w-12 h-12 bg-gray-200 rounded-full mb-3"></div>
             <div className="h-6 bg-gray-200 rounded mb-2"></div>
             <div className="h-4 bg-gray-200 rounded w-2/3"></div>

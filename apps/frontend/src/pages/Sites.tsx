@@ -15,72 +15,78 @@ export const Sites: React.FC = () => {
   const deleteSite = useDeleteSite()
   
   // Filters & search
-  const [searchQuery, setSearchQuery] = useState('')
-  const [typeFilter, setTypeFilter] = useState<'all' | 'takeoff' | 'landing' | 'both'>('all')
-  const [sortBy, setSortBy] = useState<'name' | 'created_at' | 'region'>('name')
-  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<
+    'all' | 'takeoff' | 'landing' | 'both'
+  >('all');
+  const [sortBy, setSortBy] = useState<'name' | 'created_at' | 'region'>(
+    'name'
+  );
+
   // Modals
-  const [editingSite, setEditingSite] = useState<Site | null>(null)
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  
+  const [editingSite, setEditingSite] = useState<Site | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
   // Filter & sort logic
   const filteredSites = useMemo(() => {
-    const filtered = sites.filter(site => {
+    const filtered = sites.filter((site) => {
       // Search filter
-      const matchesSearch = searchQuery === '' || 
+      const matchesSearch =
+        searchQuery === '' ||
         site.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         site.code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        site.region?.toLowerCase().includes(searchQuery.toLowerCase())
-      
+        site.region?.toLowerCase().includes(searchQuery.toLowerCase());
+
       // Type filter
-      const matchesType = typeFilter === 'all' || site.usage_type === typeFilter
-      
-      return matchesSearch && matchesType
-    })
-    
+      const matchesType =
+        typeFilter === 'all' || site.usage_type === typeFilter;
+
+      return matchesSearch && matchesType;
+    });
+
     // Sort
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'name':
-          return a.name.localeCompare(b.name)
+          return a.name.localeCompare(b.name);
         case 'region':
-          return (a.region || '').localeCompare(b.region || '')
+          return (a.region || '').localeCompare(b.region || '');
         default:
-          return 0
+          return 0;
       }
-    })
-    
-    return filtered
-  }, [sites, searchQuery, typeFilter, sortBy])
-  
+    });
+
+    return filtered;
+  }, [sites, searchQuery, typeFilter, sortBy]);
+
   // Handlers
   const handleEdit = (site: Site) => {
-    setEditingSite(site)
-    setIsEditModalOpen(true)
-  }
-  
+    setEditingSite(site);
+    setIsEditModalOpen(true);
+  };
+
   const handleCreate = () => {
-    setEditingSite(null)
-    setIsEditModalOpen(true)
-  }
-  
+    setEditingSite(null);
+    setIsEditModalOpen(true);
+  };
+
   const handleSave = async (data: SiteUpdate) => {
     if (editingSite) {
       // Edit mode
-      await updateSite.mutateAsync({ siteId: editingSite.id, data })
+      await updateSite.mutateAsync({ siteId: editingSite.id, data });
     } else {
       // Create mode - would need a createSite mutation
       // For now, this would use the existing CreateSiteModal workflow
       console.log('Create site:', data)
       alert(t('sites.createViaButton'))
     }
-  }
-  
+  };
+
   const handleDelete = async (site: Site) => {
     if (!confirm(t('sites.deleteSiteConfirm', { name: site.name }))) {
       return
     }
-    
+
     try {
       await deleteSite.mutateAsync(site.id)
       alert(t('sites.siteDeleted', { name: site.name }))
@@ -88,21 +94,21 @@ export const Sites: React.FC = () => {
       const errorMessage = (error as Error)?.message || t('sites.deleteError')
       alert(errorMessage)
     }
-  }
-  
+  };
+
   const handleViewFlights = (_site: Site) => {
     // Navigate to flights page with site filter
-    void navigate({ to: '/flights' as string })
-  }
-  
+    void navigate({ to: '/flights' as string });
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
-    )
+    );
   }
-  
+
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -110,9 +116,9 @@ export const Sites: React.FC = () => {
           ❌ {t('sites.sitesLoadError')}
         </div>
       </div>
-    )
+    );
   }
-  
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
@@ -125,7 +131,7 @@ export const Sites: React.FC = () => {
           ➕ {t('sites.newSite')}
         </button>
       </div>
-      
+
       {/* Filters Bar */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -137,11 +143,15 @@ export const Sites: React.FC = () => {
             placeholder={t('sites.searchPlaceholder')}
             className="px-3 py-2 border rounded"
           />
-          
+
           {/* Type Filter */}
           <select
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as 'all' | 'takeoff' | 'landing' | 'both')}
+            onChange={(e) =>
+              setTypeFilter(
+                e.target.value as 'all' | 'takeoff' | 'landing' | 'both'
+              )
+            }
             className="px-3 py-2 border rounded"
           >
             <option value="all">{t('sites.allTypes')}</option>
@@ -149,11 +159,13 @@ export const Sites: React.FC = () => {
             <option value="landing">{t('sites.landingOnly')}</option>
             <option value="both">{t('sites.both')}</option>
           </select>
-          
+
           {/* Sort */}
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'name' | 'created_at' | 'region')}
+            onChange={(e) =>
+              setSortBy(e.target.value as 'name' | 'created_at' | 'region')
+            }
             className="px-3 py-2 border rounded"
           >
             <option value="name">{t('sites.sortByName')}</option>
@@ -161,20 +173,20 @@ export const Sites: React.FC = () => {
           </select>
         </div>
       </div>
-      
+
       {/* Results count */}
       <p className="text-sm text-gray-600 mb-4">
         {t('common.siteFound', { count: filteredSites.length })}
       </p>
-      
+
       {/* Sites Grid */}
       {filteredSites.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredSites.map(site => (
+          {filteredSites.map((site) => (
             <SiteCard
               key={site.id}
               site={site}
-              flightCount={0}  // TODO: could fetch from API if needed
+              flightCount={0} // TODO: could fetch from API if needed
               onEdit={handleEdit}
               onDelete={handleDelete}
               onViewFlights={handleViewFlights}
@@ -196,17 +208,17 @@ export const Sites: React.FC = () => {
           )}
         </div>
       )}
-      
+
       {/* Edit Modal */}
       <EditSiteModal
         site={editingSite}
         isOpen={isEditModalOpen}
         onClose={() => {
-          setIsEditModalOpen(false)
-          setEditingSite(null)
+          setIsEditModalOpen(false);
+          setEditingSite(null);
         }}
         onSave={handleSave}
       />
     </div>
-  )
-}
+  );
+};

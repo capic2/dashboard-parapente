@@ -79,7 +79,9 @@ const defaultHandlers = [
   http.get('*/api/spots', () => HttpResponse.json(mockSites)),
   http.get('*/api/sites/:siteId/landings', () => HttpResponse.json([])),
   http.patch('*/api/sites/:siteId', () => HttpResponse.json({ success: true })),
-  http.delete('*/api/sites/:siteId', () => HttpResponse.json({ success: true })),
+  http.delete('*/api/sites/:siteId', () =>
+    HttpResponse.json({ success: true })
+  ),
 ];
 
 export const Default = meta.story({

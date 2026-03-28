@@ -37,7 +37,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
       <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
         {/* Header */}
         <h2 className="text-2xl font-bold mb-4">🎥 Export Vidéo</h2>
-        
+
         {/* Quality Selection */}
         <div className="mb-4">
           <label className="block text-sm font-medium mb-2">Qualité</label>
@@ -60,7 +60,9 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
 
         {/* FPS Selection */}
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">Images/seconde</label>
+          <label className="block text-sm font-medium mb-2">
+            Images/seconde
+          </label>
           <div className="grid grid-cols-2 gap-2">
             {([30, 60] as const).map((f) => (
               <button
@@ -82,7 +84,9 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
         <div className="mb-4">
           <label className="block text-sm font-medium mb-2">
             Vitesse de replay
-            <span className="text-xs text-gray-500 ml-2">(1x = temps réel pour sync caméra)</span>
+            <span className="text-xs text-gray-500 ml-2">
+              (1x = temps réel pour sync caméra)
+            </span>
           </label>
           <div className="grid grid-cols-4 gap-2">
             {([1, 2, 4, 8] as const).map((s) => (
@@ -106,7 +110,9 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
           <div className="text-sm text-gray-700">
             <div className="flex justify-between mb-1">
               <span>Durée vidéo:</span>
-              <span className="font-medium">{formatTime(estimatedDuration)}</span>
+              <span className="font-medium">
+                {formatTime(estimatedDuration)}
+              </span>
             </div>
             <div className="flex justify-between mb-1">
               <span>Taille estimée:</span>
@@ -123,8 +129,9 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
         {estimatedDuration > 600 && (
           <div className="bg-yellow-100 border border-yellow-400 rounded p-3 mb-4">
             <p className="text-sm text-yellow-800">
-              ⚠️ Vidéo longue détectée ({formatTime(estimatedDuration)}). 
-              L&apos;export peut prendre plusieurs minutes et générer un fichier volumineux.
+              ⚠️ Vidéo longue détectée ({formatTime(estimatedDuration)}).
+              L&apos;export peut prendre plusieurs minutes et générer un fichier
+              volumineux.
             </p>
           </div>
         )}
@@ -147,10 +154,10 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
 
         {/* Help Text */}
         <p className="text-xs text-gray-500 mt-3 text-center">
-          La vidéo sera téléchargée au format WebM. 
-          <a 
-            href="https://cloudconvert.com/webm-to-mp4" 
-            target="_blank" 
+          La vidéo sera téléchargée au format WebM.
+          <a
+            href="https://cloudconvert.com/webm-to-mp4"
+            target="_blank"
             rel="noopener noreferrer"
             className="text-blue-600 hover:underline ml-1"
           >
@@ -181,14 +188,14 @@ const calculateEstimatedSize = (
     '1080p': 5000000,
     '4K': 15000000,
   };
-  
+
   const bitrate = bitrates[quality];
   const fpsMultiplier = fps === 60 ? 1.5 : 1;
   const sizeBytes = (bitrate * fpsMultiplier * durationSeconds) / 8;
-  
+
   // Convert to MB
   const sizeMB = sizeBytes / (1024 * 1024);
-  
+
   if (sizeMB > 1000) {
     return `~${(sizeMB / 1024).toFixed(1)} GB`;
   }

@@ -1,6 +1,6 @@
-import preview from '../../.storybook/preview'
-import { http, HttpResponse } from 'msw'
-import StatsPanel from './StatsPanel'
+import preview from '../../.storybook/preview';
+import { http, HttpResponse } from 'msw';
+import StatsPanel from './StatsPanel';
 
 const mockStats = {
   total_flights: 42,
@@ -14,7 +14,7 @@ const mockStats = {
   favorite_spot: 'Arguel',
   favorite_site: null,
   last_flight_date: '2024-03-15T14:30:00Z',
-}
+};
 
 const meta = preview.meta({
   title: 'Components/StatsPanel',
@@ -30,16 +30,16 @@ const meta = preview.meta({
     msw: {
       handlers: [
         http.get('/api/flights/stats', () => {
-          return HttpResponse.json(mockStats)
+          return HttpResponse.json(mockStats);
         }),
       ],
     },
   },
   tags: ['autodocs'],
-})
+});
 
 // Default with stats
-export const Default = meta.story({})
+export const Default = meta.story({});
 
 // Loading state
 export const Loading = meta.story({
@@ -47,13 +47,13 @@ export const Loading = meta.story({
     msw: {
       handlers: [
         http.get('/api/flights/stats', async () => {
-          await new Promise(resolve => setTimeout(resolve, 100000))
-          return HttpResponse.json(mockStats)
+          await new Promise((resolve) => setTimeout(resolve, 100000));
+          return HttpResponse.json(mockStats);
         }),
       ],
     },
   },
-})
+});
 
 // Error state
 export const Error = meta.story({
@@ -61,12 +61,12 @@ export const Error = meta.story({
     msw: {
       handlers: [
         http.get('/api/flights/stats', () => {
-          return new HttpResponse(null, { status: 500 })
+          return new HttpResponse(null, { status: 500 });
         }),
       ],
     },
   },
-})
+});
 
 // No flights yet
 export const NoFlights = meta.story({
@@ -87,12 +87,12 @@ export const NoFlights = meta.story({
             favorite_spot: null,
             favorite_site: null,
             last_flight_date: null,
-          })
+          });
         }),
       ],
     },
   },
-})
+});
 
 // Many flights
 export const ManyFlights = meta.story({
@@ -113,9 +113,9 @@ export const ManyFlights = meta.story({
             favorite_spot: 'Mont Poupet',
             favorite_site: null,
             last_flight_date: '2024-03-17T10:15:00Z',
-          })
+          });
         }),
       ],
     },
   },
-})
+});

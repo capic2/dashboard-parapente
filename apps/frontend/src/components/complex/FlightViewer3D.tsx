@@ -315,15 +315,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       visiblePositionsRef.current = [positions[0]];
 
       // Expose data globally for video export (Playwright)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Playwright export interop
       if (typeof window !== 'undefined' && (window as any)._exportMode) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any)._gpxData = {
           coordinates: gpxData.coordinates,
           positions: positions,
           timestamps: timestamps,
         };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any)._cesiumViewer = viewer;
       }
 
@@ -1086,8 +1083,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     );
   }
 
-
-
   return (
     <div
       ref={containerDivRef}
@@ -1249,7 +1244,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                               }
 
                               // Refresh flight data to get updated status
-                              queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
+                              queryClient.invalidateQueries({
+                                queryKey: ['flights', flightId],
+                              });
                             } catch (error) {
                               console.error(
                                 '❌ Failed to start video generation:',
@@ -1322,7 +1319,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                                 }
 
                                 // Refresh flight data to get updated status
-                                queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
+                                queryClient.invalidateQueries({
+                                  queryKey: ['flights', flightId],
+                                });
                               } catch (error) {
                                 console.error(
                                   'Failed to cancel video generation:',
@@ -1367,7 +1366,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                               }
 
                               // Refresh flight data to get updated status
-                              queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
+                              queryClient.invalidateQueries({
+                                queryKey: ['flights', flightId],
+                              });
                             } catch (error) {
                               console.error(
                                 'Failed to regenerate video:',

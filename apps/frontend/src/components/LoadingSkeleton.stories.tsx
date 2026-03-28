@@ -1,6 +1,6 @@
-import preview from '../../.storybook/preview'
-import { expect } from 'storybook/test'
-import LoadingSkeleton from './LoadingSkeleton'
+import preview from '../../.storybook/preview';
+import { expect } from 'storybook/test';
+import LoadingSkeleton from './LoadingSkeleton';
 
 const meta = preview.meta({
   title: 'Components/LoadingSkeleton',
@@ -30,7 +30,7 @@ const meta = preview.meta({
       description: 'Custom height (CSS value like "200px" or "10rem")',
     },
   },
-})
+});
 
 // Default card skeleton
 export const Default = meta.story({
@@ -38,13 +38,16 @@ export const Default = meta.story({
     type: 'card',
     count: 1,
   },
-})
+});
 
 // Test default rendering
-Default.test('should render single card skeleton', async ({ canvasElement }) => {
-  const element = canvasElement.querySelector('.animate-pulse')
-  await expect(element).toBeTruthy()
-})
+Default.test(
+  'should render single card skeleton',
+  async ({ canvasElement }) => {
+    const element = canvasElement.querySelector('.animate-pulse');
+    await expect(element).toBeTruthy();
+  }
+);
 
 // Card type
 export const TypeCard = meta.story({
@@ -53,7 +56,7 @@ export const TypeCard = meta.story({
     type: 'card',
     count: 1,
   },
-})
+});
 
 // Chart type
 export const TypeChart = meta.story({
@@ -62,7 +65,7 @@ export const TypeChart = meta.story({
     type: 'chart',
     count: 1,
   },
-})
+});
 
 // List type
 export const TypeList = meta.story({
@@ -71,7 +74,7 @@ export const TypeList = meta.story({
     type: 'list',
     count: 1,
   },
-})
+});
 
 // Text type
 export const TypeText = meta.story({
@@ -80,7 +83,7 @@ export const TypeText = meta.story({
     type: 'text',
     count: 1,
   },
-})
+});
 
 // Multiple cards
 export const MultipleCards = meta.story({
@@ -89,13 +92,16 @@ export const MultipleCards = meta.story({
     type: 'card',
     count: 3,
   },
-})
+});
 
 // Test multiple skeletons
-MultipleCards.test('should render multiple skeletons', async ({ canvasElement }) => {
-  const elements = canvasElement.querySelectorAll('.animate-pulse')
-  await expect(elements.length).toBe(3)
-})
+MultipleCards.test(
+  'should render multiple skeletons',
+  async ({ canvasElement }) => {
+    const elements = canvasElement.querySelectorAll('.animate-pulse');
+    await expect(elements.length).toBe(3);
+  }
+);
 
 // Multiple lists
 export const MultipleLists = meta.story({
@@ -104,7 +110,7 @@ export const MultipleLists = meta.story({
     type: 'list',
     count: 5,
   },
-})
+});
 
 // Custom height card
 export const CustomHeight = meta.story({
@@ -114,7 +120,7 @@ export const CustomHeight = meta.story({
     count: 1,
     height: '400px',
   },
-})
+});
 
 // Tall chart
 export const TallChart = meta.story({
@@ -124,7 +130,7 @@ export const TallChart = meta.story({
     count: 1,
     height: '500px',
   },
-})
+});
 
 // All types comparison
 export const AllTypes = meta.story({
@@ -149,14 +155,14 @@ export const AllTypes = meta.story({
       </div>
     </div>
   ),
-})
+});
 
 // Test all types render
 AllTypes.test('should render all skeleton types', async ({ canvasElement }) => {
-  const elements = canvasElement.querySelectorAll('.animate-pulse')
+  const elements = canvasElement.querySelectorAll('.animate-pulse');
   // 1 card + 1 chart + 3 lists + 2 texts = 7 skeletons
-  await expect(elements.length).toBeGreaterThanOrEqual(6)
-})
+  await expect(elements.length).toBeGreaterThanOrEqual(6);
+});
 
 // Realistic use case: Dashboard loading
 export const DashboardLoading = meta.story({
@@ -175,11 +181,12 @@ export const DashboardLoading = meta.story({
   parameters: {
     docs: {
       description: {
-        story: 'Example of a dashboard loading state with multiple skeleton types.',
+        story:
+          'Example of a dashboard loading state with multiple skeleton types.',
       },
     },
   },
-})
+});
 
 // Realistic use case: List loading
 export const ListLoading = meta.story({
@@ -196,7 +203,7 @@ export const ListLoading = meta.story({
       },
     },
   },
-})
+});
 
 // Realistic use case: Article loading
 export const ArticleLoading = meta.story({
@@ -216,4 +223,4 @@ export const ArticleLoading = meta.story({
       },
     },
   },
-})
+});

@@ -18,11 +18,7 @@ export default function ThermalAnalysis() {
   const userLat = site?.latitude || null;
   const userLon = site?.longitude || null;
 
-  const {
-    data: latest,
-    isLoading,
-    refetch,
-  } = useLatestEmagram(selectedSiteId);
+  const { data: latest, isLoading, refetch } = useLatestEmagram(selectedSiteId);
   const { data: history } = useEmagramHistory(userLat, userLon, 7);
   const triggerMutation = useTriggerEmagram();
 

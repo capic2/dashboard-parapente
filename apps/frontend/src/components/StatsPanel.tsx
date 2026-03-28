@@ -29,13 +29,15 @@ export default function StatsPanel() {
     return `${h}h${m > 0 ? ` ${m}min` : ''}`;
   };
 
-  const avgDistancePerFlight = stats.total_flights > 0 
-    ? (stats.total_distance_km / stats.total_flights).toFixed(1)
-    : '0.0';
+  const avgDistancePerFlight =
+    stats.total_flights > 0
+      ? (stats.total_distance_km / stats.total_flights).toFixed(1)
+      : '0.0';
 
-  const avgHoursPerFlight = stats.total_flights > 0
-    ? (stats.total_hours / stats.total_flights).toFixed(1)
-    : '0.0';
+  const avgHoursPerFlight =
+    stats.total_flights > 0
+      ? (stats.total_hours / stats.total_flights).toFixed(1)
+      : '0.0';
 
   return (
     <div className="bg-white rounded-xl p-4 shadow-md flex-1 flex flex-col">
@@ -104,8 +106,11 @@ export default function StatsPanel() {
           <div className="text-2xl leading-none shrink-0">📅</div>
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">
-              {stats.last_flight_date 
-                ? new Date(stats.last_flight_date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+              {stats.last_flight_date
+                ? new Date(stats.last_flight_date).toLocaleDateString('fr-FR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                  })
                 : 'N/A'}
             </div>
             <div className="text-[10px] text-gray-600 font-medium mt-0.5">{t('stats.lastFlight')}</div>

@@ -33,7 +33,7 @@ const meta = preview.meta({
       description: 'Callback when date value changes',
     },
   },
-})
+});
 
 /*
 // Default with a selected date
@@ -81,7 +81,7 @@ export const Today = meta.story({
     value: '2026-01-15',
     onChange: fn(),
   },
-})
+});
 
 // Different label examples
 export const ShortLabel = meta.story({
@@ -91,7 +91,7 @@ export const ShortLabel = meta.story({
     value: '',
     onChange: fn(),
   },
-})
+});
 
 export const LongLabel = meta.story({
   name: 'Long Label',
@@ -100,30 +100,30 @@ export const LongLabel = meta.story({
     value: '2024-03-15',
     onChange: fn(),
   },
-})
+});
 
 // In a form context
 export const InFormContext = meta.story({
   name: 'In Form Context',
   render: () => {
-    const handleChange = fn()
-    
+    const handleChange = fn();
+
     return (
       <form className="space-y-4 w-80 p-6 bg-gray-50 rounded-lg">
         <h2 className="text-lg font-bold text-gray-900 mb-4">Flight Details</h2>
-        
+
         <DatePicker
           label="Flight Date"
           value="2024-03-15"
           onChange={handleChange}
         />
-        
+
         <DatePicker
           label="Next Flight (optional)"
           value=""
           onChange={handleChange}
         />
-        
+
         <div className="flex gap-2 pt-2">
           <button
             type="button"
@@ -139,9 +139,9 @@ export const InFormContext = meta.story({
           </button>
         </div>
       </form>
-    )
+    );
   },
-})
+});
 
 // Multiple date pickers
 export const MultiplePickers = meta.story({
@@ -149,19 +149,11 @@ export const MultiplePickers = meta.story({
   render: () => {
     return (
       <div className="space-y-4 w-80">
-        <DatePicker
-          label="Start Date"
-          value="2024-03-01"
-          onChange={fn()}
-        />
-        
-        <DatePicker
-          label="End Date"
-          value="2024-03-15"
-          onChange={fn()}
-        />
+        <DatePicker label="Start Date" value="2024-03-01" onChange={fn()} />
+
+        <DatePicker label="End Date" value="2024-03-15" onChange={fn()} />
       </div>
-    )
+    );
   },
-})
+});
 

@@ -1,9 +1,9 @@
 /**
  * MultiOrientationSelector Component
- * 
+ *
  * Generic dropdown selector for sites with multiple orientations/takeoffs
  * Automatically groups sites by their base name and shows them in a dropdown
- * 
+ *
  * Example: "Mont Poupet Nord", "Mont Poupet Sud" -> Grouped as "Mont Poupet"
  */
 
@@ -12,12 +12,15 @@ import type { Site } from '../../types';
 import { WindIndicatorCompact } from '../WindIndicator';
 
 interface MultiOrientationSelectorProps {
-  sites: Site[];  // All variants of this site (different orientations)
+  sites: Site[]; // All variants of this site (different orientations)
   selectedSiteId: string;
   onSelectSite: (siteId: string) => void;
-  weatherData?: Map<string, { windDirection?: string; windSpeed?: number; paraIndex?: number }>;
+  weatherData?: Map<
+    string,
+    { windDirection?: string; windSpeed?: number; paraIndex?: number }
+  >;
   className?: string;
-  baseName?: string;  // Display name (e.g., "Mont Poupet")
+  baseName?: string; // Display name (e.g., "Mont Poupet")
 }
 
 export function MultiOrientationSelector({
@@ -32,7 +35,7 @@ export function MultiOrientationSelector({
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Find currently selected site
-  const selectedSite = sites.find(site => site.id === selectedSiteId);
+  const selectedSite = sites.find((site) => site.id === selectedSiteId);
 
   // Determine display name (use baseName prop or extract from first site)
   const displayName = baseName || extractBaseName(sites[0]?.name || '');
@@ -40,14 +43,18 @@ export function MultiOrientationSelector({
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     }
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      return () =>
+        document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [isOpen]);
 
@@ -62,16 +69,16 @@ export function MultiOrientationSelector({
     const orientationOrder = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
     const aIndex = orientationOrder.indexOf(a.orientation || '');
     const bIndex = orientationOrder.indexOf(b.orientation || '');
-    
+
     // If both have standard orientations, sort by orientation
     if (aIndex !== -1 && bIndex !== -1) {
       return aIndex - bIndex;
     }
-    
+
     // If only one has standard orientation, prioritize it
     if (aIndex !== -1) return -1;
     if (bIndex !== -1) return 1;
-    
+
     // Otherwise sort alphabetically by name
     return (a.name || '').localeCompare(b.name || '');
   });
@@ -90,15 +97,22 @@ export function MultiOrientationSelector({
         <div className="flex items-center gap-2 justify-center">
           <span>{displayName}</span>
           {selectedSite && selectedSite.orientation && (
-            <span className="text-sm opacity-90">({selectedSite.orientation})</span>
+            <span className="text-sm opacity-90">
+              ({selectedSite.orientation})
+            </span>
           )}
-          <svg 
+          <svg
             className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-            fill="none" 
-            stroke="currentColor" 
+            fill="none"
+            stroke="currentColor"
             viewBox="0 0 24 24"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
           </svg>
         </div>
       </button>
@@ -110,7 +124,7 @@ export function MultiOrientationSelector({
             <div className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1 mb-1">
               Choisir un décollage
             </div>
-            
+
             {sortedSites.map((site) => {
               const weather = weatherData.get(site.id);
               const isSelected = site.id === selectedSiteId;
@@ -127,9 +141,7 @@ export function MultiOrientationSelector({
                   }`}
                 >
                   <div className="flex flex-col items-start">
-                    <span className="font-medium text-sm">
-                      {shortName}
-                    </span>
+                    <span className="font-medium text-sm">{shortName}</span>
                     <span className="text-xs text-gray-500 dark:text-gray-400">
                       {site.orientation || 'N/A'}
                       {site.elevation_m && ` • ${site.elevation_m}m`}
@@ -165,15 +177,32 @@ export function MultiOrientationSelector({
  */
 function extractBaseName(siteName: string): string {
   // Remove common orientation suffixes
-  const orientations = ['Nord', 'Sud', 'Est', 'Ouest', 'Nord-Ouest', 'Nord-Est', 'Sud-Ouest', 'Sud-Est', 'N', 'S', 'E', 'W', 'NW', 'NE', 'SW', 'SE'];
+  const orientations = [
+    'Nord',
+    'Sud',
+    'Est',
+    'Ouest',
+    'Nord-Ouest',
+    'Nord-Est',
+    'Sud-Ouest',
+    'Sud-Est',
+    'N',
+    'S',
+    'E',
+    'W',
+    'NW',
+    'NE',
+    'SW',
+    'SE',
+  ];
   let baseName = siteName.trim();
-  
+
   for (const orientation of orientations) {
     // Try to remove orientation from end of name
     const regex = new RegExp(`\\s*${orientation}\\s*$`, 'i');
     baseName = baseName.replace(regex, '');
   }
-  
+
   return baseName.trim();
 }
 

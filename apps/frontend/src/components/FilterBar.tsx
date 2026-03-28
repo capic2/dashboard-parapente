@@ -5,7 +5,7 @@ import { DatePicker } from '@dashboard-parapente/design-system';
 
 /**
  * Barre de filtres pour les analyses de vols
- * 
+ *
  * Permet de filtrer par :
  * - Site de décollage
  * - Plage de dates (date de début et fin)
@@ -13,7 +13,8 @@ import { DatePicker } from '@dashboard-parapente/design-system';
 export function FilterBar() {
   const { t } = useTranslation();
   const { data: sites = [], isLoading } = useSites();
-  const { filters, setSiteId, setDateFrom, setDateTo, resetFilters } = useFiltersStore();
+  const { filters, setSiteId, setDateFrom, setDateTo, resetFilters } =
+    useFiltersStore();
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
@@ -70,7 +71,7 @@ export function FilterBar() {
             <span className="font-medium">{t('filters.activeFilters')}</span>
             {filters.siteId && (
               <span className="px-2 py-1 bg-sky-100 text-sky-700 rounded">
-                {sites.find(s => s.id === filters.siteId)?.name || 'Site'}
+                {sites.find((s) => s.id === filters.siteId)?.name || 'Site'}
               </span>
             )}
             {filters.dateFrom && (

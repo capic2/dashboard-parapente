@@ -10,8 +10,12 @@ const SiteStats = lazy(() => import('../components/stats/SiteStats'));
 const MonthlyStats = lazy(() => import('../components/stats/MonthlyStats'));
 const TimeOfDayChart = lazy(() => import('../components/stats/TimeOfDayChart'));
 const WeekdayChart = lazy(() => import('../components/stats/WeekdayChart'));
-const RecordsDashboard = lazy(() => import('../components/stats/RecordsDashboard'));
-const AchievementsBadges = lazy(() => import('../components/stats/AchievementsBadges'));
+const RecordsDashboard = lazy(
+  () => import('../components/stats/RecordsDashboard')
+);
+const AchievementsBadges = lazy(
+  () => import('../components/stats/AchievementsBadges')
+);
 
 // Loading fallback component
 function ChartSkeleton() {

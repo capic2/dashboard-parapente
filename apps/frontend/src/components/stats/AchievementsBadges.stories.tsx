@@ -11,14 +11,14 @@ const meta = preview.meta({
       // Create a new QueryClient for each story to avoid cache conflicts
       const queryClient = new QueryClient({
         defaultOptions: {
-          queries: { 
+          queries: {
             retry: false,
-            gcTime: 0,  // Disable cache
-            staleTime: 0,  // Always consider data stale
+            gcTime: 0, // Disable cache
+            staleTime: 0, // Always consider data stale
           },
         },
       });
-      
+
       return (
         <QueryClientProvider client={queryClient}>
           <div style={{ maxWidth: '1200px', padding: '20px' }}>

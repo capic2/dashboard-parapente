@@ -18,7 +18,7 @@ interface Badge {
 
 /**
  * Système de badges d'achievements
- * 
+ *
  * Affiche les accomplissements du pilote basés sur :
  * - Nombre de vols
  * - Heures de vol totales
@@ -209,7 +209,11 @@ export default function AchievementsBadges() {
                 {badge.progress !== undefined && (
                   <div
                     className="absolute inset-0 bg-gradient-to-t from-sky-100 to-transparent opacity-50"
-                    style={{ height: `${badge.progress}%`, bottom: 0, top: 'auto' }}
+                    style={{
+                      height: `${badge.progress}%`,
+                      bottom: 0,
+                      top: 'auto',
+                    }}
                   ></div>
                 )}
 

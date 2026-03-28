@@ -42,7 +42,7 @@ export function StravaSyncModal({ isOpen, onClose, onSyncComplete }: StravaSyncM
         <p className="text-sm text-gray-600">
           {t('strava.description')}
         </p>
-        
+
         <div className="grid grid-cols-2 gap-4">
           <DatePicker
             label={t('strava.from')}

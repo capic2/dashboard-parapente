@@ -114,12 +114,16 @@ const defaultHandlers = [
   http.get('*/api/flights', () => HttpResponse.json({ flights: mockFlights })),
   http.get('*/api/flights/:id', ({ params }) => {
     const flight = mockFlights.find((f) => f.id === params.id);
-    return flight ? HttpResponse.json(flight) : new HttpResponse(null, { status: 404 });
+    return flight
+      ? HttpResponse.json(flight)
+      : new HttpResponse(null, { status: 404 });
   }),
   http.get('*/api/spots', () => HttpResponse.json(mockSites)),
   http.patch('*/api/flights/:id', async ({ request }) => {
     const body = await request.json();
-    return HttpResponse.json({ data: { ...mockFlights[0], ...body as object } });
+    return HttpResponse.json({
+      data: { ...mockFlights[0], ...(body as object) },
+    });
   }),
   http.delete('*/api/flights/:id', () =>
     HttpResponse.json({ success: true, message: 'Flight deleted' })

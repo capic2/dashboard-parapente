@@ -51,7 +51,10 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       }
 
       return (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-sky-600 to-indigo-700" role="alert">
+        <div
+          className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-sky-600 to-indigo-700"
+          role="alert"
+        >
           <div className="max-w-2xl w-full bg-white rounded-xl shadow-2xl p-8">
             <h2 className="text-2xl font-bold text-red-600 mb-4">❌ {t('errors.errorOccurred')}</h2>
             <p className="text-gray-700 mb-6">
@@ -84,7 +87,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                 🔄 {t('common.retry')}
               </button>
               <button
-                onClick={() => window.location.href = '/'}
+                onClick={() => (window.location.href = '/')}
                 className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-all"
               >
                 🏠 {t('common.backToHome')}

@@ -6,7 +6,7 @@ import { enUS } from 'date-fns/locale';
 
 /**
  * Dashboard des records personnels
- * 
+ *
  * Affiche les 4 records principaux :
  * - Vol le plus long (durée)
  * - Plus haute altitude
@@ -21,7 +21,10 @@ export default function RecordsDashboard() {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-white rounded-xl p-4 shadow-md animate-pulse">
+          <div
+            key={i}
+            className="bg-white rounded-xl p-4 shadow-md animate-pulse"
+          >
             <div className="h-6 bg-gray-200 rounded mb-2 w-2/3"></div>
             <div className="h-8 bg-gray-200 rounded mb-2"></div>
             <div className="h-4 bg-gray-200 rounded w-1/2"></div>
@@ -93,12 +96,16 @@ export default function RecordsDashboard() {
             >
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-2xl">{card.icon}</span>
-                <h3 className="text-sm font-semibold text-gray-700">{card.title}</h3>
+                <h3 className="text-sm font-semibold text-gray-700">
+                  {card.title}
+                </h3>
               </div>
 
               {hasRecord ? (
                 <>
-                  <div className={`text-3xl font-bold text-${card.color}-600 mb-2`}>
+                  <div
+                    className={`text-3xl font-bold text-${card.color}-600 mb-2`}
+                  >
                     {card.format(record.value)}
                   </div>
                   <div className="text-xs text-gray-600">
@@ -107,7 +114,9 @@ export default function RecordsDashboard() {
                       {format(parseISO(record.flight_date), 'dd MMMM yyyy', { locale: i18n.language === 'en' ? enUS : fr })}
                     </div>
                     {record.site_name && (
-                      <div className="mt-1 text-gray-500">📍 {record.site_name}</div>
+                      <div className="mt-1 text-gray-500">
+                        📍 {record.site_name}
+                      </div>
                     )}
                   </div>
                 </>

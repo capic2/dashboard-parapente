@@ -15,7 +15,7 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const { mutate: createFlight, isPending, data } = useCreateFlightFromGPX();
   const toast = useToast();
 
@@ -75,7 +75,7 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
         <p className="text-sm text-gray-600">
           {t('flights.createDescription')}
         </p>
-        
+
         {/* File Input */}
         <div className="space-y-2">
           <label htmlFor="gpx-file-input" className="block text-sm font-medium text-gray-700">
@@ -101,7 +101,8 @@ export function CreateFlightModal({ isOpen, onClose, onCreateComplete }: CreateF
           </div>
           {selectedFile && (
             <p className="text-sm text-gray-600">
-              📄 {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+              📄 {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)}{' '}
+              KB)
             </p>
           )}
         </div>

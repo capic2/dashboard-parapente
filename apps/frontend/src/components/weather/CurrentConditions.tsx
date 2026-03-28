@@ -56,7 +56,9 @@ export default function CurrentConditions({ spotId }: CurrentConditionsProps) {
         <div className="text-4xl sm:text-3xl font-bold text-sky-600 leading-none">
           {weather.para_index}/100
         </div>
-        <div className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap ${getVerdictClass(weather.verdict)}`}>
+        <div
+          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap ${getVerdictClass(weather.verdict)}`}
+        >
           {getVerdictEmoji(weather.verdict)} {weather.verdict.toUpperCase()}
         </div>
       </div>
@@ -75,7 +77,11 @@ export default function CurrentConditions({ spotId }: CurrentConditionsProps) {
             {site?.orientation && (
               <WindIndicator
                 windDirection={weather.wind_direction}
-                siteOrientation={Array.isArray(site.orientation) ? site.orientation[0] : site.orientation}
+                siteOrientation={
+                  Array.isArray(site.orientation)
+                    ? site.orientation[0]
+                    : site.orientation
+                }
                 windSpeed={weather.wind_speed}
                 showLabel={false}
                 size="sm"

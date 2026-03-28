@@ -1,6 +1,6 @@
-import preview from '../../.storybook/preview'
-import { fn, userEvent, within, expect } from 'storybook/test'
-import { SiteCard } from './SiteCard'
+import preview from '../../.storybook/preview';
+import { fn, userEvent, within, expect } from 'storybook/test';
+import { SiteCard } from './SiteCard';
 
 const meta = preview.meta({
   title: 'Components/SiteCard',
@@ -36,7 +36,7 @@ const meta = preview.meta({
       description: 'Callback when view flights button is clicked',
     },
   },
-})
+});
 
 const mockSiteArguel = {
   id: 'site-arguel',
@@ -51,11 +51,11 @@ const mockSiteArguel = {
   camera_distance: null,
   flight_count: 0,
   usage_type: 'both' as const,
-  description: 'Site principal de Besançon, accessible toute l\'année',
+  description: "Site principal de Besançon, accessible toute l'année",
   is_active: true,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
-}
+};
 
 // Default site card
 export const Default = meta.story({
@@ -66,20 +66,23 @@ export const Default = meta.story({
     onDelete: fn(),
     onViewFlights: fn(),
   },
-})
+});
 
 // Test interactions
-Default.test('should call callbacks when buttons clicked', async ({ canvasElement, args }) => {
-  const canvas = within(canvasElement)
-  
-  // Click edit button
-  await userEvent.click(canvas.getByText(/Éditer/i))
-  await expect(args.onEdit).toHaveBeenCalledWith(mockSiteArguel)
-  
-  // Click view flights button
-  await userEvent.click(canvas.getByRole('button', { name: /Vols/i }))
-  await expect(args.onViewFlights).toHaveBeenCalledWith(mockSiteArguel)
-})
+Default.test(
+  'should call callbacks when buttons clicked',
+  async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+
+    // Click edit button
+    await userEvent.click(canvas.getByText(/Éditer/i));
+    await expect(args.onEdit).toHaveBeenCalledWith(mockSiteArguel);
+
+    // Click view flights button
+    await userEvent.click(canvas.getByRole('button', { name: /Vols/i }));
+    await expect(args.onViewFlights).toHaveBeenCalledWith(mockSiteArguel);
+  }
+);
 
 // Takeoff only site
 export const TakeoffOnly = meta.story({
@@ -98,7 +101,7 @@ export const TakeoffOnly = meta.story({
     onDelete: fn(),
     onViewFlights: fn(),
   },
-})
+});
 
 // Landing only site
 export const LandingOnly = meta.story({
@@ -117,7 +120,7 @@ export const LandingOnly = meta.story({
     onDelete: fn(),
     onViewFlights: fn(),
   },
-})
+});
 
 // Site with no flights
 export const NoFlights = meta.story({
@@ -129,7 +132,7 @@ export const NoFlights = meta.story({
     onDelete: fn(),
     onViewFlights: fn(),
   },
-})
+});
 
 // Site without description
 export const NoDescription = meta.story({
@@ -144,7 +147,7 @@ export const NoDescription = meta.story({
     onDelete: fn(),
     onViewFlights: fn(),
   },
-})
+});
 
 // Site without code
 export const NoCode = meta.story({
@@ -159,7 +162,7 @@ export const NoCode = meta.story({
     onDelete: fn(),
     onViewFlights: fn(),
   },
-})
+});
 
 // Long description truncated
 export const LongDescription = meta.story({
@@ -167,14 +170,15 @@ export const LongDescription = meta.story({
   args: {
     site: {
       ...mockSiteArguel,
-      description: 'Ceci est une très longue description qui devrait être tronquée après 80 caractères pour maintenir une mise en page propre et lisible dans la carte du site.',
+      description:
+        'Ceci est une très longue description qui devrait être tronquée après 80 caractères pour maintenir une mise en page propre et lisible dans la carte du site.',
     },
     flightCount: 12,
     onEdit: fn(),
     onDelete: fn(),
     onViewFlights: fn(),
   },
-})
+});
 
 // Multiple orientations
 export const MultipleOrientations = meta.story({
@@ -189,7 +193,7 @@ export const MultipleOrientations = meta.story({
     onDelete: fn(),
     onViewFlights: fn(),
   },
-})
+});
 
 // Grid of site cards
 export const GridView = meta.story({
@@ -204,14 +208,25 @@ export const GridView = meta.story({
         onViewFlights={fn()}
       />
       <SiteCard
-        site={{ ...mockSiteArguel, id: '2', name: 'Mont Poupet', usage_type: 'takeoff', elevation_m: 842 }}
+        site={{
+          ...mockSiteArguel,
+          id: '2',
+          name: 'Mont Poupet',
+          usage_type: 'takeoff',
+          elevation_m: 842,
+        }}
         flightCount={8}
         onEdit={fn()}
         onDelete={fn()}
         onViewFlights={fn()}
       />
       <SiteCard
-        site={{ ...mockSiteArguel, id: '3', name: 'La Côte', usage_type: 'landing' }}
+        site={{
+          ...mockSiteArguel,
+          id: '3',
+          name: 'La Côte',
+          usage_type: 'landing',
+        }}
         flightCount={0}
         onEdit={fn()}
         onDelete={fn()}
@@ -219,4 +234,4 @@ export const GridView = meta.story({
       />
     </div>
   ),
-})
+});

@@ -1,9 +1,9 @@
 /**
  * BestSpotSuggestion Component
- * 
+ *
  * Prominent card at the top of the dashboard showing the best spot to fly
  * Based on Para-Index and wind favorability
- * 
+ *
  * Updated to support displaying the date for different days
  */
 
@@ -64,7 +64,9 @@ export function BestSpotSuggestion({
   const borderColor = 'border-sky-200 dark:border-sky-700';
 
   return (
-    <div className={`${bgColor} border ${borderColor} rounded-lg p-4 shadow-sm ${className}`}>
+    <div
+      className={`${bgColor} border ${borderColor} rounded-lg p-4 shadow-sm ${className}`}
+    >
       <div className="flex items-center justify-between">
         {/* Left side: Icon and title */}
         <div className="flex items-center gap-3">
@@ -115,9 +117,7 @@ export function BestSpotSuggestion({
       </div>
 
       {/* Reason text */}
-      <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-        {reason}
-      </p>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{reason}</p>
 
       {/* Action button */}
       <button

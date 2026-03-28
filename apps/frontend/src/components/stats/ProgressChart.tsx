@@ -9,7 +9,11 @@ import { enUS, fr } from 'date-fns/locale';
 export default function ProgressChart() {
   const { t, i18n } = useTranslation();
   const { filters } = useFiltersStore();
-  const { data: flights = [], isLoading, error } = useFlights({ 
+  const {
+    data: flights = [],
+    isLoading,
+    error,
+  } = useFlights({
     limit: 100,
     siteId: filters.siteId || undefined,
     dateFrom: filters.dateFrom || undefined,
@@ -21,20 +25,25 @@ export default function ProgressChart() {
 
     const sortedFlights = flights
       .filter((f) => f.duration_minutes && f.flight_date)
-      .sort((a, b) => new Date(a.flight_date).getTime() - new Date(b.flight_date).getTime());
+      .sort(
+        (a, b) =>
+          new Date(a.flight_date).getTime() - new Date(b.flight_date).getTime()
+      );
 
     return sortedFlights.map((flight, index) => {
       // Calculate cumulative average
       const relevantFlights = sortedFlights.slice(0, index + 1);
       const avgDuration =
-        relevantFlights.reduce((sum, f) => sum + (f.duration_minutes ?? 0), 0) / relevantFlights.length;
+        relevantFlights.reduce((sum, f) => sum + (f.duration_minutes ?? 0), 0) /
+        relevantFlights.length;
 
       // Calculate rolling average (last 10 flights)
       const rollingWindow = 10;
       const startIndex = Math.max(0, index - rollingWindow + 1);
       const rollingFlights = sortedFlights.slice(startIndex, index + 1);
       const rollingAvg =
-        rollingFlights.reduce((sum, f) => sum + (f.duration_minutes ?? 0), 0) / rollingFlights.length;
+        rollingFlights.reduce((sum, f) => sum + (f.duration_minutes ?? 0), 0) /
+        rollingFlights.length;
 
       return {
         date: format(new Date(flight.flight_date), 'dd MMM', { locale: i18n.language === 'en' ? enUS : fr }),
@@ -75,7 +84,10 @@ export default function ProgressChart() {
         </p>
       </div>
       <ResponsiveContainer width="100%" height={300}>
-        <ComposedChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+        <ComposedChart
+          data={chartData}
+          margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+        >
           <defs>
             <linearGradient id="colorDuration" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#4a90e2" stopOpacity={0.8} />

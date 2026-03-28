@@ -3,7 +3,7 @@ import {
   Modal as AriaModal,
   ModalOverlay,
   Button,
-  Heading
+  Heading,
 } from 'react-aria-components';
 import { useTranslation } from 'react-i18next';
 import { tv } from 'tailwind-variants';

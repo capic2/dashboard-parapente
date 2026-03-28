@@ -43,7 +43,11 @@ export function Toast({ id, title, type, onClose }: ToastProps) {
 
 // Container pour tous les toasts
 interface ToastContainerProps {
-  toasts: Array<{ id: string; title: string; type: 'success' | 'error' | 'info' }>;
+  toasts: Array<{
+    id: string;
+    title: string;
+    type: 'success' | 'error' | 'info';
+  }>;
   onClose: (id: string) => void;
 }
 

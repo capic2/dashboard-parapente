@@ -4,12 +4,19 @@ interface LoadingSkeletonProps {
   height?: string;
 }
 
-export default function LoadingSkeleton({ type = 'card', count = 1, height }: LoadingSkeletonProps) {
+export default function LoadingSkeleton({
+  type = 'card',
+  count = 1,
+  height,
+}: LoadingSkeletonProps) {
   const renderSkeleton = () => {
     switch (type) {
       case 'card':
         return (
-          <div className="bg-white rounded-xl p-4 shadow-md animate-pulse" style={{ height }}>
+          <div
+            className="bg-white rounded-xl p-4 shadow-md animate-pulse"
+            style={{ height }}
+          >
             <div className="h-6 bg-gray-200 rounded mb-3 w-3/4"></div>
             <div className="h-4 bg-gray-200 rounded mb-2"></div>
             <div className="h-4 bg-gray-200 rounded w-1/2"></div>
@@ -18,7 +25,10 @@ export default function LoadingSkeleton({ type = 'card', count = 1, height }: Lo
 
       case 'chart':
         return (
-          <div className="bg-white rounded-xl p-4 shadow-md animate-pulse" style={{ height: height || '300px' }}>
+          <div
+            className="bg-white rounded-xl p-4 shadow-md animate-pulse"
+            style={{ height: height || '300px' }}
+          >
             <div className="h-6 bg-gray-200 rounded mb-4 w-1/3"></div>
             <div className="h-full bg-gray-200 rounded"></div>
           </div>
@@ -45,7 +55,12 @@ export default function LoadingSkeleton({ type = 'card', count = 1, height }: Lo
         );
 
       default:
-        return <div className="bg-gray-200 rounded animate-pulse" style={{ height }}></div>;
+        return (
+          <div
+            className="bg-gray-200 rounded animate-pulse"
+            style={{ height }}
+          ></div>
+        );
     }
   };
 

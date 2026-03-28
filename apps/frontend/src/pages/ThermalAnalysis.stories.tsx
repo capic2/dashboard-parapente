@@ -48,10 +48,19 @@ const mockEmagramLatest = {
   latitude: 46.94,
   longitude: 5.88,
   score: 75,
-  summary: 'Conditions thermiques moderees. Base des cumulus estimee a 1600m. Instabilite presente en basses couches.',
+  summary:
+    'Conditions thermiques moderees. Base des cumulus estimee a 1600m. Instabilite presente en basses couches.',
   alerts: JSON.stringify([
-    { type: 'thermal', level: 'info', message: 'Thermiques moderes attendus a partir de 12h' },
-    { type: 'wind', level: 'warning', message: 'Renforcement du vent en altitude > 2000m' },
+    {
+      type: 'thermal',
+      level: 'info',
+      message: 'Thermiques moderes attendus a partir de 12h',
+    },
+    {
+      type: 'wind',
+      level: 'warning',
+      message: 'Renforcement du vent en altitude > 2000m',
+    },
   ]),
   raw_analysis: 'Detailed analysis...',
   source: 'open-meteo',
@@ -67,7 +76,9 @@ const mockEmagramHistory = [
 const defaultHandlers = [
   http.get('*/api/spots/:id', () => HttpResponse.json(mockSite)),
   http.get('*/api/emagram/latest', () => HttpResponse.json(mockEmagramLatest)),
-  http.get('*/api/emagram/history', () => HttpResponse.json(mockEmagramHistory)),
+  http.get('*/api/emagram/history', () =>
+    HttpResponse.json(mockEmagramHistory)
+  ),
   http.post('*/api/emagram/analyze', () =>
     HttpResponse.json({ success: true, id: 'emagram-new' })
   ),

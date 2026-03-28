@@ -47,7 +47,26 @@
     },
     "lint": {
       "cache": true,
-      "inputs": ["default", "packageFiles", "pythonDependencies"]
+      "inputs": [
+        "default",
+        "packageFiles",
+        "pythonDependencies",
+        "{workspaceRoot}/.oxlintrc.json"
+      ]
+    },
+    "format": {
+      "cache": true,
+      "inputs": [
+        "default",
+        "{workspaceRoot}/.oxfmtrc.json"
+      ]
+    },
+    "format:check": {
+      "cache": true,
+      "inputs": [
+        "default",
+        "{workspaceRoot}/.oxfmtrc.json"
+      ]
     },
     "type-check": {
       "cache": true,

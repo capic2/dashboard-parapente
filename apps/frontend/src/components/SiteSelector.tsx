@@ -8,7 +8,10 @@ import type { Site } from '../types';
 interface SiteSelectorProps {
   selectedSiteId: string;
   onSelectSite: (siteId: string) => void;
-  weatherData?: Map<string, { windDirection?: string; windSpeed?: number; paraIndex?: number }>;
+  weatherData?: Map<
+    string,
+    { windDirection?: string; windSpeed?: number; paraIndex?: number }
+  >;
 }
 
 /**
@@ -17,25 +20,38 @@ interface SiteSelectorProps {
  */
 function groupSitesByBaseName(sites: Site[]): Record<string, Site[]> {
   const groups: Record<string, Site[]> = {};
-  
+
   for (const site of sites) {
     // Extract base identifier from site.id (everything before the last hyphen if it's an orientation)
     // e.g., "mont-poupet-nord" -> "mont-poupet", "arguel" -> "arguel"
     const parts = site.id.split('-');
     const lastPart = parts[parts.length - 1];
-    
+
     // Check if last part is an orientation indicator
-    const orientations = ['nord', 'sud', 'est', 'ouest', 'n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
+    const orientations = [
+      'nord',
+      'sud',
+      'est',
+      'ouest',
+      'n',
+      's',
+      'e',
+      'w',
+      'ne',
+      'nw',
+      'se',
+      'sw',
+    ];
     const isOrientation = orientations.includes(lastPart.toLowerCase());
-    
+
     const baseId = isOrientation ? parts.slice(0, -1).join('-') : site.id;
-    
+
     if (!groups[baseId]) {
       groups[baseId] = [];
     }
     groups[baseId].push(site);
   }
-  
+
   return groups;
 }
 
@@ -43,7 +59,7 @@ export default function SiteSelector({ selectedSiteId, onSelectSite, weatherData
   const { t } = useTranslation();
   const { data: sites, isLoading, error } = useSites();
   const queryClient = useQueryClient();
-  
+
   // Prefetch site weather on hover (instant navigation)
   const handleMouseEnter = (siteId: string) => {
     queryClient.prefetchQuery({
@@ -88,7 +104,7 @@ export default function SiteSelector({ selectedSiteId, onSelectSite, weatherData
           if (groupSites.length === 1) {
             const site = groupSites[0];
             const isActive = selectedSiteId === site.id;
-            
+
             return (
               <button
                 key={site.id}
@@ -98,24 +114,29 @@ export default function SiteSelector({ selectedSiteId, onSelectSite, weatherData
                   border-2 rounded-lg 
                   transition-all 
                   flex flex-col items-center gap-1
-                  ${isActive 
-                    ? 'border-sky-600 bg-gradient-to-br from-sky-600 to-sky-800 text-white' 
-                    : 'border-gray-200 bg-white dark:bg-gray-700 dark:border-gray-600 hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100'
+                  ${
+                    isActive
+                      ? 'border-sky-600 bg-gradient-to-br from-sky-600 to-sky-800 text-white'
+                      : 'border-gray-200 bg-white dark:bg-gray-700 dark:border-gray-600 hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100'
                   }
                 `}
                 onClick={() => onSelectSite(site.id)}
                 onMouseEnter={() => handleMouseEnter(site.id)}
               >
-                <span className={`text-sm sm:text-xs font-semibold ${isActive ? '' : 'text-gray-900 dark:text-gray-100'}`}>
+                <span
+                  className={`text-sm sm:text-xs font-semibold ${isActive ? '' : 'text-gray-900 dark:text-gray-100'}`}
+                >
                   {site.name}
                 </span>
-                <span className={`text-xs sm:text-[11px] ${isActive ? 'opacity-90' : 'opacity-80 text-gray-600 dark:text-gray-400'}`}>
+                <span
+                  className={`text-xs sm:text-[11px] ${isActive ? 'opacity-90' : 'opacity-80 text-gray-600 dark:text-gray-400'}`}
+                >
                   {site.elevation_m || '?'}m
                 </span>
               </button>
             );
           }
-          
+
           // Multiple sites with same base -> dropdown selector
           return (
             <MultiOrientationSelector

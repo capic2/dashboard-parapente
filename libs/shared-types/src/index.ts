@@ -121,9 +121,9 @@ export const AlertHistorySchema = z.object({
 // ============================================================================
 // WEATHER SCHEMAS
 // ============================================================================
-// Note: ForecastHourSchema, HourlyForecastItemSchema, DailyForecastItemSchema, 
+// Note: ForecastHourSchema, HourlyForecastItemSchema, DailyForecastItemSchema,
 // and WeatherDataSchema have been removed as they are obsolete.
-// The app now uses BackendWeatherResponseSchema directly and transforms 
+// The app now uses BackendWeatherResponseSchema directly and transforms
 // data in useWeather hook.
 
 // ============================================================================
@@ -249,9 +249,10 @@ export const ParaglidingSpotBaseSchema = z.object({
   source: z.string(), // "openaip", "paraglidingspots", "merged"
 });
 
-export const ParaglidingSpotSearchResultSchema = ParaglidingSpotBaseSchema.extend({
-  distance_km: z.number().nullish(),
-});
+export const ParaglidingSpotSearchResultSchema =
+  ParaglidingSpotBaseSchema.extend({
+    distance_km: z.number().nullish(),
+  });
 
 export const SpotSearchResponseSchema = z.object({
   query: z.record(z.string(), z.any()),
@@ -348,7 +349,9 @@ export type Metrics = z.infer<typeof MetricsSchema>;
 export type DailySummaryDay = z.infer<typeof DailySummaryDaySchema>;
 export type DailySummary = z.infer<typeof DailySummarySchema>;
 export type ParaglidingSpotBase = z.infer<typeof ParaglidingSpotBaseSchema>;
-export type ParaglidingSpotSearchResult = z.infer<typeof ParaglidingSpotSearchResultSchema>;
+export type ParaglidingSpotSearchResult = z.infer<
+  typeof ParaglidingSpotSearchResultSchema
+>;
 export type SpotSearchResponse = z.infer<typeof SpotSearchResponseSchema>;
 export type GeocodeResponse = z.infer<typeof GeocodeResponseSchema>;
 export type FlightRecord = z.infer<typeof FlightRecordSchema>;
