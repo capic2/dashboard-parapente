@@ -5,13 +5,13 @@
  * Used to show green/yellow/red indicators for each takeoff based on wind direction.
  */
 
-export type WindFavorability = 'good' | 'moderate' | 'bad';
+type WindFavorability = 'good' | 'moderate' | 'bad';
 
 /**
  * Convert cardinal direction to degrees
  * N = 0°, E = 90°, S = 180°, W = 270°
  */
-export function cardinalToDegrees(direction: string): number {
+function cardinalToDegrees(direction: string): number {
   const directions: Record<string, number> = {
     'N': 0,
     'NNE': 22.5,
@@ -38,7 +38,7 @@ export function cardinalToDegrees(direction: string): number {
  * Calculate the angular difference between two directions (0-180°)
  * Takes into account that 0° and 360° are the same
  */
-export function getAngularDifference(degrees1: number, degrees2: number): number {
+function getAngularDifference(degrees1: number, degrees2: number): number {
   let diff = Math.abs(degrees1 - degrees2);
   
   // Handle wrap-around (e.g., 350° and 10° are only 20° apart)
@@ -99,25 +99,6 @@ export function getWindFavorability(
   
   // Bad: Wind more than 90° off (tailwind or very strong crosswind)
   return 'bad';
-}
-
-/**
- * Get a multiplier for scoring sites based on wind favorability
- * Used in useBestSpot to weight Para-Index by wind conditions
- * 
- * @returns 1.0 for good, 0.7 for moderate, 0.3 for bad
- */
-export function getWindScoreMultiplier(favorability: WindFavorability): number {
-  switch (favorability) {
-    case 'good':
-      return 1.0;
-    case 'moderate':
-      return 0.7;
-    case 'bad':
-      return 0.3;
-    default:
-      return 0.7;
-  }
 }
 
 /**

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export interface VideoExportConfig {
+interface VideoExportConfig {
   quality: '720p' | '1080p' | '4K';
   fps: 30 | 60;
   speed: 1 | 2 | 4 | 8;

@@ -1,11 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   useQuery,
-  useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import { useEffect } from 'react';
 import type { DailySummary, WeatherData } from '../types';
 import {
   BackendWeatherResponseSchema,
@@ -255,66 +253,6 @@ export const useWeather = (
     staleTime: 1000 * 60 * 30, // 30 minutes - weather forecasts don't change that fast
     enabled: !!siteId,
   });
-};
-
-/**
- * Hook to fetch a single day's weather (for prefetching)
- */
-export const useWeatherDay = (siteId: string | undefined, dayIndex: number) => {
-  return useQuery({
-    queryKey: ['weather', 'day', siteId, dayIndex],
-    queryFn: async () => {
-      if (!siteId) throw new Error('Site ID is required');
-      const data = await api
-        .get(`/weather/${siteId}?day_index=${dayIndex}`)
-        .json();
-      const validation = BackendWeatherResponseSchema.safeParse(data);
-      if (!validation.success) {
-        console.warn(`⚠️ Day ${dayIndex} validation failed:`, validation.error);
-        return null;
-      }
-      return validation.data;
-    },
-    staleTime: 1000 * 60 * 30, // 30 minutes
-    enabled: !!siteId,
-  });
-};
-
-/**
- * Hook to prefetch all 7 days in background (non-blocking)
- * Call this after the selected day has loaded
- */
-export const usePrefetch7Days = (
-  siteId: string | undefined,
-  currentDayIndex: number
-) => {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    if (!siteId) return;
-
-    // Delay prefetch slightly to not block initial render
-    const timer = setTimeout(() => {
-      // Prefetch all days except the current one
-      for (let i = 0; i < 7; i++) {
-        if (i !== currentDayIndex) {
-          queryClient.prefetchQuery({
-            queryKey: ['weather', 'day', siteId, i],
-            queryFn: async () => {
-              const data = await api
-                .get(`/weather/${siteId}?day_index=${i}`)
-                .json();
-              const validation = BackendWeatherResponseSchema.safeParse(data);
-              return validation.success ? validation.data : null;
-            },
-            staleTime: 1000 * 60 * 30, // 30 minutes
-          });
-        }
-      }
-    }, 1000); // 1 second delay
-
-    return () => clearTimeout(timer);
-  }, [siteId, currentDayIndex, queryClient]);
 };
 
 /**

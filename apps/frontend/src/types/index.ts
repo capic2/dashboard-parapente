@@ -1,19 +1,11 @@
 // Core domain types
 // Re-export types from Zod schemas to ensure consistency between validation and types
-export type { 
-  Site, 
-  Flight, 
-  FlightStats, 
-  FlightRecord,
+export type {
+  Site,
+  Flight,
+  FlightStats,
   FlightRecords,
-  DailySummary, 
-  DailySummaryDay,
-  GeoPoint,
-  GPXData,
-  ParaglidingSpotBase,
-  ParaglidingSpotSearchResult,
-  SpotSearchResponse,
-  GeocodeResponse,
+  DailySummary,
 } from '@dashboard-parapente/shared-types';
 
 export interface FlightFilters {
@@ -21,35 +13,6 @@ export interface FlightFilters {
   dateFrom?: string;
   dateTo?: string;
   limit?: number;
-}
-
-export interface Alert {
-  id: string;
-  user_id: string;
-  name: string;
-  site_id: string;
-  condition_type:
-    | 'wind'
-    | 'wind_direction'
-    | 'rain'
-    | 'cloud_base'
-    | 'temperature';
-  operator: '>' | '<' | '=' | 'between';
-  threshold_min: number;
-  threshold_max: number;
-  is_active: boolean;
-  notify_via: 'telegram' | 'email' | 'both';
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AlertHistory {
-  id: string;
-  alert_id: string;
-  triggered_at: string;
-  condition_value: number;
-  message: string;
-  alert?: Alert;
 }
 
 // Weather data as returned by the API for combined endpoint
@@ -104,17 +67,6 @@ export interface DailyForecastItem {
 }
 
 // Form types
-export interface AlertFormData {
-  name: string;
-  site_id: string;
-  condition_type: Alert['condition_type'];
-  operator: Alert['operator'];
-  threshold_min: number;
-  threshold_max: number;
-  is_active: boolean;
-  notify_via: Alert['notify_via'];
-}
-
 export interface FlightFormData {
   name?: string;
   title: string;
@@ -129,11 +81,4 @@ export interface FlightFormData {
   notes?: string;
   description?: string;
   external_url?: string;
-}
-
-// API response wrapper
-export interface ApiResponse<T> {
-  data: T;
-  message?: string;
-  status: 'success' | 'error';
 }

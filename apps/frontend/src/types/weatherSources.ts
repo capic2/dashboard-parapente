@@ -47,19 +47,6 @@ export interface WeatherSourceUpdate {
   documentation_url?: string | null
 }
 
-export interface WeatherSourceCreate {
-  source_name: string
-  display_name: string
-  description?: string | null
-  is_enabled?: boolean
-  requires_api_key?: boolean
-  api_key?: string | null
-  priority?: number
-  scraper_type: ScraperType
-  base_url?: string | null
-  documentation_url?: string | null
-}
-
 export interface WeatherSourceStats {
   total_sources: number
   active_sources: number
@@ -77,30 +64,4 @@ export interface WeatherSourceTestResult {
   tested_at: string  // ISO datetime
 }
 
-/**
- * Emagram source result in aggregator response
- * Note: forecast_hour is now provider-specific (not at root level)
- */
-export interface EmagramSourceResult {
-  source: string
-  success: boolean
-  forecast_hour: number | null  // Provider-specific (e.g., only Open-Meteo provides this)
-  error?: string
-  // Additional provider-specific fields...
-}
 
-/**
- * Emagram aggregator response structure
- * Updated: forecast_hour moved from root to per-source level
- */
-export interface EmagramAggregatorResponse {
-  success: boolean
-  spot_name: string
-  latitude: number
-  longitude: number
-  emagrammes: EmagramSourceResult[]
-  sources_available: number
-  sources_total: number
-  timestamp: string  // ISO datetime
-  // Note: forecast_hour removed from root - now in each emagrammes[].forecast_hour
-}

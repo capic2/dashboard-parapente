@@ -26,7 +26,7 @@ import {
 import { api } from '../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 
-export interface FlightViewer3DProps {
+interface FlightViewer3DProps {
   flightId: string;
   flightTitle?: string;
 }
@@ -1604,5 +1604,3 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     </div>
   );
 };
-
-export default FlightViewer3D;

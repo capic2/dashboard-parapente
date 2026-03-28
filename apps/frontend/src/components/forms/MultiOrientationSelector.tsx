@@ -11,7 +11,7 @@ import { useState, useRef, useEffect } from 'react';
 import type { Site } from '../../types';
 import { WindIndicatorCompact } from '../WindIndicator';
 
-export interface MultiOrientationSelectorProps {
+interface MultiOrientationSelectorProps {
   sites: Site[];  // All variants of this site (different orientations)
   selectedSiteId: string;
   onSelectSite: (siteId: string) => void;

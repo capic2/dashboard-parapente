@@ -3,9 +3,9 @@
  * Different best spot for each day (0-6)
  */
 
-import type { BestSpotResult } from '../../src/schemas';
+import type { BestSpotResult } from '@dashboard-parapente/shared-types';
 
-export const bestSpotByDay: Record<number, BestSpotResult> = {
+const bestSpotByDay: Record<number, BestSpotResult> = {
   // Day 0 - Today: Arguel is best (favorable wind, good thermals)
   0: {
     site: {

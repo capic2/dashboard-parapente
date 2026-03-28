@@ -13,7 +13,7 @@ import {
   getWindFavorabilityColor
 } from '../utils/windMatcher';
 
-export interface WindIndicatorProps {
+interface WindIndicatorProps {
   windDirection?: string;
   siteOrientation?: string;
   windSpeed?: number;

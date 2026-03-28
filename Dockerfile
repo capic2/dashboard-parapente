@@ -5,8 +5,11 @@ FROM node:24-alpine AS frontend-builder
 
 WORKDIR /workspace
 
-# Copier fichiers de configuration Nx
-COPY package*.json nx.json tsconfig.base.json ./
+# Installer pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Copier fichiers de configuration Nx et pnpm
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig.base.json ./
 
 # Copier libs/shared-types (dépendance du frontend)
 COPY libs/shared-types ./libs/shared-types
@@ -15,10 +18,10 @@ COPY libs/shared-types ./libs/shared-types
 COPY apps/frontend ./apps/frontend
 
 # Installer toutes les dépendances (root + frontend)
-RUN npm ci
+RUN pnpm install --frozen-lockfile
 
 # Build frontend avec Nx
-RUN npx nx build frontend --configuration=production
+RUN pnpm exec nx build frontend --configuration=production
 
 # ============================================
 # Stage 2: Backend Python avec Playwright

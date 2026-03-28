@@ -1,22 +1,20 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
-    "rootDir": ".",
+    "rootDir": "./",
     "sourceMap": true,
     "declaration": false,
-    "moduleResolution": "node",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "importHelpers": true,
+    "importHelpers": false,
     "target": "ES2022",
     "module": "ESNext",
     "lib": ["ES2022", "DOM"],
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
-    "baseUrl": ".",
     "paths": {
-      "@dashboard-parapente/shared-types": ["libs/shared-types/src/index.ts"],
-      "@dashboard-parapente/design-system": ["libs/design-system/src/index.ts"]
+      "@dashboard-parapente/shared-types": ["./libs/shared-types/src/index.ts"],
+      "@dashboard-parapente/design-system": ["./libs/design-system/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
