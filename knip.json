@@ -4,5 +4,7 @@
     "apps/e2e/**",
     "apps/frontend/src/routes/**",
     "apps/frontend/vitest.shims.d.ts"
-  ]
+  ],
+  "ignoreBinaries": ["eslint"],
+  "ignoreDependencies": ["eslint"]
 }
