@@ -5,12 +5,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { EmagramAnalysis, EmagramListItem } from '../types/emagram';
 
-const API_BASE =
-  import.meta.env.VITE_API_URL ||
-  (typeof window !== 'undefined'
-    ? `${window.location.protocol}//${window.location.hostname}:8001`
-    : 'http://localhost:8001');
-
 const emagramKeys = {
   all: ['emagram'] as const,
   latest: (siteId: string, dayIndex: number) =>
@@ -32,12 +26,13 @@ export function useLatestEmagram(
     queryFn: async (): Promise<EmagramAnalysis | null> => {
       if (!siteId) return null;
 
-      const url = new URL(`${API_BASE}/api/emagram/latest`);
-      url.searchParams.set('site_id', siteId);
-      url.searchParams.set('day_index', dayIndex.toString());
-      url.searchParams.set('auto_analyze', 'true');
+      const params = new URLSearchParams({
+        site_id: siteId,
+        day_index: dayIndex.toString(),
+        auto_analyze: 'true',
+      });
 
-      const response = await fetch(url.toString());
+      const response = await fetch(`/api/emagram/latest?${params}`);
 
       if (!response.ok) {
         throw new Error(
@@ -70,13 +65,14 @@ export function useEmagramHistory(
         return [];
       }
 
-      const url = new URL(`${API_BASE}/api/emagram/history`);
-      url.searchParams.set('user_lat', userLat.toString());
-      url.searchParams.set('user_lon', userLon.toString());
-      url.searchParams.set('days', days.toString());
-      url.searchParams.set('max_distance_km', maxDistanceKm.toString());
+      const params = new URLSearchParams({
+        user_lat: userLat.toString(),
+        user_lon: userLon.toString(),
+        days: days.toString(),
+        max_distance_km: maxDistanceKm.toString(),
+      });
 
-      const response = await fetch(url.toString());
+      const response = await fetch(`/api/emagram/history?${params}`);
 
       if (!response.ok) {
         throw new Error(
@@ -104,7 +100,7 @@ export function useTriggerEmagram() {
       user_longitude?: number;
       force_refresh?: boolean;
     }): Promise<EmagramAnalysis> => {
-      const response = await fetch(`${API_BASE}/api/emagram/analyze`, {
+      const response = await fetch('/api/emagram/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
