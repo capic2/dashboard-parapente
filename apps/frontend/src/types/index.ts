@@ -46,7 +46,7 @@ export interface HourlyForecastItem {
   para_index: number;
   verdict: string;
   sources?: Record<string, Record<string, number | null>>;
-  thermal_strength?: 'faible' | 'modérée' | 'forte';
+  thermal_strength?: string;
   cape?: number | null;
   cloud_cover?: number | null;
 }
