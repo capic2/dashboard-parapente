@@ -83,7 +83,7 @@ export const createWeatherQueryFn =
       if (!timeStr) return null;
       const parts = timeStr.split(':');
       const hour = Number.parseInt(parts[0] ?? '', 10);
-      return Number.isFinite(hour) ? hour : null;
+      return Number.isFinite(hour) && hour >= 0 && hour <= 23 ? hour : null;
     };
 
     // Extract sunrise/sunset and convert to hours
@@ -145,7 +145,7 @@ export const createWeatherQueryFn =
         para_index: hour.para_index ?? 0, // Use backend calculation (accurate)
         verdict: hour.verdict ?? 'N/A', // Use backend verdict (accurate)
         cape: hour.cape ?? null, // CAPE (J/kg)
-        thermal_strength: (hour.thermal_strength as HourlyForecastItem['thermal_strength']) || 'Faible', // Thermal strength
+        thermal_strength: (hour.thermal_strength?.toLowerCase() as HourlyForecastItem['thermal_strength']) || 'faible', // Thermal strength
         cloud_cover: hour.cloud_cover ?? null, // Cloud cover percentage
         sources: hour.sources || {}, // Preserve per-source data for tooltip
       };

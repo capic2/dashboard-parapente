@@ -916,7 +916,7 @@ export default function HourlyForecast({
                     </td>
 
                     <td className="py-2.5 px-2">
-                      {hour.thermal_strength || 'Faible'}
+                      {hour.thermal_strength || 'faible'}
                     </td>
 
                     <td className="py-2.5 px-2">
