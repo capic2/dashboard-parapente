@@ -7,6 +7,7 @@ Complete guide to using this repository.
 ## 🚀 Getting Started
 
 ### Clone (if pushing to remote later)
+
 ```bash
 cd /home/capic/.openclaw/workspace/paragliding
 git clone dashboard-repo
@@ -14,6 +15,7 @@ cd dashboard-repo
 ```
 
 ### Current Status
+
 ```bash
 # Local repository at:
 /home/capic/.openclaw/workspace/paragliding/dashboard-repo
@@ -187,26 +189,31 @@ git push origin master
 ## 🤔 Help
 
 ### Reset uncommitted changes
+
 ```bash
 git reset --hard HEAD
 ```
 
 ### Undo last commit (unpushed)
+
 ```bash
 git reset --soft HEAD~1
 ```
 
 ### View file changes
+
 ```bash
 git diff scrapers/openmeteo.py
 ```
 
 ### Check history of a file
+
 ```bash
 git log -p backend/requirements.txt
 ```
 
 ### Create a backup branch
+
 ```bash
 git branch backup-before-refactor
 ```

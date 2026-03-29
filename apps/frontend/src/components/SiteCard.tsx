@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Site } from '@dashboard-parapente/shared-types';
 
 interface SiteCardProps {
@@ -16,17 +17,25 @@ export const SiteCard: React.FC<SiteCardProps> = ({
   onDelete,
   onViewFlights,
 }) => {
+  const { t } = useTranslation();
+
   // Type badge styling
   const getTypeBadge = () => {
     switch (site.usage_type) {
       case 'takeoff':
-        return { label: 'Décollage', color: 'bg-green-100 text-green-800' };
+        return {
+          label: t('sites.takeoff'),
+          color: 'bg-green-100 text-green-800',
+        };
       case 'landing':
-        return { label: 'Atterrissage', color: 'bg-blue-100 text-blue-800' };
+        return {
+          label: t('sites.landing'),
+          color: 'bg-blue-100 text-blue-800',
+        };
       case 'both':
       default:
         return {
-          label: 'Déco/Atterro',
+          label: t('sites.both'),
           color: 'bg-purple-100 text-purple-800',
         };
     }
@@ -41,7 +50,9 @@ export const SiteCard: React.FC<SiteCardProps> = ({
         <div className="flex-1">
           <h3 className="text-lg font-bold text-gray-900">{site.name}</h3>
           {site.code && (
-            <p className="text-sm text-gray-500">Code: {site.code}</p>
+            <p className="text-sm text-gray-500">
+              {t('sites.code')} {site.code}
+            </p>
           )}
         </div>
         <span
@@ -71,7 +82,7 @@ export const SiteCard: React.FC<SiteCardProps> = ({
           <div className="text-sm">
             <span className="text-gray-600">🧭 </span>
             <span className="text-gray-800">
-              Orientation: {site.orientation}
+              {t('sites.orientation')} {site.orientation}
             </span>
           </div>
         )}
@@ -88,7 +99,7 @@ export const SiteCard: React.FC<SiteCardProps> = ({
         <div className="text-sm">
           <span className="text-gray-600">✈️ </span>
           <span className="text-gray-800">
-            {flightCount} vol{flightCount !== 1 ? 's' : ''}
+            {flightCount} {t('common.flight', { count: flightCount })}
           </span>
         </div>
 
@@ -107,21 +118,21 @@ export const SiteCard: React.FC<SiteCardProps> = ({
         <button
           onClick={() => onEdit(site)}
           className="flex-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-          title="Éditer le site"
+          title={t('sites.editSite')}
         >
-          ✏️ Éditer
+          ✏️ {t('common.edit')}
         </button>
         <button
           onClick={() => onViewFlights(site)}
           className="flex-1 px-3 py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
-          title="Voir les vols"
+          title={t('sites.viewFlights')}
         >
-          📋 Vols
+          📋 {t('header.flights')}
         </button>
         <button
           onClick={() => onDelete(site)}
           className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700"
-          title="Supprimer le site"
+          title={t('sites.deleteSite')}
         >
           🗑️
         </button>

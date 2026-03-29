@@ -34,6 +34,7 @@ GET /api/weather/combined/{site_id}/{day_index}
 ```
 
 **Parameters:**
+
 - `site_id` (path, required): Site identifier (e.g., `site-arguel`)
 - `day_index` (path, required): Day offset from today (0 = today, 1 = tomorrow, etc.)
 
@@ -75,6 +76,7 @@ GET /api/weather/combined/{site_id}/{day_index}
 ```
 
 **Errors:**
+
 - `404 Not Found`: Site not found
 - `500 Internal Server Error`: Weather data unavailable
 
@@ -89,6 +91,7 @@ GET /api/weather/{source}/{site_id}/{day_index}
 ```
 
 **Parameters:**
+
 - `source` (path, required): Weather source name
   - `open-meteo`
   - `weatherapi`
@@ -169,6 +172,7 @@ GET /api/sites/{site_id}
 ```
 
 **Parameters:**
+
 - `site_id` (path, required): Site identifier
 
 **Response:** `200 OK`
@@ -190,6 +194,7 @@ GET /api/sites/{site_id}
 ```
 
 **Errors:**
+
 - `404 Not Found`: Site not found
 
 ---
@@ -205,6 +210,7 @@ GET /api/flights?site_id={site_id}&date_from={date}&date_to={date}&limit={limit}
 ```
 
 **Query Parameters:**
+
 - `site_id` (optional): Filter by site
 - `date_from` (optional): Start date (ISO 8601)
 - `date_to` (optional): End date (ISO 8601)
@@ -243,6 +249,7 @@ GET /api/flights/{flight_id}
 ```
 
 **Parameters:**
+
 - `flight_id` (path, required): Flight identifier
 
 **Response:** `200 OK`
@@ -270,6 +277,7 @@ GET /api/flights/{flight_id}
 ```
 
 **Errors:**
+
 - `404 Not Found`: Flight not found
 
 ---
@@ -316,6 +324,7 @@ Content-Type: application/json
 ```
 
 **Errors:**
+
 - `400 Bad Request`: Invalid data
 - `404 Not Found`: Site not found
 
@@ -335,6 +344,7 @@ Content-Type: application/json
 **Response:** `200 OK` (returns updated flight)
 
 **Errors:**
+
 - `404 Not Found`: Flight not found
 - `400 Bad Request`: Invalid data
 
@@ -351,6 +361,7 @@ DELETE /api/flights/{flight_id}
 **Response:** `204 No Content`
 
 **Errors:**
+
 - `404 Not Found`: Flight not found
 
 ---
@@ -366,6 +377,7 @@ GET /api/stats/flights?site_id={site_id}
 ```
 
 **Query Parameters:**
+
 - `site_id` (optional): Filter by site
 
 **Response:** `200 OK`
@@ -413,6 +425,7 @@ GET /api/health
 ```
 
 **Possible statuses:**
+
 - `healthy`: All systems operational
 - `degraded`: Some services down
 - `unhealthy`: Critical failure
@@ -424,6 +437,7 @@ GET /api/health
 **Development:** No rate limit
 
 **Production:**
+
 - 10 requests/second per IP
 - Burst: 20 requests
 - 429 Too Many Requests when exceeded
@@ -442,6 +456,7 @@ All errors follow this format:
 ```
 
 **Common Status Codes:**
+
 - `200 OK`: Success
 - `201 Created`: Resource created
 - `204 No Content`: Success with no response body
@@ -473,6 +488,7 @@ All requests are validated using Pydantic schemas. Invalid data returns `400 Bad
 ## Caching
 
 Weather data is cached with 30-minute TTL:
+
 - Cache-Control headers included in responses
 - Fresh data every 30 minutes via scheduler
 - Manual refresh not required

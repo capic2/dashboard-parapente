@@ -30,7 +30,7 @@ export const CustomWeatherStory = meta.story({
       handlers: {
         ...handlers,
         // Override uniquement weatherGet
-        weatherGet: http.get('/api/weather/:spotId', () => 
+        weatherGet: http.get('/api/weather/:spotId', () =>
           HttpResponse.json({
             para_index: 100,
             verdict: 'excellent',
@@ -51,11 +51,13 @@ export const ErrorStory = meta.story({
     msw: {
       handlers: {
         ...handlers,
-        weatherGet: http.get('/api/weather/:spotId', () => 
-          new HttpResponse(null, { status: 500 })
+        weatherGet: http.get(
+          '/api/weather/:spotId',
+          () => new HttpResponse(null, { status: 500 })
         ),
-        spotsGet: http.get('/api/spots/:spotId', () => 
-          new HttpResponse(null, { status: 404 })
+        spotsGet: http.get(
+          '/api/spots/:spotId',
+          () => new HttpResponse(null, { status: 404 })
         ),
       },
     },
@@ -66,6 +68,7 @@ export const ErrorStory = meta.story({
 ## Liste des handlers disponibles
 
 ### Spots/Sites
+
 - `spotsList` - GET /api/spots
 - `spotsBest` - GET /api/spots/best
 - `spotsGet` - GET /api/spots/:spotId
@@ -75,6 +78,7 @@ export const ErrorStory = meta.story({
 - `sitesDelete` - DELETE /api/sites/:siteId
 
 ### Flights
+
 - `flightsList` - GET /api/flights
 - `flightsStats` - GET /api/flights/stats
 - `flightsRecords` - GET /api/flights/records
@@ -88,12 +92,14 @@ export const ErrorStory = meta.story({
 - `flightsDelete` - DELETE /api/flights/:flightId
 
 ### Weather
+
 - `weatherGet` - GET /api/weather/:spotId
 - `weatherToday` - GET /api/weather/:spotId/today
 - `weatherSummary` - GET /api/weather/:spotId/summary
 - `weatherDailySummary` - GET /api/weather/:spotId/daily-summary
 
 ### Weather Sources
+
 - `weatherSourcesList` - GET /api/weather-sources
 - `weatherSourcesStats` - GET /api/weather-sources/stats
 - `weatherSourcesGet` - GET /api/weather-sources/:sourceName
@@ -103,6 +109,7 @@ export const ErrorStory = meta.story({
 - `weatherSourcesTest` - POST /api/weather-sources/:sourceName/test
 
 ### Alerts
+
 - `alertsList` - GET /api/alerts
 - `alertsCreate` - POST /api/alerts
 
@@ -111,18 +118,20 @@ export const ErrorStory = meta.story({
 ✅ **Overrides sélectifs** : Remplacez uniquement les handlers dont vous avez besoin  
 ✅ **Pas de `...spread` d'array** : Plus simple et plus lisible  
 ✅ **Autocomplétion TypeScript** : Les noms des handlers sont typés  
-✅ **Pas de conflits** : Les handlers sont identifiés par nom, pas par ordre  
+✅ **Pas de conflits** : Les handlers sont identifiés par nom, pas par ordre
 
 ## Migration depuis getDefaultHandlers()
 
 **Avant** :
+
 ```typescript
 import { getDefaultHandlers } from '../../../mocks/storyHandlers';
 
-handlers: [...getDefaultHandlers(), override1, override2]
+handlers: [...getDefaultHandlers(), override1, override2];
 ```
 
 **Après** :
+
 ```typescript
 import { handlers } from '../../../mocks/namedHandlers';
 

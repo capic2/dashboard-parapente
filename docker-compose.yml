@@ -6,12 +6,12 @@ services:
     container_name: parapente-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - '6379:6379'
     volumes:
       - /home/capic/docker-data/dashboard-parapente/redis:/data
     command: redis-server --save 60 1 --loglevel warning --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 3s
       retries: 3
@@ -29,52 +29,52 @@ services:
     container_name: parapente-backend
     restart: unless-stopped
     ports:
-      - "8001:8001"
+      - '8001:8001'
     environment:
       # Global
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      
+
       # Backend - Database
       - BACKEND_DATABASE_URL=${BACKEND_DATABASE_URL:-sqlite:///./db/dashboard.db}
-      
+
       # Backend - Redis
       - BACKEND_REDIS_HOST=redis
       - BACKEND_REDIS_PORT=6379
       - BACKEND_USE_FAKE_REDIS=${BACKEND_USE_FAKE_REDIS:-false}
-      
+
       # Backend - API
       - BACKEND_API_HOST=${BACKEND_API_HOST:-0.0.0.0}
       - BACKEND_API_PORT=${BACKEND_API_PORT:-8001}
       - BACKEND_API_DEBUG=${BACKEND_API_DEBUG:-false}
-      
+
       # Backend - Weather API Keys (set in Portainer)
       - BACKEND_WEATHERAPI_KEY=${BACKEND_WEATHERAPI_KEY}
       - BACKEND_METEOBLUE_API_KEY=${BACKEND_METEOBLUE_API_KEY}
-      
+
       # Backend - AI Analysis
       - BACKEND_GOOGLE_API_KEY=${BACKEND_GOOGLE_API_KEY}
       - BACKEND_GEMINI_MODEL=${BACKEND_GEMINI_MODEL:-gemini-2.5-flash}
       - BACKEND_ANTHROPIC_API_KEY=${BACKEND_ANTHROPIC_API_KEY}
-      
+
       # Backend - Strava OAuth (set in Portainer)
       - BACKEND_STRAVA_CLIENT_ID=${BACKEND_STRAVA_CLIENT_ID}
       - BACKEND_STRAVA_CLIENT_SECRET=${BACKEND_STRAVA_CLIENT_SECRET}
       - BACKEND_STRAVA_REFRESH_TOKEN=${BACKEND_STRAVA_REFRESH_TOKEN}
       - BACKEND_STRAVA_ACCESS_TOKEN=${BACKEND_STRAVA_ACCESS_TOKEN}
       - BACKEND_STRAVA_VERIFY_TOKEN=${BACKEND_STRAVA_VERIFY_TOKEN:-PARAPENTE_2025}
-      
+
       # Backend - Scheduler
       - BACKEND_SCHEDULER_ENABLED=${BACKEND_SCHEDULER_ENABLED:-true}
       - BACKEND_SCHEDULER_INTERVAL_MINUTES=${BACKEND_SCHEDULER_INTERVAL_MINUTES:-30}
-      
+
       # Backend - Logging
       - BACKEND_LOG_LEVEL=${BACKEND_LOG_LEVEL:-INFO}
       - BACKEND_LOG_FILE=${BACKEND_LOG_FILE:-logs/dashboard.log}
-      
+
       # Backend - Telegram (optional)
       - BACKEND_TELEGRAM_BOT_TOKEN=${BACKEND_TELEGRAM_BOT_TOKEN}
       - BACKEND_TELEGRAM_CHAT_ID=${BACKEND_TELEGRAM_CHAT_ID}
-      
+
       # Backend - Frontend URL
       - BACKEND_FRONTEND_URL=${BACKEND_FRONTEND_URL}
     depends_on:
@@ -83,7 +83,7 @@ services:
     volumes:
       - /home/capic/docker-data/dashboard-parapente/db:/app/db
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:8001/']
       interval: 30s
       timeout: 10s
       retries: 3

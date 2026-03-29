@@ -1,0 +1,17 @@
+{
+  "common": {
+    "close": "Close",
+    "retry": "Retry",
+    "backToHome": "Back to home"
+  },
+  "datepicker": {
+    "openCalendar": "Open calendar"
+  },
+  "errors": {
+    "errorOccurred": "An error occurred",
+    "errorMessage": "The application encountered an unexpected error. Please try again or go back to the home page.",
+    "technicalDetails": "Technical details",
+    "errorLabel": "Error:",
+    "stackTrace": "Stack trace:"
+  }
+}

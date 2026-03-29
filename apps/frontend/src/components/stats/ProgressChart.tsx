@@ -10,12 +10,14 @@ import {
   Line,
   ComposedChart,
 } from 'recharts';
+import { useTranslation } from 'react-i18next';
 import { useFlights } from '../../hooks/useFlights';
 import { useFiltersStore } from '../../stores/filtersStore';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { enUS, fr } from 'date-fns/locale';
 
 export default function ProgressChart() {
+  const { t, i18n } = useTranslation();
   const { filters } = useFiltersStore();
   const {
     data: flights = [],
@@ -54,9 +56,11 @@ export default function ProgressChart() {
         rollingFlights.length;
 
       return {
-        date: format(new Date(flight.flight_date), 'dd MMM', { locale: fr }),
+        date: format(new Date(flight.flight_date), 'dd MMM', {
+          locale: i18n.language === 'en' ? enUS : fr,
+        }),
         fullDate: format(new Date(flight.flight_date), 'dd MMMM yyyy', {
-          locale: fr,
+          locale: i18n.language === 'en' ? enUS : fr,
         }),
         duration: flight.duration_minutes,
         average: Math.round(avgDuration),
@@ -80,9 +84,9 @@ export default function ProgressChart() {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md text-center">
         <h3 className="text-lg font-bold text-gray-900 mb-4">
-          📈 Progression des Vols
+          📈 {t('charts.flightProgress')}
         </h3>
-        <p className="text-red-600 text-sm">Pas de données disponibles</p>
+        <p className="text-red-600 text-sm">{t('charts.noData')}</p>
       </div>
     );
   }
@@ -91,10 +95,10 @@ export default function ProgressChart() {
     <div className="bg-white rounded-xl p-4 shadow-md">
       <div className="mb-4">
         <h3 className="text-lg font-bold text-gray-900">
-          📈 Progression des Vols
+          📈 {t('charts.flightProgress')}
         </h3>
         <p className="text-sm text-gray-600 mt-1">
-          Durée des vols avec moyennes (cumulée et glissante sur 10 vols)
+          {t('charts.flightProgressDesc')}
         </p>
       </div>
       <ResponsiveContainer width="100%" height={300}>
@@ -116,7 +120,7 @@ export default function ProgressChart() {
           />
           <YAxis
             label={{
-              value: 'Durée (min)',
+              value: t('charts.durationMin'),
               angle: -90,
               position: 'insideLeft',
               style: { fontSize: 12, fill: '#666' },
@@ -136,9 +140,9 @@ export default function ProgressChart() {
               const val = value || 0;
               const hours = Math.floor(Number(val) / 60);
               const mins = Number(val) % 60;
-              let label = 'Durée';
-              if (name === 'average') label = 'Moy. cumulée';
-              if (name === 'rollingAvg') label = 'Moy. glissante (10)';
+              let label = t('charts.duration');
+              if (name === 'average') label = t('charts.cumulativeAvg');
+              if (name === 'rollingAvg') label = t('charts.rollingAvg');
               return [`${hours}h ${mins}m`, label];
             }}
             labelFormatter={(label, payload) => {
@@ -151,9 +155,9 @@ export default function ProgressChart() {
           <Legend
             wrapperStyle={{ paddingTop: '20px' }}
             formatter={(value) => {
-              if (value === 'duration') return 'Durée du vol';
-              if (value === 'average') return 'Moyenne cumulée';
-              if (value === 'rollingAvg') return 'Moy. glissante (10 vols)';
+              if (value === 'duration') return t('charts.flightDuration');
+              if (value === 'average') return t('charts.cumulativeAvg');
+              if (value === 'rollingAvg') return t('charts.rollingAvg');
               return value;
             }}
           />

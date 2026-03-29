@@ -40,11 +40,11 @@ Thank you for your interest in improving Dashboard Parapente. All contributions 
 def calculate_para_index(wind_speed: float, wind_direction: str) -> int:
     """
     Calculate Para-Index score based on wind conditions.
-    
+
     Args:
         wind_speed: Wind speed in km/h
         wind_direction: Wind direction (N, NE, E, etc.)
-        
+
     Returns:
         Para-Index score (0-100)
     """
@@ -86,6 +86,7 @@ Use conventional commits format:
 ```
 
 **Types:**
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation only
@@ -95,6 +96,7 @@ Use conventional commits format:
 - `chore`: Maintenance tasks
 
 **Examples:**
+
 ```
 feat(weather): add Windy.com data source
 fix(cache): resolve Redis connection timeout
@@ -128,6 +130,7 @@ pytest --cov              # Coverage report
 ```
 
 Write tests for:
+
 - New scrapers
 - API endpoints
 - Cache logic
@@ -143,6 +146,7 @@ pnpm run test:coverage     # Coverage report
 ```
 
 Write tests for:
+
 - React components
 - Custom hooks
 - Utility functions
@@ -151,6 +155,7 @@ Write tests for:
 ### Documentation
 
 When adding features:
+
 - Update `USER_GUIDE.md` for user-facing changes
 - Update `DEVELOPMENT.md` for developer workflow changes
 - Add JSDoc/docstrings for new functions
@@ -159,6 +164,7 @@ When adding features:
 ### Reporting Bugs
 
 Open an issue with:
+
 - **Clear title**: Summarize the problem
 - **Description**: What happened vs. what you expected
 - **Steps to reproduce**: Detailed steps
@@ -169,6 +175,7 @@ Open an issue with:
 ### Suggesting Features
 
 Open an issue with:
+
 - **Use case**: Why is this needed?
 - **Proposed solution**: How should it work?
 - **Alternatives**: Other approaches considered
@@ -177,6 +184,7 @@ Open an issue with:
 ### Code Review Process
 
 Maintainers will review for:
+
 - ✅ Code quality and style
 - ✅ Test coverage
 - ✅ Documentation completeness
@@ -228,11 +236,11 @@ Merci de votre intérêt pour améliorer Dashboard Parapente. Toutes les contrib
 def calculate_para_index(wind_speed: float, wind_direction: str) -> int:
     """
     Calcule le score Para-Index basé sur les conditions de vent.
-    
+
     Args:
         wind_speed: Vitesse du vent en km/h
         wind_direction: Direction du vent (N, NE, E, etc.)
-        
+
     Returns:
         Score Para-Index (0-100)
     """
@@ -274,6 +282,7 @@ Utiliser le format conventional commits :
 ```
 
 **Types :**
+
 - `feat` : Nouvelle fonctionnalité
 - `fix` : Correction de bug
 - `docs` : Documentation uniquement
@@ -283,6 +292,7 @@ Utiliser le format conventional commits :
 - `chore` : Tâches de maintenance
 
 **Exemples :**
+
 ```
 feat(weather): ajout source données Windy.com
 fix(cache): résout timeout connexion Redis
@@ -316,6 +326,7 @@ pytest --cov              # Rapport de couverture
 ```
 
 Écrire des tests pour :
+
 - Nouveaux scrapers
 - Endpoints API
 - Logique de cache
@@ -331,6 +342,7 @@ pnpm run test:coverage     # Rapport de couverture
 ```
 
 Écrire des tests pour :
+
 - Composants React
 - Hooks personnalisés
 - Fonctions utilitaires
@@ -339,6 +351,7 @@ pnpm run test:coverage     # Rapport de couverture
 ### Documentation
 
 Lors de l'ajout de fonctionnalités :
+
 - Mettre à jour `USER_GUIDE.md` pour changements côté utilisateur
 - Mettre à jour `DEVELOPMENT.md` pour changements workflow développeur
 - Ajouter JSDoc/docstrings pour nouvelles fonctions
@@ -347,6 +360,7 @@ Lors de l'ajout de fonctionnalités :
 ### Rapporter des Bugs
 
 Ouvrir une issue avec :
+
 - **Titre clair** : Résumer le problème
 - **Description** : Ce qui s'est passé vs. ce qui était attendu
 - **Étapes de reproduction** : Étapes détaillées
@@ -357,6 +371,7 @@ Ouvrir une issue avec :
 ### Suggérer des Fonctionnalités
 
 Ouvrir une issue avec :
+
 - **Cas d'usage** : Pourquoi est-ce nécessaire ?
 - **Solution proposée** : Comment devrait-elle fonctionner ?
 - **Alternatives** : Autres approches considérées
@@ -365,6 +380,7 @@ Ouvrir une issue avec :
 ### Processus de Code Review
 
 Les mainteneurs réviseront pour :
+
 - ✅ Qualité et style du code
 - ✅ Couverture de tests
 - ✅ Complétude de la documentation

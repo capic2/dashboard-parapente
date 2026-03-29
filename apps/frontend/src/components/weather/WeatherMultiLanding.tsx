@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import {
   useLandingAssociations,
   useLandingWeather,
@@ -30,6 +31,7 @@ export default function WeatherMultiLanding({
   spotId,
   dayIndex,
 }: WeatherMultiLandingProps) {
+  const { t } = useTranslation();
   const { data: associations } = useLandingAssociations(spotId);
   const { data: weatherData, isLoading } = useLandingWeather(spotId, dayIndex);
 
@@ -39,16 +41,16 @@ export default function WeatherMultiLanding({
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-indigo-500">
       <h2 className="text-sm text-gray-600 dark:text-gray-400 mb-3 font-semibold">
-        Atterrissages
+        {t('weather.landings')}
       </h2>
 
       {isLoading ? (
         <div className="py-3 text-center text-gray-500 dark:text-gray-400 text-sm">
-          Chargement meteo atterrissages...
+          {t('weather.loadingLandings')}
         </div>
       ) : !weatherData || weatherData.length === 0 ? (
         <div className="py-3 text-center text-gray-400 dark:text-gray-500 text-sm">
-          Aucune donnee meteo disponible
+          {t('weather.noWeatherData')}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -97,7 +99,7 @@ export default function WeatherMultiLanding({
 
                 {entry.is_primary && (
                   <span className="inline-block mt-2 text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">
-                    Principal
+                    {t('weather.primary')}
                   </span>
                 )}
               </div>

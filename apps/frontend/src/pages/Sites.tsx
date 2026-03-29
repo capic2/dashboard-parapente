@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
 import { useSites } from '../hooks/useSites';
 import {
@@ -11,6 +12,7 @@ import { SiteCard } from '../components/SiteCard';
 import { EditSiteModal } from '../components/forms/EditSiteModal';
 
 export const Sites: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { data: sites = [], isLoading, error } = useSites();
   const updateSite = useUpdateSite();
@@ -80,27 +82,20 @@ export const Sites: React.FC = () => {
       // Create mode - would need a createSite mutation
       // For now, this would use the existing CreateSiteModal workflow
       console.log('Create site:', data);
-      alert(
-        'La création de sites est disponible via le bouton "Nouveau site" dans l\'historique des vols'
-      );
+      alert(t('sites.createViaButton'));
     }
   };
 
   const handleDelete = async (site: Site) => {
-    if (
-      !confirm(
-        `Supprimer le site "${site.name}" ?\n\nCette action est irréversible.`
-      )
-    ) {
+    if (!confirm(t('sites.deleteSiteConfirm', { name: site.name }))) {
       return;
     }
 
     try {
       await deleteSite.mutateAsync(site.id);
-      alert(`Site "${site.name}" supprimé avec succès`);
+      alert(t('sites.siteDeleted', { name: site.name }));
     } catch (error: unknown) {
-      const errorMessage =
-        (error as Error)?.message || 'Erreur lors de la suppression';
+      const errorMessage = (error as Error)?.message || t('sites.deleteError');
       alert(errorMessage);
     }
   };
@@ -122,7 +117,7 @@ export const Sites: React.FC = () => {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          ❌ Erreur lors du chargement des sites
+          ❌ {t('sites.sitesLoadError')}
         </div>
       </div>
     );
@@ -132,12 +127,12 @@ export const Sites: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Gestion des Sites</h1>
+        <h1 className="text-3xl font-bold">{t('sites.management')}</h1>
         <button
           onClick={handleCreate}
           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
         >
-          ➕ Nouveau site
+          ➕ {t('sites.newSite')}
         </button>
       </div>
 
@@ -149,7 +144,7 @@ export const Sites: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher par nom, code ou région..."
+            placeholder={t('sites.searchPlaceholder')}
             className="px-3 py-2 border rounded"
           />
 
@@ -163,10 +158,10 @@ export const Sites: React.FC = () => {
             }
             className="px-3 py-2 border rounded"
           >
-            <option value="all">Tous les types</option>
-            <option value="takeoff">Décollage uniquement</option>
-            <option value="landing">Atterrissage uniquement</option>
-            <option value="both">Déco/Atterro</option>
+            <option value="all">{t('sites.allTypes')}</option>
+            <option value="takeoff">{t('sites.takeoffOnly')}</option>
+            <option value="landing">{t('sites.landingOnly')}</option>
+            <option value="both">{t('sites.both')}</option>
           </select>
 
           {/* Sort */}
@@ -177,16 +172,15 @@ export const Sites: React.FC = () => {
             }
             className="px-3 py-2 border rounded"
           >
-            <option value="name">Trier par nom</option>
-            <option value="region">Trier par région</option>
+            <option value="name">{t('sites.sortByName')}</option>
+            <option value="region">{t('sites.sortByRegion')}</option>
           </select>
         </div>
       </div>
 
       {/* Results count */}
       <p className="text-sm text-gray-600 mb-4">
-        {filteredSites.length} site{filteredSites.length !== 1 ? 's' : ''}{' '}
-        trouvé{filteredSites.length !== 1 ? 's' : ''}
+        {t('common.siteFound', { count: filteredSites.length })}
       </p>
 
       {/* Sites Grid */}
@@ -205,17 +199,15 @@ export const Sites: React.FC = () => {
         </div>
       ) : (
         <div className="text-center py-12">
-          <p className="text-gray-500 text-lg mb-4">Aucun site trouvé</p>
+          <p className="text-gray-500 text-lg mb-4">{t('sites.noSiteFound')}</p>
           {searchQuery || typeFilter !== 'all' ? (
-            <p className="text-gray-400">
-              Essayez de modifier vos filtres de recherche
-            </p>
+            <p className="text-gray-400">{t('sites.adjustFilters')}</p>
           ) : (
             <button
               onClick={handleCreate}
               className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
             >
-              ➕ Créer votre premier site
+              ➕ {t('sites.createFirstSite')}
             </button>
           )}
         </div>

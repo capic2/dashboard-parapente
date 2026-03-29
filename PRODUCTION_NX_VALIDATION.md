@@ -13,18 +13,21 @@ Aucune modification n'est nécessaire dans Portainer. Le nouveau build NX foncti
 ### 1. **Build Frontend** ✅
 
 #### Avant (structure classique) :
+
 ```bash
 npm run build
 # Output: frontend/dist/
 ```
 
 #### Après (NX monorepo) :
+
 ```bash
 npx nx build frontend --configuration=production
 # Output: dist/apps/frontend/
 ```
 
 **Impact Docker** : ✅ **AUCUN**
+
 - Le Dockerfile copie depuis le bon chemin : `COPY --from=frontend-builder /workspace/dist/apps/frontend ./static`
 - La structure du build est identique (index.html + assets/)
 
@@ -46,6 +49,7 @@ dist/apps/frontend/
 ```
 
 **Backend FastAPI** : ✅ **Compatible**
+
 - Sert toujours depuis `/app/static/`
 - `app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"))`
 - Catch-all route pour le SPA : `@app.get("/{full_path:path}")`
@@ -55,6 +59,7 @@ dist/apps/frontend/
 ### 3. **Process de Build Docker** ✅
 
 #### Stage 1 : Build Frontend
+
 ```dockerfile
 FROM node:24-alpine AS frontend-builder
 WORKDIR /workspace
@@ -70,6 +75,7 @@ RUN npx nx build frontend --configuration=production
 ```
 
 #### Stage 2 : Backend Python
+
 ```dockerfile
 FROM python:3.14-slim
 WORKDIR /app
@@ -108,8 +114,8 @@ Les volumes existants continuent de fonctionner :
 
 ```yaml
 volumes:
-  - parapente-db-data:/app/db          # Base de données ✅
-  - redis-data:/data                    # Redis ✅
+  - parapente-db-data:/app/db # Base de données ✅
+  - redis-data:/data # Redis ✅
 ```
 
 Aucune modification nécessaire.
@@ -122,11 +128,11 @@ Configuration identique :
 
 ```yaml
 ports:
-  - "8001:8001"  # Backend API + Frontend static
-  - "6379:6379"  # Redis
+  - '8001:8001' # Backend API + Frontend static
+  - '6379:6379' # Redis
 
 networks:
-  - parapente-network  # Inchangé
+  - parapente-network # Inchangé
 ```
 
 ---
@@ -139,7 +145,7 @@ Les healthchecks fonctionnent toujours :
 # Backend
 healthcheck:
   test: ["CMD", "curl", "-f", "http://localhost:8001/"]
-  
+
 # Redis
 healthcheck:
   test: ["CMD", "redis-cli", "ping"]
@@ -170,14 +176,14 @@ Si vous utilisez Git Repository dans Portainer :
 
 ## ⏱️ Timing du Déploiement
 
-| Étape | Durée | Description |
-|-------|-------|-------------|
-| **Pull Git** | 10s | Récupération du code |
-| **Build Frontend (Stage 1)** | 5-8 min | `npm ci` + `nx build` (premier build) |
-| **Build Backend (Stage 2)** | 2-3 min | Installation Python + Playwright |
-| **Start Services** | 30s | Démarrage backend + Redis |
-| **Healthcheck** | 30s | Vérification santé |
-| **TOTAL** | **~10 min** | Downtime effectif |
+| Étape                        | Durée       | Description                           |
+| ---------------------------- | ----------- | ------------------------------------- |
+| **Pull Git**                 | 10s         | Récupération du code                  |
+| **Build Frontend (Stage 1)** | 5-8 min     | `npm ci` + `nx build` (premier build) |
+| **Build Backend (Stage 2)**  | 2-3 min     | Installation Python + Playwright      |
+| **Start Services**           | 30s         | Démarrage backend + Redis             |
+| **Healthcheck**              | 30s         | Vérification santé                    |
+| **TOTAL**                    | **~10 min** | Downtime effectif                     |
 
 **Builds suivants** : ~3-4 minutes (cache Docker)
 
@@ -195,6 +201,7 @@ dashboard-parapente/
 ```
 
 **Build** :
+
 ```dockerfile
 COPY frontend ./frontend
 RUN cd frontend && npm ci && npm run build
@@ -214,6 +221,7 @@ dashboard-parapente/
 ```
 
 **Build** :
+
 ```dockerfile
 COPY apps/frontend ./apps/frontend
 COPY libs/shared-types ./libs/shared-types
@@ -306,6 +314,7 @@ Aucune perte de données même en cas de rollback.
 **Vous pouvez déployer en toute confiance.**
 
 La migration NX est **100% transparente** pour la production :
+
 - ✅ Même Dockerfile (juste paths adaptés)
 - ✅ Même docker-compose.yml
 - ✅ Même variables d'environnement

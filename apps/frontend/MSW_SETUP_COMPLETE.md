@@ -7,7 +7,7 @@
 
 ## 📋 Résumé
 
-Mock Service Worker (MSW) a été **entièrement installé et configuré** dans le frontend du dashboard parapente. 
+Mock Service Worker (MSW) a été **entièrement installé et configuré** dans le frontend du dashboard parapente.
 
 Les mocks sont basés sur les **données réelles de la base de données** (6 vols, 3 sites) et s'activent automatiquement en mode développement.
 
@@ -16,6 +16,7 @@ Les mocks sont basés sur les **données réelles de la base de données** (6 vo
 ## ✅ Actions réalisées
 
 ### 1. Installation MSW ✅
+
 ```bash
 npm install -D msw
 npx msw init public/ --save
@@ -40,27 +41,29 @@ src/mocks/
 
 Tous les endpoints requis sont mockés :
 
-| Endpoint | Méthode | Description |
-|----------|---------|-------------|
-| `/api/spots` | GET | Liste des 3 sites (Arguel, Mont Poupet, La Côte) |
-| `/api/spots/:spotId` | GET | Détails d'un site spécifique |
-| `/api/flights` | GET | Liste des vols récents (6 vols) |
-| `/api/flights/:flightId` | GET | Détails d'un vol |
-| `/api/flights/:flightId/gpx-data` | GET | Coordonnées GPX pour Cesium 3D |
-| `/api/flights/stats` | GET | Statistiques agrégées |
-| `/api/weather/:spotId` | GET | Prévisions météo avec para_index |
-| `/api/weather/:spotId/today` | GET | Météo du jour |
+| Endpoint                          | Méthode | Description                                      |
+| --------------------------------- | ------- | ------------------------------------------------ |
+| `/api/spots`                      | GET     | Liste des 3 sites (Arguel, Mont Poupet, La Côte) |
+| `/api/spots/:spotId`              | GET     | Détails d'un site spécifique                     |
+| `/api/flights`                    | GET     | Liste des vols récents (6 vols)                  |
+| `/api/flights/:flightId`          | GET     | Détails d'un vol                                 |
+| `/api/flights/:flightId/gpx-data` | GET     | Coordonnées GPX pour Cesium 3D                   |
+| `/api/flights/stats`              | GET     | Statistiques agrégées                            |
+| `/api/weather/:spotId`            | GET     | Prévisions météo avec para_index                 |
+| `/api/weather/:spotId/today`      | GET     | Météo du jour                                    |
 
 ### 4. Données mockées ✅
 
 Les données sont **basées sur la BD réelle** :
 
 #### Sites (3)
+
 - **Arguel** : 427m, 47.2518°N, 6.1234°E
-- **Mont Poupet** : 842m, 47.3267°N, 6.189°E  
+- **Mont Poupet** : 842m, 47.3267°N, 6.189°E
 - **La Côte** : 800m, 47.1456°N, 6.2456°E
 
 #### Vols (6)
+
 1. La Côte 08-11 14h53 (11min, 4.6km, 872m)
 2. La Côte 08-11 16h01 (6min, 2.2km, 800m)
 3. Mont Poupet 12-10 16h17 (4min, 1.5km, 842m)
@@ -69,23 +72,29 @@ Les données sont **basées sur la BD réelle** :
 6. Arguel 27-09 17h08 (5min, 2.0km, 435m)
 
 #### Données GPX
+
 Chaque vol a des coordonnées GPX simulées :
+
 - Longitude, latitude, élévation
 - Timestamps
 - Stats (distance, altitude, gain)
 
 #### Météo
+
 3 prévisions mockées (une par site) :
+
 - **Arguel** : Para-index 75, verdict "BON" ✅
 - **Mont Poupet** : Para-index 82, verdict "BON" ✅
 - **La Côte** : Para-index 68, verdict "MOYEN" ⚠️
 
 Chaque prévision inclut :
+
 - Consensus horaire (10h, 12h, 14h, 16h)
 - Créneaux volables (`slots`)
 - Métriques (vent, température, précipitations)
 
 #### Stats
+
 ```json
 {
   "total_flights": 6,
@@ -125,6 +134,7 @@ MSW s'active **automatiquement** quand vous lancez `npm run dev`.
 ### Option 1: Console navigateur (recommandé)
 
 1. Lancer le frontend :
+
    ```bash
    cd frontend
    npm run dev
@@ -135,6 +145,7 @@ MSW s'active **automatiquement** quand vous lancez `npm run dev`.
 3. Ouvrir la console (F12)
 
 4. Vérifier le message :
+
    ```
    [MSW] Mocking enabled.
    ```
@@ -153,18 +164,20 @@ Un composant `TestMSW.tsx` a été créé pour tester tous les endpoints.
 
 1. Éditer `src/App.tsx`
 2. Ajouter temporairement :
+
    ```tsx
-   import TestMSW from './mocks/TestMSW'
-   
+   import TestMSW from './mocks/TestMSW';
+
    function App() {
      return (
        <>
          <TestMSW />
          {/* ... reste de l'app */}
        </>
-     )
+     );
    }
    ```
+
 3. Relancer `npm run dev`
 4. Vérifier la console
 5. Retirer le composant après les tests
@@ -218,6 +231,7 @@ Un fichier **README.md** complet a été créé dans `src/mocks/` avec :
 ### Modifier les données mockées
 
 Éditer `src/mocks/data.ts` :
+
 - `sites` : Modifier les sites
 - `flights` : Ajouter/modifier des vols
 - `gpxData` : Ajuster les coordonnées GPX
@@ -230,13 +244,14 @@ Un fichier **README.md** complet a été créé dans `src/mocks/` avec :
 2. Ajouter un nouveau handler :
    ```typescript
    http.get('/api/nouveau-endpoint', () => {
-     return HttpResponse.json({ data: 'mock' })
-   })
+     return HttpResponse.json({ data: 'mock' });
+   });
    ```
 
 ### Désactiver MSW temporairement
 
 Commenter dans `src/main.tsx` :
+
 ```typescript
 // await enableMocking() // ← Commenter pour désactiver
 ```
@@ -255,4 +270,4 @@ Tous les endpoints API sont mockés avec des données réelles de la base de don
 
 **Auteur:** Claw  
 **Version MSW:** 2.12.10  
-**Date:** 27 février 2026 16:57  
+**Date:** 27 février 2026 16:57

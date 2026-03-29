@@ -13,15 +13,18 @@ Your existing weather report code (`generate-weather-report-v5.js`) contains **p
 ## Existing Code Inventory
 
 ### 1. Open-Meteo Scraper ✅
+
 **Location:** `/home/capic/.openclaw/workspace/paragliding/generate-weather-report-v5.js`
 
 **What it does:**
+
 - Fetches 7-day hourly forecast from Open-Meteo API
 - Handles error cases & retries
 - Caches responses
 - Returns: temperature, wind, cloud, humidity, etc.
 
 **How to reuse:**
+
 ```python
 # Phase 2, Week 2: Create Python wrapper
 from requests import Session
@@ -29,7 +32,7 @@ from requests import Session
 class OpenMeteoScraper:
     def __init__(self):
         self.base_url = "https://api.open-meteo.com/v1/forecast"
-    
+
     async def fetch(self, lat, lon):
         # Use EXACT SAME API parameters as JS version
         params = {
@@ -46,7 +49,7 @@ class OpenMeteoScraper:
         }
         # ... call API (same as JS)
         return response.json()
-    
+
     def normalize(self, data):
         """Convert to DB schema"""
         return {
@@ -61,20 +64,23 @@ class OpenMeteoScraper:
 ---
 
 ### 2. WeatherAPI Scraper ✅
+
 **Location:** Same JS file
 
 **What it does:**
+
 - Alternative weather API (backup source)
 - Handles API key from env variable
 - Returns similar data to Open-Meteo
 
 **How to reuse:**
+
 ```python
 class WeatherAPIScraper:
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.base_url = "https://api.weatherapi.com/v1/forecast.json"
-    
+
     async def fetch(self, lat, lon):
         # Same parameters as JS script
         params = {
@@ -86,7 +92,7 @@ class WeatherAPIScraper:
         }
         # ... call API
         return response.json()
-    
+
     def normalize(self, data):
         """Convert to DB schema"""
         return {
@@ -99,15 +105,18 @@ class WeatherAPIScraper:
 ---
 
 ### 3. Meteoblue Scraper (Playwright) ✅ — **CRITICAL REUSE**
+
 **Location:** Same JS file
 
 **What it does:**
+
 - Uses Playwright to open Meteoblue forecast page
 - Extracts hourly weather table (not SVG, actual data)
 - Handles dynamic content loading
 - Returns 23 hours/day of detailed forecast
 
 **How to reuse:**
+
 ```python
 # Port the EXACT SAME Playwright logic to Python
 
@@ -118,14 +127,14 @@ class MeteoblueScraper:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             page = await browser.new_page()
-            
+
             await page.goto(url)
             await page.wait_for_load_state("networkidle")  # Same as JS
-            
+
             # Extract table (SAME CSS selectors as JS script)
             table = await page.query_selector(".forecast-table")
             rows = await table.query_selector_all("tr.hourly-row")
-            
+
             forecasts = []
             for row in rows:
                 cells = await row.query_selector_all("td")
@@ -135,10 +144,10 @@ class MeteoblueScraper:
                     'wind': await cells[2].text_content(),
                     # ... extract all columns
                 })
-            
+
             await browser.close()
             return forecasts
-    
+
     def normalize(self, data):
         """Convert to DB schema"""
         return [
@@ -156,14 +165,17 @@ class MeteoblueScraper:
 ---
 
 ### 4. Météo-parapente Scraper ✅
+
 **Location:** Same JS file
 
 **What it does:**
+
 - Fetch Météo-parapente RSS feed (structured data)
 - Extract thermal index, stability index
 - Fallback to HTML parsing if RSS fails
 
 **How to reuse:**
+
 ```python
 import feedparser
 from bs4 import BeautifulSoup
@@ -172,7 +184,7 @@ class MeteoParapenteScraper:
     async def fetch(self):
         # Parse RSS feed (EXACT SAME URL as JS)
         feed = feedparser.parse("https://www.meteo-parapente.com/rss.php")
-        
+
         forecasts = []
         for entry in feed.entries:
             # Extract: thermal_strength, stability_index, etc.
@@ -181,9 +193,9 @@ class MeteoParapenteScraper:
                 'stability_index': self._parse_stability(entry.summary),
                 # ... etc
             })
-        
+
         return forecasts
-    
+
     def normalize(self, data):
         """Convert to DB schema"""
         return [
@@ -199,24 +211,27 @@ class MeteoParapenteScraper:
 ---
 
 ### 5. Para-Index Calculation ✅ — **MOST CRITICAL**
+
 **Location:** JS file, function `calculateParaIndex()`
 
 **What it does:**
+
 - **Production-tested** scoring algorithm
 - Combines: wind, cloud cover, temp, thermals, stability
 - Returns 0-100 score
 - Validated against real flying conditions
 
 **How to reuse:**
+
 ```python
 def calculate_para_index(weather_data):
     """
     COPY THE EXACT SAME LOGIC from JS script!
     Don't rewrite - this is production code.
     """
-    
+
     score = 50  # Base
-    
+
     # Wind scoring (EXACT from JS)
     wind = weather_data['wind_speed_kmh']
     if wind < 3:
@@ -231,7 +246,7 @@ def calculate_para_index(weather_data):
         score -= 10
     else:
         score -= 50  # Trop fort
-    
+
     # Cloud cover (EXACT from JS)
     cloud = weather_data['cloud_cover_percent']
     if cloud > 80:
@@ -240,7 +255,7 @@ def calculate_para_index(weather_data):
         score -= 15
     elif cloud < 20:
         score += 10
-    
+
     # Temperature (EXACT from JS)
     temp = weather_data['temperature_c']
     if temp < 5:
@@ -251,12 +266,12 @@ def calculate_para_index(weather_data):
         score += 15
     elif temp > 25:
         score -= 20
-    
+
     # Gusts (EXACT from JS)
     gusts = weather_data['wind_gust_kmh']
     if gusts > 25:
         score -= 50
-    
+
     return max(0, min(100, score))  # Clamp 0-100
 ```
 
@@ -269,6 +284,7 @@ def calculate_para_index(weather_data):
 ### Week 2: API Clients (5-7 hours) — OPTIMIZED
 
 **Timeline:**
+
 - **Monday:** Extract all 5 functions from JS to Python modules
 - **Tuesday:** Write normalize() wrappers + unit tests
 - **Wednesday:** Integration test (scrapers → SQLite)
@@ -276,13 +292,13 @@ def calculate_para_index(weather_data):
 
 **Tasks by source:**
 
-| Source | Refactor | Test | Normalize | Total |
-|--------|----------|------|-----------|-------|
-| Open-Meteo | 30 min | 20 min | 30 min | 1.5h |
-| WeatherAPI | 30 min | 15 min | 30 min | 1.25h |
-| Meteoblue | 1h | 45 min | 30 min | 2.25h |
-| Météo-parapente | 30 min | 20 min | 20 min | 1.1h |
-| Para-Index | 20 min | 30 min | - | 0.75h |
+| Source          | Refactor | Test   | Normalize | Total |
+| --------------- | -------- | ------ | --------- | ----- |
+| Open-Meteo      | 30 min   | 20 min | 30 min    | 1.5h  |
+| WeatherAPI      | 30 min   | 15 min | 30 min    | 1.25h |
+| Meteoblue       | 1h       | 45 min | 30 min    | 2.25h |
+| Météo-parapente | 30 min   | 20 min | 20 min    | 1.1h  |
+| Para-Index      | 20 min   | 30 min | -         | 0.75h |
 
 **Total:** 6.85 hours ≈ 7 hours (vs. 20 hours from scratch!)
 
@@ -291,9 +307,11 @@ def calculate_para_index(weather_data):
 ## Integration Points
 
 ### 1. Scheduler (APScheduler)
+
 **Existing:** Cron job runs daily at 7h
 
 **For dashboard:**
+
 ```python
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -309,6 +327,7 @@ scheduler.add_job(
 ```
 
 ### 2. Database Insertion
+
 **New:** Instead of email/Telegram, insert to SQLite
 
 ```python
@@ -317,7 +336,7 @@ async def process_all_sites():
         for scraper in [openmeteo, weatherapi, meteoblue, meteo_parapente]:
             raw_data = await scraper.fetch(site.lat, site.lon)
             normalized = scraper.normalize(raw_data)
-            
+
             # Insert to DB (new)
             db.weather_forecasts.insert_many(normalized)
 ```
@@ -380,7 +399,7 @@ import json
 def test_openmeteo_normalize():
     with open('fixtures/openmeteo-response.json') as f:
         response = json.load(f)
-    
+
     result = openmeteo.normalize(response)
     assert result['temperature_c'] == 8.2
 ```
@@ -392,12 +411,14 @@ def test_openmeteo_normalize():
 **Risk:** JS and Python implementations diverge
 
 **Mitigation:**
+
 1. Copy logic line-by-line (don't "improve")
 2. Use identical test data
 3. Compare outputs side-by-side during Week 2
 4. Keep JS script running in parallel (backup)
 
 **Example check:**
+
 ```bash
 # Week 2 Thursday: Sanity check
 # JS script output (email): Arguel para-index 75
@@ -409,10 +430,12 @@ def test_openmeteo_normalize():
 ## Timeline Impact
 
 ### Without reuse:
+
 - Week 2: 20 hours building scrapers from scratch
 - Total Phase 2: 40-50 hours
 
 ### With reuse:
+
 - Week 2: 5-7 hours refactoring existing code
 - Total Phase 2: 20-30 hours ⚡
 
@@ -425,6 +448,7 @@ def test_openmeteo_normalize():
 **"Don't rewrite. Refactor."**
 
 Your weather report script is:
+
 - ✅ Production-tested
 - ✅ Handles errors gracefully
 - ✅ Validated against real conditions

@@ -50,6 +50,7 @@ Dashboard Parapente is a full-stack web application that aggregates weather data
 ### 1. Frontend (React + TypeScript)
 
 **Tech Stack:**
+
 - React 18 with TypeScript
 - TanStack Query (data fetching & caching)
 - Tailwind CSS (styling)
@@ -58,6 +59,7 @@ Dashboard Parapente is a full-stack web application that aggregates weather data
 - Vite (build tool)
 
 **Key Features:**
+
 - Component-based architecture
 - Type-safe API calls with Zod validation
 - Optimistic UI updates
@@ -65,6 +67,7 @@ Dashboard Parapente is a full-stack web application that aggregates weather data
 - Responsive design (mobile-first)
 
 **File Structure:**
+
 ```
 frontend/src/
 ├── components/          # Reusable UI components
@@ -91,6 +94,7 @@ frontend/src/
 ### 2. Backend (Python FastAPI)
 
 **Tech Stack:**
+
 - FastAPI (REST API framework)
 - SQLAlchemy (ORM)
 - APScheduler (job scheduling)
@@ -99,6 +103,7 @@ frontend/src/
 - aiohttp (async HTTP client)
 
 **Key Features:**
+
 - Asynchronous request handling
 - Automatic OpenAPI documentation
 - Request/response validation with Pydantic
@@ -106,6 +111,7 @@ frontend/src/
 - Multi-source data aggregation
 
 **File Structure:**
+
 ```
 backend/
 ├── main.py              # FastAPI app entry point
@@ -129,6 +135,7 @@ backend/
 ### 3. Caching Layer
 
 **Development: FakeRedis**
+
 - In-memory Python implementation
 - TTL: 60 minutes
 - No server required
@@ -136,6 +143,7 @@ backend/
 - Data cleared on restart
 
 **Production: Redis**
+
 - Persistent key-value store
 - TTL: 60 minutes (aligned with scheduler)
 - Shared cache between processes
@@ -143,12 +151,14 @@ backend/
 - LRU eviction policy
 
 **Cache Strategy:**
+
 - TTL: 60 minutes (weather data)
 - Cache warming on startup
 - Automatic invalidation
 - Keys format: `weather:{prefix}:{hash}`
 
 **Cache Synchronization:**
+
 ```
 Scheduler (hourly at :00)
         ↓
@@ -164,11 +174,13 @@ Scheduler refreshes → cycle repeats
 ```
 
 **No Gap Design:**
+
 - Refresh happens before expiration
 - Users always get cached data
 - No expensive live scraping during user requests
 
 **Cached Data:**
+
 - Weather forecasts (per site, per day)
 - Aggregated consensus data
 - Source-specific predictions
@@ -239,7 +251,7 @@ Each scraper outputs standardized format:
 def calculate_consensus(sources: List[WeatherData]) -> ConsensusData:
     """
     Calculate consensus from multiple sources.
-    
+
     1. Remove outliers (>2 std dev from median)
     2. Calculate median for each metric
     3. Weight by source confidence
@@ -248,15 +260,15 @@ def calculate_consensus(sources: List[WeatherData]) -> ConsensusData:
     # Example for temperature
     temps = [s.temperature for s in sources]
     median_temp = statistics.median(temps)
-    
+
     # Remove outliers
     std_dev = statistics.stdev(temps)
     filtered = [t for t in temps if abs(t - median_temp) < 2 * std_dev]
-    
+
     # Weighted average
     weights = [s.confidence for s in sources]
     consensus_temp = weighted_average(filtered, weights)
-    
+
     return consensus_temp
 ```
 
@@ -265,6 +277,7 @@ def calculate_consensus(sources: List[WeatherData]) -> ConsensusData:
 ### 5. Scheduler Architecture
 
 **APScheduler Configuration:**
+
 ```python
 scheduler = AsyncIOScheduler(
     job_defaults={
@@ -284,6 +297,7 @@ scheduler.add_job(
 ```
 
 **Job Flow:**
+
 1. Fetch weather for all sites
 2. Normalize data
 3. Calculate consensus
@@ -292,6 +306,7 @@ scheduler.add_job(
 6. Log metrics
 
 **Monitoring:**
+
 - Job execution time
 - Success/failure rate
 - API rate limits
@@ -343,6 +358,7 @@ CREATE TABLE alerts (
 ```
 
 **Indexes:**
+
 ```sql
 CREATE INDEX idx_flights_date ON flights(flight_date DESC);
 CREATE INDEX idx_flights_site ON flights(site_id);
@@ -421,31 +437,33 @@ Next poll in 30 minutes
 
 ### Latency
 
-| Operation | Development (FakeRedis) | Production (Redis) |
-|-----------|------------------------|---------------------|
-| **Cache hit** | <1 ms | <5 ms |
-| **Cache miss (scrape)** | 2-5 seconds | 2-5 seconds |
-| **API request** | 10-50 ms | 20-100 ms |
-| **Database query** | <1 ms | <5 ms |
+| Operation               | Development (FakeRedis) | Production (Redis) |
+| ----------------------- | ----------------------- | ------------------ |
+| **Cache hit**           | <1 ms                   | <5 ms              |
+| **Cache miss (scrape)** | 2-5 seconds             | 2-5 seconds        |
+| **API request**         | 10-50 ms                | 20-100 ms          |
+| **Database query**      | <1 ms                   | <5 ms              |
 
 ### Throughput
 
-| Component | Requests/sec |
-|-----------|--------------|
-| **Frontend** | 100+ (static serving) |
+| Component       | Requests/sec             |
+| --------------- | ------------------------ |
+| **Frontend**    | 100+ (static serving)    |
 | **Backend API** | 50-100 (single instance) |
-| **Redis** | 10,000+ (reads) |
-| **Scrapers** | Limited by external APIs |
+| **Redis**       | 10,000+ (reads)          |
+| **Scrapers**    | Limited by external APIs |
 
 ### Scalability
 
 **Horizontal Scaling:**
+
 - Frontend: Infinite (static files)
 - Backend: Scale with load balancer (3-10 instances typical)
 - Redis: Single instance (can add read replicas)
 - Database: SQLite → PostgreSQL for high load
 
 **Vertical Scaling:**
+
 - 2 CPU / 2 GB RAM: 10-50 concurrent users
 - 4 CPU / 4 GB RAM: 50-200 concurrent users
 - 8 CPU / 8 GB RAM: 200-500 concurrent users
@@ -459,6 +477,7 @@ Next poll in 30 minutes
 Currently: No authentication (personal dashboard)
 
 **Planned:**
+
 - JWT token-based auth
 - OAuth2 (Google, GitHub)
 - API key for external access
@@ -513,8 +532,9 @@ Currently: No authentication (personal dashboard)
 - ✅ Sufficient for <10k flights
 
 **When to migrate to PostgreSQL:**
-- >100k flights
-- >1000 concurrent users
+
+- > 100k flights
+- > 1000 concurrent users
 - Need full-text search
 - Geographic queries
 

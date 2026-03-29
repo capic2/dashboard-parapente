@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useFlights } from '../../hooks/useFlights';
 import { useFlightStats } from '../../hooks/useFlights';
 
@@ -25,6 +26,7 @@ interface Badge {
  * - Consistance (streak)
  */
 export default function AchievementsBadges() {
+  const { t } = useTranslation();
   const { isLoading: flightsLoading } = useFlights({ limit: 500 });
   const { data: stats, isLoading: statsLoading } = useFlightStats();
 
@@ -39,15 +41,15 @@ export default function AchievementsBadges() {
       // Badges de vols
       {
         id: 'first_flight',
-        title: 'Premier Vol',
-        description: 'Réaliser votre premier vol',
+        title: t('achievements.firstFlight'),
+        description: t('achievements.firstFlightDesc'),
         icon: '🪂',
         unlocked: totalFlights >= 1,
       },
       {
         id: 'rookie',
-        title: 'Débutant',
-        description: '5 vols réalisés',
+        title: t('achievements.beginner'),
+        description: t('achievements.beginnerDesc'),
         icon: '🎓',
         unlocked: totalFlights >= 5,
         progress: Math.min(100, (totalFlights / 5) * 100),
@@ -55,8 +57,8 @@ export default function AchievementsBadges() {
       },
       {
         id: 'experienced',
-        title: 'Expérimenté',
-        description: '20 vols réalisés',
+        title: t('achievements.experienced'),
+        description: t('achievements.experiencedDesc'),
         icon: '🎖️',
         unlocked: totalFlights >= 20,
         progress: Math.min(100, (totalFlights / 20) * 100),
@@ -64,8 +66,8 @@ export default function AchievementsBadges() {
       },
       {
         id: 'veteran',
-        title: 'Vétéran',
-        description: '50 vols réalisés',
+        title: t('achievements.veteran'),
+        description: t('achievements.veteranDesc'),
         icon: '🏅',
         unlocked: totalFlights >= 50,
         progress: Math.min(100, (totalFlights / 50) * 100),
@@ -73,8 +75,8 @@ export default function AchievementsBadges() {
       },
       {
         id: 'master',
-        title: 'Maître du Ciel',
-        description: '100 vols réalisés',
+        title: t('achievements.skyMaster'),
+        description: t('achievements.skyMasterDesc'),
         icon: '👑',
         unlocked: totalFlights >= 100,
         progress: Math.min(100, (totalFlights / 100) * 100),
@@ -84,8 +86,8 @@ export default function AchievementsBadges() {
       // Badges d'heures de vol
       {
         id: 'ten_hours',
-        title: '10 Heures',
-        description: '10 heures de vol cumulées',
+        title: t('achievements.tenHours'),
+        description: t('achievements.tenHoursDesc'),
         icon: '⏱️',
         unlocked: totalHours >= 10,
         progress: Math.min(100, (totalHours / 10) * 100),
@@ -93,8 +95,8 @@ export default function AchievementsBadges() {
       },
       {
         id: 'fifty_hours',
-        title: '50 Heures',
-        description: '50 heures de vol cumulées',
+        title: t('achievements.fiftyHours'),
+        description: t('achievements.fiftyHoursDesc'),
         icon: '⌛',
         unlocked: totalHours >= 50,
         progress: Math.min(100, (totalHours / 50) * 100),
@@ -102,8 +104,8 @@ export default function AchievementsBadges() {
       },
       {
         id: 'hundred_hours',
-        title: 'Centurion',
-        description: '100 heures de vol cumulées',
+        title: t('achievements.centurion'),
+        description: t('achievements.centurionDesc'),
         icon: '🕐',
         unlocked: totalHours >= 100,
         progress: Math.min(100, (totalHours / 100) * 100),
@@ -113,8 +115,8 @@ export default function AchievementsBadges() {
       // Badges d'altitude
       {
         id: 'altitude_1000',
-        title: 'Grimpeur',
-        description: "Atteindre 1000m d'altitude",
+        title: t('achievements.climber'),
+        description: t('achievements.climberDesc'),
         icon: '⛰️',
         unlocked: maxAltitude >= 1000,
         progress: Math.min(100, (maxAltitude / 1000) * 100),
@@ -122,8 +124,8 @@ export default function AchievementsBadges() {
       },
       {
         id: 'altitude_2000',
-        title: 'Alpiniste',
-        description: "Atteindre 2000m d'altitude",
+        title: t('achievements.mountaineer'),
+        description: t('achievements.mountaineerDesc'),
         icon: '🏔️',
         unlocked: maxAltitude >= 2000,
         progress: Math.min(100, (maxAltitude / 2000) * 100),
@@ -131,8 +133,8 @@ export default function AchievementsBadges() {
       },
       {
         id: 'altitude_3000',
-        title: 'Aigle',
-        description: "Atteindre 3000m d'altitude",
+        title: t('achievements.eagle'),
+        description: t('achievements.eagleDesc'),
         icon: '🦅',
         unlocked: maxAltitude >= 3000,
         progress: Math.min(100, (maxAltitude / 3000) * 100),
@@ -141,7 +143,7 @@ export default function AchievementsBadges() {
     ];
 
     return allBadges;
-  }, [stats]);
+  }, [stats, t]);
 
   const unlockedBadges = badges.filter((b) => b.unlocked);
   const lockedBadges = badges.filter((b) => !b.unlocked);
@@ -164,9 +166,14 @@ export default function AchievementsBadges() {
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">🏆 Achievements</h3>
+        <h3 className="text-lg font-semibold text-gray-900">
+          🏆 {t('achievements.title')}
+        </h3>
         <p className="text-sm text-gray-600 mt-1">
-          {unlockedBadges.length} / {badges.length} badges débloqués
+          {t('achievements.badgesUnlocked', {
+            unlocked: unlockedBadges.length,
+            total: badges.length,
+          })}
         </p>
       </div>
 
@@ -174,7 +181,7 @@ export default function AchievementsBadges() {
       {unlockedBadges.length > 0 && (
         <div className="mb-6">
           <h4 className="text-sm font-semibold text-gray-700 mb-3">
-            Débloqués
+            {t('achievements.unlocked')}
           </h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {unlockedBadges.map((badge) => (
@@ -199,7 +206,7 @@ export default function AchievementsBadges() {
       {lockedBadges.length > 0 && (
         <div>
           <h4 className="text-sm font-semibold text-gray-700 mb-3">
-            À débloquer
+            {t('achievements.locked')}
           </h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {lockedBadges.map((badge) => (

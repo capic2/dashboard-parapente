@@ -29,6 +29,6 @@ export default defineConfig({
       ],
     },
     testTimeout: 15000,
-    setupFiles: ['./.storybook/vitest.setup.ts'],
+    setupFiles: [path.join(dirname, '.storybook/vitest.setup.ts')],
   },
 })

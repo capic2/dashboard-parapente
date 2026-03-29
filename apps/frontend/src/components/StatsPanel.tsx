@@ -1,16 +1,18 @@
+import { useTranslation } from 'react-i18next';
 import { useFlightStats } from '../hooks/useFlights';
 
 export default function StatsPanel() {
+  const { t, i18n } = useTranslation();
   const { data: stats, isLoading, error } = useFlightStats();
 
   if (isLoading) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md">
         <h2 className="text-sm text-gray-600 mb-3 font-semibold">
-          📊 Statistiques
+          📊 {t('stats.title')}
         </h2>
         <div className="py-5 text-center text-gray-500 text-sm">
-          Chargement...
+          {t('common.loading')}
         </div>
       </div>
     );
@@ -20,10 +22,10 @@ export default function StatsPanel() {
     return (
       <div className="bg-white rounded-xl p-4 shadow-md">
         <h2 className="text-sm text-gray-600 mb-3 font-semibold">
-          📊 Statistiques
+          📊 {t('stats.title')}
         </h2>
         <div className="py-5 text-center text-red-500 text-sm">
-          Données non disponibles
+          {t('common.dataUnavailable')}
         </div>
       </div>
     );
@@ -48,7 +50,7 @@ export default function StatsPanel() {
   return (
     <div className="bg-white rounded-xl p-4 shadow-md flex-1 flex flex-col">
       <h2 className="text-sm text-gray-600 mb-3 font-semibold">
-        📊 Statistiques
+        📊 {t('stats.title')}
       </h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 flex-1">
@@ -60,7 +62,7 @@ export default function StatsPanel() {
               {stats.total_flights}
             </div>
             <div className="text-[10px] text-gray-600 font-medium mt-0.5">
-              Vols totaux
+              {t('stats.totalFlights')}
             </div>
           </div>
         </div>
@@ -72,7 +74,7 @@ export default function StatsPanel() {
               {formatDuration(stats.total_hours)}
             </div>
             <div className="text-[10px] text-gray-600 font-medium mt-0.5">
-              Temps total
+              {t('stats.totalTime')}
             </div>
           </div>
         </div>
@@ -84,7 +86,7 @@ export default function StatsPanel() {
               {stats.total_distance_km.toFixed(1)} km
             </div>
             <div className="text-[10px] text-gray-600 font-medium mt-0.5">
-              Distance totale
+              {t('stats.totalDistance')}
             </div>
           </div>
         </div>
@@ -96,7 +98,7 @@ export default function StatsPanel() {
               {formatDuration(stats.avg_duration_minutes / 60)}
             </div>
             <div className="text-[10px] text-gray-600 font-medium mt-0.5">
-              Durée moyenne
+              {t('stats.avgDuration')}
             </div>
           </div>
         </div>
@@ -109,7 +111,7 @@ export default function StatsPanel() {
               {avgDistancePerFlight} km
             </div>
             <div className="text-[10px] text-gray-600 font-medium mt-0.5">
-              Dist. moyenne
+              {t('stats.avgDistance')}
             </div>
           </div>
         </div>
@@ -121,7 +123,7 @@ export default function StatsPanel() {
               {avgHoursPerFlight}h
             </div>
             <div className="text-[10px] text-gray-600 font-medium mt-0.5">
-              Temps moyen
+              {t('stats.avgTime')}
             </div>
           </div>
         </div>
@@ -133,7 +135,7 @@ export default function StatsPanel() {
               {stats.favorite_spot || 'N/A'}
             </div>
             <div className="text-[10px] text-gray-600 font-medium mt-0.5">
-              Site favori
+              {t('stats.favoriteSite')}
             </div>
           </div>
         </div>
@@ -143,14 +145,14 @@ export default function StatsPanel() {
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 leading-tight truncate">
               {stats.last_flight_date
-                ? new Date(stats.last_flight_date).toLocaleDateString('fr-FR', {
+                ? new Date(stats.last_flight_date).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR', {
                     day: '2-digit',
                     month: '2-digit',
                   })
                 : 'N/A'}
             </div>
             <div className="text-[10px] text-gray-600 font-medium mt-0.5">
-              Dernier vol
+              {t('stats.lastFlight')}
             </div>
           </div>
         </div>

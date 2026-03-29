@@ -17,7 +17,7 @@ export default defineConfig({
     }),
     react(),
     tailwindcss(),
-    cesium({ cesiumBuildRootPath: 'node_modules/cesium/Build' })
+    cesium({ cesiumBuildRootPath: 'node_modules/cesium/Build' }),
   ],
 
   server: {
@@ -26,22 +26,22 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:8001',
-        changeOrigin: true
-      }
-    }
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     port: 5173,
     proxy: {
       '/api': {
         target: 'http://localhost:8001',
-        changeOrigin: true
-      }
-    }
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     outDir: '../../dist/apps/frontend',
     emptyOutDir: true,
-    sourcemap: false
-  }
+    sourcemap: false,
+  },
 });

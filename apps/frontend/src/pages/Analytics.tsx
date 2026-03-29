@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FilterBar } from '../components/FilterBar';
 
 // Lazy load components for better performance
@@ -26,15 +27,14 @@ function ChartSkeleton() {
 }
 
 export default function Analytics() {
+  const { t } = useTranslation();
   return (
     <div>
       <div className="mb-4 bg-white rounded-xl p-4 shadow-md">
         <h1 className="text-xl font-bold text-gray-900">
-          📊 Analyses et Statistiques
+          📊 {t('analytics.title')}
         </h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Vue d&apos;ensemble de votre progression en parapente
-        </p>
+        <p className="text-sm text-gray-600 mt-1">{t('analytics.subtitle')}</p>
       </div>
 
       {/* Filtres dynamiques */}

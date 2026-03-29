@@ -38,10 +38,10 @@ export const handlers = [
     const url = new URL(request.url);
     const dayIndexParam = url.searchParams.get('day_index');
     const dayIndex = dayIndexParam ? parseInt(dayIndexParam, 10) : 0;
-    
+
     // Get best spot data for the requested day
     const bestSpot = getBestSpotForDay(dayIndex);
-    
+
     return HttpResponse.json(bestSpot);
   }),
 
@@ -64,7 +64,7 @@ export const handlers = [
   ...createHandler('get', '/spots/geocode', ({ request }) => {
     const url = new URL(request.url);
     const query = url.searchParams.get('query') || '';
-    
+
     // Mock geocoding results
     return HttpResponse.json({
       results: [
@@ -242,14 +242,14 @@ export const handlers = [
     // Check if GPX is valid (mock validation)
     const formData = await request.formData();
     const gpxFile = formData.get('gpx_file');
-    
+
     if (!gpxFile || (gpxFile as File).size < 100) {
       return HttpResponse.json(
         { error: 'Le fichier GPX ne contient pas de données de vol valides' },
         { status: 400 }
       );
     }
-    
+
     return HttpResponse.json({
       id: `flight-${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
@@ -263,14 +263,18 @@ export const handlers = [
   }),
 
   // PATCH /api/flights/:flightId - Mettre à jour un vol
-  ...createHandler('patch', '/flights/:flightId', async ({ params, request }) => {
-    const body = (await request.json()) as any;
-    return HttpResponse.json({
-      id: params.flightId,
-      ...body,
-      updated_at: new Date().toISOString(),
-    });
-  }),
+  ...createHandler(
+    'patch',
+    '/flights/:flightId',
+    async ({ params, request }) => {
+      const body = (await request.json()) as any;
+      return HttpResponse.json({
+        id: params.flightId,
+        ...body,
+        updated_at: new Date().toISOString(),
+      });
+    }
+  ),
 
   // POST /api/flights/sync-strava - Synchronize Strava flights
   ...createHandler('post', '/flights/sync-strava', async ({ request }) => {
@@ -443,48 +447,53 @@ export const handlers = [
   }),
 
   // GET /api/weather/:spotId/daily-summary - Retourne le résumé météo sur plusieurs jours
-  ...createHandler('get', '/weather/:spotId/daily-summary', ({ params, request }) => {
-    const { spotId } = params;
-    const url = new URL(request.url);
-    const daysParam = url.searchParams.get('days');
-    const days = daysParam ? parseInt(daysParam, 10) : 7;
+  ...createHandler(
+    'get',
+    '/weather/:spotId/daily-summary',
+    ({ params, request }) => {
+      const { spotId } = params;
+      const url = new URL(request.url);
+      const daysParam = url.searchParams.get('days');
+      const days = daysParam ? parseInt(daysParam, 10) : 7;
 
-    const site = sites.find((s) => s.id === spotId);
-    if (!site) {
-      return new HttpResponse(null, {
-        status: 404,
-        statusText: 'Spot not found',
-      });
+      const site = sites.find((s) => s.id === spotId);
+      if (!site) {
+        return new HttpResponse(null, {
+          status: 404,
+          statusText: 'Spot not found',
+        });
+      }
+
+      // Generate daily summary for the requested number of days
+      const dailySummary = {
+        site_id: spotId,
+        site_name: site.name,
+        days: Array.from({ length: days }, (_, index) => {
+          const date = new Date();
+          date.setDate(date.getDate() + index);
+
+          // Vary conditions across days for realistic mock data
+          const baseParaIndex = 70 + (index % 3) * 10;
+          const variance = Math.floor(Math.random() * 10);
+          const paraIndex = Math.min(100, baseParaIndex + variance);
+
+          return {
+            day_index: index,
+            date: date.toISOString().split('T')[0],
+            para_index: paraIndex,
+            verdict:
+              paraIndex >= 75 ? 'BON' : paraIndex >= 60 ? 'MOYEN' : 'MAUVAIS',
+            emoji: paraIndex >= 75 ? '✅' : paraIndex >= 60 ? '⚠️' : '❌',
+            temp_min: 10 + index,
+            temp_max: 18 + index,
+            wind_avg: 8 + index * 2,
+          };
+        }),
+      };
+
+      return HttpResponse.json(dailySummary);
     }
-
-    // Generate daily summary for the requested number of days
-    const dailySummary = {
-      site_id: spotId,
-      site_name: site.name,
-      days: Array.from({ length: days }, (_, index) => {
-        const date = new Date();
-        date.setDate(date.getDate() + index);
-        
-        // Vary conditions across days for realistic mock data
-        const baseParaIndex = 70 + (index % 3) * 10;
-        const variance = Math.floor(Math.random() * 10);
-        const paraIndex = Math.min(100, baseParaIndex + variance);
-        
-        return {
-          day_index: index,
-          date: date.toISOString().split('T')[0],
-          para_index: paraIndex,
-          verdict: paraIndex >= 75 ? 'BON' : paraIndex >= 60 ? 'MOYEN' : 'MAUVAIS',
-          emoji: paraIndex >= 75 ? '✅' : paraIndex >= 60 ? '⚠️' : '❌',
-          temp_min: 10 + index,
-          temp_max: 18 + index,
-          wind_avg: 8 + index * 2,
-        };
-      }),
-    };
-
-    return HttpResponse.json(dailySummary);
-  }),
+  ),
 
   // ============================================
   // WEATHER SOURCES

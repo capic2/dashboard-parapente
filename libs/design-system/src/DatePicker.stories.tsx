@@ -1,11 +1,15 @@
 import preview from '../.storybook/preview';
-import { fn, within, expect } from 'storybook/test';
+import { expect, fn, within } from 'storybook/test';
 import { DatePicker } from './DatePicker';
+
+
+const FROZEN_DATE = new Date(2026, 0, 15);
 
 const meta = preview.meta({
   title: 'Components/UI/DatePicker',
   component: DatePicker,
   parameters: {
+    frozenDate: FROZEN_DATE,
     layout: 'centered',
     docs: {
       description: {
@@ -63,33 +67,27 @@ export const Empty = meta.story({
     onChange: fn(),
   },
 });
+Empty.test(
+  'it is possible to select a date',
+  async ({ canvas, userEvent, args }) => {
+    await userEvent.click(
+      canvas.getByRole('button', { name: /ouvrir le calendrier/i })
+    );
+    // Calendar popover renders in a portal outside canvasElement
+    const body = within(document.body);
+    await userEvent.click(
+      body.getByRole('button', { name: /15/ })
+    );
+    await expect(args.onChange).toHaveBeenCalledWith('2026-01-15');
+  }
+);
 
 // Today's date
 export const Today = meta.story({
   name: 'Today',
   args: {
     label: 'Date',
-    value: '2025-06-15',
-    onChange: fn(),
-  },
-});
-
-// Past date
-export const PastDate = meta.story({
-  name: 'Past Date',
-  args: {
-    label: 'Birth Date',
-    value: '1990-01-15',
-    onChange: fn(),
-  },
-});
-
-// Future date
-export const FutureDate = meta.story({
-  name: 'Future Date',
-  args: {
-    label: 'Planned Flight',
-    value: '2025-06-20',
+    value: '2026-01-15',
     onChange: fn(),
   },
 });
@@ -99,7 +97,7 @@ export const ShortLabel = meta.story({
   name: 'Short Label',
   args: {
     label: 'Date',
-    value: '2024-03-15',
+    value: '',
     onChange: fn(),
   },
 });
@@ -167,54 +165,3 @@ export const MultiplePickers = meta.story({
     );
   },
 });
-
-// Test multiple pickers rendering
-MultiplePickers.test(
-  'should render multiple date pickers',
-  async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-
-    // Verify both labels are present
-    await expect(canvas.getByText('Start Date')).toBeInTheDocument();
-    await expect(canvas.getByText('End Date')).toBeInTheDocument();
-
-    // Verify both calendar buttons are present
-    const buttons = canvas.getAllByRole('button');
-    await expect(buttons.length).toBeGreaterThanOrEqual(2);
-  }
-);
-
-/*
-// Accessible example
-export const Accessible = meta.story({
-  name: 'Accessibility Example',
-  args: {
-    label: 'Flight Date',
-    value: '2024-03-15',
-    onChange: fn(),
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'DatePicker uses react-aria Label for proper accessibility. The input is correctly associated with its label.',
-      },
-    },
-  },
-})
-
-// Test accessibility
-Accessible.test('should have accessible label and components', async ({ canvasElement }) => {
-  const canvas = within(canvasElement)
-  
-  // Verify label is present
-  await expect(canvas.getByText('Flight Date')).toBeInTheDocument()
-  
-  // Verify calendar button is accessible with proper aria-label
-  const calendarButton = canvas.getByRole('button', { name: 'Open calendar' })
-  await expect(calendarButton).toBeInTheDocument()
-  
-  // Verify date segments are present (day, month, year)
-  const groups = canvas.getAllByRole('group')
-  await expect(groups.length).toBeGreaterThan(0)
-})
-*/

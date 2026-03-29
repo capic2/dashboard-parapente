@@ -3,6 +3,7 @@
 ## Overview
 
 Complete test suite for Dashboard Parapente backend:
+
 - **Unit tests:** Scrapers, Para-Index, models
 - **Integration tests:** API routes, database
 - **Fixtures:** TestClient + in-memory DB
@@ -23,6 +24,7 @@ backend/
 ## Running Tests
 
 ### All tests:
+
 ```bash
 cd backend
 source venv_311/bin/activate
@@ -30,16 +32,19 @@ pytest tests/ -v
 ```
 
 ### Specific test file:
+
 ```bash
 pytest tests/test_routes.py -v
 ```
 
 ### Specific test:
+
 ```bash
 pytest tests/test_routes.py::TestSpotsEndpoints::test_get_spots_empty -v
 ```
 
 ### With coverage report:
+
 ```bash
 bash run-tests.sh
 ```
@@ -49,6 +54,7 @@ bash run-tests.sh
 ### Unit Tests
 
 **`test_routes.py`** - API Endpoints
+
 - ✅ GET `/api/spots` (empty, with data)
 - ✅ GET `/api/spots/{id}` (exists, not found)
 - ✅ GET `/api/flights` (empty, with data, limit)
@@ -57,6 +63,7 @@ bash run-tests.sh
 - ✅ GET `/api/alerts` (list, empty)
 
 **`test_scrapers.py`** - Para-Index Scoring
+
 - ✅ `score_hour()` - Ideal, no-wind, strong-wind conditions
 - ✅ `calculate_para_index()` - Full day scoring (0-100)
 - ✅ `analyze_hourly_slots()` - Flyable slot detection
@@ -64,6 +71,7 @@ bash run-tests.sh
 - ✅ Verdict logic (🟢 green, 🟡 yellow, 🔴 red)
 
 **`test_models.py`** - Database Models
+
 - ✅ Site creation + retrieval
 - ✅ Site unique constraint
 - ✅ Flight creation + duration calculation
@@ -74,6 +82,7 @@ bash run-tests.sh
 ## Test Fixtures
 
 ### `test_db` - In-Memory Database
+
 ```python
 @pytest.fixture
 def test_db():
@@ -82,6 +91,7 @@ def test_db():
 ```
 
 ### `client` - FastAPI TestClient
+
 ```python
 @pytest.fixture
 def client(test_db):
@@ -89,6 +99,7 @@ def client(test_db):
 ```
 
 ### `db_session` - Direct DB Access
+
 ```python
 @pytest.fixture
 def db_session(test_db):
@@ -103,10 +114,10 @@ def test_get_spots_with_data(self, client, db_session):
     site = Site(id="site-test", name="Test", latitude=47, longitude=6, altitude=400)
     db_session.add(site)
     db_session.commit()
-    
+
     # Test
     response = client.get("/api/spots")
-    
+
     # Assert
     assert response.status_code == 200
     assert len(response.json()["sites"]) == 1
@@ -115,6 +126,7 @@ def test_get_spots_with_data(self, client, db_session):
 ## CI/CD Integration
 
 ### GitHub Actions Example
+
 ```yaml
 - name: Run backend tests
   run: |
@@ -126,16 +138,19 @@ def test_get_spots_with_data(self, client, db_session):
 ## Debugging Failed Tests
 
 ### Verbose output:
+
 ```bash
 pytest tests/test_routes.py::TestSpotsEndpoints::test_get_spots_empty -vv --tb=long
 ```
 
 ### Print statements:
+
 ```bash
 pytest tests/ -v -s  # -s shows print() output
 ```
 
 ### Stop on first failure:
+
 ```bash
 pytest tests/ -x -v  # -x stops at first failure
 ```

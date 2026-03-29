@@ -56,17 +56,11 @@
     },
     "format": {
       "cache": true,
-      "inputs": [
-        "default",
-        "{workspaceRoot}/.oxfmtrc.json"
-      ]
+      "inputs": ["default", "{workspaceRoot}/.oxfmtrc.json"]
     },
     "format:check": {
       "cache": true,
-      "inputs": [
-        "default",
-        "{workspaceRoot}/.oxfmtrc.json"
-      ]
+      "inputs": ["default", "{workspaceRoot}/.oxfmtrc.json"]
     },
     "type-check": {
       "cache": true,

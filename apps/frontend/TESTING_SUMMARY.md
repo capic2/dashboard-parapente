@@ -15,6 +15,7 @@ Implementation of a comprehensive testing infrastructure for the paragliding das
 ### Infrastructure Created
 
 ✅ **7 configuration files**
+
 - `vitest.config.ts` - Vitest configuration (Happy-DOM, coverage >80%)
 - `src/test/setup.ts` - Global setup (MSW, matchers, browser mocks)
 - `src/test/utils/test-utils.tsx` - Custom render with QueryClientProvider
@@ -27,21 +28,22 @@ Implementation of a comprehensive testing infrastructure for the paragliding das
 
 ✅ **7 components fully tested** (69 stories, 14 interaction tests)
 
-| Component | Stories | Tests | Category |
-|-----------|---------|-------|----------|
-| Modal | 11 | 3 | UI Primitive |
-| Toast | 6 | 1 | UI Primitive |
-| ToastContainer | 6 | 2 | UI Primitive |
-| DatePicker | 11 | 3 | UI Primitive |
-| LoadingSkeleton | 14 | 3 | Display |
-| ErrorBoundary | 7 | 1 | Display |
-| SiteCard | 9 | 1 | Display |
-| StatsPanel | 5 | 0 | Display |
-| **TOTAL** | **69** | **14** | - |
+| Component       | Stories | Tests  | Category     |
+| --------------- | ------- | ------ | ------------ |
+| Modal           | 11      | 3      | UI Primitive |
+| Toast           | 6       | 1      | UI Primitive |
+| ToastContainer  | 6       | 2      | UI Primitive |
+| DatePicker      | 11      | 3      | UI Primitive |
+| LoadingSkeleton | 14      | 3      | Display      |
+| ErrorBoundary   | 7       | 1      | Display      |
+| SiteCard        | 9       | 1      | Display      |
+| StatsPanel      | 5       | 0      | Display      |
+| **TOTAL**       | **69**  | **14** | -            |
 
 ### Pre-existing Stories
 
 ✅ **4 components already had stories**
+
 - WeatherSourceCard (11 stories)
 - SiteSelector (5 stories)
 - WindIndicator (1 story)
@@ -73,22 +75,24 @@ render(<MyComponent />)
 ### Story Pattern
 
 ```typescript
-import preview from '../../.storybook/preview'
-import { fn, userEvent, within, expect } from 'storybook/test'
+import preview from '../../.storybook/preview';
+import { fn, userEvent, within, expect } from 'storybook/test';
 
 const meta = preview.meta({
   title: 'Components/MyComponent',
   component: MyComponent,
   // ... config
-})
+});
 
 export const Default = meta.story({
-  args: { /* ... */ }
-})
+  args: {
+    /* ... */
+  },
+});
 
 Default.test('interaction test', async ({ canvasElement }) => {
   // ... test logic
-})
+});
 ```
 
 ---
@@ -97,13 +101,14 @@ Default.test('interaction test', async ({ canvasElement }) => {
 
 ### ✅ Group A: UI Primitives (100% Complete - 3/3)
 
-| Component | Type | Stories | Status |
-|-----------|------|---------|--------|
-| Modal | react-aria | 11 | ✅ |
-| Toast + Container | custom | 12 | ✅ |
-| DatePicker | react-aria | 11 | ✅ |
+| Component         | Type       | Stories | Status |
+| ----------------- | ---------- | ------- | ------ |
+| Modal             | react-aria | 11      | ✅     |
+| Toast + Container | custom     | 12      | ✅     |
+| DatePicker        | react-aria | 11      | ✅     |
 
 **Key Features:**
+
 - All sizes/variants covered
 - Accessibility tested (ARIA labels, keyboard nav)
 - Interactive tests for all user actions
@@ -111,14 +116,15 @@ Default.test('interaction test', async ({ canvasElement }) => {
 
 ### ✅ Group B: Display Components (100% Complete - 4/4)
 
-| Component | Stories | Status |
-|-----------|---------|--------|
-| LoadingSkeleton | 14 | ✅ |
-| ErrorBoundary | 7 | ✅ |
-| SiteCard | 9 | ✅ |
-| StatsPanel | 5 | ✅ |
+| Component       | Stories | Status |
+| --------------- | ------- | ------ |
+| LoadingSkeleton | 14      | ✅     |
+| ErrorBoundary   | 7       | ✅     |
+| SiteCard        | 9       | ✅     |
+| StatsPanel      | 5       | ✅     |
 
 **Key Features:**
+
 - All display variants (card, chart, list, text)
 - Loading/error/empty states
 - MSW integration for data fetching
@@ -127,6 +133,7 @@ Default.test('interaction test', async ({ canvasElement }) => {
 ### 🔄 Group C: Weather (Pattern Established - 0/4)
 
 Components to implement following the established pattern:
+
 - CurrentConditions (MSW + useWeather mock)
 - HourlyForecast (24h data + charts)
 - Forecast7Day (7 days + weather icons)
@@ -137,6 +144,7 @@ Components to implement following the established pattern:
 ### 🔄 Group D: Forms (Pattern Established - 0/5)
 
 Components to implement:
+
 - MultiOrientationSelector
 - CreateSiteModal (POST /api/spots)
 - EditSiteModal (PATCH /api/sites/:id)
@@ -148,6 +156,7 @@ Components to implement:
 ### 🔄 Group E: Stats/Charts (Pattern Established - 0/9)
 
 Components to implement:
+
 - RecordsDashboard
 - AchievementsBadges
 - AltitudeChart (Chart.js/Recharts mock)
@@ -163,6 +172,7 @@ Components to implement:
 ### 🔄 Group F: Complex (Pattern Established - 0/3)
 
 Components with heavy dependencies:
+
 - EmagramWidget (Canvas + analysis)
 - FlightViewer3D (Cesium mock)
 - ExportVideoModal (FFmpeg mock)
@@ -178,16 +188,19 @@ Components with heavy dependencies:
 **File:** `.github/workflows/frontend-tests.yml`
 
 **Jobs:**
+
 1. **test** - Run Vitest + coverage report
 2. **storybook** - Build Storybook static site
 3. **type-check** - TypeScript validation
 
 **Triggers:**
+
 - Push to `main` or `develop`
 - Pull requests
 - Only when `frontend/**` files change
 
 **Artifacts:**
+
 - Coverage report (uploaded to Codecov)
 - Storybook build (7 days retention)
 
@@ -202,6 +215,7 @@ npm run coverage
 ```
 
 **Thresholds:** >80% for all metrics
+
 - Statements: 80%
 - Branches: 80%
 - Functions: 80%
@@ -279,7 +293,7 @@ npm run type-check        # TypeScript validation
 ✅ **React Aria Components** - Built-in accessibility  
 ✅ **MSW** - Easy API mocking without backend  
 ✅ **Happy-DOM** - Fast test execution  
-✅ **Component-by-component** - Incremental validation  
+✅ **Component-by-component** - Incremental validation
 
 ### Challenges Overcome
 
@@ -309,14 +323,14 @@ npm run type-check        # TypeScript validation
 
 ## 🏆 Success Metrics
 
-| Metric | Target | Current | Status |
-|--------|--------|---------|--------|
-| Infrastructure | Complete | ✅ Complete | ✅ |
-| UI Primitives | 3/3 | 3/3 | ✅ 100% |
-| Display Components | 4/4 | 4/4 | ✅ 100% |
-| Total Stories | 50+ | 87 | ✅ 174% |
-| CI/CD Setup | Yes | ✅ Yes | ✅ |
-| Documentation | Yes | ✅ Yes | ✅ |
+| Metric             | Target   | Current     | Status  |
+| ------------------ | -------- | ----------- | ------- |
+| Infrastructure     | Complete | ✅ Complete | ✅      |
+| UI Primitives      | 3/3      | 3/3         | ✅ 100% |
+| Display Components | 4/4      | 4/4         | ✅ 100% |
+| Total Stories      | 50+      | 87          | ✅ 174% |
+| CI/CD Setup        | Yes      | ✅ Yes      | ✅      |
+| Documentation      | Yes      | ✅ Yes      | ✅      |
 
 ---
 

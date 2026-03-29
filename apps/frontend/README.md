@@ -184,6 +184,7 @@ VITE_API_URL=http://localhost:8000
 ```
 
 **Production:**
+
 ```bash
 VITE_API_URL=https://your-domain.com
 ```
@@ -243,7 +244,9 @@ import { http, HttpResponse } from 'msw';
 const handlers = [
   http.get('/api/sites', () => {
     return HttpResponse.json({
-      sites: [/* mock data */]
+      sites: [
+        /* mock data */
+      ],
     });
   }),
 ];
@@ -275,7 +278,7 @@ import { useWeather } from './useWeather';
 
 test('fetches weather data', async () => {
   const { result } = renderHook(() => useWeather('site-arguel', 0));
-  
+
   await waitFor(() => {
     expect(result.current.data).toBeDefined();
   });
@@ -299,6 +302,7 @@ test('fetches weather data', async () => {
 Target: < 500 KB gzipped
 
 Check with:
+
 ```bash
 npm run build
 npx vite-bundle-visualizer
@@ -315,6 +319,7 @@ npx vite-bundle-visualizer
 - ✅ Focus indicators
 
 Test with:
+
 ```bash
 npm run test:a11y
 ```
@@ -336,6 +341,7 @@ npm run test:a11y
 ### Static Hosting
 
 Build output in `dist/` can be hosted on:
+
 - Netlify
 - Vercel
 - GitHub Pages
