@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@source "../../../libs/design-system/src";
 
 /* Global styles - keep minimal, use Tailwind classes in components instead */
 body {
