@@ -25,7 +25,7 @@
       "outputs": ["{workspaceRoot}/coverage/apps/backend"],
       "options": {
         "commands": [
-          "command -v .venv/bin/pytest >/dev/null 2>&1 && PYTEST=.venv/bin/pytest || PYTEST=pytest; $PYTEST tests/ -m 'not integration and not slow' -q --tb=short --no-header --cov=. --cov-config=.coveragerc --cov-report=term-missing --cov-report=xml"
+          "command -v .venv/bin/pytest >/dev/null 2>&1 && PYTEST=.venv/bin/pytest || PYTEST=pytest; $PYTEST tests/ -m 'not integration and not slow' -q --tb=short --no-header --cov=. --cov-config=.coveragerc --cov-report=term-missing --cov-report=xml:../../coverage/apps/backend/coverage.xml"
         ],
         "cwd": "apps/backend",
         "env": {
