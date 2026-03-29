@@ -31,13 +31,6 @@ interface FlightViewer3DProps {
   flightTitle?: string;
 }
 
-// API base URL - use environment variable or derive from current location
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  (typeof window !== 'undefined'
-    ? `${window.location.protocol}//${window.location.hostname}:8001`
-    : 'http://localhost:8001');
-
 /**
  * AccordionSection - Collapsible section component for control panel
  */
@@ -1219,7 +1212,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           ) {
                             // Download video
                             window.open(
-                              `${API_BASE_URL}/api/exports/${flight.video_export_job_id}/download`,
+                              `/api/exports/${flight.video_export_job_id}/download`,
                               '_blank'
                             );
                           } else if (
@@ -1229,7 +1222,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             // Generate video
                             try {
                               const response = await fetch(
-                                `${API_BASE_URL}/api/flights/${flightId}/generate-video`,
+                                `/api/flights/${flightId}/generate-video`,
                                 {
                                   method: 'POST',
                                 }
@@ -1304,7 +1297,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
                               try {
                                 const response = await fetch(
-                                  `${API_BASE_URL}/api/exports/${flight.video_export_job_id}/cancel`,
+                                  `/api/exports/${flight.video_export_job_id}/cancel`,
                                   {
                                     method: 'DELETE',
                                   }
@@ -1351,7 +1344,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
                             try {
                               const response = await fetch(
-                                `${API_BASE_URL}/api/flights/${flightId}/generate-video`,
+                                `/api/flights/${flightId}/generate-video`,
                                 {
                                   method: 'POST',
                                 }
