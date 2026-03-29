@@ -2329,7 +2329,11 @@ async def sync_strava_activities(request: dict, db: Session = Depends(get_db)):
                     id=str(uuid.uuid4()),
                     strava_id=strava_id,
                     title=activity.get("name", f"Vol {activity_date}"),
-                    name=activity.get("name", f"Vol {activity_date}"),
+                    name=(
+                        f"Vol du {activity_date.strftime('%d/%m/%Y')} à {departure_time.strftime('%H:%M')}"
+                        if departure_time
+                        else f"Vol du {activity_date.strftime('%d/%m/%Y')}"
+                    ),
                     flight_date=activity_date,
                     departure_time=departure_time,
                     duration_minutes=int(activity.get("moving_time", 0) / 60),
