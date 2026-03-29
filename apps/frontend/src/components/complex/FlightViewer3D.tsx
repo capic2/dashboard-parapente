@@ -25,6 +25,7 @@ import {
 } from '../../utils/cameraOrientation';
 import { api } from '../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../../hooks/useToast';
 
 interface FlightViewer3DProps {
   flightId: string;
@@ -82,6 +83,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const { data: gpxData, isLoading, error } = useFlightGPX(flightId);
   const { data: flight } = useFlight(flightId);
   const queryClient = useQueryClient();
+  const toast = useToast();
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<CesiumViewer | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -914,7 +916,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       await queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
     } catch (error) {
       console.error('❌ Failed to update orientation:', error);
-      alert("Erreur lors de la mise à jour de l'orientation");
+      toast.error("Erreur lors de la mise à jour de l'orientation");
     } finally {
       setIsUpdatingOrientation(false);
     }
@@ -943,7 +945,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       );
     } catch (error) {
       console.error('Failed to update camera settings:', error);
-      alert('❌ Erreur lors de la mise à jour de la caméra');
+      toast.error('Erreur lors de la mise à jour de la caméra');
     } finally {
       setIsUpdatingCamera(false);
     }
@@ -1230,8 +1232,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
                               if (!response.ok) {
                                 const error = await response.json();
-                                alert(
-                                  `Erreur: ${error.detail || 'Impossible de lancer la génération'}`
+                                toast.error(
+                                  error.detail || 'Impossible de lancer la génération'
                                 );
                                 return;
                               }
@@ -1245,7 +1247,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                                 '❌ Failed to start video generation:',
                                 error
                               );
-                              alert(
+                              toast.error(
                                 'Erreur lors du lancement de la génération'
                               );
                             }
@@ -1305,8 +1307,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
                                 if (!response.ok) {
                                   const error = await response.json();
-                                  alert(
-                                    `Erreur: ${error.detail || "Impossible d'annuler la génération"}`
+                                  toast.error(
+                                    error.detail || "Impossible d'annuler la génération"
                                   );
                                   return;
                                 }
@@ -1320,7 +1322,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                                   'Failed to cancel video generation:',
                                   error
                                 );
-                                alert("Erreur lors de l'annulation");
+                                toast.error("Erreur lors de l'annulation");
                               }
                             }}
                             className="w-full px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 mb-3"
@@ -1352,8 +1354,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
                               if (!response.ok) {
                                 const error = await response.json();
-                                alert(
-                                  `Erreur: ${error.detail || 'Impossible de lancer la régénération'}`
+                                toast.error(
+                                  error.detail || 'Impossible de lancer la régénération'
                                 );
                                 return;
                               }
@@ -1367,7 +1369,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                                 'Failed to regenerate video:',
                                 error
                               );
-                              alert('Erreur lors de la régénération');
+                              toast.error('Erreur lors de la régénération');
                             }
                           }}
                           className="w-full px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 mb-3"
