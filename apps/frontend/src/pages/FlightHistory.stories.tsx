@@ -227,6 +227,11 @@ ConfirmDeleteFlight.test(
     await expect(
       await canvas.findByText('Vol supprimé avec succès')
     ).toBeInTheDocument();
+
+    // Vérifier que le vol supprimé n'apparaît plus
+    await expect(
+      canvas.queryByText('Vol thermique Arguel')
+    ).not.toBeInTheDocument();
   }
 );
 

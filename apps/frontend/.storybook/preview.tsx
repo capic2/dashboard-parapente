@@ -55,11 +55,11 @@ const initializeMsw = (
     return;
   }
 
+  initialize(options, handlers);
+
   if (typeof window !== 'undefined') {
     window.__mswInitialized = true;
   }
-
-  initialize(options, handlers);
 };
 // Initialize MSW with default fallback handlers
 initializeMsw({ onUnhandledRequest: 'error', quiet: true }, defaultMswHandlers);

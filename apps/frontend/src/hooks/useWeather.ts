@@ -82,7 +82,8 @@ export const createWeatherQueryFn =
     const timeToHour = (timeStr: string | null): number | null => {
       if (!timeStr) return null;
       const parts = timeStr.split(':');
-      return parseInt(parts[0], 10);
+      const hour = Number.parseInt(parts[0] ?? '', 10);
+      return Number.isFinite(hour) ? hour : null;
     };
 
     // Extract sunrise/sunset and convert to hours
@@ -167,7 +168,9 @@ export const createWeatherQueryFn =
         dayDate.setDate(dayDate.getDate() + index);
 
         const consensus = dayData.consensus || [];
-        const temps = consensus.map((h: ConsensusHour) => h.temperature || 0);
+        const temps = consensus
+          .map((h: ConsensusHour) => h.temperature)
+          .filter((t): t is number => t !== null && t !== undefined);
         const minTemp = temps.length > 0 ? Math.min(...temps) : 0;
         const maxTemp = temps.length > 0 ? Math.max(...temps) : 0;
 
