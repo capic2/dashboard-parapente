@@ -10,6 +10,7 @@
 import { useTranslation } from 'react-i18next';
 import { format, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import CacheTimestamp from '../CacheTimestamp';
 import { enUS } from 'date-fns/locale';
 import { WindIndicatorCompact } from '../WindIndicator';
 import type { BestSpotResult } from '@dashboard-parapente/shared-types';
@@ -127,12 +128,15 @@ export function BestSpotSuggestion({
       <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{reason}</p>
 
       {/* Action button */}
-      <button
-        onClick={() => onSelectSite(site.id)}
-        className="mt-3 w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors"
-      >
-        {t('weather.viewForecast')}
-      </button>
+      <div className="flex items-center justify-between mt-3">
+        <button
+          onClick={() => onSelectSite(site.id)}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors"
+        >
+          {t('weather.viewForecast')}
+        </button>
+        <CacheTimestamp cachedAt={bestSpot.cached_at} />
+      </div>
     </div>
   );
 }

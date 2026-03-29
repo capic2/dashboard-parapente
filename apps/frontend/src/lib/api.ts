@@ -1,7 +1,8 @@
 import ky from 'ky';
 
 // Instance Ky configurée pour l'API backend
-export const api = ky.create({
+// eslint-disable-next-line import/no-mutable-exports
+export let api = ky.create({
   prefixUrl: '/api', // Toutes les requêtes préfixées par /api
   timeout: 30000, // 30 secondes
   retry: {
@@ -32,3 +33,8 @@ export const api = ky.create({
     ],
   },
 });
+
+// Override api configuration (used by test setup to disable retry)
+export function overrideApi(options: Parameters<typeof api.extend>[0]) {
+  api = api.extend(options);
+}

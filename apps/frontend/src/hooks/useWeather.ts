@@ -219,7 +219,8 @@ export const createWeatherQueryFn =
       wind_direction: formatWindDirection(currentHour.wind_direction),
       wind_gusts: currentHour.wind_gust || metrics.max_gust_kmh || 0,
       conditions: buildCurrentConditions(),
-      forecast_time: new Date().toISOString(),
+      forecast_time: data.cached_at || new Date().toISOString(),
+      cached_at: data.cached_at ?? null,
       hourly_forecast: hourlyForecast,
       daily_forecast: dailyForecast,
     };

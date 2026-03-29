@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useDailySummary, createWeatherQueryFn } from '../../hooks/useWeather';
 import { useQueryClient } from '@tanstack/react-query';
+import CacheTimestamp from '../CacheTimestamp';
 
 interface Forecast7DayProps {
   spotId: string;
@@ -93,9 +94,12 @@ export default function Forecast7Day({
 
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
-      <h2 className="text-sm text-gray-600 mb-3 font-semibold">
-        {t('weather.forecast7Days')}
-      </h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm text-gray-600 font-semibold">
+          {t('weather.forecast7Days')}
+        </h2>
+        <CacheTimestamp cachedAt={dailySummary.cached_at} />
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
         {dailySummary.days.map((day, index) => {

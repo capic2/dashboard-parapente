@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useWeather } from '../../hooks/useWeather';
 import { useSite } from '../../hooks/useSites';
 import { WindIndicator } from '../WindIndicator';
+import CacheTimestamp from '../CacheTimestamp';
 
 interface CurrentConditionsProps {
   spotId: string;
@@ -24,7 +25,7 @@ const getVerdictEmoji = (verdict: string): string => {
 };
 
 export default function CurrentConditions({ spotId }: CurrentConditionsProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { data: weather, isLoading, error } = useWeather(spotId);
   const { data: site } = useSite(spotId);
 
@@ -123,9 +124,8 @@ export default function CurrentConditions({ spotId }: CurrentConditionsProps) {
         </div>
       </div>
 
-      <div className="mt-3 text-xs text-gray-400 text-center pt-2 border-t border-gray-100">
-        {t('weather.updatedAt')}{' '}
-        {new Date(weather.forecast_time).toLocaleString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR')}
+      <div className="mt-3 text-center pt-2 border-t border-gray-100">
+        <CacheTimestamp cachedAt={weather.cached_at} />
       </div>
     </div>
   );

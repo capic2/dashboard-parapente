@@ -27,6 +27,7 @@ export interface WeatherData {
   wind_gusts?: number;
   conditions: string;
   forecast_time: string;
+  cached_at?: string | null;
   hourly_forecast?: HourlyForecastItem[];
   daily_forecast?: DailyForecastItem[];
 }
