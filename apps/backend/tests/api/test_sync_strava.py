@@ -5,7 +5,7 @@ Verifies that Strava activity sync creates flights with the correct
 normalized name format: "Vol du DD/MM/YYYY à HH:MM"
 """
 
-from datetime import date, datetime
+from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from models import Flight
@@ -19,7 +19,10 @@ class TestSyncStravaEndpoint:
     def test_sync_strava_flight_name_format(self, client, db_session, sample_strava_activity):
         """Sync creates flight with name 'Vol du DD/MM/YYYY à HH:MM'"""
         with (
-            patch("strava.get_activities_by_period", new=AsyncMock(return_value=[sample_strava_activity])),
+            patch(
+                "strava.get_activities_by_period",
+                new=AsyncMock(return_value=[sample_strava_activity]),
+            ),
             patch("strava.download_gpx", new=AsyncMock(return_value=None)),
             patch("strava.save_gpx_file", new=MagicMock(return_value=None)),
         ):
@@ -77,7 +80,10 @@ class TestSyncStravaEndpoint:
         db_session.commit()
 
         with (
-            patch("strava.get_activities_by_period", new=AsyncMock(return_value=[sample_strava_activity])),
+            patch(
+                "strava.get_activities_by_period",
+                new=AsyncMock(return_value=[sample_strava_activity]),
+            ),
             patch("strava.download_gpx", new=AsyncMock(return_value=None)),
             patch("strava.save_gpx_file", new=MagicMock(return_value=None)),
         ):
