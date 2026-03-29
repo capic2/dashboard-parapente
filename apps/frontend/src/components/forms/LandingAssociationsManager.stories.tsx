@@ -208,7 +208,7 @@ export const Empty = meta.story({
 });
 
 Empty.test('shows empty state message', async ({ canvas }) => {
-  await canvas.findByText('Aucun atterrissage associe');
+  await canvas.findByText('Aucun atterrissage associé');
   await expect(
     canvas.getByText('+ Ajouter un atterrissage')
   ).toBeInTheDocument();

@@ -3,6 +3,10 @@ import { initialize, mswLoader } from 'msw-storybook-addon';
 import addonA11y from '@storybook/addon-a11y';
 import i18n from '../src/i18n';
 import '../src/App.css';
+
+// Force French locale in Storybook context — overrides LanguageDetector which
+// detects English in CI headless browsers
+i18n.changeLanguage('fr');
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 declare global {
