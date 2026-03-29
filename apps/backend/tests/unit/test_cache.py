@@ -1,6 +1,6 @@
 """Tests for cache.py - cached_at timestamp injection."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -34,6 +34,7 @@ async def test_set_cached_injects_cached_at(mock_redis):
     # Verify Redis was called with the data including cached_at
     mock_redis.setex.assert_called_once()
     import json
+
     stored_data = json.loads(mock_redis.setex.call_args[0][2])
     assert "cached_at" in stored_data
     assert stored_data["temperature"] == 15
@@ -55,6 +56,7 @@ async def test_set_cached_does_not_break_non_dict(mock_redis):
 async def test_get_cached_returns_cached_at(mock_redis):
     """get_cached should return data including cached_at from Redis."""
     import json
+
     stored = json.dumps({"temp": 10, "cached_at": "2026-03-29T12:00:00+00:00"})
     mock_redis.get = AsyncMock(return_value=stored)
 
