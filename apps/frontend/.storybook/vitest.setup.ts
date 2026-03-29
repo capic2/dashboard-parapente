@@ -1,5 +1,8 @@
 import { beforeAll } from 'vitest';
 import preview from './preview';
+import { getWorker } from 'msw-storybook-addon';
 
-// Just call Storybook's beforeAll - msw-storybook-addon should handle MSW initialization
-beforeAll(preview.composed.beforeAll);
+beforeAll(async () => {
+  await preview.composed.beforeAll();
+  await getWorker().context.activationPromise;
+});
