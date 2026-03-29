@@ -61,9 +61,7 @@ jobs:
         with:
           python-version: "3.14"
           cache: "pip"
-          cache-dependency-path: |
-            apps/backend/requirements.txt
-            apps/backend/requirements-dev.txt
+          cache-dependency-path: apps/backend/requirements.txt
 
       - name: 📦 Install dependencies
         run: pnpm install --frozen-lockfile
@@ -71,14 +69,14 @@ jobs:
       - name: 📦 Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          cd apps/backend && pip install -r requirements-dev.txt
+          cd apps/backend && pip install -r requirements.txt
 
       - name: 💾 Cache Playwright browsers
         id: playwright-cache-main
         uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml', 'apps/backend/requirements-dev.txt') }}
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml', 'apps/backend/requirements.txt') }}
 
       - name: 🎭 Install Playwright
         run: pnpm exec playwright install --with-deps chromium
@@ -232,9 +230,7 @@ jobs:
         with:
           python-version: "3.14"
           cache: "pip"
-          cache-dependency-path: |
-            apps/backend/requirements.txt
-            apps/backend/requirements-dev.txt
+          cache-dependency-path: apps/backend/requirements.txt
 
       - name: 📦 Install dependencies
         run: pnpm install --frozen-lockfile
@@ -242,7 +238,7 @@ jobs:
       - name: 📦 Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          cd apps/backend && pip install -r requirements-dev.txt
+          cd apps/backend && pip install -r requirements.txt
 
       - name: 💾 Cache Playwright browsers
         id: playwright-cache-e2e
