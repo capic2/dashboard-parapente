@@ -26,7 +26,9 @@ class TestSyncStravaEndpoint:
                 new=AsyncMock(return_value=[sample_strava_activity]),
             ),
             patch("strava.download_gpx", new=AsyncMock(return_value=sample_gpx)),
-            patch("strava.save_gpx_file", new=MagicMock(return_value="db/gpx/strava_123456789.gpx")),
+            patch(
+                "strava.save_gpx_file", new=MagicMock(return_value="db/gpx/strava_123456789.gpx")
+            ),
         ):
             response = client.post(
                 f"{API_PREFIX}/flights/sync-strava",
@@ -115,7 +117,9 @@ class TestSyncStravaEndpoint:
                 new=AsyncMock(return_value=[sample_strava_activity]),
             ),
             patch("strava.download_gpx", new=AsyncMock(return_value=sample_gpx)),
-            patch("strava.save_gpx_file", new=MagicMock(return_value="db/gpx/strava_123456789.gpx")),
+            patch(
+                "strava.save_gpx_file", new=MagicMock(return_value="db/gpx/strava_123456789.gpx")
+            ),
         ):
             response = client.post(
                 f"{API_PREFIX}/flights/sync-strava",

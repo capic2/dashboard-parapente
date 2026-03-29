@@ -2266,7 +2266,12 @@ async def sync_strava_activities(request: dict, db: Session = Depends(get_db)):
             "flights": [...]
         }
     """
-    from strava import download_gpx, get_activities_by_period, match_site_by_coordinates, save_gpx_file
+    from strava import (
+        download_gpx,
+        get_activities_by_period,
+        match_site_by_coordinates,
+        save_gpx_file,
+    )
 
     date_from = request.get("date_from")
     date_to = request.get("date_to")
