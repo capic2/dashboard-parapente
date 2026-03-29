@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
-import { expect, screen, userEvent, within } from 'storybook/test';
+import { expect, screen, userEvent, waitFor, within } from 'storybook/test';
 import preview from '../../.storybook/preview';
 import FlightHistory from './FlightHistory';
 
@@ -198,8 +198,38 @@ DeleteSingleFlight.test(
   }
 );
 
+const confirmDeleteHandlers = (() => {
+  const deletedIds = new Set<string>();
+  return [
+    http.get('*/api/flights', () =>
+      HttpResponse.json({
+        flights: mockFlights.filter((f) => !deletedIds.has(f.id)),
+      })
+    ),
+    http.get('*/api/flights/:id', ({ params }) => {
+      const flight = mockFlights.find(
+        (f) => f.id === params.id && !deletedIds.has(f.id)
+      );
+      return flight
+        ? HttpResponse.json(flight)
+        : new HttpResponse(null, { status: 404 });
+    }),
+    http.get('*/api/spots', () => HttpResponse.json(mockSites)),
+    http.patch('*/api/flights/:id', async ({ request }) => {
+      const body = await request.json();
+      return HttpResponse.json({
+        data: { ...mockFlights[0], ...(body as object) },
+      });
+    }),
+    http.delete('*/api/flights/:id', ({ params }) => {
+      deletedIds.add(params.id as string);
+      return HttpResponse.json({ success: true, message: 'Flight deleted' });
+    }),
+  ];
+})();
+
 export const ConfirmDeleteFlight = meta.story({
-  parameters: { msw: { handlers: defaultHandlers } },
+  parameters: { msw: { handlers: confirmDeleteHandlers } },
 });
 
 ConfirmDeleteFlight.test(
@@ -228,10 +258,12 @@ ConfirmDeleteFlight.test(
       await canvas.findByText('Vol supprimé avec succès')
     ).toBeInTheDocument();
 
-    // Vérifier que le vol supprimé n'apparaît plus
-    await expect(
-      canvas.queryByText('Vol thermique Arguel')
-    ).not.toBeInTheDocument();
+    // Vérifier que le vol supprimé n'apparaît plus (attendre le refetch)
+    await waitFor(() => {
+      expect(
+        canvas.queryByText('Vol thermique Arguel')
+      ).not.toBeInTheDocument();
+    });
   }
 );
 
