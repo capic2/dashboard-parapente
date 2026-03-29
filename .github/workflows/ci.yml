@@ -53,8 +53,8 @@ jobs:
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "24"
-          cache: "pnpm"
+          node-version: '24'
+          cache: 'pnpm'
 
       - name: 🐍 Setup Python
         uses: actions/setup-python@v6
@@ -89,7 +89,7 @@ jobs:
       - name: 🔍 Derive SHAs for Nx affected
         uses: nrwl/nx-set-shas@v5
         with:
-          main-branch-name: "main"
+          main-branch-name: 'main'
 
       # NX Cloud strategy:
       # - Default: NX Cloud ENABLED
@@ -224,8 +224,8 @@ jobs:
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "24"
-          cache: "pnpm"
+          node-version: '24'
+          cache: 'pnpm'
 
       - name: 🐍 Setup Python
         uses: actions/setup-python@v6

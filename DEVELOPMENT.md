@@ -5,6 +5,7 @@
 ### Option 1 : Mode Mock (MSW) - Recommandé pour le frontend seul
 
 **Avantages :**
+
 - Pas besoin de lancer le backend
 - Données cohérentes et prévisibles
 - Rapide à démarrer
@@ -13,6 +14,7 @@
 **Démarrage :**
 
 1. Configurer le frontend pour utiliser MSW :
+
    ```bash
    cd frontend
    # Créer/modifier .env
@@ -20,6 +22,7 @@
    ```
 
 2. Lancer le frontend :
+
    ```bash
    pnpm run dev
    ```
@@ -27,6 +30,7 @@
 3. Ouvrir http://localhost:5173
 
 **Données disponibles :**
+
 - 3 sites (Arguel, Mont Poupet, La Côte)
 - 7 vols (dont 1 sans GPX pour tester l'upload)
 - Météo mockée pour chaque site
@@ -37,6 +41,7 @@
 ### Option 2 : Mode API réelle - Pour tester le backend
 
 **Avantages :**
+
 - Teste l'intégration complète frontend/backend
 - Utilise la vraie base de données SQLite
 - Teste les vraies API Strava (avec credentials)
@@ -45,12 +50,14 @@
 **Démarrage :**
 
 1. Configurer le backend (.env déjà configuré) :
+
    ```bash
    cd backend
    cat .env  # Vérifier que ENVIRONMENT=development et USE_FAKE_REDIS=true
    ```
 
 2. Lancer le backend :
+
    ```bash
    cd backend
    source venv/bin/activate
@@ -58,6 +65,7 @@
    ```
 
 3. Configurer le frontend pour utiliser l'API réelle :
+
    ```bash
    cd frontend
    echo "VITE_ENABLE_MSW=false" > .env
@@ -65,6 +73,7 @@
    ```
 
 4. Lancer le frontend :
+
    ```bash
    pnpm run dev
    ```
@@ -72,6 +81,7 @@
 5. Ouvrir http://localhost:5173 (ou 5174)
 
 **URLs :**
+
 - Frontend : http://localhost:5173
 - Backend API : http://localhost:8001
 - API Docs (Swagger) : http://localhost:8001/docs
@@ -85,6 +95,7 @@
 **Prérequis :** API réelle avec credentials Strava configurés
 
 **Test :**
+
 1. Aller sur "Historique des vols"
 2. Cliquer sur "🔄 Sync Strava"
 3. Sélectionner une période (ex: 90 derniers jours)
@@ -98,6 +109,7 @@
 ### 2️⃣ Upload GPX
 
 **Test avec mocks :**
+
 1. Chercher le vol "Mont Poupet 15-09 14h30 (sans GPX)" avec badge orange
 2. Cliquer dessus pour voir les détails
 3. Cliquer "📎 Ajouter GPX"
@@ -105,6 +117,7 @@
 5. Vérifier que le badge passe au vert ✅
 
 **Test avec API réelle :**
+
 1. Trouver un vol sans GPX (ou créer un vol manuel)
 2. Upload un vrai fichier GPX
 3. Vérifier dans `backend/db/gpx/` que le fichier a été sauvegardé
@@ -232,6 +245,7 @@ pnpm run dev
 **Avec mocks :** Devrait toujours fonctionner (retourne données mockées)
 
 **Avec API réelle :**
+
 1. Vérifier credentials dans `backend/.env`
 2. Vérifier logs backend : `tail -f backend/logs/dashboard.log`
 3. Tester manuellement : `curl -X POST http://localhost:8001/api/flights/sync-strava -H "Content-Type: application/json" -d '{"date_from":"2025-01-01","date_to":"2025-03-04"}'`
@@ -251,12 +265,15 @@ pnpm run dev
 ## 🎯 Workflow recommandé
 
 ### Pour développer l'UI uniquement
+
 → **Option 1 (MSW)** - Rapide, pas besoin du backend
 
 ### Pour tester l'intégration complète
+
 → **Option 2 (API réelle)** - Lancer backend + frontend
 
 ### Pour tester Strava sync avec vraies données
+
 → **Option 2** + vérifier credentials Strava dans `.env`
 
 ---

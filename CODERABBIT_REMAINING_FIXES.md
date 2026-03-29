@@ -3,11 +3,13 @@
 ## ✅ Déjà Corrigé (14/25)
 
 ### 🔴 Sécurité (5/5) - TERMINÉ
+
 - ✅ API key logging supprimé
 - ✅ Bare except remplacés (3 fichiers)
 - ✅ Regex injection corrigée
 
 ### 🟠 Bugs Critiques (9/10) - PRESQUE TERMINÉ
+
 - ✅ Type hints corrigés
 - ✅ zip() avec strict=True
 - ✅ Shear trié par altitude
@@ -19,10 +21,12 @@
 ## 🟡 À Faire - Priorité Moyenne (3 corrections)
 
 ### 1. **main.py:375** - Déplacer imports en haut
+
 **Fichier**: `apps/backend/main.py`  
 **Ligne**: 375-380
 
 **Problème**: Imports après le code (violation PEP8 E402)
+
 ```python
 # ❌ ACTUEL
 app.include_router(...)
@@ -31,6 +35,7 @@ from fastapi.responses import FileResponse
 ```
 
 **Solution**:
+
 ```python
 # ✅ CORRECTION
 # En haut du fichier avec les autres imports FastAPI
@@ -45,16 +50,19 @@ app.include_router(...)
 ---
 
 ### 2. **acp_analyzer.py:75-85** - Chaîner exceptions
+
 **Fichier**: `apps/backend/llm/acp_analyzer.py`  
 **Lignes**: 75, 81, 85
 
 **Problème**: Perte du traceback original
+
 ```python
 except subprocess.TimeoutExpired:
     raise TimeoutError("...")  # ❌ Perd le contexte
 ```
 
 **Solution**:
+
 ```python
 except subprocess.TimeoutExpired as e:
     raise TimeoutError("...") from e  # ✅ Préserve traceback
@@ -69,10 +77,12 @@ except Exception as e:
 ---
 
 ### 3. **multi_emagram_analyzer.py:129** - Variable unused
+
 **Fichier**: `apps/backend/llm/multi_emagram_analyzer.py`  
 **Ligne**: 129-132
 
 **Problème**: `path` non utilisé + zip sans strict
+
 ```python
 for i, (path, source) in enumerate(zip(image_paths, sources), 1):
     image_descriptions.append(f"Image {i}: {source.title()}")
@@ -80,6 +90,7 @@ for i, (path, source) in enumerate(zip(image_paths, sources), 1):
 ```
 
 **Solution**:
+
 ```python
 for i, (_path, source) in enumerate(
     zip(image_paths, sources, strict=True), 1
@@ -96,6 +107,7 @@ for i, (_path, source) in enumerate(
 **Fichier**: `apps/backend/test_endpoints.py`
 
 #### 4.1 Ligne 33-39: Initialiser first_site_id
+
 ```python
 # ❌ ACTUEL
 if sites:
@@ -109,6 +121,7 @@ if sites:
 ```
 
 #### 4.2 Ligne 101-104: Flux 404
+
 ```python
 # ❌ ACTUEL
 if response.status_code != 200:
@@ -130,6 +143,7 @@ elif response.status_code != 200:
 **Fichier**: `apps/backend/test_strava_webhook.py`
 
 #### 7.1 Ligne 79-82: Assertions GPX
+
 ```python
 # ❌ ACTUEL
 if gpx_path:
@@ -147,6 +161,7 @@ else:
 ```
 
 #### 7.2 Ligne 99-100: Loop inutile
+
 ```python
 # ❌ ACTUEL
 for site in sites_data:
@@ -158,6 +173,7 @@ print(f"📍 Found {len(sites_data)} sites")
 ```
 
 #### 7.3 Ligne 142-145: Vérification GPX
+
 ```python
 # ❌ ACTUEL
 if gpx_full_path.exists():
@@ -196,13 +212,16 @@ for key, value in para_result["metrics"].items():
 **Lignes**: 37, 190, 206
 
 **Problème**: Blocs code sans spécificateur
+
 ````markdown
 ❌ ACTUEL:
+
 ```
 dist/apps/frontend/
 ```
 
 ✅ CORRECTION:
+
 ```text
 dist/apps/frontend/
 ```
@@ -214,13 +233,13 @@ dist/apps/frontend/
 
 ## 📊 Résumé Global
 
-| Catégorie | Complétées | Restantes | Total |
-|-----------|------------|-----------|-------|
-| 🔴 Sécurité | 5 | 0 | 5 |
-| 🟠 Bugs critiques | 9 | 0* | 10 |
-| 🟡 Moyenne priorité | 0 | 3 | 3 |
-| 🟢 Basse priorité | 0 | 7 | 7 |
-| **TOTAL** | **14** | **10** | **25** |
+| Catégorie           | Complétées | Restantes | Total  |
+| ------------------- | ---------- | --------- | ------ |
+| 🔴 Sécurité         | 5          | 0         | 5      |
+| 🟠 Bugs critiques   | 9          | 0\*       | 10     |
+| 🟡 Moyenne priorité | 0          | 3         | 3      |
+| 🟢 Basse priorité   | 0          | 7         | 7      |
+| **TOTAL**           | **14**     | **10**    | **25** |
 
 \* forecast_hour skip (trop complexe)
 
@@ -270,6 +289,7 @@ git push
 ## ✅ Validation Finale
 
 Après toutes les corrections, relancer CodeRabbit :
+
 ```bash
 # Forcer une nouvelle review
 git commit --allow-empty -m "chore: trigger CodeRabbit re-review"
@@ -277,6 +297,7 @@ git push
 ```
 
 Ou commenter sur la PR :
+
 ```
 @coderabbitai review
 ```

@@ -3,7 +3,7 @@
 **Version:** 1.0  
 **Status:** Design Phase  
 **Date:** 2026-02-26  
-**Author:** Claw, for Vincent  
+**Author:** Claw, for Vincent
 
 ---
 
@@ -45,19 +45,19 @@ This document outlines the **multi-source weather data scraping strategy** for V
 
 ### Active Sites (Phase 1)
 
-| Site | Elevation | Latitude | Longitude | Status |
-|------|-----------|----------|-----------|--------|
-| Arguel | 427m | 47.2823 | 6.1742 | ✓ Data |
-| Mont Poupet | 842m | 47.2247 | 6.2045 | ✓ Data |
-| La Côte | 800m | 47.2567 | 6.1856 | ✓ Data |
+| Site        | Elevation | Latitude | Longitude | Status |
+| ----------- | --------- | -------- | --------- | ------ |
+| Arguel      | 427m      | 47.2823  | 6.1742    | ✓ Data |
+| Mont Poupet | 842m      | 47.2247  | 6.2045    | ✓ Data |
+| La Côte     | 800m      | 47.2567  | 6.1856    | ✓ Data |
 
 ### Data Freshness Requirements
 
-| Use Case | Freshness | Frequency |
-|----------|-----------|-----------|
-| Dashboard display | 30 min | Every 30 min |
-| Real-time alerts | 5 min | Every 5 min |
-| Historical analysis | Daily | Once per day |
+| Use Case            | Freshness | Frequency    |
+| ------------------- | --------- | ------------ |
+| Dashboard display   | 30 min    | Every 30 min |
+| Real-time alerts    | 5 min     | Every 5 min  |
+| Historical analysis | Daily     | Once per day |
 
 ---
 
@@ -114,7 +114,7 @@ This document outlines the **multi-source weather data scraping strategy** for V
 **Type:** REST API (free, no key required)  
 **Endpoint:** `https://api.open-meteo.com/v1/forecast`  
 **Rate Limit:** None (unlimited for free tier)  
-**Update Frequency:** Every 30 minutes  
+**Update Frequency:** Every 30 minutes
 
 #### Data Available
 
@@ -146,7 +146,7 @@ def scrape_openmeteo(lat, lon):
     }
     response = requests.get(url, params=params)
     data = response.json()
-    
+
     # Extract and normalize
     forecasts = []
     for i, timestamp in enumerate(data['hourly']['time']):
@@ -162,7 +162,7 @@ def scrape_openmeteo(lat, lon):
             'para_index': calculate_para_index(data, i)  # See calculation below
         }
         forecasts.append(forecast)
-    
+
     return forecasts
 ```
 
@@ -172,7 +172,7 @@ def scrape_openmeteo(lat, lon):
 def calculate_para_index(source_data, hourly_index):
     """
     Combines multiple factors into a 0-100 score for flying conditions.
-    
+
     Formula:
     para_index = (
         (1 - abs(wind_speed - 12) / 20) * 40 +  # Ideal wind: 10-15 km/h
@@ -184,19 +184,19 @@ def calculate_para_index(source_data, hourly_index):
     wind = source_data['hourly']['wind_speed_10m'][hourly_index]
     cloud = source_data['hourly']['cloud_cover'][hourly_index]
     temp = source_data['hourly']['temperature_2m'][hourly_index]
-    
+
     # Wind score (20 km/h max, centered at 12 km/h)
     wind_score = max(0, (1 - abs(wind - 12) / 20)) * 40
-    
+
     # Cloud score (0 clouds = 20, 100 clouds = 0)
     cloud_score = (100 - cloud) * 0.2
-    
+
     # Temperature score (optimal 12-18°C)
     temp_score = max(0, (1 - abs(temp - 15) / 20)) * 20
-    
+
     # Thermal estimate (hour of day + season)
     thermal_score = estimate_thermals(hourly_index) * 20
-    
+
     para_index = max(0, min(100, wind_score + cloud_score + temp_score + thermal_score))
     return para_index
 ```
@@ -209,7 +209,7 @@ def calculate_para_index(source_data, hourly_index):
 **Endpoint:** `https://api.weatherapi.com/v1/forecast.json`  
 **Rate Limit:** 1,000 calls/day (free tier)  
 **Update Frequency:** Every 60 minutes  
-**Key Location:** `~/.openclaw/config/weatherapi.key`  
+**Key Location:** `~/.openclaw/config/weatherapi.key`
 
 #### Data Available
 
@@ -238,7 +238,7 @@ def scrape_weatherapi(lat, lon, api_key):
     }
     response = requests.get(url, params=params)
     data = response.json()
-    
+
     forecasts = []
     for day in data['forecast']['forecastday']:
         for hour in day['hour']:
@@ -261,7 +261,7 @@ def scrape_weatherapi(lat, lon, api_key):
                 'para_index': calculate_para_index_weatherapi(hour)
             }
             forecasts.append(forecast)
-    
+
     return forecasts
 ```
 
@@ -273,7 +273,7 @@ def scrape_weatherapi(lat, lon, api_key):
 **URL:** `https://www.meteoblue.com/en/weather/forecast/[...]/[LAT],[LON]/[ELEVATION]`  
 **Rate Limit:** ~1 request every 5 minutes (respect robots.txt)  
 **Update Frequency:** Every 120 minutes  
-**Why Scraping:** Professional weather with multiple model comparisons (ICON, GFS, NEMS)  
+**Why Scraping:** Professional weather with multiple model comparisons (ICON, GFS, NEMS)
 
 #### Playwright Setup
 
@@ -289,17 +289,17 @@ async def scrape_meteoblue(lat, lon, elevation, site_name):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
-        
+
         # Build Meteoblue URL
         url = f"https://www.meteoblue.com/en/weather/forecast/3columns/{lat},{lon}/{elevation}"
-        
+
         # Navigate and wait for dynamic content
         await page.goto(url, wait_until="networkidle")
         await page.wait_for_timeout(3000)  # Wait for chart rendering
-        
+
         # Extract hourly forecast table
         forecast_rows = await page.query_selector_all("table.forecast tr")
-        
+
         forecasts = []
         for row in forecast_rows:
             cells = await row.query_selector_all("td")
@@ -317,7 +317,7 @@ async def scrape_meteoblue(lat, lon, elevation, site_name):
                     'model_gfs': await extract_model_data(cells[9], 'GFS'),
                 }
                 forecasts.append(forecast)
-        
+
         await browser.close()
         return forecasts
 
@@ -361,7 +361,7 @@ def meteoblue_ensemble_forecast(forecasts):
 **URL:** `https://www.meteo-parapente.com`  
 **Rate Limit:** 1 request per site per hour (very respectful)  
 **Update Frequency:** Every 180 minutes  
-**Advantage:** **Paragliding-specific** data (thermals, stability, convergences)  
+**Advantage:** **Paragliding-specific** data (thermals, stability, convergences)
 
 #### RSS Feed Strategy
 
@@ -374,19 +374,19 @@ def scrape_meteo_parapente_rss():
     """
     feed_url = "https://www.meteo-parapente.com/rss/forecasts"
     feed = feedparser.parse(feed_url)
-    
+
     forecasts = {}
     for entry in feed.entries:
         # Entry format: "Arguel - 27 fév: Thermiques 7/10, Stabilité 6/10, Vent 12 km/h"
         site_name = entry.title.split(' - ')[0]
-        
+
         forecasts[site_name] = {
             'thermal_index': extract_value(entry.summary, 'Thermiques', 10),
             'stability_index': extract_value(entry.summary, 'Stabilité', 10),
             'wind_speed_kmh': extract_value(entry.summary, 'Vent', 50),
             'updated_at': entry.published_parsed
         }
-    
+
     return forecasts
 
 def extract_value(text, keyword, max_value):
@@ -408,21 +408,21 @@ def scrape_meteo_parapente_html(site_code):
     Returns thermal/stability forecasts for next 7 days.
     """
     url = f"https://www.meteo-parapente.com/forecast/{site_code}"
-    
+
     headers = {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
     }
-    
+
     response = requests.get(url, headers=headers, timeout=15)
     soup = BeautifulSoup(response.content, 'html.parser')
-    
+
     # Find forecast table
     table = soup.find('table', {'class': 'forecast-table'})
-    
+
     forecasts = []
     for row in table.find_all('tr')[1:]:  # Skip header
         cells = row.find_all('td')
-        
+
         forecast = {
             'site_id': site_id,
             'source_id': 'meteo-parapente',
@@ -433,7 +433,7 @@ def scrape_meteo_parapente_html(site_code):
             'lift_expectation': cells[4].text.strip(),  # "Excellent", "Bon", etc.
         }
         forecasts.append(forecast)
-    
+
     return forecasts
 ```
 
@@ -445,7 +445,7 @@ def scrape_meteo_parapente_html(site_code):
 **URL:** `https://www.meteociel.fr`  
 **Rate Limit:** Very respectful (1 req/10 min per site)  
 **Update Frequency:** Every 180 minutes  
-**Data:** French meteorological data, model charts  
+**Data:** French meteorological data, model charts
 
 #### HTML Extraction
 
@@ -456,22 +456,22 @@ def scrape_meteociel(lat, lon, site_name):
     """
     import requests
     from bs4 import BeautifulSoup
-    
+
     # Meteociel uses lat/lon in custom format
     url = f"https://www.meteociel.fr/modeles/gfs/gfs.php?lat={lat}&lon={lon}&mode=1"
-    
+
     response = requests.get(url, timeout=15)
     soup = BeautifulSoup(response.content, 'html.parser')
-    
+
     # GFS data is in HTML table
     tables = soup.find_all('table', {'class': 'modeldata'})
-    
+
     forecasts = []
     for table in tables:
         rows = table.find_all('tr')
         for row in rows[2:]:  # Skip headers
             cells = row.find_all('td')
-            
+
             if len(cells) >= 8:
                 forecast = {
                     'site_id': site_id,
@@ -485,7 +485,7 @@ def scrape_meteociel(lat, lon, site_name):
                     'para_index': calculate_para_index_meteociel(cells)
                 }
                 forecasts.append(forecast)
-    
+
     return forecasts
 ```
 
@@ -496,7 +496,7 @@ def scrape_meteociel(lat, lon, site_name):
 **Type:** HTML Scraping (French paragliding forum/portal)  
 **URL:** `https://www.parapente.net/`  
 **Update Frequency:** Daily (forum posts are less frequent)  
-**Challenge:** Dynamic JavaScript rendering, forum structure  
+**Challenge:** Dynamic JavaScript rendering, forum structure
 
 #### Planned Approach
 
@@ -509,21 +509,21 @@ async def scrape_parapente_net(site_name):
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         page = await browser.new_page()
-        
+
         # Navigate to site conditions forum
         await page.goto(f"https://www.parapente.net/f-conditions/{site_name}")
         await page.wait_for_load_state("networkidle")
-        
+
         # Extract recent posts
         posts = await page.query_selector_all("article.forum-post")
-        
+
         conditions = []
         for post in posts[:5]:  # Last 5 posts
             title = await post.query_selector(".post-title").inner_text()
             content = await post.query_selector(".post-content").inner_text()
             author = await post.query_selector(".author-name").inner_text()
             date = await post.query_selector(".post-date").inner_text()
-            
+
             # Parse user-reported conditions
             user_experience = {
                 'site_id': site_id,
@@ -535,7 +535,7 @@ async def scrape_parapente_net(site_name):
                 'sentiment': analyze_sentiment(content),  # Positive/Negative/Neutral
             }
             conditions.append(user_experience)
-        
+
         await browser.close()
         return conditions
 ```
@@ -546,7 +546,8 @@ async def scrape_parapente_net(site_name):
 
 **Type:** Hybrid (API + Map visualization)  
 **URL:** `https://www.windy.com/`  
-**Approach:** 
+**Approach:**
+
 1. Use Windy's public API (if available) for wind data
 2. Fallback to scraping their visualization layer (complex, requires Playwright)
 
@@ -558,17 +559,17 @@ def scrape_windy_api(lat, lon, api_key):
     Windy provides wind forecast via their API (requires registration).
     """
     url = "https://api.windy.com/api/v2/point"
-    
+
     params = {
         "lat": lat,
         "lon": lon,
         "key": api_key,
         "model": "gfs"  # GFS model
     }
-    
+
     response = requests.get(url, params=params)
     data = response.json()
-    
+
     # Extract wind data
     forecasts = []
     for forecast in data['forecast']:
@@ -580,7 +581,7 @@ def scrape_windy_api(lat, lon, api_key):
             'wind_direction_deg': forecast['wind']['direction'],
             'gust_kmh': forecast['gust']['speed'] * 3.6 if 'gust' in forecast else None,
         })
-    
+
     return forecasts
 ```
 
@@ -595,14 +596,14 @@ async def scrape_windy_visualization(lat, lon):
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         page = await browser.new_page()
-        
+
         # Navigate to Windy forecast
         url = f"https://www.windy.com/?{lat},{lon},5"
         await page.goto(url)
-        
+
         # Wait for forecast data to load
         await page.wait_for_timeout(5000)
-        
+
         # Extract data from page context
         forecast_data = await page.evaluate("""
             () => {
@@ -613,7 +614,7 @@ async def scrape_windy_visualization(lat, lon):
               }
             }
         """)
-        
+
         return forecast_data
 ```
 
@@ -624,7 +625,7 @@ async def scrape_windy_visualization(lat, lon):
 **Type:** HTML Scraping (Sailing/Wind conditions)  
 **URL:** `https://www.planete-voile.com`  
 **Use Case:** Secondary wind/weather source for cross-validation  
-**Update Frequency:** Daily  
+**Update Frequency:** Daily
 
 #### Planned Implementation
 
@@ -636,27 +637,27 @@ def scrape_planete_voile(lat, lon):
     """
     import requests
     from bs4 import BeautifulSoup
-    
+
     # Planète-Voile requires location search first
     search_url = "https://www.planete-voile.com/search"
     search_params = {"q": f"{lat},{lon}"}
-    
+
     response = requests.post(search_url, data=search_params)
     soup = BeautifulSoup(response.content, 'html.parser')
-    
+
     # Find location link
     location_link = soup.find('a', {'class': 'location-result'})
     if location_link:
         forecast_url = location_link['href']
-        
+
         forecast_response = requests.get(forecast_url)
         forecast_soup = BeautifulSoup(forecast_response.content, 'html.parser')
-        
+
         # Extract wind/pressure forecast
         forecasts = []
         for row in forecast_soup.find_all('tr', {'class': 'forecast-row'}):
             cells = row.find_all('td')
-            
+
             forecast = {
                 'site_id': site_id,
                 'source_id': 'planete-voile',
@@ -666,7 +667,7 @@ def scrape_planete_voile(lat, lon):
                 'pressure_hpa': float(cells[3].text),
             }
             forecasts.append(forecast)
-        
+
         return forecasts
     return []
 ```
@@ -707,7 +708,7 @@ class WeatherPipeline:
             'meteoblue': MetablueScaper(),
             # ... etc
         }
-    
+
     async def fetch_all_sources(self, site_id):
         """
         Concurrently fetch from all sources.
@@ -718,12 +719,12 @@ class WeatherPipeline:
             for source in self.sources.values()
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         # Filter out failures, keep successes
         forecasts = [r for r in results if not isinstance(r, Exception)]
-        
+
         return forecasts
-    
+
     async def fetch_and_normalize(self, scraper, site_id):
         """Fetch, validate, and normalize single source."""
         try:
@@ -734,7 +735,7 @@ class WeatherPipeline:
         except Exception as e:
             logger.error(f"Error fetching {scraper.source}: {e}")
             return None
-    
+
     def normalize(self, data):
         """Convert all units to metric, standardize field names."""
         return {
@@ -742,12 +743,12 @@ class WeatherPipeline:
             'wind_speed_kmh': data.get('wind_kph', 0) * 1.60934 if 'wind_kph' in data else data.get('wind_kmh'),
             'para_index': calculate_para_index(data),
         }
-    
+
     async def save_batch(self, forecasts):
         """Insert all forecasts into database."""
         for forecast in forecasts:
             self.db.insert_forecast(forecast)
-        
+
         # Trigger alert checks
         await self.check_alerts(forecasts)
 ```
@@ -758,13 +759,13 @@ class WeatherPipeline:
 
 ### Failure Modes & Responses
 
-| Failure | Code | Strategy |
-|---------|------|----------|
-| **API Down** | 503 | Use cached data, alert admin |
-| **Slow Response** | Timeout | Fallback to prev forecast |
-| **Invalid Data** | Bad schema | Log & skip, use other sources |
-| **Rate Limited** | 429 | Exponential backoff, queue job |
-| **Auth Failed** | 401 | Rotate keys, notify |
+| Failure           | Code       | Strategy                       |
+| ----------------- | ---------- | ------------------------------ |
+| **API Down**      | 503        | Use cached data, alert admin   |
+| **Slow Response** | Timeout    | Fallback to prev forecast      |
+| **Invalid Data**  | Bad schema | Log & skip, use other sources  |
+| **Rate Limited**  | 429        | Exponential backoff, queue job |
+| **Auth Failed**   | 401        | Rotate keys, notify            |
 
 ### Retry Logic
 
@@ -802,20 +803,20 @@ async def get_forecast_with_fallback(site_id):
     try:
         # Try to fetch fresh data
         fresh = await fetch_all_sources(site_id)
-        
+
         if fresh and len(fresh) > 0:
             # Save for fallback
             save_cache(site_id, fresh)
             return fresh
     except Exception as e:
         logger.error(f"Error fetching fresh data: {e}")
-    
+
     # Fallback to cached data
     cached = load_cache(site_id)
     if cached and is_recent(cached, hours=6):
         logger.info(f"Using cached forecast for {site_id}")
         return cached
-    
+
     # Last resort: return empty/error state
     logger.error(f"No forecast available for {site_id}")
     return None
@@ -827,16 +828,16 @@ async def get_forecast_with_fallback(site_id):
 
 ### Terms of Service Compliance
 
-| Source | Terms | Rate Limit (Ours) | Justification |
-|--------|-------|-------------------|---------------|
-| Open-Meteo | Unlimited | Every 30 min | Free tier allows |
-| WeatherAPI | 1k/day | Every 60 min (~24/day) | Conservative (⅓ limit) |
-| Meteoblue | Respect ToS | Every 2h per site | HTML scraping: 1 req/5min max |
-| Météo-parapente | Be nice | Every 3h per site | Community site: minimal impact |
-| Météociel | Standard respect | Every 3h per site | Public meteorological data |
-| Parapente.net | Community | Once/day | Forum content: low priority |
-| Windy | API terms | To be defined | Phase 2 |
-| Planète-Voile | Standard | Once/day | Phase 3 |
+| Source          | Terms            | Rate Limit (Ours)      | Justification                  |
+| --------------- | ---------------- | ---------------------- | ------------------------------ |
+| Open-Meteo      | Unlimited        | Every 30 min           | Free tier allows               |
+| WeatherAPI      | 1k/day           | Every 60 min (~24/day) | Conservative (⅓ limit)         |
+| Meteoblue       | Respect ToS      | Every 2h per site      | HTML scraping: 1 req/5min max  |
+| Météo-parapente | Be nice          | Every 3h per site      | Community site: minimal impact |
+| Météociel       | Standard respect | Every 3h per site      | Public meteorological data     |
+| Parapente.net   | Community        | Once/day               | Forum content: low priority    |
+| Windy           | API terms        | To be defined          | Phase 2                        |
+| Planète-Voile   | Standard         | Once/day               | Phase 3                        |
 
 ### Rate Limit Implementation
 
@@ -849,17 +850,17 @@ class RateLimiter:
         self.requests = requests
         self.period = period_seconds
         self.calls = []
-    
+
     def is_allowed(self):
         now = time.time()
         # Remove old calls outside the period
         self.calls = [t for t in self.calls if now - t < self.period]
-        
+
         if len(self.calls) < self.requests:
             self.calls.append(now)
             return True
         return False
-    
+
     def wait_if_needed(self):
         while not self.is_allowed():
             time.sleep(1)
@@ -897,6 +898,7 @@ HEADERS = {
 - [x] Architecture diagrams
 
 **Deliverables:**
+
 - Design documents (5 files)
 - No code implementation yet
 
@@ -907,6 +909,7 @@ HEADERS = {
 ### Phase 2: Backend Data (Estimated: 3-4 weeks)
 
 **Scope:**
+
 - Set up PostgreSQL database from schema
 - Implement 5 sources (Open-Meteo, WeatherAPI, Meteoblue, Météo-parapente, Météociel)
 - Build data pipeline (extract → normalize → store)
@@ -914,6 +917,7 @@ HEADERS = {
 - Create initial scheduler (cron/APScheduler)
 
 **Tasks:**
+
 1. Database initialization & migrations (2-3 days)
 2. API client libraries for each source (1 week)
 3. HTML scraper for Meteoblue/Meteociel (1 week)
@@ -921,12 +925,14 @@ HEADERS = {
 5. Testing & error handling (1 week)
 
 **Deliverables:**
+
 - Running PostgreSQL with schema
 - Scheduler fetching from 5 sources
 - Database populated with 7-day forecasts
 - Unit tests for scrapers
 
 **Skills Needed:**
+
 - Python (async/await, requests/Playwright)
 - PostgreSQL (migrations, indexes)
 - Docker (for consistent environment)
@@ -936,6 +942,7 @@ HEADERS = {
 ### Phase 3: Frontend + Polish (Estimated: 2-3 weeks)
 
 **Scope:**
+
 - Convert HTML prototype to real frontend (Vue.js/React)
 - Implement dashboard endpoints (GET /dashboard, /weather/current, etc.)
 - Build alert management UI
@@ -943,6 +950,7 @@ HEADERS = {
 - Deploy to OpenClaw infrastructure
 
 **Tasks:**
+
 1. Frontend framework setup (Vue/React) (2-3 days)
 2. API integration (dashboard, forecasts, flights) (1 week)
 3. Real-time updates (WebSocket/polling) (2-3 days)
@@ -950,6 +958,7 @@ HEADERS = {
 5. Testing & deployment (1 week)
 
 **Deliverables:**
+
 - Live dashboard at `https://dashboard.parapente.local`
 - Working Strava integration
 - Alert notifications (Telegram/Email)
@@ -983,22 +992,22 @@ async def health_check():
         'timestamp': datetime.now(),
         'sources': {}
     }
-    
+
     for source_name, scraper in scrapers.items():
         last_run = db.get_last_scrape_time(source_name)
         is_healthy = (
-            last_run and 
+            last_run and
             (datetime.now() - last_run).seconds < 3600 and  # Less than 1h old
             not scraper.last_error
         )
-        
+
         status['sources'][source_name] = {
             'healthy': is_healthy,
             'last_run': last_run,
             'error': scraper.last_error,
             'records_fetched': scraper.last_record_count
         }
-    
+
     # Send to monitoring
     send_to_monitoring(status)
     return status
@@ -1041,9 +1050,10 @@ This scraping strategy provides:
 ✅ **Resilience** — Fallbacks, retries, caching, error handling  
 ✅ **Ethics** — Respects rate limits and terms of service  
 ✅ **Scalability** — Can add sources/sites without major refactoring  
-✅ **Accuracy** — Multi-source consensus & Para-Index weighting  
+✅ **Accuracy** — Multi-source consensus & Para-Index weighting
 
 **Next Steps:**
+
 1. Review & approve this strategy
 2. Begin Phase 2 backend development
 3. Set up development database

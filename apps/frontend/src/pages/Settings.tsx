@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSites } from '../hooks/useSites';
 import {
   useWeatherSources,
@@ -58,6 +59,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 // Weather Sources Tab Component
 function WeatherSourcesTab() {
+  const { t } = useTranslation();
   const { data: sources = [], isLoading, error } = useWeatherSources();
   const { data: stats } = useWeatherSourceStats();
   const deleteSource = useDeleteWeatherSource();
@@ -65,7 +67,9 @@ function WeatherSourcesTab() {
   const handleDelete = async (source: WeatherSource) => {
     if (
       !confirm(
-        `Supprimer la source "${source.display_name}" ?\n\nCette action est irréversible.`
+        t('settings.weatherSources.deleteConfirm', {
+          name: source.display_name,
+        })
       )
     ) {
       return;
@@ -73,10 +77,14 @@ function WeatherSourcesTab() {
 
     try {
       await deleteSource.mutateAsync(source.source_name);
-      alert(`Source "${source.display_name}" supprimée avec succès`);
+      alert(
+        t('settings.weatherSources.deleteSuccess', {
+          name: source.display_name,
+        })
+      );
     } catch (error: unknown) {
       const errorMessage =
-        (error as Error)?.message || 'Erreur lors de la suppression';
+        (error as Error)?.message || t('settings.weatherSources.deleteError');
       alert(errorMessage);
     }
   };
@@ -95,7 +103,7 @@ function WeatherSourcesTab() {
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
-        ❌ Erreur lors du chargement des sources météo
+        ❌ {t('settings.weatherSources.loadError')}
       </div>
     );
   }
@@ -105,18 +113,17 @@ function WeatherSourcesTab() {
       {/* Header with stats */}
       <div className="bg-white rounded-xl p-6 shadow-md">
         <h2 className="text-xl font-bold text-gray-900 mb-2">
-          🌦️ Gestion des Sources Météo
+          🌦️ {t('settings.weatherSources.title')}
         </h2>
         <p className="text-sm text-gray-600 mb-4">
-          Configurez les sources utilisées pour les prévisions météo. Au moins
-          une source doit rester active.
+          {t('settings.weatherSources.description')}
         </p>
 
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="p-3 bg-blue-50 rounded-lg">
               <div className="text-xs text-blue-600 font-semibold mb-1">
-                Sources actives
+                {t('settings.weatherSources.activeSources')}
               </div>
               <div className="text-2xl font-bold text-blue-900">
                 {stats.active_sources}/{stats.total_sources}
@@ -124,7 +131,7 @@ function WeatherSourcesTab() {
             </div>
             <div className="p-3 bg-green-50 rounded-lg">
               <div className="text-xs text-green-600 font-semibold mb-1">
-                Taux de succès global
+                {t('settings.weatherSources.globalSuccessRate')}
               </div>
               <div className="text-2xl font-bold text-green-900">
                 {stats.global_success_rate.toFixed(0)}%
@@ -132,7 +139,7 @@ function WeatherSourcesTab() {
             </div>
             <div className="p-3 bg-purple-50 rounded-lg">
               <div className="text-xs text-purple-600 font-semibold mb-1">
-                Temps moyen
+                {t('settings.weatherSources.avgTime')}
               </div>
               <div className="text-2xl font-bold text-purple-900">
                 {stats.global_avg_response_time_ms
@@ -142,7 +149,7 @@ function WeatherSourcesTab() {
             </div>
             <div className="p-3 bg-red-50 rounded-lg">
               <div className="text-xs text-red-600 font-semibold mb-1">
-                Sources en erreur
+                {t('settings.weatherSources.sourcesWithErrors')}
               </div>
               <div className="text-2xl font-bold text-red-900">
                 {stats.sources_with_errors}
@@ -166,35 +173,35 @@ function WeatherSourcesTab() {
 
       {sources.length === 0 && (
         <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-600">
-          Aucune source météo configurée
+          {t('settings.weatherSources.noSources')}
         </div>
       )}
 
       {/* Info Box */}
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
         <h3 className="font-semibold text-yellow-900 mb-2">
-          ℹ️ À propos des sources météo
+          ℹ️ {t('settings.weatherSources.aboutTitle')}
         </h3>
         <ul className="text-sm text-yellow-800 space-y-1">
           <li>
-            • <strong>Open-Meteo</strong>: API gratuite et fiable, recommandée
-            comme source principale
+            • <strong>Open-Meteo</strong>:{' '}
+            {t('settings.weatherSources.openMeteoDesc')}
           </li>
           <li>
-            • <strong>WeatherAPI</strong>: Nécessite une clé API (plan gratuit
-            disponible)
+            • <strong>WeatherAPI</strong>:{' '}
+            {t('settings.weatherSources.weatherApiDesc')}
           </li>
           <li>
-            • <strong>Météo Parapente</strong>: Spécialisée parapente avec
-            prévisions de thermiques
+            • <strong>Météo Parapente</strong>:{' '}
+            {t('settings.weatherSources.meteoParaglideDesc')}
           </li>
           <li>
-            • <strong>Météociel</strong>: Modèle AROME haute résolution pour la
-            France
+            • <strong>Météociel</strong>:{' '}
+            {t('settings.weatherSources.meteocielDesc')}
           </li>
           <li>
-            • <strong>Meteoblue</strong>: Prévisions professionnelles
-            multi-modèles
+            • <strong>Meteoblue</strong>:{' '}
+            {t('settings.weatherSources.meteoblueDesc')}
           </li>
         </ul>
       </div>
@@ -203,6 +210,7 @@ function WeatherSourcesTab() {
 }
 
 export default function Settings() {
+  const { t, i18n } = useTranslation();
   const { data: sites = [], isLoading: sitesLoading } = useSites();
   const [settings, setSettings] = useState<AppSettings>(() => {
     const stored = localStorage.getItem('paragliding-settings');
@@ -219,6 +227,10 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState<
     'general' | 'sites' | 'weather' | 'data'
   >('general');
+
+  useEffect(() => {
+    i18n.changeLanguage(settings.language);
+  }, []);
 
   // Save settings to localStorage
   const saveSettings = () => {
@@ -267,10 +279,10 @@ export default function Settings() {
         if (imported.settings) {
           setSettings(imported.settings);
           saveSettings();
-          alert('✅ Paramètres importés avec succès !');
+          alert(t('settings.data.importSuccess'));
         }
       } catch {
-        alert("❌ Erreur lors de l'import : fichier invalide");
+        alert(t('settings.data.importError'));
       }
     };
     reader.readAsText(file);
@@ -278,24 +290,20 @@ export default function Settings() {
 
   // Clear all data
   const clearData = () => {
-    if (
-      window.confirm(
-        '⚠️ Êtes-vous sûr de vouloir réinitialiser tous les paramètres ?'
-      )
-    ) {
+    if (window.confirm(t('settings.data.resetConfirm'))) {
       setSettings(DEFAULT_SETTINGS);
       localStorage.removeItem('paragliding-settings');
-      alert('✅ Paramètres réinitialisés !');
+      alert(t('settings.data.resetSuccess'));
     }
   };
 
   return (
     <div>
       <div className="mb-4 bg-white rounded-xl p-4 shadow-md">
-        <h1 className="text-xl font-bold text-gray-900">⚙️ Paramètres</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Configuration de votre dashboard parapente
-        </p>
+        <h1 className="text-xl font-bold text-gray-900">
+          ⚙️ {t('settings.title')}
+        </h1>
+        <p className="text-sm text-gray-600 mt-1">{t('settings.subtitle')}</p>
       </div>
 
       {/* Tabs Navigation */}
@@ -308,7 +316,7 @@ export default function Settings() {
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
-          🎛️ Général
+          🎛️ {t('settings.tabs.general')}
         </button>
         <button
           onClick={() => setActiveTab('sites')}
@@ -318,7 +326,7 @@ export default function Settings() {
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
-          📍 Sites Favoris
+          📍 {t('settings.tabs.favoriteSites')}
         </button>
         <button
           onClick={() => setActiveTab('weather')}
@@ -328,7 +336,7 @@ export default function Settings() {
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
-          🌦️ Sources Météo
+          🌦️ {t('settings.tabs.weatherSources')}
         </button>
         <button
           onClick={() => setActiveTab('data')}
@@ -338,7 +346,7 @@ export default function Settings() {
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
-          💾 Données
+          💾 {t('settings.tabs.data')}
         </button>
       </div>
 
@@ -350,12 +358,12 @@ export default function Settings() {
             {/* Units Section */}
             <div className="bg-white rounded-xl p-6 shadow-md">
               <h2 className="text-lg font-bold text-gray-900 mb-4">
-                📏 Unités de Mesure
+                📏 {t('settings.units.title')}
               </h2>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Distance
+                    {t('settings.units.distance')}
                   </label>
                   <div className="flex gap-4">
                     <button
@@ -371,7 +379,7 @@ export default function Settings() {
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      Kilomètres (km)
+                      {t('settings.units.kilometers')}
                     </button>
                     <button
                       onClick={() =>
@@ -386,14 +394,14 @@ export default function Settings() {
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      Miles (mi)
+                      {t('settings.units.miles')}
                     </button>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Altitude
+                    {t('settings.units.altitude')}
                   </label>
                   <div className="flex gap-4">
                     <button
@@ -409,7 +417,7 @@ export default function Settings() {
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      Mètres (m)
+                      {t('settings.units.meters')}
                     </button>
                     <button
                       onClick={() =>
@@ -424,14 +432,14 @@ export default function Settings() {
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      Pieds (ft)
+                      {t('settings.units.feet')}
                     </button>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Vitesse
+                    {t('settings.units.speed')}
                   </label>
                   <div className="flex gap-4">
                     <button
@@ -472,18 +480,19 @@ export default function Settings() {
             {/* Language & Theme Section */}
             <div className="bg-white rounded-xl p-6 shadow-md">
               <h2 className="text-lg font-bold text-gray-900 mb-4">
-                🌐 Langue & Thème
+                🌐 {t('settings.languageTheme.title')}
               </h2>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Langue
+                    {t('settings.languageTheme.language')}
                   </label>
                   <div className="flex gap-4">
                     <button
-                      onClick={() =>
-                        setSettings((prev) => ({ ...prev, language: 'fr' }))
-                      }
+                      onClick={() => {
+                        setSettings((prev) => ({ ...prev, language: 'fr' }));
+                        i18n.changeLanguage('fr');
+                      }}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.language === 'fr'
                           ? 'bg-sky-600 text-white shadow-md'
@@ -493,9 +502,10 @@ export default function Settings() {
                       🇫🇷 Français
                     </button>
                     <button
-                      onClick={() =>
-                        setSettings((prev) => ({ ...prev, language: 'en' }))
-                      }
+                      onClick={() => {
+                        setSettings((prev) => ({ ...prev, language: 'en' }));
+                        i18n.changeLanguage('en');
+                      }}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.language === 'en'
                           ? 'bg-sky-600 text-white shadow-md'
@@ -509,7 +519,7 @@ export default function Settings() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Thème
+                    {t('settings.languageTheme.theme')}
                   </label>
                   <div className="flex gap-4">
                     <button
@@ -522,7 +532,7 @@ export default function Settings() {
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      ☀️ Clair
+                      ☀️ {t('settings.languageTheme.light')}
                     </button>
                     <button
                       onClick={() =>
@@ -534,7 +544,7 @@ export default function Settings() {
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      🌙 Sombre
+                      🌙 {t('settings.languageTheme.dark')}
                     </button>
                     <button
                       onClick={() =>
@@ -546,7 +556,7 @@ export default function Settings() {
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      🔄 Auto
+                      🔄 {t('settings.languageTheme.auto')}
                     </button>
                   </div>
                 </div>
@@ -556,12 +566,12 @@ export default function Settings() {
             {/* Notifications Section */}
             <div className="bg-white rounded-xl p-6 shadow-md">
               <h2 className="text-lg font-bold text-gray-900 mb-4">
-                🔔 Notifications
+                🔔 {t('settings.notifications.title')}
               </h2>
               <div className="space-y-3">
                 <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all cursor-pointer">
                   <span className="text-sm font-medium text-gray-700">
-                    Alertes météo
+                    {t('settings.notifications.weatherAlerts')}
                   </span>
                   <input
                     type="checkbox"
@@ -580,7 +590,7 @@ export default function Settings() {
                 </label>
                 <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all cursor-pointer">
                   <span className="text-sm font-medium text-gray-700">
-                    Nouveaux vols
+                    {t('settings.notifications.newFlights')}
                   </span>
                   <input
                     type="checkbox"
@@ -599,7 +609,7 @@ export default function Settings() {
                 </label>
                 <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all cursor-pointer">
                   <span className="text-sm font-medium text-gray-700">
-                    Alertes personnalisées
+                    {t('settings.notifications.customAlerts')}
                   </span>
                   <input
                     type="checkbox"
@@ -625,7 +635,7 @@ export default function Settings() {
         {activeTab === 'sites' && (
           <div className="bg-white rounded-xl p-6 shadow-md">
             <h2 className="text-lg font-bold text-gray-900 mb-4">
-              📍 Gérer vos Sites Favoris
+              📍 {t('settings.favorites.title')}
             </h2>
             {sitesLoading ? (
               <div className="animate-pulse space-y-3">
@@ -635,7 +645,7 @@ export default function Settings() {
               </div>
             ) : sites.length === 0 ? (
               <p className="text-gray-600 text-center py-8">
-                Aucun site disponible
+                {t('settings.favorites.noSites')}
               </p>
             ) : (
               <div className="space-y-3">
@@ -673,16 +683,16 @@ export default function Settings() {
                       }`}
                     >
                       {settings.favoriteSites.includes(site.id)
-                        ? '⭐ Favori'
-                        : '☆ Ajouter'}
+                        ? '⭐ ' + t('settings.favorites.favorite')
+                        : '☆ ' + t('settings.favorites.add')}
                     </button>
                   </div>
                 ))}
               </div>
             )}
             <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
-              💡 <strong>Astuce :</strong> Les sites favoris apparaîtront en
-              priorité dans les sélecteurs
+              💡 <strong>{t('settings.favorites.tip')}</strong>{' '}
+              {t('settings.favorites.tipText')}
             </div>
           </div>
         )}
@@ -696,7 +706,7 @@ export default function Settings() {
             {/* Export/Import Section */}
             <div className="bg-white rounded-xl p-6 shadow-md">
               <h2 className="text-lg font-bold text-gray-900 mb-4">
-                💾 Sauvegarde & Restauration
+                💾 {t('settings.data.backupTitle')}
               </h2>
               <div className="space-y-3">
                 <button
@@ -704,11 +714,11 @@ export default function Settings() {
                   className="w-full px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all flex items-center justify-center gap-2"
                 >
                   <span>📥</span>
-                  Exporter mes paramètres
+                  {t('settings.data.export')}
                 </button>
                 <label className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all flex items-center justify-center gap-2 cursor-pointer">
                   <span>📤</span>
-                  Importer des paramètres
+                  {t('settings.data.import')}
                   <input
                     type="file"
                     accept=".json"
@@ -718,39 +728,37 @@ export default function Settings() {
                 </label>
               </div>
               <div className="mt-4 p-3 bg-yellow-50 rounded-lg text-sm text-yellow-800">
-                ⚠️ L&apos;import remplacera vos paramètres actuels
+                ⚠️ {t('settings.data.importWarning')}
               </div>
             </div>
 
             {/* Clear Data Section */}
             <div className="bg-white rounded-xl p-6 shadow-md">
               <h2 className="text-lg font-bold text-gray-900 mb-4">
-                🗑️ Réinitialisation
+                🗑️ {t('settings.data.resetTitle')}
               </h2>
               <button
                 onClick={clearData}
                 className="w-full px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"
               >
-                Réinitialiser tous les paramètres
+                {t('settings.data.resetAll')}
               </button>
               <div className="mt-4 p-3 bg-red-50 rounded-lg text-sm text-red-800">
-                ⚠️ Cette action est irréversible (sauf si vous avez exporté une
-                sauvegarde)
+                ⚠️ {t('settings.data.resetWarning')}
               </div>
             </div>
 
             {/* User Profile Placeholder */}
             <div className="bg-white rounded-xl p-6 shadow-md">
               <h2 className="text-lg font-bold text-gray-900 mb-4">
-                👤 Profil Utilisateur
+                👤 {t('settings.profile.title')}
               </h2>
               <div className="p-8 bg-gray-50 rounded-lg text-center">
                 <p className="text-gray-600 mb-2">
-                  🚧 Fonctionnalité en développement
+                  🚧 {t('settings.profile.wip')}
                 </p>
                 <p className="text-sm text-gray-500">
-                  Bientôt : avatar, bio, statistiques personnelles, historique
-                  d&apos;activité
+                  {t('settings.profile.wipDetails')}
                 </p>
               </div>
             </div>
@@ -769,8 +777,8 @@ export default function Settings() {
           }`}
         >
           {saved
-            ? '✅ Paramètres sauvegardés !'
-            : '💾 Sauvegarder les modifications'}
+            ? '✅ ' + t('settings.saved')
+            : '💾 ' + t('settings.saveButton')}
         </button>
       </div>
     </div>

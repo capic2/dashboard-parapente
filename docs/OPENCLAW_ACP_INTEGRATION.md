@@ -171,6 +171,7 @@ python backend/test_acp_integration.py
 ```
 
 Ce script vérifie:
+
 - ✅ openclaw est disponible
 - ✅ Gateway OpenClaw est en cours d'exécution
 - ✅ Création de screenshots de test
@@ -224,9 +225,7 @@ L'analyseur ACP retourne un JSON structuré:
   "heures_volables": "13h-18h",
   "score_volabilite": 75,
   "conseils_vol": "Bonne journée de vol thermique. Cumulus attendus vers 14h.",
-  "alertes_securite": [
-    "Vigilance sur le cisaillement en altitude"
-  ],
+  "alertes_securite": ["Vigilance sur le cisaillement en altitude"],
   "details_analyse": "Consensus des 3 sources: Plafond stable à 2800m..."
 }
 ```
@@ -235,13 +234,13 @@ L'analyseur ACP retourne un JSON structuré:
 
 OpenClaw supporte plusieurs agents via ACP:
 
-| Agent     | Provider      | Modèle recommandé           | Vision |
-|-----------|---------------|------------------------------|--------|
-| `claude`  | Anthropic     | claude-opus-4-6              | ✅     |
-| `codex`   | OpenAI        | gpt-5.2                      | ✅     |
-| `gemini`  | Google        | gemini-2.5-pro               | ✅     |
-| `pi`      | Inflection    | pi-3                         | ❌     |
-| `opencode`| GitHub        | github-copilot-gpt-4o        | ✅     |
+| Agent      | Provider   | Modèle recommandé     | Vision |
+| ---------- | ---------- | --------------------- | ------ |
+| `claude`   | Anthropic  | claude-opus-4-6       | ✅     |
+| `codex`    | OpenAI     | gpt-5.2               | ✅     |
+| `gemini`   | Google     | gemini-2.5-pro        | ✅     |
+| `pi`       | Inflection | pi-3                  | ❌     |
+| `opencode` | GitHub     | github-copilot-gpt-4o | ✅     |
 
 Choisir un agent avec Vision pour l'analyse d'emagrammes.
 
@@ -295,6 +294,7 @@ OPENCLAW_TIMEOUT=300
 Si ACP échoue, le système utilise automatiquement l'API Anthropic directe (si `ANTHROPIC_API_KEY` est configurée).
 
 Logs typiques:
+
 ```
 🦞 Trying OpenClaw ACP analysis...
 WARNING: OpenClaw ACP failed, falling back to direct API: ...
@@ -303,13 +303,13 @@ WARNING: OpenClaw ACP failed, falling back to direct API: ...
 
 ## Avantages vs API directe
 
-| Critère              | OpenClaw ACP                  | API Anthropic directe     |
-|----------------------|-------------------------------|---------------------------|
-| **Coût**             | ✅ Gratuit (local)            | ❌ ~50€/mois              |
-| **Confidentialité**  | ✅ Données locales            | ⚠️ Envoyé à Anthropic     |
-| **Flexibilité**      | ✅ Multi-providers            | ❌ Anthropic uniquement   |
-| **Complexité**       | ⚠️ Nécessite OpenClaw         | ✅ API REST simple        |
-| **Fiabilité**        | ⚠️ Dépend du gateway local    | ✅ Service managé         |
+| Critère             | OpenClaw ACP               | API Anthropic directe   |
+| ------------------- | -------------------------- | ----------------------- |
+| **Coût**            | ✅ Gratuit (local)         | ❌ ~50€/mois            |
+| **Confidentialité** | ✅ Données locales         | ⚠️ Envoyé à Anthropic   |
+| **Flexibilité**     | ✅ Multi-providers         | ❌ Anthropic uniquement |
+| **Complexité**      | ⚠️ Nécessite OpenClaw      | ✅ API REST simple      |
+| **Fiabilité**       | ⚠️ Dépend du gateway local | ✅ Service managé       |
 
 ## Limitations connues
 

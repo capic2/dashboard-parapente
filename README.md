@@ -13,6 +13,7 @@ Tableau de bord météo personnel pour sites de parapente avec agrégation multi
 ## 🚀 Stack Technique (Mars 2026)
 
 ### Backend
+
 - **Python** 3.13 LTS (support jusqu'en 2028)
 - **FastAPI** 0.135 (framework async moderne)
 - **SQLAlchemy** 2.0.48 (ORM)
@@ -21,6 +22,7 @@ Tableau de bord météo personnel pour sites de parapente avec agrégation multi
 - **Redis** 8.6 (cache ultra-rapide)
 
 ### Frontend
+
 - **React** 18.3
 - **Node.js** 24 LTS (Krypton)
 - **Ky** 1.14 (HTTP client moderne)
@@ -31,6 +33,7 @@ Tableau de bord météo personnel pour sites de parapente avec agrégation multi
 - **Cesium** 1.139 (cartographie 3D)
 
 ### Infrastructure
+
 - **Nx** 20.4 (monorepo intelligent)
 - **Nx Cloud** (distributed caching)
 - Docker multi-stage builds
@@ -44,6 +47,7 @@ Tableau de bord météo personnel pour sites de parapente avec agrégation multi
 ## ✨ Fonctionnalités
 
 ### 🌤️ Météo & Prévisions
+
 - **Météo multi-sources** : 5 sources agrégées (WeatherAPI, Meteoblue, etc.)
 - **Para-Index** : Score 0-100 de volabilité en temps réel
 - **6 sites pré-configurés** : Région Besançon (Arguel, Mont Poupet, La Côte)
@@ -51,6 +55,7 @@ Tableau de bord météo personnel pour sites de parapente avec agrégation multi
 - **Cache Redis** : Performances optimales
 
 ### 📊 Analytics & Statistiques (Mars 2026)
+
 - **Filtres dynamiques** : Filtrer par site et plage de dates avec persistence
 - **Dashboard records** : 4 records personnels (durée, altitude, distance, vitesse)
 - **Analyses temporelles** :
@@ -67,6 +72,7 @@ Tableau de bord météo personnel pour sites de parapente avec agrégation multi
   - Altitude (1000m, 2000m, 3000m)
 
 ### 🔗 Intégrations
+
 - **Strava** : Sync automatique des vols avec GPX
 - **Telegram** : Alertes météo (optionnel)
 
@@ -144,6 +150,7 @@ METEOBLUE_API_KEY=***
 ### Sites Pré-Configurés
 
 6 sites région Besançon auto-initialisés:
+
 1. Arguel (462m, NNW)
 2. Mont Poupet Nord (795m, N)
 3. Mont Poupet Nord-Ouest (795m, NW)

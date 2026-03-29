@@ -3,6 +3,7 @@
 ## 🎯 Objectif
 
 Ce projet utilise MSW (Mock Service Worker) pour:
+
 1. **Dev** : Mocker les API calls en mode développement navigateur
 2. **Storybook** : Mocker les API calls dans les stories Storybook
 3. **Tests Vitest** : Mocker les API calls dans les tests Storybook via Vitest
@@ -24,11 +25,13 @@ Ce projet utilise MSW (Mock Service Worker) pour:
 
 ```typescript
 // ✅ CORRECT
-http.get('/api/weather/:spotId', () => HttpResponse.json(data))
+http.get('/api/weather/:spotId', () => HttpResponse.json(data));
 
 // ❌ INCORRECT (cause des erreurs "Missing parameter name")
-http.get('*/api/weather/:spotId', () => HttpResponse.json(data))
-http.get('http://localhost:*/api/weather/:spotId', () => HttpResponse.json(data))
+http.get('*/api/weather/:spotId', () => HttpResponse.json(data));
+http.get('http://localhost:*/api/weather/:spotId', () =>
+  HttpResponse.json(data)
+);
 ```
 
 ## 🚀 Utiliser MSW dans les Stories
@@ -135,7 +138,7 @@ export const MyStory = meta.story({
 MyStory.test('displays data correctly', async ({ canvas }) => {
   // Attendre que les données soient chargées
   await canvas.findByText(/85\/100/);
-  
+
   // Vérifier l'affichage
   await expect(canvas.getByText(/BON/)).toBeInTheDocument();
   await expect(canvas.getByText('22°C')).toBeInTheDocument();

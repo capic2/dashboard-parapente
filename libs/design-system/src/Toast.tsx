@@ -1,27 +1,34 @@
+import { tv } from 'tailwind-variants';
+
+const toast = tv({
+  base: 'text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px]',
+  variants: {
+    type: {
+      success: 'bg-green-600',
+      error: 'bg-red-600',
+      info: 'bg-blue-600',
+    },
+  },
+});
+
+const icons: Record<ToastType, string> = {
+  success: '✓',
+  error: '✕',
+  info: 'ℹ',
+};
+
+type ToastType = 'success' | 'error' | 'info';
+
 interface ToastProps {
   id: string;
   title: string;
-  type: 'success' | 'error' | 'info';
+  type: ToastType;
   onClose: (id: string) => void;
 }
 
 export function Toast({ id, title, type, onClose }: ToastProps) {
-  const colors = {
-    success: 'bg-green-600',
-    error: 'bg-red-600',
-    info: 'bg-blue-600',
-  };
-
-  const icons = {
-    success: '✓',
-    error: '✕',
-    info: 'ℹ',
-  };
-
   return (
-    <div
-      className={`${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px]`}
-    >
+    <div className={toast({ type })}>
       <span className="text-xl font-bold">{icons[type]}</span>
       <span className="font-medium flex-1">{title}</span>
       <button

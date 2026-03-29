@@ -87,7 +87,8 @@ const bestSpotByDay: Record<number, BestSpotResult> = {
     paraIndex: 55,
     windDirection: 'W',
     windSpeed: 22,
-    reason: 'Vent fort Ouest 22km/h, conditions difficiles, prudence recommandée',
+    reason:
+      'Vent fort Ouest 22km/h, conditions difficiles, prudence recommandée',
   },
 
   // Day 6 - Arguel (improving conditions)

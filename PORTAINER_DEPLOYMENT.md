@@ -311,16 +311,16 @@ docker-compose down && docker-compose up -d
 
 ## 📊 Comparaison Avant/Après
 
-| Aspect | Avant (Monolithique) | Après (Nx Monorepo) |
-|--------|---------------------|---------------------|
-| **Structure** | `frontend/`, `backend/` séparés | `apps/`, `libs/` organisés |
-| **Base de données** | Bind mount `./backend/db` | Volume nommé `parapente-db-data` |
-| **Build frontend** | `npm run build` dans frontend/ | `nx build frontend` (avec cache) |
-| **CI/CD** | 2 workflows séparés | 1 workflow unifié + Nx affected |
-| **Cache** | Local uniquement | Local + Nx Cloud distribué |
-| **Tests** | Tous les tests à chaque run | Seulement tests affectés |
-| **Temps CI** | ~8-12 minutes | ~3-5 minutes (avec cache) |
-| **Shared code** | Copier/coller | `libs/shared-types` partagée |
+| Aspect              | Avant (Monolithique)            | Après (Nx Monorepo)              |
+| ------------------- | ------------------------------- | -------------------------------- |
+| **Structure**       | `frontend/`, `backend/` séparés | `apps/`, `libs/` organisés       |
+| **Base de données** | Bind mount `./backend/db`       | Volume nommé `parapente-db-data` |
+| **Build frontend**  | `npm run build` dans frontend/  | `nx build frontend` (avec cache) |
+| **CI/CD**           | 2 workflows séparés             | 1 workflow unifié + Nx affected  |
+| **Cache**           | Local uniquement                | Local + Nx Cloud distribué       |
+| **Tests**           | Tous les tests à chaque run     | Seulement tests affectés         |
+| **Temps CI**        | ~8-12 minutes                   | ~3-5 minutes (avec cache)        |
+| **Shared code**     | Copier/coller                   | `libs/shared-types` partagée     |
 
 ---
 
@@ -331,6 +331,7 @@ docker-compose down && docker-compose up -d
 **Cause**: Dépendances npm manquantes dans le container
 
 **Solution**:
+
 ```bash
 # Rebuild complet sans cache
 docker-compose build --no-cache backend
@@ -342,6 +343,7 @@ docker-compose up -d backend
 **Cause**: Plusieurs processus tentent d'accéder à SQLite simultanément
 
 **Solution**:
+
 ```bash
 # Redémarrer le backend
 docker-compose restart backend
@@ -355,6 +357,7 @@ docker ps | grep parapente-backend
 **Cause**: Le volume n'a pas été créé ou les données n'ont pas été migrées
 
 **Solution**:
+
 ```bash
 # Vérifier que le volume existe
 docker volume inspect parapente-db-data
@@ -367,6 +370,7 @@ docker volume inspect parapente-db-data
 **Cause**: Backend pas encore démarré ou crashed
 
 **Solution**:
+
 ```bash
 # Vérifier les logs backend
 docker-compose logs backend
@@ -383,6 +387,7 @@ docker-compose restart backend
 **Cause**: L'app GitHub Nx Cloud n'est pas installée ou le repo n'a pas accès
 
 **Solution**:
+
 1. Vérifier sur https://github.com/apps/nx-cloud
 2. S'assurer que `dashboard-parapente` est dans les repos autorisés
 3. Re-run le workflow GitHub Actions
@@ -420,7 +425,6 @@ Avant de considérer la migration comme complète:
 
 ---
 
-**Date de migration**: _______________  
-**Validé par**: _______________  
-**Notes**: _______________
-
+**Date de migration**: ******\_\_\_******  
+**Validé par**: ******\_\_\_******  
+**Notes**: ******\_\_\_******

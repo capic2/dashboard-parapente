@@ -57,6 +57,7 @@
 ```
 
 **Components:**
+
 - **Frontend**: React app serving static files
 - **Backend**: FastAPI + APScheduler (weather polling)
 - **Redis**: Centralized cache (shared between processes)
@@ -69,12 +70,14 @@
 #### Server Requirements
 
 **Minimum:**
+
 - 2 CPU cores
 - 2 GB RAM
 - 20 GB disk space
 - Ubuntu 20.04+ or Debian 11+
 
 **Recommended:**
+
 - 4 CPU cores
 - 4 GB RAM
 - 50 GB SSD
@@ -155,41 +158,41 @@ curl http://localhost:8001/api/sites
 ```yaml
 environment:
   # Core
-  ENVIRONMENT: "production"
-  PYTHONUNBUFFERED: "1"
-  
+  ENVIRONMENT: 'production'
+  PYTHONUNBUFFERED: '1'
+
   # Database
-  DATABASE_URL: "sqlite:///db/dashboard.db"
-  
+  DATABASE_URL: 'sqlite:///db/dashboard.db'
+
   # Redis Cache
-  USE_FAKE_REDIS: "false"  # MUST be false in production
-  REDIS_HOST: "redis"
-  REDIS_PORT: "6379"
-  
+  USE_FAKE_REDIS: 'false' # MUST be false in production
+  REDIS_HOST: 'redis'
+  REDIS_PORT: '6379'
+
   # Scheduler
-  SCHEDULER_ENABLED: "true"
-  SCHEDULER_INTERVAL_MINUTES: "30"  # Poll weather every 30min
-  
+  SCHEDULER_ENABLED: 'true'
+  SCHEDULER_INTERVAL_MINUTES: '30' # Poll weather every 30min
+
   # Logging
-  LOG_LEVEL: "INFO"  # Or "WARNING" for less verbose
-  LOG_FILE: "logs/dashboard.log"
-  
+  LOG_LEVEL: 'INFO' # Or "WARNING" for less verbose
+  LOG_FILE: 'logs/dashboard.log'
+
   # API Keys (use Portainer env vars instead)
-  WEATHERAPI_KEY: "${WEATHERAPI_KEY}"
-  METEOBLUE_API_KEY: "${METEOBLUE_API_KEY}"
-  STRAVA_KEY: "${STRAVA_KEY}"
-  
+  WEATHERAPI_KEY: '${WEATHERAPI_KEY}'
+  METEOBLUE_API_KEY: '${METEOBLUE_API_KEY}'
+  STRAVA_KEY: '${STRAVA_KEY}'
+
   # Optional: Telegram
-  TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"
-  TELEGRAM_CHAT_ID: "${TELEGRAM_CHAT_ID:-}"
+  TELEGRAM_BOT_TOKEN: '${TELEGRAM_BOT_TOKEN:-}'
+  TELEGRAM_CHAT_ID: '${TELEGRAM_CHAT_ID:-}'
 ```
 
 **Frontend:**
 
 ```yaml
 environment:
-  VITE_API_URL: "http://localhost:8001"  # Adjust for your domain
-  NODE_ENV: "production"
+  VITE_API_URL: 'http://localhost:8001' # Adjust for your domain
+  NODE_ENV: 'production'
 ```
 
 ---
@@ -199,24 +202,28 @@ environment:
 #### Cache TTL Configuration
 
 **Production Cache Strategy:**
+
 - **TTL:** 60 minutes (3600 seconds)
 - **Polling:** Every hour via APScheduler
 - **Coverage:** Today + Tomorrow (most consulted days)
 - **On-demand:** Days 2-6 fetched as needed
 
 **Why this configuration?**
+
 1. **No cache gaps:** TTL matches refresh interval
 2. **Predictable performance:** Users always hit cache
 3. **API efficiency:** Only 6 sites × 2 days × hourly = 288 API calls/day
 4. **Cost optimization:** Minimal external API usage
 
 **Cache Keys Format:**
+
 ```
 weather:forecast:{site_id}_{day_index}_{hash}
 TTL: 3600 seconds (1 hour)
 ```
 
 **Monitoring Cache Health:**
+
 ```bash
 # Check cache hit ratio
 docker exec -it dashboard-redis redis-cli INFO stats | grep keyspace
@@ -234,6 +241,7 @@ services:
 ```
 
 **Explanation:**
+
 - `--appendonly yes`: Enable AOF (Append-Only File) persistence
 - `--maxmemory 256mb`: Limit Redis memory usage
 - `--maxmemory-policy allkeys-lru`: Evict least recently used keys when full
@@ -273,8 +281,8 @@ redis:
   image: redis:7-alpine
   volumes:
     - redis-data:/data
-    - ./redis.conf:/usr/local/etc/redis/redis.conf  # Add this
-  command: redis-server /usr/local/etc/redis/redis.conf  # Change this
+    - ./redis.conf:/usr/local/etc/redis/redis.conf # Add this
+  command: redis-server /usr/local/etc/redis/redis.conf # Change this
 ```
 
 #### Redis Monitoring
@@ -299,6 +307,7 @@ MONITOR
 ```
 
 **Key Metrics to Watch:**
+
 - `used_memory_human`: Current memory usage
 - `evicted_keys`: Keys removed due to maxmemory
 - `keyspace_hits` / `keyspace_misses`: Cache efficiency
@@ -313,7 +322,7 @@ Redis healthcheck is already configured:
 
 ```yaml
 healthcheck:
-  test: ["CMD", "redis-cli", "ping"]
+  test: ['CMD', 'redis-cli', 'ping']
   interval: 5s
   timeout: 3s
   retries: 5
@@ -327,7 +336,7 @@ Update `docker-compose.yml`:
 dashboard-backend:
   # ... existing config ...
   healthcheck:
-    test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+    test: ['CMD', 'curl', '-f', 'http://localhost:8000/api/health']
     interval: 30s
     timeout: 10s
     retries: 3
@@ -347,14 +356,14 @@ async def health_check():
         redis_status = "healthy"
     except Exception as e:
         redis_status = f"unhealthy: {str(e)}"
-    
+
     # Test Database
     try:
         db.execute("SELECT 1")
         db_status = "healthy"
     except Exception as e:
         db_status = f"unhealthy: {str(e)}"
-    
+
     return {
         "status": "healthy" if redis_status == "healthy" and db_status == "healthy" else "degraded",
         "redis": redis_status,
@@ -366,6 +375,7 @@ async def health_check():
 #### Monitoring with Portainer
 
 In Portainer:
+
 1. Go to **Containers**
 2. Click on container name
 3. View **Stats** for CPU/Memory usage
@@ -374,12 +384,14 @@ In Portainer:
 #### External Monitoring (Optional)
 
 **UptimeRobot Setup:**
+
 1. Create account at uptimerobot.com
 2. Add monitor: `https://your-domain.com/api/health`
 3. Check interval: 5 minutes
 4. Alert methods: Email, SMS, Webhook
 
 **Prometheus + Grafana (Advanced):**
+
 ```yaml
 # docker-compose.monitoring.yml
 services:
@@ -388,12 +400,12 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
-      - "9090:9090"
-  
+      - '9090:9090'
+
   grafana:
     image: grafana/grafana:latest
     ports:
-      - "3000:3000"
+      - '3000:3000'
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
 ```
@@ -516,8 +528,8 @@ services:
   nginx:
     image: nginx:alpine
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
       - ./ssl:/etc/nginx/ssl
@@ -538,13 +550,13 @@ upstream backend {
 server {
     listen 80;
     server_name your-domain.com;
-    
+
     location /api {
         proxy_pass http://backend;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
-    
+
     location / {
         proxy_pass http://dashboard-frontend:5173;
     }
@@ -606,12 +618,14 @@ CREATE INDEX idx_alerts_active ON alerts(is_active, site_id);
 #### 1. API Keys Management
 
 **DO:**
+
 - ✅ Store keys in Portainer environment variables
 - ✅ Use secrets management (Docker Secrets)
 - ✅ Rotate keys regularly
 - ✅ Limit API key permissions
 
 **DON'T:**
+
 - ❌ Commit keys to Git
 - ❌ Log API keys
 - ❌ Expose keys in URLs
@@ -638,7 +652,7 @@ sudo ufw deny 6379/tcp
 networks:
   dashboard-net:
     driver: bridge
-    internal: false  # Set to true to isolate from external
+    internal: false # Set to true to isolate from external
 ```
 
 #### 3. HTTPS with Let's Encrypt
@@ -718,6 +732,7 @@ docker exec -it dashboard-backend ping redis
 ```
 
 **Solution:**
+
 - Ensure Redis container is running
 - Check network connectivity: `docker network inspect dashboard-net`
 - Verify `REDIS_HOST=redis` in environment variables
@@ -735,6 +750,7 @@ docker exec -it dashboard-redis redis-cli INFO memory
 ```
 
 **Solution:**
+
 - Increase `maxmemory` in Redis config
 - Check for memory leaks: `docker exec dashboard-backend ps aux`
 - Restart containers: `docker-compose restart`
@@ -753,6 +769,7 @@ docker logs dashboard-backend | grep -i "scheduler"
 ```
 
 **Solution:**
+
 - Verify `SCHEDULER_ENABLED=true`
 - Check for exceptions in logs
 - Restart backend: `docker-compose restart dashboard-backend`
@@ -762,6 +779,7 @@ docker logs dashboard-backend | grep -i "scheduler"
 **Issue: "Frontend can't reach API"**
 
 **Solution:**
+
 - Check `VITE_API_URL` environment variable
 - Verify CORS settings in backend
 - Check Nginx proxy configuration
@@ -822,35 +840,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-      
+
       - name: Install dependencies
         run: |
           cd backend
           pip install -r requirements.txt
-      
+
       - name: Run tests
         run: |
           cd backend
           pytest
-      
+
       - name: Run linter
         run: |
           cd backend
           flake8 .
-  
+
   deploy:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Deploy to Portainer
         env:
           PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
@@ -862,6 +880,7 @@ jobs:
 ```
 
 **Setup:**
+
 1. Go to GitHub repo → Settings → Secrets
 2. Add secrets:
    - `PORTAINER_URL`: Your Portainer URL

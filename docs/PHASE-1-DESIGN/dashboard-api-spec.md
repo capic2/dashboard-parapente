@@ -3,7 +3,7 @@
 **Version:** 1.0  
 **Status:** Design Phase (Not yet implemented)  
 **Author:** Claw, for Vincent  
-**Date:** 2026-02-26  
+**Date:** 2026-02-26
 
 ---
 
@@ -29,6 +29,7 @@
 ## Overview
 
 The Dashboard Parapente API provides access to:
+
 - **Flights**: Personal flight data (synced from Strava)
 - **Weather**: Real-time & forecasted weather from 8 sources
 - **Alerts**: User-defined weather alerts & notifications
@@ -37,7 +38,7 @@ The Dashboard Parapente API provides access to:
 
 **Base URL:** `https://dashboard.parapente.local/api/v1`  
 **Protocol:** HTTPS (required in production)  
-**Content-Type:** `application/json`  
+**Content-Type:** `application/json`
 
 ---
 
@@ -69,7 +70,7 @@ API keys can be scoped to limit access:
 ```
 POST /auth/validate
 Headers: Authorization: Bearer TOKEN
-Response: 
+Response:
 {
   "valid": true,
   "user_id": "vincent",
@@ -87,7 +88,9 @@ Response:
 ```json
 {
   "success": true,
-  "data": { /* response data */ },
+  "data": {
+    /* response data */
+  },
   "meta": {
     "timestamp": "2026-02-26T11:58:00Z",
     "request_id": "req-12345",
@@ -104,7 +107,9 @@ Response:
   "error": {
     "code": "INVALID_REQUEST",
     "message": "Missing required parameter: site_id",
-    "details": { /* optional debugging info */ }
+    "details": {
+      /* optional debugging info */
+    }
   },
   "meta": {
     "timestamp": "2026-02-26T11:58:00Z",
@@ -120,7 +125,9 @@ List endpoints support pagination:
 ```json
 {
   "success": true,
-  "data": [ /* items */ ],
+  "data": [
+    /* items */
+  ],
   "pagination": {
     "page": 1,
     "page_size": 20,
@@ -138,15 +145,15 @@ List endpoints support pagination:
 
 ### Common Error Codes
 
-| Code | HTTP | Description |
-|------|------|-------------|
-| `UNAUTHORIZED` | 401 | Missing or invalid API key |
-| `FORBIDDEN` | 403 | Insufficient permissions for this resource |
-| `NOT_FOUND` | 404 | Resource does not exist |
-| `INVALID_REQUEST` | 400 | Malformed request (missing fields, invalid types) |
-| `RATE_LIMITED` | 429 | Too many requests (see rate limiting) |
-| `UNPROCESSABLE_ENTITY` | 422 | Request is valid but contains conflicting data |
-| `INTERNAL_ERROR` | 500 | Server error (please report) |
+| Code                   | HTTP | Description                                       |
+| ---------------------- | ---- | ------------------------------------------------- |
+| `UNAUTHORIZED`         | 401  | Missing or invalid API key                        |
+| `FORBIDDEN`            | 403  | Insufficient permissions for this resource        |
+| `NOT_FOUND`            | 404  | Resource does not exist                           |
+| `INVALID_REQUEST`      | 400  | Malformed request (missing fields, invalid types) |
+| `RATE_LIMITED`         | 429  | Too many requests (see rate limiting)             |
+| `UNPROCESSABLE_ENTITY` | 422  | Request is valid but contains conflicting data    |
+| `INTERNAL_ERROR`       | 500  | Server error (please report)                      |
 
 ---
 
@@ -155,6 +162,7 @@ List endpoints support pagination:
 ### Sites
 
 #### List Sites
+
 ```
 GET /sites
 Query Parameters:
@@ -183,6 +191,7 @@ Response:
 ```
 
 #### Get Site Details
+
 ```
 GET /sites/{site_id}
 
@@ -201,6 +210,7 @@ Response:
 ```
 
 #### Create Site (Admin only)
+
 ```
 POST /sites
 Required: code, name, elevation_m, latitude, longitude
@@ -224,6 +234,7 @@ Response: { new site object }
 ### Flights
 
 #### List Flights
+
 ```
 GET /flights
 Query Parameters:
@@ -258,6 +269,7 @@ Response:
 ```
 
 #### Get Flight Details
+
 ```
 GET /flights/{flight_id}
 
@@ -283,6 +295,7 @@ Response:
 ```
 
 #### Create/Update Flight (Manual entry)
+
 ```
 POST /flights
 Scopes: write:flights
@@ -304,6 +317,7 @@ Response: { flight object }
 ```
 
 #### Sync Flights from Strava
+
 ```
 POST /flights/sync
 Scopes: write:flights
@@ -336,6 +350,7 @@ Response:
 ### Weather Forecasts
 
 #### Current Conditions (All Sites)
+
 ```
 GET /weather/current
 Query Parameters:
@@ -380,6 +395,7 @@ Response:
 ```
 
 #### Get Forecast for Site
+
 ```
 GET /weather/forecast/{site_id}
 Query Parameters:
@@ -421,6 +437,7 @@ Response:
 ```
 
 #### Get Forecast Comparison (Multiple sources)
+
 ```
 GET /weather/forecast/{site_id}/comparison
 Query Parameters:
@@ -461,6 +478,7 @@ Response:
 ### Weather History
 
 #### Get Historical Weather
+
 ```
 GET /weather/history/{site_id}
 Query Parameters:
@@ -493,6 +511,7 @@ Response:
 ```
 
 #### Weather Statistics (Aggregated)
+
 ```
 GET /weather/statistics/{site_id}
 Query Parameters:
@@ -534,6 +553,7 @@ Response:
 ### Alerts
 
 #### List Alerts
+
 ```
 GET /alerts
 Query Parameters:
@@ -565,6 +585,7 @@ Response:
 ```
 
 #### Get Alert Details
+
 ```
 GET /alerts/{alert_id}
 
@@ -588,6 +609,7 @@ Response:
 ```
 
 #### Create Alert
+
 ```
 POST /alerts
 Scopes: write:alerts
@@ -607,6 +629,7 @@ Response: { alert object }
 ```
 
 #### Update Alert
+
 ```
 PATCH /alerts/{alert_id}
 Scopes: write:alerts
@@ -621,6 +644,7 @@ Response: { updated alert object }
 ```
 
 #### Delete Alert
+
 ```
 DELETE /alerts/{alert_id}
 Scopes: write:alerts
@@ -629,6 +653,7 @@ Response: { "success": true, "message": "Alert deleted" }
 ```
 
 #### Alert History
+
 ```
 GET /alerts/{alert_id}/history
 Query Parameters:
@@ -658,6 +683,7 @@ Response:
 ### Statistics
 
 #### Flight Statistics
+
 ```
 GET /statistics/flights
 Query Parameters:
@@ -699,6 +725,7 @@ Response:
 ```
 
 #### Weather Correlation (Forecast Accuracy)
+
 ```
 GET /statistics/weather-accuracy
 Query Parameters:
@@ -736,6 +763,7 @@ Response:
 ### Dashboard
 
 #### Dashboard Overview (All-in-one view)
+
 ```
 GET /dashboard
 
@@ -746,11 +774,11 @@ Response:
 {
   "timestamp": "2026-02-26T11:58:00Z",
   "user": "vincent",
-  
+
   "current_conditions": {
     // See weather/current endpoint
   },
-  
+
   "forecast": {
     "next_7_days": [
       // Daily forecast summary for all sites
@@ -764,23 +792,23 @@ Response:
       }
     ]
   },
-  
+
   "recent_flights": [
     // Last 3 flights
   ],
-  
+
   "statistics": {
     "total_flights": 6,
     "total_hours": 4.5,
     "skill_level": "beginner",
     "is_improving": true
   },
-  
+
   "alerts": {
     "active_count": 3,
     "recent_triggers": 2  // In last 24 hours
   },
-  
+
   "recommendations": [
     {
       "type": "good_conditions",
@@ -793,6 +821,7 @@ Response:
 ```
 
 #### Dashboard Settings
+
 ```
 GET /dashboard/settings
 
@@ -823,12 +852,12 @@ Payload:
 ### Limits
 
 | Endpoint Category | Requests/Hour | Burst (per minute) |
-|------------------|---------------|-------------------|
-| Weather (read)   | 1,000         | 50                |
-| Flights (read)   | 500           | 30                |
-| Flights (write)  | 100           | 10                |
-| Alerts (write)   | 200           | 20                |
-| Dashboard        | 600           | 40                |
+| ----------------- | ------------- | ------------------ |
+| Weather (read)    | 1,000         | 50                 |
+| Flights (read)    | 500           | 30                 |
+| Flights (write)   | 100           | 10                 |
+| Alerts (write)    | 200           | 20                 |
+| Dashboard         | 600           | 40                 |
 
 ### Rate Limit Headers
 
@@ -842,6 +871,7 @@ X-RateLimit-Retry-After: 30
 ```
 
 When rate limited (429):
+
 ```json
 {
   "success": false,
@@ -882,6 +912,7 @@ Payload:
 ### Event Examples
 
 #### forecast.updated
+
 ```json
 {
   "event": "forecast.updated",
@@ -897,6 +928,7 @@ Payload:
 ```
 
 #### alert.triggered
+
 ```json
 {
   "event": "alert.triggered",
@@ -915,6 +947,7 @@ Payload:
 ```
 
 #### flight.synced
+
 ```json
 {
   "event": "flight.synced",
@@ -937,6 +970,7 @@ Payload:
 - **Sunset Policy:** Deprecated endpoints are supported for 6 months after replacement
 
 Changes between versions:
+
 - New endpoints added
 - Breaking changes announced 3 months in advance
 
@@ -945,6 +979,7 @@ Changes between versions:
 ## Code Examples
 
 ### Python (Requests)
+
 ```python
 import requests
 
@@ -971,23 +1006,25 @@ response = requests.post(f"{BASE_URL}/alerts", json=alert_data, headers=headers)
 ```
 
 ### JavaScript/Node.js (Fetch)
+
 ```javascript
-const API_KEY = "your-api-key";
-const BASE_URL = "https://dashboard.parapente.local/api/v1";
+const API_KEY = 'your-api-key';
+const BASE_URL = 'https://dashboard.parapente.local/api/v1';
 
 const headers = {
-  "Authorization": `Bearer ${API_KEY}`,
-  "Content-Type": "application/json"
+  Authorization: `Bearer ${API_KEY}`,
+  'Content-Type': 'application/json',
 };
 
 // Get dashboard overview
 const response = await fetch(`${BASE_URL}/dashboard`, { headers });
 const data = await response.json();
 
-console.log("Current conditions:", data.current_conditions);
+console.log('Current conditions:', data.current_conditions);
 ```
 
 ### cURL
+
 ```bash
 # Get weather forecast
 curl -H "Authorization: Bearer YOUR_API_KEY" \

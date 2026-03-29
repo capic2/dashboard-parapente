@@ -4,7 +4,7 @@
 # Configuration globale de la merge queue
 # Compatible avec "Require branches to be up to date before merging"
 merge_queue:
-  max_parallel_checks: 1  # In-place checks: teste les PRs individuellement
+  max_parallel_checks: 1 # In-place checks: teste les PRs individuellement
 
 # File d'attente pour gérer les merges de manière ordonnée
 queue_rules:
@@ -15,18 +15,18 @@ queue_rules:
     batch_size: 1
     commit_message_template: |
       {{ title }} (#{{ number }})
-      
+
       {{ body }}
     queue_conditions:
       - check-success=main
       - check-success=E2E Tests
       - base=main
-      - "#approved-reviews-by>=0"
+      - '#approved-reviews-by>=0'
     merge_conditions:
       - check-success=main
       - check-success=E2E Tests
       - base=main
-      - "#approved-reviews-by>=0"
+      - '#approved-reviews-by>=0'
 
 # Règles de merge automatique
 pull_request_rules:
@@ -37,7 +37,7 @@ pull_request_rules:
       - label=automerge
       - check-success=main
       - check-success=E2E Tests
-      - "#changes-requested-reviews-by=0"
+      - '#changes-requested-reviews-by=0'
     actions:
       queue:
         name: default
@@ -74,7 +74,7 @@ pull_request_rules:
       - check-success=main
       - check-success=E2E Tests
       - "title~=^fix\\(deps\\):"
-      - "-title~=major"
+      - '-title~=major'
     actions:
       queue:
         name: default
@@ -96,7 +96,7 @@ pull_request_rules:
       - check-success=main
       - check-success=E2E Tests
       - "title~=^chore\\(deps\\):"
-      - "-title~=major"
+      - '-title~=major'
     actions:
       queue:
         name: default
@@ -115,7 +115,7 @@ pull_request_rules:
     conditions:
       - base=main
       - author=renovate[bot]
-      - "title~=major"
+      - 'title~=major'
     actions:
       label:
         add:
@@ -124,20 +124,20 @@ pull_request_rules:
       comment:
         message: |
           Mise a jour majeure detectee
-          
+
           Cette PR contient une mise a jour majeure qui necessite une review manuelle.
           Veuillez verifier les breaking changes avant de merger.
-          
+
           Une fois valide, ajoutez le label automerge pour declencher le merge automatique.
 
   # 6. Auto-update des branches quand main avance
   - name: Auto-update branch avec main
     conditions:
       - base=main
-      - "-closed"
-      - "-draft"
-      - "-conflict"
-      - "#commits-behind>0"
+      - '-closed'
+      - '-draft'
+      - '-conflict'
+      - '#commits-behind>0'
     actions:
       update: {}
 
@@ -147,9 +147,9 @@ pull_request_rules:
       - base=main
       - check-success=main
       - check-success=E2E Tests
-      - "#changes-requested-reviews-by=0"
-      - "-draft"
-      - "-conflict"
+      - '#changes-requested-reviews-by=0'
+      - '-draft'
+      - '-conflict'
     actions:
       label:
         add:
@@ -160,8 +160,8 @@ pull_request_rules:
     conditions:
       - base=main
       - or:
-        - check-failure=main
-        - check-failure=E2E Tests
+          - check-failure=main
+          - check-failure=E2E Tests
     actions:
       label:
         remove:
@@ -171,7 +171,7 @@ pull_request_rules:
   - name: Retirer ready-to-merge si changes requested
     conditions:
       - base=main
-      - "#changes-requested-reviews-by>0"
+      - '#changes-requested-reviews-by>0'
     actions:
       label:
         remove:
@@ -202,16 +202,16 @@ pull_request_rules:
     conditions:
       - base=main
       - label=ready-to-merge
-      - "-label=automerge"
-      - "-label=renovate"
-      - "-draft"
+      - '-label=automerge'
+      - '-label=renovate'
+      - '-draft'
     actions:
       comment:
         message: |
           Cette PR est prete a etre mergee!
-          
+
           Tous les checks sont verts et les conditions de merge sont remplies.
-          
+
           Pour activer le merge automatique, ajoutez le label automerge.
           Sinon, vous pouvez merger manuellement quand vous etes pret.
 
@@ -244,11 +244,11 @@ merge_protections:
     if:
       - base=main
     success_conditions:
-      - "#commits-behind=0"
+      - '#commits-behind=0'
 
   - name: Pas de changements demandes
     description: Aucune review avec changements demandes
     if:
       - base=main
     success_conditions:
-      - "#changes-requested-reviews-by=0"
+      - '#changes-requested-reviews-by=0'

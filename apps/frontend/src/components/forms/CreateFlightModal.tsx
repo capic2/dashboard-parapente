@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal } from '@dashboard-parapente/design-system';
 import { useCreateFlightFromGPX } from '../../hooks/useFlights';
 import { useToast } from '../../hooks/useToast';
@@ -14,6 +15,7 @@ export function CreateFlightModal({
   onClose,
   onCreateComplete,
 }: CreateFlightModalProps) {
+  const { t } = useTranslation();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -26,7 +28,7 @@ export function CreateFlightModal({
     if (file) {
       const fileName = file.name.toLowerCase();
       if (!fileName.endsWith('.gpx') && !fileName.endsWith('.igc')) {
-        toast.error('Veuillez sélectionner un fichier GPX ou IGC valide');
+        toast.error(t('flights.selectValidFile'));
         return;
       }
       setSelectedFile(file);
@@ -44,7 +46,7 @@ export function CreateFlightModal({
     createFlight(formData, {
       onSuccess: (result) => {
         toast.success(
-          `Vol créé avec succès : ${result.flight.name || 'Sans nom'}`
+          t('flights.createdSuccess') + ` ${result.flight.name || t('flights.unnamed')}`
         );
         onCreateComplete();
         setSelectedFile(null);
@@ -55,10 +57,9 @@ export function CreateFlightModal({
         setTimeout(() => onClose(), 2000); // Fermer après 2s
       },
       onError: (error: Error) => {
-        const errorMessage =
-          error.message || 'Une erreur est survenue lors de la création du vol';
+        const errorMessage = error.message || t('flights.createGenericError');
         setError(errorMessage);
-        toast.error(`Échec de la création : ${errorMessage}`);
+        toast.error(t('flights.createFailure') + ` ${errorMessage}`);
       },
     });
   };
@@ -78,14 +79,12 @@ export function CreateFlightModal({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="📤 Créer un vol depuis GPX/IGC"
+      title={`📤 ${t('flights.createFromGpx')}`}
       size="md"
     >
       <div className="space-y-4">
         <p className="text-sm text-gray-600">
-          Uploadez un fichier GPX ou IGC pour créer automatiquement un nouveau
-          vol. Les statistiques (durée, altitude, distance, vitesse) seront
-          extraites du fichier.
+          {t('flights.createDescription')}
         </p>
 
         {/* File Input */}
@@ -94,7 +93,7 @@ export function CreateFlightModal({
             htmlFor="gpx-file-input"
             className="block text-sm font-medium text-gray-700"
           >
-            Fichier GPX ou IGC
+            {t('flights.gpxFile')}
           </label>
           <div className="flex items-center gap-3">
             <input
@@ -124,9 +123,8 @@ export function CreateFlightModal({
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
           <p className="text-sm text-blue-800">
-            💡 <strong>Détection automatique :</strong> Le site de décollage
-            sera détecté automatiquement à partir des coordonnées GPS du fichier
-            GPX.
+            💡 <strong>{t('flights.autoDetection')}</strong>{' '}
+            {t('flights.autoDetectionText')}
           </p>
         </div>
 
@@ -134,28 +132,30 @@ export function CreateFlightModal({
         {data && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
             <p className="font-semibold text-green-800 mb-2">
-              ✅ Vol créé avec succès
+              ✅ {t('flights.createSuccess')}
             </p>
             <ul className="text-sm text-green-700 space-y-1">
               <li>
-                • <strong>Nom :</strong> {data.flight.name || 'Sans nom'}
+                • <strong>{t('flights.name')}</strong>{' '}
+                {data.flight.name || t('flights.unnamed')}
               </li>
               <li>
-                • <strong>Date :</strong> {data.flight.flight_date}
+                • <strong>{t('flights.date')}</strong> {data.flight.flight_date}
               </li>
               {data.flight.site_name && (
                 <li>
-                  • <strong>Site :</strong> {data.flight.site_name}
+                  • <strong>{t('flights.site')}</strong> {data.flight.site_name}
                 </li>
               )}
               {data.flight.duration_minutes && (
                 <li>
-                  • <strong>Durée :</strong> {data.flight.duration_minutes} min
+                  • <strong>{t('flights.duration')}</strong>{' '}
+                  {data.flight.duration_minutes} min
                 </li>
               )}
               {data.flight.distance_km && (
                 <li>
-                  • <strong>Distance :</strong>{' '}
+                  • <strong>{t('flights.distance')}</strong>{' '}
                   {data.flight.distance_km.toFixed(2)} km
                 </li>
               )}
@@ -167,7 +167,7 @@ export function CreateFlightModal({
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <p className="font-semibold text-red-800 mb-2">
-              ❌ Erreur lors de la création
+              ❌ {t('flights.createError')}
             </p>
             <p className="text-sm text-red-700">{error}</p>
           </div>
@@ -180,7 +180,7 @@ export function CreateFlightModal({
             className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
             disabled={isPending}
           >
-            Annuler
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleUpload}
@@ -190,10 +190,10 @@ export function CreateFlightModal({
             {isPending ? (
               <>
                 <span className="inline-block animate-spin mr-2">⏳</span>
-                Création en cours...
+                {t('flights.creating')}
               </>
             ) : (
-              '📤 Créer le vol'
+              `📤 ${t('flights.createButton')}`
             )}
           </button>
         </div>

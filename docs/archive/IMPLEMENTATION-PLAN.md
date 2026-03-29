@@ -32,6 +32,7 @@
 Personal paragliding weather dashboard combining real-time conditions from 8 sources with flight analytics.
 
 **Key Metrics:**
+
 - **Timeline:** 8-9 weeks (March 1 - May 10, 2026)
 - **Effort:** ~70-80 hours total (~4-5 hrs/week)
 - **Technology:** Python (FastAPI) + Vue 3 + SQLite
@@ -39,6 +40,7 @@ Personal paragliding weather dashboard combining real-time conditions from 8 sou
 - **Code Reuse:** Leveraging existing weather report code (saves 15-20 hours)
 
 **Phases:**
+
 1. ✅ **Phase 1 - Design (Complete):** Schema, API spec, frontend prototype, implementation plan
 2. ⏳ **Phase 2 - Backend (6 weeks):** Database, scrapers, pipeline, scheduler
 3. ⏳ **Phase 3 - Frontend (4 weeks):** Vue.js UI, API integration, deployment
@@ -52,6 +54,7 @@ Personal paragliding weather dashboard combining real-time conditions from 8 sou
 ### Vision
 
 Create a personal flying conditions dashboard optimized for your region that:
+
 - Aggregates real-time weather from 8 independent sources
 - Calculates a unified "Para-Index" flying score (0-100)
 - Tracks flight history with learning analytics
@@ -60,13 +63,13 @@ Create a personal flying conditions dashboard optimized for your region that:
 
 ### Goals
 
-| Goal | Metric | Target |
-|------|--------|--------|
-| Data Aggregation | Sources integrated | 5/8 (Phase 2), all 8 (Phase 4) |
-| Accuracy | Forecast error vs actual | <5°C temp, <3 km/h wind |
-| Uptime | Dashboard availability | 99% SLA |
-| Performance | Page load time | <2 seconds |
-| User Satisfaction | Alert accuracy | 90% |
+| Goal              | Metric                   | Target                         |
+| ----------------- | ------------------------ | ------------------------------ |
+| Data Aggregation  | Sources integrated       | 5/8 (Phase 2), all 8 (Phase 4) |
+| Accuracy          | Forecast error vs actual | <5°C temp, <3 km/h wind        |
+| Uptime            | Dashboard availability   | 99% SLA                        |
+| Performance       | Page load time           | <2 seconds                     |
+| User Satisfaction | Alert accuracy           | 90%                            |
 
 ### Non-Goals (Out of Scope)
 
@@ -83,6 +86,7 @@ Create a personal flying conditions dashboard optimized for your region that:
 ### Tech Stack
 
 **Backend:**
+
 - **Language:** Python 3.10+
 - **Web Framework:** FastAPI (REST API, auto-docs)
 - **Database:** SQLite (local file)
@@ -93,6 +97,7 @@ Create a personal flying conditions dashboard optimized for your region that:
 - **Testing:** pytest, pytest-cov (>80% coverage target)
 
 **Frontend:**
+
 - **Framework:** React 19+ (hooks + Server Components)
 - **Build Tool:** Vite (fast development)
 - **TanStack Suite:**
@@ -107,6 +112,7 @@ Create a personal flying conditions dashboard optimized for your region that:
 - **Testing:** Vitest + React Testing Library
 
 **Infrastructure:**
+
 - **Database:** SQLite 3 (single local file)
 - **Web Server:** Nginx (reverse proxy, HTTPS)
 - **Container:** Docker (optional, for deployment)
@@ -181,6 +187,7 @@ Separate Process (APScheduler):
 ### Key Tables
 
 **sites**
+
 ```sql
 CREATE TABLE sites (
   id TEXT PRIMARY KEY,
@@ -200,6 +207,7 @@ CREATE TABLE sites (
 ```
 
 **weather_forecasts**
+
 ```sql
 CREATE TABLE weather_forecasts (
   id TEXT PRIMARY KEY,
@@ -207,7 +215,7 @@ CREATE TABLE weather_forecasts (
   source_id TEXT NOT NULL,          -- Reference to weather_sources
   forecast_date DATE NOT NULL,
   forecast_time TIME,               -- Hourly
-  
+
   -- Core meteorological data
   temperature_c REAL,
   humidity_percent INTEGER,
@@ -217,17 +225,17 @@ CREATE TABLE weather_forecasts (
   cloud_cover_percent INTEGER,
   precipitation_mm REAL,
   uv_index REAL,
-  
+
   -- Paragliding-specific
   thermal_strength INTEGER,         -- 0-5
   thermal_potential TEXT,           -- 'weak', 'moderate', 'strong'
   stability_index REAL,
-  
+
   -- Composite scoring
   para_index INTEGER DEFAULT 50,    -- 0-100
   verdict TEXT,                     -- 'BON', 'MOYEN', 'LIMITE', 'MAUVAIS'
   verdict_reason TEXT,
-  
+
   fetched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -239,6 +247,7 @@ CREATE TABLE weather_forecasts (
 ```
 
 **flights**
+
 ```sql
 CREATE TABLE flights (
   id TEXT PRIMARY KEY,
@@ -249,11 +258,11 @@ CREATE TABLE flights (
   max_altitude_m INTEGER,
   distance_km REAL,
   elevation_gain_m INTEGER,
-  
+
   -- Context from weather on flight day
   avg_wind_speed_kmh REAL,
   para_index_on_flight_day INTEGER,  -- Historical para-index for learning
-  
+
   imported_from TEXT DEFAULT 'strava',
   imported_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -261,6 +270,7 @@ CREATE TABLE flights (
 ```
 
 **alerts**
+
 ```sql
 CREATE TABLE alerts (
   id TEXT PRIMARY KEY,
@@ -292,25 +302,31 @@ sqlite3 backend/db/dashboard.db ".tables"
 ## API Specification
 
 ### Base URL
+
 - Development: `http://localhost:8000/api/v1`
 - Production: `https://dashboard.parapente.local/api/v1`
 
 ### Authentication
+
 - API key in request header: `X-API-Key: <key>`
 - (Optional, for Phase 2+)
 
 ### Response Format
 
 **Success (200):**
+
 ```json
 {
   "ok": true,
-  "data": { /* endpoint-specific */ },
+  "data": {
+    /* endpoint-specific */
+  },
   "timestamp": "2026-02-26T14:30:00Z"
 }
 ```
 
 **Error (4xx/5xx):**
+
 ```json
 {
   "ok": false,
@@ -323,11 +339,13 @@ sqlite3 backend/db/dashboard.db ".tables"
 ### Key Endpoints (50+ total)
 
 #### Sites
+
 - `GET /sites` — List all flying sites
 - `GET /sites/{site_id}` — Site details
 - `POST /sites` — Create site (admin)
 
 #### Weather (Current & Forecast)
+
 - `GET /weather/current` — Latest conditions for all sites
 - `GET /weather/current/{site_id}` — Latest for one site
 - `GET /weather/forecast/{site_id}` — 7-day hourly forecast
@@ -336,11 +354,13 @@ sqlite3 backend/db/dashboard.db ".tables"
 - `GET /weather/sources/{source_id}/health` — Source health status
 
 #### Para-Index
+
 - `GET /para-index/today/{site_id}` — Today's score
 - `GET /para-index/forecast/{site_id}` — 7-day scores
 - `GET /para-index/comparison` — Compare across sites
 
 #### Flights
+
 - `GET /flights` — List all flights (with filters)
 - `GET /flights/{flight_id}` — Flight details
 - `POST /flights` — Create flight (manual entry)
@@ -348,6 +368,7 @@ sqlite3 backend/db/dashboard.db ".tables"
 - `GET /flights/best-conditions` — Flights in best conditions
 
 #### Alerts
+
 - `GET /alerts` — List user's alerts
 - `POST /alerts` — Create alert
 - `PATCH /alerts/{alert_id}` — Update alert
@@ -355,11 +376,13 @@ sqlite3 backend/db/dashboard.db ".tables"
 - `GET /alerts/history` — Triggered alert history
 
 #### Statistics
+
 - `GET /stats/learning` — Overall learning progress
 - `GET /stats/sites/{site_id}` — Stats per site
 - `GET /stats/wind-correlation` — Wind speed vs flight quality
 
 #### System
+
 - `GET /health` — System health check
 - `GET /version` — API version
 
@@ -370,24 +393,28 @@ sqlite3 backend/db/dashboard.db ".tables"
 ### Dashboard Sections
 
 **1. Today at a Glance**
+
 - 3 cards (Arguel, Mont Poupet, La Côte)
 - Current para-index + verdict
 - Best flying window today
 - One-line recommendation
 
 **2. 5-Day Forecast**
+
 - Timeline: each day with best site highlighted
 - Para-index trend
 - Next volable day indicator
 - Swipe for details
 
 **3. Recent Flights**
+
 - List of last 5-10 flights with date, duration, site
 - Weather conditions during flight
 - Link to Strava
 - Filter by site/month
 
 **4. Learning Stats**
+
 - Total flights & hours
 - Average altitude, distance, duration
 - Skill level assessment
@@ -395,12 +422,14 @@ sqlite3 backend/db/dashboard.db ".tables"
 - Best site for you
 
 **5. Alert Manager**
+
 - Create/edit/delete alerts
 - Real-time alerts (Telegram)
 - Alert history
 - Custom thresholds
 
 **6. Weather Sources**
+
 - All 8 sources listed with health status
 - Last update time
 - Data accuracy (RMSE vs actual)
@@ -443,6 +472,7 @@ src/
 ```
 
 **Data Flow:**
+
 1. **Data fetching** → TanStack Query hooks (automatic caching)
 2. **Data display** → TanStack Table hooks (sorting, filtering, pagination)
 3. **Forms** → TanStack Form hooks (validation, submission)
@@ -455,16 +485,16 @@ src/
 
 ### 8 Weather Sources
 
-| # | Source | Type | Free | Reuse | Status |
-|---|--------|------|------|-------|--------|
-| 1 | **Open-Meteo** | API | ✅ Yes | ✅ Existing JS | Phase 2 |
-| 2 | **WeatherAPI** | API | ✅ Limited | ✅ Existing JS | Phase 2 |
-| 3 | **Meteoblue** | Scraper | ❌ No | ✅ Existing JS (Playwright) | Phase 2 |
-| 4 | **Météo-parapente** | Feed/HTML | ✅ Yes | ✅ Existing JS | Phase 2 |
-| 5 | **Météociel** | Scraper | ✅ Yes | ❌ New (Phase 2) | Phase 2 |
-| 6 | **Parapente.net** | Scraper | ✅ Yes | ❌ New (Phase 4) | Phase 4 |
-| 7 | **Windy** | API | ✅ Limited | ❌ New (Phase 4) | Phase 4 |
-| 8 | **Planete-voile** | Scraper | ✅ Yes | ❌ New (Phase 4) | Phase 4 |
+| #   | Source              | Type      | Free       | Reuse                       | Status  |
+| --- | ------------------- | --------- | ---------- | --------------------------- | ------- |
+| 1   | **Open-Meteo**      | API       | ✅ Yes     | ✅ Existing JS              | Phase 2 |
+| 2   | **WeatherAPI**      | API       | ✅ Limited | ✅ Existing JS              | Phase 2 |
+| 3   | **Meteoblue**       | Scraper   | ❌ No      | ✅ Existing JS (Playwright) | Phase 2 |
+| 4   | **Météo-parapente** | Feed/HTML | ✅ Yes     | ✅ Existing JS              | Phase 2 |
+| 5   | **Météociel**       | Scraper   | ✅ Yes     | ❌ New (Phase 2)            | Phase 2 |
+| 6   | **Parapente.net**   | Scraper   | ✅ Yes     | ❌ New (Phase 4)            | Phase 4 |
+| 7   | **Windy**           | API       | ✅ Limited | ❌ New (Phase 4)            | Phase 4 |
+| 8   | **Planete-voile**   | Scraper   | ✅ Yes     | ❌ New (Phase 4)            | Phase 4 |
 
 **Phase 2 Focus:** 5 sources (1-5)  
 **Phase 4 Future:** Add 3-8
@@ -477,7 +507,7 @@ WeatherAPI API  → ├→ Normalize → De-duplicate → SQLite
 Meteoblue HTML  → ├→ Validate  → Para-Index   ↓
 Météo-parapente → ┤            Calculation   Dashboard
 Météociel HTML  → ┘
-                  
+
 Every 30 minutes (APScheduler)
 ```
 
@@ -488,7 +518,7 @@ Every 30 minutes (APScheduler)
 ```python
 def calculate_para_index(weather_data):
     score = 50  # Base
-    
+
     # Wind (most critical)
     wind = weather_data['wind_speed_kmh']
     if wind < 3:
@@ -501,34 +531,35 @@ def calculate_para_index(weather_data):
         score -= 10
     else:
         score -= 50      # Trop fort
-    
+
     # Cloud cover
     cloud = weather_data['cloud_cover_percent']
     if cloud > 80:
         score -= 30
     elif cloud < 20:
         score += 10
-    
+
     # Temperature (thermals)
     temp = weather_data['temperature_c']
     if 12 <= temp <= 18:
         score += 15
     elif temp > 25:
         score -= 20
-    
+
     # Gusts
     gusts = weather_data['wind_gust_kmh']
     if gusts > 25:
         score -= 50
-    
+
     # Stability
     if weather_data.get('stability_index', 0) > 5:
         score += 10
-    
+
     return max(0, min(100, score))
 ```
 
 **Verdicts:**
+
 - 🟢 **BON** (80-100) — Go fly!
 - 🟡 **MOYEN** (50-79) — Possible with experience
 - 🟠 **LIMITE** (30-49) — Risky, need skill
@@ -551,6 +582,7 @@ Your `generate-weather-report-v5.js` script is production-tested. We refactor it
 **Existing:** Working JS function with error handling, caching
 
 **Refactor:**
+
 ```python
 # backend/scrapers/openmeteo.py
 from scripts.generate_weather_report_v5 import fetch_open_meteo
@@ -559,7 +591,7 @@ class OpenMeteoScraper:
     async def fetch(self, lat, lon):
         # REUSE existing function
         return fetch_open_meteo(lat, lon)
-    
+
     def normalize(self, data):
         # Convert to DB schema
         return {
@@ -589,14 +621,14 @@ async def fetch(self, url: str):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
-        
+
         await page.goto(url)
         await page.wait_for_load_state("networkidle")
-        
+
         # SAME CSS selectors as JS
         table = await page.query_selector(".forecast-table")
         rows = await table.query_selector_all("tr.hourly-row")
-        
+
         # Extract 23 hours of data per day
         # ... parsing logic (SAME as JS)
 ```
@@ -657,12 +689,12 @@ POLISH & LAUNCH              [APR 25 - MAY 10]
 
 ### Effort Breakdown
 
-| Phase | Duration | Effort | Vincent | Claw |
-|-------|----------|--------|---------|------|
-| Phase 1 | 1 week | 30 hrs | 10 hrs | 20 hrs (design) |
-| Phase 2 | 4 weeks | 20-30 hrs | 25 hrs | 10 hrs async |
-| Phase 3 | 4 weeks | 40-50 hrs | 40 hrs | 15 hrs async |
-| **Total** | **9 weeks** | **70-80 hrs** | **75 hrs** | **45 hrs** |
+| Phase     | Duration    | Effort        | Vincent    | Claw            |
+| --------- | ----------- | ------------- | ---------- | --------------- |
+| Phase 1   | 1 week      | 30 hrs        | 10 hrs     | 20 hrs (design) |
+| Phase 2   | 4 weeks     | 20-30 hrs     | 25 hrs     | 10 hrs async    |
+| Phase 3   | 4 weeks     | 40-50 hrs     | 40 hrs     | 15 hrs async    |
+| **Total** | **9 weeks** | **70-80 hrs** | **75 hrs** | **45 hrs**      |
 
 **Per week:** ~4-5 hours for Vincent
 
@@ -677,44 +709,49 @@ POLISH & LAUNCH              [APR 25 - MAY 10]
 **Tasks:**
 
 1. **Database Initialization** (1-2 hours)
+
    ```bash
    # From project root
    sqlite3 backend/db/dashboard.db < docs/PHASE-1-DESIGN/dashboard-schema-sqlite.sql
-   
+
    # Verify
    sqlite3 backend/db/dashboard.db ".tables"
    sqlite3 backend/db/dashboard.db "SELECT COUNT(*) FROM sites;"  # Should be 3
    ```
+
    - ✅ All 12 tables created
    - ✅ Indexes optimized
    - ✅ Initial data loaded (3 sites, 8 weather sources)
 
 2. **Python Environment** (2-3 hours)
+
    ```bash
    # Virtual environment
    python3 -m venv venv
    source venv/bin/activate
-   
+
    # Install dependencies
    pip install -r backend/requirements.txt
-   
+
    # Playwright browsers
    playwright install chromium
-   
+
    # .env configuration
    cp backend/.env.example backend/.env
    # Edit: WEATHERAPI_KEY, STRAVA_KEY, API_PORT
    ```
+
    - ✅ venv created
    - ✅ All deps installed
    - ✅ Config ready
 
 3. **Project Structure** (0.5 hours)
    - ✅ Already created in git
-   - ✅ __init__.py files in place
+   - ✅ **init**.py files in place
    - ✅ Ready for code
 
 **Definition of Done:**
+
 ```bash
 # Database
 sqlite3 backend/db/dashboard.db ".schema sites"  # Shows table
@@ -746,10 +783,10 @@ import asyncio
 
 class OpenMeteoScraper:
     """Refactored from existing JS script"""
-    
+
     def __init__(self):
         self.base_url = "https://api.open-meteo.com/v1/forecast"
-    
+
     async def fetch(self, lat: float, lon: float):
         """Fetch 7-day hourly forecast (SAME as JS)"""
         params = {
@@ -765,16 +802,16 @@ class OpenMeteoScraper:
             "timezone": "Europe/Paris",
             "forecast_days": 7
         }
-        
+
         async with aiohttp.ClientSession() as session:
             async with session.get(self.base_url, params=params) as resp:
                 return await resp.json()
-    
+
     def normalize(self, raw_data: dict) -> list:
         """Convert to database format"""
         forecasts = []
         hourly = raw_data['hourly']
-        
+
         for i, time_str in enumerate(hourly['time']):
             forecasts.append({
                 'forecast_date': time_str.split('T')[0],
@@ -789,7 +826,7 @@ class OpenMeteoScraper:
                 'uv_index': hourly['uv_index'][i],
                 'source_id': 'src-001',  # Open-Meteo
             })
-        
+
         return forecasts
 ```
 
@@ -802,14 +839,14 @@ from scrapers.openmeteo import OpenMeteoScraper
 @pytest.mark.asyncio
 async def test_openmeteo_fetch():
     scraper = OpenMeteoScraper()
-    
+
     # Use RECORDED response from JS script
     with open('tests/fixtures/openmeteo-response.json') as f:
         response = json.load(f)
-    
+
     # Normalize
     normalized = scraper.normalize(response)
-    
+
     # Assertions
     assert len(normalized) == 7 * 24  # 7 days, 24 hours
     assert normalized[0]['temperature_c'] > -50
@@ -817,6 +854,7 @@ async def test_openmeteo_fetch():
 ```
 
 **Deliverables:**
+
 - ✅ `openmeteo.py` with fetch + normalize
 - ✅ Unit tests passing
 - ✅ Can fetch real data from API
@@ -833,7 +871,7 @@ class WeatherAPIScraper:
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.base_url = "https://api.weatherapi.com/v1/forecast.json"
-    
+
     async def fetch(self, lat: float, lon: float):
         params = {
             "key": self.api_key,
@@ -844,7 +882,7 @@ class WeatherAPIScraper:
         async with aiohttp.ClientSession() as session:
             async with session.get(self.base_url, params=params) as resp:
                 return await resp.json()
-    
+
     def normalize(self, raw_data: dict) -> list:
         # Similar structure, different API format
         # Convert forecast days to hourly records
@@ -874,24 +912,24 @@ class MeteoblueScraper:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             page = await browser.new_page()
-            
+
             # Navigate and wait for content
             await page.goto(url, wait_until="networkidle")
-            
+
             # Extract table (SAME selectors as JS)
             table_selector = "table.forecast-table"
             rows_selector = "tr.hourly-row"
-            
+
             table = await page.query_selector(table_selector)
             if not table:
                 raise ValueError("Could not find forecast table")
-            
+
             rows = await table.query_selector_all(rows_selector)
-            
+
             forecasts = []
             for row in rows:
                 cells = await row.query_selector_all("td")
-                
+
                 # Extract each column (SAME parsing as JS)
                 forecast = {
                     'time': await cells[0].text_content(),
@@ -903,10 +941,10 @@ class MeteoblueScraper:
                     # ... etc (23 columns per hour)
                 }
                 forecasts.append(forecast)
-            
+
             await browser.close()
             return forecasts
-    
+
     def normalize(self, raw_data: list) -> list:
         # Convert Meteoblue format to database format
 ```
@@ -927,7 +965,7 @@ class MeteoParapenteScraper:
     async def fetch(self) -> dict:
         # Fetch RSS feed
         feed = feedparser.parse("https://www.meteo-parapente.com/rss.php")
-        
+
         entries = []
         for entry in feed.entries:
             entries.append({
@@ -935,9 +973,9 @@ class MeteoParapenteScraper:
                 'summary': entry.summary,
                 'published': entry.published,
             })
-        
+
         return {'entries': entries}
-    
+
     def normalize(self, raw_data: dict) -> list:
         # Extract: thermal_strength, stability_index from summary
         # Return forecast list
@@ -969,14 +1007,14 @@ def calculate_para_index(weather: dict) -> int:
     (Copied directly from JS script - DO NOT MODIFY)
     """
     score = 50
-    
+
     wind = weather['wind_speed_kmh']
     if wind < 3:
         score -= 40
     elif wind <= 8:
         score += 10
     # ... rest exactly as in JS
-    
+
     return max(0, min(100, score))
 ```
 
@@ -985,6 +1023,7 @@ def calculate_para_index(weather: dict) -> int:
 ---
 
 **Definition of Done (Week 2):**
+
 ```bash
 # All scrapers can fetch data
 python -c "
@@ -1022,46 +1061,46 @@ print(f'Para-index: {score}')
 
 class DataNormalizer:
     """Convert all sources to standard schema"""
-    
+
     @staticmethod
     def normalize_forecast(raw_data, source_id, site_id):
         """Raw data → database format"""
-        
+
         normalized = {
             'site_id': site_id,
             'source_id': source_id,
             'forecast_date': parse_date(raw_data),
             'forecast_time': parse_time(raw_data),
-            
+
             # All in standard units
             'temperature_c': raw_data['temp_celsius'],
             'wind_speed_kmh': raw_data['wind_kmh'],
             'humidity_percent': raw_data['humidity'],
             'cloud_cover_percent': raw_data['cloud'],
-            
+
             # Calculated
             'para_index': calculate_para_index(raw_data),
             'verdict': verdict_from_index(raw_data),
         }
-        
+
         return normalized
-    
+
     @staticmethod
     def validate(data):
         """Check for invalid values"""
-        
+
         # Temperature: -50 to 50°C
         assert -50 <= data['temperature_c'] <= 50
-        
+
         # Wind: 0 to 100 km/h
         assert 0 <= data['wind_speed_kmh'] <= 100
-        
+
         # Humidity: 0 to 100%
         assert 0 <= data['humidity_percent'] <= 100
-        
+
         # Cloud: 0 to 100%
         assert 0 <= data['cloud_cover_percent'] <= 100
-        
+
         return True
 ```
 
@@ -1087,15 +1126,15 @@ class WeatherPipeline:
             'meteorueil': MeteocielScraper(),
         }
         self.normalizer = DataNormalizer()
-    
+
     async def process(self, site_id: str, site_lat: float, site_lon: float):
         """
         Fetch from all sources, normalize, insert to DB
         """
-        
+
         all_forecasts = []
         errors = []
-        
+
         # Fetch concurrently from all sources
         tasks = [
             self.scrapers['open-meteo'].fetch(site_lat, site_lon),
@@ -1104,20 +1143,20 @@ class WeatherPipeline:
             self.scrapers['meteo-parapente'].fetch(),
             self.scrapers['meteorueil'].fetch(),
         ]
-        
+
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         # Process each source
         for scraper_name, raw_data in zip(self.scrapers.keys(), results):
             if isinstance(raw_data, Exception):
                 errors.append((scraper_name, str(raw_data)))
                 continue
-            
+
             try:
                 # Get scraper's normalize method
                 scraper = self.scrapers[scraper_name]
                 normalized = scraper.normalize(raw_data)
-                
+
                 # Validate each forecast
                 for forecast in normalized:
                     try:
@@ -1127,23 +1166,23 @@ class WeatherPipeline:
                         all_forecasts.append(forecast)
                     except AssertionError as e:
                         errors.append((scraper_name, f"Validation: {str(e)}"))
-            
+
             except Exception as e:
                 errors.append((scraper_name, str(e)))
-        
+
         # Insert to database (batch)
         if all_forecasts:
             db.weather_forecasts.insert_many(all_forecasts)
-        
+
         # Log errors (don't fail if one source is down)
         if errors:
             logger.warning(f"Scraper errors: {errors}")
-        
+
         return {
             'inserted': len(all_forecasts),
             'errors': errors,
         }
-    
+
     async def process_all_sites(self):
         """Process all 3 sites"""
         sites = [
@@ -1151,7 +1190,7 @@ class WeatherPipeline:
             ('site-002', 47.16425, 5.99234),  # Mont Poupet
             ('site-003', 47.18956, 6.04567),  # La Côte
         ]
-        
+
         for site_id, lat, lon in sites:
             await self.process(site_id, lat, lon)
 ```
@@ -1169,7 +1208,7 @@ Base = declarative_base()
 
 class Site(Base):
     __tablename__ = "sites"
-    
+
     id = Column(String, primary_key=True)
     code = Column(String, unique=True, nullable=False)
     name = Column(String, nullable=False)
@@ -1180,7 +1219,7 @@ class Site(Base):
 
 class WeatherForecast(Base):
     __tablename__ = "weather_forecasts"
-    
+
     id = Column(String, primary_key=True)
     site_id = Column(String, ForeignKey("sites.id"))
     source_id = Column(String, ForeignKey("weather_sources.id"))
@@ -1201,7 +1240,7 @@ class WeatherForecast(Base):
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 class ResilientPipeline(WeatherPipeline):
-    
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=10)
@@ -1209,7 +1248,7 @@ class ResilientPipeline(WeatherPipeline):
     async def fetch_with_retry(self, scraper_name):
         """Retry failed requests"""
         return await self.scrapers[scraper_name].fetch()
-    
+
     async def process_all_sites(self):
         """
         Process all sites even if one fails
@@ -1219,6 +1258,7 @@ class ResilientPipeline(WeatherPipeline):
 ```
 
 **Definition of Done (Week 3):**
+
 ```bash
 # Pipeline test
 python -c "
@@ -1237,7 +1277,7 @@ sqlite3 backend/db/dashboard.db "SELECT COUNT(*) FROM weather_forecasts;"
 
 # Verify data quality
 sqlite3 backend/db/dashboard.db "
-SELECT 
+SELECT
   source_id,
   COUNT(*) as count,
   MIN(temperature_c) as min_temp,
@@ -1272,7 +1312,7 @@ pipeline = WeatherPipeline()
 
 def setup_scheduler():
     """Configure all scheduled jobs"""
-    
+
     # Every 30 minutes: fetch weather from all sources
     scheduler.add_job(
         pipeline.process_all_sites,
@@ -1282,7 +1322,7 @@ def setup_scheduler():
         max_instances=1,  # Don't overlap
         coalesce=True,    # Skip missed runs
     )
-    
+
     # Every 5 minutes: check alert triggers
     scheduler.add_job(
         check_alert_triggers,
@@ -1290,7 +1330,7 @@ def setup_scheduler():
         id='check_alerts',
         name='Check alert thresholds',
     )
-    
+
     # Daily: Strava flight sync
     scheduler.add_job(
         sync_strava_flights,
@@ -1298,7 +1338,7 @@ def setup_scheduler():
         id='sync_strava',
         name='Sync flights from Strava',
     )
-    
+
     # Daily: Cleanup old data (>30 days)
     scheduler.add_job(
         cleanup_old_data,
@@ -1306,7 +1346,7 @@ def setup_scheduler():
         id='cleanup',
         name='Clean up old forecasts',
     )
-    
+
     scheduler.start()
     return scheduler
 
@@ -1324,26 +1364,26 @@ def start_scheduler():
 class StravaScraper:
     def __init__(self, api_key: str):
         self.client = StravaClient(api_key)
-    
+
     async def sync_flights(self):
         """Fetch new/updated activities from Strava"""
-        
+
         # Get athlete's activities since last sync
         activities = await self.client.get_athlete_activities(
             after=last_sync_time
         )
-        
+
         for activity in activities:
             # Only flights (paragliding activity type)
             if activity.activity_type != 'paragliding':
                 continue
-            
+
             # Match to site (by location)
             site = self.match_site(activity.latitude, activity.longitude)
             if not site:
                 logger.warning(f"Could not match site for: {activity.name}")
                 continue
-            
+
             # Create flight record
             flight = {
                 'strava_id': activity.id,
@@ -1355,10 +1395,10 @@ class StravaScraper:
                 'distance_km': activity.distance / 1000,
                 'imported_from': 'strava',
             }
-            
+
             # Insert or update
             db.flights.upsert(flight, strava_id=activity.id)
-        
+
         logger.info(f"Synced {len(activities)} activities from Strava")
 ```
 
@@ -1397,11 +1437,11 @@ def pipeline():
 @pytest.mark.asyncio
 async def test_full_pipeline(pipeline, tmp_path):
     """Full pipeline: fetch → normalize → insert"""
-    
+
     # Use recorded response (from JS script)
     with open('tests/fixtures/openmeteo-response.json') as f:
         mock_response = json.load(f)
-    
+
     # Mock the scraper
     with patch.object(
         pipeline.scrapers['open-meteo'],
@@ -1410,15 +1450,15 @@ async def test_full_pipeline(pipeline, tmp_path):
     ):
         # Run pipeline
         result = await pipeline.process('site-001', 47.22, 6.01)
-    
+
     # Verify
     assert result['inserted'] > 100
     assert len(result['errors']) == 0  # No errors on mocked data
-    
+
     # Check database
     forecasts = db.weather_forecasts.find(site_id='site-001')
     assert len(forecasts) > 100
-    
+
     # Verify para-index calculated
     for forecast in forecasts[:10]:
         assert 0 <= forecast['para_index'] <= 100
@@ -1432,6 +1472,7 @@ async def test_full_pipeline(pipeline, tmp_path):
 - Deployment instructions
 
 **Definition of Done (Week 4):**
+
 ```bash
 # Scheduler runs successfully
 python -c "
@@ -1448,7 +1489,7 @@ pytest backend/tests/ --cov=backend -v
 
 # Database has 7+ days of data for all sites/sources
 sqlite3 backend/db/dashboard.db "
-SELECT 
+SELECT
   DATE(forecast_date),
   COUNT(DISTINCT source_id) as sources,
   COUNT(*) as records
@@ -1489,19 +1530,19 @@ curl http://localhost:8000/api/v1/sites
 
 ```jsx
 // Example: Dashboard with TanStack Query + Router
-import { useCurrentConditions, useSites } from '../hooks/useWeather'
-import { useFlightsTable } from '../hooks/useFlightsTable'
-import { useNavigate } from '@tanstack/react-router'
+import { useCurrentConditions, useSites } from '../hooks/useWeather';
+import { useFlightsTable } from '../hooks/useFlightsTable';
+import { useNavigate } from '@tanstack/react-router';
 
 export function Dashboard() {
-  const navigate = useNavigate()
-  
+  const navigate = useNavigate();
+
   // Data fetching with automatic caching
-  const { data: sites, isLoading } = useSites()
-  const { data: conditions } = useCurrentConditions()
-  
-  if (isLoading) return <div>Loading...</div>
-  
+  const { data: sites, isLoading } = useSites();
+  const { data: conditions } = useCurrentConditions();
+
+  if (isLoading) return <div>Loading...</div>;
+
   return (
     <div className="dashboard">
       <CurrentConditions data={conditions} />
@@ -1511,33 +1552,36 @@ export function Dashboard() {
       <AlertManager />
       <SourceComparison />
     </div>
-  )
+  );
 }
 
 // Example: Flights table with TanStack Table
 export function FlightsList() {
-  const { table, isLoading } = useFlightsTable()
-  
+  const { table, isLoading } = useFlightsTable();
+
   return (
     <div>
-      <table>
-        {/* TanStack Table renders here */}
-      </table>
+      <table>{/* TanStack Table renders here */}</table>
       <div className="pagination">
         <button onClick={() => table.previousPage()}>Previous</button>
         <span>Page {table.getState().pagination.pageIndex + 1}</span>
         <button onClick={() => table.nextPage()}>Next</button>
       </div>
     </div>
-  )
+  );
 }
 
 // Example: Alert form with TanStack Form
 export function AlertForm({ alertId }) {
-  const { form, isLoading } = useAlertForm()
-  
+  const { form, isLoading } = useAlertForm();
+
   return (
-    <form onSubmit={(e) => { e.preventDefault(); form.handleSubmit() }}>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        form.handleSubmit();
+      }}
+    >
       <form.Field name="name">
         {(field) => (
           <input
@@ -1546,33 +1590,30 @@ export function AlertForm({ alertId }) {
           />
         )}
       </form.Field>
-      <button type="submit" disabled={isLoading}>Save</button>
+      <button type="submit" disabled={isLoading}>
+        Save
+      </button>
     </form>
-  )
+  );
 }
 ```
 
 **Components to implement:**
+
 - **CurrentConditions** — 3 site cards with para-index
   - Uses: `useCurrentConditions` (TanStack Query)
-  
 - **Forecast7Day** — Timeline of best flying days
   - Uses: `useForecast` (TanStack Query)
-  
 - **RecentFlights** — List with sorting, filtering, pagination
   - Uses: `useFlightsTable` (TanStack Table) + `useFlights` (TanStack Query)
-  
 - **LearningStats** — Charts and metrics
   - Uses: `useFlightStats`, `useSiteStats` (TanStack Query)
-  
 - **AlertManager** — Create/edit/delete alerts
   - Uses: `useAlerts`, `useCreateAlert`, `useUpdateAlert` (TanStack Query + Mutations)
   - Uses: `useAlertForm` (TanStack Form)
-  
 - **SourceComparison** — Data accuracy comparison table
   - Uses: `useWeatherSourcesTable` (TanStack Table)
   - Uses: `useWeatherSources` (TanStack Query)
-  
 - **Navigation** — Header with routing
   - Uses: `useNavigate` (TanStack Router)
 
@@ -1674,14 +1715,14 @@ tail -f backend/logs/dashboard.log
 
 ### Identified Risks
 
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|-----------|
-| **Scraper HTML changes** | Medium | High | Monitor + quick fixes + fallback sources |
-| **API rate limiting** | Medium | Medium | Caching (30-60 min TTL) + stagger requests |
-| **Database performance** | Low | High | Proper indexing + query optimization |
-| **Strava API breaks** | Low | Low | Graceful degradation + manual entry option |
-| **Weather data accuracy** | Medium | Medium | Multi-source consensus + validation |
-| **Vincent unavailable** | Medium | Medium | Async work + documentation + tests |
+| Risk                      | Probability | Impact | Mitigation                                 |
+| ------------------------- | ----------- | ------ | ------------------------------------------ |
+| **Scraper HTML changes**  | Medium      | High   | Monitor + quick fixes + fallback sources   |
+| **API rate limiting**     | Medium      | Medium | Caching (30-60 min TTL) + stagger requests |
+| **Database performance**  | Low         | High   | Proper indexing + query optimization       |
+| **Strava API breaks**     | Low         | Low    | Graceful degradation + manual entry option |
+| **Weather data accuracy** | Medium      | Medium | Multi-source consensus + validation        |
+| **Vincent unavailable**   | Medium      | Medium | Async work + documentation + tests         |
 
 ### Mitigation Strategies
 
@@ -1697,6 +1738,7 @@ tail -f backend/logs/dashboard.log
 ### Go/No-Go Gates
 
 **Phase 2 Gate (End of March 28):**
+
 - ✅ Database initialized with 5 sources working
 - ✅ 7+ days of data for all sites
 - ✅ Test coverage >80%
@@ -1704,6 +1746,7 @@ tail -f backend/logs/dashboard.log
 - ✅ Strava flights synced
 
 **Phase 3 Gate (End of April 25):**
+
 - ✅ All 50+ API endpoints working (<200ms response)
 - ✅ All UI sections implemented & responsive
 - ✅ End-to-end tests passing
@@ -1730,6 +1773,7 @@ tail -f backend/logs/dashboard.log
 ### A. Technology Justifications
 
 **Why SQLite (not PostgreSQL)?**
+
 - ✅ Single file = easy backup
 - ✅ Zero infrastructure setup
 - ✅ Perfect for single-user dashboard
@@ -1737,12 +1781,14 @@ tail -f backend/logs/dashboard.log
 - ✅ Saves 20 hours setup time
 
 **Why FastAPI (not Flask)?**
+
 - ✅ Async/await built-in (better for I/O)
 - ✅ Auto-documentation (Swagger UI)
 - ✅ Type hints + validation (Pydantic)
 - ✅ Modern Python 3.10+ features
 
 **Why React + TanStack Suite?**
+
 - ✅ Larger ecosystem & community
 - ✅ More job market value
 - ✅ TanStack tools are industry-leading for specific problems:
@@ -1756,6 +1802,7 @@ tail -f backend/logs/dashboard.log
 ### B. Code Organization
 
 **Backend structure:**
+
 ```
 backend/
 ├── scrapers/       # Data fetchers (refactored from JS)
@@ -1768,6 +1815,7 @@ backend/
 ```
 
 **Frontend structure:**
+
 ```
 frontend/
 ├── src/
@@ -1801,6 +1849,7 @@ frontend/
 **Issues:** GitHub Issues tracker
 
 **Key principle:** "Don't block each other"
+
 - Vincent works on implementation
 - Claw handles async coding tasks
 - Tests run automatically
@@ -1830,6 +1879,7 @@ frontend/
 - ✅ Success criteria (clear gates)
 
 **Next steps:**
+
 1. Vincent reviews & provides feedback (if any)
 2. Phase 2 begins March 1, 2026
 3. Weekly syncs + async support from Claw

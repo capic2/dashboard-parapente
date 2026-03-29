@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Switch,
@@ -29,6 +30,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
   isLastActive,
   onDelete,
 }) => {
+  const { t } = useTranslation();
   const updateSource = useUpdateWeatherSource();
   const testSource = useTestWeatherSource();
 
@@ -48,10 +50,10 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
   // Status badge styling
   const getStatusBadge = () => {
     const statusLabels = {
-      active: 'Actif',
-      error: 'Erreur',
-      disabled: 'Désactivé',
-      unknown: 'Non testé',
+      active: t('settings.weatherSources.active'),
+      error: t('settings.weatherSources.error'),
+      disabled: t('settings.weatherSources.disabled'),
+      unknown: t('settings.weatherSources.untested'),
     };
 
     const statusClasses = {
@@ -114,7 +116,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
     if (isLastActive && source.is_enabled) {
       showNotification(
         'warning',
-        'Impossible de désactiver la dernière source active. Au moins une source doit rester activée.'
+        t('settings.weatherSources.cannotDisableLast')
       );
       return;
     }
@@ -128,7 +130,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       showNotification(
         'error',
         (error instanceof Error ? error.message : null) ||
-          'Impossible de modifier la source'
+          t('settings.weatherSources.cannotModify')
       );
     }
   };
@@ -136,7 +138,10 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
   // Save API key
   const handleSaveApiKey = async () => {
     if (!apiKeyValue.trim()) {
-      showNotification('warning', 'Veuillez entrer une clé API');
+      showNotification(
+        'warning',
+        t('settings.weatherSources.enterApiKeyWarning')
+      );
       return;
     }
 
@@ -147,12 +152,12 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       });
       setIsEditingApiKey(false);
       setApiKeyValue('');
-      showNotification('success', 'Clé API sauvegardée avec succès');
+      showNotification('success', t('settings.weatherSources.apiKeySaved'));
     } catch (error: unknown) {
       showNotification(
         'error',
         (error instanceof Error ? error.message : null) ||
-          'Impossible de sauvegarder la clé API'
+          t('settings.weatherSources.apiKeySaveError')
       );
     }
   };
@@ -173,18 +178,18 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       if (result.success) {
         setTestResult({
           success: true,
-          message: `✅ Test réussi en ${result.response_time_ms}ms`,
+          message: `✅ ${t('settings.weatherSources.testSuccess', { time: result.response_time_ms })}`,
         });
       } else {
         setTestResult({
           success: false,
-          message: `❌ Échec: ${result.error || 'Erreur inconnue'}`,
+          message: `❌ ${t('settings.weatherSources.testFailure', { error: result.error || t('settings.weatherSources.unknownError') })}`,
         });
       }
     } catch (error: unknown) {
       setTestResult({
         success: false,
-        message: `❌ Erreur: ${error instanceof Error ? error.message : 'Test échoué'}`,
+        message: `❌ ${t('settings.weatherSources.testError', { error: error instanceof Error ? error.message : t('settings.weatherSources.testFailed') })}`,
       });
     } finally {
       setIsTesting(false);
@@ -196,16 +201,17 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
 
   // Format timestamp
   const formatTimestamp = (timestamp: string | null) => {
-    if (!timestamp) return 'Jamais';
+    if (!timestamp) return t('common.never');
     const date = new Date(timestamp);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
 
-    if (diffMins < 1) return "À l'instant";
-    if (diffMins < 60) return `Il y a ${diffMins}min`;
-    if (diffMins < 1440) return `Il y a ${Math.floor(diffMins / 60)}h`;
-    return `Il y a ${Math.floor(diffMins / 1440)}j`;
+    if (diffMins < 1) return t('common.justNow');
+    if (diffMins < 60) return t('common.minutesAgo', { count: diffMins });
+    if (diffMins < 1440)
+      return t('common.hoursAgo', { count: Math.floor(diffMins / 60) });
+    return t('common.daysAgo', { count: Math.floor(diffMins / 1440) });
   };
 
   return (
@@ -280,17 +286,17 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
               <span
                 className="text-xs text-green-600 font-semibold"
                 role="status"
-                aria-label="Clé API configurée"
+                aria-label={t('settings.weatherSources.apiKeyConfigured')}
               >
-                ✓ Configurée
+                ✓ {t('settings.weatherSources.apiKeyConfigured')}
               </span>
             ) : (
               <span
                 className="text-xs text-red-600 font-semibold"
                 role="status"
-                aria-label="Clé API manquante"
+                aria-label={t('settings.weatherSources.apiKeyMissing')}
               >
-                ✗ Manquante
+                ✗ {t('settings.weatherSources.apiKeyMissing')}
               </span>
             )}
           </div>
@@ -305,7 +311,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
                 className="flex-1"
               >
                 <Input
-                  placeholder="Entrez votre clé API"
+                  placeholder={t('settings.weatherSources.enterApiKey')}
                   className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-sky-300"
                 />
               </TextField>
@@ -343,8 +349,8 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
               className="w-full px-3 py-1 text-sm bg-white border rounded hover:bg-gray-50 pressed:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
             >
               {source.api_key_configured
-                ? 'Modifier la clé API'
-                : 'Configurer la clé API'}
+                ? t('settings.weatherSources.modifyApiKey')
+                : t('settings.weatherSources.configureApiKey')}
             </Button>
           )}
 
@@ -355,7 +361,8 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
               rel="noopener noreferrer"
               className="text-xs text-blue-600 hover:underline mt-1 inline-block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 rounded"
             >
-              <span aria-hidden="true">📖 </span>Documentation API
+              <span aria-hidden="true">📖 </span>
+              {t('settings.weatherSources.documentation')}
             </Link>
           )}
         </div>
@@ -372,7 +379,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
             className="text-xs text-gray-600"
             id={`success-rate-label-${source.source_name}`}
           >
-            Taux succès
+            {t('settings.weatherSources.successRate')}
           </div>
           <div
             className={`text-lg font-bold ${
@@ -393,7 +400,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
             className="text-xs text-gray-600"
             id={`response-time-label-${source.source_name}`}
           >
-            Temps moy
+            {t('settings.weatherSources.avgResponseTime')}
           </div>
           <div
             className="text-lg font-bold text-gray-900"
@@ -410,7 +417,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
             className="text-xs text-gray-600"
             id={`calls-count-label-${source.source_name}`}
           >
-            Appels
+            {t('settings.weatherSources.calls')}
           </div>
           <div
             className="text-lg font-bold text-gray-900"
@@ -430,13 +437,15 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       >
         {source.last_success_at && (
           <div role="status">
-            <span aria-hidden="true">✓ </span>Dernier succès:{' '}
+            <span aria-hidden="true">✓ </span>
+            {t('settings.weatherSources.lastSuccess')}{' '}
             {formatTimestamp(source.last_success_at)}
           </div>
         )}
         {source.last_error_at && (
           <div className="text-red-600" role="alert">
-            <span aria-hidden="true">✗ </span>Dernière erreur:{' '}
+            <span aria-hidden="true">✗ </span>
+            {t('settings.weatherSources.lastError')}{' '}
             {formatTimestamp(source.last_error_at)}
             {source.last_error_message && (
               <div
@@ -483,12 +492,12 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
           {isTesting ? (
             <>
               <span aria-hidden="true">⏳ </span>
-              <span>Test en cours...</span>
+              <span>{t('settings.weatherSources.testing')}</span>
             </>
           ) : (
             <>
               <span aria-hidden="true">🔍 </span>
-              <span>Tester</span>
+              <span>{t('settings.weatherSources.test')}</span>
             </>
           )}
         </Button>

@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Phase 2: Backend (March 1 - March 28)
+
 - [ ] Database setup (SQLite)
 - [ ] Weather scrapers (Open-Meteo, WeatherAPI, Meteoblue, Météo-parapente)
 - [ ] Data pipeline & normalization
@@ -14,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - [ ] Testing & documentation
 
 ### Phase 3: Frontend (March 28 - April 25)
+
 - [ ] REST API (FastAPI)
 - [ ] Vue.js dashboard
 - [ ] Real-time updates
@@ -24,6 +26,7 @@ All notable changes to this project will be documented in this file.
 ## [0.1.0] - 2026-02-26
 
 ### Added
+
 - **Phase 1: Design Complete** ✅
   - SQLite schema (12 tables)
   - API specification (50+ endpoints)
@@ -33,6 +36,7 @@ All notable changes to this project will be documented in this file.
   - Scraping strategy (8 weather sources)
 
 ### Project Details
+
 - Architecture: Python (FastAPI) + Vue 3 + SQLite
 - Database: Local SQLite (no server needed)
 - Code reuse: Leveraging production weather report code

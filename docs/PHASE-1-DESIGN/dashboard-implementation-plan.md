@@ -3,7 +3,7 @@
 **Version:** 1.0  
 **Status:** Design Phase (Ready for Phase 2)  
 **Date:** 2026-02-26  
-**Author:** Claw, for Vincent  
+**Author:** Claw, for Vincent
 
 ---
 
@@ -12,6 +12,7 @@
 This document outlines the **complete implementation roadmap** for Vincent's personal paragliding dashboard, from design to production deployment.
 
 **Project Overview:**
+
 - **Owner:** Vincent (Developer + Paragliding Enthusiast)
 - **Team:** Claw (AI Assistant) + Vincent (Development Lead)
 - **Timeline:** 6-8 weeks (3 phases) — **Faster with SQLite!**
@@ -38,6 +39,7 @@ This document outlines the **complete implementation roadmap** for Vincent's per
 ### Vision
 
 **Personal dashboard for daily paragliding decision-making, combining:**
+
 - Real-time weather from 8 sources
 - Flight history & learning analytics
 - Intelligent alerts (wind, conditions, thermal strength)
@@ -45,13 +47,13 @@ This document outlines the **complete implementation roadmap** for Vincent's per
 
 ### Goals
 
-| Goal | Metric | Target |
-|------|--------|--------|
-| **Data Aggregation** | Sources integrated | 5/8 (Phase 2), all 8 (Phase 4) |
-| **Accuracy** | Forecast RMSE vs. actual | < 5°C temp, < 3 km/h wind |
-| **Uptime** | Dashboard availability | 99% (SLA) |
-| **Performance** | Page load time | < 2 seconds |
-| **User Satisfaction** | Alerts properly timed | 90% accuracy |
+| Goal                  | Metric                   | Target                         |
+| --------------------- | ------------------------ | ------------------------------ |
+| **Data Aggregation**  | Sources integrated       | 5/8 (Phase 2), all 8 (Phase 4) |
+| **Accuracy**          | Forecast RMSE vs. actual | < 5°C temp, < 3 km/h wind      |
+| **Uptime**            | Dashboard availability   | 99% (SLA)                      |
+| **Performance**       | Page load time           | < 2 seconds                    |
+| **User Satisfaction** | Alerts properly timed    | 90% accuracy                   |
 
 ### Non-Goals (Out of Scope)
 
@@ -68,15 +70,17 @@ This document outlines the **complete implementation roadmap** for Vincent's per
 ### Team Members
 
 #### Vincent (Owner/Developer)
+
 - **Availability:** Full-time from 2026-02-27
 - **Skills:** Python, backend development, infrastructure
 - **Time allocation:** 60% dashboard, 40% other projects
 - **Expected effort:** 5-6 hours/week
-- **Constraints:** 
+- **Constraints:**
   - At Paris until 2026-02-26 (no infra work)
   - MMA training & DAF exam (21 Feb) — may affect availability early March
 
 #### Claw (AI Assistant)
+
 - **Availability:** Always on (24/7)
 - **Skills:** Design, architecture, code generation, documentation
 - **Role:** Lead design, generate boilerplate, handle async tasks
@@ -86,18 +90,21 @@ This document outlines the **complete implementation roadmap** for Vincent's per
 ### Team Process
 
 **Weekly Syncs:**
+
 - **When:** Every Monday 10:00 GMT+1 (or async update if Vincent unavailable)
 - **Duration:** 30 min
 - **Agenda:** Progress review, blockers, next sprint planning
 - **Format:** Telegram chat + optional video call
 
 **Communication Channels:**
+
 - **Quick decisions:** Telegram (real-time)
 - **Code reviews:** GitHub pull requests
 - **Documentation:** Markdown files in repo
 - **Task tracking:** GitHub Issues
 
 **Code Ownership:**
+
 - Claw → Generates boilerplate, refactors, fixes bugs
 - Vincent → Reviews, integrates, deploys, makes architectural decisions
 - Shared → Testing, database migrations, documentation
@@ -136,12 +143,14 @@ This document outlines the **complete implementation roadmap** for Vincent's per
 ### Critical Path
 
 **Blocking dependencies:**
+
 1. Database must be ready before any scraper can be tested
 2. Scrapers must work before frontend can fetch data
 3. Frontend must be complete before deployment
 4. Testing across all phases takes 20-30% of time
 
 **Parallelizable work:**
+
 - API spec & frontend can be developed in parallel with scrapers
 - Documentation can be written as code is developed
 - Unit tests can be written alongside features
@@ -154,7 +163,7 @@ This document outlines the **complete implementation roadmap** for Vincent's per
 **Effort:** 20-30 hours (~3-4 hours/week for Vincent) — **SQLite + Code Reuse!** ⚡  
 **Deliverable:** SQLite database + 5 data sources + scheduler (no infrastructure overhead)
 
-**⚡ OPTIMIZATION: Reusing existing weather report code saves 10-15 hours!**  
+**⚡ OPTIMIZATION: Reusing existing weather report code saves 10-15 hours!**
 
 ### Phase 2 Breakdown
 
@@ -163,16 +172,18 @@ This document outlines the **complete implementation roadmap** for Vincent's per
 **Tasks:**
 
 1. **SQLite Database Initialization** (1-2 hours)
+
    ```bash
    # Create database directory
    mkdir -p /home/capic/.openclaw/workspace/paragliding/db
-   
+
    # Initialize SQLite from schema
    sqlite3 /home/capic/.openclaw/workspace/paragliding/db/dashboard.db < dashboard-schema-sqlite.sql
-   
+
    # Verify schema
    sqlite3 /home/capic/.openclaw/workspace/paragliding/db/dashboard.db ".tables"
    ```
+
    - [x] SQLite database file created
    - [x] All 12 tables initialized
    - [x] Initial data loaded (8 weather sources, 3 sites)
@@ -199,6 +210,7 @@ This document outlines the **complete implementation roadmap** for Vincent's per
    - [x] Git repository initialized
 
 **Deliverables:**
+
 - ✓ SQLite database file created (`dashboard.db`)
 - ✓ Schema imported with all 12 tables
 - ✓ Initial data loaded (weather sources, sites)
@@ -206,6 +218,7 @@ This document outlines the **complete implementation roadmap** for Vincent's per
 - ✓ Python environment ready
 
 **Definition of Done:**
+
 ```bash
 # Verify database
 sqlite3 /home/capic/.openclaw/workspace/paragliding/db/dashboard.db ".tables"
@@ -226,23 +239,24 @@ sqlite3 /home/capic/.openclaw/workspace/paragliding/db/dashboard.db "SELECT COUN
 
 **🎉 MAJOR TIME SAVER: Reuse production code from weather reports!**
 
-Vincent already has working scrapers in `/workspace/scripts/generate-weather-report-v5.js`. 
+Vincent already has working scrapers in `/workspace/scripts/generate-weather-report-v5.js`.
 We refactor + adapt them for SQLite insertion instead of email/Telegram output.
 
 **Tasks:**
 
 1. **Refactor Open-Meteo** (1-2 hours)
+
    ```python
    # /scrapers/openmeteo.py
    # REUSE: from scripts.generate_weather_report_v5 import fetch_open_meteo
-   
+
    from scripts.generate_weather_report_v5 import fetch_open_meteo
-   
+
    class OpenMeteoScraper:
        async def fetch(self, lat, lon):
            # Just wrap existing function
            return fetch_open_meteo(lat, lon)
-       
+
        def normalize(self, data):
            # Convert to DB format
            return {
@@ -251,6 +265,7 @@ We refactor + adapt them for SQLite insertion instead of email/Telegram output.
                # ... etc
            }
    ```
+
    - [x] Extract existing function from JS to Python module
    - [x] Add normalize() wrapper for DB
    - [x] Write tests (use existing data)
@@ -261,10 +276,12 @@ We refactor + adapt them for SQLite insertion instead of email/Telegram output.
    - [x] Quick tests
 
 3. **Refactor Meteoblue (Playwright)** (1.5-2 hours)
+
    ```python
    # REUSE: fetch_meteoblue already works in JS
    # Just port + normalize for DB insertion
    ```
+
    - [x] Port JS Playwright logic to Python
    - [x] Keep all HTML parsing/table extraction logic
    - [x] Normalize to DB format
@@ -276,6 +293,7 @@ We refactor + adapt them for SQLite insertion instead of email/Telegram output.
    - [x] Quick tests
 
 **What you already have working:**
+
 - ✅ `fetch_open_meteo()` — Get live data, error handling, caching
 - ✅ `fetch_weatherapi()` — API integration, key management
 - ✅ `fetch_meteoblue()` — Playwright automation, HTML table parsing
@@ -286,12 +304,14 @@ We refactor + adapt them for SQLite insertion instead of email/Telegram output.
 **Effort savings:** ~15-20 hours! Don't rewrite, refactor. 🚀
 
 **Deliverables:**
+
 - ✓ 4 working scrapers
 - ✓ Unit tests for each (>80% coverage)
 - ✓ Error handling & retry logic
 - ✓ Caching mechanism for API responses
 
 **Definition of Done:**
+
 ```bash
 # All tests pass
 pytest tests/scrapers/ -v
@@ -310,12 +330,13 @@ python -m scrapers.meteo_parapente --site arguel
 **Tasks:**
 
 1. **Data Normalization Layer** (3-4 hours)
+
    ```python
    # /pipeline/normalize.py
-   
+
    class DataNormalizer:
        """Convert all data to standard units/schema"""
-       
+
        @staticmethod
        def normalize_forecast(raw_data, source):
            """Raw data → standard forecast format"""
@@ -326,35 +347,39 @@ python -m scrapers.meteo_parapente --site arguel
                # ... etc
            }
    ```
+
    - [x] Unit conversions (°F→°C, mph→km/h, etc.)
    - [x] Field name standardization
    - [x] Data validation (ranges, null handling)
    - [x] Para-Index calculation implementation
 
 2. **Pipeline Orchestration** (3-4 hours)
+
    ```python
    # /pipeline/pipeline.py
-   
+
    class WeatherPipeline:
        async def process(self, site_id):
            # 1. Fetch from all sources concurrently
            forecasts = await asyncio.gather(...)
-           
+
            # 2. Normalize
            normalized = [self.normalize(f) for f in forecasts]
-           
+
            # 3. Deduplicate (same forecast time, multiple sources)
            deduped = self.deduplicate(normalized)
-           
+
            # 4. Store in DB
            await self.db.insert_batch(deduped)
    ```
+
    - [x] Concurrent fetching (asyncio)
    - [x] Error handling (partial failures OK)
    - [x] Database insertion (batch)
    - [x] Logging & monitoring
 
 3. **Para-Index Calculation** (2-3 hours)
+
    ```python
    def calculate_para_index(weather_data):
        """
@@ -366,6 +391,7 @@ python -m scrapers.meteo_parapente --site arguel
        """
        # Implementation from strategy doc
    ```
+
    - [x] Formula implemented & tested
    - [x] Validation against known conditions
    - [x] Documentation of weighting
@@ -377,12 +403,14 @@ python -m scrapers.meteo_parapente --site arguel
    - [x] Foreign key handling
 
 **Deliverables:**
+
 - ✓ Normalization layer working
 - ✓ Pipeline orchestration complete
 - ✓ Para-Index calculation validated
 - ✓ Database insertion tested
 
 **Definition of Done:**
+
 ```bash
 # Pipeline processes sample data
 python -m pipeline.pipeline --test
@@ -403,13 +431,14 @@ SELECT DISTINCT source_id FROM weather_forecasts;
 **Tasks:**
 
 1. **Job Scheduler** (3-4 hours)
+
    ```python
    # /scheduler/scheduler.py
-   
+
    from apscheduler.schedulers.asyncio import AsyncIOScheduler
-   
+
    scheduler = AsyncIOScheduler()
-   
+
    # Every 30 min: fetch from all sources
    scheduler.add_job(
        pipeline.process_all_sites,
@@ -417,7 +446,7 @@ SELECT DISTINCT source_id FROM weather_forecasts;
        minutes=30,
        id='fetch_weather'
    )
-   
+
    # Every 5 min: check alerts
    scheduler.add_job(
        check_alerts,
@@ -426,47 +455,52 @@ SELECT DISTINCT source_id FROM weather_forecasts;
        id='check_alerts'
    )
    ```
+
    - [x] APScheduler integration
    - [x] Configurable intervals per source
    - [x] Job logging & error handling
    - [x] Graceful shutdown
 
 2. **Strava Flight Sync** (3-4 hours)
+
    ```python
    # /scrapers/strava.py
-   
+
    class StravaScraper:
        def __init__(self, api_key):
            self.api = StravaClient(api_key)
-       
+
        async def sync_flights(self):
            """Fetch new/updated flights from Strava"""
            activities = await self.api.get_athlete_activities()
            # Parse activities, match to sites, insert
    ```
+
    - [x] Strava API authentication
    - [x] Fetch athlete activities
    - [x] Map Strava activity location → site
    - [x] Insert into `flights` table
 
 3. **Testing Suite** (3-4 hours)
+
    ```bash
    # Unit tests
    pytest tests/scrapers/ -v --cov
    pytest tests/pipeline/ -v --cov
    pytest tests/scheduler/ -v --cov
-   
+
    # Integration tests
    pytest tests/integration/ -v  # Real API calls
-   
+
    # Database tests
    pytest tests/database/ -v
    ```
+
    - [x] Scraper tests (mocked API responses)
    - [x] Pipeline tests (sample data)
    - [x] Scheduler tests (mock time)
    - [x] Database tests (transactions, rollback)
-   - [x] >80% code coverage
+   - [x] > 80% code coverage
 
 4. **End-to-End Testing** (2-3 hours)
    - [x] Run full pipeline cycle
@@ -482,12 +516,14 @@ SELECT DISTINCT source_id FROM weather_forecasts;
    - [x] Troubleshooting guide
 
 **Deliverables:**
+
 - ✓ Scheduler running continuously
 - ✓ Strava sync working
 - ✓ Full test coverage >80%
 - ✓ Production-ready backend
 
 **Definition of Done:**
+
 ```bash
 # All tests pass
 pytest tests/ -v --cov=scrapers,pipeline,scheduler
@@ -524,7 +560,7 @@ SELECT COUNT(*) FROM flights;
 
 **Duration:** 2-3 weeks (April 15 - May 10)  
 **Effort:** 40-50 hours (~5-6 hours/week for Vincent)  
-**Deliverable:** Live dashboard at https://dashboard.parapente.local  
+**Deliverable:** Live dashboard at https://dashboard.parapente.local
 
 ### Phase 3 Breakdown
 
@@ -533,13 +569,14 @@ SELECT COUNT(*) FROM flights;
 **Tasks:**
 
 1. **API Framework Setup** (2-3 hours)
+
    ```python
    # /api/app.py
    from fastapi import FastAPI
    from fastapi.middleware.cors import CORSMiddleware
-   
+
    app = FastAPI(title="Dashboard Parapente API")
-   
+
    # CORS for frontend
    app.add_middleware(
        CORSMiddleware,
@@ -547,12 +584,13 @@ SELECT COUNT(*) FROM flights;
        allow_methods=["*"],
        allow_headers=["*"],
    )
-   
+
    # Health check
    @app.get("/api/v1/health")
    async def health():
        return {"status": "ok"}
    ```
+
    - [x] FastAPI setup
    - [x] CORS configuration
    - [x] Error handling middleware
@@ -560,24 +598,26 @@ SELECT COUNT(*) FROM flights;
    - [x] Health check endpoint
 
 2. **Weather Endpoints** (2-3 hours)
+
    ```python
    # /api/routes/weather.py
-   
+
    @router.get("/weather/current")
    async def get_current_conditions(site_id: str = None):
        """Get latest conditions for all/single site"""
        # Implementation
-   
+
    @router.get("/weather/forecast/{site_id}")
    async def get_forecast(site_id: str, days: int = 7):
        """Get 7-day forecast"""
        # Implementation
-   
+
    @router.get("/weather/history/{site_id}")
    async def get_weather_history(site_id: str, from_date: str, to_date: str):
        """Get historical weather"""
        # Implementation
    ```
+
    - [x] Current conditions endpoint
    - [x] Forecast endpoint (with filtering)
    - [x] History endpoint
@@ -598,12 +638,14 @@ SELECT COUNT(*) FROM flights;
    - [x] Trigger alert endpoint (for testing)
 
 **Deliverables:**
+
 - ✓ RESTful API complete (30+ endpoints)
 - ✓ Input validation & error handling
 - ✓ Response caching
 - ✓ API documentation (auto-generated by FastAPI)
 
 **Definition of Done:**
+
 ```bash
 # API server running
 python -m api.app
@@ -624,12 +666,14 @@ curl http://localhost:8000/api/v1/weather/current
 **Tasks:**
 
 1. **Vue.js Setup** (2-3 hours)
+
    ```bash
    npm create vite@latest dashboard -- --template vue
    cd dashboard
    npm install
    npm install axios vue-router pinia
    ```
+
    - [x] Vue 3 + Vite setup
    - [x] Router configured (Vue Router)
    - [x] State management (Pinia)
@@ -637,6 +681,7 @@ curl http://localhost:8000/api/v1/weather/current
    - [x] Build process configured
 
 2. **Component Development** (5-7 hours)
+
    ```
    src/components/
    ├── CurrentConditions.vue      (weather widget)
@@ -647,6 +692,7 @@ curl http://localhost:8000/api/v1/weather/current
    ├── Dashboard.vue              (main layout)
    └── Navigation.vue             (header/nav)
    ```
+
    - [x] Convert HTML prototype to Vue components
    - [x] State management (Pinia stores)
    - [x] API integration
@@ -664,12 +710,14 @@ curl http://localhost:8000/api/v1/weather/current
    - [x] Recommendations (best flying days)
 
 **Deliverables:**
+
 - ✓ Fully functional Vue.js frontend
 - ✓ All dashboard sections implemented
 - ✓ API integration complete
 - ✓ Responsive design (mobile-friendly)
 
 **Definition of Done:**
+
 ```bash
 # Frontend runs
 npm run dev
@@ -693,22 +741,26 @@ npm run dev
 **Tasks:**
 
 1. **Production Build** (2-3 hours)
+
    ```bash
    npm run build
    # Outputs: dist/
    ```
+
    - [x] Frontend minified & optimized
    - [x] Asset hashing for cache busting
    - [x] Source maps for debugging
    - [x] <2s load time (lighthouse)
 
 2. **Deployment Pipeline** (3-4 hours)
+
    ```bash
    # Docker setup
    Dockerfile.api       # Backend
    Dockerfile.frontend  # Frontend
    docker-compose.yml   # Orchestration
    ```
+
    - [x] Docker images for API & frontend
    - [x] Docker Compose for local testing
    - [x] Environment configuration
@@ -722,18 +774,20 @@ npm run dev
    - [x] Rate limiting enabled
 
 4. **Monitoring & Alerts** (2-3 hours)
+
    ```python
    # /monitoring/alerts.py
-   
+
    async def monitor_system():
        """Check health, send alerts if issues"""
        db_health = check_database()
        api_health = check_api()
        scraper_health = check_scrapers()
-       
+
        if not all([db_health, api_health, scraper_health]):
            await send_telegram_alert("Dashboard health check failed")
    ```
+
    - [x] System health checks
    - [x] Error rate monitoring
    - [x] Telegram notifications
@@ -747,6 +801,7 @@ npm run dev
    - [x] Mobile responsiveness
 
 **Deliverables:**
+
 - ✓ Production-ready API server
 - ✓ Production-ready frontend
 - ✓ Docker setup for easy deployment
@@ -754,6 +809,7 @@ npm run dev
 - ✓ Full test coverage (backend & frontend)
 
 **Definition of Done:**
+
 ```bash
 # Docker services running
 docker-compose up -d
@@ -796,6 +852,7 @@ npm run test
 ### OpenClaw Environment (Simplified with SQLite)
 
 **Current Setup:**
+
 - Proxmox host (hypervisor)
 - OpenClaw 2026.2.24 running
 - **No additional LXC containers needed for database!**
@@ -911,37 +968,41 @@ cp /home/capic/.openclaw/workspace/paragliding/db/backups/dashboard-YYYYMMDD.db 
 
 ### Identified Risks
 
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|-----------|
-| **API rate limiting** | Medium | Medium | Implement caching, stagger requests |
-| **Scraper HTML changes** | Medium | High | Monitor, quick fixes, fallback sources |
-| **Database performance** | Low | High | Index strategy, query optimization |
-| **PostgreSQL disk full** | Low | Medium | Monitoring, archival strategy |
-| **Strava API breaks** | Low | Low | Graceful degradation, manual entry |
-| **Weather data accuracy** | Medium | Medium | Multi-source consensus, validation |
-| **Vincent unavailable** | Medium | Medium | Async work, detailed docs, auto-tests |
+| Risk                      | Probability | Impact | Mitigation                             |
+| ------------------------- | ----------- | ------ | -------------------------------------- |
+| **API rate limiting**     | Medium      | Medium | Implement caching, stagger requests    |
+| **Scraper HTML changes**  | Medium      | High   | Monitor, quick fixes, fallback sources |
+| **Database performance**  | Low         | High   | Index strategy, query optimization     |
+| **PostgreSQL disk full**  | Low         | Medium | Monitoring, archival strategy          |
+| **Strava API breaks**     | Low         | Low    | Graceful degradation, manual entry     |
+| **Weather data accuracy** | Medium      | Medium | Multi-source consensus, validation     |
+| **Vincent unavailable**   | Medium      | Medium | Async work, detailed docs, auto-tests  |
 
 ### Mitigation Strategies
 
 **Rate Limiting:**
+
 - Use API caching (30-60 min TTL)
 - Implement request queuing
 - Monitor rate limit headers
 - Fallback to cached data when limited
 
 **Scraper Robustness:**
+
 - Monitor page structure changes
 - Version HTML parsers
 - Keep 5+ sources for consensus
 - Daily scraper health checks
 
 **Database Performance:**
+
 - Proper indexing on query columns
 - Query optimization (EXPLAIN ANALYZE)
 - Archive old weather data (>90 days)
 - Monitor slow queries (>1 second)
 
 **Continuity:**
+
 - Complete documentation
 - Automated tests (CI/CD)
 - Claw can handle async tasks
@@ -955,17 +1016,18 @@ cp /home/capic/.openclaw/workspace/paragliding/db/backups/dashboard-YYYYMMDD.db 
 
 **Go/No-Go Decision Points:**
 
-| Phase | Gate | Criteria |
-|-------|------|----------|
-| Phase 2 | Database Ready | DB initialized, 5 sources working, test coverage >80% |
-| Phase 2 | Scheduler Stable | 24h uptime, <0.1% error rate |
-| Phase 3 | API Complete | All 50 endpoints working, load time <200ms |
-| Phase 3 | Frontend Ready | All UI sections functional, responsive design OK |
-| Phase 3 | Deploy Ready | Docker build successful, smoke tests pass |
+| Phase   | Gate             | Criteria                                              |
+| ------- | ---------------- | ----------------------------------------------------- |
+| Phase 2 | Database Ready   | DB initialized, 5 sources working, test coverage >80% |
+| Phase 2 | Scheduler Stable | 24h uptime, <0.1% error rate                          |
+| Phase 3 | API Complete     | All 50 endpoints working, load time <200ms            |
+| Phase 3 | Frontend Ready   | All UI sections functional, responsive design OK      |
+| Phase 3 | Deploy Ready     | Docker build successful, smoke tests pass             |
 
 ### Feature-Level Success Criteria
 
 #### Dashboard Display
+
 - [x] Real-time weather from all 5 sources
 - [x] Unified para-index displayed
 - [x] Site selector working
@@ -973,30 +1035,35 @@ cp /home/capic/.openclaw/workspace/paragliding/db/backups/dashboard-YYYYMMDD.db 
 - [x] Page load time <2 seconds
 
 #### Forecast
+
 - [x] 7-day forecast with hourly data
 - [x] Condition indicators (wind, temperature, cloud)
 - [x] Best flying day highlighted
 - [x] Source comparison available
 
 #### Flight History
+
 - [x] Flights synced from Strava
 - [x] Manual flight entry available
 - [x] Flight details viewable
 - [x] Filter by site/date working
 
 #### Learning Stats
+
 - [x] Total flights/hours tracked
 - [x] Altitude & distance metrics
 - [x] Skill level assessment
 - [x] Improvement trend shown
 
 #### Alerts
+
 - [x] Alert creation/management
 - [x] Real-time trigger (Telegram notification)
 - [x] Alert history viewable
 - [x] Custom thresholds configurable
 
 #### Weather Sources
+
 - [x] 5 sources integrated & working
 - [x] Health status dashboard
 - [x] Last update times shown
@@ -1007,7 +1074,7 @@ cp /home/capic/.openclaw/workspace/paragliding/db/backups/dashboard-YYYYMMDD.db 
 - **Test Coverage:** >80% (backend & frontend)
 - **Code Style:** PEP 8 (Python), ESLint (JavaScript)
 - **Documentation:** Docstrings for all functions, README complete
-- **Performance:** 
+- **Performance:**
   - API response <200ms (p95)
   - Page load <2 seconds
   - Database queries <100ms
@@ -1038,7 +1105,7 @@ LAUNCH                 [May 10]              ✓ DONE   (2 weeks EARLIER!)
   - Reuse weather code: -10 hours (existing scrapers)
 - **Frontend (Phase 3):** 40-50 hours (~5-6 hrs/week)
 - **Combined:** ~60-80 hours (~9 weeks wall-clock)
-- **Total savings:** 
+- **Total savings:**
   - 2 weeks timeline (vs PostgreSQL)
   - 40-50 hours effort (no DB server, code reuse)
   - **Launch: May 10** (instead of June 1 with PostgreSQL!) 🚀
@@ -1108,6 +1175,7 @@ LAUNCH                 [May 10]              ✓ DONE   (2 weeks EARLIER!)
 ### B. Key Technologies
 
 **Backend:**
+
 - Python 3.10+
 - FastAPI (REST API)
 - PostgreSQL 14 (database)
@@ -1118,6 +1186,7 @@ LAUNCH                 [May 10]              ✓ DONE   (2 weeks EARLIER!)
 - AsyncIO (concurrency)
 
 **Frontend:**
+
 - Vue 3 (UI framework)
 - Vite (build tool)
 - Pinia (state management)
@@ -1126,6 +1195,7 @@ LAUNCH                 [May 10]              ✓ DONE   (2 weeks EARLIER!)
 - Tailwind CSS (styling)
 
 **Infrastructure:**
+
 - Docker (containers)
 - Docker Compose (orchestration)
 - Nginx (web server)
@@ -1135,11 +1205,13 @@ LAUNCH                 [May 10]              ✓ DONE   (2 weeks EARLIER!)
 ### C. Communication & Support
 
 **Questions or Issues:**
+
 - Create GitHub Issue with label `[phase-2]` or `[phase-3]`
 - Tag Claw for discussion/help
 - Include error logs, reproduction steps
 
 **Regular Updates:**
+
 - Weekly sync: Monday 10:00 GMT+1
 - Async updates: Telegram chat
 - Monthly retrospective (May 1)
@@ -1148,9 +1220,10 @@ LAUNCH                 [May 10]              ✓ DONE   (2 weeks EARLIER!)
 
 **Document Version:** 1.0  
 **Last Updated:** 2026-02-26 11:58 GMT+1  
-**Status:** Ready for Phase 2 (Awaiting Approval)  
+**Status:** Ready for Phase 2 (Awaiting Approval)
 
 **Sign-Off:**
+
 - [ ] Vincent reviews & approves
 - [ ] Claw confirms architecture
 - [ ] Begin Phase 2 work

@@ -5,6 +5,7 @@ Quick reference for testing the Dashboard Parapente application.
 ## 🚀 Quick Start (5 minutes)
 
 ### Option 1: Automated Setup
+
 ```bash
 cd /home/capic/.openclaw/workspace/paragliding/dashboard
 ./QUICKSTART.sh
@@ -13,6 +14,7 @@ cd /home/capic/.openclaw/workspace/paragliding/dashboard
 ### Option 2: Manual Setup
 
 **1. Database Setup**
+
 ```bash
 cd backend
 python3 init_db.py      # Create database with 3 sites
@@ -20,6 +22,7 @@ python3 seed_flights.py # Create 5 sample flights with GPX
 ```
 
 **2. Start Backend**
+
 ```bash
 # Terminal 1
 cd backend
@@ -28,6 +31,7 @@ uvicorn main:app --reload --port 8000
 ```
 
 **3. Test API**
+
 ```bash
 # Terminal 2
 cd backend
@@ -35,6 +39,7 @@ python3 test_endpoints.py
 ```
 
 **4. Start Frontend**
+
 ```bash
 # Terminal 3
 cd frontend
@@ -42,6 +47,7 @@ npm run dev
 ```
 
 **5. Open Browser**
+
 - Frontend: http://localhost:5173
 - API Docs: http://localhost:8000/docs
 
@@ -75,6 +81,7 @@ curl http://localhost:8000/api/alerts
 ### Frontend UI Tests
 
 **Dashboard Page** (http://localhost:5173)
+
 - [ ] Site selector shows 3 sites
 - [ ] Selecting a site loads weather data
 - [ ] Para-Index score displays (0-100)
@@ -85,6 +92,7 @@ curl http://localhost:8000/api/alerts
 - [ ] 7-day forecast displays
 
 **Flight History Page** (http://localhost:5173/flights)
+
 - [ ] Flight list shows 5 sample flights
 - [ ] Flights show title, date, duration, distance, altitude
 - [ ] Clicking a flight selects it (highlight)
@@ -101,11 +109,13 @@ curl http://localhost:8000/api/alerts
 - [ ] Mobile view: stacks vertically
 
 **Settings Page** (http://localhost:5173/settings)
+
 - [ ] Placeholder displays (not implemented yet)
 
 ## 🔍 What to Look For
 
 ### Good Signs ✅
+
 - **Para-Index:** Should be 0-100 (not negative, not > 100)
 - **Verdict:** Should be one of: BON, MOYEN, LIMITE, MAUVAIS
 - **Weather Data:** Should have hourly consensus array
@@ -114,12 +124,14 @@ curl http://localhost:8000/api/alerts
 - **Elevation Chart:** Should show climb, cruise, and descent phases
 
 ### Warning Signs ⚠️
+
 - **Empty Data:** If no flights show, run `seed_flights.py`
 - **Weather Error:** If weather fails, check API keys in `backend/.env`
 - **3D Not Loading:** Check browser console for Cesium errors
 - **Missing Map:** Cesium requires WebGL support
 
 ### Error Scenarios to Test
+
 1. **No GPX File:** Try accessing a flight without GPX
    - Should show error: "No GPX file available"
 2. **Invalid Site ID:** Try `/api/weather/invalid-id`
@@ -132,6 +144,7 @@ curl http://localhost:8000/api/alerts
 ### Backend Issues
 
 **Check Database**
+
 ```bash
 cd backend
 sqlite3 db/dashboard.db
@@ -142,6 +155,7 @@ sqlite3 db/dashboard.db
 ```
 
 **Check Logs**
+
 ```bash
 # Backend should show:
 # INFO:     Uvicorn running on http://0.0.0.0:8000
@@ -149,6 +163,7 @@ sqlite3 db/dashboard.db
 ```
 
 **Test Individual Endpoints**
+
 ```bash
 # Use the interactive API docs
 open http://localhost:8000/docs
@@ -157,16 +172,19 @@ open http://localhost:8000/docs
 ### Frontend Issues
 
 **Check Console**
+
 - Open browser DevTools (F12)
 - Look for errors in Console tab
 - Check Network tab for failed API calls
 
 **Common Fixes**
+
 1. **Cesium not loading:** Clear cache and reload
 2. **API calls failing:** Check CORS and backend is running
 3. **Missing data:** Check React Query DevTools
 
 **React Query DevTools**
+
 ```tsx
 // Already included in dev mode
 // Bottom-left corner of the page
@@ -176,6 +194,7 @@ open http://localhost:8000/docs
 ## 📊 Expected Data
 
 ### Sample Flight Data
+
 ```
 Flight 1: "Vol d'initiation Arguel"
   - Duration: 45 min
@@ -191,6 +210,7 @@ Flight 2: "Cross-country Mont Poupet"
 ```
 
 ### Sample Weather Response
+
 ```json
 {
   "site_name": "Arguel",
@@ -208,6 +228,7 @@ Flight 2: "Cross-country Mont Poupet"
 ```
 
 ### Sample Stats
+
 ```json
 {
   "total_flights": 5,
@@ -221,6 +242,7 @@ Flight 2: "Cross-country Mont Poupet"
 ## 🎯 Success Criteria
 
 ### Week 2 Completion Requirements
+
 - [x] All 7 backend endpoints return 200 OK
 - [x] Weather data includes Para-Index and verdict
 - [x] Flight list displays from database
@@ -232,6 +254,7 @@ Flight 2: "Cross-country Mont Poupet"
 - [x] Responsive design on mobile
 
 ### Performance Benchmarks
+
 - Page load: < 2 seconds
 - Weather API: < 5 seconds
 - GPX parsing: < 1 second
@@ -241,6 +264,7 @@ Flight 2: "Cross-country Mont Poupet"
 ## 🆘 Getting Help
 
 ### Check These First
+
 1. **WEEK2_IMPLEMENTATION.md** - Full implementation details
 2. **COMPLETION_REPORT.md** - What was built and why
 3. **Backend logs** - Terminal 1 output
@@ -250,6 +274,7 @@ Flight 2: "Cross-country Mont Poupet"
 ### Common Issues
 
 **"ModuleNotFoundError"**
+
 ```bash
 cd backend
 source venv/bin/activate
@@ -257,18 +282,21 @@ pip install -r requirements.txt
 ```
 
 **"Database not found"**
+
 ```bash
 cd backend
 python3 init_db.py
 ```
 
 **"No flights found"**
+
 ```bash
 cd backend
 python3 seed_flights.py
 ```
 
 **"npm: command not found"**
+
 ```bash
 # Install Node.js first
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
@@ -276,6 +304,7 @@ sudo apt-get install -y nodejs
 ```
 
 **"Cesium is not defined"**
+
 ```bash
 cd frontend
 npm install cesium resium

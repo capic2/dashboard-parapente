@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useDailySummary, createWeatherQueryFn } from '../../hooks/useWeather';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -23,27 +24,29 @@ const getVerdictEmoji = (verdict: string): string => {
   return '🔴';
 };
 
-const formatDate = (dateStr: string): string => {
-  const date = new Date(dateStr);
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  if (date.toDateString() === today.toDateString()) return "Aujourd'hui";
-  if (date.toDateString() === tomorrow.toDateString()) return 'Demain';
-
-  return date.toLocaleDateString('fr-FR', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
-};
-
 export default function Forecast7Day({
   spotId,
   selectedDayIndex = 0,
   onSelectDay,
 }: Forecast7DayProps) {
+  const { t, i18n } = useTranslation();
+
+  const formatDate = (dateStr: string): string => {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    if (date.toDateString() === today.toDateString()) return t('common.today');
+    if (date.toDateString() === tomorrow.toDateString())
+      return t('common.tomorrow');
+
+    return date.toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    });
+  };
   // OPTIMISATION: Use daily summary instead of full weather data
   // This loads 7 days of aggregate data (para_index, temps, wind) WITHOUT hourly details
   // → 2-3x faster than loading full hourly forecasts
@@ -66,10 +69,10 @@ export default function Forecast7Day({
     return (
       <div className="bg-white rounded-xl p-4 shadow-md">
         <h2 className="text-sm text-gray-600 mb-3 font-semibold">
-          Prévisions 7 Jours
+          {t('weather.forecast7Days')}
         </h2>
         <div className="py-5 text-center text-gray-500 text-sm">
-          Chargement...
+          {t('common.loading')}
         </div>
       </div>
     );
@@ -79,10 +82,10 @@ export default function Forecast7Day({
     return (
       <div className="bg-white rounded-xl p-4 shadow-md">
         <h2 className="text-sm text-gray-600 mb-3 font-semibold">
-          Prévisions 7 Jours
+          {t('weather.forecast7Days')}
         </h2>
         <div className="py-5 text-center text-red-500 text-sm">
-          Données non disponibles
+          {t('common.dataUnavailable')}
         </div>
       </div>
     );
@@ -91,7 +94,7 @@ export default function Forecast7Day({
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
       <h2 className="text-sm text-gray-600 mb-3 font-semibold">
-        Prévisions 7 Jours
+        {t('weather.forecast7Days')}
       </h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">

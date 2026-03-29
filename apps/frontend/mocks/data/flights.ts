@@ -134,7 +134,7 @@ export const flights = [
     elevation_gain_m: 35,
     gpx_file_path: null,
     strava_id: null,
-    notes: 'Vol manuel sans GPX - idéal pour tester l\'upload',
+    notes: "Vol manuel sans GPX - idéal pour tester l'upload",
     description: null,
     external_url: null,
     created_at: '2025-09-15T15:00:00Z',

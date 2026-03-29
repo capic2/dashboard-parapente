@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useSites } from '../hooks/useSites';
 import { MultiOrientationSelector } from './forms/MultiOrientationSelector';
 import { useQueryClient } from '@tanstack/react-query';
@@ -59,6 +60,7 @@ export default function SiteSelector({
   onSelectSite,
   weatherData,
 }: SiteSelectorProps) {
+  const { t } = useTranslation();
   const { data: sites, isLoading, error } = useSites();
   const queryClient = useQueryClient();
 
@@ -76,7 +78,7 @@ export default function SiteSelector({
       <div className="mb-4">
         <div className="flex gap-2 flex-wrap bg-white rounded-xl p-3 shadow-md">
           <div className="flex-1 min-w-[120px] p-3 border-2 border-gray-300 rounded-lg bg-white cursor-not-allowed text-gray-400">
-            Chargement...
+            {t('common.loading')}
           </div>
         </div>
       </div>
@@ -88,7 +90,7 @@ export default function SiteSelector({
       <div className="mb-4">
         <div className="flex gap-2 flex-wrap bg-white rounded-xl p-3 shadow-md">
           <div className="flex-1 min-w-[120px] p-3 border-2 border-gray-300 rounded-lg bg-white cursor-not-allowed text-gray-400">
-            Erreur de chargement
+            {t('common.loadingError')}
           </div>
         </div>
       </div>
