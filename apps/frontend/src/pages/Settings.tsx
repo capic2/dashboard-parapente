@@ -229,8 +229,8 @@ export default function Settings() {
   >('general');
 
   useEffect(() => {
-    i18n.changeLanguage(settings.language);
-  }, []);
+    void i18n.changeLanguage(settings.language);
+  }, [i18n, settings.language]);
 
   // Save settings to localStorage
   const saveSettings = () => {

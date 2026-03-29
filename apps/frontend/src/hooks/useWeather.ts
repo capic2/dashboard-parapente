@@ -1,9 +1,14 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import type { DailySummary, WeatherData } from '../types';
+import type { DailySummary, HourlyForecastItem, WeatherData } from '../types';
 import {
   BackendWeatherResponseSchema,
   DailySummarySchema,
+} from '@dashboard-parapente/shared-types';
+import type {
+  BackendWeatherResponse,
+  ConsensusHour,
+  Slot,
 } from '@dashboard-parapente/shared-types';
 
 /**
@@ -44,7 +49,7 @@ export const createWeatherQueryFn =
     const now = new Date();
     const nowHour = now.getHours();
     const currentHourData =
-      data.consensus?.find((h: any) => h.hour === nowHour) ||
+      data.consensus?.find((h: ConsensusHour) => h.hour === nowHour) ||
       data.consensus?.[0];
 
     const currentHour = currentHourData || {
@@ -83,8 +88,8 @@ export const createWeatherQueryFn =
 
     // Extract sunrise/sunset and convert to hours
     // API returns sunrise/sunset for the requested day
-    let sunriseHour = timeToHour((data as any).sunrise as string | null);
-    let sunsetHour = timeToHour((data as any).sunset as string | null);
+    let sunriseHour = timeToHour((data as BackendWeatherResponse).sunrise ?? null);
+    let sunsetHour = timeToHour((data as BackendWeatherResponse).sunset ?? null);
 
     // If sunrise/sunset not available, use seasonal approximation
     if (sunriseHour === null || sunsetHour === null) {
@@ -104,7 +109,7 @@ export const createWeatherQueryFn =
     // Map slots to hourly verdicts
     const hourToVerdict = new Map<number, string>();
     if (data.slots) {
-      data.slots.forEach((slot: any) => {
+      data.slots.forEach((slot: Slot) => {
         const verdictText =
           slot.verdict === '🟢'
             ? 'BON'
@@ -121,7 +126,7 @@ export const createWeatherQueryFn =
 
     // Transform consensus array to hourly forecast
     // NOTE: Backend now calculates para_index per hour (not daily average)
-    let hourlyForecast = (data.consensus || []).map((hour: any) => {
+    let hourlyForecast = (data.consensus || []).map((hour: ConsensusHour) => {
       return {
         hour: `${hour.hour}:00`,
         time: `${hour.hour}:00`,
@@ -140,7 +145,7 @@ export const createWeatherQueryFn =
         para_index: hour.para_index ?? 0, // Use backend calculation (accurate)
         verdict: hour.verdict ?? 'N/A', // Use backend verdict (accurate)
         cape: hour.cape ?? null, // CAPE (J/kg)
-        thermal_strength: hour.thermal_strength || 'Faible', // Thermal strength
+        thermal_strength: (hour.thermal_strength || 'faible') as HourlyForecastItem['thermal_strength'], // Thermal strength
         cloud_cover: hour.cloud_cover ?? null, // Cloud cover percentage
         sources: hour.sources || {}, // Preserve per-source data for tooltip
       };
@@ -163,7 +168,7 @@ export const createWeatherQueryFn =
         dayDate.setDate(dayDate.getDate() + index);
 
         const consensus = dayData.consensus || [];
-        const temps = consensus.map((h: any) => h.temperature || 0);
+        const temps = consensus.map((h: ConsensusHour) => h.temperature || 0);
         const minTemp = temps.length > 0 ? Math.min(...temps) : 0;
         const maxTemp = temps.length > 0 ? Math.max(...temps) : 0;
 
