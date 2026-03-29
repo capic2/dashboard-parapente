@@ -16,15 +16,19 @@ API_PREFIX = "/api"
 class TestSyncStravaEndpoint:
     """Tests for POST /flights/sync-strava"""
 
-    def test_sync_strava_flight_name_format(self, client, db_session, sample_strava_activity):
-        """Sync creates flight with name 'Vol du DD/MM/YYYY à HH:MM'"""
+    def test_sync_strava_flight_name_format(
+        self, client, db_session, sample_strava_activity, arguel_site, sample_gpx
+    ):
+        """Sync creates flight with name 'Vol du DD/MM/YYYY à HH:MM' and detects site"""
         with (
             patch(
                 "strava.get_activities_by_period",
                 new=AsyncMock(return_value=[sample_strava_activity]),
             ),
-            patch("strava.download_gpx", new=AsyncMock(return_value=None)),
-            patch("strava.save_gpx_file", new=MagicMock(return_value=None)),
+            patch("strava.download_gpx", new=AsyncMock(return_value=sample_gpx)),
+            patch(
+                "strava.save_gpx_file", new=MagicMock(return_value="db/gpx/strava_123456789.gpx")
+            ),
         ):
             response = client.post(
                 f"{API_PREFIX}/flights/sync-strava",
@@ -38,11 +42,11 @@ class TestSyncStravaEndpoint:
         flight = db_session.query(Flight).filter(Flight.strava_id == "123456789").first()
         assert flight is not None
         assert flight.name == "Vol du 15/03/2026 à 15:00"
-        # title keeps the raw Strava name
-        assert flight.title == "Arguel 15-03 14h00"
+        assert flight.title == "Vol du 15/03/2026 à 15:00"
+        assert flight.site_id == "site-arguel"
 
-    def test_sync_strava_flight_name_without_time(self, client, db_session):
-        """Sync with unparseable datetime falls back to 'Vol du DD/MM/YYYY'"""
+    def test_sync_strava_flight_name_without_gpx(self, client, db_session):
+        """Sync without GPX still creates flight with correct name, no site"""
         activity = {
             "id": 999888777,
             "name": "Morning Flight",
@@ -67,6 +71,8 @@ class TestSyncStravaEndpoint:
         flight = db_session.query(Flight).filter(Flight.strava_id == "999888777").first()
         assert flight is not None
         assert flight.name == "Vol du 10/06/2026 à 00:00"
+        assert flight.title == "Vol du 10/06/2026 à 00:00"
+        assert flight.site_id is None
 
     def test_sync_strava_skips_duplicates(self, client, db_session, sample_strava_activity):
         """Sync skips activities that already exist in DB"""
@@ -99,3 +105,29 @@ class TestSyncStravaEndpoint:
 
         flights = db_session.query(Flight).filter(Flight.strava_id == "123456789").all()
         assert len(flights) == 1
+
+    def test_sync_strava_no_site_match(
+        self, client, db_session, sample_strava_activity, sample_gpx
+    ):
+        """Sync with GPX but no matching site sets site_id to None"""
+        # No sites in DB → no match possible
+        with (
+            patch(
+                "strava.get_activities_by_period",
+                new=AsyncMock(return_value=[sample_strava_activity]),
+            ),
+            patch("strava.download_gpx", new=AsyncMock(return_value=sample_gpx)),
+            patch(
+                "strava.save_gpx_file", new=MagicMock(return_value="db/gpx/strava_123456789.gpx")
+            ),
+        ):
+            response = client.post(
+                f"{API_PREFIX}/flights/sync-strava",
+                json={"date_from": "2026-03-01", "date_to": "2026-03-31"},
+            )
+
+        assert response.status_code == 200
+        flight = db_session.query(Flight).filter(Flight.strava_id == "123456789").first()
+        assert flight is not None
+        assert flight.site_id is None
+        assert flight.name == "Vol du 15/03/2026 à 15:00"
