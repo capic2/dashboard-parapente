@@ -8,7 +8,7 @@ This module provides functions to:
 """
 
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -469,7 +469,7 @@ async def get_best_spot_cached(db: Session, day_index: int = 0) -> dict[str, Any
         if best_spot and cache_ttl:
             # Store in cache
             ttl = cache_ttl.get("summary", 3600)  # 60 minutes
-            best_spot["cached_at"] = datetime.now(datetime.UTC).isoformat()
+            best_spot["cached_at"] = datetime.now(timezone.utc).isoformat()
             await redis.setex(cache_key, ttl, json.dumps(best_spot))
             logger.info(f"✅ Best spot for day {day_index} cached for {ttl}s")
 
@@ -506,7 +506,7 @@ async def refresh_best_spot_cache(db: Session):
                 cache_key = "best_spot:day_0"
                 ttl = cache_ttl.get("summary", 3600)
 
-                best_spot["cached_at"] = datetime.now(datetime.UTC).isoformat()
+                best_spot["cached_at"] = datetime.now(timezone.utc).isoformat()
                 await redis.setex(cache_key, ttl, json.dumps(best_spot))
                 logger.info(f"✅ Best spot cache refreshed for today: {best_spot['site']['name']}")
             else:
