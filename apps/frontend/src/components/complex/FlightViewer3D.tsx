@@ -30,7 +30,7 @@ import {GPXData} from "@dashboard-parapente/shared-types";
 declare global {
   interface Window {
     _cesiumViewer?: CesiumViewer;
-    _gpxData: GPXData & { positions: Cartesian3[]; timestamps: number[] };
+    _gpxData?: GPXData & { positions: Cartesian3[]; timestamps: number[] };
   }
 }
 
@@ -316,13 +316,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       visiblePositionsRef.current = [positions[0]];
 
       // Expose data globally for video export (Playwright)
-      if (typeof window !== 'undefined' && (window)._exportMode) {
-        (window)._gpxData = {
+      if (typeof window !== 'undefined' && window._exportMode) {
+        window._gpxData = {
           ...gpxData,
           positions: positions,
           timestamps: timestamps,
         };
-        (window)._cesiumViewer = viewer;
+        window._cesiumViewer = viewer;
       }
 
       // Clean old entities

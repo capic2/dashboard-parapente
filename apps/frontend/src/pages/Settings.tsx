@@ -491,7 +491,6 @@ export default function Settings() {
                     <button
                       onClick={() => {
                         setSettings((prev) => ({ ...prev, language: 'fr' }));
-                        i18n.changeLanguage('fr');
                       }}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.language === 'fr'
@@ -504,7 +503,6 @@ export default function Settings() {
                     <button
                       onClick={() => {
                         setSettings((prev) => ({ ...prev, language: 'en' }));
-                        i18n.changeLanguage('en');
                       }}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         settings.language === 'en'

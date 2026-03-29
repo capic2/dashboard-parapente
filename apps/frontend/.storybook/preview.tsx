@@ -1,6 +1,7 @@
 import { definePreview } from '@storybook/react-vite';
 import { initialize, mswLoader } from 'msw-storybook-addon';
 import addonA11y from '@storybook/addon-a11y';
+import { http, HttpResponse } from 'msw';
 import i18n from '../src/i18n';
 import '../src/App.css';
 
@@ -15,7 +16,41 @@ declare global {
   }
 }
 
-const initializeMsw = (options?: Parameters<typeof initialize>[0]) => {
+// Default MSW handlers — fallback responses for common API endpoints.
+// Individual stories override these with their own parameters.msw.handlers.
+// These survive resetHandlers() between stories because they are passed
+// as initialHandlers to setupWorker().
+const defaultMswHandlers = [
+  http.get('*/api/flights', () => HttpResponse.json({ flights: [] })),
+  http.get('*/api/flights/stats', () => HttpResponse.json({})),
+  http.get('*/api/flights/records', () => HttpResponse.json({ records: {} })),
+  http.get('*/api/flights/:id', () => HttpResponse.json({})),
+  http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
+  http.get('*/api/spots/:id', () => HttpResponse.json({})),
+  http.get('*/api/weather/:spotId/daily-summary', () =>
+    HttpResponse.json({ days: [] })
+  ),
+  http.get('*/api/weather/:spotId', () =>
+    HttpResponse.json({
+      site_id: '',
+      site_name: '',
+      day_index: 0,
+      days: 1,
+      consensus: [],
+      para_index: 0,
+      verdict: '',
+      emoji: '',
+      explanation: '',
+      slots_summary: '',
+    })
+  ),
+  http.get('*/api/sites/:siteId/landings', () => HttpResponse.json([])),
+];
+
+const initializeMsw = (
+  options?: Parameters<typeof initialize>[0],
+  handlers?: Parameters<typeof initialize>[1]
+) => {
   if (typeof window !== 'undefined' && window.__mswInitialized) {
     return;
   }
@@ -24,10 +59,10 @@ const initializeMsw = (options?: Parameters<typeof initialize>[0]) => {
     window.__mswInitialized = true;
   }
 
-  initialize(options);
+  initialize(options, handlers);
 };
-// Initialize MSW
-initializeMsw({ onUnhandledRequest: 'error', quiet: true });
+// Initialize MSW with default fallback handlers
+initializeMsw({ onUnhandledRequest: 'error', quiet: true }, defaultMswHandlers);
 
 const preview = definePreview({
   addons: [addonA11y()],

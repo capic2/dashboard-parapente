@@ -190,6 +190,11 @@ DeleteSingleFlight.test(
     // Cliquer Annuler ferme la modal
     const cancelButton = await screen.findByText('Annuler');
     await user.click(cancelButton);
+
+    // Vérifier que la modal est fermée
+    await expect(
+      screen.queryByText(/Confirmer la suppression/)
+    ).not.toBeInTheDocument();
   }
 );
 

@@ -6,7 +6,6 @@ import {
   DailySummarySchema,
 } from '@dashboard-parapente/shared-types';
 import type {
-  BackendWeatherResponse,
   ConsensusHour,
   Slot,
 } from '@dashboard-parapente/shared-types';
@@ -88,8 +87,8 @@ export const createWeatherQueryFn =
 
     // Extract sunrise/sunset and convert to hours
     // API returns sunrise/sunset for the requested day
-    let sunriseHour = timeToHour((data as BackendWeatherResponse).sunrise ?? null);
-    let sunsetHour = timeToHour((data as BackendWeatherResponse).sunset ?? null);
+    let sunriseHour = timeToHour(data.sunrise ?? null);
+    let sunsetHour = timeToHour(data.sunset ?? null);
 
     // If sunrise/sunset not available, use seasonal approximation
     if (sunriseHour === null || sunsetHour === null) {
@@ -145,7 +144,7 @@ export const createWeatherQueryFn =
         para_index: hour.para_index ?? 0, // Use backend calculation (accurate)
         verdict: hour.verdict ?? 'N/A', // Use backend verdict (accurate)
         cape: hour.cape ?? null, // CAPE (J/kg)
-        thermal_strength: (hour.thermal_strength || 'faible') as HourlyForecastItem['thermal_strength'], // Thermal strength
+        thermal_strength: (hour.thermal_strength as HourlyForecastItem['thermal_strength']) || 'Faible', // Thermal strength
         cloud_cover: hour.cloud_cover ?? null, // Cloud cover percentage
         sources: hour.sources || {}, // Preserve per-source data for tooltip
       };

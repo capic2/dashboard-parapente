@@ -13,6 +13,7 @@ import { CreateSiteModal } from '../components/forms/CreateSiteModal';
 import { useSites } from '../hooks/useSites';
 import { ToastContainer, Modal } from '@dashboard-parapente/design-system';
 import { useToast, useToastStore } from '../hooks/useToast';
+import { HTTPError } from 'ky';
 import { api } from '../lib/api';
 
 export default function FlightHistory() {
@@ -246,9 +247,18 @@ export default function FlightHistory() {
       }
     } catch (err) {
       console.error('Failed to delete flight:', err);
-      toast.error(
-        `Échec de la suppression: ${err instanceof Error ? err.message : 'Erreur inconnue'}`
-      );
+      let errorMessage = 'Erreur inconnue';
+      if (err instanceof HTTPError) {
+        try {
+          const errorBody = await err.response.json();
+          errorMessage = errorBody.message || errorBody.detail || err.message;
+        } catch {
+          errorMessage = err.message;
+        }
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      toast.error(`Échec de la suppression: ${errorMessage}`);
     } finally {
       setIsDeleting(false);
     }

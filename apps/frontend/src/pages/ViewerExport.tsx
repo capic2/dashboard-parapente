@@ -23,7 +23,7 @@ export function ViewerExport() {
   // Setup export mode for Playwright
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      (window)._exportMode = 'manual_render';
+      window._exportMode = 'manual_render';
 
       console.log('🎥 Export mode: manual_render');
       console.log('📍 Flight ID:', flightId);
