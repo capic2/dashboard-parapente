@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useWeather } from '../../hooks/useWeather';
+import type { HourlyForecastItem } from '../../types';
 import CacheTimestamp from '../CacheTimestamp';
 
 interface HourlyForecastProps {
@@ -35,7 +36,7 @@ interface BaseTooltipProps {
 }
 
 interface SourceDataTooltipProps extends BaseTooltipProps {
-  sources: Record<string, any>;
+  sources: Record<string, Record<string, number | null>>;
   consensus: number | string | null;
   unit: string;
   fieldName: string;
@@ -89,7 +90,7 @@ const getSourceUrl = (sourceKey: string): string | null => {
  * Format: "🟢 BON" or "🟡 MOYEN — Vent faible" or "🔴 MAUVAIS — Vent insuffisant"
  */
 const getFlyabilityDisplay = (
-  hour: any
+  hour: HourlyForecastItem
 ): { emoji: string; text: string; color: string } => {
   const verdict = hour.verdict?.toLowerCase();
   const verdictUpper = verdict?.toUpperCase() || 'MOYEN';
@@ -552,7 +553,7 @@ export default function HourlyForecast({
   const { data: weather, isLoading, error } = useWeather(spotId, dayIndex);
   const [activeTooltip, setActiveTooltip] = useState<{
     type: CellType;
-    data: any;
+    data: HourlyForecastItem;
     position: TooltipPosition;
   } | null>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -623,7 +624,7 @@ export default function HourlyForecast({
 
   const handleCellInteraction = (
     cellType: CellType,
-    hourData: any,
+    hourData: HourlyForecastItem,
     event: React.MouseEvent
   ) => {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -717,7 +718,7 @@ export default function HourlyForecast({
           <SourceDataTooltip
             {...commonProps}
             sources={data.sources || {}}
-            consensus={data.wind_gust}
+            consensus={data.wind_gust ?? null}
             unit="km/h"
             fieldName="wind_gust"
             label="💨 Rafales"
@@ -777,7 +778,7 @@ export default function HourlyForecast({
     }
   };
 
-  const cellEventHandlers = (cellType: CellType, hourData: any) => ({
+  const cellEventHandlers = (cellType: CellType, hourData: HourlyForecastItem) => ({
     onClick: (e: React.MouseEvent) =>
       handleCellInteraction(cellType, hourData, e),
   });
@@ -919,7 +920,7 @@ export default function HourlyForecast({
                     </td>
 
                     <td className="py-2.5 px-2">
-                      {hour.thermal_strength || 'Faible'}
+                      {hour.thermal_strength || 'faible'}
                     </td>
 
                     <td className="py-2.5 px-2">

@@ -2,6 +2,12 @@ import { useEffect } from 'react';
 import { useSearch } from '@tanstack/react-router';
 import { FlightViewer3D } from '../components/complex/FlightViewer3D';
 
+declare global {
+  interface Window {
+    _exportMode?: string;
+  }
+}
+
 /**
  * Dedicated page for video export - shows only the 3D viewer
  * Used by Playwright for capturing video frames
@@ -17,7 +23,7 @@ export function ViewerExport() {
   // Setup export mode for Playwright
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      (window as any)._exportMode = 'manual_render';
+      window._exportMode = 'manual_render';
 
       console.log('🎥 Export mode: manual_render');
       console.log('📍 Flight ID:', flightId);

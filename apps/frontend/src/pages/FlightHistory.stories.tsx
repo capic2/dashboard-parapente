@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
+import { expect, screen, userEvent, waitFor, within } from 'storybook/test';
 import preview from '../../.storybook/preview';
 import FlightHistory from './FlightHistory';
 
@@ -162,3 +163,142 @@ export const Loading = meta.story({
     },
   },
 });
+
+export const DeleteSingleFlight = meta.story({
+  parameters: { msw: { handlers: defaultHandlers } },
+});
+
+DeleteSingleFlight.test(
+  'opens delete modal and can cancel',
+  async ({ canvas }) => {
+    const user = userEvent.setup();
+
+    // Attendre que la liste de vols s'affiche
+    await canvas.findByText('Vol thermique Arguel');
+
+    // Cliquer le bouton poubelle
+    const deleteButton = await canvas.findByLabelText(
+      'Supprimer le vol Vol thermique Arguel'
+    );
+    await user.click(deleteButton);
+
+    // La modal de confirmation s'ouvre (portail hors du canvas → screen)
+    await expect(
+      await screen.findByText(/Confirmer la suppression/)
+    ).toBeInTheDocument();
+
+    // Cliquer Annuler ferme la modal
+    const cancelButton = await screen.findByText('Annuler');
+    await user.click(cancelButton);
+
+    // Vérifier que la modal est fermée
+    await expect(
+      screen.queryByText(/Confirmer la suppression/)
+    ).not.toBeInTheDocument();
+  }
+);
+
+const confirmDeleteHandlers = (() => {
+  const deletedIds = new Set<string>();
+  return [
+    http.get('*/api/flights', () =>
+      HttpResponse.json({
+        flights: mockFlights.filter((f) => !deletedIds.has(f.id)),
+      })
+    ),
+    http.get('*/api/flights/:id', ({ params }) => {
+      const flight = mockFlights.find(
+        (f) => f.id === params.id && !deletedIds.has(f.id)
+      );
+      return flight
+        ? HttpResponse.json(flight)
+        : new HttpResponse(null, { status: 404 });
+    }),
+    http.get('*/api/spots', () => HttpResponse.json(mockSites)),
+    http.patch('*/api/flights/:id', async ({ request }) => {
+      const body = await request.json();
+      return HttpResponse.json({
+        data: { ...mockFlights[0], ...(body as object) },
+      });
+    }),
+    http.delete('*/api/flights/:id', ({ params }) => {
+      deletedIds.add(params.id as string);
+      return HttpResponse.json({ success: true, message: 'Flight deleted' });
+    }),
+  ];
+})();
+
+export const ConfirmDeleteFlight = meta.story({
+  parameters: { msw: { handlers: confirmDeleteHandlers } },
+});
+
+ConfirmDeleteFlight.test(
+  'deletes flight on confirm',
+  async ({ canvas }) => {
+    const user = userEvent.setup();
+
+    await canvas.findByText('Vol thermique Arguel');
+
+    // Cliquer le bouton poubelle
+    const deleteButton = await canvas.findByLabelText(
+      'Supprimer le vol Vol thermique Arguel'
+    );
+    await user.click(deleteButton);
+
+    // Confirmer la suppression dans la modal (portail → screen)
+    const dialog = await screen.findByRole('dialog');
+    const dialogContent = within(dialog);
+    const confirmButton = await dialogContent.findByRole('button', {
+      name: /Supprimer/,
+    });
+    await user.click(confirmButton);
+
+    // Le toast de succès apparaît
+    await expect(
+      await canvas.findByText('Vol supprimé avec succès')
+    ).toBeInTheDocument();
+
+    // Vérifier que le vol supprimé n'apparaît plus (attendre le refetch)
+    await waitFor(() => {
+      expect(
+        canvas.queryByText('Vol thermique Arguel')
+      ).not.toBeInTheDocument();
+    });
+  }
+);
+
+export const DeleteMultipleFlights = meta.story({
+  parameters: { msw: { handlers: defaultHandlers } },
+});
+
+DeleteMultipleFlights.test(
+  'opens multi-delete modal with flight count',
+  async ({ canvas }) => {
+    const user = userEvent.setup();
+
+    await canvas.findByText('Vol thermique Arguel');
+
+    // Entrer en mode sélection
+    const selectButton = await canvas.findByText('☑️ Sélectionner');
+    await user.click(selectButton);
+
+    // Sélectionner tous les vols
+    const selectAllButton = await canvas.findByText('Tout sélectionner');
+    await user.click(selectAllButton);
+
+    // Cliquer le bouton supprimer
+    const deleteButton = await canvas.findByText(/Supprimer \(3\)/);
+    await user.click(deleteButton);
+
+    // La modal de confirmation s'ouvre (portail → screen)
+    const dialog = await screen.findByRole('dialog');
+    const dialogContent = within(dialog);
+    await expect(
+      await dialogContent.findByText(/irréversible/)
+    ).toBeInTheDocument();
+    // Le bouton de confirmation affiche le bon nombre
+    await expect(
+      await dialogContent.findByRole('button', { name: /Supprimer 3 vols/ })
+    ).toBeInTheDocument();
+  }
+);

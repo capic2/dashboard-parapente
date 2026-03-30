@@ -43,12 +43,12 @@ export interface HourlyForecastItem {
   direction: string;
   wind_direction: string;
   conditions: string;
-  precipitation: number;
+  precipitation: number | null;
   para_index: number;
   verdict: string;
-  sources?: Record<string, any>;
-  thermal_strength?: 'faible' | 'modérée' | 'forte';
-  cape?: number;
+  sources?: Record<string, Record<string, number | null>>;
+  thermal_strength?: string;
+  cape?: number | null;
   cloud_cover?: number | null;
 }
 
