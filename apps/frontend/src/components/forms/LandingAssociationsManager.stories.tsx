@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import preview from '../../../.storybook/preview';
-import { expect, userEvent } from 'storybook/test';
+import { expect, userEvent, waitFor } from 'storybook/test';
 import LandingAssociationsManager from './LandingAssociationsManager';
 
 const meta = preview.meta({
@@ -239,7 +239,9 @@ AddingAssociation.test(
   async ({ canvas }) => {
     const user = userEvent.setup();
 
+    // Wait for sites to load so button is enabled before clicking
     const addButton = await canvas.findByText('+ Ajouter un atterrissage');
+    await waitFor(async () => await expect(addButton).toBeEnabled());
     await user.click(addButton);
 
     await expect(

@@ -49,7 +49,7 @@ const mockHourlyForecastGood = [
     direction: 'NW',
     precipitation: 0,
     cape: 800,
-    thermal_strength: 'Fort',
+    thermal_strength: 'fort',
     sources: {
       'open-meteo': {
         temperature: 22.2,
@@ -81,7 +81,7 @@ const mockHourlyForecastGood = [
     direction: 'NW',
     precipitation: 0,
     cape: 1000,
-    thermal_strength: 'Fort',
+    thermal_strength: 'fort',
     sources: {
       'open-meteo': {
         temperature: 24.1,
@@ -113,7 +113,7 @@ const mockHourlyForecastGood = [
     direction: 'W',
     precipitation: 0,
     cape: 1200,
-    thermal_strength: 'Fort',
+    thermal_strength: 'fort',
     sources: {
       'open-meteo': {
         temperature: 25.3,
@@ -148,7 +148,7 @@ const mockHourlyForecastMixed = [
     direction: 'NE',
     precipitation: 0.2,
     cape: 150,
-    thermal_strength: 'Faible',
+    thermal_strength: 'faible',
     sources: {
       'open-meteo': {
         temperature: 16.1,
@@ -180,7 +180,7 @@ const mockHourlyForecastMixed = [
     direction: 'E',
     precipitation: 1.5,
     cape: 100,
-    thermal_strength: 'Faible',
+    thermal_strength: 'faible',
     sources: {
       'open-meteo': {
         temperature: 15.2,
@@ -212,7 +212,7 @@ const mockHourlyForecastMixed = [
     direction: 'E',
     precipitation: 3.5,
     cape: 50,
-    thermal_strength: 'Faible',
+    thermal_strength: 'faible',
     sources: {
       'open-meteo': {
         temperature: 14.1,
@@ -379,7 +379,7 @@ GoodConditions.test('it renders the correct values', async ({ canvas }) => {
   await expect(getByText('1200')).toBeInTheDocument(); // 12:00
 
   // Verify thermal strength
-  await expect(getAllByText('Fort').length).toBeGreaterThanOrEqual(3); // All hours have "Fort"
+  await expect(getAllByText('fort').length).toBeGreaterThanOrEqual(3); // All hours have "fort"
 
   // Verify all hours show "BON" verdict (since all have verdict: 'bon')
   const bonVerdicts = getAllByText(/BON/);
@@ -432,7 +432,7 @@ MixedConditions.test(
     await expect(getAllByText(/MAUVAIS/).length).toBeGreaterThanOrEqual(1);
 
     // Verify thermal strength is "Faible" for all (bad conditions)
-    await expect(getAllByText('Faible').length).toBeGreaterThanOrEqual(3);
+    await expect(getAllByText('faible').length).toBeGreaterThanOrEqual(3);
   }
 );
 

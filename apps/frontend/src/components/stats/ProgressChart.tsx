@@ -67,7 +67,7 @@ export default function ProgressChart() {
         rollingAvg: Math.round(rollingAvg),
       };
     });
-  }, [flights]);
+  }, [flights, i18n.language]);
 
   if (isLoading) {
     return (

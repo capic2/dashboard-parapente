@@ -323,7 +323,7 @@ export const GeoPointSchema = z.object({
   lat: z.number(),
   lon: z.number(),
   elevation: z.number(),
-  timestamp: z.string().optional(),
+  timestamp: z.number(),
 });
 
 export const GPXDataSchema = z.object({
@@ -344,6 +344,8 @@ export type Site = z.infer<typeof SiteSchema>;
 export type Flight = z.infer<typeof FlightSchema>;
 export type FlightStats = z.infer<typeof FlightStatsSchema>;
 export type Alert = z.infer<typeof AlertSchema>;
+export type ConsensusHour = z.infer<typeof ConsensusHourSchema>;
+export type BackendWeatherResponse = z.infer<typeof BackendWeatherResponseSchema>;
 export type Slot = z.infer<typeof SlotSchema>;
 export type Metrics = z.infer<typeof MetricsSchema>;
 export type DailySummaryDay = z.infer<typeof DailySummaryDaySchema>;

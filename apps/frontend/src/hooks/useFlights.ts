@@ -1,27 +1,21 @@
 import {
-  useQuery,
-  useMutation,
-  useQueryClient,
   queryOptions,
-  type UseQueryResult,
+  useMutation,
   type UseMutationResult,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
 } from '@tanstack/react-query';
-import { api } from '../lib/api';
-import type {
-  Flight,
-  FlightFilters,
-  FlightStats,
-  FlightFormData,
-  FlightRecords,
-} from '../types';
+import {api} from '../lib/api';
+import type {Flight, FlightFilters, FlightFormData, FlightRecords, FlightStats,} from '../types';
 import {
+  ApiResponseSchema,
+  FlightRecordsSchema,
   FlightsApiResponseSchema,
   FlightSchema,
   FlightStatsSchema,
-  FlightRecordsSchema,
-  ApiResponseSchema,
 } from '@dashboard-parapente/shared-types';
-import { HTTPError } from 'ky';
+import {HTTPError} from 'ky';
 
 export const flightsQueryOptions = (filters: FlightFilters = {}) => {
   const searchParams = Object.entries(filters).reduce(
@@ -134,25 +128,6 @@ export const useUpdateFlight = (
   });
 };
 
-/**
- * Delete flight
- */
-export const useDeleteFlight = (
-  flightId: string | undefined
-): UseMutationResult<void, Error, void> => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async () => {
-      if (!flightId) throw new Error('Flight ID is required');
-      await api.delete(`flights/${flightId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['flights'] });
-      queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] });
-    },
-  });
-};
 
 /**
  * Synchroniser les vols Strava pour une période donnée
