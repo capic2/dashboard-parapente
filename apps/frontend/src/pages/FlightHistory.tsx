@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, lazy, Suspense } from 'react';
 import {
   useFlights,
   useUpdateFlight,
@@ -6,7 +6,7 @@ import {
 } from '../hooks/useFlights';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Flight, Site } from '../types';
-import { FlightViewer3D } from '../components/complex/FlightViewer3D';
+const FlightViewer3D = lazy(() => import('../components/complex/FlightViewer3D').then(m => ({ default: m.FlightViewer3D })));
 import { StravaSyncModal } from '../components/forms/StravaSyncModal';
 import { CreateFlightModal } from '../components/forms/CreateFlightModal';
 import { CreateSiteModal } from '../components/forms/CreateSiteModal';
@@ -969,13 +969,15 @@ export default function FlightHistory() {
 
               {/* 3D Viewer */}
               <div className="bg-white rounded-xl shadow-md overflow-hidden">
-                <FlightViewer3D
-                  flightId={selectedFlightId}
-                  flightTitle={
-                    selectedFlight.title ||
-                    `Vol du ${new Date(selectedFlight.flight_date).toLocaleDateString('fr-FR')}`
-                  }
-                />
+                <Suspense fallback={<div className="h-96 flex items-center justify-center text-gray-500">Chargement du viewer 3D...</div>}>
+                  <FlightViewer3D
+                    flightId={selectedFlightId}
+                    flightTitle={
+                      selectedFlight.title ||
+                      `Vol du ${new Date(selectedFlight.flight_date).toLocaleDateString('fr-FR')}`
+                    }
+                  />
+                </Suspense>
               </div>
             </>
           ) : (

@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { useSearch } from '@tanstack/react-router';
-import { FlightViewer3D } from '../components/complex/FlightViewer3D';
+const FlightViewer3D = lazy(() => import('../components/complex/FlightViewer3D').then(m => ({ default: m.FlightViewer3D })));
 
 declare global {
   interface Window {
@@ -45,7 +45,9 @@ export function ViewerExport() {
 
   return (
     <div className="w-full h-screen" style={{ backgroundColor: '#000' }}>
-      <FlightViewer3D flightId={flightId} />
+      <Suspense fallback={<div className="h-screen flex items-center justify-center text-white">Chargement...</div>}>
+        <FlightViewer3D flightId={flightId} />
+      </Suspense>
     </div>
   );
 }
