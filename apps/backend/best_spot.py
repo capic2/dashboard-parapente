@@ -225,7 +225,12 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
                 # Calculate best flyable slot
                 slots = analyze_hourly_slots(flyable_hours)
                 best_slot = get_best_slot(slots)
-                flyable_slot = f"{best_slot['start_hour']}h-{best_slot['end_hour']}h" if best_slot else None
+                if not best_slot:
+                    flyable_slot = None
+                elif best_slot["start_hour"] == best_slot["end_hour"]:
+                    flyable_slot = f"{best_slot['start_hour']}h"
+                else:
+                    flyable_slot = f"{best_slot['start_hour']}h-{best_slot['end_hour']}h"
 
                 # Build enriched reason text
                 metrics = para_result.get("metrics", {})
@@ -245,9 +250,7 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
                     parts.append(f"{avg_temp}°C")
 
                 cloud_values = [
-                    h.get("cloud_cover")
-                    for h in flyable_hours
-                    if h.get("cloud_cover") is not None
+                    h.get("cloud_cover") for h in flyable_hours if h.get("cloud_cover") is not None
                 ]
                 if cloud_values:
                     avg_cloud = statistics.mean(cloud_values)
@@ -347,6 +350,7 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
                     if (
                         analysis.station_latitude is None
                         or analysis.station_longitude is None
+                        or analysis.plafond_thermique_m is None
                     ):
                         continue
                     dist = haversine_distance(
