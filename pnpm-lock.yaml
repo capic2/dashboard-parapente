@@ -126,6 +126,9 @@ importers:
       '@vitest/ui':
         specifier: ^4.0.18
         version: 4.1.2(vitest@4.1.2)
+      chromatic:
+        specifier: ^16.0.0
+        version: 16.0.0
       happy-dom:
         specifier: ^20.8.4
         version: 20.8.9
@@ -3410,6 +3413,18 @@ packages:
 
   chromatic@13.3.5:
     resolution: {integrity: sha512-MzPhxpl838qJUo0A55osCF2ifwPbjcIPeElr1d4SHcjnHoIcg7l1syJDrAYK/a+PcCBrOGi06jPNpQAln5hWgw==}
+    hasBin: true
+    peerDependencies:
+      '@chromatic-com/cypress': ^0.*.* || ^1.0.0
+      '@chromatic-com/playwright': ^0.*.* || ^1.0.0
+    peerDependenciesMeta:
+      '@chromatic-com/cypress':
+        optional: true
+      '@chromatic-com/playwright':
+        optional: true
+
+  chromatic@16.0.0:
+    resolution: {integrity: sha512-O81RVGDXXoreNeG894hjaUx08xep+C/BA6aJNMZkwSjH7Lln8IweZekBpBEoQPNNpjmHyZvcTIwN/aGitdK53Q==}
     hasBin: true
     peerDependencies:
       '@chromatic-com/cypress': ^0.*.* || ^1.0.0
@@ -9173,6 +9188,8 @@ snapshots:
       fsevents: 2.3.3
 
   chromatic@13.3.5: {}
+
+  chromatic@16.0.0: {}
 
   chrome-trace-event@1.0.4:
     optional: true
