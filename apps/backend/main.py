@@ -511,6 +511,11 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("⏹️ Shutting down Dashboard Parapente API...")
     stop_scheduler()
+
+    # Close Redis connection
+    from cache import close_redis
+
+    await close_redis()
     # Emagram scheduler shutdown handled by registered event
 
 
