@@ -29,18 +29,30 @@ jobs:
       (github.event.action == 'opened' || github.event.action == 'reopened') &&
       github.event.pull_request.user.login == 'renovate[bot]'
     steps:
-      - name: Add to project
-        uses: actions/add-to-project@v1
-        id: add
-        with:
-          project-url: https://github.com/users/capic2/projects/2
-          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
-
-      - name: Set status to "In progress"
-        if: steps.add.outputs.itemId
+      - name: Add to project and set status
         env:
           GH_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          PR_NODE_ID: ${{ github.event.pull_request.node_id }}
         run: |
+          # Add PR to project
+          ITEM_ID=$(gh api graphql -f query='
+            mutation($projectId: ID!, $contentId: ID!) {
+              addProjectV2ItemById(
+                input: { projectId: $projectId, contentId: $contentId }
+              ) {
+                item { id }
+              }
+            }
+          ' -f projectId="$PROJECT_ID" -f contentId="$PR_NODE_ID" --jq '.data.addProjectV2ItemById.item.id')
+
+          if [ -z "$ITEM_ID" ]; then
+            echo "Failed to add PR to project"
+            exit 1
+          fi
+
+          echo "Added PR to project with item ID: $ITEM_ID"
+
+          # Set status to "In progress"
           gh api graphql -f query='
             mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
               updateProjectV2ItemFieldValue(
@@ -56,9 +68,11 @@ jobs:
             }
           ' \
             -f projectId="$PROJECT_ID" \
-            -f itemId="${{ steps.add.outputs.itemId }}" \
+            -f itemId="$ITEM_ID" \
             -f fieldId="$STATUS_FIELD_ID" \
             -f optionId="$STATUS_IN_PROGRESS"
+
+          echo "Set status to In progress"
 
   # Job 2: When a Renovate PR is merged, move it to "Done"
   mark-done:
