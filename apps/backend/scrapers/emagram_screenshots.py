@@ -296,17 +296,68 @@ async def fetch_all_emagram_screenshots(
     }
 
 
-def cleanup_old_screenshots(max_age_hours: int = 3):
+def cleanup_old_screenshots(max_age_hours: int = 1, cache_dir: Path | None = None):
     """
-    Delete screenshot images older than max_age_hours
-    Called by background task scheduler
+    Delete screenshot images that are no longer needed.
+    Protects screenshots referenced by the latest completed analysis per site.
+    Files younger than max_age_hours are never deleted (race-condition guard).
+
+    Args:
+        max_age_hours: Minimum age (in hours) before a file can be deleted
+        cache_dir: Override cache directory (for testing)
     """
+    import json
     from datetime import timedelta
 
+    from database import get_db_context
+    from models import EmagramAnalysis
+
+    target_dir = cache_dir or EMAGRAM_CACHE_DIR
+
+    # Build set of protected file paths from latest analysis per site
+    protected_paths: set[str] = set()
+    try:
+        with get_db_context() as db:
+            from sqlalchemy import func
+
+            latest_subq = (
+                db.query(
+                    EmagramAnalysis.station_code,
+                    func.max(EmagramAnalysis.analysis_datetime).label("max_dt"),
+                )
+                .filter(EmagramAnalysis.analysis_status == "completed")
+                .group_by(EmagramAnalysis.station_code)
+                .subquery()
+            )
+
+            latest_analyses = (
+                db.query(EmagramAnalysis)
+                .join(
+                    latest_subq,
+                    (EmagramAnalysis.station_code == latest_subq.c.station_code)
+                    & (EmagramAnalysis.analysis_datetime == latest_subq.c.max_dt),
+                )
+                .all()
+            )
+
+            for analysis in latest_analyses:
+                if analysis.screenshot_paths:
+                    try:
+                        paths = json.loads(analysis.screenshot_paths)
+                        protected_paths.update(paths.values())
+                    except (json.JSONDecodeError, AttributeError):
+                        pass
+    except Exception as e:
+        logger.warning(f"Could not query DB for protected paths, skipping cleanup: {e}")
+        return 0
+
+    # Delete unprotected old files
     cutoff = datetime.now() - timedelta(hours=max_age_hours)
     deleted = 0
 
-    for file_path in EMAGRAM_CACHE_DIR.glob("*.png"):
+    for file_path in target_dir.glob("*.png"):
+        if str(file_path) in protected_paths:
+            continue
         try:
             file_age = datetime.fromtimestamp(file_path.stat().st_mtime)
             if file_age < cutoff:
@@ -316,6 +367,8 @@ def cleanup_old_screenshots(max_age_hours: int = 3):
             logger.warning(f"Failed to delete {file_path}: {e}")
 
     if deleted > 0:
-        logger.info(f"🗑️ Cleaned up {deleted} old emagram screenshots")
+        logger.info(
+            f"🗑️ Cleaned up {deleted} old emagram screenshots ({len(protected_paths)} protected)"
+        )
 
     return deleted
