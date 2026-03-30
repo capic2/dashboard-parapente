@@ -558,9 +558,7 @@ export const CallsOnSelectDayCallback = meta.story({
   },
 });
 
-CallsOnSelectDayCallback.test('calls onSelectDay callback', async ({ args, canvas }) => {
-  const user = userEvent.setup();
-
+CallsOnSelectDayCallback.test('calls onSelectDay callback', async ({ args, canvas, userEvent }) => {
   await waitFor(() => {
     expect(canvas.getByText('Demain')).toBeInTheDocument();
   });

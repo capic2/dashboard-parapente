@@ -649,9 +649,7 @@ export const OpensTooltipOnHover = meta.story({
   },
 });
 
-OpensTooltipOnHover.test('opens tooltip on hover', async ({ canvas }) => {
-  const user = userEvent.setup();
-
+OpensTooltipOnHover.test('opens tooltip on hover', async ({ canvas, userEvent }) => {
   await waitFor(() => {
     expect(canvas.getByText('85/100')).toBeInTheDocument();
   });

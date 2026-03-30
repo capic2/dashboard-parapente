@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import preview from '../../../.storybook/preview';
-import { expect, userEvent } from 'storybook/test';
+import { expect } from 'storybook/test';
 import LandingAssociationsManager from './LandingAssociationsManager';
 
 const meta = preview.meta({
@@ -236,11 +236,9 @@ export const AddingAssociation = meta.story({
 
 AddingAssociation.test(
   'opens add form when clicking add button',
-  async ({ canvas }) => {
-    const user = userEvent.setup();
-
+  async ({ canvas, userEvent }) => {
     const addButton = await canvas.findByText('+ Ajouter un atterrissage');
-    await user.click(addButton);
+    await userEvent.click(addButton);
 
     await expect(
       await canvas.findByText('Choisir un site...')

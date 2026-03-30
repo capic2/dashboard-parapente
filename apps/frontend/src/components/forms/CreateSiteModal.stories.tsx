@@ -1,5 +1,5 @@
 import preview from '../../../.storybook/preview';
-import { expect, fn, screen, userEvent } from 'storybook/test';
+import { expect, fn, screen } from 'storybook/test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { delay, http, HttpResponse } from 'msw';
 import { CreateSiteModal } from './CreateSiteModal';
@@ -85,36 +85,39 @@ Modal.test('The creation button is disabled if no data', async () => {
   ).toBeDisabled();
 });
 
-Modal.test('It is possible to search for a site', async ({ step }) => {
-  const input = screen.getByPlaceholderText(/Ex: Besançon/);
-  await userEvent.type(input, 'Besançon');
+Modal.test(
+  'It is possible to search for a site',
+  async ({ step, userEvent }) => {
+    const input = screen.getByPlaceholderText(/Ex: Besançon/);
+    await userEvent.type(input, 'Besançon');
 
-  const searchButton = screen.getByText('Rechercher');
-  await userEvent.click(searchButton);
+    const searchButton = screen.getByText('Rechercher');
+    await userEvent.click(searchButton);
 
-  await expect(await screen.findByText(/✓ Trouvé !/)).toBeInTheDocument();
+    await expect(await screen.findByText(/✓ Trouvé !/)).toBeInTheDocument();
 
-  // Verify the location details are shown
-  await expect(
-    await screen.findByText(/Besançon, Doubs, France/)
-  ).toBeInTheDocument();
-  await expect(await screen.findByText(/47.23800/)).toBeInTheDocument();
+    // Verify the location details are shown
+    await expect(
+      await screen.findByText(/Besançon, Doubs, France/)
+    ).toBeInTheDocument();
+    await expect(await screen.findByText(/47.23800/)).toBeInTheDocument();
 
-  await step('it fills the form fields', async () => {
-    await expect(
-      screen.getByLabelText('Nom du site', { exact: false })
-    ).toHaveValue('Besançon');
-    await expect(
-      screen.getByLabelText('Latitude', { exact: false })
-    ).toHaveValue(47.238);
-    await expect(
-      screen.getByLabelText('Longitude', { exact: false })
-    ).toHaveValue(6.024);
-    await expect(
-      screen.getByLabelText('Altitude', { exact: false })
-    ).toHaveValue(null);
-  });
-});
+    await step('it fills the form fields', async () => {
+      await expect(
+        screen.getByLabelText('Nom du site', { exact: false })
+      ).toHaveValue('Besançon');
+      await expect(
+        screen.getByLabelText('Latitude', { exact: false })
+      ).toHaveValue(47.238);
+      await expect(
+        screen.getByLabelText('Longitude', { exact: false })
+      ).toHaveValue(6.024);
+      await expect(
+        screen.getByLabelText('Altitude', { exact: false })
+      ).toHaveValue(null);
+    });
+  }
+);
 
 // Search loading
 export const SearchLoading = meta.story({
@@ -135,7 +138,7 @@ export const SearchLoading = meta.story({
   },
 });
 
-SearchLoading.test('interaction test', async () => {
+SearchLoading.test('interaction test', async ({ userEvent }) => {
   const input = screen.getByPlaceholderText(/Ex: Besançon/);
   await userEvent.type(input, 'Besançon');
 
@@ -161,23 +164,21 @@ export const ManualEntryFilled = meta.story({
   },
 });
 
-ManualEntryFilled.test('interaction test', async ({ canvas }) => {
-  const user = userEvent.setup();
-
+ManualEntryFilled.test('interaction test', async ({ canvas, userEvent }) => {
   const manualButton = canvas.getByText('Saisie manuelle');
-  await user.click(manualButton);
+  await userEvent.click(manualButton);
 
   const nameInput = canvas.getByPlaceholderText(/Ex: Mont Poupet/);
-  await user.type(nameInput, 'Mont Poupet');
+  await userEvent.type(nameInput, 'Mont Poupet');
 
   const latInput = canvas.getByPlaceholderText('47.238');
-  await user.type(latInput, '47.238');
+  await userEvent.type(latInput, '47.238');
 
   const lonInput = canvas.getByPlaceholderText('6.024');
-  await user.type(lonInput, '6.024');
+  await userEvent.type(lonInput, '6.024');
 
   const elevInput = canvas.getByPlaceholderText('450');
-  await user.type(elevInput, '450');
+  await userEvent.type(elevInput, '450');
 });
 
 // Create site loading
@@ -199,23 +200,21 @@ export const CreateSiteLoading = meta.story({
   },
 });
 
-CreateSiteLoading.test('interaction test', async ({ canvas }) => {
-  const user = userEvent.setup();
-
+CreateSiteLoading.test('interaction test', async ({ canvas, userEvent }) => {
   const manualButton = canvas.getByText('Saisie manuelle');
-  await user.click(manualButton);
+  await userEvent.click(manualButton);
 
   const nameInput = canvas.getByPlaceholderText(/Ex: Mont Poupet/);
-  await user.type(nameInput, 'Mont Poupet');
+  await userEvent.type(nameInput, 'Mont Poupet');
 
   const latInput = canvas.getByPlaceholderText('47.238');
-  await user.type(latInput, '47.238');
+  await userEvent.type(latInput, '47.238');
 
   const lonInput = canvas.getByPlaceholderText('6.024');
-  await user.type(lonInput, '6.024');
+  await userEvent.type(lonInput, '6.024');
 
   const createButton = canvas.getByText('Créer le site');
-  await user.click(createButton);
+  await userEvent.click(createButton);
 });
 
 // Interaction Tests
@@ -247,9 +246,7 @@ export const SwitchesBetweenModes = meta.story({
 
 SwitchesBetweenModes.test(
   'switches between search and manual modes',
-  async ({ canvas }) => {
-    const user = userEvent.setup();
-
+  async ({ canvas, userEvent }) => {
     // Default is search mode
     await expect(
       canvas.getByPlaceholderText(/Ex: Besançon/)
@@ -257,7 +254,7 @@ SwitchesBetweenModes.test(
 
     // Switch to manual mode
     const manualButton = canvas.getByText('Saisie manuelle');
-    await user.click(manualButton);
+    await userEvent.click(manualButton);
 
     await expect(
       canvas.getByPlaceholderText(/Ex: Mont Poupet/)
@@ -265,7 +262,7 @@ SwitchesBetweenModes.test(
 
     // Switch back to search
     const searchButton = canvas.getByText('Recherche');
-    await user.click(searchButton);
+    await userEvent.click(searchButton);
 
     await expect(
       canvas.getByPlaceholderText(/Ex: Besançon/)
@@ -292,14 +289,12 @@ export const SearchesForLocation = meta.story({
 
 SearchesForLocation.test(
   'searches for location and displays results',
-  async ({ canvas }) => {
-    const user = userEvent.setup();
-
+  async ({ canvas, userEvent }) => {
     const input = canvas.getByPlaceholderText(/Ex: Besançon/);
-    await user.type(input, 'Besançon');
+    await userEvent.type(input, 'Besançon');
 
     const searchButton = canvas.getByText('Rechercher');
-    await user.click(searchButton);
+    await userEvent.click(searchButton);
 
     await waitFor(() => {
       expect(canvas.getByText(/✓ Trouvé !/)).toBeInTheDocument();
@@ -330,23 +325,21 @@ export const CreatesSiteSuccessfully = meta.story({
 
 CreatesSiteSuccessfully.test(
   'creates site successfully and calls callbacks',
-  async ({ args, canvas }) => {
-    const user = userEvent.setup();
-
+  async ({ args, canvas,userEvent }) => {
     const manualButton = canvas.getByText('Saisie manuelle');
-    await user.click(manualButton);
+    await userEvent.click(manualButton);
 
     const nameInput = canvas.getByPlaceholderText(/Ex: Mont Poupet/);
-    await user.type(nameInput, 'Mont Poupet');
+    await userEvent.type(nameInput, 'Mont Poupet');
 
     const latInput = canvas.getByPlaceholderText('47.238');
-    await user.type(latInput, '47.238');
+    await userEvent.type(latInput, '47.238');
 
     const lonInput = canvas.getByPlaceholderText('6.024');
-    await user.type(lonInput, '6.024');
+    await userEvent.type(lonInput, '6.024');
 
     const createButton = canvas.getByText('Créer le site');
-    await user.click(createButton);
+    await userEvent.click(createButton);
 
     await waitFor(() => {
       expect(args.onSiteCreated).toHaveBeenCalledWith(mockCreatedSite);
@@ -366,26 +359,24 @@ export const DisablesCreateButtonWhenInvalid = meta.story({
 
 DisablesCreateButtonWhenInvalid.test(
   'disables create button when form is invalid',
-  async ({ canvas }) => {
-    const user = userEvent.setup();
-
+  async ({ canvas, userEvent }) => {
     const manualButton = canvas.getByText('Saisie manuelle');
-    await user.click(manualButton);
+    await userEvent.click(manualButton);
 
     const createButton = canvas.getByText('Créer le site');
     await expect(createButton).toBeDisabled();
 
     // Add name only
     const nameInput = canvas.getByPlaceholderText(/Ex: Mont Poupet/);
-    await user.type(nameInput, 'Mont Poupet');
+    await userEvent.type(nameInput, 'Mont Poupet');
     await expect(createButton).toBeDisabled();
 
     // Add coordinates
     const latInput = canvas.getByPlaceholderText('47.238');
-    await user.type(latInput, '47.238');
+    await userEvent.type(latInput, '47.238');
 
     const lonInput = canvas.getByPlaceholderText('6.024');
-    await user.type(lonInput, '6.024');
+    await userEvent.type(lonInput, '6.024');
 
     // Now should be enabled
     await expect(createButton).not.toBeDisabled();

@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import preview from '../../.storybook/preview';
-import { expect, userEvent } from 'storybook/test';
+import { expect } from 'storybook/test';
 import { Sites } from './Sites';
 
 const meta = preview.meta({
@@ -100,16 +100,18 @@ export const FilteredByType = meta.story({
   parameters: { msw: { handlers: defaultHandlers } },
 });
 
-FilteredByType.test('filters by landing type', async ({ canvas }) => {
-  const user = userEvent.setup();
-  await canvas.findByText('Gestion des Sites');
+FilteredByType.test(
+  'filters by landing type',
+  async ({ canvas, userEvent }) => {
+    await canvas.findByText('Gestion des Sites');
 
-  const typeSelect = canvas.getByDisplayValue('Tous les types');
-  await user.selectOptions(typeSelect, 'landing');
+    const typeSelect = canvas.getByDisplayValue('Tous les types');
+    await userEvent.selectOptions(typeSelect, 'landing');
 
-  await expect(canvas.getByText(/1 site/)).toBeInTheDocument();
-  await expect(canvas.getByText("Plaine d'Arguel")).toBeInTheDocument();
-});
+    await expect(canvas.getByText(/1 site/)).toBeInTheDocument();
+    await expect(canvas.getByText("Plaine d'Arguel")).toBeInTheDocument();
+  }
+);
 
 export const EmptyState = meta.story({
   parameters: {
