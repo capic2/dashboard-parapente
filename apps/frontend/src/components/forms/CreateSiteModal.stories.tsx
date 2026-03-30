@@ -33,7 +33,7 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-export default meta;
+
 
 // Mock geocoding result
 const mockGeocodeResult = {

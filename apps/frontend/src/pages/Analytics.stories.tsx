@@ -26,7 +26,7 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-export default meta;
+
 
 const mockStats = {
   total_flights: 42,

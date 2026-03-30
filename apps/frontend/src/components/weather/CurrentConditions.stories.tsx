@@ -35,7 +35,7 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-export default meta;
+
 
 // Mock data - matches BackendWeatherResponseSchema
 // Current hour is used for CurrentConditions display

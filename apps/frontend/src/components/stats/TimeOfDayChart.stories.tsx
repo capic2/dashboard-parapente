@@ -34,7 +34,7 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-export default meta;
+
 
 const mockFlights = [
   ...Array.from({ length: 3 }, (_, i) => ({ id: `${i}`, start_time: '09:30' })),

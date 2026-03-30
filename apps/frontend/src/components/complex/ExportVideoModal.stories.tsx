@@ -32,7 +32,7 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-export default meta;
+
 
 export const Closed = meta.story({
   args: {
