@@ -29,7 +29,7 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-export default meta;
+
 
 // Mock associations
 const mockAssociations = [

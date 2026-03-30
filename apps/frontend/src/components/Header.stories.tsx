@@ -19,7 +19,7 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-export default meta;
+
 
 /**
  * Default header with title
