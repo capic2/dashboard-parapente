@@ -1,0 +1,50 @@
+name: Chromatic
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: chromatic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromatic:
+    name: Chromatic (Frontend)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🎨 Publish to Chromatic
+        uses: chromaui/action@latest
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          workingDir: apps/frontend
+          buildScriptName: build-storybook
+          onlyChanged: true
+          exitZeroOnChanges: true
+          exitOnceUploaded: true
+          autoAcceptChanges: main
+          skip: "renovate/**"
