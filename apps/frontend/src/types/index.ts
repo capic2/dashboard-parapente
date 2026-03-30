@@ -42,6 +42,7 @@ export interface HourlyForecastItem {
   wind_gust?: number;
   direction: string;
   wind_direction: string;
+  wind_direction_deg?: number | null;
   conditions: string;
   precipitation: number | null;
   para_index: number;

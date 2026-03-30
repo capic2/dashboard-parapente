@@ -1,7 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
+import {
+  Clock,
+  Gauge,
+  Thermometer,
+  Wind,
+  Zap,
+  Compass,
+  CloudRain,
+  Cloud,
+  Flame,
+  CircleCheck,
+} from 'lucide-react';
 import { useWeather } from '../../hooks/useWeather';
 import type { HourlyForecastItem } from '../../types';
 import CacheTimestamp from '../CacheTimestamp';
+import WindArrow from './WindArrow';
 
 interface HourlyForecastProps {
   spotId: string;
@@ -169,8 +182,9 @@ const formatWindDirectionFromDegrees = (deg: number | null): string => {
 };
 
 const formatWindDirectionWithDegrees = (deg: number | null): string => {
-  // Now returns cardinal only (no degrees) per user request
-  return formatWindDirectionFromDegrees(deg);
+  if (deg === null) return '—';
+  const cardinal = formatWindDirectionFromDegrees(deg);
+  return `${cardinal} (${Math.round(deg)}°)`;
 };
 
 const SOURCE_NAMES: Record<string, string> = {
@@ -796,38 +810,38 @@ export default function HourlyForecast({
         <table className="w-full min-w-[800px] text-sm">
           <thead>
             <tr className="border-b-2 border-gray-200">
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">
-                Heure
+              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+                <span className="inline-flex items-center justify-center gap-1"><Clock size={14} /> Heure</span>
               </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">
-                Para-Index
+              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+                <span className="inline-flex items-center justify-center gap-1"><Gauge size={14} /> Para-Index</span>
               </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">
-                Temp
+              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+                <span className="inline-flex items-center justify-center gap-1"><Thermometer size={14} /> Temp (°C)</span>
               </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">
-                Vent
+              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+                <span className="inline-flex items-center justify-center gap-1"><Wind size={14} /> Vent (km/h)</span>
               </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">
-                Rafales
+              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+                <span className="inline-flex items-center justify-center gap-1"><Zap size={14} /> Rafales (km/h)</span>
               </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">
-                Direction
+              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+                <span className="inline-flex items-center justify-center gap-1"><Compass size={14} /> Direction</span>
               </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">
-                Précip.
+              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+                <span className="inline-flex items-center justify-center gap-1"><CloudRain size={14} /> Précip. (mm)</span>
               </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">
-                Nuages
+              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+                <span className="inline-flex items-center justify-center gap-1"><Cloud size={14} /> Nuages (%)</span>
               </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">
-                CAPE (J/kg)
+              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+                <span className="inline-flex items-center justify-center gap-1"><Zap size={14} /> CAPE (J/kg)</span>
               </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">
-                Thermiques
+              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+                <span className="inline-flex items-center justify-center gap-1"><Flame size={14} /> Thermiques</span>
               </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">
-                Volabilité
+              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+                <span className="inline-flex items-center justify-center gap-1"><CircleCheck size={14} /> Volabilité</span>
               </th>
             </tr>
           </thead>
@@ -853,10 +867,10 @@ export default function HourlyForecast({
                     key={index}
                     className={`border-b border-gray-100 ${getVerdictClass(hour.verdict)}`}
                   >
-                    <td className="py-2.5 px-2 font-medium">{hour.hour}</td>
+                    <td className="py-2.5 px-2 font-medium text-center">{hour.hour}</td>
 
                     <td
-                      className="py-2.5 px-2 cursor-help hover:bg-sky-100 transition-colors"
+                      className="py-2.5 px-2 text-center cursor-help hover:bg-sky-100 transition-colors"
                       {...cellEventHandlers('para-index', hour)}
                     >
                       <strong className="text-sky-600">
@@ -865,65 +879,90 @@ export default function HourlyForecast({
                     </td>
 
                     <td
-                      className="py-2.5 px-2 cursor-help hover:bg-red-50 transition-colors"
+                      className="py-2.5 px-2 text-center cursor-help hover:bg-red-50 transition-colors"
                       {...cellEventHandlers('temperature', hour)}
                     >
-                      {hour.temp}°C
+                      <span className="inline-flex items-center justify-center gap-1">
+                        <Thermometer size={13} className="text-red-400" />
+                        {hour.temp}
+                      </span>
                     </td>
 
                     <td
-                      className="py-2.5 px-2 cursor-help hover:bg-blue-50 transition-colors"
+                      className="py-2.5 px-2 text-center cursor-help hover:bg-blue-50 transition-colors"
                       {...cellEventHandlers('wind', hour)}
                     >
-                      {hour.wind} km/h
+                      <span className="inline-flex items-center justify-center gap-1">
+                        <Wind size={13} className="text-blue-400" />
+                        {hour.wind}
+                      </span>
                     </td>
 
                     <td
-                      className="py-2.5 px-2 cursor-help hover:bg-red-50 transition-colors"
+                      className="py-2.5 px-2 text-center cursor-help hover:bg-red-50 transition-colors"
                       {...cellEventHandlers('gust', hour)}
                     >
-                      {gustValue !== null && gustValue !== undefined
-                        ? `${gustValue.toFixed(1)} km/h`
-                        : '—'}
+                      <span className="inline-flex items-center justify-center gap-1">
+                        <Zap size={13} className="text-orange-400" />
+                        {gustValue !== null && gustValue !== undefined
+                          ? gustValue.toFixed(1)
+                          : '—'}
+                      </span>
                     </td>
 
                     <td
-                      className="py-2.5 px-2 cursor-help hover:bg-violet-50 transition-colors"
+                      className="py-2.5 px-2 text-center cursor-help hover:bg-violet-50 transition-colors"
                       {...cellEventHandlers('direction', hour)}
                     >
-                      {hour.direction}
+                      {hour.wind_direction_deg != null ? (
+                        <WindArrow degrees={hour.wind_direction_deg} className="text-violet-600" />
+                      ) : (
+                        '—'
+                      )}
                     </td>
 
                     <td
-                      className="py-2.5 px-2 cursor-help hover:bg-cyan-50 transition-colors"
+                      className="py-2.5 px-2 text-center cursor-help hover:bg-cyan-50 transition-colors"
                       {...cellEventHandlers('precipitation', hour)}
                     >
-                      {hour.precipitation !== null &&
-                      hour.precipitation !== undefined
-                        ? `${hour.precipitation.toFixed(1)} mm`
-                        : '—'}
+                      <span className="inline-flex items-center justify-center gap-1">
+                        <CloudRain size={13} className="text-cyan-400" />
+                        {hour.precipitation !== null &&
+                        hour.precipitation !== undefined
+                          ? hour.precipitation.toFixed(1)
+                          : '—'}
+                      </span>
                     </td>
 
                     <td
-                      className="py-2.5 px-2 cursor-help hover:bg-slate-50 transition-colors"
+                      className="py-2.5 px-2 text-center cursor-help hover:bg-slate-50 transition-colors"
                       {...cellEventHandlers('cloud-cover', hour)}
                     >
-                      {cloudCover !== null && cloudCover !== undefined
-                        ? `${Math.round(cloudCover)}%`
-                        : '—'}
+                      <span className="inline-flex items-center justify-center gap-1">
+                        <Cloud size={13} className="text-slate-400" />
+                        {cloudCover !== null && cloudCover !== undefined
+                          ? Math.round(cloudCover)
+                          : '—'}
+                      </span>
                     </td>
 
-                    <td className="py-2.5 px-2">
-                      {hour.cape !== null && hour.cape !== undefined
-                        ? Math.round(hour.cape)
-                        : '—'}
+                    <td className="py-2.5 px-2 text-center">
+                      <span className="inline-flex items-center justify-center gap-1">
+                        <Zap size={13} className="text-yellow-500" />
+                        {hour.cape !== null && hour.cape !== undefined
+                          ? Math.round(hour.cape)
+                          : '—'}
+                      </span>
                     </td>
 
-                    <td className="py-2.5 px-2">
-                      {hour.thermal_strength || 'faible'}
+                    <td className="py-2.5 px-2 text-center">
+                      <span className="inline-flex items-center justify-center gap-1">
+                        <Flame size={13} className="text-orange-400" />
+                        {hour.thermal_strength || 'faible'}
+                      </span>
                     </td>
 
-                    <td className="py-2.5 px-2">
+                    <td className="py-2.5 px-2 text-center">
                       {(() => {
                         const display = getFlyabilityDisplay(hour);
                         return (
