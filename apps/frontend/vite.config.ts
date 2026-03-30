@@ -43,5 +43,24 @@ export default defineConfig({
     outDir: '../../dist/apps/frontend',
     emptyOutDir: true,
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
+            return 'vendor-react';
+          }
+          // Cesium is lazy-loaded via route splitting, no manual chunk needed
+          if (id.includes('node_modules/@tanstack')) {
+            return 'vendor-tanstack';
+          }
+          if (id.includes('node_modules/i18next') || id.includes('node_modules/react-i18next')) {
+            return 'vendor-i18n';
+          }
+          if (id.includes('node_modules/react-aria-components') || id.includes('node_modules/@react-aria') || id.includes('node_modules/@react-stately')) {
+            return 'vendor-react-aria';
+          }
+        },
+      },
+    },
   },
 });
