@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import os
+from datetime import datetime, timezone
 from functools import wraps
 from typing import TYPE_CHECKING, Any
 
@@ -178,6 +179,8 @@ async def set_cached(key: str, data: Any, ttl: int):
         ttl: Time-to-live in seconds
     """
     try:
+        if isinstance(data, dict):
+            data["cached_at"] = datetime.now(timezone.utc).isoformat()
         redis_client = await get_redis()
         serialized = json.dumps(data)
         await redis_client.setex(key, ttl, serialized)

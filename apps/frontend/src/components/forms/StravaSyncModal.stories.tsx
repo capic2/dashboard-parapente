@@ -198,14 +198,12 @@ export const CustomDateRange = meta.story({
   },
 });
 
-CustomDateRange.test('interaction test', async ({ canvas }) => {
-  const user = userEvent.setup();
-
+CustomDateRange.test('interaction test', async ({ canvas, userEvent }) => {
   // Change date from
   const dateFromInputs = canvas.getAllByRole('spinbutton');
   if (dateFromInputs[0]) {
-    await user.clear(dateFromInputs[0]);
-    await user.type(dateFromInputs[0], '2024');
+    await userEvent.clear(dateFromInputs[0]);
+    await userEvent.type(dateFromInputs[0], '2024');
   }
 });
 

@@ -1,4 +1,4 @@
-import { expect, userEvent, screen } from 'storybook/test';
+import { expect, screen } from 'storybook/test';
 import { fn } from 'storybook/test';
 import preview from '../../../.storybook/preview';
 import {
@@ -287,11 +287,9 @@ export const CallsOnSelectSiteCallback = meta.story({
 
 CallsOnSelectSiteCallback.test(
   'should call onSelectSite callback when button clicked',
-  async ({ canvas }) => {
-    const user = userEvent.setup();
-
+  async ({ canvas, userEvent }) => {
     const button = canvas.getByText('Voir les prévisions →');
-    await user.click(button);
+    await userEvent.click(button);
 
     // Note: In CSF3 with .test(), we can't easily check the callback
     // This test verifies the button is clickable and doesn't error
@@ -325,13 +323,11 @@ export const CompactCallsOnSelectSite = meta.story({
 
 CompactCallsOnSelectSite.test(
   'should call onSelectSite callback in compact variant',
-  async ({ canvas }) => {
-    const user = userEvent.setup();
-
+  async ({ canvas, userEvent }) => {
     const button = canvas.getByText('Annecy').closest('button');
     await expect(button).toBeInTheDocument();
 
-    if (button) await user.click(button);
+    if (button) await userEvent.click(button);
 
     // Note: In CSF3 with .test(), we can't easily check the callback
     // This test verifies the button is clickable and doesn't error

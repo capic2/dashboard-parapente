@@ -5,7 +5,7 @@ Avoids re-downloading same sounding multiple times
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import redis
@@ -82,6 +82,8 @@ class EmagramCache:
             # Cache for ttl_hours
             ttl_seconds = ttl_hours * 3600
 
+            if isinstance(sounding_data, dict):
+                sounding_data["cached_at"] = datetime.now(timezone.utc).isoformat()
             self.redis_client.setex(key, ttl_seconds, json.dumps(sounding_data))
 
             return True

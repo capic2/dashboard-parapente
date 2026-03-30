@@ -186,6 +186,7 @@ export const BackendWeatherResponseSchema = z.object({
   slots: z.array(SlotSchema).optional(),
   slots_summary: z.string().catch(''),
   total_sources: z.number().optional(),
+  cached_at: z.string().nullish(),
 });
 
 // ============================================================================
@@ -230,6 +231,7 @@ export const DailySummarySchema = z.object({
   site_id: z.string(),
   site_name: z.string(),
   days: z.array(DailySummaryDaySchema),
+  cached_at: z.string().nullish(),
 });
 
 // ============================================================================
@@ -294,6 +296,7 @@ export const BestSpotResultSchema = z.object({
   score: z.number().optional(),
   verdict: z.string().optional(),
   reason: z.string(),
+  cached_at: z.string().nullish(),
 });
 
 // ============================================================================

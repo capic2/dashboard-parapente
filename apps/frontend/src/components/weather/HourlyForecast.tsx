@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useWeather } from '../../hooks/useWeather';
 import type { HourlyForecastItem } from '../../types';
+import CacheTimestamp from '../CacheTimestamp';
 
 interface HourlyForecastProps {
   spotId: string;
@@ -784,9 +785,12 @@ export default function HourlyForecast({
 
   return (
     <div className="bg-white rounded-xl p-4 shadow-md">
-      <h2 className="text-sm text-gray-600 mb-3 font-semibold">
-        Prévisions Horaires
-      </h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm text-gray-600 font-semibold">
+          Prévisions Horaires
+        </h2>
+        <CacheTimestamp cachedAt={weather.cached_at} />
+      </div>
 
       <div className="overflow-x-auto -mx-4 px-4">
         <table className="w-full min-w-[800px] text-sm">

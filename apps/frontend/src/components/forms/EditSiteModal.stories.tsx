@@ -1,7 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import preview from '../../../.storybook/preview';
-import { expect, userEvent, waitFor } from 'storybook/test';
-import { fn } from 'storybook/test';
+import { expect, fn, waitFor } from 'storybook/test';
 import { EditSiteModal } from './EditSiteModal';
 import type { Site } from '@dashboard-parapente/shared-types';
 
@@ -157,7 +156,7 @@ export const SavingState = meta.story({
   },
 });
 
-SavingState.test('interaction test', async ({ canvas }) => {
+SavingState.test('interaction test', async ({ canvas, userEvent }) => {
   const saveButton = canvas.getByText('💾 Enregistrer');
   await userEvent.click(saveButton);
 });
@@ -227,13 +226,11 @@ export const AllowsCodeInCreateMode = meta.story({
   },
 });
 
-AllowsCodeInCreateMode.test('allows code input in create mode', async ({ canvas }) => {
-  const user = userEvent.setup();
-
+AllowsCodeInCreateMode.test('allows code input in create mode', async ({ canvas, userEvent }) => {
   const codeInput = canvas.getByLabelText('Code');
   await expect(codeInput).not.toBeDisabled();
 
-  await user.type(codeInput, 'NEWCODE');
+  await userEvent.type(codeInput, 'NEWCODE');
   await expect(canvas.getByDisplayValue('NEWCODE')).toBeInTheDocument();
 });
 */
@@ -247,12 +244,10 @@ export const EditsNameField = meta.story({
   },
 });
 
-EditsNameField.test('edits name field', async ({ canvas }) => {
-  const user = userEvent.setup();
-
+EditsNameField.test('edits name field', async ({ canvas, userEvent }) => {
   const nameInput = canvas.getByDisplayValue('Mont Poupet');
-  await user.clear(nameInput);
-  await user.type(nameInput, 'Nouveau Nom');
+  await userEvent.clear(nameInput);
+  await userEvent.type(nameInput, 'Nouveau Nom');
 
   await expect(canvas.getByDisplayValue('Nouveau Nom')).toBeInTheDocument();
 });
@@ -266,11 +261,9 @@ export const SelectsUsageType = meta.story({
   },
 });
 
-SelectsUsageType.test('selects usage type', async ({ canvas }) => {
-  const user = userEvent.setup();
-
+SelectsUsageType.test('selects usage type', async ({ canvas, userEvent }) => {
   const takeoffRadio = canvas.getByLabelText('Décollage uniquement');
-  await user.click(takeoffRadio);
+  await userEvent.click(takeoffRadio);
 
   await expect(takeoffRadio).toBeChecked();
 });
@@ -285,11 +278,9 @@ export const ChangesOrientation = meta.story({
   },
 });
 
-ChangesOrientation.test('changes orientation', async ({ canvas }) => {
-  const user = userEvent.setup();
-
+ChangesOrientation.test('changes orientation', async ({ canvas,userEvent }) => {
   const orientationSelect = canvas.getByLabelText('Orientation');
-  await user.selectOptions(orientationSelect, 'S');
+  await userEvent.selectOptions(orientationSelect, 'S');
 
   await expect(canvas.getByDisplayValue('Sud (S)')).toBeInTheDocument();
 });
@@ -305,11 +296,9 @@ export const AdjustsCameraAngle = meta.story({
   },
 });
 
-AdjustsCameraAngle.test('adjusts camera angle', async ({ canvas }) => {
-  const user = userEvent.setup();
-
+AdjustsCameraAngle.test('adjusts camera angle', async ({ canvas,userEvent }) => {
   const angleSlider = canvas.getByLabelText(/Angle: 180°/);
-  await user.type(angleSlider, '90');
+  await userEvent.type(angleSlider, '90');
 
   await waitFor(() => {
     expect(canvas.getByText(/Angle: /)).toBeInTheDocument();
@@ -328,11 +317,9 @@ export const CallsOnCloseWhenCancelled = meta.story({
 
 CallsOnCloseWhenCancelled.test(
   'calls onClose when cancelled',
-  async ({ args, canvas }) => {
-    const user = userEvent.setup();
-
+  async ({ args, canvas, userEvent }) => {
     const cancelButton = canvas.getByText('Annuler');
-    await user.click(cancelButton);
+    await userEvent.click(cancelButton);
 
     await expect(args.onClose).toHaveBeenCalled();
   }
@@ -352,7 +339,7 @@ ValidatesRequiredFields.test('validates required fields', async ({ canvas }) => 
   const user = userEvent.setup();
 
   const saveButton = canvas.getByText('💾 Enregistrer');
-  await user.click(saveButton);
+  await userEvent.click(saveButton);
 
   await waitFor(() => {
     expect(canvas.getByText(/Le nom doit contenir au moins 2 caractères/)).toBeInTheDocument();
@@ -373,15 +360,13 @@ export const SavesSuccessfully = meta.story({
 
 SavesSuccessfully.test(
   'saves successfully and closes',
-  async ({ args, canvas }) => {
-    const user = userEvent.setup();
-
+  async ({ args, canvas, userEvent }) => {
     const nameInput = canvas.getByDisplayValue('Mont Poupet');
-    await user.clear(nameInput);
-    await user.type(nameInput, 'Nouveau Nom');
+    await userEvent.clear(nameInput);
+    await userEvent.type(nameInput, 'Nouveau Nom');
 
     const saveButton = canvas.getByText('💾 Enregistrer');
-    await user.click(saveButton);
+    await userEvent.click(saveButton);
 
     await waitFor(() => {
       expect(args.onSave).toHaveBeenCalled();
@@ -404,11 +389,9 @@ export const ShowsSavingState = meta.story({
   },
 });
 
-ShowsSavingState.test('shows saving state', async ({ canvas }) => {
-  const user = userEvent.setup();
-
+ShowsSavingState.test('shows saving state', async ({ canvas, userEvent }) => {
   const saveButton = canvas.getByText('💾 Enregistrer');
-  await user.click(saveButton);
+  await userEvent.click(saveButton);
 
   await waitFor(() => {
     expect(canvas.getByText('⏳ Enregistrement...')).toBeInTheDocument();
