@@ -35,7 +35,7 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-export default meta;
+
 
 // Mock daily summary data
 const mockDailySummaryGood = {

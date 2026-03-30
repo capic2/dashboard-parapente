@@ -12,7 +12,7 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-export default meta;
+
 
 // Mock sites with multiple orientations
 const mockSitesMontPoupet: Site[] = [

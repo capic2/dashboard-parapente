@@ -34,7 +34,7 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-export default meta;
+
 
 // Mock successful flight creation
 const mockFlightResult = {

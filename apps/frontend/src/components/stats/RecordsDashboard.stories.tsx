@@ -36,7 +36,7 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-export default meta;
+
 
 // Mock records data
 const mockRecords = {

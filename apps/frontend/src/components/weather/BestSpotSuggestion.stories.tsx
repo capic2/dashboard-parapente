@@ -16,7 +16,7 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-export default meta;
+
 
 // Mock data - simplified to match API response
 const mockBestSpotExcellent: BestSpotResult = {
