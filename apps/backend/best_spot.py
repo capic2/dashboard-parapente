@@ -8,7 +8,7 @@ This module provides functions to:
 """
 
 import logging
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -19,16 +19,15 @@ from models import Site, WeatherForecast
 logger = logging.getLogger(__name__)
 
 
-# Lazy import of cache to avoid Redis dependency issues
-def get_cache_module():
+def _get_cache_functions():
     """Lazy import of cache module to handle missing Redis gracefully"""
     try:
-        from cache import CACHE_TTL, get_redis
+        from cache import CACHE_TTL, get_cached, set_cached
 
-        return get_redis, CACHE_TTL
+        return get_cached, set_cached, CACHE_TTL
     except (ImportError, ModuleNotFoundError) as e:
         logger.warning(f"Redis not available, caching disabled: {e}")
-        return None, None
+        return None, None, None
 
 
 # Wind direction mappings (8 cardinal directions)
@@ -513,34 +512,29 @@ async def get_best_spot_cached(db: Session, day_index: int = 0) -> dict[str, Any
     Returns:
         Best spot data or None
     """
-    import json
-
     cache_key = f"best_spot:day_{day_index}"
-    get_redis_func, cache_ttl = get_cache_module()
+    get_cached_func, set_cached_func, cache_ttl = _get_cache_functions()
 
-    # If Redis is not available, just calculate directly
-    if get_redis_func is None:
+    # If cache module is not available, just calculate directly
+    if get_cached_func is None:
         logger.info(f"Redis not available, calculating best spot for day {day_index} directly...")
         return await calculate_best_spot_from_cache(db, day_index)
 
     try:
         # Try to get from cache
-        redis = await get_redis_func()
-        cached_data = await redis.get(cache_key)
+        cached_data = await get_cached_func(cache_key)
 
-        if cached_data:
+        if cached_data is not None:
             logger.info(f"✅ Best spot for day {day_index} retrieved from cache")
-            return json.loads(cached_data)
+            return cached_data
 
         # Not in cache, calculate
         logger.info(f"Cache miss, calculating best spot for day {day_index}...")
         best_spot = await calculate_best_spot_from_cache(db, day_index)
 
         if best_spot and cache_ttl:
-            # Store in cache
             ttl = cache_ttl.get("summary", 3600)  # 60 minutes
-            best_spot["cached_at"] = datetime.now(timezone.utc).isoformat()
-            await redis.setex(cache_key, ttl, json.dumps(best_spot))
+            await set_cached_func(cache_key, best_spot, ttl)
             logger.info(f"✅ Best spot for day {day_index} cached for {ttl}s")
 
         return best_spot
@@ -561,23 +555,19 @@ async def refresh_best_spot_cache(db: Session):
     """
     logger.info("♻️ Refreshing best spot cache for today (day 0)...")
 
-    get_redis_func, cache_ttl = get_cache_module()
+    get_cached_func, set_cached_func, cache_ttl = _get_cache_functions()
 
     try:
         # Calculate best spot for today only (day_index=0)
         best_spot = await calculate_best_spot_from_cache(db, day_index=0)
 
         if best_spot:
-            # Store in cache if Redis is available
-            if get_redis_func and cache_ttl:
-                import json
-
-                redis = await get_redis_func()
+            # Store in cache if cache module is available
+            if set_cached_func and cache_ttl:
                 cache_key = "best_spot:day_0"
                 ttl = cache_ttl.get("summary", 3600)
 
-                best_spot["cached_at"] = datetime.now(timezone.utc).isoformat()
-                await redis.setex(cache_key, ttl, json.dumps(best_spot))
+                await set_cached_func(cache_key, best_spot, ttl)
                 logger.info(f"✅ Best spot cache refreshed for today: {best_spot['site']['name']}")
             else:
                 logger.info(

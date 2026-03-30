@@ -282,7 +282,7 @@ def stop_scheduler():
     """Stop the scheduler"""
     try:
         if scheduler.running:
-            scheduler.shutdown(wait=False)
+            scheduler.shutdown(wait=True)
             logger.info("⏹️ Weather scheduler stopped")
     except Exception as e:
         logger.warning(f"⚠️ Error stopping scheduler (may already be stopped): {e}")

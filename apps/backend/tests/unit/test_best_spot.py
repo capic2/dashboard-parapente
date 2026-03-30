@@ -441,26 +441,23 @@ async def test_refresh_best_spot_cache_success(db_session):
         "score": 75.0,
     }
 
-    # Mock Redis cache (async functions)
-    mock_redis = MagicMock()
-    mock_redis.setex = AsyncMock()
-
-    async def mock_get_redis():
-        return mock_redis
-
+    mock_set_cached = AsyncMock()
     mock_cache_ttl = {"summary": 3600}
 
     with (
         patch(
             "best_spot.calculate_best_spot_from_cache", new=AsyncMock(return_value=mock_best_spot)
         ),
-        patch("best_spot.get_cache_module", return_value=(mock_get_redis, mock_cache_ttl)),
+        patch(
+            "best_spot._get_cache_functions",
+            return_value=(AsyncMock(), mock_set_cached, mock_cache_ttl),
+        ),
     ):
 
         await refresh_best_spot_cache(db_session)
 
         # Verify cache was set
-        mock_redis.setex.assert_called_once()
+        mock_set_cached.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -473,7 +470,7 @@ async def test_refresh_best_spot_cache_no_redis(db_session):
         patch(
             "best_spot.calculate_best_spot_from_cache", new=AsyncMock(return_value=mock_best_spot)
         ),
-        patch("best_spot.get_cache_module", return_value=(None, None)),
+        patch("best_spot._get_cache_functions", return_value=(None, None, None)),
     ):
 
         # Should not crash when Redis unavailable
@@ -484,17 +481,20 @@ async def test_refresh_best_spot_cache_no_redis(db_session):
 async def test_refresh_best_spot_cache_no_data(db_session):
     """Test cache refresh when no best spot data available"""
 
-    mock_redis = MagicMock()
+    mock_set_cached = AsyncMock()
 
     with (
         patch("best_spot.calculate_best_spot_from_cache", new=AsyncMock(return_value=None)),
-        patch("best_spot.get_cache_module", return_value=(lambda: mock_redis, 1800)),
+        patch(
+            "best_spot._get_cache_functions",
+            return_value=(AsyncMock(), mock_set_cached, {"summary": 3600}),
+        ),
     ):
 
         await refresh_best_spot_cache(db_session)
 
         # Should not set cache when no data
-        mock_redis.set.assert_not_called()
+        mock_set_cached.assert_not_called()
 
 
 # ============================================================================
@@ -599,11 +599,11 @@ async def test_get_best_spot_cached_day_0():
 
     with patch("weather_pipeline.get_normalized_forecast", new_callable=AsyncMock) as mock_weather:
         with patch("para_index.calculate_para_index") as mock_para:
-            with patch("best_spot.get_cache_module") as mock_cache_module:
+            with patch("best_spot._get_cache_functions") as mock_cache_module:
                 # Setup mocks
                 mock_weather.return_value = mock_forecast
                 mock_para.return_value = {"para_index": 75, "verdict": "BON"}
-                mock_cache_module.return_value = (None, None)  # No Redis
+                mock_cache_module.return_value = (None, None, None)  # No Redis
 
                 # Call function with day_index=0
                 result = await get_best_spot_cached(mock_db, day_index=0)
@@ -646,10 +646,10 @@ async def test_get_best_spot_cached_day_3():
 
     with patch("weather_pipeline.get_normalized_forecast", new_callable=AsyncMock) as mock_weather:
         with patch("para_index.calculate_para_index") as mock_para:
-            with patch("best_spot.get_cache_module") as mock_cache_module:
+            with patch("best_spot._get_cache_functions") as mock_cache_module:
                 mock_weather.return_value = mock_forecast
                 mock_para.return_value = {"para_index": 65, "verdict": "MOYEN"}
-                mock_cache_module.return_value = (None, None)
+                mock_cache_module.return_value = (None, None, None)
 
                 # Call with day_index=3
                 result = await get_best_spot_cached(mock_db, day_index=3)
@@ -687,37 +687,32 @@ async def test_cache_key_per_day():
         "consensus": [{"hour": 12, "wind_speed": 15, "wind_direction": 270}],
     }
 
-    mock_redis = AsyncMock()
-    mock_redis.get = AsyncMock(return_value=None)
-    mock_redis.setex = AsyncMock()
-
-    async def get_redis_func():
-        return mock_redis
-
+    mock_get_cached = AsyncMock(return_value=None)
+    mock_set_cached = AsyncMock()
     cache_ttl = {"summary": 3600}
 
     with patch("weather_pipeline.get_normalized_forecast", new_callable=AsyncMock) as mock_weather:
         with patch("para_index.calculate_para_index") as mock_para:
-            with patch("best_spot.get_cache_module") as mock_cache_module:
+            with patch("best_spot._get_cache_functions") as mock_cache_module:
                 mock_weather.return_value = mock_forecast
                 mock_para.return_value = {"para_index": 75, "verdict": "BON"}
-                mock_cache_module.return_value = (get_redis_func, cache_ttl)
+                mock_cache_module.return_value = (mock_get_cached, mock_set_cached, cache_ttl)
 
                 # Fetch day 0
                 await get_best_spot_cached(mock_db, day_index=0)
 
                 # Check cache key for day 0
-                calls = mock_redis.get.call_args_list
+                calls = mock_get_cached.call_args_list
                 assert any("best_spot:day_0" in str(call) for call in calls)
 
                 # Reset mock
-                mock_redis.reset_mock()
+                mock_get_cached.reset_mock()
 
                 # Fetch day 3
                 await get_best_spot_cached(mock_db, day_index=3)
 
                 # Check cache key for day 3
-                calls = mock_redis.get.call_args_list
+                calls = mock_get_cached.call_args_list
                 assert any("best_spot:day_3" in str(call) for call in calls)
 
 
@@ -746,27 +741,23 @@ async def test_refresh_cache_only_day_0():
         "consensus": [{"hour": 12, "wind_speed": 15, "wind_direction": 270}],
     }
 
-    mock_redis = AsyncMock()
-    mock_redis.setex = AsyncMock()
-
-    async def get_redis_func():
-        return mock_redis
-
+    mock_get_cached = AsyncMock(return_value=None)
+    mock_set_cached = AsyncMock()
     cache_ttl = {"summary": 3600}
 
     with patch("weather_pipeline.get_normalized_forecast", new_callable=AsyncMock) as mock_weather:
         with patch("para_index.calculate_para_index") as mock_para:
-            with patch("best_spot.get_cache_module") as mock_cache_module:
+            with patch("best_spot._get_cache_functions") as mock_cache_module:
                 mock_weather.return_value = mock_forecast
                 mock_para.return_value = {"para_index": 75, "verdict": "BON"}
-                mock_cache_module.return_value = (get_redis_func, cache_ttl)
+                mock_cache_module.return_value = (mock_get_cached, mock_set_cached, cache_ttl)
 
                 # Call refresh
                 await refresh_best_spot_cache(mock_db)
 
-                # Verify setex was called with day_0 key
-                mock_redis.setex.assert_called_once()
-                call_args = mock_redis.setex.call_args
+                # Verify set_cached was called with day_0 key
+                mock_set_cached.assert_called_once()
+                call_args = mock_set_cached.call_args
                 assert call_args[0][0] == "best_spot:day_0"
 
                 # Verify get_normalized_forecast was called with day_index=0
