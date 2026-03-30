@@ -134,7 +134,7 @@ export function BestSpotSuggestion({
           </div>
         )}
 
-        {thermalCeiling && (
+        {thermalCeiling != null && (
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 dark:text-gray-400">
               ☁️ {t('weather.thermalCeiling')}:

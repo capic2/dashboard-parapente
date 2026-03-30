@@ -320,15 +320,20 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
                 f"Conditions défavorables partout (meilleur: {best_site['site']['name']}, score {int(best_site['score'])})"
             )
 
-        # Fetch thermal ceiling from most recent emagram analysis
+        # Fetch thermal ceiling from nearest emagram analysis for the winning site
         try:
             from datetime import timedelta
+
+            from spots.distance import haversine_distance
 
             target_date = (datetime.now(timezone.utc) + timedelta(days=day_index)).date()
             window_start = datetime.combine(target_date, datetime.min.time()) - timedelta(hours=12)
             window_end = datetime.combine(target_date, datetime.min.time()) + timedelta(hours=36)
 
-            emagram = (
+            site_lat = best_site["site"].get("latitude")
+            site_lon = best_site["site"].get("longitude")
+
+            analyses = (
                 db.query(EmagramAnalysisModel)
                 .filter(
                     EmagramAnalysisModel.analysis_datetime >= window_start,
@@ -336,9 +341,26 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
                     EmagramAnalysisModel.analysis_status == "completed",
                 )
                 .order_by(EmagramAnalysisModel.analysis_datetime.desc())
-                .first()
+                .all()
             )
-            best_site["thermalCeiling"] = emagram.plafond_thermique_m if emagram else None
+
+            # Pick the closest analysis within 200km of the winning site
+            best_emagram = None
+            if site_lat is not None and site_lon is not None:
+                max_distance_km = 200
+                best_dist = max_distance_km
+                for analysis in analyses:
+                    dist = haversine_distance(
+                        site_lat, site_lon,
+                        analysis.station_latitude, analysis.station_longitude,
+                    )
+                    if dist < best_dist:
+                        best_dist = dist
+                        best_emagram = analysis
+
+            best_site["thermalCeiling"] = (
+                best_emagram.plafond_thermique_m if best_emagram else None
+            )
         except Exception as e:
             logger.warning(f"Could not fetch thermal ceiling: {e}")
             best_site["thermalCeiling"] = None
