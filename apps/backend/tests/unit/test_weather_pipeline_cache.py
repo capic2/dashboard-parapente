@@ -25,9 +25,7 @@ def _make_cached_forecast(*, sunrise="07:15", sunset="19:30"):
     """Helper to build a cached forecast result."""
     return {
         "success": True,
-        "consensus": [
-            {"hour": 12, "wind_speed": 15, "wind_direction": 270, "temperature": 18}
-        ],
+        "consensus": [{"hour": 12, "wind_speed": 15, "wind_direction": 270, "temperature": 18}],
         "sunrise": sunrise,
         "sunset": sunset,
         "cached_at": "2026-03-30T10:00:00+00:00",
@@ -108,9 +106,7 @@ async def test_cache_miss_fetches_and_caches(mock_redis):
 
     consensus = {
         "success": True,
-        "consensus": [
-            {"hour": 12, "temperature": 18, "wind_speed": 15, "wind_direction": 270}
-        ],
+        "consensus": [{"hour": 12, "temperature": 18, "wind_speed": 15, "wind_direction": 270}],
         "total_sources": 1,
     }
 
@@ -120,9 +116,7 @@ async def test_cache_miss_fetches_and_caches(mock_redis):
         patch("weather_pipeline.aggregate_forecasts", new=AsyncMock(return_value=aggregated)),
         patch("weather_pipeline.normalize_data", return_value=normalized),
         patch("weather_pipeline.calculate_consensus", return_value=consensus),
-        patch(
-            "weather_pipeline.extract_sunrise_sunset", return_value=("07:15", "19:30")
-        ),
+        patch("weather_pipeline.extract_sunrise_sunset", return_value=("07:15", "19:30")),
     ):
         result = await get_normalized_forecast(lat=47.2, lon=6.0, day_index=0)
 
@@ -146,8 +140,12 @@ async def test_cache_error_falls_back_to_live_fetch():
         "sources": {
             "open-meteo": {
                 "success": True,
-                "data": {"daily": {"sunrise": ["2026-03-30T07:15"], "sunset": ["2026-03-30T19:30"]}},
-                "hourly": [{"hour": 12, "temperature": 18, "wind_speed": 15, "wind_direction": 270}],
+                "data": {
+                    "daily": {"sunrise": ["2026-03-30T07:15"], "sunset": ["2026-03-30T19:30"]}
+                },
+                "hourly": [
+                    {"hour": 12, "temperature": 18, "wind_speed": 15, "wind_direction": 270}
+                ],
             }
         }
     }
