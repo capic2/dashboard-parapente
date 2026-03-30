@@ -67,12 +67,11 @@ export const createWeatherQueryFn =
       total_rain_mm: null,
     };
 
-    // Helper to format wind direction
-    // CRITICAL FIX: Add 180° to show where wind COMES FROM (not goes to)
-    // Example: if wind comes from North (0°), display as South (180°) with arrow pointing down
+    // Helper to format wind direction from degrees to cardinal
+    // Backend sends degrees in meteorological convention (where wind comes FROM)
+    // 0° = North wind (from North), 90° = East wind, etc.
     const formatWindDirection = (deg: number | null): string => {
       if (deg === null) return '—';
-      // Flip direction by adding 180° (already done in backend, but ensuring consistency)
       const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
       const index = Math.round((deg % 360) / 45) % 8;
       return directions[index];
@@ -137,6 +136,7 @@ export const createWeatherQueryFn =
         wind_gust: hour.wind_gust || 0,
         direction: formatWindDirection(hour.wind_direction),
         wind_direction: formatWindDirection(hour.wind_direction),
+        wind_direction_deg: hour.wind_direction ?? null,
         conditions:
           hour.cloud_cover !== null
             ? `${Math.round(hour.cloud_cover)}% nuages`
