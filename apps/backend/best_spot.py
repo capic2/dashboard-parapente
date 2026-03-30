@@ -8,7 +8,7 @@ This module provides functions to:
 """
 
 import logging
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Any
 
 from sqlalchemy.orm import Session

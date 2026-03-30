@@ -7,7 +7,6 @@ Covers:
 - extract_sunrise_sunset uses logger instead of file writes
 """
 
-import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
