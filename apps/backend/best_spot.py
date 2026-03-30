@@ -8,7 +8,7 @@ This module provides functions to:
 """
 
 import logging
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -322,8 +322,6 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
 
         # Fetch thermal ceiling from nearest emagram analysis for the winning site
         try:
-            from datetime import timedelta
-
             from spots.distance import haversine_distance
 
             target_date = (datetime.now(timezone.utc) + timedelta(days=day_index)).date()
@@ -350,6 +348,11 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
                 max_distance_km = 200
                 best_dist = max_distance_km
                 for analysis in analyses:
+                    if (
+                        analysis.station_latitude is None
+                        or analysis.station_longitude is None
+                    ):
+                        continue
                     dist = haversine_distance(
                         site_lat, site_lon,
                         analysis.station_latitude, analysis.station_longitude,
@@ -416,8 +419,6 @@ async def calculate_best_spot_from_db(db: Session, day_index: int = 0) -> dict[s
     Returns:
         Dict with best spot info or None if no data available
     """
-    from datetime import timedelta
-
     forecast_date = date.today() + timedelta(days=day_index)
 
     logger.info(f"Calculating best spot for day {day_index} ({forecast_date})...")
