@@ -1380,9 +1380,7 @@ async def debug_cache_data(site_id: str, day_index: int = 0, db: Session = Depen
     """
     Admin endpoint: Show RAW cache data for debugging
     """
-    import hashlib
-
-    from cache import get_redis
+    from cache import generate_cache_key, get_cached
 
     try:
         site = db.query(Site).filter(Site.id == site_id).first()
@@ -1390,25 +1388,27 @@ async def debug_cache_data(site_id: str, day_index: int = 0, db: Session = Depen
             raise HTTPException(status_code=404, detail=f"Site not found: {site_id}")
 
         # Calculate cache key the same way weather_pipeline does
-        cache_key_base = f"{site.latitude},{site.longitude},{day_index}"
-        cache_key = f"weather:forecast:{hashlib.md5(cache_key_base.encode()).hexdigest()[:8]}"
+        cache_key = generate_cache_key(
+            "forecast",
+            lat=round(site.latitude, 4),
+            lon=round(site.longitude, 4),
+            day_index=day_index,
+        )
 
-        redis_client = await get_redis()
-        cached_data = await redis_client.get(cache_key)
+        cached_data = await get_cached(cache_key)
 
-        if cached_data:
-            import json
-
-            data = json.loads(cached_data)
+        if cached_data is not None:
             return {
                 "cache_key": cache_key,
                 "found": True,
-                "success": data.get("success"),
-                "error": data.get("error"),
-                "consensus_count": len(data.get("consensus", [])),
-                "sources_count": len(data.get("sources", {})),
-                "sample_hour": data.get("consensus", [{}])[0] if data.get("consensus") else None,
-                "raw_keys": list(data.keys()),
+                "success": cached_data.get("success"),
+                "error": cached_data.get("error"),
+                "consensus_count": len(cached_data.get("consensus", [])),
+                "sources_count": len(cached_data.get("sources", {})),
+                "sample_hour": (
+                    cached_data.get("consensus", [{}])[0] if cached_data.get("consensus") else None
+                ),
+                "raw_keys": list(cached_data.keys()),
             }
         else:
             return {"cache_key": cache_key, "found": False}
