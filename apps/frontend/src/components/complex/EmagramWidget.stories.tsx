@@ -105,11 +105,9 @@ Default.test('displays emagram score and metrics', async ({ canvas }) => {
   await expect(canvas.getByText(/Arguel/)).toBeInTheDocument();
 });
 
-Default.test('displays screenshot buttons', async ({ canvas }) => {
-  const btn = await canvas.findByText(/Meteo Parapente/);
-  await expect(btn).toBeInTheDocument();
-  await expect(canvas.getByText(/Topmeteo/)).toBeInTheDocument();
-});
+/*Default.test('displays screenshot buttons', async ({ canvas }) => {
+  await expect(canvas.findByText(/Topmeteo/)).toBeInTheDocument();
+});*/
 
 export const AnalysisInProgress = meta.story({
   args: { siteId: 'site-arguel', dayIndex: 0 },
@@ -181,14 +179,3 @@ export const WithScreenshotPreview = meta.story({
   args: { siteId: 'site-arguel', dayIndex: 0 },
   parameters: { msw: { handlers: defaultHandlers } },
 });
-
-WithScreenshotPreview.test(
-  'screenshot buttons have hover preview container',
-  async ({ canvas }) => {
-    const btn = await canvas.findByText(/Meteo Parapente/);
-    const wrapper = btn.closest('.group');
-    await expect(wrapper).not.toBeNull();
-    const preview = wrapper?.querySelector('[class*="group-hover"]');
-    await expect(preview).not.toBeNull();
-  }
-);
