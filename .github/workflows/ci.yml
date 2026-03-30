@@ -75,6 +75,21 @@ jobs:
           python -m pip install --upgrade pip
           cd apps/backend && pip install -r requirements.txt
 
+      - name: 💾 Cache Playwright browsers
+        id: playwright-cache-main
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: 🎭 Install Playwright
+        run: |
+          if [ "${{ steps.playwright-cache-main.outputs.cache-hit }}" != "true" ]; then
+            pnpm exec playwright install --with-deps chromium
+          else
+            pnpm exec playwright install-deps chromium
+          fi
+
       - name: 🔍 Check unused code (knip)
         run: pnpm knip
 
@@ -233,8 +248,12 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
 
       - name: 🎭 Install Playwright
-        if: steps.playwright-cache-e2e.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
+        run: |
+          if [ "${{ steps.playwright-cache-e2e.outputs.cache-hit }}" != "true" ]; then
+            pnpm exec playwright install --with-deps chromium
+          else
+            pnpm exec playwright install-deps chromium
+          fi
 
       # Configure NX Cloud for E2E: same logic as main job
       - name: 🎛️ Configure NX Cloud execution
