@@ -14,7 +14,13 @@ export default function CacheTimestamp({
 }: CacheTimestampProps) {
   const { t, i18n } = useTranslation();
 
-  if (!cachedAt) return null;
+  if (!cachedAt) {
+    return (
+      <span className={`text-xs text-gray-400 ${className}`}>
+        {t('weather.notCached')}
+      </span>
+    );
+  }
 
   const locale = i18n.language === 'fr' ? fr : enUS;
   const relativeTime = formatDistanceToNow(new Date(cachedAt), {

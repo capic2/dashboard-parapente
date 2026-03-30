@@ -64,6 +64,7 @@
     "currentConditionsFor": "Conditions Actuelles - {{name}}",
     "loadError": "Impossible de charger les données météo",
     "updatedAt": "Mis à jour:",
+    "notCached": "Non mis en cache",
     "forecast7Days": "Prévisions 7 Jours",
     "bestSpotFor": "Meilleur spot pour {{date}}",
     "calculating": "Calcul en cours...",

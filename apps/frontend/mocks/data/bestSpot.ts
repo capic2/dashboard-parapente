@@ -18,6 +18,7 @@ const bestSpotByDay: Record<number, BestSpotResult> = {
     windDirection: 'N',
     windSpeed: 12,
     reason: 'Vent favorable Nord 12km/h, thermiques excellents (15h-18h)',
+    cached_at: '2025-06-15T08:30:00Z',
   },
 
   // Day 1 - Tomorrow: Mont Poupet is best (light wind, good conditions)
@@ -32,6 +33,7 @@ const bestSpotByDay: Record<number, BestSpotResult> = {
     windDirection: 'E',
     windSpeed: 8,
     reason: 'Vent léger Est 8km/h, conditions optimales toute la journée',
+    cached_at: '2025-06-15T09:00:00Z',
   },
 
   // Day 2 - La Côte is best (moderate wind)
@@ -46,6 +48,7 @@ const bestSpotByDay: Record<number, BestSpotResult> = {
     windDirection: 'NW',
     windSpeed: 15,
     reason: 'Vent modéré Nord-Ouest 15km/h, bon créneau 14h-17h',
+    cached_at: '2025-06-15T09:30:00Z',
   },
 
   // Day 3 - Arguel again (wind picks up)
@@ -60,6 +63,7 @@ const bestSpotByDay: Record<number, BestSpotResult> = {
     windDirection: 'N',
     windSpeed: 18,
     reason: 'Vent soutenu Nord 18km/h, vol possible pour pilotes confirmés',
+    cached_at: '2025-06-15T10:00:00Z',
   },
 
   // Day 4 - Mont Poupet (calmer conditions)
@@ -74,6 +78,7 @@ const bestSpotByDay: Record<number, BestSpotResult> = {
     windDirection: 'SE',
     windSpeed: 10,
     reason: 'Vent faible Sud-Est 10km/h, bonnes conditions thermiques',
+    cached_at: '2025-06-15T10:30:00Z',
   },
 
   // Day 5 - La Côte (variable conditions)
@@ -89,6 +94,7 @@ const bestSpotByDay: Record<number, BestSpotResult> = {
     windSpeed: 22,
     reason:
       'Vent fort Ouest 22km/h, conditions difficiles, prudence recommandée',
+    cached_at: '2025-06-15T11:00:00Z',
   },
 
   // Day 6 - Arguel (improving conditions)
@@ -103,6 +109,7 @@ const bestSpotByDay: Record<number, BestSpotResult> = {
     windDirection: 'NE',
     windSpeed: 14,
     reason: 'Vent modéré Nord-Est 14km/h, amélioration en fin de journée',
+    cached_at: '2025-06-15T11:30:00Z',
   },
 };
 
