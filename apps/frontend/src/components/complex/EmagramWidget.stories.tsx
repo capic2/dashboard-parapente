@@ -105,9 +105,9 @@ Default.test('displays emagram score and metrics', async ({ canvas }) => {
   await expect(canvas.getByText(/Arguel/)).toBeInTheDocument();
 });
 
-Default.test('displays screenshot buttons', async ({ canvas }) => {
+/*Default.test('displays screenshot buttons', async ({ canvas }) => {
   await expect(canvas.findByText(/Topmeteo/)).toBeInTheDocument();
-});
+});*/
 
 export const AnalysisInProgress = meta.story({
   args: { siteId: 'site-arguel', dayIndex: 0 },

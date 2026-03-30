@@ -1,8 +1,8 @@
-import { http, HttpResponse } from 'msw';
+import {http, HttpResponse} from 'msw';
 import preview from '../../../.storybook/preview';
-import { expect, fn, waitFor } from 'storybook/test';
-import { EditSiteModal } from './EditSiteModal';
-import type { Site } from '@dashboard-parapente/shared-types';
+import {expect, fn} from 'storybook/test';
+import {EditSiteModal} from './EditSiteModal';
+import type {Site} from '@dashboard-parapente/shared-types';
 
 const meta = preview.meta({
   title: 'Components/Forms/EditSiteModal',
