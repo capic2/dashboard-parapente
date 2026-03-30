@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   issues: write
@@ -30,7 +34,7 @@ jobs:
       - name: 📥 Checkout
         uses: actions/checkout@v6
         with:
-          fetch-depth: 0
+          fetch-depth: 50
 
       # NX Local Cache: fallback when NX Cloud credits are exhausted
       # This cache is also used for Renovate PRs to conserve NX Cloud credits
@@ -70,16 +74,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           cd apps/backend && pip install -r requirements.txt
-
-      - name: 💾 Cache Playwright browsers
-        id: playwright-cache-main
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml', 'apps/backend/requirements.txt') }}
-
-      - name: 🎭 Install Playwright
-        run: pnpm exec playwright install --with-deps chromium
 
       - name: 🔍 Check unused code (knip)
         run: pnpm knip
@@ -130,16 +124,13 @@ jobs:
             echo "$output"
           }
 
-          run_nx nx affected -t build --parallel=3 --exclude=e2e
-          run_nx nx affected -t lint --parallel=3 --exclude=e2e
-          run_nx nx affected -t type-check --parallel=3 --exclude=e2e
-
-          TESTING=true \
-          BACKEND_DATABASE_URL=sqlite:///./test.db \
-          BACKEND_WEATHERAPI_KEY=test_key \
-          BACKEND_METEOBLUE_API_KEY=test_key \
-            run_nx nx affected -t test --parallel=3 --exclude=e2e
+          run_nx nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e
         continue-on-error: true
+        env:
+          TESTING: true
+          BACKEND_DATABASE_URL: sqlite:///./test.db
+          BACKEND_WEATHERAPI_KEY: test_key
+          BACKEND_METEOBLUE_API_KEY: test_key
 
       - name: 💡 Handle NX Cloud credits exhaustion
         if: steps.nx_tasks.outcome == 'failure' && env.NX_CLOUD_EXHAUSTED == 'true'
@@ -156,12 +147,9 @@ jobs:
 
       - name: 🔄 Retry with local cache
         if: steps.nx_tasks.outcome == 'failure' && env.NX_CLOUD_EXHAUSTED == 'true'
-        run: |
-          pnpm exec nx affected -t build --parallel=3 --exclude=e2e
-          pnpm exec nx affected -t lint --parallel=3 --exclude=e2e
-          pnpm exec nx affected -t type-check --parallel=3 --exclude=e2e
-          pnpm exec nx affected -t test --parallel=3 --exclude=e2e
+        run: pnpm exec nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e
         env:
+          NX_NO_CLOUD: true
           TESTING: true
           BACKEND_DATABASE_URL: sqlite:///./test.db
           BACKEND_WEATHERAPI_KEY: test_key
@@ -170,9 +158,6 @@ jobs:
       - name: ❌ Fail if non-NX-Cloud error
         if: steps.nx_tasks.outcome == 'failure' && env.NX_CLOUD_EXHAUSTED != 'true'
         run: exit 1
-
-      - name: 🔍 Check unused code (knip)
-        run: pnpm knip
 
       - name: 📊 Upload frontend coverage
         if: always()
@@ -211,10 +196,10 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .nx/cache
-          key: nx-e2e-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ github.sha }}
+          key: nx-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
-            nx-e2e-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-
-            nx-e2e-${{ runner.os }}-
+            nx-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-
+            nx-${{ runner.os }}-
 
       - name: 📦 Setup pnpm
         uses: pnpm/action-setup@v5
@@ -248,6 +233,7 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
 
       - name: 🎭 Install Playwright
+        if: steps.playwright-cache-e2e.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
 
       # Configure NX Cloud for E2E: same logic as main job
