@@ -8,6 +8,7 @@ vi.mock('react-i18next', () => ({
     t: (key: string) => {
       const translations: Record<string, string> = {
         'weather.updatedAt': 'Mis à jour:',
+        'weather.notCached': 'Non mis en cache',
       };
       return translations[key] || key;
     },
@@ -16,14 +17,14 @@ vi.mock('react-i18next', () => ({
 }));
 
 describe('CacheTimestamp', () => {
-  it('renders nothing when cachedAt is null', () => {
-    const { container } = render(<CacheTimestamp cachedAt={null} />);
-    expect(container.innerHTML).toBe('');
+  it('renders "not cached" when cachedAt is null', () => {
+    render(<CacheTimestamp cachedAt={null} />);
+    expect(screen.getByText('Non mis en cache')).toBeInTheDocument();
   });
 
-  it('renders nothing when cachedAt is undefined', () => {
-    const { container } = render(<CacheTimestamp cachedAt={undefined} />);
-    expect(container.innerHTML).toBe('');
+  it('renders "not cached" when cachedAt is undefined', () => {
+    render(<CacheTimestamp cachedAt={undefined} />);
+    expect(screen.getByText('Non mis en cache')).toBeInTheDocument();
   });
 
   it('renders relative time for a valid cachedAt', () => {

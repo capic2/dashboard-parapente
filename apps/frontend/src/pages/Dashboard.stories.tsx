@@ -65,6 +65,7 @@ const mockSites = {
 const mockWeather = {
   site_id: 'site-arguel',
   site_name: 'Arguel',
+  cached_at: '2025-06-15T08:30:00Z',
   day_index: 0,
   days: 1,
   para_index: 78,
@@ -114,6 +115,7 @@ const mockStats = {
 const mockBestSpot = {
   site_id: 'site-arguel',
   site_name: 'Arguel',
+  cached_at: '2025-06-15T08:30:00Z',
   score: 82,
   para_index: 78,
   verdict: 'bon',
@@ -127,6 +129,7 @@ const mockBestSpot = {
 const mockDailySummary = {
   site_id: 'site-arguel',
   site_name: 'Arguel',
+  cached_at: '2025-06-15T08:00:00Z',
   days: Array.from({ length: 7 }, (_, i) => ({
     day_index: i,
     date: `2026-03-${24 + i}`,

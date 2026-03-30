@@ -468,6 +468,7 @@ export const handlers = [
       const dailySummary = {
         site_id: spotId,
         site_name: site.name,
+        cached_at: '2025-06-15T08:00:00Z',
         days: Array.from({ length: days }, (_, index) => {
           const date = new Date();
           date.setDate(date.getDate() + index);
