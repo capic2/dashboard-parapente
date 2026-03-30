@@ -27,8 +27,6 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-export default meta;
-
 const mockSites = {
   sites: [
     {
@@ -133,7 +131,7 @@ const mockDailySummary = {
   days: Array.from({ length: 7 }, (_, i) => ({
     day_index: i,
     date: `2026-03-${24 + i}`,
-    para_index: 70 + Math.floor(Math.random() * 20),
+    para_index: 10 * i,
     verdict: i < 3 ? 'bon' : 'moyen',
     emoji: i < 3 ? '🟢' : '🟡',
     temp_min: 10 + i,
@@ -143,23 +141,23 @@ const mockDailySummary = {
 };
 
 const defaultHandlers = [
-  http.get('*/api/spots', () => HttpResponse.json(mockSites)),
-  http.get('*/api/spots/best', () => HttpResponse.json(mockBestSpot)),
-  http.get('*/api/spots/:id', ({ params }) => {
+  http.get('/api/spots', () => HttpResponse.json(mockSites)),
+  http.get('/api/spots/best', () => HttpResponse.json(mockBestSpot)),
+  http.get('/api/spots/:id', ({ params }) => {
     const site = mockSites.sites.find((s) => s.id === params.id);
     return site
       ? HttpResponse.json(site)
       : new HttpResponse(null, { status: 404 });
   }),
-  http.get('*/api/weather/:spotId/daily-summary', () =>
+  http.get('/api/weather/:spotId/daily-summary', () =>
     HttpResponse.json(mockDailySummary)
   ),
-  http.get('*/api/weather/:spotId', () => HttpResponse.json(mockWeather)),
-  http.get('*/api/flights/stats', () => HttpResponse.json(mockStats)),
-  http.get('*/api/sites/:siteId/landings', () => HttpResponse.json([])),
-  http.get('*/api/sites/:siteId/landings/weather', () => HttpResponse.json([])),
-  http.get('*/api/emagram/latest', () => HttpResponse.json(null)),
-  http.get('*/api/emagram/history', () => HttpResponse.json([])),
+  http.get('/api/weather/:spotId', () => HttpResponse.json(mockWeather)),
+  http.get('/api/flights/stats', () => HttpResponse.json(mockStats)),
+  http.get('/api/sites/:siteId/landings', () => HttpResponse.json([])),
+  http.get('/api/sites/:siteId/landings/weather', () => HttpResponse.json([])),
+  http.get('/api/emagram/latest', () => HttpResponse.json(null)),
+  http.get('/api/emagram/history', () => HttpResponse.json([])),
 ];
 
 export const Default = meta.story({
@@ -178,7 +176,7 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/spots', async () => {
+        http.get('/api/spots', async () => {
           await new Promise(() => {});
         }),
         ...defaultHandlers.slice(1),
@@ -191,7 +189,7 @@ export const Error = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/spots', () => new HttpResponse(null, { status: 500 })),
+        http.get('/api/spots', () => new HttpResponse(null, { status: 500 })),
         ...defaultHandlers.slice(1),
       ],
     },
