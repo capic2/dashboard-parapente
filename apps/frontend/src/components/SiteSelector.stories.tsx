@@ -117,7 +117,7 @@ const meta = preview.meta({
   },
 });
 
-export default meta;
+
 
 /**
  * Default story showing Arguel selected

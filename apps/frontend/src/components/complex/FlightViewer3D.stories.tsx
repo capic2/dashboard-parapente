@@ -37,7 +37,7 @@ const meta = preview.meta({
   tags: ['autodocs', 'test-skip'],
 });
 
-export default meta;
+
 
 const mockGPXData = {
   coordinates: Array.from({ length: 100 }, (_, i) => ({

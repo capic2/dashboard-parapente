@@ -44,7 +44,7 @@ export const Default = meta.story({
   },
 });
 
-export default meta;
+
 ```
 
 ### Personnaliser la route initiale avec parameters
@@ -112,7 +112,7 @@ export const WithHistory = meta.story({
   ],
 });
 
-export default meta;
+
 ```
 
 ### Routes disponibles dans Storybook
