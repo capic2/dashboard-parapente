@@ -462,9 +462,8 @@ def calculate_consensus(normalized: dict[str, Any]) -> dict[str, Any]:
                 # Normalize to 0-360
                 dir_avg = (dir_avg + 360) % 360
 
-                # Apply 180° flip to show where wind COMES FROM (not goes to)
-                # Convention in paragliding: wind direction = origin of wind
-                dir_avg = (dir_avg + 180) % 360
+                # All scrapers now use meteorological convention (where wind comes FROM)
+                # No flip needed — consensus is already in "comes from" convention
 
                 # Calculate confidence based on number of sources and vector magnitude
                 # magnitude close to 1.0 = all sources agree, close to 0 = sources disagree
