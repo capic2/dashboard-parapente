@@ -326,15 +326,15 @@ GoodConditions.test('it renders the correct values', async ({ canvas }) => {
   // Wait for data to load - wait for a specific value that only appears when data is loaded
   await canvas.findByText('85/100');
 
-  // Verify table headers are present
+  // Verify table headers are present (headers now include icons and units)
   await expect(getByText('Heure')).toBeInTheDocument();
   await expect(getByText('Para-Index')).toBeInTheDocument();
-  await expect(getByText('Temp')).toBeInTheDocument();
-  await expect(getByText('Vent')).toBeInTheDocument();
-  await expect(getByText('Rafales')).toBeInTheDocument();
+  await expect(getByText('Temp (°C)')).toBeInTheDocument();
+  await expect(getByText('Vent (km/h)')).toBeInTheDocument();
+  await expect(getByText('Rafales (km/h)')).toBeInTheDocument();
   await expect(getByText('Direction')).toBeInTheDocument();
-  await expect(getByText('Précip.')).toBeInTheDocument();
-  await expect(getByText('Nuages')).toBeInTheDocument();
+  await expect(getByText('Précip. (mm)')).toBeInTheDocument();
+  await expect(getByText('Nuages (%)')).toBeInTheDocument();
   await expect(getByText('CAPE (J/kg)')).toBeInTheDocument();
   await expect(getByText('Thermiques')).toBeInTheDocument();
   await expect(getByText('Volabilité')).toBeInTheDocument();
@@ -349,29 +349,29 @@ GoodConditions.test('it renders the correct values', async ({ canvas }) => {
   await expect(getByText('92/100')).toBeInTheDocument(); // 11:00
   await expect(getByText('90/100')).toBeInTheDocument(); // 12:00
 
-  // Verify temperatures (unique values)
-  await expect(getByText('22°C')).toBeInTheDocument(); // 10:00
-  await expect(getByText('24°C')).toBeInTheDocument(); // 11:00
-  await expect(getByText('25°C')).toBeInTheDocument(); // 12:00
+  // Verify temperatures (units now in headers, cells show raw values)
+  await expect(getByText('22')).toBeInTheDocument(); // 10:00
+  await expect(getByText('24')).toBeInTheDocument(); // 11:00
+  await expect(getByText('25')).toBeInTheDocument(); // 12:00
 
-  // Verify wind speeds (unique values)
-  await expect(getByText('10 km/h')).toBeInTheDocument(); // 10:00
-  await expect(getByText('11 km/h')).toBeInTheDocument(); // 11:00
-  await expect(getByText('12 km/h')).toBeInTheDocument(); // 12:00
+  // Verify wind speeds (units now in headers, some values may appear in multiple columns)
+  await expect(getAllByText('10').length).toBeGreaterThanOrEqual(1); // 10:00 (also cloud cover)
+  await expect(getAllByText('11').length).toBeGreaterThanOrEqual(1); // 11:00
+  await expect(getAllByText('12').length).toBeGreaterThanOrEqual(1); // 12:00
 
-  // Verify wind gusts (unique values)
-  await expect(getByText('15.0 km/h')).toBeInTheDocument(); // 10:00
-  await expect(getByText('16.0 km/h')).toBeInTheDocument(); // 11:00
-  await expect(getByText('17.0 km/h')).toBeInTheDocument(); // 12:00
+  // Verify wind gusts (units now in headers)
+  await expect(getByText('15.0')).toBeInTheDocument(); // 10:00
+  await expect(getByText('16.0')).toBeInTheDocument(); // 11:00
+  await expect(getByText('17.0')).toBeInTheDocument(); // 12:00
 
-  // Verify directions (may appear multiple times - just check they exist)
-  await expect(getAllByText('NW').length).toBeGreaterThanOrEqual(2); // 10:00 and 11:00
-  await expect(getByText('W')).toBeInTheDocument(); // 12:00
+  // Verify wind direction arrows are rendered (SVG elements with aria-label)
+  const directionArrows = canvas.getAllByLabelText(/Vent \d+°/);
+  await expect(directionArrows.length).toBeGreaterThanOrEqual(3);
 
-  // Verify cloud cover percentages (unique values)
-  await expect(getByText('10%')).toBeInTheDocument(); // 10:00
-  await expect(getByText('8%')).toBeInTheDocument(); // 11:00
-  await expect(getByText('5%')).toBeInTheDocument(); // 12:00
+  // Verify cloud cover values (units now in headers)
+  await expect(getAllByText('10').length).toBeGreaterThanOrEqual(1); // 10:00 (also wind speed)
+  await expect(getAllByText('8').length).toBeGreaterThanOrEqual(1); // 11:00
+  await expect(getAllByText('5').length).toBeGreaterThanOrEqual(1); // 12:00
 
   // Verify CAPE values (unique values)
   await expect(getByText('800')).toBeInTheDocument(); // 10:00
@@ -416,15 +416,15 @@ MixedConditions.test(
     await expect(getByText('45/100')).toBeInTheDocument(); // 11:00 - limite
     await expect(getByText('30/100')).toBeInTheDocument(); // 12:00 - mauvais
 
-    // Verify temperatures (lower temps for bad conditions)
-    await expect(getByText('16°C')).toBeInTheDocument(); // 10:00
-    await expect(getByText('15°C')).toBeInTheDocument(); // 11:00
-    await expect(getByText('14°C')).toBeInTheDocument(); // 12:00
+    // Verify temperatures (units now in headers)
+    await expect(getByText('16')).toBeInTheDocument(); // 10:00
+    await expect(getByText('15')).toBeInTheDocument(); // 11:00
+    await expect(getByText('14')).toBeInTheDocument(); // 12:00
 
-    // Verify wind speeds (higher winds for bad conditions)
-    await expect(getByText('18 km/h')).toBeInTheDocument(); // 10:00
-    await expect(getByText('25 km/h')).toBeInTheDocument(); // 11:00
-    await expect(getByText('32 km/h')).toBeInTheDocument(); // 12:00
+    // Verify wind speeds (units now in headers)
+    await expect(getByText('18')).toBeInTheDocument(); // 10:00
+    await expect(getByText('25')).toBeInTheDocument(); // 11:00
+    await expect(getByText('32')).toBeInTheDocument(); // 12:00
 
     // Verify different verdicts appear
     await expect(getAllByText(/MOYEN/).length).toBeGreaterThanOrEqual(1);

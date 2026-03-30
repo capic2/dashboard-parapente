@@ -48,11 +48,11 @@ def calculate_wind_direction_from_components(u: float, v: float) -> int:
     Returns:
         Wind direction in degrees (0-360)
     """
-    # atan2(u, v) gives direction in radians
-    # Convert to degrees and normalize to 0-360
-    direction = math.degrees(math.atan2(u, v))
+    # atan2(u, v) gives direction WHERE wind goes TO in radians
+    # Add 180° to convert to meteorological convention (where wind comes FROM)
+    direction = math.degrees(math.atan2(u, v)) + 180
     # Normalize to 0-360
-    direction = (direction + 360) % 360
+    direction = direction % 360
     return int(direction)
 
 
