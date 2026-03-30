@@ -28,7 +28,7 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-export default meta;
+
 
 const mockEmagramData = {
   id: 'test-emagram-1',
@@ -73,9 +73,26 @@ const mockEmagramData = {
   updated_at: '2026-03-24T12:00:00Z',
 };
 
+// 1x1 blue PNG placeholder for screenshot preview testing
+const PLACEHOLDER_PNG = new Uint8Array([
+  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1,
+  0, 0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222, 0, 0, 0, 12, 73, 68, 65, 84,
+  8, 215, 99, 104, 104, 248, 15, 0, 1, 1, 0, 5, 24, 217, 38, 57, 0, 0, 0, 0,
+  73, 69, 78, 68, 174, 66, 96, 130,
+]);
+
+const screenshotHandler = http.get(
+  '*/api/emagram/screenshot/:id/:source',
+  () =>
+    new HttpResponse(PLACEHOLDER_PNG, {
+      headers: { 'Content-Type': 'image/png' },
+    })
+);
+
 const defaultHandlers = [
   http.get('*/api/emagram/latest', () => HttpResponse.json(mockEmagramData)),
   http.post('*/api/emagram/analyze', () => HttpResponse.json(mockEmagramData)),
+  screenshotHandler,
 ];
 
 export const Default = meta.story({
@@ -86,6 +103,12 @@ export const Default = meta.story({
 Default.test('displays emagram score and metrics', async ({ canvas }) => {
   await canvas.findByText(/75/);
   await expect(canvas.getByText(/Arguel/)).toBeInTheDocument();
+});
+
+Default.test('displays screenshot buttons', async ({ canvas }) => {
+  const btn = await canvas.findByText(/Meteo Parapente/);
+  await expect(btn).toBeInTheDocument();
+  await expect(canvas.getByText(/Topmeteo/)).toBeInTheDocument();
 });
 
 export const AnalysisInProgress = meta.story({
@@ -152,3 +175,20 @@ export const Loading = meta.story({
     },
   },
 });
+
+export const WithScreenshotPreview = meta.story({
+  name: 'With Screenshot Preview (hover)',
+  args: { siteId: 'site-arguel', dayIndex: 0 },
+  parameters: { msw: { handlers: defaultHandlers } },
+});
+
+WithScreenshotPreview.test(
+  'screenshot buttons have hover preview container',
+  async ({ canvas }) => {
+    const btn = await canvas.findByText(/Meteo Parapente/);
+    const wrapper = btn.closest('.group');
+    await expect(wrapper).not.toBeNull();
+    const preview = wrapper?.querySelector('[class*="group-hover"]');
+    await expect(preview).not.toBeNull();
+  }
+);
