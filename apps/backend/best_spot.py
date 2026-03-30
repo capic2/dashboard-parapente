@@ -454,7 +454,7 @@ async def get_best_spot_cached(db: Session, day_index: int = 0) -> dict[str, Any
         # Try to get from cache
         cached_data = await get_cached_func(cache_key)
 
-        if cached_data:
+        if cached_data is not None:
             logger.info(f"✅ Best spot for day {day_index} retrieved from cache")
             return cached_data
 

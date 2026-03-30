@@ -1397,7 +1397,7 @@ async def debug_cache_data(site_id: str, day_index: int = 0, db: Session = Depen
 
         cached_data = await get_cached(cache_key)
 
-        if cached_data:
+        if cached_data is not None:
             return {
                 "cache_key": cache_key,
                 "found": True,
