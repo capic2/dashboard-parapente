@@ -248,5 +248,117 @@ def sample_emagram_analysis():
     }
 
 
+class TestCleanupOldScreenshots:
+    """Tests for database-aware screenshot cleanup"""
+
+    def test_cleanup_preserves_latest_analysis_screenshots(self, db_session, tmp_path):
+        """Screenshots referenced by the latest analysis per site are never deleted"""
+        import json
+        from datetime import datetime, timedelta
+        from unittest.mock import patch
+
+        from models import EmagramAnalysis
+
+        old_file = tmp_path / "Arguel_meteo-parapente_old.png"
+        old_file.write_bytes(b"old")
+        new_file = tmp_path / "Arguel_meteo-parapente_new.png"
+        new_file.write_bytes(b"new")
+
+        # Make both files old enough to be eligible for deletion
+        old_mtime = (datetime.now() - timedelta(hours=2)).timestamp()
+        import os
+
+        os.utime(old_file, (old_mtime, old_mtime))
+        os.utime(new_file, (old_mtime, old_mtime))
+
+        # Old analysis (superseded)
+        old_analysis = EmagramAnalysis(
+            id="old-1",
+            analysis_date=datetime.now().date(),
+            analysis_time=datetime.now().time(),
+            analysis_datetime=datetime.now() - timedelta(hours=6),
+            station_code="site-arguel",
+            station_name="Arguel",
+            station_latitude=47.2,
+            station_longitude=6.0,
+            distance_km=0.0,
+            data_source="test",
+            sounding_time="12Z",
+            analysis_method="llm_vision",
+            analysis_status="completed",
+            screenshot_paths=json.dumps({"meteo-parapente": str(old_file)}),
+        )
+        # Latest analysis
+        new_analysis = EmagramAnalysis(
+            id="new-1",
+            analysis_date=datetime.now().date(),
+            analysis_time=datetime.now().time(),
+            analysis_datetime=datetime.now() - timedelta(hours=1, minutes=30),
+            station_code="site-arguel",
+            station_name="Arguel",
+            station_latitude=47.2,
+            station_longitude=6.0,
+            distance_km=0.0,
+            data_source="test",
+            sounding_time="12Z",
+            analysis_method="llm_vision",
+            analysis_status="completed",
+            screenshot_paths=json.dumps({"meteo-parapente": str(new_file)}),
+        )
+        db_session.add_all([old_analysis, new_analysis])
+        db_session.commit()
+
+        from scrapers.emagram_screenshots import cleanup_old_screenshots
+
+        with patch("database.get_db_context") as mock_ctx:
+            mock_ctx.return_value.__enter__ = lambda s: db_session
+            mock_ctx.return_value.__exit__ = lambda s, *a: None
+            deleted = cleanup_old_screenshots(max_age_hours=1, cache_dir=tmp_path)
+
+        assert deleted == 1
+        assert not old_file.exists(), "Old analysis screenshot should be deleted"
+        assert new_file.exists(), "Latest analysis screenshot should be preserved"
+
+    def test_cleanup_deletes_orphan_files(self, db_session, tmp_path):
+        """PNG files not referenced by any analysis are deleted if old enough"""
+        from datetime import datetime, timedelta
+        from unittest.mock import patch
+
+        orphan = tmp_path / "orphan.png"
+        orphan.write_bytes(b"orphan")
+        import os
+
+        old_mtime = (datetime.now() - timedelta(hours=2)).timestamp()
+        os.utime(orphan, (old_mtime, old_mtime))
+
+        from scrapers.emagram_screenshots import cleanup_old_screenshots
+
+        with patch("database.get_db_context") as mock_ctx:
+            mock_ctx.return_value.__enter__ = lambda s: db_session
+            mock_ctx.return_value.__exit__ = lambda s, *a: None
+            deleted = cleanup_old_screenshots(max_age_hours=1, cache_dir=tmp_path)
+
+        assert deleted == 1
+        assert not orphan.exists()
+
+    def test_cleanup_preserves_recent_files(self, db_session, tmp_path):
+        """Files younger than max_age_hours are never deleted even if unreferenced"""
+        from unittest.mock import patch
+
+        recent = tmp_path / "recent.png"
+        recent.write_bytes(b"recent")
+        # File just created, mtime is now → younger than 1 hour
+
+        from scrapers.emagram_screenshots import cleanup_old_screenshots
+
+        with patch("database.get_db_context") as mock_ctx:
+            mock_ctx.return_value.__enter__ = lambda s: db_session
+            mock_ctx.return_value.__exit__ = lambda s, *a: None
+            deleted = cleanup_old_screenshots(max_age_hours=1, cache_dir=tmp_path)
+
+        assert deleted == 0
+        assert recent.exists()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

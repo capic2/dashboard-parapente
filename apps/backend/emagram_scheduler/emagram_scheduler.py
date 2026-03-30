@@ -68,13 +68,14 @@ async def run_scheduled_emagram_analysis():
 
 async def cleanup_old_emagram_screenshots():
     """
-    Clean up screenshot images older than 24 hours
+    Clean up screenshot images no longer referenced by latest analyses.
+    Files younger than 1 hour are never deleted (race-condition guard).
     Called every hour by scheduler
     """
     from scrapers.emagram_screenshots import cleanup_old_screenshots
 
     logger.info("🗑️ Running emagram screenshot cleanup...")
-    deleted = cleanup_old_screenshots(max_age_hours=24)
+    deleted = cleanup_old_screenshots(max_age_hours=1)
 
     if deleted > 0:
         logger.info(f"✅ Cleanup complete: {deleted} old screenshots deleted")

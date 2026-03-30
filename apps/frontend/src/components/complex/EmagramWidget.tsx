@@ -329,17 +329,33 @@ export default function EmagramWidget({
                         .join(' ');
                       const screenshotUrl = `/api/emagram/screenshot/${emagram.id}/${source}`;
                       return (
-                        <a
-                          key={source}
-                          href={screenshotUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-3 py-2 text-xs bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200"
-                        >
-                          <span>📸</span>
-                          <span>{sourceName}</span>
-                          <span className="text-blue-400">↗</span>
-                        </a>
+                        <div key={source} className="relative group">
+                          <a
+                            href={screenshotUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-3 py-2 text-xs bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200"
+                          >
+                            <span>📸</span>
+                            <span>{sourceName}</span>
+                            <span className="text-blue-400">↗</span>
+                          </a>
+                          <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none">
+                            <div className="bg-white border border-gray-300 rounded-lg shadow-xl p-1">
+                              <img
+                                src={screenshotUrl}
+                                alt={`Émagramme ${sourceName}`}
+                                className="rounded w-72 h-auto"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).closest('.group')?.querySelector('[class*="group-hover"]')?.classList.add('!hidden');
+                                }}
+                              />
+                              <div className="text-xs text-center text-gray-500 py-1">
+                                {sourceName}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
