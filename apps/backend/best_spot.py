@@ -225,11 +225,7 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
                 # Calculate best flyable slot
                 slots = analyze_hourly_slots(flyable_hours)
                 best_slot = get_best_slot(slots)
-                flyable_slot = (
-                    f"{best_slot['start_hour']}h-{best_slot['end_hour']}h"
-                    if best_slot
-                    else None
-                )
+                flyable_slot = f"{best_slot['start_hour']}h-{best_slot['end_hour']}h" if best_slot else None
 
                 # Build enriched reason text
                 metrics = para_result.get("metrics", {})
