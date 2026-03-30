@@ -13,6 +13,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from models import EmagramAnalysis as EmagramAnalysisModel
 from models import Site, WeatherForecast
 
 logger = logging.getLogger(__name__)
@@ -131,7 +132,9 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
     Returns:
         Dict with best spot info or None if no data available
     """
-    from para_index import calculate_para_index
+    import statistics
+
+    from para_index import analyze_hourly_slots, calculate_para_index, get_best_slot
     from weather_pipeline import get_normalized_forecast
 
     logger.info(f"Calculating best spot from cached weather data for day {day_index}...")
@@ -220,22 +223,63 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
                 wind_multiplier = get_wind_score_multiplier(wind_favorability)
                 final_score = para_index * wind_multiplier
 
-                # Generate reason text
-                if para_index >= 70:
-                    reason = f"Excellentes conditions (Para-Index {para_index})"
-                elif para_index >= 50:
-                    reason = f"Bonnes conditions (Para-Index {para_index})"
-                elif para_index >= 30:
-                    reason = f"Conditions moyennes (Para-Index {para_index})"
-                else:
-                    reason = f"Conditions limites (Para-Index {para_index})"
+                # Calculate best flyable slot
+                slots = analyze_hourly_slots(flyable_hours)
+                best_slot = get_best_slot(slots)
+                flyable_slot = (
+                    f"{best_slot['start_hour']}h-{best_slot['end_hour']}h"
+                    if best_slot
+                    else None
+                )
 
-                # Add wind info if available
+                # Build enriched reason text
+                metrics = para_result.get("metrics", {})
+                parts = []
+
+                if para_index >= 70:
+                    parts.append(f"Excellentes conditions (Para-Index {para_index})")
+                elif para_index >= 50:
+                    parts.append(f"Bonnes conditions (Para-Index {para_index})")
+                elif para_index >= 30:
+                    parts.append(f"Conditions moyennes (Para-Index {para_index})")
+                else:
+                    parts.append(f"Conditions limites (Para-Index {para_index})")
+
+                avg_temp = metrics.get("avg_temp_c")
+                if avg_temp is not None:
+                    parts.append(f"{avg_temp}°C")
+
+                cloud_values = [
+                    h.get("cloud_cover")
+                    for h in flyable_hours
+                    if h.get("cloud_cover") is not None
+                ]
+                if cloud_values:
+                    avg_cloud = statistics.mean(cloud_values)
+                    if avg_cloud < 30:
+                        parts.append("ciel dégagé")
+                    elif avg_cloud < 60:
+                        parts.append(f"nuageux {int(avg_cloud)}%")
+                    else:
+                        parts.append(f"très couvert {int(avg_cloud)}%")
+
+                max_gust = metrics.get("max_gust_kmh", 0)
+                if max_gust and max_gust >= 20:
+                    parts.append(f"rafales {int(max_gust)}km/h")
+
+                avg_li = metrics.get("avg_lifted_index")
+                if avg_li is not None and avg_li < -3:
+                    parts.append("atmosphère instable")
+                elif avg_li is not None and avg_li > 2:
+                    parts.append("atmosphère stable")
+
                 if wind_dir_str and avg_wind_speed:
                     if wind_favorability == "good":
-                        reason += f", vent favorable {wind_dir_str} {int(avg_wind_speed)}km/h"
+                        parts.append(f"vent favorable {wind_dir_str} {int(avg_wind_speed)}km/h")
                     elif wind_favorability == "bad":
-                        reason += f", vent défavorable {wind_dir_str} {int(avg_wind_speed)}km/h"
+                        parts.append(f"vent défavorable {wind_dir_str} {int(avg_wind_speed)}km/h")
+
+                reason = ", ".join(parts)
 
                 scored_sites.append(
                     {
@@ -253,6 +297,7 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
                         "windSpeed": avg_wind_speed,
                         "windFavorability": wind_favorability,
                         "score": final_score,
+                        "flyableSlot": flyable_slot,
                         "reason": reason,
                         "verdict": para_result.get("verdict"),
                     }
@@ -275,6 +320,29 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
             best_site["reason"] = (
                 f"Conditions défavorables partout (meilleur: {best_site['site']['name']}, score {int(best_site['score'])})"
             )
+
+        # Fetch thermal ceiling from most recent emagram analysis
+        try:
+            from datetime import timedelta
+
+            target_date = (datetime.now(timezone.utc) + timedelta(days=day_index)).date()
+            window_start = datetime.combine(target_date, datetime.min.time()) - timedelta(hours=12)
+            window_end = datetime.combine(target_date, datetime.min.time()) + timedelta(hours=36)
+
+            emagram = (
+                db.query(EmagramAnalysisModel)
+                .filter(
+                    EmagramAnalysisModel.analysis_datetime >= window_start,
+                    EmagramAnalysisModel.analysis_datetime <= window_end,
+                    EmagramAnalysisModel.analysis_status == "completed",
+                )
+                .order_by(EmagramAnalysisModel.analysis_datetime.desc())
+                .first()
+            )
+            best_site["thermalCeiling"] = emagram.plafond_thermique_m if emagram else None
+        except Exception as e:
+            logger.warning(f"Could not fetch thermal ceiling: {e}")
+            best_site["thermalCeiling"] = None
 
         logger.info(
             f"✅ Best spot: {best_site['site']['name']} (score: {best_site['score']:.1f}, Para-Index: {best_site['paraIndex']})"
@@ -401,6 +469,8 @@ async def calculate_best_spot_from_db(db: Session, day_index: int = 0) -> dict[s
                     "windSpeed": wind_speed,
                     "windFavorability": wind_favorability,
                     "score": final_score,
+                    "flyableSlot": None,
+                    "thermalCeiling": None,
                     "reason": reason,
                     "verdict": forecast.verdict,
                 }

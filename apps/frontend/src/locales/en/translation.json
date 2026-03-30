@@ -75,7 +75,9 @@
     "loadingLandings": "Loading landing weather...",
     "noWeatherData": "No weather data available",
     "primary": "Primary",
-    "windUnavailable": "Wind data unavailable"
+    "windUnavailable": "Wind data unavailable",
+    "flyableSlot": "Window",
+    "thermalCeiling": "Ceiling"
   },
   "filters": {
     "title": "Filters",
