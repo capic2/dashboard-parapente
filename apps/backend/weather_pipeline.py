@@ -613,9 +613,7 @@ def extract_sunrise_sunset(aggregated: dict[str, Any], day_index: int) -> tuple:
     sunrises = daily.get("sunrise", [])
     sunsets = daily.get("sunset", [])
 
-    logger.debug(
-        f"extract_sunrise_sunset: sunrises={len(sunrises)}, sunsets={len(sunsets)}"
-    )
+    logger.debug(f"extract_sunrise_sunset: sunrises={len(sunrises)}, sunsets={len(sunsets)}")
 
     if day_index >= len(sunrises) or day_index >= len(sunsets):
         return None, None

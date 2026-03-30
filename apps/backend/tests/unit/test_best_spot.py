@@ -448,7 +448,10 @@ async def test_refresh_best_spot_cache_success(db_session):
         patch(
             "best_spot.calculate_best_spot_from_cache", new=AsyncMock(return_value=mock_best_spot)
         ),
-        patch("best_spot._get_cache_functions", return_value=(AsyncMock(), mock_set_cached, mock_cache_ttl)),
+        patch(
+            "best_spot._get_cache_functions",
+            return_value=(AsyncMock(), mock_set_cached, mock_cache_ttl),
+        ),
     ):
 
         await refresh_best_spot_cache(db_session)
@@ -482,7 +485,10 @@ async def test_refresh_best_spot_cache_no_data(db_session):
 
     with (
         patch("best_spot.calculate_best_spot_from_cache", new=AsyncMock(return_value=None)),
-        patch("best_spot._get_cache_functions", return_value=(AsyncMock(), mock_set_cached, {"summary": 3600})),
+        patch(
+            "best_spot._get_cache_functions",
+            return_value=(AsyncMock(), mock_set_cached, {"summary": 3600}),
+        ),
     ):
 
         await refresh_best_spot_cache(db_session)

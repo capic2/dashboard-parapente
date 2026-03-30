@@ -1405,7 +1405,9 @@ async def debug_cache_data(site_id: str, day_index: int = 0, db: Session = Depen
                 "error": cached_data.get("error"),
                 "consensus_count": len(cached_data.get("consensus", [])),
                 "sources_count": len(cached_data.get("sources", {})),
-                "sample_hour": cached_data.get("consensus", [{}])[0] if cached_data.get("consensus") else None,
+                "sample_hour": (
+                    cached_data.get("consensus", [{}])[0] if cached_data.get("consensus") else None
+                ),
                 "raw_keys": list(cached_data.keys()),
             }
         else:
