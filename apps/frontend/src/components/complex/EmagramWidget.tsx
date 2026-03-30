@@ -345,7 +345,7 @@ export default function EmagramWidget({
                               <img
                                 src={screenshotUrl}
                                 alt={`Émagramme ${sourceName}`}
-                                className="rounded w-[32rem] h-auto"
+                                className="rounded w-[min(32rem,calc(100vw-2rem))] h-auto"
                                 onError={(e) => {
                                   (e.target as HTMLImageElement).closest('.group')?.querySelector('[class*="group-hover"]')?.classList.add('!hidden');
                                 }}
