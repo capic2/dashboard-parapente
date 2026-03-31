@@ -1839,7 +1839,12 @@ async def get_daily_summary(spot_id: str, days: int = 7, db: Session = Depends(g
                 cached_at = day_result["cached_at"]
                 break
 
-        return {"site_id": spot_id, "site_name": site.name, "cached_at": cached_at, "days": summary_days}
+        return {
+            "site_id": spot_id,
+            "site_name": site.name,
+            "cached_at": cached_at,
+            "days": summary_days,
+        }
 
     except HTTPException:
         raise  # Re-raise HTTP exceptions as-is
