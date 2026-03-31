@@ -37,7 +37,7 @@ const queryClient = new QueryClient({
 
 // Root layout with Header
 const RootLayout: React.FC = () => (
-  <div className="min-h-screen p-3 md:p-4 overflow-x-hidden">
+  <div className="min-h-screen p-3 md:p-4 overflow-x-hidden bg-gray-50 dark:bg-gray-900 transition-colors">
     <div className="max-w-7xl mx-auto">
       <Header />
       <main>

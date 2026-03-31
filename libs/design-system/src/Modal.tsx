@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { tv } from 'tailwind-variants';
 
 const modal = tv({
-  base: 'bg-white rounded-xl shadow-2xl w-full max-h-[90vh] overflow-y-auto',
+  base: 'bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-h-[90vh] overflow-y-auto',
   variants: {
     size: {
       sm: 'max-w-md',
@@ -48,13 +48,13 @@ export function Modal({
       <AriaModal className={modal({ size })}>
         <Dialog className="outline-none p-6">
           <div className="flex justify-between items-start mb-4">
-            <Heading slot="title" className="text-xl font-bold text-gray-900">
+            <Heading slot="title" className="text-xl font-bold text-gray-900 dark:text-white">
               {title}
             </Heading>
             <Button
               aria-label={t('common.close', 'Close')}
               onPress={onClose}
-              className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+              className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 text-2xl leading-none"
             >
               ×
             </Button>

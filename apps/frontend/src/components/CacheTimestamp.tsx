@@ -16,7 +16,7 @@ export default function CacheTimestamp({
 
   if (!cachedAt) {
     return (
-      <span className={`text-xs text-gray-400 ${className}`}>
+      <span className={`text-xs text-gray-400 dark:text-gray-500 ${className}`}>
         {t('weather.notCached')}
       </span>
     );
@@ -30,7 +30,7 @@ export default function CacheTimestamp({
 
   return (
     <span
-      className={`text-xs text-gray-400 ${className}`}
+      className={`text-xs text-gray-400 dark:text-gray-500 ${className}`}
       title={new Date(cachedAt).toLocaleString(i18n.language)}
     >
       {t('weather.updatedAt')} {relativeTime}

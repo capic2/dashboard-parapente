@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @source "../../../libs/design-system/src";
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* Global styles - keep minimal, use Tailwind classes in components instead */
 body {
@@ -9,6 +10,10 @@ body {
     Cantarell, 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+:root.dark body {
+  background-color: #111827;
 }
 
 /* Custom scrollbar */
@@ -28,6 +33,18 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+:root.dark ::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+:root.dark ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+:root.dark ::-webkit-scrollbar-thumb:hover {
   background: #6b7280;
 }
 

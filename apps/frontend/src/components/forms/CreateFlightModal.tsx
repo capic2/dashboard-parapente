@@ -83,7 +83,7 @@ export function CreateFlightModal({
       size="md"
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-gray-600 dark:text-gray-300">
           {t('flights.createDescription')}
         </p>
 
@@ -91,7 +91,7 @@ export function CreateFlightModal({
         <div className="space-y-2">
           <label
             htmlFor="gpx-file-input"
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
           >
             {t('flights.gpxFile')}
           </label>
@@ -103,26 +103,26 @@ export function CreateFlightModal({
               accept=".gpx,.igc"
               onChange={handleFileChange}
               disabled={isPending}
-              className="block w-full text-sm text-gray-500
+              className="block w-full text-sm text-gray-500 dark:text-gray-400
                 file:mr-4 file:py-2 file:px-4
                 file:rounded-lg file:border-0
                 file:text-sm file:font-semibold
-                file:bg-orange-50 file:text-orange-700
+                file:bg-orange-50 file:text-orange-700 dark:file:bg-orange-900/30 dark:file:text-orange-400
                 hover:file:bg-orange-100
                 file:cursor-pointer cursor-pointer
                 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
           {selectedFile && (
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-300">
               📄 {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)}{' '}
               KB)
             </p>
           )}
         </div>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <p className="text-sm text-blue-800">
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
+          <p className="text-sm text-blue-800 dark:text-blue-200">
             💡 <strong>{t('flights.autoDetection')}</strong>{' '}
             {t('flights.autoDetectionText')}
           </p>
@@ -130,11 +130,11 @@ export function CreateFlightModal({
 
         {/* Résultat de la création */}
         {data && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <p className="font-semibold text-green-800 mb-2">
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
+            <p className="font-semibold text-green-800 dark:text-green-200 mb-2">
               ✅ {t('flights.createSuccess')}
             </p>
-            <ul className="text-sm text-green-700 space-y-1">
+            <ul className="text-sm text-green-700 dark:text-green-300 space-y-1">
               <li>
                 • <strong>{t('flights.name')}</strong>{' '}
                 {data.flight.name || t('flights.unnamed')}
@@ -165,11 +165,11 @@ export function CreateFlightModal({
 
         {/* Affichage de l'erreur */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="font-semibold text-red-800 mb-2">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
+            <p className="font-semibold text-red-800 dark:text-red-200 mb-2">
               ❌ {t('flights.createError')}
             </p>
-            <p className="text-sm text-red-700">{error}</p>
+            <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
           </div>
         )}
 
@@ -177,7 +177,7 @@ export function CreateFlightModal({
         <div className="flex gap-3 justify-end">
           <button
             onClick={handleClose}
-            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+            className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
             disabled={isPending}
           >
             {t('common.cancel')}

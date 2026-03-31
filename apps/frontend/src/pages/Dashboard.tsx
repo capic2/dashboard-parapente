@@ -32,11 +32,11 @@ export default function Dashboard() {
   if (error) {
     return (
       <div className="py-8">
-        <div className="bg-white rounded-xl p-8 shadow-md text-center max-w-md mx-auto">
-          <h2 className="text-xl font-bold text-red-600 mb-3">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center max-w-md mx-auto">
+          <h2 className="text-xl font-bold text-red-600 dark:text-red-400 mb-3">
             ❌ {t('dashboard.loadingError')}
           </h2>
-          <p className="text-gray-700 mb-4">{error.message}</p>
+          <p className="text-gray-700 dark:text-gray-300 mb-4">{error.message}</p>
           <button
             onClick={() => window.location.reload()}
             className="px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-all"

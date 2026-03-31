@@ -70,11 +70,11 @@ export default function EmagramWidget({
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md border-l-4 border-purple-600">
-        <h2 className="text-sm text-gray-600 mb-3.5 font-semibold">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-purple-600">
+        <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3.5 font-semibold">
           🌡️ Analyse Thermique (Émagramme)
         </h2>
-        <div className="py-5 text-center text-gray-500 text-sm">
+        <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
           Chargement...
         </div>
       </div>
@@ -83,8 +83,8 @@ export default function EmagramWidget({
 
   if (error) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md border-l-4 border-red-500">
-        <h2 className="text-sm text-gray-600 mb-3 font-semibold">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-red-500">
+        <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
           🌡️ Analyse Thermique (Émagramme)
         </h2>
         <div className="text-red-600 text-sm">Erreur : {error.message}</div>
@@ -94,9 +94,9 @@ export default function EmagramWidget({
 
   if (!emagram) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md border-l-4 border-purple-600">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-purple-600">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm text-gray-600 font-semibold">
+          <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
             🌡️ Analyse Thermique (Émagramme)
           </h2>
           <button
@@ -112,7 +112,7 @@ export default function EmagramWidget({
             </span>
           </button>
         </div>
-        <div className="py-5 text-center text-gray-500 text-sm">
+        <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
           {!siteId ? 'Aucun site selectionne' : 'Analyse en cours...'}
         </div>
         {siteId && (
@@ -134,16 +134,16 @@ export default function EmagramWidget({
   const timeAgo = getTimeAgo(analysisDate);
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow-md border-l-4 border-purple-600 flex-1 flex flex-col">
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-purple-600 flex-1 flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm text-gray-600 font-semibold">
+        <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
           🌡️ Analyse Thermique (Émagramme)
         </h2>
         <button
           onClick={handleRefresh}
           disabled={isRefreshing}
-          className="p-1.5 rounded-full hover:bg-gray-100 transition-colors disabled:opacity-50"
+          className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
           title="Actualiser"
         >
           <span
@@ -183,7 +183,7 @@ export default function EmagramWidget({
             <span className="text-2xl font-bold" style={{ color: scoreColor }}>
               {score}
             </span>
-            <span className="text-xs text-gray-500">/ 100</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">/ 100</span>
           </div>
         </div>
 
@@ -194,7 +194,7 @@ export default function EmagramWidget({
           >
             {translateCategory(scoreCategory)}
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-1">
             <span>📍</span>
             <span>
               {emagram.station_name}
@@ -215,11 +215,11 @@ export default function EmagramWidget({
       <div className="grid grid-cols-2 gap-3 mb-4">
         {/* Plafond thermique */}
         {emagram.plafond_thermique_m && (
-          <div className="flex items-center gap-2 bg-gradient-to-br from-blue-50 to-sky-50 rounded-lg p-2.5">
+          <div className="flex items-center gap-2 bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-900/20 dark:to-sky-900/20 rounded-lg p-2.5">
             <span className="text-xl flex-shrink-0">☁️</span>
             <div className="flex-1 min-w-0">
-              <div className="text-xs text-gray-600">Plafond</div>
-              <div className="text-base font-bold text-gray-900 truncate">
+              <div className="text-xs text-gray-600 dark:text-gray-300">Plafond</div>
+              <div className="text-base font-bold text-gray-900 dark:text-white truncate">
                 {emagram.plafond_thermique_m}m
               </div>
             </div>
@@ -228,11 +228,11 @@ export default function EmagramWidget({
 
         {/* Force thermique */}
         {emagram.force_thermique_ms && (
-          <div className="flex items-center gap-2 bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg p-2.5">
+          <div className="flex items-center gap-2 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-lg p-2.5">
             <span className="text-xl flex-shrink-0">📈</span>
             <div className="flex-1 min-w-0">
-              <div className="text-xs text-gray-600">Force</div>
-              <div className="text-base font-bold text-gray-900 truncate">
+              <div className="text-xs text-gray-600 dark:text-gray-300">Force</div>
+              <div className="text-base font-bold text-gray-900 dark:text-white truncate">
                 {emagram.force_thermique_ms.toFixed(1)} m/s
               </div>
             </div>
@@ -241,11 +241,11 @@ export default function EmagramWidget({
 
         {/* Heures volables */}
         {emagram.flyable_hours_formatted && (
-          <div className="flex items-center gap-2 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-2.5">
+          <div className="flex items-center gap-2 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg p-2.5">
             <span className="text-xl flex-shrink-0">⏰</span>
             <div className="flex-1 min-w-0">
-              <div className="text-xs text-gray-600">Heures</div>
-              <div className="text-sm font-bold text-gray-900 truncate">
+              <div className="text-xs text-gray-600 dark:text-gray-300">Heures</div>
+              <div className="text-sm font-bold text-gray-900 dark:text-white truncate">
                 {emagram.flyable_hours_formatted}
               </div>
             </div>
@@ -254,13 +254,13 @@ export default function EmagramWidget({
 
         {/* Stabilité */}
         {emagram.stabilite_atmospherique && (
-          <div className="flex items-center gap-2 bg-gradient-to-br from-purple-50 to-violet-50 rounded-lg p-2.5">
+          <div className="flex items-center gap-2 bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20 rounded-lg p-2.5">
             <span className="text-xl flex-shrink-0">
               {getStabilityEmoji(emagram.stabilite_atmospherique)}
             </span>
             <div className="flex-1 min-w-0">
-              <div className="text-xs text-gray-600">Stabilité</div>
-              <div className="text-sm font-semibold text-gray-900 truncate capitalize">
+              <div className="text-xs text-gray-600 dark:text-gray-300">Stabilité</div>
+              <div className="text-sm font-semibold text-gray-900 dark:text-white truncate capitalize">
                 {emagram.stabilite_atmospherique}
               </div>
             </div>
@@ -270,8 +270,8 @@ export default function EmagramWidget({
 
       {/* Summary */}
       {emagram.resume_conditions && (
-        <div className="bg-gray-50 rounded-lg p-3 mb-3">
-          <p className="text-sm text-gray-700 leading-relaxed">
+        <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 mb-3">
+          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
             {emagram.resume_conditions}
           </p>
         </div>
@@ -279,10 +279,10 @@ export default function EmagramWidget({
 
       {/* Conseils */}
       {emagram.conseils_vol && (
-        <div className="bg-blue-50 rounded-lg p-3 mb-3">
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-3">
           <div className="flex items-start gap-2">
             <span className="text-base flex-shrink-0">💡</span>
-            <p className="text-sm text-blue-900 leading-relaxed flex-1">
+            <p className="text-sm text-blue-900 dark:text-blue-100 leading-relaxed flex-1">
               {emagram.conseils_vol}
             </p>
           </div>
@@ -291,16 +291,16 @@ export default function EmagramWidget({
 
       {/* Safety Alerts */}
       {alerts.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-3">
           <div className="flex items-start gap-2 mb-2">
             <span className="text-base flex-shrink-0">⚠️</span>
-            <span className="text-sm font-semibold text-red-900">
+            <span className="text-sm font-semibold text-red-900 dark:text-red-100">
               Alertes de sécurité
             </span>
           </div>
           <ul className="space-y-1 ml-6">
             {alerts.map((alert, idx) => (
-              <li key={idx} className="text-xs text-red-800 list-disc">
+              <li key={idx} className="text-xs text-red-800 dark:text-red-200 list-disc">
                 {alert}
               </li>
             ))}
@@ -316,8 +316,8 @@ export default function EmagramWidget({
             const sourceKeys = Object.keys(screenshots);
             if (sourceKeys.length > 0) {
               return (
-                <div className="mt-3 pt-3 border-t border-gray-100">
-                  <div className="text-xs text-gray-600 font-semibold mb-2">
+                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                  <div className="text-xs text-gray-600 dark:text-gray-300 font-semibold mb-2">
                     📊 Émagrammes capturés ({sourceKeys.length})
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -334,7 +334,7 @@ export default function EmagramWidget({
                             href={screenshotUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-3 py-2 text-xs bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200"
+                            className="inline-flex items-center gap-1 px-3 py-2 text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors border border-blue-200 dark:border-blue-700"
                           >
                             <span>📸</span>
                             <span>{sourceName}</span>
@@ -350,7 +350,7 @@ export default function EmagramWidget({
                                   (e.target as HTMLImageElement).closest('.group')?.querySelector('[class*="group-hover"]')?.classList.add('!hidden');
                                 }}
                               />
-                              <div className="text-xs text-center text-gray-500 py-1">
+                              <div className="text-xs text-center text-gray-500 dark:text-gray-400 py-1">
                                 {sourceName}
                               </div>
                             </div>
@@ -360,7 +360,7 @@ export default function EmagramWidget({
                     })}
                   </div>
                   {emagram.sources_agreement && (
-                    <div className="mt-2 text-xs text-gray-500">
+                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                       Consensus:{' '}
                       <span className="font-medium">
                         {emagram.sources_agreement}
@@ -377,8 +377,8 @@ export default function EmagramWidget({
         })()}
 
       {/* Method indicator */}
-      <div className="mt-3 pt-3 border-t border-gray-100">
-        <div className="flex items-center justify-between text-xs text-gray-500">
+      <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
           <span>
             {emagram.is_from_llm
               ? `🤖 Analyse IA (${emagram.llm_model?.split('-')[0] || 'AI'})`

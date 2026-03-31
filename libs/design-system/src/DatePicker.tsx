@@ -44,18 +44,18 @@ export function DatePicker({ label, value, onChange }: DatePickerProps) {
       onChange={handleChange}
       className="flex flex-col gap-1.5"
     >
-      <Label className="block text-sm font-medium text-gray-700">{label}</Label>
-      <Group className="flex items-center border border-gray-200 rounded-lg bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-shadow">
-        <DateInput className="flex-1 flex px-3 py-2 text-sm text-gray-900 outline-none bg-transparent">
+      <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{label}</Label>
+      <Group className="flex items-center border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-shadow">
+        <DateInput className="flex-1 flex px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none bg-transparent">
           {(segment) => (
             <DateSegment
               segment={segment}
-              className="px-0.5 tabular-nums outline-none rounded focus:bg-blue-500 focus:text-white caret-transparent placeholder-shown:italic placeholder-shown:text-gray-400"
+              className="px-0.5 tabular-nums outline-none rounded focus:bg-blue-500 focus:text-white caret-transparent placeholder-shown:italic placeholder-shown:text-gray-400 dark:placeholder-shown:text-gray-500"
             />
           )}
         </DateInput>
         <Button
-          className="cursor-pointer px-3 py-2 border-l border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-r-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="cursor-pointer px-3 py-2 border-l border-gray-200 dark:border-gray-600 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-r-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           aria-label={t('datepicker.openCalendar', 'Open calendar')}
         >
           <svg
@@ -73,13 +73,13 @@ export function DatePicker({ label, value, onChange }: DatePickerProps) {
           </svg>
         </Button>
       </Group>
-      <Popover className="bg-white rounded-xl shadow-xl border border-gray-200 mt-1">
+      <Popover className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-600 mt-1">
         <Dialog className="p-4 outline-none">
           <Calendar>
             <header className="flex items-center justify-between mb-3">
               <Button
                 slot="previous"
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors"
               >
                 <svg
                   className="w-4 h-4"
@@ -95,10 +95,10 @@ export function DatePicker({ label, value, onChange }: DatePickerProps) {
                   />
                 </svg>
               </Button>
-              <Heading className="text-sm font-medium text-gray-900" />
+              <Heading className="text-sm font-medium text-gray-900 dark:text-gray-100" />
               <Button
                 slot="next"
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors"
               >
                 <svg
                   className="w-4 h-4"
@@ -118,7 +118,7 @@ export function DatePicker({ label, value, onChange }: DatePickerProps) {
             <CalendarGrid className="border-spacing-1 border-separate">
               <CalendarGridHeader>
                 {(day) => (
-                  <CalendarHeaderCell className="w-9 h-8 text-xs font-medium text-gray-400">
+                  <CalendarHeaderCell className="w-9 h-8 text-xs font-medium text-gray-400 dark:text-gray-500">
                     {day}
                   </CalendarHeaderCell>
                 )}
@@ -128,10 +128,11 @@ export function DatePicker({ label, value, onChange }: DatePickerProps) {
                   <CalendarCell
                     date={date}
                     className={`w-9 h-9 flex items-center justify-center text-sm cursor-pointer rounded-full outline-none transition-colors
-                      hover:bg-gray-100
+                      text-gray-900 dark:text-gray-100
+                      hover:bg-gray-100 dark:hover:bg-gray-700
                       selected:bg-blue-500 selected:text-white selected:hover:bg-blue-600
-                      disabled:text-gray-300 disabled:cursor-default
-                      outside-month:text-gray-300
+                      disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-default
+                      outside-month:text-gray-300 dark:outside-month:text-gray-600
                       focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1
                       ${!calendarValue && date.compare(todayDate) === 0 ? 'font-bold text-blue-500' : ''}
                     `}

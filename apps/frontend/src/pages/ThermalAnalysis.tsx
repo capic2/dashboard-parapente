@@ -49,8 +49,8 @@ export default function ThermalAnalysis() {
     return (
       <div className="p-4">
         <h1 className="text-2xl font-bold mb-4">🌡️ Analyse Thermique</h1>
-        <div className="bg-white rounded-xl p-8 shadow-md text-center">
-          <p className="text-gray-600 mb-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center">
+          <p className="text-gray-600 dark:text-gray-300 mb-4">
             Aucune analyse récente disponible
           </p>
           <button
@@ -88,7 +88,7 @@ export default function ThermalAnalysis() {
       {/* Main Analysis Card */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         {/* Left Column - Score & Metrics */}
-        <div className="bg-white rounded-xl p-6 shadow-md">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
           <h2 className="text-lg font-bold mb-4">Score de Volabilité</h2>
 
           {/* Score Gauge */}
@@ -121,7 +121,7 @@ export default function ThermalAnalysis() {
                 >
                   {score}
                 </span>
-                <span className="text-sm text-gray-500">/ 100</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">/ 100</span>
               </div>
             </div>
           </div>
@@ -129,15 +129,15 @@ export default function ThermalAnalysis() {
           {/* Key Metrics */}
           <div className="space-y-3">
             {latest.plafond_thermique_m && (
-              <div className="flex justify-between items-center border-b pb-2">
-                <span className="text-gray-600">☁️ Plafond</span>
+              <div className="flex justify-between items-center border-b dark:border-gray-700 pb-2">
+                <span className="text-gray-600 dark:text-gray-300">☁️ Plafond</span>
                 <span className="font-bold">{latest.plafond_thermique_m}m</span>
               </div>
             )}
 
             {latest.force_thermique_ms && (
-              <div className="flex justify-between items-center border-b pb-2">
-                <span className="text-gray-600">📈 Force</span>
+              <div className="flex justify-between items-center border-b dark:border-gray-700 pb-2">
+                <span className="text-gray-600 dark:text-gray-300">📈 Force</span>
                 <span className="font-bold">
                   {latest.force_thermique_ms.toFixed(1)} m/s
                 </span>
@@ -145,8 +145,8 @@ export default function ThermalAnalysis() {
             )}
 
             {latest.cape_jkg && (
-              <div className="flex justify-between items-center border-b pb-2">
-                <span className="text-gray-600">⚡ CAPE</span>
+              <div className="flex justify-between items-center border-b dark:border-gray-700 pb-2">
+                <span className="text-gray-600 dark:text-gray-300">⚡ CAPE</span>
                 <span className="font-bold">
                   {latest.cape_jkg.toFixed(0)} J/kg
                 </span>
@@ -154,8 +154,8 @@ export default function ThermalAnalysis() {
             )}
 
             {latest.flyable_hours_formatted && (
-              <div className="flex justify-between items-center border-b pb-2">
-                <span className="text-gray-600">⏰ Heures</span>
+              <div className="flex justify-between items-center border-b dark:border-gray-700 pb-2">
+                <span className="text-gray-600 dark:text-gray-300">⏰ Heures</span>
                 <span className="font-bold">
                   {latest.flyable_hours_formatted}
                 </span>
@@ -165,11 +165,11 @@ export default function ThermalAnalysis() {
         </div>
 
         {/* Middle Column - Skew-T Diagram */}
-        <div className="lg:col-span-2 bg-white rounded-xl p-6 shadow-md">
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
           <h2 className="text-lg font-bold mb-4">Diagramme Skew-T</h2>
 
           {latest.skewt_image_path ? (
-            <div className="bg-gray-100 rounded-lg p-4">
+            <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
               <img
                 src={`/api/files${latest.skewt_image_path}`}
                 alt="Skew-T Diagram"
@@ -179,13 +179,13 @@ export default function ThermalAnalysis() {
                     'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="%23f3f4f6"/><text x="50%" y="50%" text-anchor="middle" fill="%239ca3af" font-size="16">Image non disponible</text></svg>';
                 }}
               />
-              <p className="text-xs text-gray-500 mt-2 text-center">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
                 {latest.station_name} • {latest.sounding_time} •{' '}
                 {new Date(latest.analysis_datetime).toLocaleDateString()}
               </p>
             </div>
           ) : (
-            <div className="bg-gray-100 rounded-lg p-8 text-center text-gray-500">
+            <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-8 text-center text-gray-500 dark:text-gray-400">
               Diagramme non disponible
             </div>
           )}
@@ -196,9 +196,9 @@ export default function ThermalAnalysis() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Conditions */}
         {latest.resume_conditions && (
-          <div className="bg-white rounded-xl p-6 shadow-md">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
             <h2 className="text-lg font-bold mb-3">📊 Résumé des Conditions</h2>
-            <p className="text-gray-700 leading-relaxed">
+            <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
               {latest.resume_conditions}
             </p>
           </div>
@@ -206,11 +206,11 @@ export default function ThermalAnalysis() {
 
         {/* Conseils */}
         {latest.conseils_vol && (
-          <div className="bg-blue-50 rounded-xl p-6 shadow-md border border-blue-200">
-            <h2 className="text-lg font-bold mb-3 text-blue-900">
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6 shadow-md border border-blue-200 dark:border-blue-700">
+            <h2 className="text-lg font-bold mb-3 text-blue-900 dark:text-blue-100">
               💡 Conseils de Vol
             </h2>
-            <p className="text-blue-800 leading-relaxed">
+            <p className="text-blue-800 dark:text-blue-200 leading-relaxed">
               {latest.conseils_vol}
             </p>
           </div>
@@ -219,13 +219,13 @@ export default function ThermalAnalysis() {
 
       {/* Safety Alerts */}
       {alerts.length > 0 && (
-        <div className="bg-red-50 rounded-xl p-6 shadow-md border border-red-200 mb-6">
-          <h2 className="text-lg font-bold mb-3 text-red-900">
+        <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-6 shadow-md border border-red-200 dark:border-red-700 mb-6">
+          <h2 className="text-lg font-bold mb-3 text-red-900 dark:text-red-100">
             ⚠️ Alertes de Sécurité
           </h2>
           <ul className="space-y-2">
             {alerts.map((alert, idx) => (
-              <li key={idx} className="flex items-start gap-2 text-red-800">
+              <li key={idx} className="flex items-start gap-2 text-red-800 dark:text-red-200">
                 <span>•</span>
                 <span>{alert}</span>
               </li>
@@ -236,13 +236,13 @@ export default function ThermalAnalysis() {
 
       {/* History */}
       {history && history.length > 0 && (
-        <div className="bg-white rounded-xl p-6 shadow-md">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
           <h2 className="text-lg font-bold mb-4">📈 Historique 7 Jours</h2>
 
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b">
+                <tr className="border-b dark:border-gray-700">
                   <th className="text-left py-2">Date</th>
                   <th className="text-center py-2">Score</th>
                   <th className="text-center py-2">Plafond</th>
@@ -252,7 +252,7 @@ export default function ThermalAnalysis() {
               </thead>
               <tbody>
                 {history.slice(0, 10).map((item) => (
-                  <tr key={item.id} className="border-b hover:bg-gray-50">
+                  <tr key={item.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="py-2">
                       {new Date(item.created_at).toLocaleDateString()}
                     </td>
@@ -277,7 +277,7 @@ export default function ThermalAnalysis() {
                         ? `${item.force_thermique_ms.toFixed(1)} m/s`
                         : '-'}
                     </td>
-                    <td className="text-center text-xs text-gray-500">
+                    <td className="text-center text-xs text-gray-500 dark:text-gray-400">
                       {item.analysis_method === 'llm_vision'
                         ? '🤖 IA'
                         : '📊 Classique'}
