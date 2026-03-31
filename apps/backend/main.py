@@ -59,17 +59,11 @@ def initialize_database():
         with engine.connect() as conn:
             cols = {
                 row[1]
-                for row in conn.execute(
-                    sa_text("PRAGMA table_info(emagram_analysis)")
-                ).fetchall()
+                for row in conn.execute(sa_text("PRAGMA table_info(emagram_analysis)")).fetchall()
             }
             if cols and "forecast_date" not in cols:
                 logger.info("Adding missing forecast_date column to emagram_analysis...")
-                conn.execute(
-                    sa_text(
-                        "ALTER TABLE emagram_analysis ADD COLUMN forecast_date DATE"
-                    )
-                )
+                conn.execute(sa_text("ALTER TABLE emagram_analysis ADD COLUMN forecast_date DATE"))
                 conn.execute(
                     sa_text(
                         "UPDATE emagram_analysis SET forecast_date = analysis_date WHERE forecast_date IS NULL"
