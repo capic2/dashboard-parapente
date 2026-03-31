@@ -80,3 +80,22 @@ export const OnAnalyticsPage = meta.story({
     },
   },
 });
+
+/**
+ * Header in dark mode
+ */
+export const DarkMode = meta.story({
+  args: {},
+  parameters: {
+    theme: 'dark',
+    router: {
+      initialPath: '/',
+      routes: [{ path: '/', element: 'story' }],
+      renderRootRoute: (Story: React.ComponentType) => <Story />,
+    },
+  },
+});
+
+DarkMode.test('should render header in dark mode', async ({ canvas }) => {
+  await canvas.findByText('🪂', { exact: false });
+});

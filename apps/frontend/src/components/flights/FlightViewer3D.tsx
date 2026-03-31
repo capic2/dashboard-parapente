@@ -60,18 +60,18 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="border-b border-gray-200 last:border-0">
+    <div className="border-b border-gray-200 dark:border-gray-700 last:border-0">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between py-2 px-1 hover:bg-gray-50 transition-colors rounded"
+        className="w-full flex items-center justify-between py-2 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded"
         type="button"
       >
-        <span className="text-sm font-semibold text-gray-700">
+        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
           {emoji && <span className="mr-1.5">{emoji}</span>}
           {title}
         </span>
         <span
-          className="text-gray-400 text-xs transition-transform"
+          className="text-gray-400 dark:text-gray-500 text-xs transition-transform"
           style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}
         >
           ▶
@@ -1025,10 +1025,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const renderOverlay = () => {
     if (isLoading) {
       return (
-        <div className="absolute inset-0 flex items-center justify-center bg-blue-50 z-20">
+        <div className="absolute inset-0 flex items-center justify-center bg-blue-50 dark:bg-blue-900/20 z-20">
           <div className="text-center p-8">
-            <p className="text-lg">⏳ Chargement du vol...</p>
-            <p className="text-sm text-gray-600 mt-2">Flight ID: {flightId}</p>
+            <p className="text-lg dark:text-white">⏳ Chargement du vol...</p>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">Flight ID: {flightId}</p>
           </div>
         </div>
       );
@@ -1036,15 +1036,15 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
     if (error) {
       return (
-        <div className="absolute inset-0 flex items-center justify-center bg-yellow-50 z-20">
-          <div className="bg-white border-2 border-yellow-400 rounded-xl p-8 text-center max-w-md">
-            <p className="text-lg font-bold text-yellow-800 mb-2">
+        <div className="absolute inset-0 flex items-center justify-center bg-yellow-50 dark:bg-yellow-900/20 z-20">
+          <div className="bg-white dark:bg-gray-800 border-2 border-yellow-400 rounded-xl p-8 text-center max-w-md">
+            <p className="text-lg font-bold text-yellow-800 dark:text-yellow-200 mb-2">
               📍 Pas de tracé GPS disponible
             </p>
-            <p className="text-sm text-yellow-700">
+            <p className="text-sm text-yellow-700 dark:text-yellow-300">
               Les données GPS ne sont pas disponibles pour ce vol.
             </p>
-            <p className="text-xs text-gray-600 mt-2">Error: {String(error)}</p>
+            <p className="text-xs text-gray-600 dark:text-gray-300 mt-2">Error: {String(error)}</p>
           </div>
         </div>
       );
@@ -1052,10 +1052,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
     if (!gpxData?.coordinates) {
       return (
-        <div className="absolute inset-0 flex items-center justify-center bg-red-50 z-20">
+        <div className="absolute inset-0 flex items-center justify-center bg-red-50 dark:bg-red-900/20 z-20">
           <div className="text-center p-8">
-            <p className="text-lg">❌ Aucune donnée GPS disponible</p>
-            <p className="text-sm text-gray-600 mt-2">
+            <p className="text-lg dark:text-white">❌ Aucune donnée GPS disponible</p>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
               GPX Data: {JSON.stringify(gpxData)}
             </p>
           </div>
@@ -1069,18 +1069,18 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   // Show viewer error if viewer failed to initialize
   if (viewerError) {
     return (
-      <div className="bg-red-50 border-2 border-red-400 rounded-xl p-8 text-center">
-        <p className="text-lg font-bold text-red-800 mb-2">
+      <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-400 rounded-xl p-8 text-center">
+        <p className="text-lg font-bold text-red-800 dark:text-red-200 mb-2">
           ❌ Erreur d&apos;initialisation Cesium
         </p>
-        <p className="text-sm text-red-700 mb-4">
+        <p className="text-sm text-red-700 dark:text-red-300 mb-4">
           Le viewer 3D n&apos;a pas pu être créé.
         </p>
-        <div className="bg-white p-4 rounded text-left text-xs font-mono">
-          <p className="font-bold mb-2">Erreur:</p>
+        <div className="bg-white dark:bg-gray-800 p-4 rounded text-left text-xs font-mono">
+          <p className="font-bold mb-2 dark:text-white">Erreur:</p>
           <p className="text-red-600">{viewerError}</p>
         </div>
-        <p className="text-xs text-gray-600 mt-4">
+        <p className="text-xs text-gray-600 dark:text-gray-300 mt-4">
           Vérifiez la console du navigateur (F12) pour plus de détails.
         </p>
       </div>
@@ -1110,7 +1110,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       {/* Controls - only show when data is loaded */}
       {gpxData?.coordinates && (
         <div
-          className={`absolute top-4 left-4 z-10 bg-white rounded-lg shadow-lg transition-all ${
+          className={`absolute top-4 left-4 z-10 bg-white dark:bg-gray-800 rounded-lg shadow-lg transition-all ${
             isPanelCollapsed ? 'p-2' : 'p-4 max-w-xs'
           }`}
         >
@@ -1120,7 +1120,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             )}
             <button
               onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
-              className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm"
+              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-sm dark:text-gray-200"
               title={
                 isPanelCollapsed ? 'Ouvrir le panneau' : 'Réduire le panneau'
               }
@@ -1131,15 +1131,15 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
           {!isPanelCollapsed && (
             <>
-              <p className="text-xs text-gray-500 mb-3">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
                 Points: {gpxData?.coordinates?.length || 0}
               </p>
 
-              <div className="divide-y divide-gray-200">
+              <div className="divide-y divide-gray-200 dark:divide-gray-700">
                 {/* Terrain Loading Indicator - Outside accordion, always visible */}
                 {!terrainReady && (
-                  <div className="bg-blue-100 border border-blue-400 rounded p-2 mb-3">
-                    <p className="text-xs text-blue-800 flex items-center gap-2">
+                  <div className="bg-blue-100 dark:bg-blue-900/30 border border-blue-400 rounded p-2 mb-3">
+                    <p className="text-xs text-blue-800 dark:text-blue-200 flex items-center gap-2">
                       <span className="animate-spin">⏳</span>
                       Chargement des textures du terrain...
                     </p>
@@ -1183,7 +1183,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   </div>
 
                   {/* Flight Time Display */}
-                  <div className="text-sm text-gray-700 font-medium">
+                  <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">
                     ⏱️ {formatFlightTime(currentElapsedTime)} /{' '}
                     {formatFlightTime(gpxData?.flight_duration_seconds || 0)}
                   </div>
@@ -1407,7 +1407,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         value={flight.site.orientation || ''}
                         onChange={(e) => updateOrientation(e.target.value)}
                         disabled={isUpdatingOrientation}
-                        className="w-full px-2 py-1 border rounded text-sm bg-white"
+                        className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 dark:text-white"
                       >
                         <option value="">Non définie</option>
                         {getOrientationOptions().map((opt) => (
@@ -1416,7 +1416,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           </option>
                         ))}
                       </select>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {flight.site.orientation
                           ? `Direction: ${getOrientationLabel(flight.site.orientation)}`
                           : 'Direction vers laquelle regarde le pilote'}
@@ -1424,14 +1424,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                     </div>
 
                     {/* Camera Position Controls */}
-                    <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                      <label className="block text-sm font-medium mb-2 text-blue-900">
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-700">
+                      <label className="block text-sm font-medium mb-2 text-blue-900 dark:text-blue-100">
                         📷 Position Caméra
                       </label>
 
                       {/* Camera Angle */}
                       <div className="mb-2">
-                        <label className="block text-xs text-gray-600 mb-1">
+                        <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">
                           Angle: {tempCameraAngle}°{' '}
                           {tempCameraAngle === 0
                             ? '(Nord)'
@@ -1454,7 +1454,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           }
                           className="w-full"
                         />
-                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                           <span>0° (N)</span>
                           <span>90° (E)</span>
                           <span>180° (S)</span>
@@ -1464,7 +1464,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
                       {/* Camera Distance */}
                       <div className="mb-2">
-                        <label className="block text-xs text-gray-600 mb-1">
+                        <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">
                           Distance: {tempCameraDistance}m
                         </label>
                         <input
@@ -1478,7 +1478,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           }
                           className="w-full"
                         />
-                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                           <span>100m</span>
                           <span>2000m</span>
                         </div>
@@ -1493,7 +1493,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         {isUpdatingCamera ? '⏳ Mise à jour...' : '✓ Appliquer'}
                       </button>
 
-                      <p className="text-xs text-gray-600 mt-2">
+                      <p className="text-xs text-gray-600 dark:text-gray-300 mt-2">
                         💡 Ces réglages seront sauvegardés pour le site &quot;
                         {flight.site.name}&quot; et appliqués à tous ses vols
                       </p>
@@ -1534,7 +1534,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                       className="w-full"
                     />
                     {autoOffset !== 0 && (
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         Offset auto: {autoOffset.toFixed(1)}m
                       </p>
                     )}

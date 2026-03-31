@@ -23,11 +23,11 @@ export default function RecordsDashboard() {
         {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
-            className="bg-white rounded-xl p-4 shadow-md animate-pulse"
+            className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md animate-pulse"
           >
-            <div className="h-6 bg-gray-200 rounded mb-2 w-2/3"></div>
-            <div className="h-8 bg-gray-200 rounded mb-2"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+            <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded mb-2 w-2/3"></div>
+            <div className="h-8 bg-gray-200 dark:bg-gray-600 rounded mb-2"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-1/2"></div>
           </div>
         ))}
       </div>
@@ -36,8 +36,8 @@ export default function RecordsDashboard() {
 
   if (error) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md">
-        <h3 className="text-lg font-semibold mb-2 text-gray-900">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
+        <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
           🏆 {t('records.title')}
         </h3>
         <div className="text-red-600">
@@ -82,7 +82,7 @@ export default function RecordsDashboard() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
           🏆 {t('records.title')}
         </h2>
       </div>
@@ -95,15 +95,15 @@ export default function RecordsDashboard() {
           return (
             <div
               key={card.title}
-              className={`bg-white rounded-xl p-4 shadow-md border-2 ${
+              className={`bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-2 ${
                 hasRecord
-                  ? `border-${card.color}-200 hover:border-${card.color}-400`
-                  : 'border-gray-200'
+                  ? `border-${card.color}-200 dark:border-${card.color}-700 hover:border-${card.color}-400`
+                  : 'border-gray-200 dark:border-gray-700'
               } transition-colors`}
             >
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-2xl">{card.icon}</span>
-                <h3 className="text-sm font-semibold text-gray-700">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
                   {card.title}
                 </h3>
               </div>
@@ -111,11 +111,11 @@ export default function RecordsDashboard() {
               {hasRecord ? (
                 <>
                   <div
-                    className={`text-3xl font-bold text-${card.color}-600 mb-2`}
+                    className={`text-3xl font-bold text-${card.color}-600 dark:text-${card.color}-400 mb-2`}
                   >
                     {card.format(record.value)}
                   </div>
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs text-gray-600 dark:text-gray-300">
                     <div className="font-medium">{record.flight_name}</div>
                     <div className="mt-1">
                       {format(parseISO(record.flight_date), 'dd MMMM yyyy', {
@@ -123,7 +123,7 @@ export default function RecordsDashboard() {
                       })}
                     </div>
                     {record.site_name && (
-                      <div className="mt-1 text-gray-500">
+                      <div className="mt-1 text-gray-500 dark:text-gray-400">
                         📍 {record.site_name}
                       </div>
                     )}

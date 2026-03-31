@@ -297,9 +297,9 @@ export default function FlightHistory() {
   if (isLoading) {
     return (
       <div className="py-8">
-        <div className="bg-white rounded-xl p-8 shadow-md animate-pulse">
-          <div className="h-8 bg-gray-200 rounded mb-4 w-1/3"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md animate-pulse">
+          <div className="h-8 bg-gray-200 dark:bg-gray-600 rounded mb-4 w-1/3"></div>
+          <div className="h-64 bg-gray-200 dark:bg-gray-600 rounded"></div>
         </div>
       </div>
     );
@@ -308,9 +308,9 @@ export default function FlightHistory() {
   if (error) {
     return (
       <div className="py-8">
-        <div className="bg-white rounded-xl p-8 shadow-md text-center max-w-md mx-auto">
-          <h2 className="text-xl font-bold text-red-600 mb-3">❌ Erreur</h2>
-          <p className="text-gray-700 mb-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center max-w-md mx-auto">
+          <h2 className="text-xl font-bold text-red-600 dark:text-red-400 mb-3">❌ Erreur</h2>
+          <p className="text-gray-700 dark:text-gray-300 mb-4">
             Impossible de charger l&apos;historique des vols
           </p>
           <button
@@ -329,13 +329,13 @@ export default function FlightHistory() {
       {/* Toast notifications */}
       <ToastContainer toasts={toasts} onClose={removeToast} />
 
-      <div className="mb-4 bg-white rounded-xl p-4 shadow-md">
+      <div className="mb-4 bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
         <div className="flex justify-between items-center mb-3">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
               🪂 Historique des Vols
             </h1>
-            <div className="text-sm text-gray-600 mt-1">
+            <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
               {selectionMode && selectedFlightIds.size > 0 ? (
                 <span className="text-sky-600 font-semibold">
                   {selectedFlightIds.size} vol
@@ -388,16 +388,16 @@ export default function FlightHistory() {
 
         {/* Actions de sélection multiple */}
         {selectionMode && (
-          <div className="flex gap-2 pt-3 border-t border-gray-200">
+          <div className="flex gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
             <button
               onClick={handleSelectAll}
-              className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
+              className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
             >
               Tout sélectionner
             </button>
             <button
               onClick={handleDeselectAll}
-              className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
+              className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
             >
               Tout désélectionner
             </button>
@@ -416,9 +416,9 @@ export default function FlightHistory() {
         {/* Flight List */}
         <div className="lg:col-span-1 space-y-2">
           {flights.length === 0 ? (
-            <div className="bg-white rounded-xl p-8 shadow-md text-center">
-              <p className="text-gray-700 font-medium">Aucun vol enregistré</p>
-              <p className="text-sm text-gray-500 mt-2">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center">
+              <p className="text-gray-700 dark:text-gray-300 font-medium">Aucun vol enregistré</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
                 Les vols Strava apparaîtront automatiquement ici
               </p>
             </div>
@@ -426,12 +426,12 @@ export default function FlightHistory() {
             flights.map((flight: Flight) => (
               <div
                 key={flight.id}
-                className={`group relative bg-white rounded-lg p-3 shadow-sm border-2 transition-all cursor-pointer ${
+                className={`group relative bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border-2 transition-all cursor-pointer ${
                   selectionMode && selectedFlightIds.has(flight.id)
-                    ? 'border-sky-600 shadow-md bg-sky-50'
+                    ? 'border-sky-600 shadow-md bg-sky-50 dark:bg-sky-900/20'
                     : selectedFlightId === flight.id
                       ? 'border-sky-600 shadow-md'
-                      : 'border-gray-200 hover:border-sky-400'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-sky-400'
                 }`}
                 onClick={() => handleSelectFlight(flight)}
                 role="button"
@@ -468,20 +468,20 @@ export default function FlightHistory() {
                     />
                   )}
 
-                  <h3 className="font-semibold text-sm text-gray-900 truncate flex-1">
+                  <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate flex-1">
                     {flight.title || 'Vol sans titre'}
                   </h3>
 
                   {/* Badge GPX manquant */}
                   {!flight.gpx_file_path && !selectionMode && (
-                    <span className="ml-2 px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full shrink-0">
+                    <span className="ml-2 px-2 py-0.5 text-xs bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded-full shrink-0">
                       📎 GPX manquant
                     </span>
                   )}
                 </div>
 
                 {/* Date et heure */}
-                <div className="text-xs text-gray-500 mb-2">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                   <span className="font-medium">
                     {(() => {
                       // Parse date comme date locale pour éviter les problèmes de timezone
@@ -512,7 +512,7 @@ export default function FlightHistory() {
                   )}
                 </div>
 
-                <div className="flex flex-wrap gap-2 text-xs text-gray-600">
+                <div className="flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-300">
                   {flight.duration_minutes && (
                     <div className="flex items-center gap-1">
                       <span aria-hidden="true">⏱️</span>
@@ -536,7 +536,7 @@ export default function FlightHistory() {
                   )}
                 </div>
                 {flight.site_id && (
-                  <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+                  <div className="mt-2 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                     <span aria-hidden="true">📍</span>
                     <span className="truncate">
                       {flight.site_name || flight.site_id}
@@ -553,37 +553,37 @@ export default function FlightHistory() {
           {selectedFlightId && selectedFlight ? (
             <>
               {/* Flight Details */}
-              <div className="bg-white rounded-xl p-4 shadow-md">
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
                 <div className="flex justify-between items-start mb-4">
                   {editingMode ? (
                     <div className="flex-1 space-y-2">
                       <div>
-                        <label className="text-xs text-gray-600">
+                        <label className="text-xs text-gray-600 dark:text-gray-300">
                           Nom du vol (identifiant)
                         </label>
                         <input
                           type="text"
                           value={editedName}
                           onChange={(e) => setEditedName(e.target.value)}
-                          className="block w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                          className="block w-full mt-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600 dark:bg-gray-700 dark:text-gray-100"
                           placeholder="Ex: Arguel 14-08 21h08"
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-600">
+                        <label className="text-xs text-gray-600 dark:text-gray-300">
                           Titre du vol
                         </label>
                         <input
                           type="text"
                           value={editedTitle}
                           onChange={(e) => setEditedTitle(e.target.value)}
-                          className="block w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                          className="block w-full mt-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600 dark:bg-gray-700 dark:text-gray-100"
                           placeholder="Titre du vol"
                         />
                       </div>
                     </div>
                   ) : (
-                    <h2 className="text-lg font-bold text-gray-900">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                       {selectedFlight.title || 'Vol sans titre'}
                     </h2>
                   )}
@@ -601,7 +601,7 @@ export default function FlightHistory() {
                             : '✓ Enregistrer'}
                         </button>
                         <button
-                          className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-all"
+                          className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition-all"
                           onClick={handleCancelEdit}
                         >
                           ✖ Annuler
@@ -653,16 +653,16 @@ export default function FlightHistory() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                   {/* Date */}
                   <div>
-                    <span className="text-xs text-gray-600">📅 Date</span>
+                    <span className="text-xs text-gray-600 dark:text-gray-300">📅 Date</span>
                     {editingMode ? (
                       <input
                         type="date"
                         value={editedFlightDate}
                         onChange={(e) => setEditedFlightDate(e.target.value)}
-                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600 dark:bg-gray-700 dark:text-gray-100"
                       />
                     ) : (
-                      <span className="block text-sm font-medium text-gray-900 mt-1">
+                      <span className="block text-sm font-medium text-gray-900 dark:text-white mt-1">
                         {(() => {
                           // Parse date comme date locale pour éviter les problèmes de timezone
                           const [year, month, day] =
@@ -685,7 +685,7 @@ export default function FlightHistory() {
 
                   {/* Heure de départ */}
                   <div>
-                    <span className="text-xs text-gray-600">
+                    <span className="text-xs text-gray-600 dark:text-gray-300">
                       🕐 Heure de départ
                     </span>
                     {editingMode ? (
@@ -714,10 +714,10 @@ export default function FlightHistory() {
                             setEditedDepartureTime('');
                           }
                         }}
-                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600 dark:bg-gray-700 dark:text-gray-100"
                       />
                     ) : (
-                      <span className="block text-sm font-medium text-gray-900 mt-1">
+                      <span className="block text-sm font-medium text-gray-900 dark:text-white mt-1">
                         {selectedFlight.departure_time
                           ? new Date(
                               selectedFlight.departure_time
@@ -732,13 +732,13 @@ export default function FlightHistory() {
 
                   {/* Site */}
                   <div className="col-span-2 md:col-span-3">
-                    <span className="text-xs text-gray-600">📍 Site</span>
+                    <span className="text-xs text-gray-600 dark:text-gray-300">📍 Site</span>
                     {editingMode ? (
                       <div className="flex gap-2 mt-1">
                         <select
                           value={editedSiteId}
                           onChange={(e) => setEditedSiteId(e.target.value)}
-                          className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                          className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600 dark:bg-gray-700 dark:text-gray-100"
                         >
                           <option value="">Non spécifié</option>
                           {sites.map((site: Site) => (
@@ -756,7 +756,7 @@ export default function FlightHistory() {
                         </button>
                       </div>
                     ) : (
-                      <span className="block text-sm font-medium text-gray-900 mt-1">
+                      <span className="block text-sm font-medium text-gray-900 dark:text-white mt-1">
                         {selectedFlight.site_name ||
                           selectedFlight.site_id ||
                           'Non spécifié'}
@@ -766,7 +766,7 @@ export default function FlightHistory() {
 
                   {/* Durée */}
                   <div>
-                    <span className="text-xs text-gray-600">
+                    <span className="text-xs text-gray-600 dark:text-gray-300">
                       ⏱️ Durée (min)
                     </span>
                     {editingMode ? (
@@ -777,10 +777,10 @@ export default function FlightHistory() {
                           setEditedDuration(Number(e.target.value))
                         }
                         min="0"
-                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600 dark:bg-gray-700 dark:text-gray-100"
                       />
                     ) : (
-                      <span className="block text-sm font-medium text-gray-900 mt-1">
+                      <span className="block text-sm font-medium text-gray-900 dark:text-white mt-1">
                         {selectedFlight.duration_minutes ? (
                           <>
                             {Math.floor(selectedFlight.duration_minutes / 60)}h{' '}
@@ -795,7 +795,7 @@ export default function FlightHistory() {
 
                   {/* Distance */}
                   <div>
-                    <span className="text-xs text-gray-600">
+                    <span className="text-xs text-gray-600 dark:text-gray-300">
                       📏 Distance (km)
                     </span>
                     {editingMode ? (
@@ -807,10 +807,10 @@ export default function FlightHistory() {
                         }
                         min="0"
                         step="0.1"
-                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600 dark:bg-gray-700 dark:text-gray-100"
                       />
                     ) : (
-                      <span className="block text-sm font-medium text-gray-900 mt-1">
+                      <span className="block text-sm font-medium text-gray-900 dark:text-white mt-1">
                         {selectedFlight.distance_km?.toFixed(2)} km
                       </span>
                     )}
@@ -818,7 +818,7 @@ export default function FlightHistory() {
 
                   {/* Altitude max */}
                   <div>
-                    <span className="text-xs text-gray-600">
+                    <span className="text-xs text-gray-600 dark:text-gray-300">
                       ⛰️ Altitude max (m)
                     </span>
                     {editingMode ? (
@@ -829,10 +829,10 @@ export default function FlightHistory() {
                           setEditedMaxAltitude(Number(e.target.value))
                         }
                         min="0"
-                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600 dark:bg-gray-700 dark:text-gray-100"
                       />
                     ) : (
-                      <span className="block text-sm font-medium text-gray-900 mt-1">
+                      <span className="block text-sm font-medium text-gray-900 dark:text-white mt-1">
                         {selectedFlight.max_altitude_m} m
                       </span>
                     )}
@@ -840,7 +840,7 @@ export default function FlightHistory() {
 
                   {/* Dénivelé */}
                   <div>
-                    <span className="text-xs text-gray-600">
+                    <span className="text-xs text-gray-600 dark:text-gray-300">
                       📈 Dénivelé (m)
                     </span>
                     {editingMode ? (
@@ -851,10 +851,10 @@ export default function FlightHistory() {
                           setEditedElevationGain(Number(e.target.value))
                         }
                         min="0"
-                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600 dark:bg-gray-700 dark:text-gray-100"
                       />
                     ) : (
-                      <span className="block text-sm font-medium text-gray-900 mt-1">
+                      <span className="block text-sm font-medium text-gray-900 dark:text-white mt-1">
                         {selectedFlight.elevation_gain_m} m
                       </span>
                     )}
@@ -862,7 +862,7 @@ export default function FlightHistory() {
 
                   {/* Vitesse max */}
                   <div>
-                    <span className="text-xs text-gray-600">
+                    <span className="text-xs text-gray-600 dark:text-gray-300">
                       🏃 Vitesse max (km/h)
                     </span>
                     {editingMode ? (
@@ -874,10 +874,10 @@ export default function FlightHistory() {
                         }
                         min="0"
                         step="0.1"
-                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600"
+                        className="block w-full mt-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-600 dark:bg-gray-700 dark:text-gray-100"
                       />
                     ) : (
-                      <span className="block text-sm font-medium text-gray-900 mt-1">
+                      <span className="block text-sm font-medium text-gray-900 dark:text-white mt-1">
                         {selectedFlight.max_speed_kmh?.toFixed(2)} km/h
                       </span>
                     )}
@@ -888,7 +888,7 @@ export default function FlightHistory() {
                 <div>
                   <label
                     htmlFor="flight-notes"
-                    className="text-sm font-semibold text-gray-700 mb-2 block"
+                    className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 block"
                   >
                     📝 Notes
                   </label>
@@ -899,7 +899,7 @@ export default function FlightHistory() {
                       onChange={(e) => setEditedNotes(e.target.value)}
                       placeholder="Conditions, sensations, points à améliorer..."
                       rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600 resize-none"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600 resize-none dark:bg-gray-700 dark:text-gray-100"
                     />
                   ) : editingNotes ? (
                     <div className="space-y-2">
@@ -909,7 +909,7 @@ export default function FlightHistory() {
                         onChange={(e) => setNotesText(e.target.value)}
                         placeholder="Conditions, sensations, points à améliorer..."
                         rows={4}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600 resize-none"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600 resize-none dark:bg-gray-700 dark:text-gray-100"
                       />
                       <div className="flex gap-2">
                         <button
@@ -922,7 +922,7 @@ export default function FlightHistory() {
                             : '✓ Enregistrer'}
                         </button>
                         <button
-                          className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-all"
+                          className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition-all"
                           onClick={() => {
                             setNotesText(selectedFlight.notes || '');
                             setEditingNotes(false);
@@ -933,14 +933,14 @@ export default function FlightHistory() {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+                    <p className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 p-3 rounded-lg">
                       {selectedFlight.notes || 'Aucune note pour ce vol'}
                     </p>
                   )}
                 </div>
 
                 {/* Indicateur statut GPX */}
-                <div className="mt-4 pt-4 border-t">
+                <div className="mt-4 pt-4 border-t dark:border-gray-700">
                   {selectedFlight.gpx_file_path ? (
                     <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-3 rounded-lg">
                       <span className="text-xl">✅</span>
@@ -968,8 +968,8 @@ export default function FlightHistory() {
               </div>
 
               {/* 3D Viewer */}
-              <div className="bg-white rounded-xl shadow-md overflow-hidden">
-                <Suspense fallback={<div className="h-96 flex items-center justify-center text-gray-500">Chargement du viewer 3D...</div>}>
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+                <Suspense fallback={<div className="h-96 flex items-center justify-center text-gray-500 dark:text-gray-400">Chargement du viewer 3D...</div>}>
                   <FlightViewer3D
                     flightId={selectedFlightId}
                     flightTitle={
@@ -981,8 +981,8 @@ export default function FlightHistory() {
               </div>
             </>
           ) : (
-            <div className="bg-white rounded-xl p-12 shadow-md text-center">
-              <p className="text-gray-600">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-12 shadow-md text-center">
+              <p className="text-gray-600 dark:text-gray-300">
                 📍 Sélectionnez un vol pour visualiser les détails et la
                 trajectoire 3D
               </p>
@@ -1024,7 +1024,7 @@ export default function FlightHistory() {
         title="⚠️ Confirmer la suppression"
         size="sm"
       >
-        <p className="text-gray-700 mb-6">
+        <p className="text-gray-700 dark:text-gray-300 mb-6">
           Vous êtes sur le point de supprimer définitivement le vol{' '}
           <span className="font-bold text-red-600">
             {flightToDelete?.title || 'sans titre'}
@@ -1034,7 +1034,7 @@ export default function FlightHistory() {
         <div className="flex gap-3 justify-end">
           <button
             onClick={() => setFlightToDelete(null)}
-            className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all"
+            className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-all"
           >
             Annuler
           </button>
@@ -1055,7 +1055,7 @@ export default function FlightHistory() {
         title="⚠️ Confirmer la suppression"
         size="sm"
       >
-        <p className="text-gray-700 mb-6">
+        <p className="text-gray-700 dark:text-gray-300 mb-6">
           Vous êtes sur le point de supprimer définitivement{' '}
           <span className="font-bold text-red-600">
             {selectedFlightIds.size} vol
@@ -1066,7 +1066,7 @@ export default function FlightHistory() {
         <div className="flex gap-3 justify-end">
           <button
             onClick={() => setShowMultiDeleteConfirm(false)}
-            className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all"
+            className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-all"
           >
             Annuler
           </button>

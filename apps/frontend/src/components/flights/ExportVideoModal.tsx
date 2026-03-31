@@ -34,13 +34,13 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
         {/* Header */}
-        <h2 className="text-2xl font-bold mb-4">🎥 Export Vidéo</h2>
+        <h2 className="text-2xl font-bold mb-4 dark:text-white">🎥 Export Vidéo</h2>
 
         {/* Quality Selection */}
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">Qualité</label>
+          <label className="block text-sm font-medium mb-2 dark:text-gray-200">Qualité</label>
           <div className="grid grid-cols-3 gap-2">
             {(['720p', '1080p', '4K'] as const).map((q) => (
               <button
@@ -49,7 +49,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
                 className={`px-3 py-2 rounded border ${
                   quality === q
                     ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
                 }`}
               >
                 {q}
@@ -60,7 +60,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
 
         {/* FPS Selection */}
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">
+          <label className="block text-sm font-medium mb-2 dark:text-gray-200">
             Images/seconde
           </label>
           <div className="grid grid-cols-2 gap-2">
@@ -71,7 +71,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
                 className={`px-3 py-2 rounded border ${
                   fps === f
                     ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
                 }`}
               >
                 {f} FPS
@@ -82,9 +82,9 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
 
         {/* Speed Selection */}
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">
+          <label className="block text-sm font-medium mb-2 dark:text-gray-200">
             Vitesse de replay
-            <span className="text-xs text-gray-500 ml-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
               (1x = temps réel pour sync caméra)
             </span>
           </label>
@@ -96,7 +96,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
                 className={`px-3 py-2 rounded border ${
                   speed === s
                     ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
                 }`}
               >
                 {s}x
@@ -106,8 +106,8 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
         </div>
 
         {/* Estimates */}
-        <div className="bg-gray-100 rounded p-3 mb-4">
-          <div className="text-sm text-gray-700">
+        <div className="bg-gray-100 dark:bg-gray-700 rounded p-3 mb-4">
+          <div className="text-sm text-gray-700 dark:text-gray-300">
             <div className="flex justify-between mb-1">
               <span>Durée vidéo:</span>
               <span className="font-medium">
@@ -127,8 +127,8 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
 
         {/* Warning for long videos */}
         {estimatedDuration > 600 && (
-          <div className="bg-yellow-100 border border-yellow-400 rounded p-3 mb-4">
-            <p className="text-sm text-yellow-800">
+          <div className="bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-400 rounded p-3 mb-4">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">
               ⚠️ Vidéo longue détectée ({formatTime(estimatedDuration)}).
               L&apos;export peut prendre plusieurs minutes et générer un fichier
               volumineux.
@@ -140,7 +140,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
         <div className="flex gap-2">
           <button
             onClick={onCancel}
-            className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+            className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-500"
           >
             Annuler
           </button>
@@ -153,7 +153,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
         </div>
 
         {/* Help Text */}
-        <p className="text-xs text-gray-500 mt-3 text-center">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 text-center">
           La vidéo sera téléchargée au format WebM.
           <a
             href="https://cloudconvert.com/webm-to-mp4"

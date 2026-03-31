@@ -76,8 +76,8 @@ export default function SiteSelector({
   if (isLoading) {
     return (
       <div className="mb-4">
-        <div className="flex gap-2 flex-wrap bg-white rounded-xl p-3 shadow-md">
-          <div className="flex-1 min-w-[120px] p-3 border-2 border-gray-300 rounded-lg bg-white cursor-not-allowed text-gray-400">
+        <div className="flex gap-2 flex-wrap bg-white dark:bg-gray-800 rounded-xl p-3 shadow-md">
+          <div className="flex-1 min-w-[120px] p-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 cursor-not-allowed text-gray-400 dark:text-gray-500">
             {t('common.loading')}
           </div>
         </div>
@@ -88,8 +88,8 @@ export default function SiteSelector({
   if (error || !sites) {
     return (
       <div className="mb-4">
-        <div className="flex gap-2 flex-wrap bg-white rounded-xl p-3 shadow-md">
-          <div className="flex-1 min-w-[120px] p-3 border-2 border-gray-300 rounded-lg bg-white cursor-not-allowed text-gray-400">
+        <div className="flex gap-2 flex-wrap bg-white dark:bg-gray-800 rounded-xl p-3 shadow-md">
+          <div className="flex-1 min-w-[120px] p-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 cursor-not-allowed text-gray-400 dark:text-gray-500">
             {t('common.loadingError')}
           </div>
         </div>

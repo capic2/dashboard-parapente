@@ -62,6 +62,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xdg-utils \
     curl \
     ffmpeg \
+    sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copier requirements et installer packages Python

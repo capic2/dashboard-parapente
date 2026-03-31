@@ -55,7 +55,7 @@ export function StravaSyncModal({
       size="md"
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">{t('strava.description')}</p>
+        <p className="text-sm text-gray-600 dark:text-gray-300">{t('strava.description')}</p>
 
         <div className="grid grid-cols-2 gap-4">
           <DatePicker
@@ -72,11 +72,11 @@ export function StravaSyncModal({
 
         {/* Résultat de la sync */}
         {data && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <p className="font-semibold text-green-800 mb-2">
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
+            <p className="font-semibold text-green-800 dark:text-green-200 mb-2">
               ✅ {t('strava.syncComplete')}
             </p>
-            <ul className="text-sm text-green-700 space-y-1">
+            <ul className="text-sm text-green-700 dark:text-green-300 space-y-1">
               <li>
                 • {data.imported} {t('strava.imported')}
               </li>
@@ -86,7 +86,7 @@ export function StravaSyncModal({
                 </li>
               )}
               {data.failed > 0 && (
-                <li className="text-orange-700">
+                <li className="text-orange-700 dark:text-orange-400">
                   • {data.failed} {t('strava.failures')}
                 </li>
               )}
@@ -98,7 +98,7 @@ export function StravaSyncModal({
         <div className="flex gap-3 justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+            className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
             disabled={isPending}
           >
             {t('common.cancel')}

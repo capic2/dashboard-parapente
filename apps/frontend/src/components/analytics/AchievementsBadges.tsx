@@ -150,12 +150,12 @@ export default function AchievementsBadges() {
 
   if (flightsLoading || statsLoading) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
         <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded mb-4 w-1/3"></div>
+          <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded mb-4 w-1/3"></div>
           <div className="grid grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded"></div>
+              <div key={i} className="h-24 bg-gray-200 dark:bg-gray-600 rounded"></div>
             ))}
           </div>
         </div>
@@ -164,12 +164,12 @@ export default function AchievementsBadges() {
   }
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow-md">
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
           🏆 {t('achievements.title')}
         </h3>
-        <p className="text-sm text-gray-600 mt-1">
+        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
           {t('achievements.badgesUnlocked', {
             unlocked: unlockedBadges.length,
             total: badges.length,
@@ -180,20 +180,20 @@ export default function AchievementsBadges() {
       {/* Unlocked Badges */}
       {unlockedBadges.length > 0 && (
         <div className="mb-6">
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+          <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
             {t('achievements.unlocked')}
           </h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {unlockedBadges.map((badge) => (
               <div
                 key={badge.id}
-                className="flex flex-col items-center p-3 bg-gradient-to-br from-sky-50 to-blue-50 border-2 border-sky-300 rounded-lg hover:shadow-md transition-shadow"
+                className="flex flex-col items-center p-3 bg-gradient-to-br from-sky-50 to-blue-50 dark:from-sky-900/20 dark:to-blue-900/20 border-2 border-sky-300 dark:border-sky-600 rounded-lg hover:shadow-md transition-shadow"
               >
                 <span className="text-3xl mb-1">{badge.icon}</span>
-                <span className="text-xs font-semibold text-gray-800 text-center">
+                <span className="text-xs font-semibold text-gray-800 dark:text-gray-100 text-center">
                   {badge.title}
                 </span>
-                <span className="text-xs text-gray-600 text-center mt-1">
+                <span className="text-xs text-gray-600 dark:text-gray-300 text-center mt-1">
                   {badge.description}
                 </span>
               </div>
@@ -205,19 +205,19 @@ export default function AchievementsBadges() {
       {/* Locked Badges with Progress */}
       {lockedBadges.length > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+          <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
             {t('achievements.locked')}
           </h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {lockedBadges.map((badge) => (
               <div
                 key={badge.id}
-                className="flex flex-col items-center p-3 bg-gray-50 border-2 border-gray-200 rounded-lg relative overflow-hidden"
+                className="flex flex-col items-center p-3 bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-lg relative overflow-hidden"
               >
                 {/* Progress bar background */}
                 {badge.progress !== undefined && (
                   <div
-                    className="absolute inset-0 bg-gradient-to-t from-sky-100 to-transparent opacity-50"
+                    className="absolute inset-0 bg-gradient-to-t from-sky-100 dark:from-sky-900/30 to-transparent opacity-50"
                     style={{
                       height: `${badge.progress}%`,
                       bottom: 0,
@@ -230,14 +230,14 @@ export default function AchievementsBadges() {
                   <span className="text-3xl mb-1 opacity-40 grayscale">
                     {badge.icon}
                   </span>
-                  <span className="text-xs font-semibold text-gray-500 text-center">
+                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 text-center">
                     {badge.title}
                   </span>
-                  <span className="text-xs text-gray-400 text-center mt-1">
+                  <span className="text-xs text-gray-400 dark:text-gray-500 text-center mt-1">
                     {badge.description}
                   </span>
                   {badge.progress !== undefined && badge.progress > 0 && (
-                    <span className="text-xs text-sky-600 font-medium mt-1">
+                    <span className="text-xs text-sky-600 dark:text-sky-400 font-medium mt-1">
                       {Math.round(badge.progress)}%
                     </span>
                   )}

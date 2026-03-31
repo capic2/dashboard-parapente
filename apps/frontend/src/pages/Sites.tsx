@@ -116,7 +116,7 @@ export const Sites: React.FC = () => {
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+        <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 text-red-700 dark:text-red-300 px-4 py-3 rounded">
           ❌ {t('sites.sitesLoadError')}
         </div>
       </div>
@@ -137,7 +137,7 @@ export const Sites: React.FC = () => {
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Search */}
           <input
@@ -145,7 +145,7 @@ export const Sites: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('sites.searchPlaceholder')}
-            className="px-3 py-2 border rounded"
+            className="px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
           />
 
           {/* Type Filter */}
@@ -156,7 +156,7 @@ export const Sites: React.FC = () => {
                 e.target.value as 'all' | 'takeoff' | 'landing' | 'both'
               )
             }
-            className="px-3 py-2 border rounded"
+            className="px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
           >
             <option value="all">{t('sites.allTypes')}</option>
             <option value="takeoff">{t('sites.takeoffOnly')}</option>
@@ -170,7 +170,7 @@ export const Sites: React.FC = () => {
             onChange={(e) =>
               setSortBy(e.target.value as 'name' | 'created_at' | 'region')
             }
-            className="px-3 py-2 border rounded"
+            className="px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
           >
             <option value="name">{t('sites.sortByName')}</option>
             <option value="region">{t('sites.sortByRegion')}</option>
@@ -179,7 +179,7 @@ export const Sites: React.FC = () => {
       </div>
 
       {/* Results count */}
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
         {t('common.siteFound', { count: filteredSites.length })}
       </p>
 
@@ -199,9 +199,9 @@ export const Sites: React.FC = () => {
         </div>
       ) : (
         <div className="text-center py-12">
-          <p className="text-gray-500 text-lg mb-4">{t('sites.noSiteFound')}</p>
+          <p className="text-gray-500 dark:text-gray-400 text-lg mb-4">{t('sites.noSiteFound')}</p>
           {searchQuery || typeFilter !== 'all' ? (
-            <p className="text-gray-400">{t('sites.adjustFilters')}</p>
+            <p className="text-gray-400 dark:text-gray-500">{t('sites.adjustFilters')}</p>
           ) : (
             <button
               onClick={handleCreate}

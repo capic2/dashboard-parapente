@@ -110,18 +110,18 @@ const getFlyabilityDisplay = (
 
   // Emoji and color based on verdict
   let emoji = '🟡';
-  let color = 'text-yellow-600';
+  let color = 'text-yellow-600 dark:text-yellow-400';
 
   if (verdict === 'bon') {
     emoji = '🟢';
-    color = 'text-green-600';
+    color = 'text-green-600 dark:text-green-400';
     return { emoji, text: 'BON', color };
   } else if (verdict === 'mauvais') {
     emoji = '🔴';
-    color = 'text-red-600';
+    color = 'text-red-600 dark:text-red-400';
   } else if (verdict === 'limite') {
     emoji = '🟠';
-    color = 'text-orange-600';
+    color = 'text-orange-600 dark:text-orange-400';
   }
 
   // Determine the reason when not BON
@@ -168,10 +168,10 @@ const getFlyabilityDisplay = (
 
 const getVerdictClass = (verdict: string): string => {
   const v = verdict.toLowerCase();
-  if (v === 'bon') return 'bg-green-50 hover:bg-green-100';
-  if (v === 'moyen') return 'bg-yellow-50 hover:bg-yellow-100';
-  if (v === 'limite') return 'bg-orange-50 hover:bg-orange-100';
-  return 'bg-red-50 hover:bg-red-100';
+  if (v === 'bon') return 'bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30';
+  if (v === 'moyen') return 'bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/30';
+  if (v === 'limite') return 'bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30';
+  return 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30';
 };
 
 const formatWindDirectionFromDegrees = (deg: number | null): string => {
@@ -224,7 +224,7 @@ const ParaIndexTooltip = ({
       ref={tooltipRef}
       className={`
         ${isMobile ? 'fixed bottom-0 left-0 right-0 mx-4 mb-4' : 'fixed'}
-        bg-white border-2 border-sky-500 rounded-lg shadow-xl p-4 z-50 text-sm
+        bg-white dark:bg-gray-800 border-2 border-sky-500 rounded-lg shadow-xl p-4 z-50 text-sm
       `}
       style={
         isMobile
@@ -240,18 +240,18 @@ const ParaIndexTooltip = ({
       {onClose && (
         <button
           onClick={onClose}
-          className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+          className="absolute top-2 right-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
         >
           ✕
         </button>
       )}
-      <div className="font-bold mb-3 text-sky-700 flex items-center gap-2">
+      <div className="font-bold mb-3 text-sky-700 dark:text-sky-400 flex items-center gap-2">
         📊 Para-Index - {hour}
       </div>
-      <div className="space-y-2 text-gray-700">
+      <div className="space-y-2 text-gray-700 dark:text-gray-300">
         <div className="text-lg font-bold text-sky-600">{paraIndex}/100</div>
-        <div className="border-t border-gray-200 pt-2 mt-2">
-          <div className="text-xs font-semibold text-gray-500 mb-2">
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
+          <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
             Métriques utilisées :
           </div>
           <div className="space-y-1 text-xs">
@@ -269,7 +269,7 @@ const ParaIndexTooltip = ({
             </div>
           </div>
         </div>
-        <div className="text-xs text-gray-500 mt-3">
+        <div className="text-xs text-gray-500 dark:text-gray-400 mt-3">
           Score calculé selon les conditions optimales de vol
         </div>
       </div>
@@ -316,7 +316,7 @@ const VerdictTooltip = ({
     <div
       className={`
         ${isMobile ? 'fixed bottom-0 left-0 right-0 mx-4 mb-4' : 'fixed'}
-        bg-white border-2 border-emerald-500 rounded-lg shadow-xl p-4 z-50 text-sm
+        bg-white dark:bg-gray-800 border-2 border-emerald-500 rounded-lg shadow-xl p-4 z-50 text-sm
       `}
       ref={tooltipRef}
       style={
@@ -333,23 +333,23 @@ const VerdictTooltip = ({
       {onClose && (
         <button
           onClick={onClose}
-          className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+          className="absolute top-2 right-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
         >
           ✕
         </button>
       )}
-      <div className="font-bold mb-3 text-emerald-700 flex items-center gap-2">
+      <div className="font-bold mb-3 text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
         ✓ Verdict - {hour}
       </div>
-      <div className="space-y-2 text-gray-700">
-        <div className="text-lg font-bold capitalize text-emerald-600">
+      <div className="space-y-2 text-gray-700 dark:text-gray-300">
+        <div className="text-lg font-bold capitalize text-emerald-600 dark:text-emerald-400">
           {verdict}
         </div>
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-gray-500 dark:text-gray-400">
           Para-Index : {paraIndex}/100
         </div>
-        <div className="border-t border-gray-200 pt-2 mt-2">
-          <div className="text-xs font-semibold text-gray-500 mb-2">
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
+          <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
             Critères évalués :
           </div>
           <div className="space-y-1 text-xs">
@@ -361,7 +361,7 @@ const VerdictTooltip = ({
                   {criterion.met ? '✓' : '✗'}
                 </span>
                 <span
-                  className={criterion.met ? 'text-gray-700' : 'text-gray-500'}
+                  className={criterion.met ? 'text-gray-700 dark:text-gray-300' : 'text-gray-500 dark:text-gray-400'}
                 >
                   {criterion.label}
                 </span>
@@ -392,7 +392,7 @@ const SourceDataTooltip = ({
       ref={tooltipRef}
       className={`
         ${isMobile ? 'fixed bottom-0 left-0 right-0 mx-4 mb-4' : 'fixed'}
-        bg-white border-2 rounded-lg shadow-xl p-4 z-50 text-sm
+        bg-white dark:bg-gray-800 border-2 rounded-lg shadow-xl p-4 z-50 text-sm
       `}
       style={
         isMobile
@@ -409,12 +409,12 @@ const SourceDataTooltip = ({
       {onClose && (
         <button
           onClick={onClose}
-          className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+          className="absolute top-2 right-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
         >
           ✕
         </button>
       )}
-      <div className="font-bold mb-3 text-gray-800 flex items-center gap-2">
+      <div className="font-bold mb-3 text-gray-800 dark:text-gray-100 flex items-center gap-2">
         {label} - {hour}
       </div>
       <div className="space-y-2">
@@ -424,7 +424,7 @@ const SourceDataTooltip = ({
 
           if (!sourceData) {
             return (
-              <div key={sourceKey} className="text-xs text-gray-400">
+              <div key={sourceKey} className="text-xs text-gray-400 dark:text-gray-500">
                 <span className="font-semibold">{sourceName}:</span> (non
                 disponible)
               </div>
@@ -450,7 +450,7 @@ const SourceDataTooltip = ({
             return (
               <div
                 key={sourceKey}
-                className="text-xs text-gray-700 flex items-center justify-between gap-2"
+                className="text-xs text-gray-700 dark:text-gray-300 flex items-center justify-between gap-2"
               >
                 <span>
                   <span className="font-semibold">{sourceName}:</span>{' '}
@@ -482,7 +482,7 @@ const SourceDataTooltip = ({
             return (
               <div
                 key={sourceKey}
-                className="text-xs text-gray-700 flex items-center justify-between gap-2"
+                className="text-xs text-gray-700 dark:text-gray-300 flex items-center justify-between gap-2"
               >
                 <span>
                   <span className="font-semibold">{sourceName}:</span>{' '}
@@ -506,7 +506,7 @@ const SourceDataTooltip = ({
           // General case
           if (value === null || value === undefined) {
             return (
-              <div key={sourceKey} className="text-xs text-gray-400">
+              <div key={sourceKey} className="text-xs text-gray-400 dark:text-gray-500">
                 <span className="font-semibold">{sourceName}:</span> (non
                 dispo.)
               </div>
@@ -519,7 +519,7 @@ const SourceDataTooltip = ({
           return (
             <div
               key={sourceKey}
-              className="text-xs text-gray-700 flex items-center justify-between gap-2"
+              className="text-xs text-gray-700 dark:text-gray-300 flex items-center justify-between gap-2"
             >
               <span>
                 <span className="font-semibold">{sourceName}:</span>{' '}
@@ -540,8 +540,8 @@ const SourceDataTooltip = ({
           );
         })}
 
-        <div className="border-t border-gray-200 pt-2 mt-2">
-          <div className="text-xs font-bold text-gray-800">
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
+          <div className="text-xs font-bold text-gray-800 dark:text-gray-100">
             Consensus :{' '}
             {consensus !== null && consensus !== undefined
               ? typeof consensus === 'number'
@@ -610,11 +610,11 @@ export default function HourlyForecast({
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md">
-        <h2 className="text-sm text-gray-600 mb-3 font-semibold">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
+        <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
           Prévisions Horaires
         </h2>
-        <div className="py-5 text-center text-gray-500 text-sm">
+        <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
           Chargement...
         </div>
       </div>
@@ -623,8 +623,8 @@ export default function HourlyForecast({
 
   if (error || !weather || !weather.hourly_forecast) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md">
-        <h2 className="text-sm text-gray-600 mb-3 font-semibold">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
+        <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
           Prévisions Horaires
         </h2>
         <div className="py-5 text-center text-red-500 text-sm">
@@ -798,9 +798,9 @@ export default function HourlyForecast({
   });
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow-md">
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm text-gray-600 font-semibold">
+        <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
           Prévisions Horaires
         </h2>
         <CacheTimestamp cachedAt={weather.cached_at} />
@@ -809,38 +809,38 @@ export default function HourlyForecast({
       <div className="overflow-x-auto -mx-4 px-4">
         <table className="w-full min-w-[800px] text-sm">
           <thead>
-            <tr className="border-b-2 border-gray-200">
-              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+            <tr className="border-b-2 border-gray-200 dark:border-gray-600">
+              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
                 <span className="inline-flex items-center justify-center gap-1"><Clock size={14} /> Heure</span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
                 <span className="inline-flex items-center justify-center gap-1"><Gauge size={14} /> Para-Index</span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
                 <span className="inline-flex items-center justify-center gap-1"><Thermometer size={14} /> Temp (°C)</span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
                 <span className="inline-flex items-center justify-center gap-1"><Wind size={14} /> Vent (km/h)</span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
                 <span className="inline-flex items-center justify-center gap-1"><Zap size={14} /> Rafales (km/h)</span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
                 <span className="inline-flex items-center justify-center gap-1"><Compass size={14} /> Direction</span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
                 <span className="inline-flex items-center justify-center gap-1"><CloudRain size={14} /> Précip. (mm)</span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
                 <span className="inline-flex items-center justify-center gap-1"><Cloud size={14} /> Nuages (%)</span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
                 <span className="inline-flex items-center justify-center gap-1"><Zap size={14} /> CAPE (J/kg)</span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
                 <span className="inline-flex items-center justify-center gap-1"><Flame size={14} /> Thermiques</span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700">
+              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
                 <span className="inline-flex items-center justify-center gap-1"><CircleCheck size={14} /> Volabilité</span>
               </th>
             </tr>
@@ -865,12 +865,12 @@ export default function HourlyForecast({
                 return (
                   <tr
                     key={index}
-                    className={`border-b border-gray-100 ${getVerdictClass(hour.verdict)}`}
+                    className={`border-b border-gray-100 dark:border-gray-700 ${getVerdictClass(hour.verdict)}`}
                   >
                     <td className="py-2.5 px-2 font-medium text-center">{hour.hour}</td>
 
                     <td
-                      className="py-2.5 px-2 text-center cursor-help hover:bg-sky-100 transition-colors"
+                      className="py-2.5 px-2 text-center cursor-help hover:bg-sky-100 dark:hover:bg-sky-900/30 transition-colors"
                       {...cellEventHandlers('para-index', hour)}
                     >
                       <strong className="text-sky-600">
@@ -879,21 +879,21 @@ export default function HourlyForecast({
                     </td>
 
                     <td
-                      className="py-2.5 px-2 text-center cursor-help hover:bg-red-50 transition-colors"
+                      className="py-2.5 px-2 text-center cursor-help hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                       {...cellEventHandlers('temperature', hour)}
                     >
                       {hour.temp}
                     </td>
 
                     <td
-                      className="py-2.5 px-2 text-center cursor-help hover:bg-blue-50 transition-colors"
+                      className="py-2.5 px-2 text-center cursor-help hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                       {...cellEventHandlers('wind', hour)}
                     >
                       {hour.wind}
                     </td>
 
                     <td
-                      className="py-2.5 px-2 text-center cursor-help hover:bg-red-50 transition-colors"
+                      className="py-2.5 px-2 text-center cursor-help hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                       {...cellEventHandlers('gust', hour)}
                     >
                       {gustValue !== null && gustValue !== undefined
@@ -902,18 +902,18 @@ export default function HourlyForecast({
                     </td>
 
                     <td
-                      className="py-2.5 px-2 text-center cursor-help hover:bg-violet-50 transition-colors"
+                      className="py-2.5 px-2 text-center cursor-help hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
                       {...cellEventHandlers('direction', hour)}
                     >
                       {hour.wind_direction_deg != null ? (
-                        <WindArrow degrees={hour.wind_direction_deg} className="text-violet-600" />
+                        <WindArrow degrees={hour.wind_direction_deg} className="text-violet-600 dark:text-violet-400" />
                       ) : (
                         '—'
                       )}
                     </td>
 
                     <td
-                      className="py-2.5 px-2 text-center cursor-help hover:bg-cyan-50 transition-colors"
+                      className="py-2.5 px-2 text-center cursor-help hover:bg-cyan-50 dark:hover:bg-cyan-900/20 transition-colors"
                       {...cellEventHandlers('precipitation', hour)}
                     >
                       {hour.precipitation !== null &&
@@ -923,7 +923,7 @@ export default function HourlyForecast({
                     </td>
 
                     <td
-                      className="py-2.5 px-2 text-center cursor-help hover:bg-slate-50 transition-colors"
+                      className="py-2.5 px-2 text-center cursor-help hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors"
                       {...cellEventHandlers('cloud-cover', hour)}
                     >
                       {cloudCover !== null && cloudCover !== undefined
@@ -956,7 +956,7 @@ export default function HourlyForecast({
               })
             ) : (
               <tr>
-                <td colSpan={11} className="py-8 text-center text-gray-500">
+                <td colSpan={11} className="py-8 text-center text-gray-500 dark:text-gray-400">
                   Aucune donnée horaire disponible
                 </td>
               </tr>

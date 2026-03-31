@@ -64,9 +64,9 @@ export default function WeatherMultiLanding({
                 key={entry.landing_site_id}
                 className={`rounded-lg border-l-4 p-3 ${
                   hasError
-                    ? 'border-gray-300 bg-gray-50 dark:bg-gray-700'
+                    ? 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700'
                     : getVerdictColor(verdict)
-                } ${entry.is_primary ? 'ring-2 ring-indigo-400 ring-offset-1' : ''}`}
+                } ${entry.is_primary ? 'ring-2 ring-indigo-400 ring-offset-1 dark:ring-offset-gray-800' : ''}`}
               >
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">

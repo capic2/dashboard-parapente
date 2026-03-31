@@ -478,6 +478,13 @@ async def get_spot_weather(
             "model": config.get("model", "unknown"),
         }
 
+    # Extract cached_at from the first day result
+    cached_at = None
+    for day_result in results:
+        if day_result.get("cached_at"):
+            cached_at = day_result["cached_at"]
+            break
+
     return {
         "spot_id": spot_id,
         "spot_name": spot["name"],
@@ -488,6 +495,7 @@ async def get_spot_weather(
         "coordinates": {"latitude": spot["latitude"], "longitude": spot["longitude"]},
         "day_index": day_index,
         "days": days,
+        "cached_at": cached_at,
         "consensus": all_consensus,
         "para_index": para_result.get("para_index"),
         "verdict": para_result.get("verdict"),
@@ -1621,6 +1629,13 @@ async def get_weather(
                 "available_fields": config.get("provides", []),
             }
 
+    # Extract cached_at from the first day result
+    cached_at = None
+    for day_result in results:
+        if day_result.get("cached_at"):
+            cached_at = day_result["cached_at"]
+            break
+
     return {
         "site_id": spot_id,
         "site_name": site.name,
@@ -1628,6 +1643,7 @@ async def get_weather(
         "days": days,
         "sunrise": sunrise_time,
         "sunset": sunset_time,
+        "cached_at": cached_at,
         "sources_metadata": sources_metadata,  # ← New field with source metadata
         "consensus": all_consensus,
         "para_index": para_result["para_index"],
@@ -1712,6 +1728,7 @@ async def get_weather_summary(spot_id: str, day_index: int = 0, db: Session = De
         "verdict": para_result["verdict"],
         "emoji": para_result["emoji"],
         "wind_avg": wind_avg,
+        "cached_at": day_result.get("cached_at"),
     }
 
 
@@ -1815,7 +1832,19 @@ async def get_daily_summary(spot_id: str, days: int = 7, db: Session = Depends(g
                 status_code=500, detail=f"Failed to fetch daily summary for {site.name}"
             )
 
-        return {"site_id": spot_id, "site_name": site.name, "days": summary_days}
+        # Extract cached_at from the first successful day
+        cached_at = None
+        for day_result in results:
+            if not isinstance(day_result, Exception) and day_result and day_result.get("cached_at"):
+                cached_at = day_result["cached_at"]
+                break
+
+        return {
+            "site_id": spot_id,
+            "site_name": site.name,
+            "cached_at": cached_at,
+            "days": summary_days,
+        }
 
     except HTTPException:
         raise  # Re-raise HTTP exceptions as-is

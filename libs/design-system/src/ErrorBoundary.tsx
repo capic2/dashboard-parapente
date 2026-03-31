@@ -55,18 +55,18 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-sky-600 to-indigo-700"
           role="alert"
         >
-          <div className="max-w-2xl w-full bg-white rounded-xl shadow-2xl p-8">
-            <h2 className="text-2xl font-bold text-red-600 mb-4">
+          <div className="max-w-2xl w-full bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8">
+            <h2 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-4">
               ❌ {t('errors.errorOccurred')}
             </h2>
-            <p className="text-gray-700 mb-6">{t('errors.errorMessage')}</p>
+            <p className="text-gray-700 dark:text-gray-300 mb-6">{t('errors.errorMessage')}</p>
 
-            {this.state.error && (
-              <details className="mb-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <summary className="cursor-pointer text-sm font-semibold text-gray-700 hover:text-sky-600">
+            {this.state.error && typeof window !== 'undefined' && window.location.hostname === 'localhost' && (
+              <details className="mb-6 bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <summary className="cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-sky-600">
                   {t('errors.technicalDetails')}
                 </summary>
-                <pre className="mt-3 text-xs text-gray-800 overflow-auto max-h-64 bg-white p-3 rounded border border-gray-200">
+                <pre className="mt-3 text-xs text-gray-800 dark:text-gray-200 overflow-auto max-h-64 bg-white dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                   <strong>{t('errors.errorLabel')}</strong>{' '}
                   {this.state.error.toString()}
                   {this.state.errorInfo && (
@@ -89,7 +89,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               </button>
               <button
                 onClick={() => (window.location.href = '/')}
-                className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-all"
+                className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
               >
                 🏠 {t('common.backToHome')}
               </button>

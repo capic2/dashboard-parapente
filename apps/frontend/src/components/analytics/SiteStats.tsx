@@ -92,10 +92,10 @@ export default function SiteStats() {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
         <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded mb-4 w-1/3"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
+          <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded mb-4 w-1/3"></div>
+          <div className="h-64 bg-gray-200 dark:bg-gray-600 rounded"></div>
         </div>
       </div>
     );
@@ -103,8 +103,8 @@ export default function SiteStats() {
 
   if (error || !siteData.length) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md text-center">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
           📍 Statistiques par Site
         </h3>
         <p className="text-red-600 text-sm">Pas de données disponibles</p>
@@ -113,8 +113,8 @@ export default function SiteStats() {
   }
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow-md">
-      <h3 className="text-lg font-bold text-gray-900 mb-4">
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
+      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
         📍 Statistiques par Site
       </h3>
 
@@ -149,20 +149,20 @@ export default function SiteStats() {
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b-2 border-gray-200">
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">
+            <tr className="border-b-2 border-gray-200 dark:border-gray-700">
+              <th className="text-left py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
                 Site
               </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">
+              <th className="text-left py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
                 Vols
               </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">
+              <th className="text-left py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
                 %
               </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">
+              <th className="text-left py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
                 Alt. moy.
               </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700">
+              <th className="text-left py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
                 Temps total
               </th>
             </tr>
@@ -171,7 +171,7 @@ export default function SiteStats() {
             {siteDetails.map((site, index) => (
               <tr
                 key={site.siteId}
-                className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 <td className="py-2 px-2 flex items-center gap-2">
                   <span

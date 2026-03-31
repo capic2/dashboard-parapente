@@ -13,10 +13,12 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useFlights } from '../../hooks/flights/useFlights';
 import { useFiltersStore } from '../../stores/filtersStore';
+import { useThemeStore } from '../../stores/themeStore';
 import { format } from 'date-fns';
 import { enUS, fr } from 'date-fns/locale';
 
 export default function ProgressChart() {
+  const isDark = useThemeStore((s) => s.resolved === 'dark');
   const { t, i18n } = useTranslation();
   const { filters } = useFiltersStore();
   const {
@@ -71,10 +73,10 @@ export default function ProgressChart() {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
         <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded mb-4 w-1/3"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
+          <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded mb-4 w-1/3"></div>
+          <div className="h-64 bg-gray-200 dark:bg-gray-600 rounded"></div>
         </div>
       </div>
     );
@@ -82,8 +84,8 @@ export default function ProgressChart() {
 
   if (error || !chartData.length) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md text-center">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
           📈 {t('charts.flightProgress')}
         </h3>
         <p className="text-red-600 text-sm">{t('charts.noData')}</p>
@@ -92,12 +94,12 @@ export default function ProgressChart() {
   }
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow-md">
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
       <div className="mb-4">
-        <h3 className="text-lg font-bold text-gray-900">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white">
           📈 {t('charts.flightProgress')}
         </h3>
-        <p className="text-sm text-gray-600 mt-1">
+        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
           {t('charts.flightProgressDesc')}
         </p>
       </div>
@@ -112,30 +114,31 @@ export default function ProgressChart() {
               <stop offset="95%" stopColor="#4a90e2" stopOpacity={0.1} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e0e0e0'} />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 12, fill: '#666' }}
-            stroke="#999"
+            tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : '#666' }}
+            stroke={isDark ? '#4b5563' : '#999'}
           />
           <YAxis
             label={{
               value: t('charts.durationMin'),
               angle: -90,
               position: 'insideLeft',
-              style: { fontSize: 12, fill: '#666' },
+              style: { fontSize: 12, fill: isDark ? '#9ca3af' : '#666' },
             }}
-            tick={{ fontSize: 12, fill: '#666' }}
-            stroke="#999"
+            tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : '#666' }}
+            stroke={isDark ? '#4b5563' : '#999'}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: 'white',
-              border: '1px solid #ccc',
+              backgroundColor: isDark ? '#1f2937' : 'white',
+              border: `1px solid ${isDark ? '#374151' : '#ccc'}`,
               borderRadius: '4px',
               padding: '8px',
+              color: isDark ? '#e5e7eb' : undefined,
             }}
-            labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
+            labelStyle={{ fontWeight: 'bold', marginBottom: '4px', color: isDark ? '#e5e7eb' : undefined }}
             formatter={(value, name) => {
               const val = value || 0;
               const hours = Math.floor(Number(val) / 60);
