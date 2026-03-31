@@ -94,6 +94,9 @@ const preview = definePreview({
       },
     },
     layout: 'centered',
+    chromatic: {
+      disableSnapshot: true
+    }
   },
 
   // Global decorators
