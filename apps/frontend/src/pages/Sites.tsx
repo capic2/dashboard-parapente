@@ -1,15 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
-import { useSites } from '../hooks/useSites';
+import { useSites } from '../hooks/sites/useSites';
 import {
   useUpdateSite,
   useDeleteSite,
   SiteUpdate,
-} from '../hooks/useSiteMutations';
+} from '../hooks/sites/useSiteMutations';
 import type { Site } from '@dashboard-parapente/shared-types';
-import { SiteCard } from '../components/SiteCard';
-import { EditSiteModal } from '../components/forms/EditSiteModal';
+import { SiteCard } from '../components/sites/SiteCard';
+import { EditSiteModal } from '../components/sites/EditSiteModal';
 
 export const Sites: React.FC = () => {
   const { t } = useTranslation();

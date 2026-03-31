@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import SiteSelector from '../components/SiteSelector';
+import SiteSelector from '../components/dashboard/SiteSelector';
 import CurrentConditions from '../components/weather/CurrentConditions';
 import Forecast7Day from '../components/weather/Forecast7Day';
 import HourlyForecast from '../components/weather/HourlyForecast';
-import StatsPanel from '../components/StatsPanel';
-import EmagramWidget from '../components/complex/EmagramWidget';
+import StatsPanel from '../components/dashboard/StatsPanel';
+import EmagramWidget from '../components/dashboard/EmagramWidget';
 import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
 import WeatherMultiLanding from '../components/weather/WeatherMultiLanding';
-import { useSites } from '../hooks/useSites';
-import { useBestSpotAPI } from '../hooks/useBestSpotAPI';
+import { useSites } from '../hooks/sites/useSites';
+import { useBestSpotAPI } from '../hooks/weather/useBestSpotAPI';
 
 export default function Dashboard() {
   const { t } = useTranslation();

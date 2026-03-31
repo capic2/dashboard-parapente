@@ -1,20 +1,20 @@
 import { lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FilterBar } from '../components/FilterBar';
+import { FilterBar } from '../components/analytics/FilterBar';
 
 // Lazy load components for better performance
-const StatsDashboard = lazy(() => import('../components/stats/StatsDashboard'));
-const AltitudeChart = lazy(() => import('../components/stats/AltitudeChart'));
-const ProgressChart = lazy(() => import('../components/stats/ProgressChart'));
-const SiteStats = lazy(() => import('../components/stats/SiteStats'));
-const MonthlyStats = lazy(() => import('../components/stats/MonthlyStats'));
-const TimeOfDayChart = lazy(() => import('../components/stats/TimeOfDayChart'));
-const WeekdayChart = lazy(() => import('../components/stats/WeekdayChart'));
+const StatsDashboard = lazy(() => import('../components/analytics/StatsDashboard'));
+const AltitudeChart = lazy(() => import('../components/analytics/AltitudeChart'));
+const ProgressChart = lazy(() => import('../components/analytics/ProgressChart'));
+const SiteStats = lazy(() => import('../components/analytics/SiteStats'));
+const MonthlyStats = lazy(() => import('../components/analytics/MonthlyStats'));
+const TimeOfDayChart = lazy(() => import('../components/analytics/TimeOfDayChart'));
+const WeekdayChart = lazy(() => import('../components/analytics/WeekdayChart'));
 const RecordsDashboard = lazy(
-  () => import('../components/stats/RecordsDashboard')
+  () => import('../components/analytics/RecordsDashboard')
 );
 const AchievementsBadges = lazy(
-  () => import('../components/stats/AchievementsBadges')
+  () => import('../components/analytics/AchievementsBadges')
 );
 
 // Loading fallback component

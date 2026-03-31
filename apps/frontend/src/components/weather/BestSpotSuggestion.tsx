@@ -10,9 +10,9 @@
 import { useTranslation } from 'react-i18next';
 import { format, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import CacheTimestamp from '../CacheTimestamp';
+import CacheTimestamp from '../common/CacheTimestamp';
 import { enUS } from 'date-fns/locale';
-import { WindIndicatorCompact } from '../WindIndicator';
+import { WindIndicatorCompact } from '../common/WindIndicator';
 import type { BestSpotResult } from '@dashboard-parapente/shared-types';
 
 interface BestSpotSuggestionProps {

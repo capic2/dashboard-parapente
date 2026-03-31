@@ -3,14 +3,14 @@ import {
   useFlights,
   useUpdateFlight,
   useUploadGPXToFlight,
-} from '../hooks/useFlights';
+} from '../hooks/flights/useFlights';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Flight, Site } from '../types';
-const FlightViewer3D = lazy(() => import('../components/complex/FlightViewer3D').then(m => ({ default: m.FlightViewer3D })));
-import { StravaSyncModal } from '../components/forms/StravaSyncModal';
-import { CreateFlightModal } from '../components/forms/CreateFlightModal';
-import { CreateSiteModal } from '../components/forms/CreateSiteModal';
-import { useSites } from '../hooks/useSites';
+const FlightViewer3D = lazy(() => import('../components/flights/FlightViewer3D').then(m => ({ default: m.FlightViewer3D })));
+import { StravaSyncModal } from '../components/flights/StravaSyncModal';
+import { CreateFlightModal } from '../components/flights/CreateFlightModal';
+import { CreateSiteModal } from '../components/flights/CreateSiteModal';
+import { useSites } from '../hooks/sites/useSites';
 import { ToastContainer, Modal } from '@dashboard-parapente/design-system';
 import { useToast, useToastStore } from '../hooks/useToast';
 import { HTTPError } from 'ky';

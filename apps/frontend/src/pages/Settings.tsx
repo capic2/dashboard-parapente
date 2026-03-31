@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSites } from '../hooks/useSites';
+import { useSites } from '../hooks/sites/useSites';
 import {
   useWeatherSources,
   useWeatherSourceStats,
   useDeleteWeatherSource,
-} from '../hooks/useWeatherSources';
-import { WeatherSourceCard } from '../components/WeatherSourceCard';
+} from '../hooks/weather/useWeatherSources';
+import { WeatherSourceCard } from '../components/settings/WeatherSourceCard';
 import type { WeatherSource } from '../types/weatherSources';
 
 // Site interface as returned by API

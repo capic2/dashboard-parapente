@@ -7,8 +7,8 @@ import {
   useLatestEmagram,
   useEmagramHistory,
   useTriggerEmagram,
-} from '../hooks/useEmagramAnalysis';
-import { useSite } from '../hooks/useSites';
+} from '../hooks/weather/useEmagramAnalysis';
+import { useSite } from '../hooks/sites/useSites';
 import { parseAlerts, getScoreColor } from '../types/emagram';
 
 export default function ThermalAnalysis() {

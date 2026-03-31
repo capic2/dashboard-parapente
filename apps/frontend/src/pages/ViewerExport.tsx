@@ -1,6 +1,6 @@
 import { useEffect, lazy, Suspense } from 'react';
 import { useSearch } from '@tanstack/react-router';
-const FlightViewer3D = lazy(() => import('../components/complex/FlightViewer3D').then(m => ({ default: m.FlightViewer3D })));
+const FlightViewer3D = lazy(() => import('../components/flights/FlightViewer3D').then(m => ({ default: m.FlightViewer3D })));
 
 declare global {
   interface Window {

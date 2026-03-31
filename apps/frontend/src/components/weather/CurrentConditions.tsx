@@ -1,8 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { useWeather } from '../../hooks/useWeather';
-import { useSite } from '../../hooks/useSites';
-import { WindIndicator } from '../WindIndicator';
-import CacheTimestamp from '../CacheTimestamp';
+import { useWeather } from '../../hooks/weather/useWeather';
+import { useSite } from '../../hooks/sites/useSites';
+import { WindIndicator } from '../common/WindIndicator';
+import CacheTimestamp from '../common/CacheTimestamp';
 
 interface CurrentConditionsProps {
   spotId: string;

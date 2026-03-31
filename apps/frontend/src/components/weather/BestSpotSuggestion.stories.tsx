@@ -5,7 +5,7 @@ import {
   BestSpotSuggestion,
   BestSpotSuggestionCompact,
 } from './BestSpotSuggestion';
-import type { BestSpotResult } from '../../hooks/useBestSpotAPI';
+import type { BestSpotResult } from '../../hooks/weather/useBestSpotAPI';
 
 const meta = preview.meta({
   title: 'Components/Weather/BestSpotSuggestion',

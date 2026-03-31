@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import {
   useLandingAssociations,
   useLandingWeather,
-} from '../../hooks/useLandingAssociations';
+} from '../../hooks/sites/useLandingAssociations';
 
 interface WeatherMultiLandingProps {
   spotId: string;

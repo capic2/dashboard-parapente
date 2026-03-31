@@ -11,9 +11,9 @@ import {
   Flame,
   CircleCheck,
 } from 'lucide-react';
-import { useWeather } from '../../hooks/useWeather';
+import { useWeather } from '../../hooks/weather/useWeather';
 import type { HourlyForecastItem } from '../../types';
-import CacheTimestamp from '../CacheTimestamp';
+import CacheTimestamp from '../common/CacheTimestamp';
 import WindArrow from './WindArrow';
 
 interface HourlyForecastProps {

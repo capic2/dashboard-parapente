@@ -7,7 +7,7 @@ import {
   Outlet,
 } from '@tanstack/react-router';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
-import Header from './components/Header';
+import Header from './components/common/Header';
 import { ErrorBoundary } from '@dashboard-parapente/design-system';
 import Dashboard from './pages/Dashboard';
 import FlightHistory from './pages/FlightHistory';
@@ -15,13 +15,13 @@ import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import { ViewerExport } from './pages/ViewerExport';
 import { Sites } from './pages/Sites';
-import { sitesQueryOptions } from './hooks/useSites';
+import { sitesQueryOptions } from './hooks/sites/useSites';
 import {
   flightsQueryOptions,
   flightStatsQueryOptions,
   flightRecordsQueryOptions,
-} from './hooks/useFlights';
-import { bestSpotQueryOptions } from './hooks/useBestSpotAPI';
+} from './hooks/flights/useFlights';
+import { bestSpotQueryOptions } from './hooks/weather/useBestSpotAPI';
 
 // Create query client for TanStack Query
 const queryClient = new QueryClient({
