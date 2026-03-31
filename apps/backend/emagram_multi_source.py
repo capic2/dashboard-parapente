@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 async def generate_multi_source_emagram_for_spot(
-    site_id: str, db: Session, force_refresh: bool = False
+    site_id: str, db: Session, force_refresh: bool = False, day_index: int = 0
 ) -> dict[str, Any]:
     """
     Complete workflow to generate multi-source emagram analysis for a spot
@@ -66,10 +66,13 @@ async def generate_multi_source_emagram_for_spot(
 
         logger.info(f"🎯 Starting multi-source emagram analysis for {site.name}")
 
+        # Compute forecast target date
+        from datetime import timedelta
+
+        forecast_date = (datetime.utcnow() + timedelta(days=day_index)).date()
+
         # Step 2: Check for recent analysis (unless force_refresh)
         if not force_refresh:
-            from datetime import timedelta
-
             cutoff_time = datetime.utcnow() - timedelta(hours=3)
 
             existing = (
@@ -79,6 +82,7 @@ async def generate_multi_source_emagram_for_spot(
                     EmagramAnalysis.analysis_method == "llm_vision",
                     EmagramAnalysis.analysis_datetime >= cutoff_time,
                     EmagramAnalysis.analysis_status == "completed",
+                    EmagramAnalysis.forecast_date == forecast_date,
                 )
                 .order_by(EmagramAnalysis.analysis_datetime.desc())
                 .first()
@@ -92,7 +96,11 @@ async def generate_multi_source_emagram_for_spot(
 
         # Step 3: Fetch screenshots from all sources
         screenshot_result = await fetch_all_emagram_screenshots(
-            spot_id=site.id, latitude=site.latitude, longitude=site.longitude, spot_name=site.name
+            spot_id=site.id,
+            latitude=site.latitude,
+            longitude=site.longitude,
+            spot_name=site.name,
+            day_index=day_index,
         )
 
         if not screenshot_result.get("success"):
@@ -227,7 +235,9 @@ async def generate_multi_source_emagram_for_spot(
         if not analysis_result.get("success"):
             logger.error(f"LLM analysis failed: {analysis_result.get('error')}")
             # Save failed analysis to DB for debugging
-            save_failed_analysis(db, site, screenshot_result, analysis_result)
+            save_failed_analysis(
+                db, site, screenshot_result, analysis_result, forecast_date=forecast_date
+            )
             return {"success": False, "error": "LLM analysis failed", "details": analysis_result}
 
         analyzer_used = analysis_result.get("analyzer", "unknown")
@@ -237,7 +247,11 @@ async def generate_multi_source_emagram_for_spot(
 
         # Step 5: Save to database
         emagram_analysis = save_emagram_analysis(
-            db=db, site=site, screenshot_result=screenshot_result, analysis_result=analysis_result
+            db=db,
+            site=site,
+            screenshot_result=screenshot_result,
+            analysis_result=analysis_result,
+            forecast_date=forecast_date,
         )
 
         logger.info(f"✅ Multi-source emagram analysis complete for {site.name}")
@@ -250,7 +264,11 @@ async def generate_multi_source_emagram_for_spot(
 
 
 def save_emagram_analysis(
-    db: Session, site: Site, screenshot_result: dict[str, Any], analysis_result: dict[str, Any]
+    db: Session,
+    site: Site,
+    screenshot_result: dict[str, Any],
+    analysis_result: dict[str, Any],
+    forecast_date=None,
 ) -> EmagramAnalysis:
     """
     Save emagram analysis to database
@@ -274,6 +292,7 @@ def save_emagram_analysis(
         analysis_date=now.date(),
         analysis_time=now.time(),
         analysis_datetime=now,
+        forecast_date=forecast_date or now.date(),
         # Station info (using site_id as station_code for multi-source)
         station_code=site.id,
         station_name=site.name,
@@ -327,7 +346,11 @@ def save_emagram_analysis(
 
 
 def save_failed_analysis(
-    db: Session, site: Site, screenshot_result: dict[str, Any], analysis_result: dict[str, Any]
+    db: Session,
+    site: Site,
+    screenshot_result: dict[str, Any],
+    analysis_result: dict[str, Any],
+    forecast_date=None,
 ):
     """
     Save failed analysis attempt for debugging
@@ -339,6 +362,7 @@ def save_failed_analysis(
         analysis_date=now.date(),
         analysis_time=now.time(),
         analysis_datetime=now,
+        forecast_date=forecast_date or now.date(),
         station_code=site.id,
         station_name=site.name,
         station_latitude=site.latitude,
