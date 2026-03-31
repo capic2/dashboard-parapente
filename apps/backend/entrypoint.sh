@@ -12,7 +12,7 @@ python migrations/add_weather_source_config.py || echo "⚠️ Weather source co
 python migrations/add_emagram_analysis.py || echo "⚠️ Emagram analysis migration skipped"
 python migrations/003_add_multi_source_emagram_fields.py || echo "⚠️ Multi-source emagram fields migration skipped"
 python migrations/004_add_screenshot_paths.py || echo "⚠️ Screenshot paths migration skipped"
-python migrations/005_add_forecast_date.py || echo "⚠️ Forecast date migration skipped"
+python migrations/005_add_forecast_date.py 2>&1 || echo "⚠️ Forecast date migration failed (see above)"
 
 echo "Starting uvicorn server..."
 exec uvicorn main:app --host 0.0.0.0 --port 8001 --proxy-headers --forwarded-allow-ips "*"
