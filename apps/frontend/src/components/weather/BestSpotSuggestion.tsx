@@ -59,7 +59,7 @@ export function BestSpotSuggestion({
     );
   }
 
-  const { site, paraIndex, windDirection, windSpeed, reason } = bestSpot;
+  const { site, paraIndex, windDirection, windSpeed, reason, flyableSlot, thermalCeiling } = bestSpot;
 
   // Consistent sky blue theme for best spot card
   const bgColor = 'bg-sky-50 dark:bg-sky-900/20';
@@ -102,7 +102,7 @@ export function BestSpotSuggestion({
       </div>
 
       {/* Metrics row */}
-      <div className="flex items-center gap-4 mt-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3">
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-600 dark:text-gray-400">
             {t('weather.paraIndex')}
@@ -119,6 +119,28 @@ export function BestSpotSuggestion({
             </span>
             <span className="text-sm font-medium text-gray-900 dark:text-white">
               {windDirection} {windSpeed}km/h
+            </span>
+          </div>
+        )}
+
+        {flyableSlot && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              🕐 {t('weather.flyableSlot')}:
+            </span>
+            <span className="text-sm font-medium text-green-600 dark:text-green-400">
+              {flyableSlot}
+            </span>
+          </div>
+        )}
+
+        {thermalCeiling != null && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              ☁️ {t('weather.thermalCeiling')}:
+            </span>
+            <span className="text-sm font-medium text-orange-600 dark:text-orange-400">
+              {thermalCeiling}m
             </span>
           </div>
         )}
