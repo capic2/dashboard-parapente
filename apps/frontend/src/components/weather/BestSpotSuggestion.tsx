@@ -107,7 +107,7 @@ export function BestSpotSuggestion({
           <span className="text-sm text-gray-600 dark:text-gray-400">
             {t('weather.paraIndex')}
           </span>
-          <span className="text-lg font-bold text-sky-600">
+          <span className="text-lg font-bold text-sky-600 dark:text-sky-400">
             {paraIndex}/100
           </span>
         </div>

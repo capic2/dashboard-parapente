@@ -20,8 +20,8 @@ const AchievementsBadges = lazy(
 // Loading fallback component
 function ChartSkeleton() {
   return (
-    <div className="bg-white rounded-xl p-6 shadow-md animate-pulse">
-      <div className="h-64 bg-gray-200 rounded"></div>
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md animate-pulse">
+      <div className="h-64 bg-gray-200 dark:bg-gray-600 rounded"></div>
     </div>
   );
 }
@@ -30,11 +30,11 @@ export default function Analytics() {
   const { t } = useTranslation();
   return (
     <div>
-      <div className="mb-4 bg-white rounded-xl p-4 shadow-md">
-        <h1 className="text-xl font-bold text-gray-900">
+      <div className="mb-4 bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">
           📊 {t('analytics.title')}
         </h1>
-        <p className="text-sm text-gray-600 mt-1">{t('analytics.subtitle')}</p>
+        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{t('analytics.subtitle')}</p>
       </div>
 
       {/* Filtres dynamiques */}

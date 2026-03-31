@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import './i18n';
 import App from './App';
 import './App.css';
+import { initTheme } from './stores/themeStore';
 
 // Initialiser MSW en mode développement (peut être désactivé via VITE_ENABLE_MSW=false)
 async function enableMocking() {
@@ -24,6 +25,9 @@ const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error('Failed to find the root element');
 }
+
+// Initialiser le thème avant le rendu pour éviter le FOUC
+initTheme();
 
 // Attendre que MSW soit prêt avant de rendre l'app
 enableMocking().then(() => {

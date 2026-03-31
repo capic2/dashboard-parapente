@@ -36,7 +36,7 @@ export function ViewerExport() {
   if (!flightId) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <p className="text-gray-600">
+        <p className="text-gray-600 dark:text-gray-300">
           No flight ID provided. Use ?flightId=xxx
         </p>
       </div>
