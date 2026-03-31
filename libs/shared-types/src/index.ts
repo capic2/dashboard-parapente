@@ -296,6 +296,8 @@ export const BestSpotResultSchema = z.object({
   score: z.number().optional(),
   verdict: z.string().optional(),
   reason: z.string(),
+  flyableSlot: z.string().nullish(),
+  thermalCeiling: z.number().nullish(),
   cached_at: z.string().nullish(),
 });
 

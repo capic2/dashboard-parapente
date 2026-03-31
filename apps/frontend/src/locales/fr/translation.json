@@ -75,7 +75,9 @@
     "loadingLandings": "Chargement meteo atterrissages...",
     "noWeatherData": "Aucune donnee meteo disponible",
     "primary": "Principal",
-    "windUnavailable": "Données vent indisponibles"
+    "windUnavailable": "Données vent indisponibles",
+    "flyableSlot": "Créneau",
+    "thermalCeiling": "Plafond"
   },
   "filters": {
     "title": "Filtres",

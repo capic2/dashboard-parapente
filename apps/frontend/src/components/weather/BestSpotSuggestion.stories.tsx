@@ -34,8 +34,10 @@ const mockBestSpotExcellent: BestSpotResult = {
   windSpeed: 12,
   windFavorability: 'good',
   score: 90,
-  reason: 'Excellentes conditions (Para-Index 90), vent favorable NW 12km/h',
+  reason: 'Excellentes conditions (Para-Index 90), 22°C, ciel dégagé, vent favorable NW 12km/h',
   verdict: 'BON',
+  flyableSlot: '10h-17h',
+  thermalCeiling: 2800,
 };
 
 const mockBestSpotGood: BestSpotResult = {
@@ -52,8 +54,10 @@ const mockBestSpotGood: BestSpotResult = {
   windSpeed: 15,
   windFavorability: 'good',
   score: 75,
-  reason: 'Bonnes conditions (Para-Index 75), vent favorable N 15km/h',
+  reason: 'Bonnes conditions (Para-Index 75), 18°C, nuageux 45%, vent favorable N 15km/h',
   verdict: 'BON',
+  flyableSlot: '11h-16h',
+  thermalCeiling: 2200,
 };
 
 const mockBestSpotModerate: BestSpotResult = {
@@ -70,8 +74,9 @@ const mockBestSpotModerate: BestSpotResult = {
   windSpeed: 18,
   windFavorability: 'moderate',
   score: 55,
-  reason: 'Conditions moyennes (Para-Index 55)',
+  reason: 'Conditions moyennes (Para-Index 55), 15°C, nuageux 52%',
   verdict: 'MOYEN',
+  flyableSlot: '12h-15h',
 };
 
 const mockBestSpotPoor: BestSpotResult = {
@@ -88,7 +93,7 @@ const mockBestSpotPoor: BestSpotResult = {
   windSpeed: 25,
   windFavorability: 'bad',
   score: 35,
-  reason: 'Conditions limites (Para-Index 35), vent défavorable N 25km/h',
+  reason: 'Conditions limites (Para-Index 35), 12°C, rafales 28km/h, vent défavorable N 25km/h',
   verdict: 'LIMITE',
 };
 
