@@ -405,6 +405,7 @@ class EmagramAnalysisBase(BaseModel):
 
     analysis_date: date
     analysis_time: time
+    forecast_date: date | None = None
     station_code: str
     station_name: str
     station_latitude: float

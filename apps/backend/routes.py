@@ -3655,23 +3655,26 @@ async def test_weather_source(
 _pending_emagram_analyses: set[str] = set()
 
 
-def _auto_emagram_analysis(site_id: str):
+def _auto_emagram_analysis(site_id: str, day_index: int = 0):
     """Background task: auto-trigger emagram analysis for a site."""
     import asyncio
 
     from database import get_db_context
     from emagram_multi_source import generate_multi_source_emagram_for_spot
 
-    if site_id in _pending_emagram_analyses:
+    key = f"{site_id}:{day_index}"
+    if key in _pending_emagram_analyses:
         return
-    _pending_emagram_analyses.add(site_id)
+    _pending_emagram_analyses.add(key)
     try:
         with get_db_context() as db:
-            asyncio.run(generate_multi_source_emagram_for_spot(site_id=site_id, db=db))
+            asyncio.run(
+                generate_multi_source_emagram_for_spot(site_id=site_id, db=db, day_index=day_index)
+            )
     except Exception as e:
-        logger.error(f"Auto emagram analysis failed for {site_id}: {e}")
+        logger.error(f"Auto emagram analysis failed for {site_id} day_index={day_index}: {e}")
     finally:
-        _pending_emagram_analyses.discard(site_id)
+        _pending_emagram_analyses.discard(key)
 
 
 @router.get("/emagram/latest", response_model=EmagramAnalysisSchema | None, tags=["Emagram"])
@@ -3715,16 +3718,13 @@ async def get_latest_emagram(
                 status_code=400, detail="Either site_id or user_lat/user_lon required"
             )
 
-        # Time window based on day_index
+        # Filter by forecast target date
         target_date = (datetime.utcnow() + timedelta(days=day_index)).date()
-        window_start = datetime.combine(target_date, datetime.min.time()) - timedelta(hours=12)
-        window_end = datetime.combine(target_date, datetime.min.time()) + timedelta(hours=36)
 
         recent_analyses = (
             db.query(EmagramAnalysis)
             .filter(
-                EmagramAnalysis.analysis_datetime >= window_start,
-                EmagramAnalysis.analysis_datetime <= window_end,
+                EmagramAnalysis.forecast_date == target_date,
                 EmagramAnalysis.analysis_status == "completed",
             )
             .order_by(EmagramAnalysis.analysis_datetime.desc())
@@ -3778,7 +3778,7 @@ async def get_latest_emagram(
 
         # Auto-trigger analysis in background if no data found
         if result is None and auto_analyze and site_id:
-            background_tasks.add_task(_auto_emagram_analysis, site_id)
+            background_tasks.add_task(_auto_emagram_analysis, site_id, day_index)
 
         return result
 

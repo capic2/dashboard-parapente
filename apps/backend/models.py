@@ -285,6 +285,7 @@ class EmagramAnalysis(Base):
     analysis_date = Column(Date, nullable=False, index=True)
     analysis_time = Column(Time, nullable=False)
     analysis_datetime = Column(DateTime, nullable=False, index=True)
+    forecast_date = Column(Date, nullable=True, index=True)  # The date this forecast is about
     station_code = Column(String, nullable=False, index=True)  # e.g., "07481" (Lyon)
     station_name = Column(String, nullable=False)
     station_latitude = Column(Float, nullable=False)

@@ -48,6 +48,7 @@ class TestEmagramEndpoints:
             analysis_date=datetime.now().date(),
             analysis_time=datetime.now().time(),
             analysis_datetime=datetime.now(),  # Required field
+            forecast_date=datetime.now().date(),
             distance_km=0.0,  # Required field
             data_source="wyoming",  # Required field
             sounding_time="12Z",  # Required field
@@ -91,6 +92,7 @@ class TestEmagramEndpoints:
             analysis_date=datetime(2026, 3, 24).date(),
             analysis_time=datetime(2026, 3, 24, 12, 0).time(),
             analysis_datetime=datetime.utcnow(),
+            forecast_date=datetime.utcnow().date(),
             distance_km=0.0,
             data_source="test",
             sounding_time="12Z",
@@ -137,6 +139,7 @@ class TestEmagramEndpoints:
             analysis_date=datetime.utcnow().date(),
             analysis_time=datetime.utcnow().time(),
             analysis_datetime=datetime.utcnow(),
+            forecast_date=datetime.utcnow().date(),
             distance_km=0.0,
             data_source="test",
             sounding_time="12Z",

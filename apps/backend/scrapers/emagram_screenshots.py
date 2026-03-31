@@ -19,7 +19,7 @@ EMAGRAM_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 async def screenshot_meteo_parapente(
-    latitude: float, longitude: float, spot_name: str, timeout: int = 30000
+    latitude: float, longitude: float, spot_name: str, timeout: int = 30000, day_index: int = 0
 ) -> dict[str, Any]:
     """
     Screenshot emagram from Meteo-Parapente
@@ -88,6 +88,34 @@ async def screenshot_meteo_parapente(
 
             if not emagram_tab_clicked:
                 logger.warning("Sounding tab not clicked, emagram may not be visible")
+
+            # Navigate to the correct day if day_index > 0
+            if day_index > 0:
+                logger.info(f"Navigating to day +{day_index} on Meteo-Parapente...")
+                for _ in range(day_index):
+                    next_day_selectors = [
+                        "button.next-day",
+                        "[data-action='next-day']",
+                        ".day-nav-next",
+                        "button:has-text('▶')",
+                        "button:has-text('›')",
+                        ".nav-next",
+                    ]
+                    clicked = False
+                    for sel in next_day_selectors:
+                        try:
+                            el = page.locator(sel).first
+                            if await el.count() > 0:
+                                await el.click(timeout=2000)
+                                await page.wait_for_timeout(1500)
+                                clicked = True
+                                logger.info(f"Clicked next-day button: {sel}")
+                                break
+                        except Exception:
+                            continue
+                    if not clicked:
+                        logger.warning(f"Could not click next-day button for day +{day_index}")
+                        break
 
             # Wait for emagram to render
             await page.wait_for_timeout(5000)
@@ -169,15 +197,16 @@ async def screenshot_topmeteo(
 
 
 async def screenshot_meteociel_emagram(
-    latitude: float, longitude: float, spot_name: str, timeout: int = 25000
+    latitude: float, longitude: float, spot_name: str, timeout: int = 25000, day_index: int = 0
 ) -> dict[str, Any]:
     """
     Screenshot emagram from Meteociel
     URL: https://www.meteociel.fr/modeles/sondage2.php?mode=0&lon={lon}&lat={lat}&ech=3&map=0
 
-    mode=0 = emagram display, ech=3 = forecast step (+3h)
+    mode=0 = emagram display, ech = forecast step in hours from model run
     """
-    url = f"https://www.meteociel.fr/modeles/sondage2.php?mode=0&lon={longitude}&lat={latitude}&ech=3&map=0"
+    ech = 3 + (day_index * 24)
+    url = f"https://www.meteociel.fr/modeles/sondage2.php?mode=0&lon={longitude}&lat={latitude}&ech={ech}&map=0"
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{spot_name.replace(' ', '_')}_meteociel_{timestamp}.png"
     image_path = EMAGRAM_CACHE_DIR / filename
@@ -229,7 +258,7 @@ async def screenshot_meteociel_emagram(
 
 
 async def fetch_all_emagram_screenshots(
-    spot_id: str, latitude: float, longitude: float, spot_name: str
+    spot_id: str, latitude: float, longitude: float, spot_name: str, day_index: int = 0
 ) -> dict[str, Any]:
     """
     Fetch emagram screenshots from all 3 sources in parallel
@@ -261,8 +290,8 @@ async def fetch_all_emagram_screenshots(
 
     # Fetch sources in parallel
     tasks = [
-        screenshot_meteo_parapente(latitude, longitude, spot_name),
-        screenshot_meteociel_emagram(latitude, longitude, spot_name),
+        screenshot_meteo_parapente(latitude, longitude, spot_name, day_index=day_index),
+        screenshot_meteociel_emagram(latitude, longitude, spot_name, day_index=day_index),
     ]
 
     screenshots = await asyncio.gather(*tasks, return_exceptions=True)
