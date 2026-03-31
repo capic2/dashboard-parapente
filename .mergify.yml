@@ -216,12 +216,6 @@ pull_request_rules:
           Sinon, vous pouvez merger manuellement quand vous etes pret.
 
   # 13. Suppression automatique de la branche apres merge
-  - name: Supprimer la branche apres merge
-    conditions:
-      - merged
-      - base=main
-    actions:
-      delete_head_branch: {}
 
 # Protections de merge - S'assure que les PRs respectent les criteres
 merge_protections:
