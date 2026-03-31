@@ -1,18 +1,10 @@
-# Mergify Configuration - Dashboard Parapente
-# Documentation: https://docs.mergify.com/
-
-# Configuration globale de la merge queue
-# Compatible avec "Require branches to be up to date before merging"
 merge_queue:
-  max_parallel_checks: 1 # In-place checks: teste les PRs individuellement
-
-# File d'attente pour gérer les merges de manière ordonnée
+  max_parallel_checks: 1
 queue_rules:
   - name: default
     merge_method: squash
     update_method: merge
-    # In-place checks: batch_size=1 pour tester individuellement
-    batch_size: 1
+    batch_size: 5
     commit_message_template: |
       {{ title }} (#{{ number }})
 
@@ -21,38 +13,33 @@ queue_rules:
       - check-success=main
       - check-success=E2E Tests
       - base=main
-      - '#approved-reviews-by>=0'
+      - "#approved-reviews-by>=0"
     merge_conditions:
       - check-success=main
       - check-success=E2E Tests
       - base=main
-      - '#approved-reviews-by>=0'
-
-# Règles de merge automatique
+      - "#approved-reviews-by>=0"
 pull_request_rules:
-  # 1. Auto-merge pour les PRs avec label "automerge"
   - name: Auto-merge avec label automerge
     conditions:
       - base=main
       - label=automerge
       - check-success=main
       - check-success=E2E Tests
-      - '#changes-requested-reviews-by=0'
+      - "#changes-requested-reviews-by=0"
     actions:
       queue:
         name: default
       label:
         add:
           - ready-to-merge
-
-  # 2. Auto-merge Renovate - Patches avec SECURITY
   - name: Auto-merge Renovate patches SECURITY
     conditions:
       - base=main
       - author=renovate[bot]
       - check-success=main
       - check-success=E2E Tests
-      - "title~=^(fix|chore)\\(deps\\):.*\\[SECURITY\\]"
+      - title~=^(fix|chore)\(deps\):.*\[SECURITY\]
     actions:
       queue:
         name: default
@@ -65,8 +52,6 @@ pull_request_rules:
         message: |
           Auto-approuve par Mergify
           Mise a jour de securite - Tous les tests passent
-
-  # 3. Auto-merge Renovate - Patches sans major
   - name: Auto-merge Renovate patches
     conditions:
       - base=main
@@ -74,7 +59,7 @@ pull_request_rules:
       - check-success=main
       - check-success=E2E Tests
       - "title~=^fix\\(deps\\):"
-      - '-title~=major'
+      - -title~=major
     actions:
       queue:
         name: default
@@ -87,8 +72,6 @@ pull_request_rules:
         message: |
           Auto-approuve par Mergify
           Mise a jour de dependance patch - Tous les tests passent
-
-  # 4. Auto-merge Renovate - Minors
   - name: Auto-merge Renovate minors
     conditions:
       - base=main
@@ -96,7 +79,7 @@ pull_request_rules:
       - check-success=main
       - check-success=E2E Tests
       - "title~=^chore\\(deps\\):"
-      - '-title~=major'
+      - -title~=major
     actions:
       queue:
         name: default
@@ -109,53 +92,50 @@ pull_request_rules:
         message: |
           Auto-approuve par Mergify
           Mise a jour de dependance minor - Tous les tests passent
-
-  # 5. Label automatique pour Renovate majors (review manuelle)
   - name: Label Renovate PRs majors - review manuelle requise
     conditions:
       - base=main
       - author=renovate[bot]
-      - 'title~=major'
+      - title~=major
     actions:
       label:
         add:
           - renovate
           - needs-review
       comment:
-        message: |
+        message: >
           Mise a jour majeure detectee
 
-          Cette PR contient une mise a jour majeure qui necessite une review manuelle.
+
+          Cette PR contient une mise a jour majeure qui necessite une review
+          manuelle.
+
           Veuillez verifier les breaking changes avant de merger.
 
-          Une fois valide, ajoutez le label automerge pour declencher le merge automatique.
 
-  # 6. Auto-update des branches quand main avance
+          Une fois valide, ajoutez le label automerge pour declencher le merge
+          automatique.
   - name: Auto-update branch avec main
     conditions:
       - base=main
-      - '-closed'
-      - '-draft'
-      - '-conflict'
-      - '#commits-behind>0'
+      - -closed
+      - -draft
+      - -conflict
+      - "#commits-behind>0"
     actions:
       update: {}
-
-  # 7. Ajout automatique du label "ready-to-merge"
   - name: Label ready-to-merge quand conditions remplies
     conditions:
       - base=main
       - check-success=main
       - check-success=E2E Tests
-      - '#changes-requested-reviews-by=0'
-      - '-draft'
-      - '-conflict'
+      - "#changes-requested-reviews-by=0"
+      - -draft
+      - -conflict
     actions:
       label:
         add:
           - ready-to-merge
-
-  # 8. Retrait du label "ready-to-merge" si conditions non remplies
   - name: Retirer ready-to-merge si conditions non remplies
     conditions:
       - base=main
@@ -166,18 +146,14 @@ pull_request_rules:
       label:
         remove:
           - ready-to-merge
-
-  # 9. Retrait du label si changes requested
   - name: Retirer ready-to-merge si changes requested
     conditions:
       - base=main
-      - '#changes-requested-reviews-by>0'
+      - "#changes-requested-reviews-by>0"
     actions:
       label:
         remove:
           - ready-to-merge
-
-  # 10. Retrait du label si draft
   - name: Retirer ready-to-merge si draft
     conditions:
       - base=main
@@ -186,8 +162,6 @@ pull_request_rules:
       label:
         remove:
           - ready-to-merge
-
-  # 11. Retrait du label si conflict
   - name: Retirer ready-to-merge si conflict
     conditions:
       - base=main
@@ -196,15 +170,13 @@ pull_request_rules:
       label:
         remove:
           - ready-to-merge
-
-  # 12. Notification quand la PR est prete
   - name: Notification PR prete a merger
     conditions:
       - base=main
       - label=ready-to-merge
-      - '-label=automerge'
-      - '-label=renovate'
-      - '-draft'
+      - -label=automerge
+      - -label=renovate
+      - -draft
     actions:
       comment:
         message: |
@@ -214,10 +186,12 @@ pull_request_rules:
 
           Pour activer le merge automatique, ajoutez le label automerge.
           Sinon, vous pouvez merger manuellement quand vous etes pret.
-
-  # 13. Suppression automatique de la branche apres merge
-
-# Protections de merge - S'assure que les PRs respectent les criteres
+  - name: Supprimer la branche apres merge
+    conditions:
+      - merged
+      - base=main
+    actions:
+      delete_head_branch: {}
 merge_protections:
   - name: Verification des checks CI
     description: Les checks main doivent passer
@@ -225,24 +199,21 @@ merge_protections:
       - base=main
     success_conditions:
       - check-success=main
-
   - name: Verification des tests E2E
     description: Les tests E2E doivent passer
     if:
       - base=main
     success_conditions:
       - check-success=E2E Tests
-
   - name: Branche a jour avec main
     description: La branche doit etre a jour avec main
     if:
       - base=main
     success_conditions:
-      - '#commits-behind=0'
-
+      - "#commits-behind=0"
   - name: Pas de changements demandes
     description: Aucune review avec changements demandes
     if:
       - base=main
     success_conditions:
-      - '#changes-requested-reviews-by=0'
+      - "#changes-requested-reviews-by=0"
