@@ -447,6 +447,27 @@ def run_migrations():
         else:
             raise
 
+    # Ensure forecast_date column exists on emagram_analysis (critical migration)
+    try:
+        cursor.execute("PRAGMA table_info(emagram_analysis)")
+        existing_columns = {row[1] for row in cursor.fetchall()}
+        if existing_columns and "forecast_date" not in existing_columns:
+            logger.info("Adding missing forecast_date column to emagram_analysis...")
+            cursor.execute("ALTER TABLE emagram_analysis ADD COLUMN forecast_date DATE")
+            cursor.execute(
+                "UPDATE emagram_analysis SET forecast_date = analysis_date WHERE forecast_date IS NULL"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_emagram_analysis_forecast_date ON emagram_analysis (forecast_date)"
+            )
+            conn.commit()
+            logger.info("✓ forecast_date column added successfully")
+    except sqlite3.OperationalError as e:
+        if "duplicate column name" in str(e):
+            logger.info("⊙ forecast_date column already exists (skipping)")
+        else:
+            logger.error(f"✗ Failed to add forecast_date column: {e}")
+
     conn.close()
     logger.info("✓ All migrations completed")
 
