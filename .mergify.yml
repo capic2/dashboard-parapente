@@ -186,12 +186,6 @@ pull_request_rules:
 
           Pour activer le merge automatique, ajoutez le label automerge.
           Sinon, vous pouvez merger manuellement quand vous etes pret.
-  - name: Supprimer la branche apres merge
-    conditions:
-      - merged
-      - base=main
-    actions:
-      delete_head_branch: {}
 merge_protections:
   - name: Verification des checks CI
     description: Les checks main doivent passer
