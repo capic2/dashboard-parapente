@@ -8,7 +8,7 @@ This module provides functions to:
 """
 
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -323,7 +323,7 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
         try:
             from spots.distance import haversine_distance
 
-            target_date = (datetime.now(timezone.utc) + timedelta(days=day_index)).date()
+            target_date = date.today() + timedelta(days=day_index)
             window_start = datetime.combine(target_date, datetime.min.time()) - timedelta(hours=12)
             window_end = datetime.combine(target_date, datetime.min.time()) + timedelta(hours=36)
 
@@ -354,16 +354,17 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
                     ):
                         continue
                     dist = haversine_distance(
-                        site_lat, site_lon,
-                        analysis.station_latitude, analysis.station_longitude,
+                        site_lat,
+                        site_lon,
+                        analysis.station_latitude,
+                        analysis.station_longitude,
                     )
                     if dist < best_dist:
                         best_dist = dist
                         best_emagram = analysis
 
-            best_site["thermalCeiling"] = (
-                best_emagram.plafond_thermique_m if best_emagram else None
-            )
+            thermal = best_emagram.plafond_thermique_m if best_emagram else None
+            best_site["thermalCeiling"] = thermal
         except Exception as e:
             logger.warning(f"Could not fetch thermal ceiling: {e}")
             best_site["thermalCeiling"] = None
