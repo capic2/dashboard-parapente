@@ -3,7 +3,7 @@ Test emagram analysis endpoints
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, time
 
 import pytest
 
@@ -45,10 +45,10 @@ class TestEmagramEndpoints:
             station_name="Test Site",
             station_latitude=47.0,
             station_longitude=6.0,
-            analysis_date=datetime.now().date(),
-            analysis_time=datetime.now().time(),
-            analysis_datetime=datetime.now(),  # Required field
-            forecast_date=datetime.now().date(),
+            analysis_date=datetime.utcnow().date(),
+            analysis_time=time(12, 0),
+            analysis_datetime=datetime.utcnow(),
+            forecast_date=datetime.utcnow().date(),
             distance_km=0.0,  # Required field
             data_source="wyoming",  # Required field
             sounding_time="12Z",  # Required field
@@ -194,9 +194,9 @@ class TestEmagramEndpoints:
                 station_name=f"Site {i}",
                 station_latitude=47.0 + i * 0.01,  # Close to user location
                 station_longitude=6.0 + i * 0.01,
-                analysis_date=datetime.now().date(),
-                analysis_time=datetime.now().time(),
-                analysis_datetime=datetime.now(),  # Required field
+                analysis_date=datetime.utcnow().date(),
+                analysis_time=time(12, 0),
+                analysis_datetime=datetime.utcnow(),
                 distance_km=0.0,  # Required field
                 data_source="wyoming",  # Required field
                 sounding_time="12Z",  # Required field
@@ -226,9 +226,9 @@ class TestEmagramEndpoints:
                 station_name=f"Site {i}",
                 station_latitude=47.0,
                 station_longitude=6.0,
-                analysis_date=datetime.now().date(),
-                analysis_time=datetime.now().time(),
-                analysis_datetime=datetime.now(),  # Required field
+                analysis_date=datetime.utcnow().date(),
+                analysis_time=time(12, 0),
+                analysis_datetime=datetime.utcnow(),
                 distance_km=0.0,  # Required field
                 data_source="wyoming",  # Required field
                 sounding_time="12Z",  # Required field

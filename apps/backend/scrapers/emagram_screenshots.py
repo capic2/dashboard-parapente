@@ -41,8 +41,8 @@ async def screenshot_meteo_parapente(
         }
     """
     url = f"https://meteo-parapente.com/#/sounding/{latitude}/{longitude}"
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{spot_name.replace(' ', '_')}_meteo-parapente_{timestamp}.png"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    filename = f"{spot_name.replace(' ', '_')}_meteo-parapente_d{day_index}_{timestamp}.png"
     image_path = EMAGRAM_CACHE_DIR / filename
 
     try:
@@ -114,8 +114,9 @@ async def screenshot_meteo_parapente(
                         except Exception:
                             continue
                     if not clicked:
-                        logger.warning(f"Could not click next-day button for day +{day_index}")
-                        break
+                        raise RuntimeError(
+                            f"Could not navigate Meteo-Parapente to day_index={day_index}"
+                        )
 
             # Wait for emagram to render
             await page.wait_for_timeout(5000)
@@ -207,8 +208,8 @@ async def screenshot_meteociel_emagram(
     """
     ech = 3 + (day_index * 24)
     url = f"https://www.meteociel.fr/modeles/sondage2.php?mode=0&lon={longitude}&lat={latitude}&ech={ech}&map=0"
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{spot_name.replace(' ', '_')}_meteociel_{timestamp}.png"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    filename = f"{spot_name.replace(' ', '_')}_meteociel_d{day_index}_{timestamp}.png"
     image_path = EMAGRAM_CACHE_DIR / filename
 
     try:
