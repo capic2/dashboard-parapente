@@ -13,10 +13,12 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useFlights } from '../../hooks/useFlights';
 import { useFiltersStore } from '../../stores/filtersStore';
+import { useThemeStore } from '../../stores/themeStore';
 import { format } from 'date-fns';
 import { enUS, fr } from 'date-fns/locale';
 
 export default function ProgressChart() {
+  const isDark = useThemeStore((s) => s.resolved === 'dark');
   const { t, i18n } = useTranslation();
   const { filters } = useFiltersStore();
   const {
@@ -112,30 +114,31 @@ export default function ProgressChart() {
               <stop offset="95%" stopColor="#4a90e2" stopOpacity={0.1} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e0e0e0'} />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 12, fill: '#666' }}
-            stroke="#999"
+            tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : '#666' }}
+            stroke={isDark ? '#4b5563' : '#999'}
           />
           <YAxis
             label={{
               value: t('charts.durationMin'),
               angle: -90,
               position: 'insideLeft',
-              style: { fontSize: 12, fill: '#666' },
+              style: { fontSize: 12, fill: isDark ? '#9ca3af' : '#666' },
             }}
-            tick={{ fontSize: 12, fill: '#666' }}
-            stroke="#999"
+            tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : '#666' }}
+            stroke={isDark ? '#4b5563' : '#999'}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: 'white',
-              border: '1px solid #ccc',
+              backgroundColor: isDark ? '#1f2937' : 'white',
+              border: `1px solid ${isDark ? '#374151' : '#ccc'}`,
               borderRadius: '4px',
               padding: '8px',
+              color: isDark ? '#e5e7eb' : undefined,
             }}
-            labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
+            labelStyle={{ fontWeight: 'bold', marginBottom: '4px', color: isDark ? '#e5e7eb' : undefined }}
             formatter={(value, name) => {
               const val = value || 0;
               const hours = Math.floor(Number(val) / 60);

@@ -61,7 +61,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             </h2>
             <p className="text-gray-700 dark:text-gray-300 mb-6">{t('errors.errorMessage')}</p>
 
-            {this.state.error && (
+            {this.state.error && typeof window !== 'undefined' && window.location.hostname === 'localhost' && (
               <details className="mb-6 bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
                 <summary className="cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-sky-600">
                   {t('errors.technicalDetails')}

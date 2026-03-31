@@ -187,7 +187,7 @@ export default function AchievementsBadges() {
             {unlockedBadges.map((badge) => (
               <div
                 key={badge.id}
-                className="flex flex-col items-center p-3 bg-gradient-to-br from-sky-50 to-blue-50 dark:from-sky-900/20 dark:to-blue-900/20 border-2 border-sky-300 rounded-lg hover:shadow-md transition-shadow"
+                className="flex flex-col items-center p-3 bg-gradient-to-br from-sky-50 to-blue-50 dark:from-sky-900/20 dark:to-blue-900/20 border-2 border-sky-300 dark:border-sky-600 rounded-lg hover:shadow-md transition-shadow"
               >
                 <span className="text-3xl mb-1">{badge.icon}</span>
                 <span className="text-xs font-semibold text-gray-800 dark:text-gray-100 text-center">

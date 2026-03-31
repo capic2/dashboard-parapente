@@ -601,7 +601,7 @@ export default function FlightHistory() {
                             : '✓ Enregistrer'}
                         </button>
                         <button
-                          className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
+                          className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition-all"
                           onClick={handleCancelEdit}
                         >
                           ✖ Annuler
@@ -922,7 +922,7 @@ export default function FlightHistory() {
                             : '✓ Enregistrer'}
                         </button>
                         <button
-                          className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
+                          className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition-all"
                           onClick={() => {
                             setNotesText(selectedFlight.notes || '');
                             setEditingNotes(false);
@@ -1034,7 +1034,7 @@ export default function FlightHistory() {
         <div className="flex gap-3 justify-end">
           <button
             onClick={() => setFlightToDelete(null)}
-            className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
+            className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-all"
           >
             Annuler
           </button>
@@ -1066,7 +1066,7 @@ export default function FlightHistory() {
         <div className="flex gap-3 justify-end">
           <button
             onClick={() => setShowMultiDeleteConfirm(false)}
-            className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
+            className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-all"
           >
             Annuler
           </button>

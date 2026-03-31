@@ -317,7 +317,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
               </TextField>
               <Button
                 onPress={() => setShowApiKey(!showApiKey)}
-                className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-600 pressed:bg-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-500 pressed:bg-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                 aria-label={
                   showApiKey ? 'Masquer la clé API' : 'Afficher la clé API'
                 }

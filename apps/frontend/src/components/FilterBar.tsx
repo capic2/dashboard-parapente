@@ -79,13 +79,11 @@ export function FilterBar() {
             )}
             {filters.dateFrom && (
               <span className="px-2 py-1 bg-sky-100 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 rounded">
-                {t('filters.from')}{' '}
                 {t('filters.from')} {new Date(filters.dateFrom).toLocaleDateString(dateLocale)}
               </span>
             )}
             {filters.dateTo && (
               <span className="px-2 py-1 bg-sky-100 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 rounded">
-                {t('filters.to')}{' '}
                 {t('filters.to')} {new Date(filters.dateTo).toLocaleDateString(dateLocale)}
               </span>
             )}

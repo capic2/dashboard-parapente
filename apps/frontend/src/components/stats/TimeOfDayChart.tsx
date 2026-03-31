@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import { useFlights } from '../../hooks/useFlights';
 import { useFiltersStore } from '../../stores/filtersStore';
+import { useThemeStore } from '../../stores/themeStore';
 import { parseISO, getHours } from 'date-fns';
 
 // Couleurs pour chaque période de la journée
@@ -28,6 +29,7 @@ const TIME_COLORS: Record<string, string> = {
  * les périodes de la journée préférées du pilote
  */
 export default function TimeOfDayChart() {
+  const isDark = useThemeStore((s) => s.resolved === 'dark');
   const { filters } = useFiltersStore();
   const {
     data: flights = [],
@@ -133,23 +135,24 @@ export default function TimeOfDayChart() {
           data={chartData}
           margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e5e7eb'} />
           <XAxis
             dataKey="period"
-            tick={{ fill: '#6b7280', fontSize: 12 }}
+            tick={{ fill: isDark ? '#9ca3af' : '#6b7280', fontSize: 12 }}
             tickLine={false}
           />
           <YAxis
-            tick={{ fill: '#6b7280', fontSize: 12 }}
+            tick={{ fill: isDark ? '#9ca3af' : '#6b7280', fontSize: 12 }}
             tickLine={false}
             axisLine={false}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: 'white',
-              border: '1px solid #e5e7eb',
+              backgroundColor: isDark ? '#1f2937' : 'white',
+              border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`,
               borderRadius: '8px',
               padding: '8px 12px',
+              color: isDark ? '#e5e7eb' : undefined,
             }}
             formatter={(value, _name, props) => [
               `${value} vols (${props.payload.percentage}%)`,
