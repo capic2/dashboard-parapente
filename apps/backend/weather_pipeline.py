@@ -809,6 +809,7 @@ async def get_daily_aggregate(
         "temp_max": temp_max,
         "wind_avg": wind_avg,
         "precip_total": precip_total,
+        "cached_at": forecast_result.get("cached_at"),
     }
 
 
