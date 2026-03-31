@@ -16,6 +16,8 @@ import config
 # This ensures all tables are available for Base.metadata.create_all()
 # even in test mode where initialize_database() is not called
 import models  # noqa: F401 - imported for side effects (model registration)
+from sqlalchemy import text as sa_text
+
 from database import Base, SessionLocal, engine
 from models import Site  # Needed for database initialization
 from routes import router
@@ -51,6 +53,35 @@ def initialize_database():
 
         # Create all tables
         Base.metadata.create_all(bind=engine)
+
+        # Ensure forecast_date column exists on emagram_analysis
+        # (create_all won't alter existing tables missing this column)
+        with engine.connect() as conn:
+            cols = {
+                row[1]
+                for row in conn.execute(
+                    sa_text("PRAGMA table_info(emagram_analysis)")
+                ).fetchall()
+            }
+            if cols and "forecast_date" not in cols:
+                logger.info("Adding missing forecast_date column to emagram_analysis...")
+                conn.execute(
+                    sa_text(
+                        "ALTER TABLE emagram_analysis ADD COLUMN forecast_date DATE"
+                    )
+                )
+                conn.execute(
+                    sa_text(
+                        "UPDATE emagram_analysis SET forecast_date = analysis_date WHERE forecast_date IS NULL"
+                    )
+                )
+                conn.execute(
+                    sa_text(
+                        "CREATE INDEX IF NOT EXISTS idx_emagram_analysis_forecast_date ON emagram_analysis (forecast_date)"
+                    )
+                )
+                conn.commit()
+                logger.info("✓ forecast_date column added successfully")
 
         # Verify database file
         if DB_PATH.exists():
