@@ -882,32 +882,23 @@ export default function HourlyForecast({
                       className="py-2.5 px-2 text-center cursor-help hover:bg-red-50 transition-colors"
                       {...cellEventHandlers('temperature', hour)}
                     >
-                      <span className="inline-flex items-center justify-center gap-1">
-                        <Thermometer size={13} className="text-red-400" />
-                        {hour.temp}
-                      </span>
+                      {hour.temp}
                     </td>
 
                     <td
                       className="py-2.5 px-2 text-center cursor-help hover:bg-blue-50 transition-colors"
                       {...cellEventHandlers('wind', hour)}
                     >
-                      <span className="inline-flex items-center justify-center gap-1">
-                        <Wind size={13} className="text-blue-400" />
-                        {hour.wind}
-                      </span>
+                      {hour.wind}
                     </td>
 
                     <td
                       className="py-2.5 px-2 text-center cursor-help hover:bg-red-50 transition-colors"
                       {...cellEventHandlers('gust', hour)}
                     >
-                      <span className="inline-flex items-center justify-center gap-1">
-                        <Zap size={13} className="text-orange-400" />
-                        {gustValue !== null && gustValue !== undefined
+                      {gustValue !== null && gustValue !== undefined
                           ? gustValue.toFixed(1)
                           : '—'}
-                      </span>
                     </td>
 
                     <td
@@ -925,41 +916,29 @@ export default function HourlyForecast({
                       className="py-2.5 px-2 text-center cursor-help hover:bg-cyan-50 transition-colors"
                       {...cellEventHandlers('precipitation', hour)}
                     >
-                      <span className="inline-flex items-center justify-center gap-1">
-                        <CloudRain size={13} className="text-cyan-400" />
-                        {hour.precipitation !== null &&
+                      {hour.precipitation !== null &&
                         hour.precipitation !== undefined
                           ? hour.precipitation.toFixed(1)
                           : '—'}
-                      </span>
                     </td>
 
                     <td
                       className="py-2.5 px-2 text-center cursor-help hover:bg-slate-50 transition-colors"
                       {...cellEventHandlers('cloud-cover', hour)}
                     >
-                      <span className="inline-flex items-center justify-center gap-1">
-                        <Cloud size={13} className="text-slate-400" />
-                        {cloudCover !== null && cloudCover !== undefined
+                      {cloudCover !== null && cloudCover !== undefined
                           ? Math.round(cloudCover)
                           : '—'}
-                      </span>
                     </td>
 
                     <td className="py-2.5 px-2 text-center">
-                      <span className="inline-flex items-center justify-center gap-1">
-                        <Zap size={13} className="text-yellow-500" />
-                        {hour.cape !== null && hour.cape !== undefined
+                      {hour.cape !== null && hour.cape !== undefined
                           ? Math.round(hour.cape)
                           : '—'}
-                      </span>
                     </td>
 
                     <td className="py-2.5 px-2 text-center">
-                      <span className="inline-flex items-center justify-center gap-1">
-                        <Flame size={13} className="text-orange-400" />
-                        {hour.thermal_strength || 'faible'}
-                      </span>
+                      {hour.thermal_strength || 'faible'}
                     </td>
 
                     <td className="py-2.5 px-2 text-center">
