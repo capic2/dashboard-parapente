@@ -313,11 +313,9 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
         scored_sites.sort(key=lambda x: x["score"], reverse=True)
         best_site = scored_sites[0]
 
-        # Add warning if score is too low
+        # Prepend warning if score is too low (keep enriched reason)
         if best_site["score"] < 20:
-            best_site["reason"] = (
-                f"Conditions défavorables partout (meilleur: {best_site['site']['name']}, score {int(best_site['score'])})"
-            )
+            best_site["reason"] = f"⚠️ Conditions défavorables — {best_site['reason']}"
 
         # Fetch thermal ceiling from nearest emagram analysis for the winning site
         try:
@@ -345,7 +343,7 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
             best_emagram = None
             if site_lat is not None and site_lon is not None:
                 max_distance_km = 200
-                best_dist = max_distance_km
+                best_dist = float("inf")
                 for analysis in analyses:
                     if (
                         analysis.station_latitude is None
@@ -359,7 +357,7 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
                         analysis.station_latitude,
                         analysis.station_longitude,
                     )
-                    if dist < best_dist:
+                    if dist <= max_distance_km and dist < best_dist:
                         best_dist = dist
                         best_emagram = analysis
 
@@ -505,11 +503,9 @@ async def calculate_best_spot_from_db(db: Session, day_index: int = 0) -> dict[s
         # Get the best site
         best_site = scored_sites[0]
 
-        # Add warning if score is too low
+        # Prepend warning if score is too low (keep enriched reason)
         if best_site["score"] < 20:
-            best_site["reason"] = (
-                f"Conditions défavorables partout (meilleur: {best_site['site']['name']}, score {int(best_site['score'])})"
-            )
+            best_site["reason"] = f"⚠️ Conditions défavorables — {best_site['reason']}"
 
         logger.info(f"✅ Best spot: {best_site['site']['name']} (score: {best_site['score']:.1f})")
 
