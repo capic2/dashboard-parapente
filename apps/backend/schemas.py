@@ -525,6 +525,7 @@ class EmagramTriggerRequest(BaseModel):
     user_latitude: float | None = None
     user_longitude: float | None = None
     force_refresh: bool = False
+    day_index: int = 0
 
     @validator("user_latitude")
     def validate_latitude(cls, v):

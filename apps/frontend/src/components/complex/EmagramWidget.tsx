@@ -59,6 +59,7 @@ export default function EmagramWidget({
       await triggerMutation.mutateAsync({
         site_id: siteId,
         force_refresh: true,
+        day_index: dayIndex,
       });
       await refetch();
     } catch {
