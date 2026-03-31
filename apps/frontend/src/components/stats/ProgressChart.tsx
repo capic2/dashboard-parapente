@@ -71,10 +71,10 @@ export default function ProgressChart() {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
         <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded mb-4 w-1/3"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
+          <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded mb-4 w-1/3"></div>
+          <div className="h-64 bg-gray-200 dark:bg-gray-600 rounded"></div>
         </div>
       </div>
     );
@@ -82,8 +82,8 @@ export default function ProgressChart() {
 
   if (error || !chartData.length) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md text-center">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
           📈 {t('charts.flightProgress')}
         </h3>
         <p className="text-red-600 text-sm">{t('charts.noData')}</p>
@@ -92,12 +92,12 @@ export default function ProgressChart() {
   }
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow-md">
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
       <div className="mb-4">
-        <h3 className="text-lg font-bold text-gray-900">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white">
           📈 {t('charts.flightProgress')}
         </h3>
-        <p className="text-sm text-gray-600 mt-1">
+        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
           {t('charts.flightProgressDesc')}
         </p>
       </div>

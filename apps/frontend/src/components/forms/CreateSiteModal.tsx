@@ -128,7 +128,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
                 setError(null);
               }}
               className={`px-4 py-2 rounded ${
-                mode === 'auto' ? 'bg-blue-500 text-white' : 'bg-gray-200'
+                mode === 'auto' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-600 dark:text-gray-200'
               }`}
             >
               {t('createSite.autoDetect')}
@@ -140,7 +140,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
               setError(null);
             }}
             className={`px-4 py-2 rounded ${
-              mode === 'search' ? 'bg-blue-500 text-white' : 'bg-gray-200'
+              mode === 'search' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-600 dark:text-gray-200'
             }`}
           >
             {t('createSite.search')}
@@ -151,7 +151,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
               setError(null);
             }}
             className={`px-4 py-2 rounded ${
-              mode === 'manual' ? 'bg-blue-500 text-white' : 'bg-gray-200'
+              mode === 'manual' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-600 dark:text-gray-200'
             }`}
           >
             {t('createSite.manualEntry')}
@@ -160,8 +160,8 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
 
         {/* Error display */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <p className="text-sm text-red-800">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-3">
+            <p className="text-sm text-red-800 dark:text-red-200">
               <span className="font-semibold">❌ Erreur : </span>
               {error}
             </p>
@@ -171,7 +171,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
         {/* Auto-detect mode */}
         {mode === 'auto' && (
           <div>
-            <p className="text-sm text-gray-600 mb-2">
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
               Utiliser le premier point GPS du fichier de vol
             </p>
             <Button
@@ -196,7 +196,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Ex: Besançon, Arguel..."
-                  className="flex-1 px-3 py-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded outline-none focus:ring-2 focus:ring-blue-500"
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                 />
                 <Button
@@ -210,12 +210,12 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
             </TextField>
 
             {searchResult && (
-              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
-                <p className="text-sm font-medium text-green-800">✓ Trouvé !</p>
-                <p className="text-sm text-gray-600">
+              <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded">
+                <p className="text-sm font-medium text-green-800 dark:text-green-200">✓ Trouvé !</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
                   {searchResult.display_name}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {searchResult.latitude.toFixed(5)},{' '}
                   {searchResult.longitude.toFixed(5)}
                 </p>
@@ -234,7 +234,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
                 value={siteName}
                 onChange={(e) => setSiteName(e.target.value)}
                 placeholder="Ex: Mont Poupet"
-                className="w-full px-3 py-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded outline-none focus:ring-2 focus:ring-blue-500"
               />
             </TextField>
 
@@ -247,7 +247,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
                   value={latitude}
                   onChange={(e) => setLatitude(e.target.value)}
                   placeholder="47.238"
-                  className="w-full px-3 py-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </TextField>
 
@@ -259,7 +259,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
                   value={longitude}
                   onChange={(e) => setLongitude(e.target.value)}
                   placeholder="6.024"
-                  className="w-full px-3 py-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </TextField>
             </div>
@@ -271,17 +271,17 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
                 value={elevation}
                 onChange={(e) => setElevation(e.target.value)}
                 placeholder="450"
-                className="w-full px-3 py-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded outline-none focus:ring-2 focus:ring-blue-500"
               />
             </TextField>
           </div>
         )}
 
         {/* Actions */}
-        <div className="flex justify-end gap-2 pt-4 border-t">
+        <div className="flex justify-end gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
           <Button
             onPress={onClose}
-            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded"
+            className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
           >
             Annuler
           </Button>

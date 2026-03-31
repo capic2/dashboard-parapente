@@ -72,10 +72,10 @@ export default function WeekdayChart() {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
         <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded mb-4 w-1/3"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
+          <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded mb-4 w-1/3"></div>
+          <div className="h-64 bg-gray-200 dark:bg-gray-600 rounded"></div>
         </div>
       </div>
     );
@@ -83,8 +83,8 @@ export default function WeekdayChart() {
 
   if (error) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md">
-        <h3 className="text-lg font-semibold mb-2 text-gray-900">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
+        <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
           📅 Jours de vol préférés
         </h3>
         <div className="text-red-600">Erreur : {error.message}</div>
@@ -94,11 +94,11 @@ export default function WeekdayChart() {
 
   if (!chartData.length || flights.length === 0) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md">
-        <h3 className="text-lg font-semibold mb-2 text-gray-900">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
+        <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
           📅 Jours de vol préférés
         </h3>
-        <p className="text-gray-500 text-center py-8">
+        <p className="text-gray-500 dark:text-gray-400 text-center py-8">
           Aucune donnée de vol disponible
         </p>
       </div>
@@ -112,16 +112,16 @@ export default function WeekdayChart() {
   );
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow-md">
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
           📅 Jours de vol préférés
         </h3>
-        <p className="text-sm text-gray-600 mt-1">
+        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
           Répartition de vos {totalFlights} vols par jour de la semaine
         </p>
         {maxDay && maxDay.count > 0 && (
-          <p className="text-sm text-sky-600 font-medium mt-1">
+          <p className="text-sm text-sky-600 dark:text-sky-400 font-medium mt-1">
             Jour favori : {maxDay.day} ({maxDay.count} vols, {maxDay.percentage}
             %)
           </p>
@@ -170,9 +170,9 @@ export default function WeekdayChart() {
       <div className="grid grid-cols-7 gap-1 mt-4 text-center text-xs">
         {chartData.map((day) => (
           <div key={day.day} className="flex flex-col">
-            <span className="font-medium text-gray-700">{day.dayShort}</span>
-            <span className="text-sky-600 font-bold text-sm">{day.count}</span>
-            <span className="text-gray-500">{day.percentage}%</span>
+            <span className="font-medium text-gray-700 dark:text-gray-300">{day.dayShort}</span>
+            <span className="text-sky-600 dark:text-sky-400 font-bold text-sm">{day.count}</span>
+            <span className="text-gray-500 dark:text-gray-400">{day.percentage}%</span>
           </div>
         ))}
       </div>

@@ -148,15 +148,15 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold mb-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <h2 className="text-2xl font-bold mb-4 dark:text-white">
           {site ? `${t('editSite.title')} ${site.name}` : t('editSite.newSite')}
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Nom */}
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-medium mb-1 dark:text-gray-200">
               {t('editSite.siteName')} *
             </label>
             <input
@@ -165,7 +165,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               onChange={(e) =>
                 setFormData({ ...formData, name: e.target.value })
               }
-              className="w-full px-3 py-2 border rounded"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded"
               required
             />
             {errors.name && (
@@ -175,18 +175,18 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
 
           {/* Code */}
           <div>
-            <label className="block text-sm font-medium mb-1">{t('editSite.code')}</label>
+            <label className="block text-sm font-medium mb-1 dark:text-gray-200">{t('editSite.code')}</label>
             <input
               type="text"
               value={formData.code}
               onChange={(e) =>
                 setFormData({ ...formData, code: e.target.value })
               }
-              className="w-full px-3 py-2 border rounded disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded disabled:bg-gray-100 dark:disabled:bg-gray-600"
               disabled={!!site}
             />
             {site && (
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 {t('editSite.codeReadonly')}
               </p>
             )}
@@ -194,7 +194,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
 
           {/* Type de site */}
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <label className="block text-sm font-medium mb-2 dark:text-gray-200">
               {t('editSite.siteType')} *
             </label>
             <div className="space-y-2">
@@ -240,7 +240,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           {/* GPS Coordinates */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="block text-sm font-medium mb-1 dark:text-gray-200">
                 {t('editSite.latitude')} *
               </label>
               <input
@@ -253,7 +253,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                     latitude: parseFloat(e.target.value) || 0,
                   })
                 }
-                className="w-full px-3 py-2 border rounded"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded"
                 required
               />
               {errors.latitude && (
@@ -261,7 +261,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="block text-sm font-medium mb-1 dark:text-gray-200">
                 {t('editSite.longitude')} *
               </label>
               <input
@@ -274,7 +274,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                     longitude: parseFloat(e.target.value) || 0,
                   })
                 }
-                className="w-full px-3 py-2 border rounded"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded"
                 required
               />
               {errors.longitude && (
@@ -282,7 +282,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="block text-sm font-medium mb-1 dark:text-gray-200">
                 {t('editSite.elevation')}
               </label>
               <input
@@ -294,7 +294,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                     elevation_m: parseInt(e.target.value) || 0,
                   })
                 }
-                className="w-full px-3 py-2 border rounded"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded"
               />
             </div>
           </div>
@@ -302,25 +302,25 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           {/* Region & Country */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium mb-1">{t('editSite.region')}</label>
+              <label className="block text-sm font-medium mb-1 dark:text-gray-200">{t('editSite.region')}</label>
               <input
                 type="text"
                 value={formData.region}
                 onChange={(e) =>
                   setFormData({ ...formData, region: e.target.value })
                 }
-                className="w-full px-3 py-2 border rounded"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded"
                 placeholder={t('editSite.regionPlaceholder')}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">{t('editSite.country')}</label>
+              <label className="block text-sm font-medium mb-1 dark:text-gray-200">{t('editSite.country')}</label>
               <select
                 value={formData.country}
                 onChange={(e) =>
                   setFormData({ ...formData, country: e.target.value })
                 }
-                className="w-full px-3 py-2 border rounded"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded"
               >
                 <option value="FR">{t('editSite.france')}</option>
                 <option value="CH">{t('editSite.switzerland')}</option>
@@ -332,7 +332,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
 
           {/* Orientation */}
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-medium mb-1 dark:text-gray-200">
               {t('editSite.orientation')}
             </label>
             <select
@@ -340,7 +340,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               onChange={(e) =>
                 setFormData({ ...formData, orientation: e.target.value })
               }
-              className="w-full px-3 py-2 border rounded"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded"
             >
               <option value="">{t('editSite.undefined')}</option>
               <option value="N">Nord (N)</option>
@@ -355,8 +355,8 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           </div>
 
           {/* Camera Settings */}
-          <div className="p-3 bg-blue-50 rounded border border-blue-200">
-            <h4 className="text-sm font-semibold mb-3">
+          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-700">
+            <h4 className="text-sm font-semibold mb-3 dark:text-gray-200">
               📷 {t('editSite.camera3D')}
             </h4>
 
@@ -378,7 +378,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                 }
                 className="w-full"
               />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                 <span>0° (N)</span>
                 <span>90° (E)</span>
                 <span>180° (S)</span>
@@ -404,7 +404,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                 }
                 className="w-full"
               />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                 <span>100m</span>
                 <span>2000m</span>
               </div>
@@ -413,7 +413,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-medium mb-1 dark:text-gray-200">
               {t('editSite.description')}
             </label>
             <textarea
@@ -421,7 +421,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               onChange={(e) =>
                 setFormData({ ...formData, description: e.target.value })
               }
-              className="w-full px-3 py-2 border rounded"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded"
               rows={3}
               placeholder={t('editSite.additionalInfo')}
             />
@@ -435,11 +435,11 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
             )}
 
           {/* Actions */}
-          <div className="flex gap-3 pt-4 border-t">
+          <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+              className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
               disabled={isSaving}
             >
               {t('common.cancel')}

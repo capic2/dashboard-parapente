@@ -57,10 +57,10 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
     };
 
     const statusClasses = {
-      active: 'bg-green-100 text-green-800',
-      error: 'bg-red-100 text-red-800',
-      disabled: 'bg-gray-100 text-gray-600',
-      unknown: 'bg-yellow-100 text-yellow-800',
+      active: 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200',
+      error: 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200',
+      disabled: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300',
+      unknown: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200',
     };
 
     return (
@@ -216,8 +216,8 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
 
   return (
     <article
-      className={`bg-white rounded-lg shadow-md p-5 border-2 transition-all ${
-        source.is_enabled ? 'border-sky-200' : 'border-gray-200'
+      className={`bg-white dark:bg-gray-800 rounded-lg shadow-md p-5 border-2 transition-all ${
+        source.is_enabled ? 'border-sky-200 dark:border-sky-700' : 'border-gray-200 dark:border-gray-700'
       }`}
       aria-label={`Configuration de la source météo ${source.display_name}`}
     >
@@ -226,10 +226,10 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
         <div
           className={`mb-3 p-3 rounded-lg text-sm font-medium ${
             notification.type === 'error'
-              ? 'bg-red-50 text-red-800 border border-red-200'
+              ? 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-700'
               : notification.type === 'success'
-                ? 'bg-green-50 text-green-800 border border-green-200'
-                : 'bg-yellow-50 text-yellow-800 border border-yellow-200'
+                ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-700'
+                : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700'
           }`}
           role="alert"
           aria-live="assertive"
@@ -246,12 +246,12 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
             <span className="text-2xl" aria-hidden="true">
               {getScraperIcon()}
             </span>
-            <h3 className="text-lg font-bold text-gray-900">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
               {source.display_name}
             </h3>
             {getStatusBadge()}
           </div>
-          <Text slot="description" className="text-sm text-gray-600">
+          <Text slot="description" className="text-sm text-gray-600 dark:text-gray-300">
             {source.description}
           </Text>
         </div>
@@ -274,17 +274,17 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
 
       {/* API Key Section */}
       {source.requires_api_key && (
-        <div className="mb-3 p-3 bg-blue-50 rounded border border-blue-200">
+        <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-700">
           <div className="flex items-center justify-between mb-2">
             <span
-              className="text-sm font-medium text-gray-700"
+              className="text-sm font-medium text-gray-700 dark:text-gray-300"
               aria-hidden="true"
             >
               🔑 Clé API
             </span>
             {source.api_key_configured ? (
               <span
-                className="text-xs text-green-600 font-semibold"
+                className="text-xs text-green-600 dark:text-green-400 font-semibold"
                 role="status"
                 aria-label={t('settings.weatherSources.apiKeyConfigured')}
               >
@@ -292,7 +292,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
               </span>
             ) : (
               <span
-                className="text-xs text-red-600 font-semibold"
+                className="text-xs text-red-600 dark:text-red-400 font-semibold"
                 role="status"
                 aria-label={t('settings.weatherSources.apiKeyMissing')}
               >
@@ -317,7 +317,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
               </TextField>
               <Button
                 onPress={() => setShowApiKey(!showApiKey)}
-                className="px-2 py-1 text-xs bg-gray-200 rounded hover:bg-gray-300 pressed:bg-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-600 pressed:bg-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                 aria-label={
                   showApiKey ? 'Masquer la clé API' : 'Afficher la clé API'
                 }
@@ -346,7 +346,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
           ) : (
             <Button
               onPress={() => setIsEditingApiKey(true)}
-              className="w-full px-3 py-1 text-sm bg-white border rounded hover:bg-gray-50 pressed:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+              className="w-full px-3 py-1 text-sm bg-white dark:bg-gray-700 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-600 pressed:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
             >
               {source.api_key_configured
                 ? t('settings.weatherSources.modifyApiKey')
@@ -374,9 +374,9 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
         role="group"
         aria-label="Statistiques de performance"
       >
-        <div className="p-2 bg-gray-50 rounded">
+        <div className="p-2 bg-gray-50 dark:bg-gray-900 rounded">
           <div
-            className="text-xs text-gray-600"
+            className="text-xs text-gray-600 dark:text-gray-300"
             id={`success-rate-label-${source.source_name}`}
           >
             {t('settings.weatherSources.successRate')}
@@ -384,10 +384,10 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
           <div
             className={`text-lg font-bold ${
               source.success_rate >= 95
-                ? 'text-green-600'
+                ? 'text-green-600 dark:text-green-400'
                 : source.success_rate >= 80
-                  ? 'text-yellow-600'
-                  : 'text-red-600'
+                  ? 'text-yellow-600 dark:text-yellow-400'
+                  : 'text-red-600 dark:text-red-400'
             }`}
             aria-labelledby={`success-rate-label-${source.source_name}`}
             aria-live="polite"
@@ -395,15 +395,15 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
             {source.success_rate.toFixed(0)}%
           </div>
         </div>
-        <div className="p-2 bg-gray-50 rounded">
+        <div className="p-2 bg-gray-50 dark:bg-gray-900 rounded">
           <div
-            className="text-xs text-gray-600"
+            className="text-xs text-gray-600 dark:text-gray-300"
             id={`response-time-label-${source.source_name}`}
           >
             {t('settings.weatherSources.avgResponseTime')}
           </div>
           <div
-            className="text-lg font-bold text-gray-900"
+            className="text-lg font-bold text-gray-900 dark:text-white"
             aria-labelledby={`response-time-label-${source.source_name}`}
             aria-live="polite"
           >
@@ -412,15 +412,15 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
               : '-'}
           </div>
         </div>
-        <div className="p-2 bg-gray-50 rounded">
+        <div className="p-2 bg-gray-50 dark:bg-gray-900 rounded">
           <div
-            className="text-xs text-gray-600"
+            className="text-xs text-gray-600 dark:text-gray-300"
             id={`calls-count-label-${source.source_name}`}
           >
             {t('settings.weatherSources.calls')}
           </div>
           <div
-            className="text-lg font-bold text-gray-900"
+            className="text-lg font-bold text-gray-900 dark:text-white"
             aria-labelledby={`calls-count-label-${source.source_name}`}
             aria-live="polite"
           >
@@ -431,7 +431,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
 
       {/* Last activity */}
       <div
-        className="text-xs text-gray-600 mb-3"
+        className="text-xs text-gray-600 dark:text-gray-300 mb-3"
         role="region"
         aria-label="Historique d'activité"
       >
@@ -443,13 +443,13 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
           </div>
         )}
         {source.last_error_at && (
-          <div className="text-red-600" role="alert">
+          <div className="text-red-600 dark:text-red-400" role="alert">
             <span aria-hidden="true">✗ </span>
             {t('settings.weatherSources.lastError')}{' '}
             {formatTimestamp(source.last_error_at)}
             {source.last_error_message && (
               <div
-                className="text-xs mt-1 p-1 bg-red-50 rounded truncate"
+                className="text-xs mt-1 p-1 bg-red-50 dark:bg-red-900/20 rounded truncate"
                 title={source.last_error_message}
                 role="status"
                 aria-label={`Message d'erreur: ${source.last_error_message}`}
@@ -466,8 +466,8 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
         <div
           className={`mb-3 p-2 rounded text-sm ${
             testResult.success
-              ? 'bg-green-50 text-green-800'
-              : 'bg-red-50 text-red-800'
+              ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200'
+              : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200'
           }`}
           role={testResult.success ? 'status' : 'alert'}
           aria-live="polite"

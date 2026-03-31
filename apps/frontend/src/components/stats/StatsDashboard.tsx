@@ -28,11 +28,11 @@ export default function StatsDashboard() {
         {[...Array(8)].map((_, i) => (
           <div
             key={i}
-            className="bg-white rounded-xl p-4 shadow-md animate-pulse"
+            className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md animate-pulse"
           >
-            <div className="w-12 h-12 bg-gray-200 rounded-full mb-3"></div>
-            <div className="h-6 bg-gray-200 rounded mb-2"></div>
-            <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+            <div className="w-12 h-12 bg-gray-200 dark:bg-gray-600 rounded-full mb-3"></div>
+            <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded mb-2"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-2/3"></div>
           </div>
         ))}
       </div>
@@ -41,7 +41,7 @@ export default function StatsDashboard() {
 
   if (error || !formattedStats) {
     return (
-      <div className="bg-white rounded-xl p-6 shadow-md text-center text-red-600">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md text-center text-red-600">
         <p>❌ {t('stats.statsLoadError')}</p>
       </div>
     );
@@ -50,57 +50,57 @@ export default function StatsDashboard() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {/* Total Flights */}
-      <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
         <div className="text-3xl mb-2">🪂</div>
-        <div className="text-2xl font-bold text-gray-900">
+        <div className="text-2xl font-bold text-gray-900 dark:text-white">
           {formattedStats.totalFlights}
         </div>
-        <div className="text-sm text-gray-600">{t('stats.flights')}</div>
+        <div className="text-sm text-gray-600 dark:text-gray-300">{t('stats.flights')}</div>
       </div>
 
       {/* Total Hours */}
-      <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
         <div className="text-3xl mb-2">⏱️</div>
-        <div className="text-2xl font-bold text-gray-900">
+        <div className="text-2xl font-bold text-gray-900 dark:text-white">
           {formattedStats.totalHours}h{formattedStats.totalMinutes}m
         </div>
-        <div className="text-sm text-gray-600">{t('stats.totalTime')}</div>
+        <div className="text-sm text-gray-600 dark:text-gray-300">{t('stats.totalTime')}</div>
       </div>
 
       {/* Total Distance */}
-      <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
         <div className="text-3xl mb-2">📏</div>
-        <div className="text-2xl font-bold text-gray-900">
+        <div className="text-2xl font-bold text-gray-900 dark:text-white">
           {formattedStats.totalDistance} km
         </div>
-        <div className="text-sm text-gray-600">{t('stats.totalDistance')}</div>
+        <div className="text-sm text-gray-600 dark:text-gray-300">{t('stats.totalDistance')}</div>
       </div>
 
       {/* Elevation Gain */}
-      <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-sky-600">
         <div className="text-3xl mb-2">📈</div>
-        <div className="text-2xl font-bold text-gray-900">
+        <div className="text-2xl font-bold text-gray-900 dark:text-white">
           {formattedStats.totalElevation} m
         </div>
-        <div className="text-sm text-gray-600">{t('stats.totalElevation')}</div>
+        <div className="text-sm text-gray-600 dark:text-gray-300">{t('stats.totalElevation')}</div>
       </div>
 
       {/* Average Duration */}
-      <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-gray-300">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-gray-300 dark:border-gray-600">
         <div className="text-3xl mb-2">⌛</div>
-        <div className="text-2xl font-bold text-gray-900">
+        <div className="text-2xl font-bold text-gray-900 dark:text-white">
           {formattedStats.avgDuration} min
         </div>
-        <div className="text-sm text-gray-600">{t('stats.avgDuration')}</div>
+        <div className="text-sm text-gray-600 dark:text-gray-300">{t('stats.avgDuration')}</div>
       </div>
 
       {/* Average Distance */}
-      <div className="bg-white rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-gray-300">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md hover:shadow-lg transition-all border-2 border-gray-300 dark:border-gray-600">
         <div className="text-3xl mb-2">🎯</div>
-        <div className="text-2xl font-bold text-gray-900">
+        <div className="text-2xl font-bold text-gray-900 dark:text-white">
           {formattedStats.avgDistance} km
         </div>
-        <div className="text-sm text-gray-600">{t('stats.avgDistance')}</div>
+        <div className="text-sm text-gray-600 dark:text-gray-300">{t('stats.avgDistance')}</div>
       </div>
 
       {/* Max Altitude */}

@@ -82,10 +82,10 @@ export default function TimeOfDayChart() {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
         <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded mb-4 w-1/3"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
+          <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded mb-4 w-1/3"></div>
+          <div className="h-64 bg-gray-200 dark:bg-gray-600 rounded"></div>
         </div>
       </div>
     );
@@ -93,8 +93,8 @@ export default function TimeOfDayChart() {
 
   if (error) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md">
-        <h3 className="text-lg font-semibold mb-2 text-gray-900">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
+        <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
           ⏰ Heures de vol préférées
         </h3>
         <div className="text-red-600">Erreur : {error.message}</div>
@@ -104,11 +104,11 @@ export default function TimeOfDayChart() {
 
   if (!chartData.length || flights.length === 0) {
     return (
-      <div className="bg-white rounded-xl p-4 shadow-md">
-        <h3 className="text-lg font-semibold mb-2 text-gray-900">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
+        <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
           ⏰ Heures de vol préférées
         </h3>
-        <p className="text-gray-500 text-center py-8">
+        <p className="text-gray-500 dark:text-gray-400 text-center py-8">
           Aucune donnée d&apos;heure de décollage disponible
         </p>
       </div>
@@ -118,12 +118,12 @@ export default function TimeOfDayChart() {
   const totalFlights = chartData.reduce((sum, d) => sum + d.count, 0);
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow-md">
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
           ⏰ Heures de vol préférées
         </h3>
-        <p className="text-sm text-gray-600 mt-1">
+        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
           Répartition de vos {totalFlights} vols par période de la journée
         </p>
       </div>
@@ -175,7 +175,7 @@ export default function TimeOfDayChart() {
               className="w-3 h-3 rounded"
               style={{ backgroundColor: TIME_COLORS[slot.period] }}
             ></div>
-            <span className="text-gray-700">
+            <span className="text-gray-700 dark:text-gray-300">
               {slot.period}: <strong>{slot.count}</strong> ({slot.percentage}%)
             </span>
           </div>
