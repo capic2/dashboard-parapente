@@ -32,7 +32,7 @@ aiofiles==25.1.0
 # ============================================
 # Web Scraping & Browser Automation
 # ============================================
-playwright==1.58.0
+playwright==1.59.0
 scrapling==0.4.3
 beautifulsoup4==4.14.3
 
