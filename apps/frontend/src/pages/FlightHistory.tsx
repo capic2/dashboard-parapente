@@ -1,23 +1,23 @@
 import { useState, useCallback, useRef, lazy, Suspense } from 'react';
 import {
-  useFlights,
+  flightsQueryOptions,
   useUpdateFlight,
   useUploadGPXToFlight,
 } from '../hooks/useFlights';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import type { Flight, Site } from '../types';
 const FlightViewer3D = lazy(() => import('../components/complex/FlightViewer3D').then(m => ({ default: m.FlightViewer3D })));
 import { StravaSyncModal } from '../components/forms/StravaSyncModal';
 import { CreateFlightModal } from '../components/forms/CreateFlightModal';
 import { CreateSiteModal } from '../components/forms/CreateSiteModal';
-import { useSites } from '../hooks/useSites';
+import { sitesQueryOptions } from '../hooks/useSites';
 import { ToastContainer, Modal } from '@dashboard-parapente/design-system';
 import { useToast, useToastStore } from '../hooks/useToast';
 import { HTTPError } from 'ky';
 import { api } from '../lib/api';
 
 export default function FlightHistory() {
-  const { data: flightsRaw = [], isLoading, error } = useFlights({ limit: 50 });
+  const { data: flightsRaw } = useSuspenseQuery(flightsQueryOptions({ limit: 50 }));
 
   // Trier les vols par date (plus récent en premier) côté frontend en backup du tri backend
   const flights = [...flightsRaw].sort((a, b) => {
@@ -58,7 +58,7 @@ export default function FlightHistory() {
   const updateFlight = useUpdateFlight(selectedFlightId || undefined);
   const [isDeleting, setIsDeleting] = useState(false);
   const uploadGPXMutation = useUploadGPXToFlight(selectedFlightId || '');
-  const { data: sites = [] } = useSites();
+  const { data: sites } = useSuspenseQuery(sitesQueryOptions());
   const queryClient = useQueryClient();
   const toast = useToast();
   const { toasts, removeToast } = useToastStore();
@@ -293,36 +293,6 @@ export default function FlightHistory() {
       fileInputRef.current.value = '';
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="py-8">
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md animate-pulse">
-          <div className="h-8 bg-gray-200 dark:bg-gray-600 rounded mb-4 w-1/3"></div>
-          <div className="h-64 bg-gray-200 dark:bg-gray-600 rounded"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="py-8">
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center max-w-md mx-auto">
-          <h2 className="text-xl font-bold text-red-600 dark:text-red-400 mb-3">❌ Erreur</h2>
-          <p className="text-gray-700 dark:text-gray-300 mb-4">
-            Impossible de charger l&apos;historique des vols
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-all"
-          >
-            Réessayer
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div>

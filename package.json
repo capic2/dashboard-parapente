@@ -18,7 +18,8 @@
     "lint:affected": "nx affected -t lint",
     "format": "nx run-many -t format --all",
     "graph": "nx graph",
-    "knip": "knip"
+    "knip": "knip",
+    "prepare": "husky"
   },
   "dependencies": {
     "@internationalized/date": "^3.7.0",
@@ -45,7 +46,7 @@
     "@nx/playwright": "^22.6.0",
     "@nx/vite": "^22.6.0",
     "@nx/vitest": "^22.6.0",
-    "@playwright/test": "^1.58.2",
+    "@playwright/test": "1.58.0",
     "@storybook/addon-a11y": "^10.3.3",
     "@storybook/addon-docs": "^10.3.3",
     "@storybook/addon-vitest": "^10.3.3",
@@ -64,13 +65,15 @@
     "@vitest/ui": "^4.0.18",
     "chromatic": "^16.0.0",
     "happy-dom": "^20.8.4",
+    "husky": "^9.1.7",
     "knip": "^6.1.0",
+    "lint-staged": "^16.4.0",
     "msw": "^2.12.10",
     "msw-storybook-addon": "^2.0.6",
     "nx": "^22.6.0",
     "oxfmt": "^0.43.0",
     "oxlint": "^1.57.0",
-    "playwright": "^1.58.2",
+    "playwright": "1.58.0",
     "storybook": "^10.3.3",
     "storybook-react-i18next": "^10.1.1",
     "tailwindcss": "^4.2.1",
@@ -78,6 +81,24 @@
     "vite": "^8.0.0",
     "vite-plugin-cesium": "^1.2.23",
     "vitest": "^4.0.18"
+  },
+  "lint-staged": {
+    "apps/frontend/src/**/!(routeTree.gen).{ts,tsx}": [
+      "oxlint -c .oxlintrc.json",
+      "oxfmt -c .oxfmtrc.json"
+    ],
+    "libs/design-system/src/**/*.{ts,tsx}": [
+      "oxlint -c .oxlintrc.json",
+      "oxfmt -c .oxfmtrc.json"
+    ],
+    "libs/shared-types/src/**/*.{ts,tsx}": [
+      "oxlint -c .oxlintrc.json",
+      "oxfmt -c .oxfmtrc.json"
+    ],
+    "apps/backend/**/*.py": [
+      "bash -c 'command -v .venv/bin/ruff >/dev/null 2>&1 && RUFF=.venv/bin/ruff || RUFF=ruff; $RUFF check --output-format=github \"$@\"' --",
+      "bash -c 'command -v .venv/bin/black >/dev/null 2>&1 && BLACK=.venv/bin/black || BLACK=black; $BLACK --check --diff \"$@\"' --"
+    ]
   },
   "pnpm": {
     "onlyBuiltDependencies": [

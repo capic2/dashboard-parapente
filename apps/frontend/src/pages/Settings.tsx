@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSites } from '../hooks/useSites';
+import { useSuspenseQuery } from '@tanstack/react-query';
+import { sitesQueryOptions } from '../hooks/useSites';
 import {
   useWeatherSources,
   useWeatherSourceStats,
@@ -58,6 +59,77 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
   favoriteSites: [],
 };
+
+// Sites Favorites Tab Component
+function SitesTab({
+  settings,
+  toggleFavorite,
+}: {
+  settings: AppSettings;
+  toggleFavorite: (siteId: string) => void;
+}) {
+  const { t } = useTranslation();
+  const { data: sites } = useSuspenseQuery(sitesQueryOptions());
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
+      <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+        📍 {t('settings.favorites.title')}
+      </h2>
+      {sites.length === 0 ? (
+        <p className="text-gray-600 dark:text-gray-300 text-center py-8">
+          {t('settings.favorites.noSites')}
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {(sites as unknown as ApiSite[]).map((site: ApiSite) => (
+            <div
+              key={site.id}
+              className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
+                settings.favoriteSites.includes(site.id)
+                  ? 'border-sky-600 bg-sky-50 dark:bg-sky-900/20'
+                  : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  {site.name}
+                </h3>
+                {site.latitude && site.longitude && site.elevation_m && (
+                  <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                    📍 {site.latitude.toFixed(4)}, {site.longitude.toFixed(4)} •
+                    ⛰️ {site.elevation_m}m
+                  </div>
+                )}
+                {site.description && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {site.description}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => toggleFavorite(site.id)}
+                className={`ml-4 px-4 py-2 rounded-lg font-medium transition-all ${
+                  settings.favoriteSites.includes(site.id)
+                    ? 'bg-sky-600 text-white hover:bg-sky-700'
+                    : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                }`}
+              >
+                {settings.favoriteSites.includes(site.id)
+                  ? '⭐ ' + t('settings.favorites.favorite')
+                  : '☆ ' + t('settings.favorites.add')}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-800 dark:text-blue-200">
+        💡 <strong>{t('settings.favorites.tip')}</strong>{' '}
+        {t('settings.favorites.tipText')}
+      </div>
+    </div>
+  );
+}
 
 // Weather Sources Tab Component
 function WeatherSourcesTab() {
@@ -213,7 +285,6 @@ function WeatherSourcesTab() {
 
 export default function Settings() {
   const { t, i18n } = useTranslation();
-  const { data: sites = [], isLoading: sitesLoading } = useSites();
   const { preference: themePreference, setPreference: setThemePreference } =
     useThemeStore();
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -307,7 +378,9 @@ export default function Settings() {
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">
           ⚙️ {t('settings.title')}
         </h1>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{t('settings.subtitle')}</p>
+        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+          {t('settings.subtitle')}
+        </p>
       </div>
 
       {/* Tabs Navigation */}
@@ -618,68 +691,20 @@ export default function Settings() {
 
         {/* SITES TAB */}
         {activeTab === 'sites' && (
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-              📍 {t('settings.favorites.title')}
-            </h2>
-            {sitesLoading ? (
-              <div className="animate-pulse space-y-3">
+          <Suspense
+            fallback={
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md animate-pulse space-y-3">
                 {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-16 bg-gray-200 dark:bg-gray-600 rounded-lg"></div>
-                ))}
-              </div>
-            ) : sites.length === 0 ? (
-              <p className="text-gray-600 dark:text-gray-300 text-center py-8">
-                {t('settings.favorites.noSites')}
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {(sites as unknown as ApiSite[]).map((site: ApiSite) => (
                   <div
-                    key={site.id}
-                    className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
-                      settings.favoriteSites.includes(site.id)
-                        ? 'border-sky-600 bg-sky-50 dark:bg-sky-900/20'
-                        : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-600'
-                    }`}
-                  >
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 dark:text-white">
-                        {site.name}
-                      </h3>
-                      {site.latitude && site.longitude && site.elevation_m && (
-                        <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                          📍 {site.latitude.toFixed(4)},{' '}
-                          {site.longitude.toFixed(4)} • ⛰️ {site.elevation_m}m
-                        </div>
-                      )}
-                      {site.description && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {site.description}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => toggleFavorite(site.id)}
-                      className={`ml-4 px-4 py-2 rounded-lg font-medium transition-all ${
-                        settings.favoriteSites.includes(site.id)
-                          ? 'bg-sky-600 text-white hover:bg-sky-700'
-                          : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                      }`}
-                    >
-                      {settings.favoriteSites.includes(site.id)
-                        ? '⭐ ' + t('settings.favorites.favorite')
-                        : '☆ ' + t('settings.favorites.add')}
-                    </button>
-                  </div>
+                    key={i}
+                    className="h-16 bg-gray-200 dark:bg-gray-600 rounded-lg"
+                  ></div>
                 ))}
               </div>
-            )}
-            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-800 dark:text-blue-200">
-              💡 <strong>{t('settings.favorites.tip')}</strong>{' '}
-              {t('settings.favorites.tipText')}
-            </div>
-          </div>
+            }
+          >
+            <SitesTab settings={settings} toggleFavorite={toggleFavorite} />
+          </Suspense>
         )}
 
         {/* WEATHER SOURCES TAB */}
