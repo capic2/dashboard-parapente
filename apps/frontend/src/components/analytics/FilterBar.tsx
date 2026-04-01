@@ -1,7 +1,11 @@
 import { useTranslation } from 'react-i18next';
-import { useSites } from '../../hooks/sites/useSites';
 import { useFiltersStore } from '../../stores/filtersStore';
 import { DatePicker } from '@dashboard-parapente/design-system';
+import type { Site } from '@dashboard-parapente/shared-types';
+
+interface FilterBarProps {
+  sites: Site[];
+}
 
 /**
  * Barre de filtres pour les analyses de vols
@@ -10,10 +14,9 @@ import { DatePicker } from '@dashboard-parapente/design-system';
  * - Site de décollage
  * - Plage de dates (date de début et fin)
  */
-export function FilterBar() {
+export function FilterBar({ sites }: FilterBarProps) {
   const { t, i18n } = useTranslation();
   const dateLocale = i18n.language === 'en' ? 'en-US' : 'fr-FR';
-  const { data: sites = [], isLoading } = useSites();
   const { filters, setSiteId, setDateFrom, setDateTo, resetFilters } =
     useFiltersStore();
 
@@ -41,8 +44,7 @@ export function FilterBar() {
             <select
               value={filters.siteId || ''}
               onChange={(e) => setSiteId(e.target.value || null)}
-              disabled={isLoading}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed dark:bg-gray-700 dark:text-gray-100"
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
             >
               <option value="">{t('filters.allSites')}</option>
               {sites.map((site) => (
@@ -74,17 +76,20 @@ export function FilterBar() {
             <span className="font-medium">{t('filters.activeFilters')}</span>
             {filters.siteId && (
               <span className="px-2 py-1 bg-sky-100 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 rounded">
-                {sites.find((s) => s.id === filters.siteId)?.name || t('common.site')}
+                {sites.find((s) => s.id === filters.siteId)?.name ||
+                  t('common.site')}
               </span>
             )}
             {filters.dateFrom && (
               <span className="px-2 py-1 bg-sky-100 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 rounded">
-                {t('filters.from')} {new Date(filters.dateFrom).toLocaleDateString(dateLocale)}
+                {t('filters.from')}{' '}
+                {new Date(filters.dateFrom).toLocaleDateString(dateLocale)}
               </span>
             )}
             {filters.dateTo && (
               <span className="px-2 py-1 bg-sky-100 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 rounded">
-                {t('filters.to')} {new Date(filters.dateTo).toLocaleDateString(dateLocale)}
+                {t('filters.to')}{' '}
+                {new Date(filters.dateTo).toLocaleDateString(dateLocale)}
               </span>
             )}
           </div>

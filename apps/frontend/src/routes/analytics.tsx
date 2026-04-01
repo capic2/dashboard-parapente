@@ -5,6 +5,7 @@ import {
   flightRecordsQueryOptions,
   flightsQueryOptions,
 } from '../hooks/flights/useFlights';
+import { sitesQueryOptions } from '../hooks/sites/useSites';
 
 export const Route = createFileRoute('/analytics')({
   loader: async () => {
@@ -12,6 +13,7 @@ export const Route = createFileRoute('/analytics')({
       queryClient.ensureQueryData(flightStatsQueryOptions()),
       queryClient.ensureQueryData(flightRecordsQueryOptions()),
       queryClient.ensureQueryData(flightsQueryOptions()),
+      queryClient.ensureQueryData(sitesQueryOptions()),
     ]);
   },
 });

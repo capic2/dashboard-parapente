@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useSuspenseQuery } from '@tanstack/react-query';
 import { FilterBar } from '../components/analytics/FilterBar';
 import { useFiltersStore } from '../stores/filtersStore';
 import {
@@ -6,6 +7,7 @@ import {
   useFlightStats,
   useFlightRecords,
 } from '../hooks/flights/useFlights';
+import { sitesQueryOptions } from '../hooks/sites/useSites';
 import StatsDashboard from '../components/analytics/StatsDashboard';
 import AltitudeChart from '../components/analytics/AltitudeChart';
 import ProgressChart from '../components/analytics/ProgressChart';
@@ -27,6 +29,7 @@ function ChartSkeleton() {
 
 export default function Analytics() {
   const { t } = useTranslation();
+  const { data: sites } = useSuspenseQuery(sitesQueryOptions());
   const { filters } = useFiltersStore();
   const { data: flights = [], isLoading: flightsLoading } = useFlights({
     limit: 500,
@@ -51,7 +54,7 @@ export default function Analytics() {
       </div>
 
       {/* Filtres dynamiques */}
-      <FilterBar />
+      <FilterBar sites={sites} />
 
       {isLoading ? (
         <div className="space-y-4">
