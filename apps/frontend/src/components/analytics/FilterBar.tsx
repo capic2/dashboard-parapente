@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useFiltersStore } from '../../stores/filtersStore';
-import { DatePicker } from '@dashboard-parapente/design-system';
+import { DatePicker, Select } from '@dashboard-parapente/design-system';
 import type { Site } from '@dashboard-parapente/shared-types';
 
 interface FilterBarProps {
@@ -20,6 +20,11 @@ export function FilterBar({ sites }: FilterBarProps) {
   const { filters, setSiteId, setDateFrom, setDateTo, resetFilters } =
     useFiltersStore();
 
+  const siteOptions = sites.map((site) => ({
+    id: site.id,
+    label: site.name,
+  }));
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
       <div className="flex flex-col gap-4">
@@ -37,23 +42,13 @@ export function FilterBar({ sites }: FilterBarProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Site filter */}
-          <div className="flex flex-col gap-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              {t('common.site')}
-            </label>
-            <select
-              value={filters.siteId || ''}
-              onChange={(e) => setSiteId(e.target.value || null)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
-            >
-              <option value="">{t('filters.allSites')}</option>
-              {sites.map((site) => (
-                <option key={site.id} value={site.id}>
-                  {site.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label={t('common.site')}
+            options={siteOptions}
+            value={filters.siteId}
+            onChange={setSiteId}
+            placeholder={t('filters.allSites')}
+          />
 
           {/* Date from filter */}
           <DatePicker
