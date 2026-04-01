@@ -13,16 +13,15 @@ const meta = preview.meta({
   tags: ['!autodocs'],
 });
 
-const stories = [{ story: Default }, { story: NoData }];
-
 export const AltitudeChartChromatic = meta.story({
   render: () => (
     <div className="flex flex-col gap-2">
-      {stories.map(({ story }) => (
-        <FigureWrapper key={story.composed.name} title={story.composed.name}>
-          <story.Component />
-        </FigureWrapper>
-      ))}
+      <FigureWrapper title={Default.composed.name}>
+        <Default.Component />
+      </FigureWrapper>
+      <FigureWrapper title={NoData.composed.name}>
+        <NoData.Component />
+      </FigureWrapper>
     </div>
   ),
 });

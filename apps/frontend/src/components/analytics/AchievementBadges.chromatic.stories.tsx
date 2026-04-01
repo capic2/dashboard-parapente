@@ -17,20 +17,18 @@ const meta = preview.meta({
   tags: ['!autodocs'],
 });
 
-const stories = [
-  { story: NoBadges },
-  { story: PartialProgress },
-  { story: AllUnlocked },
-];
-
 export const AchievementBadgesChromatic = meta.story({
   render: () => (
     <div className="flex flex-col gap-2">
-      {stories.map(({ story }) => (
-        <FigureWrapper key={story.composed.name} title={story.composed.name}>
-          <story.Component />
-        </FigureWrapper>
-      ))}
+      <FigureWrapper title={NoBadges.composed.name}>
+        <NoBadges.Component />
+      </FigureWrapper>
+      <FigureWrapper title={PartialProgress.composed.name}>
+        <PartialProgress.Component />
+      </FigureWrapper>
+      <FigureWrapper title={AllUnlocked.composed.name}>
+        <AllUnlocked.Component />
+      </FigureWrapper>
     </div>
   ),
 });
