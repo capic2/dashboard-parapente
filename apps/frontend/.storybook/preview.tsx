@@ -88,7 +88,13 @@ const preview = definePreview({
     router: {
       initialPath: '/',
       routes: [{ path: '/', element: 'story' as const }],
-      renderRootRoute: (Story: React.ComponentType) => <Story />,
+      renderRootRoute: (Story: React.ComponentType) => (
+        <QueryClientProvider client={new QueryClient()}>
+          <Suspense fallback={<div>Loading…</div>}>
+            <Story />
+          </Suspense>
+        </QueryClientProvider>
+      ),
     },
     i18n,
     locale: 'fr',
@@ -141,13 +147,9 @@ const preview = definePreview({
       const theme = context.globals?.theme ?? context.parameters?.theme ?? 'light';
       return (
         <ThemeDecorator theme={theme}>
-          <QueryClientProvider client={new QueryClient()}>
-            <Suspense fallback={<div>Loading…</div>}>
-              <div style={{ padding: '1rem' }}>
-                <Story />
-              </div>
-            </Suspense>
-          </QueryClientProvider>
+          <div style={{ padding: '1rem' }}>
+            <Story />
+          </div>
         </ThemeDecorator>
       );
     },
