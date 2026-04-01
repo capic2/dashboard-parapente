@@ -18,7 +18,8 @@
     "lint:affected": "nx affected -t lint",
     "format": "nx run-many -t format --all",
     "graph": "nx graph",
-    "knip": "knip"
+    "knip": "knip",
+    "prepare": "husky"
   },
   "dependencies": {
     "@internationalized/date": "^3.7.0",
@@ -64,7 +65,9 @@
     "@vitest/ui": "^4.0.18",
     "chromatic": "^16.0.0",
     "happy-dom": "^20.8.4",
+    "husky": "^9.1.7",
     "knip": "^6.1.0",
+    "lint-staged": "^16.4.0",
     "msw": "^2.12.10",
     "msw-storybook-addon": "^2.0.6",
     "nx": "^22.6.0",
@@ -78,6 +81,24 @@
     "vite": "^8.0.0",
     "vite-plugin-cesium": "^1.2.23",
     "vitest": "^4.0.18"
+  },
+  "lint-staged": {
+    "apps/frontend/src/**/*.{ts,tsx}": [
+      "oxlint -c .oxlintrc.json",
+      "oxfmt -c .oxfmtrc.json"
+    ],
+    "libs/design-system/src/**/*.{ts,tsx}": [
+      "oxlint -c .oxlintrc.json",
+      "oxfmt -c .oxfmtrc.json"
+    ],
+    "libs/shared-types/src/**/*.{ts,tsx}": [
+      "oxlint -c .oxlintrc.json",
+      "oxfmt -c .oxfmtrc.json"
+    ],
+    "apps/backend/**/*.py": [
+      "ruff check --output-format=github",
+      "black --check --diff"
+    ]
   },
   "pnpm": {
     "onlyBuiltDependencies": [

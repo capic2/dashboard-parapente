@@ -3,8 +3,9 @@
   "ignore": [
     "apps/e2e/**",
     "apps/frontend/src/routes/**",
+    "apps/frontend/src/pages/ViewerExport.tsx",
     "apps/frontend/vitest.shims.d.ts"
   ],
-  "ignoreBinaries": ["eslint"],
+  "ignoreBinaries": ["eslint", "ruff", "black"],
   "ignoreDependencies": ["chromatic"]
 }
