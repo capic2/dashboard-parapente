@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSites } from '../hooks/useSites';
+import { useSuspenseQuery } from '@tanstack/react-query';
+import { sitesQueryOptions } from '../hooks/useSites';
 import {
   useWeatherSources,
   useWeatherSourceStats,
@@ -213,7 +214,7 @@ function WeatherSourcesTab() {
 
 export default function Settings() {
   const { t, i18n } = useTranslation();
-  const { data: sites = [], isLoading: sitesLoading } = useSites();
+  const { data: sites } = useSuspenseQuery(sitesQueryOptions());
   const { preference: themePreference, setPreference: setThemePreference } =
     useThemeStore();
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -622,13 +623,7 @@ export default function Settings() {
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
               📍 {t('settings.favorites.title')}
             </h2>
-            {sitesLoading ? (
-              <div className="animate-pulse space-y-3">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-16 bg-gray-200 dark:bg-gray-600 rounded-lg"></div>
-                ))}
-              </div>
-            ) : sites.length === 0 ? (
+            {sites.length === 0 ? (
               <p className="text-gray-600 dark:text-gray-300 text-center py-8">
                 {t('settings.favorites.noSites')}
               </p>
