@@ -83,7 +83,7 @@
     "vitest": "^4.0.18"
   },
   "lint-staged": {
-    "apps/frontend/src/**/*.{ts,tsx}": [
+    "apps/frontend/src/**/!(routeTree.gen).{ts,tsx}": [
       "oxlint -c .oxlintrc.json",
       "oxfmt -c .oxfmtrc.json"
     ],
