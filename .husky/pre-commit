@@ -1,3 +1,4 @@
+#!/bin/sh
 set -e
 
 # Ensure node/pnpm are in PATH (nvm/fnm)
