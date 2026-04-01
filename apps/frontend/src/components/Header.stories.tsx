@@ -22,13 +22,6 @@ const meta = preview.meta({
  */
 export const Default = meta.story({
   args: {},
-  parameters: {
-    router: {
-      initialPath: '/',
-      routes: [{ path: '/', element: 'story' }],
-      renderRootRoute: (Story: ComponentType) => <Story />,
-    },
-  },
 });
 
 /**
@@ -37,13 +30,6 @@ export const Default = meta.story({
 export const CustomTitle = meta.story({
   args: {
     title: '🪂 Mon Dashboard Personnalisé',
-  },
-  parameters: {
-    router: {
-      initialPath: '/',
-      routes: [{ path: '/', element: 'story' }],
-      renderRootRoute: (Story: React.ComponentType) => <Story />,
-    },
   },
 });
 
@@ -83,11 +69,6 @@ export const DarkMode = meta.story({
   args: {},
   parameters: {
     theme: 'dark',
-    router: {
-      initialPath: '/',
-      routes: [{ path: '/', element: 'story' }],
-      renderRootRoute: (Story: React.ComponentType) => <Story />,
-    },
   },
 });
 
