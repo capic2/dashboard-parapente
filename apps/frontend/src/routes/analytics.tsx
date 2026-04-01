@@ -1,3 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { queryClient } from '../lib/queryClient';
+import {
+  flightStatsQueryOptions,
+  flightRecordsQueryOptions,
+  flightsQueryOptions,
+} from '../hooks/useFlights';
 
-export const Route = createFileRoute('/analytics')({});
+export const Route = createFileRoute('/analytics')({
+  loader: () => {
+    queryClient.ensureQueryData(flightStatsQueryOptions());
+    queryClient.ensureQueryData(flightRecordsQueryOptions());
+    queryClient.ensureQueryData(flightsQueryOptions());
+  },
+});
