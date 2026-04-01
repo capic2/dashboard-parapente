@@ -1,4 +1,3 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import preview from '../../.storybook/preview';
 import ThermalAnalysis from './ThermalAnalysis';
@@ -6,27 +5,9 @@ import ThermalAnalysis from './ThermalAnalysis';
 const meta = preview.meta({
   title: 'Pages/ThermalAnalysis',
   component: ThermalAnalysis,
-  decorators: [
-    (Story) => {
-      const queryClient = new QueryClient({
-        defaultOptions: {
-          queries: { retry: false, gcTime: 0, staleTime: 0 },
-        },
-      });
-      return (
-        <QueryClientProvider client={queryClient}>
-          <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            <Story />
-          </div>
-        </QueryClientProvider>
-      );
-    },
-  ],
   parameters: { layout: 'fullscreen' },
   tags: ['autodocs'],
 });
-
-
 
 const mockSite = {
   id: 'site-mont-poupet-ouest',

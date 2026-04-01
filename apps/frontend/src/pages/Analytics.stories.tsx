@@ -1,4 +1,3 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import preview from '../../.storybook/preview';
 import Analytics from './Analytics';
@@ -6,27 +5,9 @@ import Analytics from './Analytics';
 const meta = preview.meta({
   title: 'Pages/Analytics',
   component: Analytics,
-  decorators: [
-    (Story) => {
-      const queryClient = new QueryClient({
-        defaultOptions: {
-          queries: { retry: false, gcTime: 0, staleTime: 0 },
-        },
-      });
-      return (
-        <QueryClientProvider client={queryClient}>
-          <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            <Story />
-          </div>
-        </QueryClientProvider>
-      );
-    },
-  ],
   parameters: { layout: 'fullscreen' },
   tags: ['autodocs'],
 });
-
-
 
 const mockStats = {
   total_flights: 42,
