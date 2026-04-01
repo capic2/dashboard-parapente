@@ -11,26 +11,18 @@ import {
   ComposedChart,
 } from 'recharts';
 import { useTranslation } from 'react-i18next';
-import { useFlights } from '../../hooks/flights/useFlights';
-import { useFiltersStore } from '../../stores/filtersStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { format } from 'date-fns';
 import { enUS, fr } from 'date-fns/locale';
+import type { Flight } from '../../types';
 
-export default function ProgressChart() {
+interface ProgressChartProps {
+  flights: Flight[];
+}
+
+export default function ProgressChart({ flights }: ProgressChartProps) {
   const isDark = useThemeStore((s) => s.resolved === 'dark');
   const { t, i18n } = useTranslation();
-  const { filters } = useFiltersStore();
-  const {
-    data: flights = [],
-    isLoading,
-    error,
-  } = useFlights({
-    limit: 100,
-    siteId: filters.siteId || undefined,
-    dateFrom: filters.dateFrom || undefined,
-    dateTo: filters.dateTo || undefined,
-  });
 
   const chartData = useMemo(() => {
     if (!flights.length) return [];
@@ -71,18 +63,7 @@ export default function ProgressChart() {
     });
   }, [flights, i18n.language]);
 
-  if (isLoading) {
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
-        <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded mb-4 w-1/3"></div>
-          <div className="h-64 bg-gray-200 dark:bg-gray-600 rounded"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !chartData.length) {
+  if (!chartData.length) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
@@ -114,7 +95,10 @@ export default function ProgressChart() {
               <stop offset="95%" stopColor="#4a90e2" stopOpacity={0.1} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e0e0e0'} />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke={isDark ? '#374151' : '#e0e0e0'}
+          />
           <XAxis
             dataKey="date"
             tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : '#666' }}
@@ -138,7 +122,11 @@ export default function ProgressChart() {
               padding: '8px',
               color: isDark ? '#e5e7eb' : undefined,
             }}
-            labelStyle={{ fontWeight: 'bold', marginBottom: '4px', color: isDark ? '#e5e7eb' : undefined }}
+            labelStyle={{
+              fontWeight: 'bold',
+              marginBottom: '4px',
+              color: isDark ? '#e5e7eb' : undefined,
+            }}
             formatter={(value, name) => {
               const val = value || 0;
               const hours = Math.floor(Number(val) / 60);

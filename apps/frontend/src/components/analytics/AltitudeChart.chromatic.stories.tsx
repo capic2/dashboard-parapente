@@ -1,13 +1,6 @@
-import { http, HttpResponse } from 'msw';
 import { FigureWrapper } from '../../../.storybook/FigureWrapper.tsx';
 import preview from '../../../.storybook/preview.tsx';
-import {
-  Default,
-  NoData,
-  Loading,
-  defaultFlights,
-  noDataFlights,
-} from './AltitudeChart.stories.tsx';
+import { Default, NoData } from './AltitudeChart.stories.tsx';
 
 const meta = preview.meta({
   title: 'Components/Stats/AltitudeChart/Chromatic',
@@ -20,27 +13,9 @@ const meta = preview.meta({
   tags: ['!autodocs'],
 });
 
-const stories = [
-  { story: Default, flights: defaultFlights },
-  { story: NoData, flights: noDataFlights },
-];
+const stories = [{ story: Default }, { story: NoData }];
 
 export const AltitudeChartChromatic = meta.story({
-  parameters: {
-    msw: {
-      handlers: [
-        ...stories.map(({ flights }) =>
-          http.get(
-            '*/api/flights',
-            () => HttpResponse.json({ flights }),
-            { once: true }
-          )
-        ),
-        // Fallback for Loading (rendered last): never resolves
-        http.get('*/api/flights', () => new Promise(() => {})),
-      ],
-    },
-  },
   render: () => (
     <div className="flex flex-col gap-2">
       {stories.map(({ story }) => (
@@ -48,9 +23,6 @@ export const AltitudeChartChromatic = meta.story({
           <story.Component />
         </FigureWrapper>
       ))}
-      <FigureWrapper title={Loading.composed.name}>
-        <Loading.Component />
-      </FigureWrapper>
     </div>
   ),
 });

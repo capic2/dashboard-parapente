@@ -7,8 +7,6 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
-import { useFlights } from '../../hooks/flights/useFlights';
-import { useFiltersStore } from '../../stores/filtersStore';
 import type { Flight } from '../../types';
 
 const COLORS = [
@@ -20,19 +18,11 @@ const COLORS = [
   '#a4de6c',
 ];
 
-export default function SiteStats() {
-  const { filters } = useFiltersStore();
-  const {
-    data: flights = [],
-    isLoading,
-    error,
-  } = useFlights({
-    limit: 200,
-    siteId: filters.siteId || undefined,
-    dateFrom: filters.dateFrom || undefined,
-    dateTo: filters.dateTo || undefined,
-  });
+interface SiteStatsProps {
+  flights: Flight[];
+}
 
+export default function SiteStats({ flights }: SiteStatsProps) {
   const { siteData, siteDetails } = useMemo(() => {
     if (!flights.length) return { siteData: [], siteDetails: [] };
 
@@ -90,18 +80,7 @@ export default function SiteStats() {
     return { siteData: pieData, siteDetails: details };
   }, [flights]);
 
-  if (isLoading) {
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
-        <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded mb-4 w-1/3"></div>
-          <div className="h-64 bg-gray-200 dark:bg-gray-600 rounded"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !siteData.length) {
+  if (!siteData.length) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">

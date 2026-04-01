@@ -1,40 +1,14 @@
 import preview from '../../../.storybook/preview';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { http, HttpResponse } from 'msw';
 import SiteStats from './SiteStats';
 
 const meta = preview.meta({
   title: 'Components/Stats/SiteStats',
   component: SiteStats,
-  decorators: [
-    (Story) => {
-      // Create a new QueryClient for each story to avoid cache conflicts
-      const queryClient = new QueryClient({
-        defaultOptions: {
-          queries: {
-            retry: false,
-            gcTime: 0, // Disable cache
-            staleTime: 0, // Always consider data stale
-          },
-        },
-      });
-
-      return (
-        <QueryClientProvider client={queryClient}>
-          <div style={{ maxWidth: '900px', padding: '20px' }}>
-            <Story />
-          </div>
-        </QueryClientProvider>
-      );
-    },
-  ],
   parameters: {
     layout: 'fullscreen',
   },
   tags: ['autodocs'],
 });
-
-
 
 const mockFlights = [
   ...Array.from({ length: 15 }, (_, i) => ({
@@ -86,53 +60,22 @@ const mockFlightsWithNull = [
 
 export const Default = meta.story({
   name: 'Default',
-  parameters: {
-    msw: {
-      handlers: [
-        http.get('/api/flights', () => {
-          return HttpResponse.json({ flights: mockFlights });
-        }),
-      ],
-    },
+  args: {
+    flights: mockFlights,
   },
 });
 
 export const NoData = meta.story({
   name: 'No Data',
-  parameters: {
-    msw: {
-      handlers: [
-        http.get('/api/flights', () => {
-          return HttpResponse.json({ flights: [] });
-        }),
-      ],
-    },
-  },
-});
-
-export const Loading = meta.story({
-  name: 'Loading',
-  parameters: {
-    msw: {
-      handlers: [
-        http.get('/api/flights', async () => {
-          await new Promise(() => {});
-        }),
-      ],
-    },
+  args: {
+    flights: [],
   },
 });
 
 // With flights that have null site_id (should be filtered out)
 export const WithNullSiteId = meta.story({
   name: 'With Null Site Id',
-  parameters: {
-    msw: {
-      handlers: [
-        http.get('/api/flights', () => {
-          return HttpResponse.json({ flights: mockFlightsWithNull });
-        }),
-      ],
-    },
+  args: {
+    flights: mockFlightsWithNull,
   },
 });
