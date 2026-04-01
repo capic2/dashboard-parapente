@@ -78,7 +78,7 @@ python-multipart==0.0.22
 metpy==1.7.1
 matplotlib==3.10.8
 numpy==2.4.4
-pillow==12.1.1
+pillow==12.2.0
 
 # ============================================
 # AI/LLM Integration
