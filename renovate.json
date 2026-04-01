@@ -2,5 +2,15 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
   "description": "Add 'skip-nx-cloud' label to all PRs to conserve NX Cloud credits. Remove the label from a PR to enable NX Cloud for that specific update.",
-  "labels": ["renovate", "skip-nx-cloud"]
+  "labels": ["renovate", "skip-nx-cloud"],
+  "pip_requirements": {
+    "fileMatch": ["apps/backend/requirements\\.txt$"]
+  },
+  "packageRules": [
+    {
+      "description": "Group all Playwright packages (Node.js + Python) into a single PR to keep versions aligned",
+      "matchPackageNames": ["playwright", "@playwright/test"],
+      "groupName": "playwright"
+    }
+  ]
 }

@@ -1,4 +1,3 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test';
 import preview from '../../.storybook/preview';
@@ -7,22 +6,6 @@ import FlightHistory from './FlightHistory';
 const meta = preview.meta({
   title: 'Pages/FlightHistory',
   component: FlightHistory,
-  decorators: [
-    (Story) => {
-      const queryClient = new QueryClient({
-        defaultOptions: {
-          queries: { retry: false, gcTime: 0, staleTime: 0 },
-        },
-      });
-      return (
-        <QueryClientProvider client={queryClient}>
-          <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            <Story />
-          </div>
-        </QueryClientProvider>
-      );
-    },
-  ],
   parameters: { layout: 'fullscreen' },
   tags: ['autodocs'],
 });
@@ -237,40 +220,35 @@ export const ConfirmDeleteFlight = meta.story({
   parameters: { msw: { handlers: confirmDeleteHandlers } },
 });
 
-ConfirmDeleteFlight.test(
-  'deletes flight on confirm',
-  async ({ canvas }) => {
-    const user = userEvent.setup();
+ConfirmDeleteFlight.test('deletes flight on confirm', async ({ canvas }) => {
+  const user = userEvent.setup();
 
-    await canvas.findByText('Vol thermique Arguel');
+  await canvas.findByText('Vol thermique Arguel');
 
-    // Cliquer le bouton poubelle
-    const deleteButton = await canvas.findByLabelText(
-      'Supprimer le vol Vol thermique Arguel'
-    );
-    await user.click(deleteButton);
+  // Cliquer le bouton poubelle
+  const deleteButton = await canvas.findByLabelText(
+    'Supprimer le vol Vol thermique Arguel'
+  );
+  await user.click(deleteButton);
 
-    // Confirmer la suppression dans la modal (portail → screen)
-    const dialog = await screen.findByRole('dialog');
-    const dialogContent = within(dialog);
-    const confirmButton = await dialogContent.findByRole('button', {
-      name: /Supprimer/,
-    });
-    await user.click(confirmButton);
+  // Confirmer la suppression dans la modal (portail → screen)
+  const dialog = await screen.findByRole('dialog');
+  const dialogContent = within(dialog);
+  const confirmButton = await dialogContent.findByRole('button', {
+    name: /Supprimer/,
+  });
+  await user.click(confirmButton);
 
-    // Le toast de succès apparaît
-    await expect(
-      await canvas.findByText('Vol supprimé avec succès')
-    ).toBeInTheDocument();
+  // Le toast de succès apparaît
+  await expect(
+    await canvas.findByText('Vol supprimé avec succès')
+  ).toBeInTheDocument();
 
-    // Vérifier que le vol supprimé n'apparaît plus (attendre le refetch)
-    await waitFor(() => {
-      expect(
-        canvas.queryByText('Vol thermique Arguel')
-      ).not.toBeInTheDocument();
-    });
-  }
-);
+  // Vérifier que le vol supprimé n'apparaît plus (attendre le refetch)
+  await waitFor(() => {
+    expect(canvas.queryByText('Vol thermique Arguel')).not.toBeInTheDocument();
+  });
+});
 
 export const DeleteMultipleFlights = meta.story({
   name: 'Delete Multiple Flights',

@@ -59,6 +59,7 @@ export default function EmagramWidget({
       await triggerMutation.mutateAsync({
         site_id: siteId,
         force_refresh: true,
+        day_index: dayIndex,
       });
       await refetch();
     } catch {
@@ -183,7 +184,9 @@ export default function EmagramWidget({
             <span className="text-2xl font-bold" style={{ color: scoreColor }}>
               {score}
             </span>
-            <span className="text-xs text-gray-500 dark:text-gray-400">/ 100</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              / 100
+            </span>
           </div>
         </div>
 
@@ -218,7 +221,9 @@ export default function EmagramWidget({
           <div className="flex items-center gap-2 bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-900/20 dark:to-sky-900/20 rounded-lg p-2.5">
             <span className="text-xl flex-shrink-0">☁️</span>
             <div className="flex-1 min-w-0">
-              <div className="text-xs text-gray-600 dark:text-gray-300">Plafond</div>
+              <div className="text-xs text-gray-600 dark:text-gray-300">
+                Plafond
+              </div>
               <div className="text-base font-bold text-gray-900 dark:text-white truncate">
                 {emagram.plafond_thermique_m}m
               </div>
@@ -231,7 +236,9 @@ export default function EmagramWidget({
           <div className="flex items-center gap-2 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-lg p-2.5">
             <span className="text-xl flex-shrink-0">📈</span>
             <div className="flex-1 min-w-0">
-              <div className="text-xs text-gray-600 dark:text-gray-300">Force</div>
+              <div className="text-xs text-gray-600 dark:text-gray-300">
+                Force
+              </div>
               <div className="text-base font-bold text-gray-900 dark:text-white truncate">
                 {emagram.force_thermique_ms.toFixed(1)} m/s
               </div>
@@ -244,7 +251,9 @@ export default function EmagramWidget({
           <div className="flex items-center gap-2 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg p-2.5">
             <span className="text-xl flex-shrink-0">⏰</span>
             <div className="flex-1 min-w-0">
-              <div className="text-xs text-gray-600 dark:text-gray-300">Heures</div>
+              <div className="text-xs text-gray-600 dark:text-gray-300">
+                Heures
+              </div>
               <div className="text-sm font-bold text-gray-900 dark:text-white truncate">
                 {emagram.flyable_hours_formatted}
               </div>
@@ -259,7 +268,9 @@ export default function EmagramWidget({
               {getStabilityEmoji(emagram.stabilite_atmospherique)}
             </span>
             <div className="flex-1 min-w-0">
-              <div className="text-xs text-gray-600 dark:text-gray-300">Stabilité</div>
+              <div className="text-xs text-gray-600 dark:text-gray-300">
+                Stabilité
+              </div>
               <div className="text-sm font-semibold text-gray-900 dark:text-white truncate capitalize">
                 {emagram.stabilite_atmospherique}
               </div>
@@ -300,7 +311,10 @@ export default function EmagramWidget({
           </div>
           <ul className="space-y-1 ml-6">
             {alerts.map((alert, idx) => (
-              <li key={idx} className="text-xs text-red-800 dark:text-red-200 list-disc">
+              <li
+                key={idx}
+                className="text-xs text-red-800 dark:text-red-200 list-disc"
+              >
                 {alert}
               </li>
             ))}
@@ -347,7 +361,10 @@ export default function EmagramWidget({
                                 alt={`Émagramme ${sourceName}`}
                                 className="rounded w-[min(32rem,calc(100vw-2rem))] h-auto"
                                 onError={(e) => {
-                                  (e.target as HTMLImageElement).closest('.group')?.querySelector('[class*="group-hover"]')?.classList.add('!hidden');
+                                  (e.target as HTMLImageElement)
+                                    .closest('.group')
+                                    ?.querySelector('[class*="group-hover"]')
+                                    ?.classList.add('!hidden');
                                 }}
                               />
                               <div className="text-xs text-center text-gray-500 dark:text-gray-400 py-1">

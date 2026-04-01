@@ -1,23 +1,29 @@
 import { useState, useCallback, useRef, lazy, Suspense } from 'react';
 import {
-  useFlights,
+  flightsQueryOptions,
   useUpdateFlight,
   useUploadGPXToFlight,
 } from '../hooks/flights/useFlights';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import type { Flight, Site } from '../types';
-const FlightViewer3D = lazy(() => import('../components/flights/FlightViewer3D').then(m => ({ default: m.FlightViewer3D })));
+const FlightViewer3D = lazy(() =>
+  import('../components/flights/FlightViewer3D').then((m) => ({
+    default: m.FlightViewer3D,
+  }))
+);
 import { StravaSyncModal } from '../components/flights/StravaSyncModal';
 import { CreateFlightModal } from '../components/flights/CreateFlightModal';
 import { CreateSiteModal } from '../components/flights/CreateSiteModal';
-import { useSites } from '../hooks/sites/useSites';
+import { sitesQueryOptions } from '../hooks/sites/useSites';
 import { ToastContainer, Modal } from '@dashboard-parapente/design-system';
 import { useToast, useToastStore } from '../hooks/useToast';
 import { HTTPError } from 'ky';
 import { api } from '../lib/api';
 
 export default function FlightHistory() {
-  const { data: flightsRaw = [], isLoading, error } = useFlights({ limit: 50 });
+  const { data: flightsRaw } = useSuspenseQuery(
+    flightsQueryOptions({ limit: 50 })
+  );
 
   // Trier les vols par date (plus récent en premier) côté frontend en backup du tri backend
   const flights = [...flightsRaw].sort((a, b) => {
@@ -58,7 +64,7 @@ export default function FlightHistory() {
   const updateFlight = useUpdateFlight(selectedFlightId || undefined);
   const [isDeleting, setIsDeleting] = useState(false);
   const uploadGPXMutation = useUploadGPXToFlight(selectedFlightId || '');
-  const { data: sites = [] } = useSites();
+  const { data: sites } = useSuspenseQuery(sitesQueryOptions());
   const queryClient = useQueryClient();
   const toast = useToast();
   const { toasts, removeToast } = useToastStore();
@@ -294,36 +300,6 @@ export default function FlightHistory() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="py-8">
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md animate-pulse">
-          <div className="h-8 bg-gray-200 dark:bg-gray-600 rounded mb-4 w-1/3"></div>
-          <div className="h-64 bg-gray-200 dark:bg-gray-600 rounded"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="py-8">
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center max-w-md mx-auto">
-          <h2 className="text-xl font-bold text-red-600 dark:text-red-400 mb-3">❌ Erreur</h2>
-          <p className="text-gray-700 dark:text-gray-300 mb-4">
-            Impossible de charger l&apos;historique des vols
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-all"
-          >
-            Réessayer
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div>
       {/* Toast notifications */}
@@ -417,7 +393,9 @@ export default function FlightHistory() {
         <div className="lg:col-span-1 space-y-2">
           {flights.length === 0 ? (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center">
-              <p className="text-gray-700 dark:text-gray-300 font-medium">Aucun vol enregistré</p>
+              <p className="text-gray-700 dark:text-gray-300 font-medium">
+                Aucun vol enregistré
+              </p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
                 Les vols Strava apparaîtront automatiquement ici
               </p>
@@ -451,8 +429,18 @@ export default function FlightHistory() {
                     }}
                     aria-label={`Supprimer le vol ${flight.title || 'sans titre'}`}
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+                      />
                     </svg>
                   </button>
                 )}
@@ -635,7 +623,6 @@ export default function FlightHistory() {
                             <>📎 Ajouter GPX</>
                           )}
                         </button>
-
                       </>
                     )}
                   </div>
@@ -653,7 +640,9 @@ export default function FlightHistory() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                   {/* Date */}
                   <div>
-                    <span className="text-xs text-gray-600 dark:text-gray-300">📅 Date</span>
+                    <span className="text-xs text-gray-600 dark:text-gray-300">
+                      📅 Date
+                    </span>
                     {editingMode ? (
                       <input
                         type="date"
@@ -732,7 +721,9 @@ export default function FlightHistory() {
 
                   {/* Site */}
                   <div className="col-span-2 md:col-span-3">
-                    <span className="text-xs text-gray-600 dark:text-gray-300">📍 Site</span>
+                    <span className="text-xs text-gray-600 dark:text-gray-300">
+                      📍 Site
+                    </span>
                     {editingMode ? (
                       <div className="flex gap-2 mt-1">
                         <select
@@ -964,12 +955,17 @@ export default function FlightHistory() {
                     </div>
                   )}
                 </div>
-
               </div>
 
               {/* 3D Viewer */}
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
-                <Suspense fallback={<div className="h-96 flex items-center justify-center text-gray-500 dark:text-gray-400">Chargement du viewer 3D...</div>}>
+                <Suspense
+                  fallback={
+                    <div className="h-96 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                      Chargement du viewer 3D...
+                    </div>
+                  }
+                >
                   <FlightViewer3D
                     flightId={selectedFlightId}
                     flightTitle={

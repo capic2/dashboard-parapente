@@ -99,6 +99,7 @@ export function useTriggerEmagram() {
       user_latitude?: number;
       user_longitude?: number;
       force_refresh?: boolean;
+      day_index?: number;
     }): Promise<EmagramAnalysis> => {
       const response = await fetch('/api/emagram/analyze', {
         method: 'POST',

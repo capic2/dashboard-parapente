@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
-import { useSites } from '../hooks/sites/useSites';
+import { useSuspenseQuery } from '@tanstack/react-query';
+import { sitesQueryOptions } from '../hooks/sites/useSites';
 import {
   useUpdateSite,
   useDeleteSite,
@@ -14,7 +15,7 @@ import { EditSiteModal } from '../components/sites/EditSiteModal';
 export const Sites: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { data: sites = [], isLoading, error } = useSites();
+  const { data: sites } = useSuspenseQuery(sitesQueryOptions());
   const updateSite = useUpdateSite();
   const deleteSite = useDeleteSite();
 
@@ -105,24 +106,6 @@ export const Sites: React.FC = () => {
     void navigate({ to: '/flights' as string });
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 text-red-700 dark:text-red-300 px-4 py-3 rounded">
-          ❌ {t('sites.sitesLoadError')}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
@@ -199,9 +182,13 @@ export const Sites: React.FC = () => {
         </div>
       ) : (
         <div className="text-center py-12">
-          <p className="text-gray-500 dark:text-gray-400 text-lg mb-4">{t('sites.noSiteFound')}</p>
+          <p className="text-gray-500 dark:text-gray-400 text-lg mb-4">
+            {t('sites.noSiteFound')}
+          </p>
           {searchQuery || typeFilter !== 'all' ? (
-            <p className="text-gray-400 dark:text-gray-500">{t('sites.adjustFilters')}</p>
+            <p className="text-gray-400 dark:text-gray-500">
+              {t('sites.adjustFilters')}
+            </p>
           ) : (
             <button
               onClick={handleCreate}

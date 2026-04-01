@@ -4,12 +4,13 @@ import addonA11y from '@storybook/addon-a11y';
 import { http, HttpResponse } from 'msw';
 import i18n from '../src/i18n';
 import '../src/App.css';
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 
 // Force French locale in Storybook context — overrides LanguageDetector which
 // detects English in CI headless browsers
 i18n.changeLanguage('fr');
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TanstackRouterDecorator } from './decorators';
 
 declare global {
   interface Window {
@@ -84,6 +85,17 @@ const preview = definePreview({
   addons: [addonA11y()],
 
   parameters: {
+    router: {
+      initialPath: '/',
+      routes: [{ path: '/', element: 'story' as const }],
+      renderRootRoute: (Story: React.ComponentType) => (
+        <QueryClientProvider client={new QueryClient()}>
+          <Suspense fallback={<div>Loading…</div>}>
+            <Story />
+          </Suspense>
+        </QueryClientProvider>
+      ),
+    },
     i18n,
     locale: 'fr',
     locales: {
@@ -138,14 +150,13 @@ const preview = definePreview({
       const theme = context.globals?.theme ?? context.parameters?.theme ?? 'light';
       return (
         <ThemeDecorator theme={theme}>
-          <QueryClientProvider client={new QueryClient()}>
-            <div style={{ padding: '1rem' }}>
-              <Story />
-            </div>
-          </QueryClientProvider>
+          <div style={{ padding: '1rem' }}>
+            <Story />
+          </div>
         </ThemeDecorator>
       );
     },
+    TanstackRouterDecorator,
   ],
 
   // MSW loader
