@@ -1,0 +1,8 @@
+set -e
+
+# Ensure node/pnpm are in PATH (nvm/fnm)
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+pnpm exec lint-staged
+pnpm knip

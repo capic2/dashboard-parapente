@@ -2,9 +2,9 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignore": [
     "apps/e2e/**",
-    "apps/frontend/src/routes/**",
     "apps/frontend/vitest.shims.d.ts"
   ],
-  "ignoreBinaries": ["eslint"],
-  "ignoreDependencies": ["chromatic"]
+  "ignoreBinaries": ["eslint", "apps/backend/.venv/bin/ruff", "apps/backend/.venv/bin/black"],
+  "ignoreDependencies": ["chromatic"],
+  "ignoreExportsUsedInFile": true
 }

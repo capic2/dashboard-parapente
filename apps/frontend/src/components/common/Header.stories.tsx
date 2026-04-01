@@ -1,12 +1,9 @@
 import preview from '../../../.storybook/preview';
-import { TanstackRouterDecorator } from '../../../.storybook/decorators';
 import Header from './Header';
-import { ComponentType } from 'react';
 
 const meta = preview.meta({
   title: 'Components/Header',
   component: Header,
-  decorators: [TanstackRouterDecorator],
   parameters: {
     layout: 'fullscreen',
     docs: {
@@ -19,8 +16,6 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-
-
 /**
  * Default header with title
  * Router is initialized at root path '/'
@@ -28,13 +23,6 @@ const meta = preview.meta({
 export const Default = meta.story({
   name: 'Default',
   args: {},
-  parameters: {
-    router: {
-      initialPath: '/',
-      routes: [{ path: '/', element: 'story' }],
-      renderRootRoute: (Story: ComponentType) => <Story />,
-    },
-  },
 });
 
 /**
@@ -44,13 +32,6 @@ export const CustomTitle = meta.story({
   name: 'Custom Title',
   args: {
     title: '🪂 Mon Dashboard Personnalisé',
-  },
-  parameters: {
-    router: {
-      initialPath: '/',
-      routes: [{ path: '/', element: 'story' }],
-      renderRootRoute: (Story: React.ComponentType) => <Story />,
-    },
   },
 });
 
@@ -93,11 +74,6 @@ export const DarkMode = meta.story({
   args: {},
   parameters: {
     theme: 'dark',
-    router: {
-      initialPath: '/',
-      routes: [{ path: '/', element: 'story' }],
-      renderRootRoute: (Story: React.ComponentType) => <Story />,
-    },
   },
 });
 
