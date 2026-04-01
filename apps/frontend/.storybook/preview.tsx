@@ -4,7 +4,7 @@ import addonA11y from '@storybook/addon-a11y';
 import { http, HttpResponse } from 'msw';
 import i18n from '../src/i18n';
 import '../src/App.css';
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 
 // Force French locale in Storybook context — overrides LanguageDetector which
 // detects English in CI headless browsers
@@ -142,9 +142,11 @@ const preview = definePreview({
       return (
         <ThemeDecorator theme={theme}>
           <QueryClientProvider client={new QueryClient()}>
-            <div style={{ padding: '1rem' }}>
-              <Story />
-            </div>
+            <Suspense fallback={<div>Loading…</div>}>
+              <div style={{ padding: '1rem' }}>
+                <Story />
+              </div>
+            </Suspense>
           </QueryClientProvider>
         </ThemeDecorator>
       );
