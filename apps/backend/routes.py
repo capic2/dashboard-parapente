@@ -30,11 +30,13 @@ from schemas import (
     EmagramTriggerRequest,
     FlightUpdate,
 )
-from schemas import Site as SiteSchema
+from schemas import LandingAssociation as LandingAssociationSchema
 from schemas import (
-    LandingAssociation as LandingAssociationSchema,
     LandingAssociationCreate,
     LandingAssociationUpdate,
+)
+from schemas import Site as SiteSchema
+from schemas import (
     SiteCreate,
     SiteUpdate,
     SpotsResponse,
@@ -865,9 +867,9 @@ def create_landing_association(
     site_id: str, data: LandingAssociationCreate, db: Session = Depends(get_db)
 ):
     """Associate a landing site with a takeoff site"""
-    from spots.distance import haversine_distance
-
     from sqlalchemy.exc import IntegrityError
+
+    from spots.distance import haversine_distance
 
     takeoff = db.query(Site).filter(Site.id == site_id).first()
     if not takeoff:
@@ -3773,23 +3775,6 @@ async def get_latest_emagram(
                     result = analysis
                     break
 
-            if result is None:
-                # Fallback: filter by distance and find closest
-                from scrapers.wyoming import haversine_distance
-
-                min_distance = float("inf")
-                for analysis in recent_analyses:
-                    if analysis.station_latitude is None or analysis.station_longitude is None:
-                        continue
-                    dist = haversine_distance(
-                        target_lat,
-                        target_lon,
-                        analysis.station_latitude,
-                        analysis.station_longitude,
-                    )
-                    if dist <= max_distance_km and dist < min_distance:
-                        min_distance = dist
-                        result = analysis
         else:
             # No site_id: filter by distance and find closest
             from scrapers.wyoming import haversine_distance
@@ -4067,6 +4052,8 @@ async def trigger_emagram_analysis(
             )
 
         # Step 2: Check for recent analysis (unless force_refresh)
+        forecast_date = (datetime.utcnow() + timedelta(days=request.day_index)).date()
+
         if not request.force_refresh:
             cutoff_time = datetime.utcnow() - timedelta(hours=3)
 
@@ -4077,6 +4064,7 @@ async def trigger_emagram_analysis(
                     EmagramAnalysis.analysis_method == "llm_vision",
                     EmagramAnalysis.analysis_datetime >= cutoff_time,
                     EmagramAnalysis.analysis_status == "completed",
+                    EmagramAnalysis.forecast_date == forecast_date,
                 )
                 .order_by(EmagramAnalysis.analysis_datetime.desc())
                 .first()
@@ -4092,7 +4080,10 @@ async def trigger_emagram_analysis(
         logger.info(f"Generating multi-source emagram for {closest_site.name}...")
 
         result = await generate_multi_source_emagram_for_spot(
-            site_id=closest_site.id, db=db, force_refresh=request.force_refresh
+            site_id=closest_site.id,
+            db=db,
+            force_refresh=request.force_refresh,
+            day_index=request.day_index,
         )
 
         if not result.get("success"):

@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text as sa_text
 
 # Import configuration (loads environment variables automatically)
 import config
@@ -16,8 +17,6 @@ import config
 # This ensures all tables are available for Base.metadata.create_all()
 # even in test mode where initialize_database() is not called
 import models  # noqa: F401 - imported for side effects (model registration)
-from sqlalchemy import text as sa_text
-
 from database import Base, SessionLocal, engine
 from models import Site  # Needed for database initialization
 from routes import router
