@@ -189,6 +189,7 @@ const meta = preview.meta({
 });
 
 export const Default = meta.story({
+  name: 'Default',
   args: {
     onDelete: fn(),
     source: { ...mockOpenMeteo, source_name: 'other' },

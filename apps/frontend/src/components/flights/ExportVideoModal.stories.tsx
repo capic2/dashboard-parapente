@@ -35,6 +35,7 @@ const meta = preview.meta({
 
 
 export const Closed = meta.story({
+  name: 'Closed',
   args: {
     isOpen: false,
     flightDuration: 120,
@@ -44,6 +45,7 @@ export const Closed = meta.story({
 });
 
 export const Open = meta.story({
+  name: 'Open',
   args: {
     isOpen: true,
     flightDuration: 120,
@@ -53,6 +55,7 @@ export const Open = meta.story({
 });
 
 export const Processing = meta.story({
+  name: 'Processing',
   args: {
     isOpen: true,
     flightDuration: 180,

@@ -59,6 +59,7 @@ const mockSiteArguel = {
 
 // Default site card
 export const Default = meta.story({
+  name: 'Default',
   args: {
     site: mockSiteArguel,
     flightCount: 15,

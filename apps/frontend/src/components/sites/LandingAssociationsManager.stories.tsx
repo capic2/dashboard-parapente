@@ -169,6 +169,7 @@ const defaultHandlers = [
 
 // Story: With existing associations
 export const WithAssociations = meta.story({
+  name: 'With Associations',
   args: {
     takeoffSiteId: 'site-arguel',
   },
@@ -189,6 +190,7 @@ WithAssociations.test(
 
 // Story: Empty state
 export const Empty = meta.story({
+  name: 'Empty',
   args: {
     takeoffSiteId: 'site-arguel',
   },
@@ -216,6 +218,7 @@ Empty.test('shows empty state message', async ({ canvas }) => {
 
 // Story: Adding a new association
 export const AddingAssociation = meta.story({
+  name: 'Adding Association',
   args: {
     takeoffSiteId: 'site-arguel',
   },
@@ -254,6 +257,7 @@ AddingAssociation.test(
 
 // Story: With notes displayed
 export const WithNotes = meta.story({
+  name: 'With Notes',
   args: {
     takeoffSiteId: 'site-arguel',
   },
@@ -269,6 +273,7 @@ WithNotes.test('displays notes for associations', async ({ canvas }) => {
 
 // Story: Loading state
 export const Loading = meta.story({
+  name: 'Loading',
   args: {
     takeoffSiteId: 'site-arguel',
   },

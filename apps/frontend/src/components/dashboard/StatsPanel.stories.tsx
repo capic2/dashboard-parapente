@@ -39,10 +39,13 @@ const meta = preview.meta({
 });
 
 // Default with stats
-export const Default = meta.story({});
+export const Default = meta.story({
+  name: 'Default',
+});
 
 // Loading state
 export const Loading = meta.story({
+  name: 'Loading',
   parameters: {
     msw: {
       handlers: [
@@ -57,6 +60,7 @@ export const Loading = meta.story({
 
 // Error state
 export const Error = meta.story({
+  name: 'Error',
   parameters: {
     msw: {
       handlers: [

@@ -49,6 +49,7 @@ const mockGPXData = {
 };
 
 export const Default = meta.story({
+  name: 'Default',
   args: {
     flightId: 'flight-1',
   },
@@ -71,6 +72,7 @@ export const Default = meta.story({
 });
 
 export const Loading = meta.story({
+  name: 'Loading',
   args: {
     flightId: 'flight-1',
   },
@@ -86,6 +88,7 @@ export const Loading = meta.story({
 });
 
 export const Error = meta.story({
+  name: 'Error',
   args: {
     flightId: 'flight-1',
   },

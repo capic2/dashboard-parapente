@@ -56,6 +56,7 @@ const mockSiteMinimal: Site = {
 
 // Closed state
 export const Closed = meta.story({
+  name: 'Closed',
   args: {
     site: null,
     isOpen: false,
@@ -66,6 +67,7 @@ export const Closed = meta.story({
 
 // Edit mode - open
 export const EditMode = meta.story({
+  name: 'Edit Mode',
   args: {
     site: mockSite,
     isOpen: true,
@@ -76,6 +78,7 @@ export const EditMode = meta.story({
 
 // Create mode - open
 export const CreateMode = meta.story({
+  name: 'Create Mode',
   args: {
     site: null,
     isOpen: true,
@@ -86,6 +89,7 @@ export const CreateMode = meta.story({
 
 // Edit with minimal data
 export const EditMinimalData = meta.story({
+  name: 'Edit Minimal Data',
   args: {
     site: mockSiteMinimal,
     isOpen: true,
@@ -96,6 +100,7 @@ export const EditMinimalData = meta.story({
 
 // Takeoff only
 export const TakeoffOnly = meta.story({
+  name: 'Takeoff Only',
   args: {
     site: { ...mockSite, usage_type: 'takeoff' },
     isOpen: true,
@@ -106,6 +111,7 @@ export const TakeoffOnly = meta.story({
 
 // Landing only
 export const LandingOnly = meta.story({
+  name: 'Landing Only',
   args: {
     site: { ...mockSite, usage_type: 'landing' },
     isOpen: true,
@@ -116,6 +122,7 @@ export const LandingOnly = meta.story({
 
 // Different orientation
 export const OrientationSouth = meta.story({
+  name: 'Orientation South',
   args: {
     site: { ...mockSite, orientation: 'S' },
     isOpen: true,
@@ -126,6 +133,7 @@ export const OrientationSouth = meta.story({
 
 // Different country
 export const CountrySwitzerland = meta.story({
+  name: 'Country Switzerland',
   args: {
     site: { ...mockSite, country: 'CH' },
     isOpen: true,
@@ -136,6 +144,7 @@ export const CountrySwitzerland = meta.story({
 
 // Custom camera settings
 export const CustomCameraSettings = meta.story({
+  name: 'Custom Camera Settings',
   args: {
     site: { ...mockSite, camera_angle: 90, camera_distance: 1500 },
     isOpen: true,
@@ -146,6 +155,7 @@ export const CustomCameraSettings = meta.story({
 
 // Saving state
 export const SavingState = meta.story({
+  name: 'Saving State',
   args: {
     site: mockSite,
     isOpen: true,
@@ -164,6 +174,7 @@ SavingState.test('interaction test', async ({ canvas, userEvent }) => {
 // Interaction Tests
 
 export const DisplaysSiteData = meta.story({
+  name: 'Displays Site Data',
   args: {
     site: mockSite,
     isOpen: true,
@@ -173,6 +184,7 @@ export const DisplaysSiteData = meta.story({
 });
 
 export const ShowsCreateModeTitle = meta.story({
+  name: 'Shows Create Mode Title',
   args: {
     site: null,
     isOpen: true,
@@ -186,6 +198,7 @@ ShowsCreateModeTitle.test('shows create mode title', async ({ canvas }) => {
 });
 
 export const DisablesCodeInEditMode = meta.story({
+  name: 'Disables Code In Edit Mode',
   args: {
     site: mockSite,
     isOpen: true,
@@ -209,6 +222,7 @@ DisablesCodeInEditMode.test(
 
 /*
 export const AllowsCodeInCreateMode = meta.story({
+  name: 'Allows Code In Create Mode',
   args: {
     site: null,
     isOpen: true,
@@ -227,6 +241,7 @@ AllowsCodeInCreateMode.test('allows code input in create mode', async ({ canvas,
 */
 
 export const EditsNameField = meta.story({
+  name: 'Edits Name Field',
   args: {
     site: mockSite,
     isOpen: true,
@@ -236,6 +251,7 @@ export const EditsNameField = meta.story({
 });
 
 export const SelectsUsageType = meta.story({
+  name: 'Selects Usage Type',
   args: {
     site: mockSite,
     isOpen: true,
@@ -253,6 +269,7 @@ SelectsUsageType.test('selects usage type', async ({ canvas, userEvent }) => {
 
 /*
 export const ChangesOrientation = meta.story({
+  name: 'Changes Orientation',
   args: {
     site: mockSite,
     isOpen: true,
@@ -271,6 +288,7 @@ ChangesOrientation.test('changes orientation', async ({ canvas,userEvent }) => {
 
 /*
 export const AdjustsCameraAngle = meta.story({
+  name: 'Adjusts Camera Angle',
   args: {
     site: mockSite,
     isOpen: true,
@@ -290,6 +308,7 @@ AdjustsCameraAngle.test('adjusts camera angle', async ({ canvas,userEvent }) => 
 */
 
 export const CallsOnCloseWhenCancelled = meta.story({
+  name: 'Calls On Close When Cancelled',
   args: {
     site: mockSite,
     isOpen: true,
@@ -310,6 +329,7 @@ CallsOnCloseWhenCancelled.test(
 
 /*
 export const ValidatesRequiredFields = meta.story({
+  name: 'Validates Required Fields',
   args: {
     site: null,
     isOpen: true,
@@ -331,6 +351,7 @@ ValidatesRequiredFields.test('validates required fields', async ({ canvas }) => 
 */
 
 export const SavesSuccessfully = meta.story({
+  name: 'Saves Successfully',
   args: {
     site: mockSite,
     isOpen: true,
@@ -362,6 +383,7 @@ export const SavesSuccessfully = meta.story({
 );*/
 
 export const ShowsSavingState = meta.story({
+  name: 'Shows Saving State',
   args: {
     site: mockSite,
     isOpen: true,

@@ -1,12 +1,10 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { IconCard } from '@dashboard-parapente/design-system';
 import { useFlights } from '../../hooks/flights/useFlights';
 import { useFlightStats } from '../../hooks/flights/useFlights';
 
-/**
- * Badge d'achievement
- */
-interface Badge {
+interface AchievementBadge {
   id: string;
   title: string;
   description: string;
@@ -37,7 +35,7 @@ export default function AchievementsBadges() {
     const totalHours = stats.total_hours || 0;
     const maxAltitude = stats.max_altitude_m || 0;
 
-    const allBadges: Badge[] = [
+    const allBadges: AchievementBadge[] = [
       // Badges de vols
       {
         id: 'first_flight',
@@ -185,18 +183,13 @@ export default function AchievementsBadges() {
           </h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {unlockedBadges.map((badge) => (
-              <div
+              <IconCard
                 key={badge.id}
-                className="flex flex-col items-center p-3 bg-gradient-to-br from-sky-50 to-blue-50 dark:from-sky-900/20 dark:to-blue-900/20 border-2 border-sky-300 dark:border-sky-600 rounded-lg hover:shadow-md transition-shadow"
-              >
-                <span className="text-3xl mb-1">{badge.icon}</span>
-                <span className="text-xs font-semibold text-gray-800 dark:text-gray-100 text-center">
-                  {badge.title}
-                </span>
-                <span className="text-xs text-gray-600 dark:text-gray-300 text-center mt-1">
-                  {badge.description}
-                </span>
-              </div>
+                icon={badge.icon}
+                title={badge.title}
+                description={badge.description}
+                unlocked={true}
+              />
             ))}
           </div>
         </div>
@@ -210,39 +203,14 @@ export default function AchievementsBadges() {
           </h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {lockedBadges.map((badge) => (
-              <div
+              <IconCard
                 key={badge.id}
-                className="flex flex-col items-center p-3 bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-lg relative overflow-hidden"
-              >
-                {/* Progress bar background */}
-                {badge.progress !== undefined && (
-                  <div
-                    className="absolute inset-0 bg-gradient-to-t from-sky-100 dark:from-sky-900/30 to-transparent opacity-50"
-                    style={{
-                      height: `${badge.progress}%`,
-                      bottom: 0,
-                      top: 'auto',
-                    }}
-                  ></div>
-                )}
-
-                <div className="relative z-10 flex flex-col items-center">
-                  <span className="text-3xl mb-1 opacity-40 grayscale">
-                    {badge.icon}
-                  </span>
-                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 text-center">
-                    {badge.title}
-                  </span>
-                  <span className="text-xs text-gray-400 dark:text-gray-500 text-center mt-1">
-                    {badge.description}
-                  </span>
-                  {badge.progress !== undefined && badge.progress > 0 && (
-                    <span className="text-xs text-sky-600 dark:text-sky-400 font-medium mt-1">
-                      {Math.round(badge.progress)}%
-                    </span>
-                  )}
-                </div>
-              </div>
+                icon={badge.icon}
+                title={badge.title}
+                description={badge.description}
+                unlocked={false}
+                progress={badge.progress}
+              />
             ))}
           </div>
         </div>

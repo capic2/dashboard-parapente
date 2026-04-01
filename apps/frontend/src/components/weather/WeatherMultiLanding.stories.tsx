@@ -172,6 +172,7 @@ const mockWeatherWithError = [
 
 // Story: Mixed conditions (bon, moyen, limite)
 export const MixedConditions = meta.story({
+  name: 'Mixed Conditions',
   args: {
     spotId: 'site-arguel',
     dayIndex: 0,
@@ -205,6 +206,7 @@ MixedConditions.test(
 
 // Story: All good conditions
 export const AllGoodConditions = meta.story({
+  name: 'All Good Conditions',
   args: {
     spotId: 'site-arguel',
     dayIndex: 0,
@@ -225,6 +227,7 @@ export const AllGoodConditions = meta.story({
 
 // Story: All bad conditions
 export const AllBadConditions = meta.story({
+  name: 'All Bad Conditions',
   args: {
     spotId: 'site-arguel',
     dayIndex: 0,
@@ -245,6 +248,7 @@ export const AllBadConditions = meta.story({
 
 // Story: With weather error on one landing
 export const WithWeatherError = meta.story({
+  name: 'With Weather Error',
   args: {
     spotId: 'site-arguel',
     dayIndex: 0,
@@ -275,6 +279,7 @@ WithWeatherError.test(
 
 // Story: Single landing
 export const SingleLanding = meta.story({
+  name: 'Single Landing',
   args: {
     spotId: 'site-arguel',
     dayIndex: 0,
@@ -295,6 +300,7 @@ export const SingleLanding = meta.story({
 
 // Story: No associations (renders nothing)
 export const NoAssociations = meta.story({
+  name: 'No Associations',
   args: {
     spotId: 'site-arguel',
     dayIndex: 0,
@@ -315,6 +321,7 @@ export const NoAssociations = meta.story({
 
 // Story: Loading state
 export const Loading = meta.story({
+  name: 'Loading',
   args: {
     spotId: 'site-arguel',
     dayIndex: 0,

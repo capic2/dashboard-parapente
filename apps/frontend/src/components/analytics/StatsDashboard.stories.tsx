@@ -57,6 +57,7 @@ const mockFlights = Array.from({ length: 42 }, (_, i) => ({
 }));
 
 export const Default = meta.story({
+  name: 'Default',
   parameters: {
     msw: {
       handlers: [
@@ -72,6 +73,7 @@ export const Default = meta.story({
 });
 
 export const Loading = meta.story({
+  name: 'Loading',
   parameters: {
     msw: {
       handlers: [

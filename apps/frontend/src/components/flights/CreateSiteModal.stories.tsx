@@ -63,6 +63,7 @@ const mockCreatedSite = {
 */
 
 export const Modal = meta.story({
+  name: 'Modal',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -121,6 +122,7 @@ Modal.test(
 
 // Search loading
 export const SearchLoading = meta.story({
+  name: 'Search Loading',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -148,6 +150,7 @@ SearchLoading.test('interaction test', async ({ userEvent }) => {
 /*
 // Manual entry filled
 export const ManualEntryFilled = meta.story({
+  name: 'Manual Entry Filled',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -183,6 +186,7 @@ ManualEntryFilled.test('interaction test', async ({ canvas, userEvent }) => {
 
 // Create site loading
 export const CreateSiteLoading = meta.story({
+  name: 'Create Site Loading',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -220,6 +224,7 @@ CreateSiteLoading.test('interaction test', async ({ canvas, userEvent }) => {
 // Interaction Tests
 
 export const OpensAndClosesModal = meta.story({
+  name: 'Opens And Closes Modal',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -237,6 +242,7 @@ OpensAndClosesModal.test('opens and closes modal', async ({ args, canvas }) => {
 });
 
 export const SwitchesBetweenModes = meta.story({
+  name: 'Switches Between Modes',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -271,6 +277,7 @@ SwitchesBetweenModes.test(
 );
 
 export const SearchesForLocation = meta.story({
+  name: 'Searches For Location',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -307,6 +314,7 @@ SearchesForLocation.test(
 );
 
 export const CreatesSiteSuccessfully = meta.story({
+  name: 'Creates Site Successfully',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -350,6 +358,7 @@ CreatesSiteSuccessfully.test(
 );
 
 export const DisablesCreateButtonWhenInvalid = meta.story({
+  name: 'Disables Create Button When Invalid',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -384,6 +393,7 @@ DisablesCreateButtonWhenInvalid.test(
 );
 
 export const ShowsAutoDetectWithFlightId = meta.story({
+  name: 'Shows Auto Detect With Flight Id',
   args: {
     isOpen: true,
     onClose: fn(),

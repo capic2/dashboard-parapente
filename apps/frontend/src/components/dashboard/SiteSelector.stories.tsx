@@ -123,6 +123,7 @@ const meta = preview.meta({
  * Default story showing Arguel selected
  */
 export const Default = meta.story({
+  name: 'Default',
   args: {
     selectedSiteId: 'site-arguel',
     onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
@@ -134,6 +135,7 @@ export const Default = meta.story({
  * Demonstrates multi-orientation site selection (dropdown)
  */
 export const MontPoupetSelected = meta.story({
+  name: 'Mont Poupet Selected',
   args: {
     selectedSiteId: 'mont-poupet-nord',
     onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
@@ -144,6 +146,7 @@ export const MontPoupetSelected = meta.story({
  * Story showing La Côte selected
  */
 export const LaCoteSelected = meta.story({
+  name: 'La Cote Selected',
   args: {
     selectedSiteId: 'site-la-cote',
     onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
@@ -152,6 +155,7 @@ export const LaCoteSelected = meta.story({
 
 // Loading state story
 export const Loading = meta.story({
+  name: 'Loading',
   args: {
     selectedSiteId: '',
     onSelectSite: () => {},
@@ -178,6 +182,7 @@ export const Loading = meta.story({
 
 // Error state story
 export const Error = meta.story({
+  name: 'Error',
   args: {
     selectedSiteId: '',
     onSelectSite: () => {},

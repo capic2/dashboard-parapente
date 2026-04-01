@@ -34,60 +34,91 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
+export const baseStats = {
+  total_flights: 0,
+  total_hours: 0,
+  total_duration_minutes: 0,
+  total_distance_km: 0,
+  total_elevation_gain_m: 0,
+  avg_duration_minutes: 0,
+  avg_distance_km: 0,
+  max_altitude_m: 0,
+  favorite_spot: null,
+  favorite_site: null,
+  last_flight_date: null,
+};
 
+function statsHandlers(stats: Partial<typeof baseStats>) {
+  return [
+    http.get('*/api/flights/stats', () =>
+      HttpResponse.json({ ...baseStats, ...stats })
+    ),
+    http.get('*/api/flights', () =>
+      HttpResponse.json({
+        flights: Array.from({ length: stats.total_flights ?? 0 }, (_, i) => ({
+          id: `flight-${i}`,
+          name: `Vol ${i + 1}`,
+          flight_date: '2024-03-15',
+          duration_minutes: 120,
+        })),
+      })
+    ),
+  ];
+}
 
-const mockStats = {
+export const Loading = meta.story({
+  name: 'Loading',
+  parameters: {
+    msw: {
+      handlers: [
+        http.get('*/api/flights/stats', async () => {
+          console.log('aaaa')
+          await new Promise(() => {});
+        }),
+      ],
+    },
+  },
+});
+
+export const noBadgesStats = {};
+
+export const partialProgressStats = {
   total_flights: 25,
   total_hours: 50,
   max_altitude_m: 2500,
   total_distance_km: 250,
 };
 
-const mockFlights = Array.from({ length: 25 }, (_, i) => ({
-  id: `flight-${i}`,
-  name: `Vol ${i + 1}`,
-  flight_date: '2024-03-15',
-  duration_minutes: 120,
-}));
+export const allUnlockedStats = {
+  total_flights: 100,
+  total_hours: 100,
+  max_altitude_m: 3000,
+  total_distance_km: 500,
+};
 
-export const Default = meta.story({
+export const NoBadges = meta.story({
+  name: 'No Badges',
   parameters: {
     msw: {
-      handlers: [
-        http.get('/api/flights/stats', () => {
-          return HttpResponse.json(mockStats);
-        }),
-        http.get('/api/flights', () => {
-          return HttpResponse.json({ flights: mockFlights });
-        }),
-      ],
+      handlers: statsHandlers(noBadgesStats),
     },
   },
 });
 
-export const Beginner = meta.story({
+export const PartialProgress = meta.story({
+  name: 'Partial Progress',
   parameters: {
     msw: {
-      handlers: [
-        http.get('/api/flights/stats', () => {
-          return HttpResponse.json({ ...mockStats, total_flights: 3 });
-        }),
-        http.get('/api/flights', () => {
-          return HttpResponse.json({ flights: mockFlights.slice(0, 3) });
-        }),
-      ],
+      handlers: statsHandlers(partialProgressStats),
     },
   },
 });
 
-export const Loading = meta.story({
+export const AllUnlocked = meta.story({
+  name: 'All Unlocked',
   parameters: {
     msw: {
-      handlers: [
-        http.get('/api/flights/stats', async () => {
-          await new Promise(() => {});
-        }),
-      ],
+      handlers: statsHandlers(allUnlockedStats),
     },
   },
 });

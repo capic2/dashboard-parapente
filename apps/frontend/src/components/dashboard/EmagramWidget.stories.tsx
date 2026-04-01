@@ -96,6 +96,7 @@ const defaultHandlers = [
 ];
 
 export const Default = meta.story({
+  name: 'Default',
   args: { siteId: 'site-arguel', dayIndex: 0 },
   parameters: { msw: { handlers: defaultHandlers } },
 });
@@ -110,6 +111,7 @@ Default.test('displays emagram score and metrics', async ({ canvas }) => {
 });*/
 
 export const AnalysisInProgress = meta.story({
+  name: 'Analysis In Progress',
   args: { siteId: 'site-arguel', dayIndex: 0 },
   parameters: {
     msw: {
@@ -128,6 +130,7 @@ AnalysisInProgress.test('shows analysis in progress', async ({ canvas }) => {
 });
 
 export const Error = meta.story({
+  name: 'Error',
   args: { siteId: 'site-arguel', dayIndex: 0 },
   parameters: {
     msw: {
@@ -148,11 +151,13 @@ Error.test('displays error message', async ({ canvas }) => {
 });
 
 export const DifferentDay = meta.story({
+  name: 'Different Day',
   args: { siteId: 'site-arguel', dayIndex: 2 },
   parameters: { msw: { handlers: defaultHandlers } },
 });
 
 export const NoSite = meta.story({
+  name: 'No Site',
   args: { siteId: '', dayIndex: 0 },
   parameters: { msw: { handlers: defaultHandlers } },
 });
@@ -162,6 +167,7 @@ NoSite.test('shows no site message', async ({ canvas }) => {
 });
 
 export const Loading = meta.story({
+  name: 'Loading',
   args: { siteId: 'site-arguel', dayIndex: 0 },
   parameters: {
     msw: {

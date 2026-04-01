@@ -36,7 +36,7 @@ const meta = preview.meta({
 
 
 
-const mockFlights = [
+export const defaultFlights = [
   ...Array.from({ length: 8 }, (_, i) => ({
     id: `${i}`,
     flight_date: `2024-03-${String(i + 1).padStart(2, '0')}`,
@@ -54,37 +54,40 @@ const mockFlights = [
   })),
 ];
 
+export const noDataFlights: typeof defaultFlights = [];
+
 export const Default = meta.story({
+  name: 'Default',
   parameters: {
     msw: {
       handlers: [
-        http.get('/api/flights', () => {
-          return HttpResponse.json({ flights: mockFlights });
-        }),
+        http.get('*/api/flights', () =>
+          HttpResponse.json({ flights: defaultFlights })
+        ),
       ],
     },
   },
 });
 
 export const NoData = meta.story({
+  name: 'No Data',
   parameters: {
     msw: {
       handlers: [
-        http.get('/api/flights', () => {
-          return HttpResponse.json({ flights: [] });
-        }),
+        http.get('*/api/flights', () =>
+          HttpResponse.json({ flights: noDataFlights })
+        ),
       ],
     },
   },
 });
 
 export const Loading = meta.story({
+  name: 'Loading',
   parameters: {
     msw: {
       handlers: [
-        http.get('/api/flights', async () => {
-          await new Promise(() => {});
-        }),
+        http.get('*/api/flights', () => new Promise(() => {})),
       ],
     },
   },

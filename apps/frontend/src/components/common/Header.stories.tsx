@@ -26,6 +26,7 @@ const meta = preview.meta({
  * Router is initialized at root path '/'
  */
 export const Default = meta.story({
+  name: 'Default',
   args: {},
   parameters: {
     router: {
@@ -40,6 +41,7 @@ export const Default = meta.story({
  * Header with custom title
  */
 export const CustomTitle = meta.story({
+  name: 'Custom Title',
   args: {
     title: '🪂 Mon Dashboard Personnalisé',
   },
@@ -57,6 +59,7 @@ export const CustomTitle = meta.story({
  * Demonstrates custom router configuration via parameters
  */
 export const OnFlightsPage = meta.story({
+  name: 'On Flights Page',
   args: {},
   parameters: {
     router: {
@@ -71,6 +74,7 @@ export const OnFlightsPage = meta.story({
  * Header with router initialized on /analytics path
  */
 export const OnAnalyticsPage = meta.story({
+  name: 'On Analytics Page',
   args: {},
   parameters: {
     router: {
@@ -85,6 +89,7 @@ export const OnAnalyticsPage = meta.story({
  * Header in dark mode
  */
 export const DarkMode = meta.story({
+  name: 'Dark Mode',
   args: {},
   parameters: {
     theme: 'dark',

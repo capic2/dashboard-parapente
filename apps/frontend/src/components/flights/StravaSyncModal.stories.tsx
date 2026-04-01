@@ -56,6 +56,7 @@ const mockSyncResult = {
 
 // Closed state
 export const Closed = meta.story({
+  name: 'Closed',
   args: {
     isOpen: false,
     onClose: fn(),
@@ -65,6 +66,7 @@ export const Closed = meta.story({
 
 // Open - default state
 export const Open = meta.story({
+  name: 'Open',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -84,6 +86,7 @@ export const Open = meta.story({
 /*
 // Syncing in progress
 export const SyncingInProgress = meta.story({
+  name: 'Syncing In Progress',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -108,6 +111,7 @@ SyncingInProgress.test("interaction test", async ({ canvas }) => {
 
 // Sync success
 export const SyncSuccess = meta.story({
+  name: 'Sync Success',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -132,6 +136,7 @@ SyncSuccess.test("interaction test", async ({ canvas }) => {
 
 // Sync with failures
 export const SyncWithFailures = meta.story({
+  name: 'Sync With Failures',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -156,6 +161,7 @@ SyncWithFailures.test("interaction test", async ({ canvas }) => {
 
 // Sync no skipped
 export const SyncNoSkipped = meta.story({
+  name: 'Sync No Skipped',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -182,6 +188,7 @@ SyncNoSkipped.test("interaction test", async ({ canvas }) => {
 
 // Custom date range
 export const CustomDateRange = meta.story({
+  name: 'Custom Date Range',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -210,6 +217,7 @@ CustomDateRange.test('interaction test', async ({ canvas, userEvent }) => {
 // Interaction Tests
 
 export const DisplaysModalTitle = meta.story({
+  name: 'Displays Modal Title',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -230,6 +238,7 @@ DisplaysModalTitle.test(
 );
 
 export const DisplaysDatePickers = meta.story({
+  name: 'Displays Date Pickers',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -243,6 +252,7 @@ DisplaysDatePickers.test('displays date pickers', async ({ canvas }) => {
 });
 
 export const EnablesSyncButton = meta.story({
+  name: 'Enables Sync Button',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -256,6 +266,7 @@ EnablesSyncButton.test('enables sync button by default', async ({ canvas }) => {
 });
 
 export const ShowsSyncingState = meta.story({
+  name: 'Shows Syncing State',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -286,6 +297,7 @@ ShowsSyncingState.test(
 );
 
 export const ShowsSuccessMessage = meta.story({
+  name: 'Shows Success Message',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -324,6 +336,7 @@ ShowsSuccessMessage.test(
 );
 
 export const ShowsFailures = meta.story({
+  name: 'Shows Failures',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -354,6 +367,7 @@ ShowsFailures.test('shows failure count', async ({ canvas }) => {
 });
 
 export const CallsOnSyncComplete = meta.story({
+  name: 'Calls On Sync Complete',
   args: {
     isOpen: true,
     onClose: fn(),
@@ -387,6 +401,7 @@ CallsOnSyncComplete.test(
 );
 
 export const ClosesModalOnCancel = meta.story({
+  name: 'Closes Modal On Cancel',
   args: {
     isOpen: true,
     onClose: fn(),

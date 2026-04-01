@@ -85,6 +85,7 @@ const mockFlightsWithNull = [
 ];
 
 export const Default = meta.story({
+  name: 'Default',
   parameters: {
     msw: {
       handlers: [
@@ -97,6 +98,7 @@ export const Default = meta.story({
 });
 
 export const NoData = meta.story({
+  name: 'No Data',
   parameters: {
     msw: {
       handlers: [
@@ -109,6 +111,7 @@ export const NoData = meta.story({
 });
 
 export const Loading = meta.story({
+  name: 'Loading',
   parameters: {
     msw: {
       handlers: [
@@ -122,6 +125,7 @@ export const Loading = meta.story({
 
 // With flights that have null site_id (should be filtered out)
 export const WithNullSiteId = meta.story({
+  name: 'With Null Site Id',
   parameters: {
     msw: {
       handlers: [

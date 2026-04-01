@@ -91,6 +91,7 @@ const mockPartialRecords = {
 
 // Default story - all records
 export const AllRecords = meta.story({
+  name: 'All Records',
   parameters: {
     msw: {
       handlers: [
@@ -105,6 +106,7 @@ export const AllRecords = meta.story({
 
 // Partial records
 export const PartialRecords = meta.story({
+  name: 'Partial Records',
   parameters: {
     msw: {
       handlers: [
@@ -119,6 +121,7 @@ export const PartialRecords = meta.story({
 
 // No records
 export const NoRecords = meta.story({
+  name: 'No Records',
   parameters: {
     msw: {
       handlers: [
@@ -138,6 +141,7 @@ export const NoRecords = meta.story({
 
 // Loading state
 export const Loading = meta.story({
+  name: 'Loading',
   parameters: {
     msw: {
       handlers: [
@@ -152,6 +156,7 @@ export const Loading = meta.story({
 
 // Error state
 export const Error = meta.story({
+  name: 'Error',
   parameters: {
     msw: {
       handlers: [
@@ -167,6 +172,7 @@ export const Error = meta.story({
 // Interaction Tests
 
 export const DisplaysAllRecordCards = meta.story({
+  name: 'Displays All Record Cards',
   parameters: {
     msw: {
       handlers: [
@@ -192,6 +198,7 @@ DisplaysAllRecordCards.test('displays all record cards', async ({ canvas }) => {
 /*
 
 export const DisplaysRecordValues = meta.story({
+  name: 'Displays Record Values',
   parameters: {
     msw: {
       handlers: [...getDefaultHandlers(),
@@ -214,6 +221,7 @@ DisplaysRecordValues.test('displays record values correctly', async ({ canvas })
 });
 
 export const ShowsLoadingSkeletons = meta.story({
+  name: 'Shows Loading Skeletons',
   parameters: {
     msw: {
       handlers: [...getDefaultHandlers(),
@@ -231,6 +239,7 @@ ShowsLoadingSkeletons.test('shows loading skeletons', async ({ canvasElement }) 
 });
 
 export const ShowsErrorMessage = meta.story({
+  name: 'Shows Error Message',
   parameters: {
     msw: {
       handlers: [...getDefaultHandlers(),
@@ -249,6 +258,7 @@ ShowsErrorMessage.test('shows error message on error', async ({ canvas }) => {
 });
 
 export const ShowsNoDataForMissingRecords = meta.story({
+  name: 'Shows No Data For Missing Records',
   parameters: {
     msw: {
       handlers: [...getDefaultHandlers(),

@@ -6,3 +6,4 @@ export { Toast, ToastContainer } from './Toast';
 export { DatePicker } from './DatePicker';
 export { default as ErrorBoundary } from './ErrorBoundary';
 export { default as LoadingSkeleton } from './LoadingSkeleton';
+export { IconCard } from './IconCard';

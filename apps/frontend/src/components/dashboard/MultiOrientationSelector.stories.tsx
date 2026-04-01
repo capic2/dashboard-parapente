@@ -123,6 +123,7 @@ const mockWeatherData = new Map([
 
 // Default story - Multiple orientations with weather
 export const MultipleOrientationsWithWeather = meta.story({
+  name: 'Multiple Orientations With Weather',
   args: {
     sites: mockSitesMontPoupet,
     selectedSiteId: '1',
@@ -133,6 +134,7 @@ export const MultipleOrientationsWithWeather = meta.story({
 
 // Two orientations
 export const TwoOrientations = meta.story({
+  name: 'Two Orientations',
   args: {
     sites: mockSitesAnnecy,
     selectedSiteId: '4',
@@ -143,6 +145,7 @@ export const TwoOrientations = meta.story({
 
 // No weather data
 export const NoWeatherData = meta.story({
+  name: 'No Weather Data',
   args: {
     sites: mockSitesMontPoupet,
     selectedSiteId: '2',
@@ -152,6 +155,7 @@ export const NoWeatherData = meta.story({
 
 // No rating
 export const NoRating = meta.story({
+  name: 'No Rating',
   args: {
     sites: mockSitesNoRating,
     selectedSiteId: '6',
@@ -161,6 +165,7 @@ export const NoRating = meta.story({
 
 // Custom base name
 export const CustomBaseName = meta.story({
+  name: 'Custom Base Name',
   args: {
     sites: mockSitesMontPoupet,
     selectedSiteId: '1',
@@ -172,6 +177,7 @@ export const CustomBaseName = meta.story({
 
 // No site selected
 export const NoSelection = meta.story({
+  name: 'No Selection',
   args: {
     sites: mockSitesMontPoupet,
     selectedSiteId: '',
@@ -182,6 +188,7 @@ export const NoSelection = meta.story({
 
 // Single site (edge case)
 export const SingleSite = meta.story({
+  name: 'Single Site',
   args: {
     sites: [mockSitesMontPoupet[0]],
     selectedSiteId: '1',
@@ -191,6 +198,7 @@ export const SingleSite = meta.story({
 
 // No elevation data
 export const NoElevation = meta.story({
+  name: 'No Elevation',
   args: {
     sites: mockSitesMontPoupet.map((site) => ({
       ...site,
@@ -203,6 +211,7 @@ export const NoElevation = meta.story({
 
 // Open dropdown initially (for visual testing)
 export const DropdownOpen = meta.story({
+  name: 'Dropdown Open',
   args: {
     sites: mockSitesMontPoupet,
     selectedSiteId: '1',
@@ -219,6 +228,7 @@ DropdownOpen.test('interaction test', async ({ canvas, userEvent }) => {
 // Interaction Tests
 
 export const DisplaysSiteName = meta.story({
+  name: 'Displays Site Name',
   args: {
     sites: mockSitesMontPoupet,
     selectedSiteId: '1',
@@ -235,6 +245,7 @@ DisplaysSiteName.test(
 );
 
 export const OpensDropdownOnClick = meta.story({
+  name: 'Opens Dropdown On Click',
   args: {
     sites: mockSitesMontPoupet,
     selectedSiteId: '1',
@@ -259,6 +270,7 @@ OpensDropdownOnClick.test(
 );
 
 export const SelectsSiteFromDropdown = meta.story({
+  name: 'Selects Site From Dropdown',
   args: {
     sites: mockSitesMontPoupet,
     selectedSiteId: '1',
@@ -287,6 +299,7 @@ SelectsSiteFromDropdown.test(
 );
 
 export const DisplaysWeatherData = meta.story({
+  name: 'Displays Weather Data',
   args: {
     sites: mockSitesMontPoupet,
     selectedSiteId: '1',
@@ -309,6 +322,7 @@ DisplaysWeatherData.test(
 );
 
 export const HighlightsSelectedSite = meta.story({
+  name: 'Highlights Selected Site',
   args: {
     sites: mockSitesMontPoupet,
     selectedSiteId: '2',
@@ -334,6 +348,7 @@ HighlightsSelectedSite.test(
 );
 
 export const ClosesOnOutsideClick = meta.story({
+  name: 'Closes On Outside Click',
   args: {
     sites: mockSitesMontPoupet,
     selectedSiteId: '1',
@@ -364,6 +379,7 @@ ClosesOnOutsideClick.test(
 );
 
 export const ShowsRatingStars = meta.story({
+  name: 'Shows Rating Stars',
   args: {
     sites: mockSitesMontPoupet,
     selectedSiteId: '1',

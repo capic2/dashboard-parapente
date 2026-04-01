@@ -306,6 +306,7 @@ const mockBackendWeatherMixed = {
 
 // Default story - Good conditions
 export const GoodConditions = meta.story({
+  name: 'Good Conditions',
   args: {
     spotId: '1',
     dayIndex: 0,
@@ -388,6 +389,7 @@ GoodConditions.test('it renders the correct values', async ({ canvas }) => {
 
 // Mixed conditions (good, moderate, bad)
 export const MixedConditions = meta.story({
+  name: 'Mixed Conditions',
   args: {
     spotId: '1',
     dayIndex: 0,
@@ -438,6 +440,7 @@ MixedConditions.test(
 
 // Empty hourly forecast
 export const EmptyForecast = meta.story({
+  name: 'Empty Forecast',
   args: {
     spotId: '1',
     dayIndex: 0,
@@ -458,6 +461,7 @@ export const EmptyForecast = meta.story({
 
 // Loading state
 export const Loading = meta.story({
+  name: 'Loading',
   args: {
     spotId: '1',
     dayIndex: 0,
@@ -475,6 +479,7 @@ export const Loading = meta.story({
 
 // Error state
 export const Error = meta.story({
+  name: 'Error',
   args: {
     spotId: '1',
     dayIndex: 0,
@@ -492,6 +497,7 @@ export const Error = meta.story({
 
 // No hourly forecast data
 export const NoHourlyData = meta.story({
+  name: 'No Hourly Data',
   args: {
     spotId: '1',
     dayIndex: 0,
@@ -512,6 +518,7 @@ export const NoHourlyData = meta.story({
 
 // Different day index
 export const DayTwo = meta.story({
+  name: 'Day Two',
   args: {
     spotId: '1',
     dayIndex: 1,
@@ -531,6 +538,7 @@ export const DayTwo = meta.story({
 /*
 
 export const DisplaysHourlyData = meta.story({
+  name: 'Displays Hourly Data',
   args: {
     spotId: '1',
     dayIndex: 0,
@@ -565,6 +573,7 @@ DisplaysHourlyData.test('displays hourly forecast data', async ({ canvas }) => {
 });
 
 export const ShowsLoadingState = meta.story({
+  name: 'Shows Loading State',
   args: {
     spotId: '1',
     dayIndex: 0,
@@ -587,6 +596,7 @@ ShowsLoadingState.test('shows loading state', async ({ canvas }) => {
 });
 
 export const ShowsErrorState = meta.story({
+  name: 'Shows Error State',
   args: {
     spotId: '1',
     dayIndex: 0,
@@ -609,6 +619,7 @@ ShowsErrorState.test('shows error state', async ({ canvas }) => {
 });
 
 export const ShowsEmptyState = meta.story({
+  name: 'Shows Empty State',
   args: {
     spotId: '1',
     dayIndex: 0,
@@ -634,6 +645,7 @@ ShowsEmptyState.test('shows empty state when no hourly data', async ({ canvas })
 });
 
 export const OpensTooltipOnHover = meta.story({
+  name: 'Opens Tooltip On Hover',
   args: {
     spotId: '1',
     dayIndex: 0,

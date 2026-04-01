@@ -135,6 +135,7 @@ const mockBestSpotNoRating: BestSpotResult = {
 
 // Default story - Excellent conditions
 export const ExcellentConditions = meta.story({
+  name: 'Excellent Conditions',
   render: () => (
     <BestSpotSuggestion bestSpot={mockBestSpotExcellent} onSelectSite={fn()} />
   ),
@@ -142,6 +143,7 @@ export const ExcellentConditions = meta.story({
 
 // Good conditions
 export const GoodConditions = meta.story({
+  name: 'Good Conditions',
   render: () => (
     <BestSpotSuggestion bestSpot={mockBestSpotGood} onSelectSite={fn()} />
   ),
@@ -149,6 +151,7 @@ export const GoodConditions = meta.story({
 
 // Moderate conditions
 export const ModerateConditions = meta.story({
+  name: 'Moderate Conditions',
   render: () => (
     <BestSpotSuggestion bestSpot={mockBestSpotModerate} onSelectSite={fn()} />
   ),
@@ -156,6 +159,7 @@ export const ModerateConditions = meta.story({
 
 // Poor conditions
 export const PoorConditions = meta.story({
+  name: 'Poor Conditions',
   render: () => (
     <BestSpotSuggestion bestSpot={mockBestSpotPoor} onSelectSite={fn()} />
   ),
@@ -163,6 +167,7 @@ export const PoorConditions = meta.story({
 
 // No wind data
 export const NoWindData = meta.story({
+  name: 'No Wind Data',
   render: () => (
     <BestSpotSuggestion bestSpot={mockBestSpotNoWind} onSelectSite={fn()} />
   ),
@@ -170,6 +175,7 @@ export const NoWindData = meta.story({
 
 // No rating
 export const NoRating = meta.story({
+  name: 'No Rating',
   render: () => (
     <BestSpotSuggestion bestSpot={mockBestSpotNoRating} onSelectSite={fn()} />
   ),
@@ -177,16 +183,19 @@ export const NoRating = meta.story({
 
 // Null data (renders nothing)
 export const NullData = meta.story({
+  name: 'Null Data',
   render: () => <BestSpotSuggestion bestSpot={null} onSelectSite={fn()} />,
 });
 
 // No site in bestSpot (renders nothing) - using null for the whole bestSpot
 export const NoSite = meta.story({
+  name: 'No Site',
   render: () => <BestSpotSuggestion bestSpot={null} onSelectSite={fn()} />,
 });
 
 // With custom className
 export const CustomClassName = meta.story({
+  name: 'Custom Class Name',
   render: () => (
     <BestSpotSuggestion
       bestSpot={mockBestSpotExcellent}
@@ -198,6 +207,7 @@ export const CustomClassName = meta.story({
 
 // Compact variant - Excellent
 export const CompactExcellent = meta.story({
+  name: 'Compact Excellent',
   render: () => (
     <BestSpotSuggestionCompact
       bestSpot={mockBestSpotExcellent}
@@ -208,6 +218,7 @@ export const CompactExcellent = meta.story({
 
 // Compact variant - No wind
 export const CompactNoWind = meta.story({
+  name: 'Compact No Wind',
   render: () => (
     <BestSpotSuggestionCompact
       bestSpot={mockBestSpotNoWind}
@@ -218,6 +229,7 @@ export const CompactNoWind = meta.story({
 
 // Compact variant - Null data
 export const CompactNullData = meta.story({
+  name: 'Compact Null Data',
   render: () => (
     <BestSpotSuggestionCompact bestSpot={null} onSelectSite={fn()} />
   ),
@@ -226,6 +238,7 @@ export const CompactNullData = meta.story({
 // Interaction Tests
 
 export const DisplaysBestSpotData = meta.story({
+  name: 'Displays Best Spot Data',
   render: () => (
     <BestSpotSuggestion bestSpot={mockBestSpotExcellent} onSelectSite={fn()} />
   ),
@@ -249,6 +262,7 @@ DisplaysBestSpotData.test(
 );
 
 export const ShowsRatingStars = meta.story({
+  name: 'Shows Rating Stars',
   render: () => (
     <BestSpotSuggestion bestSpot={mockBestSpotExcellent} onSelectSite={fn()} />
   ),
@@ -264,6 +278,7 @@ ShowsRatingStars.test(
 );
 
 export const HidesWindWhenNotAvailable = meta.story({
+  name: 'Hides Wind When Not Available',
   render: () => (
     <BestSpotSuggestion bestSpot={mockBestSpotNoWind} onSelectSite={fn()} />
   ),
@@ -279,6 +294,7 @@ HidesWindWhenNotAvailable.test(
 );
 
 export const CallsOnSelectSiteCallback = meta.story({
+  name: 'Calls On Select Site Callback',
   render: () => {
     const onSelectSite = fn();
     return (
@@ -302,6 +318,7 @@ CallsOnSelectSiteCallback.test(
 );
 
 export const RendersNothingWhenNull = meta.story({
+  name: 'Renders Nothing When Null',
   render: () => <BestSpotSuggestion bestSpot={null} onSelectSite={fn()} />,
 });
 
@@ -315,6 +332,7 @@ RendersNothingWhenNull.test(
 );
 
 export const CompactCallsOnSelectSite = meta.story({
+  name: 'Compact Calls On Select Site',
   render: () => {
     const onSelectSite = fn();
     return (
@@ -347,6 +365,7 @@ CompactCallsOnSelectSite.test(
  * Meilleur spot pour aujourd'hui (day 0)
  */
 export const Today = meta.story({
+  name: 'Today',
   args: {
     bestSpot: mockBestSpotExcellent,
     selectedDayIndex: 0,
@@ -362,6 +381,7 @@ Today.test('should display "aujourd\'hui"', async () => {
  * Meilleur spot pour demain (day 1)
  */
 export const Tomorrow = meta.story({
+  name: 'Tomorrow',
   args: {
     bestSpot: mockBestSpotGood,
     selectedDayIndex: 1,
@@ -377,6 +397,7 @@ Tomorrow.test('should display "demain"', async () => {
  * Meilleur spot pour dans 3 jours (day 3)
  */
 export const Day3 = meta.story({
+  name: 'Day 3',
   args: {
     bestSpot: mockBestSpotModerate,
     selectedDayIndex: 3,
@@ -394,6 +415,7 @@ Day3.test('should display formatted date', async () => {
  * Test de vent favorable (good)
  */
 export const FavorableWind = meta.story({
+  name: 'Favorable Wind',
   args: {
     bestSpot: {
       ...mockBestSpotExcellent,
@@ -409,6 +431,7 @@ export const FavorableWind = meta.story({
  * Test de vent modéré (moderate)
  */
 export const ModerateWind = meta.story({
+  name: 'Moderate Wind',
   args: {
     bestSpot: {
       ...mockBestSpotModerate,
@@ -424,6 +447,7 @@ export const ModerateWind = meta.story({
  * Test de vent défavorable (bad)
  */
 export const BadWind = meta.story({
+  name: 'Bad Wind',
   args: {
     bestSpot: {
       ...mockBestSpotPoor,

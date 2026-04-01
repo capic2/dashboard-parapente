@@ -51,6 +51,7 @@ const mockFlightResult = {
 };
 
 export const FlightModal = meta.story({
+  name: 'Flight Modal',
   args: {
     isOpen: true,
     onClose: fn(),
