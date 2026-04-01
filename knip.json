@@ -4,7 +4,7 @@
     "apps/e2e/**",
     "apps/frontend/vitest.shims.d.ts"
   ],
-  "ignoreBinaries": ["eslint", "ruff", "black"],
+  "ignoreBinaries": ["eslint"],
   "ignoreDependencies": ["chromatic"],
   "ignoreExportsUsedInFile": true
 }

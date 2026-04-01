@@ -7,9 +7,11 @@ import {
 } from '../hooks/useFlights';
 
 export const Route = createFileRoute('/analytics')({
-  loader: () => {
-    queryClient.ensureQueryData(flightStatsQueryOptions());
-    queryClient.ensureQueryData(flightRecordsQueryOptions());
-    queryClient.ensureQueryData(flightsQueryOptions());
+  loader: async () => {
+    await Promise.all([
+      queryClient.ensureQueryData(flightStatsQueryOptions()),
+      queryClient.ensureQueryData(flightRecordsQueryOptions()),
+      queryClient.ensureQueryData(flightsQueryOptions()),
+    ]);
   },
 });

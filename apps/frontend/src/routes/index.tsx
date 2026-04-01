@@ -6,8 +6,8 @@ import { bestSpotQueryOptions } from '../hooks/useBestSpotAPI';
 
 export const Route = createFileRoute('/')({
   component: Dashboard,
-  loader: () => {
-    queryClient.ensureQueryData(sitesQueryOptions());
-    queryClient.ensureQueryData(bestSpotQueryOptions(0));
+  loader: async () => {
+    void queryClient.prefetchQuery(bestSpotQueryOptions(0));
+    await queryClient.ensureQueryData(sitesQueryOptions());
   },
 });

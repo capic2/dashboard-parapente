@@ -96,8 +96,8 @@
       "oxfmt -c .oxfmtrc.json"
     ],
     "apps/backend/**/*.py": [
-      "ruff check --output-format=github",
-      "black --check --diff"
+      "bash -c 'command -v .venv/bin/ruff >/dev/null 2>&1 && RUFF=.venv/bin/ruff || RUFF=ruff; $RUFF check --output-format=github \"$@\"' --",
+      "bash -c 'command -v .venv/bin/black >/dev/null 2>&1 && BLACK=.venv/bin/black || BLACK=black; $BLACK --check --diff \"$@\"' --"
     ]
   },
   "pnpm": {
