@@ -1,0 +1,2 @@
+# Force LF for shell scripts (required on WSL/Linux)
+.husky/* text eol=lf
