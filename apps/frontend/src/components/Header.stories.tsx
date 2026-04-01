@@ -1,12 +1,9 @@
 import preview from '../../.storybook/preview';
-import { TanstackRouterDecorator } from '../../.storybook/decorators';
 import Header from './Header';
-import { ComponentType } from 'react';
 
 const meta = preview.meta({
   title: 'Components/Header',
   component: Header,
-  decorators: [TanstackRouterDecorator],
   parameters: {
     layout: 'fullscreen',
     docs: {
@@ -18,8 +15,6 @@ const meta = preview.meta({
   },
   tags: ['autodocs'],
 });
-
-
 
 /**
  * Default header with title

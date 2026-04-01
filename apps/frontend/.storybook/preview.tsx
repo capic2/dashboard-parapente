@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 // detects English in CI headless browsers
 i18n.changeLanguage('fr');
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TanstackRouterDecorator } from './decorators';
 
 declare global {
   interface Window {
@@ -84,6 +85,11 @@ const preview = definePreview({
   addons: [addonA11y()],
 
   parameters: {
+    router: {
+      initialPath: '/',
+      routes: [{ path: '/', element: 'story' as const }],
+      renderRootRoute: (Story: React.ComponentType) => <Story />,
+    },
     i18n,
     locale: 'fr',
     locales: {
@@ -143,6 +149,7 @@ const preview = definePreview({
         </ThemeDecorator>
       );
     },
+    TanstackRouterDecorator,
   ],
 
   // MSW loader
