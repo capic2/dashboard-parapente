@@ -1,7 +1,7 @@
 import preview from '../../../.storybook/preview';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { http, HttpResponse } from 'msw';
 import { FilterBar } from './FilterBar';
+import { Site } from '@dashboard-parapente/shared-types';
 
 const meta = preview.meta({
   title: 'Components/Stats/FilterBar',
@@ -33,47 +33,73 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-export const defaultSites = [
-  { id: '1', name: 'Annecy', latitude: 45.899, longitude: 6.129 },
-  { id: '2', name: 'Chamonix', latitude: 45.924, longitude: 6.869 },
-  { id: '3', name: 'Mont Poupet', latitude: 46.909, longitude: 5.854 },
+export const defaultSites: Site[] = [
+  {
+    id: 'site-arguel',
+    code: 'ARGUEL',
+    name: 'Arguel',
+    elevation_m: 427,
+    latitude: 47.2518,
+    longitude: 6.1234,
+    region: 'Franche-Comté',
+    country: 'FR',
+    camera_distance: 500,
+    flight_count: 12,
+    is_active: true,
+    created_at: '2025-09-01T10:00:00Z',
+    updated_at: '2025-09-01T10:00:00Z',
+  },
+  {
+    id: 'site-mont-poupet',
+    code: 'MONT_POUPET',
+    name: 'Mont Poupet',
+    elevation_m: 842,
+    latitude: 47.3267,
+    longitude: 6.189,
+    region: 'Franche-Comté',
+    country: 'FR',
+    camera_distance: 500,
+    flight_count: 45,
+    is_active: true,
+    created_at: '2025-09-01T10:00:00Z',
+    updated_at: '2025-09-01T10:00:00Z',
+  },
+  {
+    id: 'site-la-cote',
+    code: 'LA_COTE',
+    name: 'La Côte',
+    elevation_m: 800,
+    latitude: 47.1456,
+    longitude: 6.2456,
+    region: 'Franche-Comté',
+    country: 'FR',
+    camera_distance: 500,
+    flight_count: 8,
+    is_active: true,
+    created_at: '2025-09-01T10:00:00Z',
+    updated_at: '2025-09-01T10:00:00Z',
+  },
 ];
 
-export const noSites: typeof defaultSites = [];
+export const noSites: Site[] = [];
 
 export const Default = meta.story({
   name: 'Default',
-  parameters: {
-    msw: {
-      handlers: [
-        http.get('*/api/spots', () =>
-          HttpResponse.json({ sites: defaultSites })
-        ),
-      ],
-    },
+  args: {
+    sites: defaultSites,
   },
 });
 
 export const NoSites = meta.story({
   name: 'No Sites',
-  parameters: {
-    msw: {
-      handlers: [
-        http.get('*/api/spots', () =>
-          HttpResponse.json({ sites: noSites })
-        ),
-      ],
-    },
+  args: {
+    sites: noSites,
   },
 });
 
 export const Loading = meta.story({
   name: 'Loading',
-  parameters: {
-    msw: {
-      handlers: [
-        http.get('*/api/spots', () => new Promise(() => {})),
-      ],
-    },
+  args: {
+    sites: [],
   },
 });

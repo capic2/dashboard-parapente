@@ -17,8 +17,8 @@ export interface SelectOption {
 interface SelectProps {
   label: string;
   options: SelectOption[];
-  value: string | null;
-  onChange: (value: string | null) => void;
+  value: Key | null;
+  onChange: (value: Key | null) => void;
   placeholder?: string;
 }
 
@@ -29,15 +29,10 @@ export function Select({
   onChange,
   placeholder,
 }: SelectProps) {
-  const handleChange = (key: Key) => {
-    const stringKey = String(key);
-    onChange(stringKey === '' ? null : stringKey);
-  };
-
   return (
     <AriaSelect
-      selectedKey={value ?? ''}
-      onSelectionChange={handleChange}
+      onChange={onChange}
+      value={value}
       className="flex flex-col gap-1.5"
     >
       <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300">

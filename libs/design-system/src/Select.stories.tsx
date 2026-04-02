@@ -63,7 +63,7 @@ export const WithSelection = meta.story({
 });
 
 WithSelection.test('shows selected value', async ({ canvas }) => {
-  await expect(canvas.getByText('Arguel')).toBeInTheDocument();
+  await expect(canvas.getByText('Arguel', {selector: 'span'})).toBeInTheDocument();
 });
 
 export const NoPlaceholder = meta.story({
