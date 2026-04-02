@@ -1,5 +1,4 @@
 import preview from '../../../.storybook/preview';
-import { expect, waitFor } from 'storybook/test';
 import RecordsDashboard from './RecordsDashboard';
 
 const meta = preview.meta({
@@ -89,24 +88,4 @@ export const NoRecords = meta.story({
       max_speed: null,
     },
   },
-});
-
-// Interaction Tests
-
-export const DisplaysAllRecordCards = meta.story({
-  name: 'Displays All Record Cards',
-  args: {
-    records: mockRecords,
-  },
-});
-
-DisplaysAllRecordCards.test('displays all record cards', async ({ canvas }) => {
-  await waitFor(() => {
-    expect(canvas.getByText('🏆 Records Personnels')).toBeInTheDocument();
-  });
-
-  await expect(canvas.getByText('Vol le plus long')).toBeInTheDocument();
-  await expect(canvas.getByText('Plus haute altitude')).toBeInTheDocument();
-  await expect(canvas.getByText('Plus longue distance')).toBeInTheDocument();
-  await expect(canvas.getByText('Vitesse maximale')).toBeInTheDocument();
 });

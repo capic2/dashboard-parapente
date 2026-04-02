@@ -1,9 +1,9 @@
 import { FigureWrapper } from '../../../.storybook/FigureWrapper.tsx';
 import preview from '../../../.storybook/preview.tsx';
-import { Default, Loading, NoSites } from './FilterBar.stories.tsx';
+import { Default, NoData, WithNullSiteId } from './SiteStats.stories.tsx';
 
 const meta = preview.meta({
-  title: 'Components/Stats/FilterBar/Chromatic',
+  title: 'Components/Stats/SiteStats/Chromatic',
   parameters: {
     layout: 'padded',
     chromatic: {
@@ -19,11 +19,11 @@ export const FilterBarChromatic = meta.story({
       <FigureWrapper title={Default.composed.name}>
         <Default.Component />
       </FigureWrapper>
-      <FigureWrapper title={NoSites.composed.name}>
-        <NoSites.Component />
+      <FigureWrapper title={NoData.composed.name}>
+        <NoData.Component />
       </FigureWrapper>
-      <FigureWrapper title={Loading.composed.name}>
-        <Loading.Component />
+      <FigureWrapper title={WithNullSiteId.composed.name}>
+        <WithNullSiteId.Component />
       </FigureWrapper>
     </div>
   ),

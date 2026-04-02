@@ -1,5 +1,6 @@
 import preview from '../../../.storybook/preview';
 import MonthlyStats from './MonthlyStats';
+import { Flight } from '@dashboard-parapente/shared-types';
 
 const meta = preview.meta({
   title: 'Components/Stats/MonthlyStats',
@@ -10,7 +11,7 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-export const defaultFlights = [
+export const defaultFlights: Flight[] = [
   ...Array.from({ length: 8 }, (_, i) => ({
     id: `${i}`,
     flight_date: `2024-03-${String(i + 1).padStart(2, '0')}`,
@@ -28,7 +29,7 @@ export const defaultFlights = [
   })),
 ];
 
-export const noDataFlights: typeof defaultFlights = [];
+export const noDataFlights: Flight[] = [];
 
 export const Default = meta.story({
   name: 'Default',

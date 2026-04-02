@@ -1,9 +1,13 @@
 import { FigureWrapper } from '../../../.storybook/FigureWrapper.tsx';
 import preview from '../../../.storybook/preview.tsx';
-import { Default, Loading, NoSites } from './FilterBar.stories.tsx';
+import {
+  AllRecords,
+  NoRecords,
+  PartialRecords,
+} from './RecordsDashboard.stories.tsx';
 
 const meta = preview.meta({
-  title: 'Components/Stats/FilterBar/Chromatic',
+  title: 'Components/Stats/RecordsDashboard/Chromatic',
   parameters: {
     layout: 'padded',
     chromatic: {
@@ -16,14 +20,14 @@ const meta = preview.meta({
 export const FilterBarChromatic = meta.story({
   render: () => (
     <div className="flex flex-col gap-2">
-      <FigureWrapper title={Default.composed.name}>
-        <Default.Component />
+      <FigureWrapper title={AllRecords.composed.name}>
+        <AllRecords.Component />
       </FigureWrapper>
-      <FigureWrapper title={NoSites.composed.name}>
-        <NoSites.Component />
+      <FigureWrapper title={NoRecords.composed.name}>
+        <NoRecords.Component />
       </FigureWrapper>
-      <FigureWrapper title={Loading.composed.name}>
-        <Loading.Component />
+      <FigureWrapper title={PartialRecords.composed.name}>
+        <PartialRecords.Component />
       </FigureWrapper>
     </div>
   ),

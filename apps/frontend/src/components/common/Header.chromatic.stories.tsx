@@ -1,9 +1,9 @@
 import { FigureWrapper } from '../../../.storybook/FigureWrapper.tsx';
 import preview from '../../../.storybook/preview.tsx';
-import { Default, Loading, NoSites } from './FilterBar.stories.tsx';
+import { Default } from './Header.stories.tsx';
 
 const meta = preview.meta({
-  title: 'Components/Stats/FilterBar/Chromatic',
+  title: 'Components/Header/Chromatic',
   parameters: {
     layout: 'padded',
     chromatic: {
@@ -13,17 +13,11 @@ const meta = preview.meta({
   tags: ['!autodocs'],
 });
 
-export const FilterBarChromatic = meta.story({
+export const HeaderChromatic = meta.story({
   render: () => (
     <div className="flex flex-col gap-2">
       <FigureWrapper title={Default.composed.name}>
         <Default.Component />
-      </FigureWrapper>
-      <FigureWrapper title={NoSites.composed.name}>
-        <NoSites.Component />
-      </FigureWrapper>
-      <FigureWrapper title={Loading.composed.name}>
-        <Loading.Component />
       </FigureWrapper>
     </div>
   ),

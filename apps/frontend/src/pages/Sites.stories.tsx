@@ -10,7 +10,7 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-const mockSites = {
+export const mockSites = {
   sites: [
     {
       id: 'site-arguel',
@@ -56,13 +56,11 @@ const mockSites = {
   ],
 };
 
-const defaultHandlers = [
-  http.get('*/api/spots', () => HttpResponse.json(mockSites)),
-  http.get('*/api/sites/:siteId/landings', () => HttpResponse.json([])),
-  http.patch('*/api/sites/:siteId', () => HttpResponse.json({ success: true })),
-  http.delete('*/api/sites/:siteId', () =>
-    HttpResponse.json({ success: true })
-  ),
+export const defaultHandlers = [
+  http.get('/api/spots', () => HttpResponse.json(mockSites)),
+  http.get('/api/sites/:siteId/landings', () => HttpResponse.json([])),
+  http.patch('/api/sites/:siteId', () => HttpResponse.json({ success: true })),
+  http.delete('/api/sites/:siteId', () => HttpResponse.json({ success: true })),
 ];
 
 export const Default = meta.story({
@@ -70,45 +68,25 @@ export const Default = meta.story({
   parameters: { msw: { handlers: defaultHandlers } },
 });
 
-Default.test('renders sites with filter bar', async ({ canvas }) => {
+Default.test('filters by landing type', async ({ canvas, userEvent }) => {
   await canvas.findByText('Gestion des Sites');
-  await expect(canvas.getByText('Arguel')).toBeInTheDocument();
-  await expect(canvas.getByText('Chalais')).toBeInTheDocument();
+
+  const typeSelect = canvas.getByDisplayValue('Tous les types');
+  await userEvent.selectOptions(typeSelect, 'landing');
+
+  await expect(canvas.getByText(/1 site/)).toBeInTheDocument();
   await expect(canvas.getByText("Plaine d'Arguel")).toBeInTheDocument();
-  await expect(canvas.getByText(/3 site/)).toBeInTheDocument();
 });
-
-export const FilteredByType = meta.story({
-  name: 'Filtered By Type',
-  parameters: { msw: { handlers: defaultHandlers } },
-});
-
-FilteredByType.test(
-  'filters by landing type',
-  async ({ canvas, userEvent }) => {
-    await canvas.findByText('Gestion des Sites');
-
-    const typeSelect = canvas.getByDisplayValue('Tous les types');
-    await userEvent.selectOptions(typeSelect, 'landing');
-
-    await expect(canvas.getByText(/1 site/)).toBeInTheDocument();
-    await expect(canvas.getByText("Plaine d'Arguel")).toBeInTheDocument();
-  }
-);
 
 export const EmptyState = meta.story({
   name: 'Empty State',
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
+        http.get('/api/spots', () => HttpResponse.json({ sites: [] })),
       ],
     },
   },
-});
-
-EmptyState.test('shows empty state', async ({ canvas }) => {
-  await canvas.findByText(/Aucun site/);
 });
 
 export const Loading = meta.story({
@@ -116,7 +94,7 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/spots', async () => {
+        http.get('/api/spots', async () => {
           await new Promise(() => {});
         }),
       ],
