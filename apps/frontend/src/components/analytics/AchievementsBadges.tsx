@@ -1,8 +1,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconCard } from '@dashboard-parapente/design-system';
-import { useFlights } from '../../hooks/flights/useFlights';
-import { useFlightStats } from '../../hooks/flights/useFlights';
+import type { FlightStats } from '../../types';
 
 interface AchievementBadge {
   id: string;
@@ -14,6 +13,10 @@ interface AchievementBadge {
   threshold?: number;
 }
 
+interface AchievementsBadgesProps {
+  stats: FlightStats;
+}
+
 /**
  * Système de badges d'achievements
  *
@@ -23,14 +26,10 @@ interface AchievementBadge {
  * - Records personnels
  * - Consistance (streak)
  */
-export default function AchievementsBadges() {
+export default function AchievementsBadges({ stats }: AchievementsBadgesProps) {
   const { t } = useTranslation();
-  const { isLoading: flightsLoading } = useFlights({ limit: 500 });
-  const { data: stats, isLoading: statsLoading } = useFlightStats();
 
   const badges = useMemo(() => {
-    if (!stats) return [];
-
     const totalFlights = stats.total_flights || 0;
     const totalHours = stats.total_hours || 0;
     const maxAltitude = stats.max_altitude_m || 0;
@@ -145,21 +144,6 @@ export default function AchievementsBadges() {
 
   const unlockedBadges = badges.filter((b) => b.unlocked);
   const lockedBadges = badges.filter((b) => !b.unlocked);
-
-  if (flightsLoading || statsLoading) {
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
-        <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded mb-4 w-1/3"></div>
-          <div className="grid grid-cols-3 gap-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-24 bg-gray-200 dark:bg-gray-600 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">

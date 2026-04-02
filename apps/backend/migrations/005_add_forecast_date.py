@@ -35,18 +35,12 @@ def upgrade():
         result = conn.execute(text("PRAGMA table_info(emagram_analysis)"))
         existing_columns = {row[1] for row in result.fetchall()}
 
-        if "forecast_date" in existing_columns:
-            logger.info(f"⊙ Column forecast_date already exists, skipping {MIGRATION_NAME}")
-            print(f"⊙ Column forecast_date already exists, skipping {MIGRATION_NAME}")
-            return
+        if "forecast_date" not in existing_columns:
+            logger.info("Adding column forecast_date to emagram_analysis...")
+            print("Adding column forecast_date to emagram_analysis...")
+            conn.execute(text("ALTER TABLE emagram_analysis ADD COLUMN forecast_date DATE"))
 
-        # Add column
-        logger.info("Adding column forecast_date to emagram_analysis...")
-        print("Adding column forecast_date to emagram_analysis...")
-
-        conn.execute(text("ALTER TABLE emagram_analysis ADD COLUMN forecast_date DATE"))
-
-        # Backfill from analysis_date
+        # Backfill from analysis_date (always run to handle partial migrations)
         conn.execute(
             text(
                 "UPDATE emagram_analysis SET forecast_date = analysis_date WHERE forecast_date IS NULL"

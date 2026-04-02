@@ -1,8 +1,12 @@
 import { useTranslation } from 'react-i18next';
-import { useFlightRecords } from '../../hooks/flights/useFlights';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { enUS } from 'date-fns/locale';
+import type { FlightRecords } from '../../types';
+
+interface RecordsDashboardProps {
+  records: FlightRecords;
+}
 
 /**
  * Dashboard des records personnels
@@ -13,40 +17,8 @@ import { enUS } from 'date-fns/locale';
  * - Plus longue distance
  * - Vitesse maximale
  */
-export default function RecordsDashboard() {
+export default function RecordsDashboard({ records }: RecordsDashboardProps) {
   const { t, i18n } = useTranslation();
-  const { data: records, isLoading, error } = useFlightRecords();
-
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map((i) => (
-          <div
-            key={i}
-            className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md animate-pulse"
-          >
-            <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded mb-2 w-2/3"></div>
-            <div className="h-8 bg-gray-200 dark:bg-gray-600 rounded mb-2"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-1/2"></div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
-        <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
-          🏆 {t('records.title')}
-        </h3>
-        <div className="text-red-600">
-          {t('common.error') + ' : '}
-          {error.message}
-        </div>
-      </div>
-    );
-  }
 
   const recordCards = [
     {

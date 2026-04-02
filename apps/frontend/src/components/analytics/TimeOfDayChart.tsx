@@ -9,10 +9,9 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import { useFlights } from '../../hooks/flights/useFlights';
-import { useFiltersStore } from '../../stores/filtersStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { parseISO, getHours } from 'date-fns';
+import type { Flight } from '../../types';
 
 // Couleurs pour chaque période de la journée
 const TIME_COLORS: Record<string, string> = {
@@ -22,25 +21,18 @@ const TIME_COLORS: Record<string, string> = {
   'Soirée (18h-24h)': '#7c3aed',
 };
 
+interface TimeOfDayChartProps {
+  flights: Flight[];
+}
+
 /**
  * Graphique des heures de vol préférées
  *
  * Analyse les heures de décollage (departure_time) pour identifier
  * les périodes de la journée préférées du pilote
  */
-export default function TimeOfDayChart() {
+export default function TimeOfDayChart({ flights }: TimeOfDayChartProps) {
   const isDark = useThemeStore((s) => s.resolved === 'dark');
-  const { filters } = useFiltersStore();
-  const {
-    data: flights = [],
-    isLoading,
-    error,
-  } = useFlights({
-    limit: 300,
-    siteId: filters.siteId || undefined,
-    dateFrom: filters.dateFrom || undefined,
-    dateTo: filters.dateTo || undefined,
-  });
 
   const chartData = useMemo(() => {
     if (!flights.length) return [];
@@ -82,28 +74,6 @@ export default function TimeOfDayChart() {
     }));
   }, [flights]);
 
-  if (isLoading) {
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
-        <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded mb-4 w-1/3"></div>
-          <div className="h-64 bg-gray-200 dark:bg-gray-600 rounded"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
-        <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
-          ⏰ Heures de vol préférées
-        </h3>
-        <div className="text-red-600">Erreur : {error.message}</div>
-      </div>
-    );
-  }
-
   if (!chartData.length || flights.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
@@ -135,7 +105,10 @@ export default function TimeOfDayChart() {
           data={chartData}
           margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e5e7eb'} />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke={isDark ? '#374151' : '#e5e7eb'}
+          />
           <XAxis
             dataKey="period"
             tick={{ fill: isDark ? '#9ca3af' : '#6b7280', fontSize: 12 }}

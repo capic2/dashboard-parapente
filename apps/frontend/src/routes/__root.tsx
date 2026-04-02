@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { createRootRoute, Outlet } from '@tanstack/react-router';
 import Header from '../components/common/Header';
 
@@ -30,7 +31,9 @@ function RootComponent() {
       <div className="max-w-7xl mx-auto">
         <Header />
         <main>
-          <Outlet />
+          <Suspense>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

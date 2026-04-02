@@ -10,24 +10,16 @@ import {
   YAxis,
 } from 'recharts';
 import { useTranslation } from 'react-i18next';
-import { useFlights } from '../../hooks/flights/useFlights';
-import { useFiltersStore } from '../../stores/filtersStore';
 import { format } from 'date-fns';
 import { enUS, fr } from 'date-fns/locale';
+import type { Flight } from '../../types';
 
-export default function MonthlyStats() {
+interface MonthlyStatsProps {
+  flights: Flight[];
+}
+
+export default function MonthlyStats({ flights }: MonthlyStatsProps) {
   const { t, i18n } = useTranslation();
-  const { filters } = useFiltersStore();
-  const {
-    data: flights = [],
-    isLoading,
-    error,
-  } = useFlights({
-    limit: 300,
-    siteId: filters.siteId || undefined,
-    dateFrom: filters.dateFrom || undefined,
-    dateTo: filters.dateTo || undefined,
-  });
 
   const chartData = useMemo(() => {
     if (!flights.length) return [];
@@ -62,18 +54,7 @@ export default function MonthlyStats() {
       }));
   }, [flights, i18n.language]);
 
-  if (isLoading) {
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
-        <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded mb-4 w-1/3"></div>
-          <div className="h-64 bg-gray-200 dark:bg-gray-600 rounded"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !chartData.length) {
+  if (!chartData.length) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
