@@ -1,14 +1,15 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useFlightStats } from '../../hooks/flights/useFlights';
+import type { FlightStats } from '../../types';
 
-export default function StatsDashboard() {
+interface StatsDashboardProps {
+  stats: FlightStats;
+}
+
+export default function StatsDashboard({ stats }: StatsDashboardProps) {
   const { t } = useTranslation();
-  const { data: stats, isLoading, error } = useFlightStats();
 
   const formattedStats = useMemo(() => {
-    if (!stats) return null;
-
     return {
       totalFlights: stats.total_flights || 0,
       totalHours: Math.floor((stats.total_duration_minutes || 0) / 60),
@@ -22,31 +23,6 @@ export default function StatsDashboard() {
     };
   }, [stats]);
 
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[...Array(8)].map((_, i) => (
-          <div
-            key={i}
-            className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md animate-pulse"
-          >
-            <div className="w-12 h-12 bg-gray-200 dark:bg-gray-600 rounded-full mb-3"></div>
-            <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded mb-2"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-2/3"></div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (error || !formattedStats) {
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md text-center text-red-600">
-        <p>❌ {t('stats.statsLoadError')}</p>
-      </div>
-    );
-  }
-
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {/* Total Flights */}
@@ -55,7 +31,9 @@ export default function StatsDashboard() {
         <div className="text-2xl font-bold text-gray-900 dark:text-white">
           {formattedStats.totalFlights}
         </div>
-        <div className="text-sm text-gray-600 dark:text-gray-300">{t('stats.flights')}</div>
+        <div className="text-sm text-gray-600 dark:text-gray-300">
+          {t('stats.flights')}
+        </div>
       </div>
 
       {/* Total Hours */}
@@ -64,7 +42,9 @@ export default function StatsDashboard() {
         <div className="text-2xl font-bold text-gray-900 dark:text-white">
           {formattedStats.totalHours}h{formattedStats.totalMinutes}m
         </div>
-        <div className="text-sm text-gray-600 dark:text-gray-300">{t('stats.totalTime')}</div>
+        <div className="text-sm text-gray-600 dark:text-gray-300">
+          {t('stats.totalTime')}
+        </div>
       </div>
 
       {/* Total Distance */}
@@ -73,7 +53,9 @@ export default function StatsDashboard() {
         <div className="text-2xl font-bold text-gray-900 dark:text-white">
           {formattedStats.totalDistance} km
         </div>
-        <div className="text-sm text-gray-600 dark:text-gray-300">{t('stats.totalDistance')}</div>
+        <div className="text-sm text-gray-600 dark:text-gray-300">
+          {t('stats.totalDistance')}
+        </div>
       </div>
 
       {/* Elevation Gain */}
@@ -82,7 +64,9 @@ export default function StatsDashboard() {
         <div className="text-2xl font-bold text-gray-900 dark:text-white">
           {formattedStats.totalElevation} m
         </div>
-        <div className="text-sm text-gray-600 dark:text-gray-300">{t('stats.totalElevation')}</div>
+        <div className="text-sm text-gray-600 dark:text-gray-300">
+          {t('stats.totalElevation')}
+        </div>
       </div>
 
       {/* Average Duration */}
@@ -91,7 +75,9 @@ export default function StatsDashboard() {
         <div className="text-2xl font-bold text-gray-900 dark:text-white">
           {formattedStats.avgDuration} min
         </div>
-        <div className="text-sm text-gray-600 dark:text-gray-300">{t('stats.avgDuration')}</div>
+        <div className="text-sm text-gray-600 dark:text-gray-300">
+          {t('stats.avgDuration')}
+        </div>
       </div>
 
       {/* Average Distance */}
@@ -100,7 +86,9 @@ export default function StatsDashboard() {
         <div className="text-2xl font-bold text-gray-900 dark:text-white">
           {formattedStats.avgDistance} km
         </div>
-        <div className="text-sm text-gray-600 dark:text-gray-300">{t('stats.avgDistance')}</div>
+        <div className="text-sm text-gray-600 dark:text-gray-300">
+          {t('stats.avgDistance')}
+        </div>
       </div>
 
       {/* Max Altitude */}
