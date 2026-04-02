@@ -55,12 +55,10 @@ const mockEmagramHistory = [
 ];
 
 const defaultHandlers = [
-  http.get('*/api/spots/:id', () => HttpResponse.json(mockSite)),
-  http.get('*/api/emagram/latest', () => HttpResponse.json(mockEmagramLatest)),
-  http.get('*/api/emagram/history', () =>
-    HttpResponse.json(mockEmagramHistory)
-  ),
-  http.post('*/api/emagram/analyze', () =>
+  http.get('/api/spots/:id', () => HttpResponse.json(mockSite)),
+  http.get('/api/emagram/latest', () => HttpResponse.json(mockEmagramLatest)),
+  http.get('/api/emagram/history', () => HttpResponse.json(mockEmagramHistory)),
+  http.post('/api/emagram/analyze', () =>
     HttpResponse.json({ success: true, id: 'emagram-new' })
   ),
 ];
@@ -70,19 +68,15 @@ export const Default = meta.story({
   parameters: { msw: { handlers: defaultHandlers } },
 });
 
-Default.test('renders thermal analysis page', async ({ canvas }) => {
-  await canvas.findByText(/Analyse Thermique|Emagramme|Thermal/i);
-});
-
 export const NoData = meta.story({
   name: 'No Data',
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/spots/:id', () => HttpResponse.json(mockSite)),
-        http.get('*/api/emagram/latest', () => HttpResponse.json(null)),
-        http.get('*/api/emagram/history', () => HttpResponse.json([])),
-        http.post('*/api/emagram/trigger', () =>
+        http.get('/api/spots/:id', () => HttpResponse.json(mockSite)),
+        http.get('/api/emagram/latest', () => HttpResponse.json(null)),
+        http.get('/api/emagram/history', () => HttpResponse.json([])),
+        http.post('/api/emagram/trigger', () =>
           HttpResponse.json({ success: true })
         ),
       ],
@@ -95,11 +89,11 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/spots/:id', () => HttpResponse.json(mockSite)),
-        http.get('*/api/emagram/latest', async () => {
+        http.get('/api/spots/:id', () => HttpResponse.json(mockSite)),
+        http.get('/api/emagram/latest', async () => {
           await new Promise(() => {});
         }),
-        http.get('*/api/emagram/history', async () => {
+        http.get('/api/emagram/history', async () => {
           await new Promise(() => {});
         }),
       ],

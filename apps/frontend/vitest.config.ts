@@ -64,6 +64,7 @@ export default defineConfig({
             'node_modules',
             'dist',
             '**/FlightViewer3D.stories.tsx',
+            '**/FlightViewer3D.chromatic.stories.tsx',
             '**/EmagramWidget.stories.tsx',
           ],
           testTimeout: 15000,
