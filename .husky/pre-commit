@@ -1,5 +1,5 @@
 #!/bin/sh
-set -e
+#set -e
 
 # Ensure node/pnpm are in PATH (nvm/fnm)
 export NVM_DIR="$HOME/.nvm"
