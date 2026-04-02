@@ -66,6 +66,7 @@ const defaultHandlers = [
 ];
 
 export const Default = meta.story({
+  name: 'Default',
   parameters: { msw: { handlers: defaultHandlers } },
 });
 
@@ -74,6 +75,7 @@ Default.test('renders thermal analysis page', async ({ canvas }) => {
 });
 
 export const NoData = meta.story({
+  name: 'No Data',
   parameters: {
     msw: {
       handlers: [
@@ -89,6 +91,7 @@ export const NoData = meta.story({
 });
 
 export const Loading = meta.story({
+  name: 'Loading',
   parameters: {
     msw: {
       handlers: [

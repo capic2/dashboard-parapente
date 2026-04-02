@@ -191,6 +191,7 @@ const mockDailySummaryAllBad = {
 
 // Default story - Mixed conditions
 export const MixedConditions = meta.story({
+  name: 'Mixed Conditions',
   args: {
     spotId: '1',
     selectedDayIndex: 0,
@@ -242,6 +243,7 @@ MixedConditions.test(
 
 // All good conditions
 export const AllGoodConditions = meta.story({
+  name: 'All Good Conditions',
   args: {
     spotId: '1',
     selectedDayIndex: 0,
@@ -282,6 +284,7 @@ AllGoodConditions.test(
 
 // All bad conditions
 export const AllBadConditions = meta.story({
+  name: 'All Bad Conditions',
   args: {
     spotId: '1',
     selectedDayIndex: 0,
@@ -322,6 +325,7 @@ AllBadConditions.test(
 
 // Second day selected
 export const SecondDaySelected = meta.story({
+  name: 'Second Day Selected',
   args: {
     spotId: '1',
     selectedDayIndex: 1,
@@ -339,6 +343,7 @@ export const SecondDaySelected = meta.story({
 
 // No selection
 export const NoSelection = meta.story({
+  name: 'No Selection',
   args: {
     spotId: '1',
   },
@@ -355,6 +360,7 @@ export const NoSelection = meta.story({
 
 // With callback
 export const WithCallback = meta.story({
+  name: 'With Callback',
   args: {
     spotId: '1',
     selectedDayIndex: 0,
@@ -373,6 +379,7 @@ export const WithCallback = meta.story({
 
 // Loading state
 export const Loading = meta.story({
+  name: 'Loading',
   args: {
     spotId: '1',
   },
@@ -389,6 +396,7 @@ export const Loading = meta.story({
 
 // Error state
 export const Error = meta.story({
+  name: 'Error',
   args: {
     spotId: '1',
   },
@@ -405,6 +413,7 @@ export const Error = meta.story({
 
 // Empty days data
 export const EmptyDays = meta.story({
+  name: 'Empty Days',
   args: {
     spotId: '1',
   },
@@ -421,6 +430,7 @@ export const EmptyDays = meta.story({
 
 // No days field
 export const NoDaysField = meta.story({
+  name: 'No Days Field',
   args: {
     spotId: '1',
   },
@@ -439,6 +449,7 @@ export const NoDaysField = meta.story({
 
 /*
 export const DisplaysDailyData = meta.story({
+  name: 'Displays Daily Data',
   args: {
     spotId: '1',
     selectedDayIndex: 0,
@@ -472,6 +483,7 @@ DisplaysDailyData.test('displays daily forecast data', async ({ canvas }) => {
 */
 
 export const ShowsLoadingState = meta.story({
+  name: 'Shows Loading State',
   args: {
     spotId: '1',
   },
@@ -493,6 +505,7 @@ ShowsLoadingState.test('shows loading state', async ({ canvas }) => {
 });
 
 export const ShowsErrorState = meta.story({
+  name: 'Shows Error State',
   args: {
     spotId: '1',
   },
@@ -515,6 +528,7 @@ ShowsErrorState.test('shows error state', async ({ canvas }) => {
 
 /*
 export const HighlightsSelectedDay = meta.story({
+  name: 'Highlights Selected Day',
   args: {
     spotId: '1',
     selectedDayIndex: 1,
@@ -542,6 +556,7 @@ HighlightsSelectedDay.test('highlights selected day', async ({ canvas }) => {
 });
 
 export const CallsOnSelectDayCallback = meta.story({
+  name: 'Calls On Select Day Callback',
   args: {
     spotId: '1',
     selectedDayIndex: 0,

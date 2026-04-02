@@ -66,6 +66,7 @@ const defaultHandlers = [
 ];
 
 export const Default = meta.story({
+  name: 'Default',
   parameters: { msw: { handlers: defaultHandlers } },
 });
 
@@ -78,6 +79,7 @@ Default.test('renders sites with filter bar', async ({ canvas }) => {
 });
 
 export const FilteredByType = meta.story({
+  name: 'Filtered By Type',
   parameters: { msw: { handlers: defaultHandlers } },
 });
 
@@ -95,6 +97,7 @@ FilteredByType.test(
 );
 
 export const EmptyState = meta.story({
+  name: 'Empty State',
   parameters: {
     msw: {
       handlers: [
@@ -109,6 +112,7 @@ EmptyState.test('shows empty state', async ({ canvas }) => {
 });
 
 export const Loading = meta.story({
+  name: 'Loading',
   parameters: {
     msw: {
       handlers: [

@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 import Dashboard from '../pages/Dashboard';
 import { queryClient } from '../lib/queryClient';
-import { sitesQueryOptions } from '../hooks/useSites';
-import { bestSpotQueryOptions } from '../hooks/useBestSpotAPI';
+import { sitesQueryOptions } from '../hooks/sites/useSites';
+import { bestSpotQueryOptions } from '../hooks/weather/useBestSpotAPI';
 
 export const Route = createFileRoute('/')({
   component: Dashboard,

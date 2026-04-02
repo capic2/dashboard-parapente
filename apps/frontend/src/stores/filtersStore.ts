@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { Key } from 'react-aria-components';
 
 /**
  * Filtres pour les analyses de vols
  */
 interface FlightFilters {
-  siteId: string | null;
+  siteId: Key | null;
   dateFrom: string | null; // Format: YYYY-MM-DD
   dateTo: string | null; // Format: YYYY-MM-DD
 }
@@ -15,7 +16,7 @@ interface FiltersStore {
   filters: FlightFilters;
 
   // Actions
-  setSiteId: (siteId: string | null) => void;
+  setSiteId: (siteId: Key | null) => void;
   setDateFrom: (date: string | null) => void;
   setDateTo: (date: string | null) => void;
   setFilters: (filters: Partial<FlightFilters>) => void;

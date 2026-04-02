@@ -173,6 +173,7 @@ const mockSite = {
 
 // Default story - Good conditions
 export const GoodConditions = meta.story({
+  name: 'Good Conditions',
   args: {
     spotId: '1',
   },
@@ -192,6 +193,7 @@ export const GoodConditions = meta.story({
 
 // Moderate conditions
 export const ModerateConditions = meta.story({
+  name: 'Moderate Conditions',
   args: {
     spotId: '1',
   },
@@ -224,6 +226,7 @@ ModerateConditions.test(
 
 // Limite conditions
 export const LimiteConditions = meta.story({
+  name: 'Limite Conditions',
   args: {
     spotId: '1',
   },
@@ -256,6 +259,7 @@ LimiteConditions.test(
 
 // Bad conditions
 export const BadConditions = meta.story({
+  name: 'Bad Conditions',
   args: {
     spotId: '1',
   },
@@ -287,6 +291,7 @@ BadConditions.test('displays bad conditions correctly', async ({ canvas }) => {
 
 // No gusts data
 export const NoGustsData = meta.story({
+  name: 'No Gusts Data',
   args: {
     spotId: '1',
   },
@@ -306,6 +311,7 @@ export const NoGustsData = meta.story({
 
 // Loading state
 export const Loading = meta.story({
+  name: 'Loading',
   args: {
     spotId: '1',
   },
@@ -325,6 +331,7 @@ export const Loading = meta.story({
 
 // Error state
 export const Error = meta.story({
+  name: 'Error',
   args: {
     spotId: '1',
   },
@@ -344,6 +351,7 @@ export const Error = meta.story({
 
 // Site without orientation (no WindIndicator)
 export const NoSiteOrientation = meta.story({
+  name: 'No Site Orientation',
   args: {
     spotId: '1',
   },
@@ -365,6 +373,7 @@ export const NoSiteOrientation = meta.story({
 
 /*
 export const DisplaysWeatherData = meta.story({
+  name: 'Displays Weather Data',
   args: {
     spotId: '1',
   },
@@ -395,6 +404,7 @@ DisplaysWeatherData.test('should display weather data correctly', async ({ canva
 });
 
 export const ShowsLoadingState = meta.story({
+  name: 'Shows Loading State',
   args: {
     spotId: '1',
   },
@@ -419,6 +429,7 @@ ShowsLoadingState.test('should show loading state', async ({ canvas }) => {
 });
 
 export const ShowsErrorState = meta.story({
+  name: 'Shows Error State',
   args: {
     spotId: '1',
   },

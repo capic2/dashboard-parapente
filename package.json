@@ -46,7 +46,7 @@
     "@nx/playwright": "^22.6.0",
     "@nx/vite": "^22.6.0",
     "@nx/vitest": "^22.6.0",
-    "@playwright/test": "1.59.1",
+    "@playwright/test": "1.58.0",
     "@storybook/addon-a11y": "^10.3.3",
     "@storybook/addon-docs": "^10.3.3",
     "@storybook/addon-vitest": "^10.3.3",
@@ -73,7 +73,7 @@
     "nx": "^22.6.0",
     "oxfmt": "^0.43.0",
     "oxlint": "^1.57.0",
-    "playwright": "1.59.1",
+    "playwright": "1.58.0",
     "storybook": "^10.3.3",
     "storybook-react-i18next": "^10.1.1",
     "tailwindcss": "^4.2.1",
@@ -96,8 +96,8 @@
       "oxfmt -c .oxfmtrc.json"
     ],
     "apps/backend/**/*.py": [
-      "bash -c 'command -v .venv/bin/ruff >/dev/null 2>&1 && RUFF=.venv/bin/ruff || RUFF=ruff; $RUFF check --output-format=github \"$@\"' --",
-      "bash -c 'command -v .venv/bin/black >/dev/null 2>&1 && BLACK=.venv/bin/black || BLACK=black; $BLACK --check --diff \"$@\"' --"
+      "apps/backend/.venv/bin/ruff check --output-format=github",
+      "apps/backend/.venv/bin/black"
     ]
   },
   "pnpm": {

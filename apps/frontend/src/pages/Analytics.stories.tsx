@@ -98,6 +98,7 @@ const defaultHandlers = [
 ];
 
 export const Default = meta.story({
+  name: 'Default',
   parameters: { msw: { handlers: defaultHandlers } },
 });
 
@@ -106,6 +107,7 @@ Default.test('renders analytics page with title', async ({ canvas }) => {
 });
 
 export const Loading = meta.story({
+  name: 'Loading',
   parameters: {
     msw: {
       handlers: [

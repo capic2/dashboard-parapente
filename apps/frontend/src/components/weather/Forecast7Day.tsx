@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { useDailySummary, createWeatherQueryFn } from '../../hooks/useWeather';
+import { useDailySummary, createWeatherQueryFn } from '../../hooks/weather/useWeather';
 import { useQueryClient } from '@tanstack/react-query';
-import CacheTimestamp from '../CacheTimestamp';
+import CacheTimestamp from '../common/CacheTimestamp';
 
 interface Forecast7DayProps {
   spotId: string;

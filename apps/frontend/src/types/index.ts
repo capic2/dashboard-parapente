@@ -1,5 +1,7 @@
 // Core domain types
 // Re-export types from Zod schemas to ensure consistency between validation and types
+import {Key} from "react-aria-components";
+
 export type {
   Site,
   Flight,
@@ -9,7 +11,7 @@ export type {
 } from '@dashboard-parapente/shared-types';
 
 export interface FlightFilters {
-  siteId?: string;
+  siteId?: Key | null;
   dateFrom?: string;
   dateTo?: string;
   limit?: number;

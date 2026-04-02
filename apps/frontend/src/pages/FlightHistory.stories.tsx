@@ -115,6 +115,7 @@ const defaultHandlers = [
 ];
 
 export const Default = meta.story({
+  name: 'Default',
   parameters: { msw: { handlers: defaultHandlers } },
 });
 
@@ -124,6 +125,7 @@ Default.test('renders flight list', async ({ canvas }) => {
 });
 
 export const EmptyState = meta.story({
+  name: 'Empty State',
   parameters: {
     msw: {
       handlers: [
@@ -135,6 +137,7 @@ export const EmptyState = meta.story({
 });
 
 export const Loading = meta.story({
+  name: 'Loading',
   parameters: {
     msw: {
       handlers: [
@@ -148,6 +151,7 @@ export const Loading = meta.story({
 });
 
 export const DeleteSingleFlight = meta.story({
+  name: 'Delete Single Flight',
   parameters: { msw: { handlers: defaultHandlers } },
 });
 
@@ -212,6 +216,7 @@ const confirmDeleteHandlers = (() => {
 })();
 
 export const ConfirmDeleteFlight = meta.story({
+  name: 'Confirm Delete Flight',
   parameters: { msw: { handlers: confirmDeleteHandlers } },
 });
 
@@ -246,6 +251,7 @@ ConfirmDeleteFlight.test('deletes flight on confirm', async ({ canvas }) => {
 });
 
 export const DeleteMultipleFlights = meta.story({
+  name: 'Delete Multiple Flights',
   parameters: { msw: { handlers: defaultHandlers } },
 });
 

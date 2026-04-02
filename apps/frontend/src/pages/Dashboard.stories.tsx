@@ -144,6 +144,7 @@ const defaultHandlers = [
 ];
 
 export const Default = meta.story({
+  name: 'Default',
   parameters: { msw: { handlers: defaultHandlers } },
 });
 
@@ -156,6 +157,7 @@ Default.test(
 );
 
 export const Loading = meta.story({
+  name: 'Loading',
   parameters: {
     msw: {
       handlers: [
@@ -169,6 +171,7 @@ export const Loading = meta.story({
 });
 
 export const Error = meta.story({
+  name: 'Error',
   parameters: {
     msw: {
       handlers: [

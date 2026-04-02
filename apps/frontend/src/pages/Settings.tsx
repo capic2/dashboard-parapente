@@ -1,13 +1,13 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { sitesQueryOptions } from '../hooks/useSites';
+import { sitesQueryOptions } from '../hooks/sites/useSites';
 import {
   useWeatherSources,
   useWeatherSourceStats,
   useDeleteWeatherSource,
-} from '../hooks/useWeatherSources';
-import { WeatherSourceCard } from '../components/WeatherSourceCard';
+} from '../hooks/weather/useWeatherSources';
+import { WeatherSourceCard } from '../components/settings/WeatherSourceCard';
 import type { WeatherSource } from '../types/weatherSources';
 import { useThemeStore } from '../stores/themeStore';
 import type { ThemePreference } from '../stores/themeStore';

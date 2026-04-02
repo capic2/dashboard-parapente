@@ -67,7 +67,13 @@ const initializeMsw = (
 initializeMsw({ onUnhandledRequest: 'error', quiet: true }, defaultMswHandlers);
 
 // Theme decorator — applies/removes .dark class based on the current mode or toolbar global
-function ThemeDecorator({ children, theme }: { children: React.ReactNode; theme: string }) {
+function ThemeDecorator({
+  children,
+  theme,
+}: {
+  children: React.ReactNode;
+  theme: string;
+}) {
   useEffect(() => {
     const isDark = theme === 'dark';
     document.documentElement.classList.toggle('dark', isDark);
@@ -133,6 +139,7 @@ const preview = definePreview({
           viewport: { width: 375, height: 812 },
         },
       },
+      disableSnapshot: true,
     },
     layout: 'centered',
   },
@@ -144,7 +151,8 @@ const preview = definePreview({
   // Global decorators
   decorators: [
     (Story, context) => {
-      const theme = context.globals?.theme ?? context.parameters?.theme ?? 'light';
+      const theme =
+        context.globals?.theme ?? context.parameters?.theme ?? 'light';
       return (
         <ThemeDecorator theme={theme}>
           <div style={{ padding: '1rem' }}>

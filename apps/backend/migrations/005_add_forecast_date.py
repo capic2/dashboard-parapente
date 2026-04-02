@@ -22,9 +22,9 @@ def upgrade():
     engine = create_engine(config.DATABASE_URL)
     with engine.connect() as conn:
         # Check if table exists
-        result = conn.execute(text(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='emagram_analysis'"
-        ))
+        result = conn.execute(
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name='emagram_analysis'")
+        )
 
         if not result.fetchone():
             logger.info(f"⊙ Table emagram_analysis doesn't exist yet, skipping {MIGRATION_NAME}")
@@ -35,28 +35,24 @@ def upgrade():
         result = conn.execute(text("PRAGMA table_info(emagram_analysis)"))
         existing_columns = {row[1] for row in result.fetchall()}
 
-        if 'forecast_date' in existing_columns:
-            logger.info(f"⊙ Column forecast_date already exists, skipping {MIGRATION_NAME}")
-            print(f"⊙ Column forecast_date already exists, skipping {MIGRATION_NAME}")
-            return
+        if "forecast_date" not in existing_columns:
+            logger.info("Adding column forecast_date to emagram_analysis...")
+            print("Adding column forecast_date to emagram_analysis...")
+            conn.execute(text("ALTER TABLE emagram_analysis ADD COLUMN forecast_date DATE"))
 
-        # Add column
-        logger.info(f"Adding column forecast_date to emagram_analysis...")
-        print(f"Adding column forecast_date to emagram_analysis...")
-
-        conn.execute(text(
-            "ALTER TABLE emagram_analysis ADD COLUMN forecast_date DATE"
-        ))
-
-        # Backfill from analysis_date
-        conn.execute(text(
-            "UPDATE emagram_analysis SET forecast_date = analysis_date WHERE forecast_date IS NULL"
-        ))
+        # Backfill from analysis_date (always run to handle partial migrations)
+        conn.execute(
+            text(
+                "UPDATE emagram_analysis SET forecast_date = analysis_date WHERE forecast_date IS NULL"
+            )
+        )
 
         # Add index
-        conn.execute(text(
-            "CREATE INDEX IF NOT EXISTS idx_emagram_analysis_forecast_date ON emagram_analysis (forecast_date)"
-        ))
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_emagram_analysis_forecast_date ON emagram_analysis (forecast_date)"
+            )
+        )
 
         conn.commit()
 
