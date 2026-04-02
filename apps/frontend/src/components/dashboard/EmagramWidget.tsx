@@ -359,7 +359,7 @@ export default function EmagramWidget({
                               <img
                                 src={screenshotUrl}
                                 alt={`Émagramme ${sourceName}`}
-                                className="rounded min-w-[40rem] w-[min(48rem,calc(100vw-2rem))] h-auto"
+                                className="rounded w-[min(48rem,calc(100vw-2rem))] h-auto"
                                 onError={(e) => {
                                   (e.target as HTMLImageElement)
                                     .closest('.group')
