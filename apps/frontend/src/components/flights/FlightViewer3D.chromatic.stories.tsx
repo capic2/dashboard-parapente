@@ -9,8 +9,11 @@ const meta = preview.meta({
     chromatic: {
       disableSnapshot: false,
     },
+    vitest: {
+      skip: true, // Skip Cesium tests - requires full browser environment
+    },
   },
-  tags: ['!autodocs'],
+  tags: ['!autodocs', 'test-skip'],
 });
 
 export const FlightViewer3DChromatic = meta.story({
