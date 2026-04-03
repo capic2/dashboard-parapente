@@ -8,6 +8,7 @@ Scraping approach:
 """
 
 import logging
+import os
 import re
 from datetime import datetime, timedelta
 from typing import Any
@@ -174,6 +175,13 @@ class MeteoblueScraper(PlaywrightScraper):
         # Get updated HTML content
         html = await page.content()
 
+        # Debug: dump HTML when METEOBLUE_DEBUG_HTML env var is set
+        debug_path = os.environ.get("METEOBLUE_DEBUG_HTML")
+        if debug_path:
+            with open(debug_path, "w", encoding="utf-8") as f:
+                f.write(html)
+            self.logger.info(f"Debug HTML saved to {debug_path}")
+
         # Parse HTML to extract forecast data
         hourly_data = self._parse_html(html)
 
@@ -291,13 +299,24 @@ class MeteoblueScraper(PlaywrightScraper):
                                     break
 
             # Parse precipitation row
+            # Each cell contains two elements:
+            #   <div class="precip"><span>AMOUNT</span></div>  (mm, or "-" for none)
+            #   <span class="precip-prob">PROB%</span>         (probability %)
+            # We need the amount from div.precip, NOT the full cell text
             precip_row = hourly_table.find("tr", class_="precips")
             if precip_row:
                 precip_cells = precip_row.find_all("td")
                 for i, cell in enumerate(precip_cells):
                     if i >= len(hourly_data):
                         break
-                    precip_text = cell.get_text(strip=True)
+
+                    # Extract amount from <div class="precip"><span>
+                    precip_div = cell.find("div", class_="precip")
+                    if precip_div:
+                        precip_span = precip_div.find("span")
+                        precip_text = precip_span.get_text(strip=True) if precip_span else ""
+                    else:
+                        precip_text = ""
 
                     if precip_text in ["-", "--", ""]:
                         hourly_data[i]["precipitation"] = 0.0
