@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   PieChart,
   Pie,
@@ -7,6 +7,14 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  createColumnHelper,
+  type SortingState,
+} from '@tanstack/react-table';
+import { DataTable } from '@dashboard-parapente/design-system';
 import type { Flight } from '../../types';
 
 const COLORS = [
@@ -18,11 +26,71 @@ const COLORS = [
   '#a4de6c',
 ];
 
+interface SiteDetail {
+  siteId: string;
+  name: string;
+  count: number;
+  percentage: number;
+  avgAltitude: number;
+  totalHours: number;
+  totalMinutes: number;
+  colorIndex: number;
+}
+
 interface SiteStatsProps {
   flights: Flight[];
 }
 
+const columnHelper = createColumnHelper<SiteDetail>();
+
+const columns = [
+  columnHelper.accessor('name', {
+    header: 'Site',
+    cell: (info) => (
+      <span className="flex items-center gap-2">
+        <span
+          className="w-3 h-3 rounded-full inline-block shrink-0"
+          style={{
+            backgroundColor:
+              COLORS[info.row.original.colorIndex % COLORS.length],
+          }}
+        />
+        <span className="font-medium">{info.getValue()}</span>
+      </span>
+    ),
+  }),
+  columnHelper.accessor('count', {
+    header: 'Vols',
+  }),
+  columnHelper.accessor('percentage', {
+    header: '%',
+    cell: (info) => `${info.getValue()}%`,
+  }),
+  columnHelper.accessor('avgAltitude', {
+    header: 'Alt. moy.',
+    cell: (info) => `${info.getValue()} m`,
+  }),
+  columnHelper.display({
+    id: 'totalTime',
+    header: 'Temps total',
+    cell: (info) => {
+      const row = info.row.original;
+      return `${row.totalHours}h${row.totalMinutes}m`;
+    },
+    sortingFn: (rowA, rowB) => {
+      const a = rowA.original.totalHours * 60 + rowA.original.totalMinutes;
+      const b = rowB.original.totalHours * 60 + rowB.original.totalMinutes;
+      return a - b;
+    },
+    enableSorting: true,
+  }),
+];
+
 export default function SiteStats({ flights }: SiteStatsProps) {
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: 'count', desc: true },
+  ]);
+
   const { siteData, siteDetails } = useMemo(() => {
     if (!flights.length) return { siteData: [], siteDetails: [] };
 
@@ -45,7 +113,7 @@ export default function SiteStats({ flights }: SiteStatsProps) {
 
     // Calculate stats per site
     const details = Array.from(siteMap.entries()).map(
-      ([siteId, { flights: siteFlights, name }]) => {
+      ([siteId, { flights: siteFlights, name }], index) => {
         const totalFlights = siteFlights.length;
         const percentage = ((totalFlights / flights.length) * 100).toFixed(1);
         const avgAltitude =
@@ -64,12 +132,10 @@ export default function SiteStats({ flights }: SiteStatsProps) {
           avgAltitude: Math.round(avgAltitude),
           totalHours: Math.floor(totalDuration / 60),
           totalMinutes: totalDuration % 60,
+          colorIndex: index,
         };
       }
     );
-
-    // Sort by flight count
-    details.sort((a, b) => b.count - a.count);
 
     // Prepare pie chart data
     const pieData = details.map((site) => ({
@@ -79,6 +145,16 @@ export default function SiteStats({ flights }: SiteStatsProps) {
 
     return { siteData: pieData, siteDetails: details };
   }, [flights]);
+
+  const table = useReactTable({
+    data: siteDetails,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getRowId: (row) => row.siteId,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
 
   if (!siteData.length) {
     return (
@@ -125,51 +201,7 @@ export default function SiteStats({ flights }: SiteStatsProps) {
       </ResponsiveContainer>
 
       {/* Detailed Table */}
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b-2 border-gray-200 dark:border-gray-700">
-              <th className="text-left py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
-                Site
-              </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
-                Vols
-              </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
-                %
-              </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
-                Alt. moy.
-              </th>
-              <th className="text-left py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
-                Temps total
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {siteDetails.map((site, index) => (
-              <tr
-                key={site.siteId}
-                className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              >
-                <td className="py-2 px-2 flex items-center gap-2">
-                  <span
-                    className="w-3 h-3 rounded-full inline-block shrink-0"
-                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                  ></span>
-                  <span className="font-medium">{site.name}</span>
-                </td>
-                <td className="py-2 px-2">{site.count}</td>
-                <td className="py-2 px-2">{site.percentage}%</td>
-                <td className="py-2 px-2">{site.avgAltitude} m</td>
-                <td className="py-2 px-2">
-                  {site.totalHours}h{site.totalMinutes}m
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable table={table} className="mt-4" />
     </div>
   );
 }
