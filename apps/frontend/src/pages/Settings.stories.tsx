@@ -170,19 +170,13 @@ Default.test(
     useCacheSettingsStore.setState({ autoRefreshWeather: true });
 
     const canvas = within(canvasElement);
-    // Find the checkbox in the auto-refresh section
-    await canvas.findByText(/Rafraîchissement automatique de la météo/);
-    const checkboxes = canvasElement.querySelectorAll('input[type="checkbox"]');
-    // The auto-refresh checkbox is in the performance section (after notification checkboxes)
-    const autoRefreshCheckbox = Array.from(
-      checkboxes
-    ).pop() as HTMLInputElement;
-    if (autoRefreshCheckbox) {
-      await userEvent.click(autoRefreshCheckbox);
-      await expect(useCacheSettingsStore.getState().autoRefreshWeather).toBe(
-        false
-      );
-    }
+    const autoRefreshCheckbox = await canvas.findByRole('checkbox', {
+      name: /Rafraîchissement automatique de la météo/,
+    });
+    await userEvent.click(autoRefreshCheckbox);
+    await expect(useCacheSettingsStore.getState().autoRefreshWeather).toBe(
+      false
+    );
   }
 );
 

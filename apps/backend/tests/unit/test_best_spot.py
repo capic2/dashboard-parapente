@@ -442,7 +442,9 @@ async def test_refresh_best_spot_cache_success(db_session):
     }
 
     mock_set_cached = AsyncMock()
-    mock_cache_ttl = {"summary": 3600}
+
+    def mock_cache_ttl():
+        return {"summary": 3600}
 
     with (
         patch(
@@ -483,11 +485,14 @@ async def test_refresh_best_spot_cache_no_data(db_session):
 
     mock_set_cached = AsyncMock()
 
+    def mock_get_ttl():
+        return {"summary": 3600}
+
     with (
         patch("best_spot.calculate_best_spot_from_cache", new=AsyncMock(return_value=None)),
         patch(
             "best_spot._get_cache_functions",
-            return_value=(AsyncMock(), mock_set_cached, {"summary": 3600}),
+            return_value=(AsyncMock(), mock_set_cached, mock_get_ttl),
         ),
     ):
 
@@ -689,7 +694,9 @@ async def test_cache_key_per_day():
 
     mock_get_cached = AsyncMock(return_value=None)
     mock_set_cached = AsyncMock()
-    cache_ttl = {"summary": 3600}
+
+    def cache_ttl():
+        return {"summary": 3600}
 
     with patch("weather_pipeline.get_normalized_forecast", new_callable=AsyncMock) as mock_weather:
         with patch("para_index.calculate_para_index") as mock_para:
@@ -743,7 +750,9 @@ async def test_refresh_cache_only_day_0():
 
     mock_get_cached = AsyncMock(return_value=None)
     mock_set_cached = AsyncMock()
-    cache_ttl = {"summary": 3600}
+
+    def cache_ttl():
+        return {"summary": 3600}
 
     with patch("weather_pipeline.get_normalized_forecast", new_callable=AsyncMock) as mock_weather:
         with patch("para_index.calculate_para_index") as mock_para:

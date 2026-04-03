@@ -370,6 +370,7 @@ function PerformanceSection() {
             type="checkbox"
             checked={autoRefreshWeather}
             onChange={(e) => setAutoRefreshWeather(e.target.checked)}
+            aria-label={t('settings.performance.autoRefresh')}
             className="w-5 h-5 text-sky-600 rounded focus:ring-2 focus:ring-sky-600 ml-4 shrink-0"
           />
         </label>
