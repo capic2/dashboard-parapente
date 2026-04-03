@@ -6,6 +6,7 @@ import {
 } from '../hooks/flights/useFlights';
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import type { Flight, Site } from '../types';
+import type { RowSelectionState } from '@tanstack/react-table';
 const FlightViewer3D = lazy(() =>
   import('../components/flights/FlightViewer3D').then((m) => ({
     default: m.FlightViewer3D,
@@ -14,6 +15,7 @@ const FlightViewer3D = lazy(() =>
 import { StravaSyncModal } from '../components/flights/StravaSyncModal';
 import { CreateFlightModal } from '../components/flights/CreateFlightModal';
 import { CreateSiteModal } from '../components/flights/CreateSiteModal';
+import { FlightsTable } from '../components/flights/FlightsTable';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import { ToastContainer, Modal } from '@dashboard-parapente/design-system';
 import { useToast, useToastStore } from '../hooks/useToast';
@@ -21,21 +23,12 @@ import { HTTPError } from 'ky';
 import { api } from '../lib/api';
 
 export default function FlightHistory() {
-  const { data: flightsRaw } = useSuspenseQuery(
+  const { data: flights } = useSuspenseQuery(
     flightsQueryOptions({ limit: 50 })
   );
 
-  // Trier les vols par date (plus récent en premier) côté frontend en backup du tri backend
-  const flights = [...flightsRaw].sort((a, b) => {
-    const dateA = new Date(a.flight_date);
-    const dateB = new Date(b.flight_date);
-    return dateB.getTime() - dateA.getTime();
-  });
-
   const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null);
-  const [selectedFlightIds, setSelectedFlightIds] = useState<Set<string>>(
-    new Set()
-  );
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [selectionMode, setSelectionMode] = useState(false);
   const [editingMode, setEditingMode] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
@@ -69,55 +62,46 @@ export default function FlightHistory() {
   const toast = useToast();
   const { toasts, removeToast } = useToastStore();
 
-  const handleSelectFlight = useCallback(
-    (flight: Flight) => {
-      if (selectionMode) {
-        // Mode sélection multiple : toggle la sélection
-        setSelectedFlightIds((prev) => {
-          const newSet = new Set(prev);
-          if (newSet.has(flight.id)) {
-            newSet.delete(flight.id);
-          } else {
-            newSet.add(flight.id);
-          }
-          return newSet;
-        });
-      } else {
-        // Mode normal : afficher les détails
-        setSelectedFlightId(flight.id);
-        setNotesText(flight.notes || '');
-        setEditingNotes(false);
-        setEditingMode(false);
+  const handleSelectFlight = useCallback((flight: Flight) => {
+    // Mode normal : afficher les détails
+    setSelectedFlightId(flight.id);
+    setNotesText(flight.notes || '');
+    setEditingNotes(false);
+    setEditingMode(false);
 
-        // Initialiser les champs éditables
-        setEditedName(flight.name || '');
-        setEditedTitle(flight.title || flight.name || '');
-        setEditedSiteId(flight.site_id || '');
-        setEditedFlightDate(flight.flight_date);
-        setEditedDepartureTime(flight.departure_time || '');
-        setEditedDuration(flight.duration_minutes || 0);
-        setEditedDistance(flight.distance_km || 0);
-        setEditedMaxAltitude(flight.max_altitude_m || 0);
-        setEditedElevationGain(flight.elevation_gain_m || 0);
-        setEditedMaxSpeed(flight.max_speed_kmh || 0);
-        setEditedNotes(flight.notes || '');
-      }
-    },
-    [selectionMode]
-  );
+    // Initialiser les champs éditables
+    setEditedName(flight.name || '');
+    setEditedTitle(flight.title || flight.name || '');
+    setEditedSiteId(flight.site_id || '');
+    setEditedFlightDate(flight.flight_date);
+    setEditedDepartureTime(flight.departure_time || '');
+    setEditedDuration(flight.duration_minutes || 0);
+    setEditedDistance(flight.distance_km || 0);
+    setEditedMaxAltitude(flight.max_altitude_m || 0);
+    setEditedElevationGain(flight.elevation_gain_m || 0);
+    setEditedMaxSpeed(flight.max_speed_kmh || 0);
+    setEditedNotes(flight.notes || '');
+  }, []);
 
   const handleToggleSelectionMode = useCallback(() => {
     setSelectionMode((prev) => !prev);
-    setSelectedFlightIds(new Set());
+    setRowSelection({});
     setSelectedFlightId(null);
   }, []);
 
+  const selectedFlightIds = Object.keys(rowSelection);
+  const selectedCount = selectedFlightIds.length;
+
   const handleSelectAll = useCallback(() => {
-    setSelectedFlightIds(new Set(flights.map((f: Flight) => f.id)));
+    const allSelected: RowSelectionState = {};
+    for (const flight of flights) {
+      allSelected[flight.id] = true;
+    }
+    setRowSelection(allSelected);
   }, [flights]);
 
   const handleDeselectAll = useCallback(() => {
-    setSelectedFlightIds(new Set());
+    setRowSelection({});
   }, []);
 
   const handleEnterEditMode = useCallback(() => {
@@ -210,7 +194,7 @@ export default function FlightHistory() {
   const handleDeleteFlight = useCallback(async () => {
     setIsDeleting(true);
     try {
-      if (selectionMode && selectedFlightIds.size > 0) {
+      if (selectionMode && selectedCount > 0) {
         // Suppression multiple
         let successCount = 0;
         let failCount = 0;
@@ -238,7 +222,7 @@ export default function FlightHistory() {
           );
         }
 
-        setSelectedFlightIds(new Set());
+        setRowSelection({});
         setShowMultiDeleteConfirm(false);
       } else if (flightToDelete) {
         // Suppression simple
@@ -272,6 +256,7 @@ export default function FlightHistory() {
     flightToDelete,
     selectedFlightId,
     selectedFlightIds,
+    selectedCount,
     selectionMode,
     toast,
     queryClient,
@@ -312,11 +297,11 @@ export default function FlightHistory() {
               🪂 Historique des Vols
             </h1>
             <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-              {selectionMode && selectedFlightIds.size > 0 ? (
+              {selectionMode && selectedCount > 0 ? (
                 <span className="text-sky-600 font-semibold">
-                  {selectedFlightIds.size} vol
-                  {selectedFlightIds.size > 1 ? 's' : ''} sélectionné
-                  {selectedFlightIds.size > 1 ? 's' : ''}
+                  {selectedCount} vol
+                  {selectedCount > 1 ? 's' : ''} sélectionné
+                  {selectedCount > 1 ? 's' : ''}
                 </span>
               ) : (
                 <>
@@ -379,10 +364,10 @@ export default function FlightHistory() {
             </button>
             <button
               onClick={() => setShowMultiDeleteConfirm(true)}
-              disabled={selectedFlightIds.size === 0}
+              disabled={selectedCount === 0}
               className="ml-auto px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
-              🗑️ Supprimer ({selectedFlightIds.size})
+              🗑️ Supprimer ({selectedCount})
             </button>
           </div>
         )}
@@ -390,150 +375,16 @@ export default function FlightHistory() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Flight List */}
-        <div className="lg:col-span-1 space-y-2">
-          {flights.length === 0 ? (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center">
-              <p className="text-gray-700 dark:text-gray-300 font-medium">
-                Aucun vol enregistré
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                Les vols Strava apparaîtront automatiquement ici
-              </p>
-            </div>
-          ) : (
-            flights.map((flight: Flight) => (
-              <div
-                key={flight.id}
-                className={`group relative bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border-2 transition-all cursor-pointer ${
-                  selectionMode && selectedFlightIds.has(flight.id)
-                    ? 'border-sky-600 shadow-md bg-sky-50 dark:bg-sky-900/20'
-                    : selectedFlightId === flight.id
-                      ? 'border-sky-600 shadow-md'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-sky-400'
-                }`}
-                onClick={() => handleSelectFlight(flight)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) =>
-                  e.key === 'Enter' && handleSelectFlight(flight)
-                }
-                aria-label={`Sélectionner vol du ${new Date(flight.flight_date).toLocaleDateString('fr-FR')}`}
-              >
-                {/* Bouton supprimer au survol */}
-                {!selectionMode && (
-                  <button
-                    className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full bg-red-100 text-red-500 opacity-0 group-hover:opacity-100 hover:bg-red-200 hover:text-red-700 transition-all"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setFlightToDelete(flight);
-                    }}
-                    aria-label={`Supprimer le vol ${flight.title || 'sans titre'}`}
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={1.5}
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                      />
-                    </svg>
-                  </button>
-                )}
-                <div className="flex justify-between items-start mb-2">
-                  {/* Checkbox en mode sélection */}
-                  {selectionMode && (
-                    <input
-                      type="checkbox"
-                      checked={selectedFlightIds.has(flight.id)}
-                      onChange={() => handleSelectFlight(flight)}
-                      className="mr-2 mt-1 w-4 h-4 text-sky-600 rounded focus:ring-sky-500"
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  )}
-
-                  <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate flex-1">
-                    {flight.title || 'Vol sans titre'}
-                  </h3>
-
-                  {/* Badge GPX manquant */}
-                  {!flight.gpx_file_path && !selectionMode && (
-                    <span className="ml-2 px-2 py-0.5 text-xs bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded-full shrink-0">
-                      📎 GPX manquant
-                    </span>
-                  )}
-                </div>
-
-                {/* Date et heure */}
-                <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                  <span className="font-medium">
-                    {(() => {
-                      // Parse date comme date locale pour éviter les problèmes de timezone
-                      const [year, month, day] = flight.flight_date.split('-');
-                      const localDate = new Date(
-                        Number(year),
-                        Number(month) - 1,
-                        Number(day)
-                      );
-                      return localDate.toLocaleDateString('fr-FR', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      });
-                    })()}
-                  </span>
-                  {flight.departure_time && (
-                    <span className="ml-2">
-                      à{' '}
-                      {new Date(flight.departure_time).toLocaleTimeString(
-                        'fr-FR',
-                        {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        }
-                      )}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-300">
-                  {flight.duration_minutes && (
-                    <div className="flex items-center gap-1">
-                      <span aria-hidden="true">⏱️</span>
-                      <span>
-                        {Math.floor(flight.duration_minutes / 60)}h
-                        {flight.duration_minutes % 60}m
-                      </span>
-                    </div>
-                  )}
-                  {flight.distance_km && (
-                    <div className="flex items-center gap-1">
-                      <span aria-hidden="true">📏</span>
-                      <span>{flight.distance_km.toFixed(1)} km</span>
-                    </div>
-                  )}
-                  {flight.max_altitude_m && (
-                    <div className="flex items-center gap-1">
-                      <span aria-hidden="true">⛰️</span>
-                      <span>{flight.max_altitude_m} m</span>
-                    </div>
-                  )}
-                </div>
-                {flight.site_id && (
-                  <div className="mt-2 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                    <span aria-hidden="true">📍</span>
-                    <span className="truncate">
-                      {flight.site_name || flight.site_id}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
+        <div className="lg:col-span-1">
+          <FlightsTable
+            flights={flights}
+            selectedFlightId={selectedFlightId}
+            selectionMode={selectionMode}
+            onSelectFlight={handleSelectFlight}
+            onDeleteFlight={setFlightToDelete}
+            rowSelection={rowSelection}
+            onRowSelectionChange={setRowSelection}
+          />
         </div>
 
         {/* Detail Panel + 3D Viewer */}
@@ -1046,7 +897,7 @@ export default function FlightHistory() {
 
       {/* Modal de confirmation suppression multiple */}
       <Modal
-        isOpen={showMultiDeleteConfirm && selectedFlightIds.size > 0}
+        isOpen={showMultiDeleteConfirm && selectedCount > 0}
         onClose={() => setShowMultiDeleteConfirm(false)}
         title="⚠️ Confirmer la suppression"
         size="sm"
@@ -1054,8 +905,8 @@ export default function FlightHistory() {
         <p className="text-gray-700 dark:text-gray-300 mb-6">
           Vous êtes sur le point de supprimer définitivement{' '}
           <span className="font-bold text-red-600">
-            {selectedFlightIds.size} vol
-            {selectedFlightIds.size > 1 ? 's' : ''}
+            {selectedCount} vol
+            {selectedCount > 1 ? 's' : ''}
           </span>
           . Cette action est irréversible.
         </p>
@@ -1073,7 +924,7 @@ export default function FlightHistory() {
           >
             {isDeleting
               ? '⏳ Suppression...'
-              : `🗑️ Supprimer ${selectedFlightIds.size} vol${selectedFlightIds.size > 1 ? 's' : ''}`}
+              : `🗑️ Supprimer ${selectedCount} vol${selectedCount > 1 ? 's' : ''}`}
           </button>
         </div>
       </Modal>
