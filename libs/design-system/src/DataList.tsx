@@ -35,6 +35,7 @@ interface DataListProps<TData> {
   sortableColumns?: SortableColumn[];
   emptyMessage?: string;
   className?: string;
+  itemsClassName?: string;
 }
 
 export function DataList<TData>({
@@ -43,6 +44,7 @@ export function DataList<TData>({
   sortableColumns,
   emptyMessage = 'Aucun élément',
   className,
+  itemsClassName,
 }: DataListProps<TData>) {
   const rows = table.getRowModel().rows;
   const sorting = table.getState().sorting;
@@ -87,9 +89,11 @@ export function DataList<TData>({
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className={itemsClassName || 'space-y-2'}>
           {rows.map((row) => (
-            <div key={row.id}>{renderItem(row)}</div>
+            <div key={row.id} className="h-full">
+              {renderItem(row)}
+            </div>
           ))}
         </div>
       )}
