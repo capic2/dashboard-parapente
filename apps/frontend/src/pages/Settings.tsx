@@ -617,12 +617,30 @@ export default function Settings() {
         if (imported.cacheSettings) {
           const { setFreshnessLevel, setAutoRefreshWeather, setHttpTimeout } =
             useCacheSettingsStore.getState();
-          if (imported.cacheSettings.freshnessLevel)
-            setFreshnessLevel(imported.cacheSettings.freshnessLevel);
+          const allowedFreshness: readonly FreshnessLevel[] = [
+            'realtime',
+            'normal',
+            'economy',
+          ];
+          const allowedTimeouts: readonly HttpTimeout[] = [15000, 30000, 60000];
+
+          if (
+            allowedFreshness.includes(
+              imported.cacheSettings.freshnessLevel as FreshnessLevel
+            )
+          ) {
+            setFreshnessLevel(imported.cacheSettings.freshnessLevel as FreshnessLevel);
+          }
           if (imported.cacheSettings.autoRefreshWeather !== undefined)
             setAutoRefreshWeather(imported.cacheSettings.autoRefreshWeather);
-          if (imported.cacheSettings.httpTimeout)
-            setHttpTimeout(imported.cacheSettings.httpTimeout);
+          if (
+            allowedTimeouts.includes(
+              imported.cacheSettings.httpTimeout as HttpTimeout
+            )
+          ) {
+            setHttpTimeout(imported.cacheSettings.httpTimeout as HttpTimeout);
+          }
+        }
         }
         alert(t('settings.data.importSuccess'));
       } catch {
