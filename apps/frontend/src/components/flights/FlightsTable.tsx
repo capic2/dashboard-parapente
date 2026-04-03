@@ -49,7 +49,10 @@ export function FlightsTable({
           role="button"
           tabIndex={0}
           onKeyDown={(e) => e.key === 'Enter' && onSelectFlight(flight)}
-          aria-label={`Sélectionner vol du ${new Date(flight.flight_date).toLocaleDateString('fr-FR')}`}
+          aria-label={`Sélectionner vol du ${(() => {
+            const [year, month, day] = flight.flight_date.split('-');
+            return new Date(Number(year), Number(month) - 1, Number(day)).toLocaleDateString('fr-FR');
+          })()}`}
         >
           {/* Bouton supprimer au survol */}
           {!selectionMode && (
