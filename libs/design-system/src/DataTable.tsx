@@ -57,7 +57,7 @@ export function DataTable<TData>({ table, className }: DataTableProps<TData>) {
                     >
                       {header.isPlaceholder
                         ? null
-                        : (header.column.columnDef.header as ReactNode)}
+                        : flexRender(header.column.columnDef.header, header.getContext())}
                       {sorted && (
                         <span className="ml-1">
                           {sorted === 'desc' ? '↓' : '↑'}
