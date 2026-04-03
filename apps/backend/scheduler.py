@@ -9,7 +9,7 @@ import uuid
 from datetime import date, datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy.orm import Session
 
 from database import SessionLocal
@@ -253,29 +253,56 @@ async def scheduled_weather_fetch():
         logger.error(f"Error refreshing best spot cache: {e}", exc_info=True)
 
 
+def _get_scheduler_interval() -> int:
+    """Read scheduler interval from app_settings (fallback to config/default)."""
+    try:
+        from app_settings import get_setting_int
+
+        return get_setting_int("scheduler_interval_minutes", default=30)
+    except Exception:
+        try:
+            from config import SCHEDULER_INTERVAL_MINUTES
+
+            return SCHEDULER_INTERVAL_MINUTES
+        except Exception:
+            return 30
+
+
 def start_scheduler():
     """
-    Start weather scheduler - polls every hour for today/tomorrow data
+    Start weather scheduler - polls at configurable interval for today/tomorrow data
 
     Configuration:
-    - Runs every hour at :00
+    - Interval read from app_settings (default: 30 min)
     - Polls 6 sites × 2 days (today + tomorrow)
-    - Results cached in Redis with 30min TTL
+    - Results cached in Redis
     - Days 2-6 fetched on-demand only
     """
-    logger.info("🚀 Starting weather scheduler...")
+    interval = _get_scheduler_interval()
+    logger.info(f"🚀 Starting weather scheduler (interval: {interval} min)...")
 
-    # Add hourly job
     scheduler.add_job(
         scheduled_weather_fetch,
-        trigger=CronTrigger(minute=0),  # Every hour at :00
+        trigger=IntervalTrigger(minutes=interval),
         id="weather_fetch",
-        name="Hourly weather fetch (6 sites × 2 days)",
+        name=f"Weather fetch every {interval} min (6 sites × 2 days)",
         replace_existing=True,
     )
 
     scheduler.start()
-    logger.info("✅ Scheduler started - running every hour at :00")
+    logger.info(f"✅ Scheduler started - running every {interval} minutes")
+
+
+def reschedule(interval_minutes: int):
+    """Reschedule the weather fetch job with a new interval (called from API)."""
+    try:
+        scheduler.reschedule_job(
+            "weather_fetch",
+            trigger=IntervalTrigger(minutes=interval_minutes),
+        )
+        logger.info(f"✅ Scheduler rescheduled to every {interval_minutes} minutes")
+    except Exception as e:
+        logger.error(f"Failed to reschedule: {e}")
 
 
 def stop_scheduler():

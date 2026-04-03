@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { getStaleTime } from '../../lib/cacheConfig';
 import { useSites } from '../../hooks/sites/useSites';
 import { MultiOrientationSelector } from './MultiOrientationSelector';
 import { useQueryClient } from '@tanstack/react-query';
@@ -69,7 +70,7 @@ export default function SiteSelector({
     queryClient.prefetchQuery({
       queryKey: ['weather', 'combined', siteId, 0], // dayIndex=0 (today)
       queryFn: createWeatherQueryFn(siteId, 0),
-      staleTime: 1000 * 60 * 5,
+      staleTime: getStaleTime(1000 * 60 * 5),
     });
   };
 

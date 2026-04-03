@@ -4419,3 +4419,53 @@ async def debug_gemini_api():
     except Exception as e:
         logger.error(f"Gemini debug test failed: {e}", exc_info=True)
         return {"success": False, "error": str(e), "error_type": type(e).__name__}
+
+
+# ============================================================================
+# APP SETTINGS
+# ============================================================================
+
+
+@router.get("/settings")
+def get_app_settings(db: Session = Depends(get_db)):
+    """Get all application settings"""
+    from app_settings import get_all_settings
+
+    return get_all_settings(db)
+
+
+@router.put("/settings")
+def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db)):
+    """
+    Update application settings.
+    Body: {"key": "value", ...}
+    Only known keys are accepted.
+    """
+    from app_settings import DEFAULTS, set_setting
+
+    allowed_keys = set(DEFAULTS.keys())
+    updated = {}
+    rejected = []
+
+    for key, value in settings.items():
+        if key not in allowed_keys:
+            rejected.append(key)
+            continue
+        set_setting(db, key, str(value))
+        updated[key] = value
+
+    # If scheduler interval changed, reschedule dynamically
+    if "scheduler_interval_minutes" in updated:
+        try:
+            from scheduler import reschedule
+
+            new_interval = int(updated["scheduler_interval_minutes"])
+            reschedule(new_interval)
+            logger.info(f"Scheduler rescheduled to {new_interval} minutes")
+        except Exception as e:
+            logger.warning(f"Failed to reschedule scheduler: {e}")
+
+    result = {"success": True, "updated": updated}
+    if rejected:
+        result["rejected_keys"] = rejected
+    return result

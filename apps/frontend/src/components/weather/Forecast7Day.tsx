@@ -1,5 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { useDailySummary, createWeatherQueryFn } from '../../hooks/weather/useWeather';
+import { getStaleTime } from '../../lib/cacheConfig';
+import {
+  useDailySummary,
+  createWeatherQueryFn,
+} from '../../hooks/weather/useWeather';
 import { useQueryClient } from '@tanstack/react-query';
 import CacheTimestamp from '../common/CacheTimestamp';
 
@@ -11,9 +15,12 @@ interface Forecast7DayProps {
 
 const getVerdictClass = (verdict: string): string => {
   const v = verdict.toLowerCase();
-  if (v === 'bon') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200';
-  if (v === 'moyen') return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200';
-  if (v === 'limite') return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200';
+  if (v === 'bon')
+    return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200';
+  if (v === 'moyen')
+    return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200';
+  if (v === 'limite')
+    return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200';
   return 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-100';
 };
 
@@ -42,11 +49,14 @@ export default function Forecast7Day({
     if (date.toDateString() === tomorrow.toDateString())
       return t('common.tomorrow');
 
-    return date.toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-    });
+    return date.toLocaleDateString(
+      i18n.language.startsWith('en') ? 'en-US' : 'fr-FR',
+      {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+      }
+    );
   };
   // OPTIMISATION: Use daily summary instead of full weather data
   // This loads 7 days of aggregate data (para_index, temps, wind) WITHOUT hourly details
@@ -62,7 +72,7 @@ export default function Forecast7Day({
     queryClient.prefetchQuery({
       queryKey: ['weather', 'combined', spotId, dayIndex],
       queryFn: createWeatherQueryFn(spotId, dayIndex),
-      staleTime: 1000 * 60 * 5,
+      staleTime: getStaleTime(1000 * 60 * 5),
     });
   };
 

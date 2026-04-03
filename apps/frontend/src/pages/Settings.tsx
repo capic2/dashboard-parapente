@@ -11,6 +11,12 @@ import { WeatherSourceCard } from '../components/settings/WeatherSourceCard';
 import type { WeatherSource } from '../types/weatherSources';
 import { useThemeStore } from '../stores/themeStore';
 import type { ThemePreference } from '../stores/themeStore';
+import { useCacheSettingsStore } from '../stores/cacheSettingsStore';
+import type { FreshnessLevel, HttpTimeout } from '../stores/cacheSettingsStore';
+import {
+  useAppSettings,
+  useUpdateAppSettings,
+} from '../hooks/settings/useAppSettings';
 
 // Site interface as returned by API
 interface ApiSite {
@@ -278,6 +284,252 @@ function WeatherSourcesTab() {
             {t('settings.weatherSources.meteoblueDesc')}
           </li>
         </ul>
+      </div>
+    </div>
+  );
+}
+
+// Performance Settings Section Component
+function PerformanceSection() {
+  const { t } = useTranslation();
+  const {
+    freshnessLevel,
+    autoRefreshWeather,
+    httpTimeout,
+    setFreshnessLevel,
+    setAutoRefreshWeather,
+    setHttpTimeout,
+  } = useCacheSettingsStore();
+  const { data: backendSettings } = useAppSettings();
+  const updateBackend = useUpdateAppSettings();
+
+  const handleBackendSetting = (key: string, value: string) => {
+    updateBackend.mutate({ [key]: value });
+  };
+
+  const currentCacheTtl = backendSettings?.cache_ttl_default ?? '3600';
+  const currentSchedulerInterval =
+    backendSettings?.scheduler_interval_minutes ?? '30';
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
+      <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+        {t('settings.performance.title')}
+      </h2>
+
+      {/* Browser sub-section */}
+      <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+        {t('settings.performance.browser')}
+      </h3>
+      <div className="space-y-4 mb-6">
+        {/* Freshness Level */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {t('settings.performance.freshnessLevel')}
+          </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            {t('settings.performance.freshnessHelp')}
+          </p>
+          <div className="flex gap-3">
+            {(
+              [
+                {
+                  value: 'realtime',
+                  label: t('settings.performance.realtime'),
+                },
+                { value: 'normal', label: t('settings.performance.normal') },
+                { value: 'economy', label: t('settings.performance.economy') },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setFreshnessLevel(opt.value as FreshnessLevel)}
+                className={`px-5 py-2 rounded-lg font-medium transition-all text-sm ${
+                  freshnessLevel === opt.value
+                    ? 'bg-sky-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Auto-refresh weather */}
+        <label className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all cursor-pointer">
+          <div>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {t('settings.performance.autoRefresh')}
+            </span>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              {t('settings.performance.autoRefreshHelp')}
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            checked={autoRefreshWeather}
+            onChange={(e) => setAutoRefreshWeather(e.target.checked)}
+            className="w-5 h-5 text-sky-600 rounded focus:ring-2 focus:ring-sky-600 ml-4 shrink-0"
+          />
+        </label>
+
+        {/* HTTP Timeout */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {t('settings.performance.httpTimeout')}
+          </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            {t('settings.performance.httpTimeoutHelp')}
+          </p>
+          <div className="flex gap-3">
+            {(
+              [
+                {
+                  value: 15000,
+                  label: '15 ' + t('settings.performance.seconds'),
+                },
+                {
+                  value: 30000,
+                  label:
+                    '30 ' +
+                    t('settings.performance.seconds') +
+                    ' (' +
+                    t('settings.performance.default') +
+                    ')',
+                },
+                {
+                  value: 60000,
+                  label: '60 ' + t('settings.performance.seconds'),
+                },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setHttpTimeout(opt.value as HttpTimeout)}
+                className={`px-5 py-2 rounded-lg font-medium transition-all text-sm ${
+                  httpTimeout === opt.value
+                    ? 'bg-sky-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Server sub-section */}
+      <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+        {t('settings.performance.server')}
+      </h3>
+      <div className="space-y-4">
+        {/* Backend Cache TTL */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {t('settings.performance.backendCache')}
+          </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            {t('settings.performance.backendCacheHelp')}
+          </p>
+          <div className="flex gap-3">
+            {(
+              [
+                {
+                  value: '900',
+                  label: '15 ' + t('settings.performance.minutes'),
+                },
+                {
+                  value: '1800',
+                  label: '30 ' + t('settings.performance.minutes'),
+                },
+                {
+                  value: '3600',
+                  label:
+                    '60 ' +
+                    t('settings.performance.minutes') +
+                    ' (' +
+                    t('settings.performance.default') +
+                    ')',
+                },
+                {
+                  value: '7200',
+                  label: '120 ' + t('settings.performance.minutes'),
+                },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() =>
+                  handleBackendSetting('cache_ttl_default', opt.value)
+                }
+                disabled={updateBackend.isPending}
+                className={`px-5 py-2 rounded-lg font-medium transition-all text-sm ${
+                  currentCacheTtl === opt.value
+                    ? 'bg-sky-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                } disabled:opacity-50`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Scheduler Interval */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {t('settings.performance.schedulerInterval')}
+          </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            {t('settings.performance.schedulerIntervalHelp')}
+          </p>
+          <div className="flex gap-3">
+            {(
+              [
+                {
+                  value: '15',
+                  label: '15 ' + t('settings.performance.minutes'),
+                },
+                {
+                  value: '30',
+                  label:
+                    '30 ' +
+                    t('settings.performance.minutes') +
+                    ' (' +
+                    t('settings.performance.default') +
+                    ')',
+                },
+                {
+                  value: '60',
+                  label: '60 ' + t('settings.performance.minutes'),
+                },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() =>
+                  handleBackendSetting('scheduler_interval_minutes', opt.value)
+                }
+                disabled={updateBackend.isPending}
+                className={`px-5 py-2 rounded-lg font-medium transition-all text-sm ${
+                  currentSchedulerInterval === opt.value
+                    ? 'bg-sky-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                } disabled:opacity-50`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {updateBackend.isError && (
+          <p className="text-sm text-red-600 dark:text-red-400">
+            {t('settings.performance.serverError')}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -686,6 +938,9 @@ export default function Settings() {
                 </label>
               </div>
             </div>
+
+            {/* Performance Section */}
+            <PerformanceSection />
           </>
         )}
 

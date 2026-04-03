@@ -38,3 +38,17 @@ export let api = ky.create({
 export function overrideApi(options: Parameters<typeof api.extend>[0]) {
   api = api.extend(options);
 }
+
+// Apply persisted timeout on load and react to changes
+import { useCacheSettingsStore } from '../stores/cacheSettingsStore';
+
+const initialTimeout = useCacheSettingsStore.getState().httpTimeout;
+if (initialTimeout !== 30000) {
+  overrideApi({ timeout: initialTimeout });
+}
+
+useCacheSettingsStore.subscribe((state, prevState) => {
+  if (state.httpTimeout !== prevState.httpTimeout) {
+    overrideApi({ timeout: state.httpTimeout });
+  }
+});

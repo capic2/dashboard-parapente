@@ -1,14 +1,16 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import type { DailySummary, HourlyForecastItem, WeatherData } from '../../types';
+import { getStaleTime } from '../../lib/cacheConfig';
+import type {
+  DailySummary,
+  HourlyForecastItem,
+  WeatherData,
+} from '../../types';
 import {
   BackendWeatherResponseSchema,
   DailySummarySchema,
 } from '@dashboard-parapente/shared-types';
-import type {
-  ConsensusHour,
-  Slot,
-} from '@dashboard-parapente/shared-types';
+import type { ConsensusHour, Slot } from '@dashboard-parapente/shared-types';
 
 /**
  * Create the queryFn for fetching and transforming weather data
@@ -145,7 +147,9 @@ export const createWeatherQueryFn =
         para_index: hour.para_index ?? 0, // Use backend calculation (accurate)
         verdict: hour.verdict ?? 'N/A', // Use backend verdict (accurate)
         cape: hour.cape ?? null, // CAPE (J/kg)
-        thermal_strength: (hour.thermal_strength?.toLowerCase() as HourlyForecastItem['thermal_strength']) || 'faible', // Thermal strength
+        thermal_strength:
+          (hour.thermal_strength?.toLowerCase() as HourlyForecastItem['thermal_strength']) ||
+          'faible', // Thermal strength
         cloud_cover: hour.cloud_cover ?? null, // Cloud cover percentage
         sources: hour.sources || {}, // Preserve per-source data for tooltip
       };
@@ -251,7 +255,7 @@ export const useWeather = (siteId: string | undefined, dayIndex = 0) => {
       : async () => {
           throw new Error('Site ID required');
         },
-    staleTime: 1000 * 60 * 30, // 30 minutes - weather forecasts don't change that fast
+    staleTime: getStaleTime(1000 * 60 * 30), // 30 minutes - weather forecasts don't change that fast
     enabled: !!siteId,
   });
 };
@@ -278,7 +282,7 @@ export const useDailySummary = (
         .json();
       return DailySummarySchema.parse(data);
     },
-    staleTime: 1000 * 60 * 30, // 30 minutes - daily summaries don't change fast
+    staleTime: getStaleTime(1000 * 60 * 30), // 30 minutes - daily summaries don't change fast
     enabled: !!siteId,
   });
 };

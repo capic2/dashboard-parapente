@@ -18,17 +18,27 @@ else:
 
 logger = logging.getLogger(__name__)
 
-# Cache TTL configuration (in seconds)
-# Aligned with scheduler: 60min TTL matches hourly polling (no cache gaps)
-CACHE_TTL: dict[str, int] = {
-    "open-meteo": 3600,  # 60 minutes (refreshed hourly by scheduler)
-    "weatherapi": 3600,  # 60 minutes (refreshed hourly by scheduler)
-    "meteo-parapente": 3600,  # 60 minutes (refreshed hourly by scheduler)
-    "meteociel": 3600,  # 60 minutes (refreshed hourly by scheduler)
-    "meteoblue": 3600,  # 60 minutes (refreshed hourly by scheduler)
-    "forecast": 3600,  # 60 minutes (combined forecast, aligned with scheduler)
-    "summary": 3600,  # 60 minutes (site summary)
-}
+
+def _get_cache_ttl() -> dict[str, int]:
+    """Build CACHE_TTL dict from app_settings (in-memory cache)."""
+    from app_settings import get_setting_int
+
+    ttl_default = get_setting_int("cache_ttl_default", default=3600)
+    ttl_summary = get_setting_int("cache_ttl_summary", default=3600)
+    return {
+        "open-meteo": ttl_default,
+        "weatherapi": ttl_default,
+        "meteo-parapente": ttl_default,
+        "meteociel": ttl_default,
+        "meteoblue": ttl_default,
+        "forecast": ttl_default,
+        "summary": ttl_summary,
+    }
+
+
+# Legacy accessor — kept so existing code reading CACHE_TTL still works.
+# Prefer calling _get_cache_ttl() for fresh values after a setting change.
+CACHE_TTL = _get_cache_ttl()
 
 # Redis connection pool (singleton)
 _redis_pool: Any | None = None
@@ -76,13 +86,15 @@ async def get_redis() -> Any:
             logger.info(f"REDIS_PORT: {REDIS_PORT}")
             logger.info(f"Connecting to Redis at {REDIS_HOST}:{REDIS_PORT}")
 
+            from app_settings import get_setting_int
+
             _redis_pool = redis_module.Redis(
                 host=REDIS_HOST,
                 port=REDIS_PORT,
                 db=0,
                 decode_responses=True,
-                socket_connect_timeout=5,
-                socket_timeout=5,
+                socket_connect_timeout=get_setting_int("redis_connect_timeout", default=5),
+                socket_timeout=get_setting_int("redis_socket_timeout", default=5),
             )
 
             # Test connection for real Redis only with retries
@@ -239,8 +251,8 @@ def cached(prefix: str, ttl_key: str):
             # Call function
             result = await func(*args, **kwargs)
 
-            # Cache result
-            ttl = CACHE_TTL.get(ttl_key, 300)
+            # Cache result (read fresh TTL from settings)
+            ttl = _get_cache_ttl().get(ttl_key, 300)
             await set_cached(cache_key, result, ttl)
 
             return result

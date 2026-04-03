@@ -535,6 +535,16 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("🚀 Starting Dashboard Parapente API...")
 
+    # Load app settings into memory cache
+    try:
+        from app_settings import reload_cache as reload_settings_cache
+
+        db = SessionLocal()
+        reload_settings_cache(db)
+        db.close()
+    except Exception as e:
+        logger.warning(f"⚠️ Could not load app settings: {e}")
+
     # Start weather scheduler
     start_scheduler()
 

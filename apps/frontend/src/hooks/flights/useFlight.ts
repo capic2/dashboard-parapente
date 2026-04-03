@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { getStaleTime } from '../../lib/cacheConfig';
 import type { Flight } from '@dashboard-parapente/shared-types';
 
 /**
@@ -12,7 +13,7 @@ export const useFlight = (flightId: string) => {
       return await api.get(`flights/${flightId}`).json();
     },
     enabled: !!flightId,
-    staleTime: 1000 * 10, // 10 seconds - refresh frequently to check video status
+    staleTime: getStaleTime(1000 * 10), // 10 seconds - refresh frequently to check video status
     refetchInterval: (query) => {
       // Auto-refresh every 10 seconds if video is processing
       const data = query.state.data as Flight | undefined;
