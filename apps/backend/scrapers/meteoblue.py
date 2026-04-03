@@ -317,7 +317,11 @@ class MeteoblueScraper(PlaywrightScraper):
                     precip_div = cell.find("div", class_="precip")
                     if precip_div:
                         precip_span = precip_div.find("span")
-                        precip_text = precip_span.get_text(strip=True) if precip_span else ""
+                        precip_text = (
+                            precip_span.get_text(strip=True)
+                            if precip_span
+                            else precip_div.get_text(strip=True)
+                        )
                     else:
                         precip_text = ""
 
