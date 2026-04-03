@@ -93,7 +93,9 @@ export function DataList<TData>({
       ) : (
         <div className={itemsClassName || 'space-y-2'}>
           {rows.map((row) => (
-            <div key={row.id}>{renderItem(row)}</div>
+            <div key={row.id} className="h-full">
+              {renderItem(row)}
+            </div>
           ))}
         </div>
       )}
