@@ -2,6 +2,14 @@ import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
 import { useSuspenseQuery } from '@tanstack/react-query';
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  createColumnHelper,
+  type SortingState,
+  type Row,
+} from '@tanstack/react-table';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import {
   useUpdateSite,
@@ -11,6 +19,35 @@ import {
 import type { Site } from '@dashboard-parapente/shared-types';
 import { SiteCard } from '../components/sites/SiteCard';
 import { EditSiteModal } from '../components/sites/EditSiteModal';
+import { DataList } from '@dashboard-parapente/design-system';
+
+const columnHelper = createColumnHelper<Site>();
+
+const columns = [
+  columnHelper.accessor('name', {
+    sortingFn: 'alphanumeric',
+  }),
+  columnHelper.accessor('region', {
+    sortingFn: (rowA, rowB) => {
+      const a = rowA.original.region || '';
+      const b = rowB.original.region || '';
+      return a.localeCompare(b);
+    },
+  }),
+  columnHelper.accessor('elevation_m', {
+    sortingFn: (rowA, rowB) => {
+      const a = rowA.original.elevation_m ?? -Infinity;
+      const b = rowB.original.elevation_m ?? -Infinity;
+      return a - b;
+    },
+  }),
+];
+
+const SITE_SORTABLE_COLUMNS = [
+  { id: 'name', label: 'Nom' },
+  { id: 'region', label: 'Région' },
+  { id: 'elevation_m', label: 'Altitude' },
+];
 
 export const Sites: React.FC = () => {
   const { t } = useTranslation();
@@ -24,45 +61,40 @@ export const Sites: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<
     'all' | 'takeoff' | 'landing' | 'both'
   >('all');
-  const [sortBy, setSortBy] = useState<'name' | 'created_at' | 'region'>(
-    'name'
-  );
+
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: 'name', desc: false },
+  ]);
 
   // Modals
   const [editingSite, setEditingSite] = useState<Site | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  // Filter & sort logic
+  // Filter logic (search + type filter only, sorting handled by TanStack)
   const filteredSites = useMemo(() => {
-    const filtered = sites.filter((site) => {
-      // Search filter
+    return sites.filter((site) => {
       const matchesSearch =
         searchQuery === '' ||
         site.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         site.code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         site.region?.toLowerCase().includes(searchQuery.toLowerCase());
 
-      // Type filter
       const matchesType =
         typeFilter === 'all' || site.usage_type === typeFilter;
 
       return matchesSearch && matchesType;
     });
+  }, [sites, searchQuery, typeFilter]);
 
-    // Sort
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'name':
-          return a.name.localeCompare(b.name);
-        case 'region':
-          return (a.region || '').localeCompare(b.region || '');
-        default:
-          return 0;
-      }
-    });
-
-    return filtered;
-  }, [sites, searchQuery, typeFilter, sortBy]);
+  const table = useReactTable({
+    data: filteredSites,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getRowId: (row) => row.id,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
 
   // Handlers
   const handleEdit = (site: Site) => {
@@ -77,11 +109,8 @@ export const Sites: React.FC = () => {
 
   const handleSave = async (data: SiteUpdate) => {
     if (editingSite) {
-      // Edit mode
       await updateSite.mutateAsync({ siteId: editingSite.id, data });
     } else {
-      // Create mode - would need a createSite mutation
-      // For now, this would use the existing CreateSiteModal workflow
       console.log('Create site:', data);
       alert(t('sites.createViaButton'));
     }
@@ -102,8 +131,20 @@ export const Sites: React.FC = () => {
   };
 
   const handleViewFlights = (_site: Site) => {
-    // Navigate to flights page with site filter
     void navigate({ to: '/flights' as string });
+  };
+
+  const renderSiteCard = (row: Row<Site>) => {
+    const site = row.original;
+    return (
+      <SiteCard
+        site={site}
+        flightCount={0}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        onViewFlights={handleViewFlights}
+      />
+    );
   };
 
   return (
@@ -121,7 +162,7 @@ export const Sites: React.FC = () => {
 
       {/* Filters Bar */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Search */}
           <input
             type="text"
@@ -146,18 +187,6 @@ export const Sites: React.FC = () => {
             <option value="landing">{t('sites.landingOnly')}</option>
             <option value="both">{t('sites.both')}</option>
           </select>
-
-          {/* Sort */}
-          <select
-            value={sortBy}
-            onChange={(e) =>
-              setSortBy(e.target.value as 'name' | 'created_at' | 'region')
-            }
-            className="px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
-          >
-            <option value="name">{t('sites.sortByName')}</option>
-            <option value="region">{t('sites.sortByRegion')}</option>
-          </select>
         </div>
       </div>
 
@@ -166,37 +195,24 @@ export const Sites: React.FC = () => {
         {t('common.siteFound', { count: filteredSites.length })}
       </p>
 
-      {/* Sites Grid */}
-      {filteredSites.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredSites.map((site) => (
-            <SiteCard
-              key={site.id}
-              site={site}
-              flightCount={0} // TODO: could fetch from API if needed
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onViewFlights={handleViewFlights}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <p className="text-gray-500 dark:text-gray-400 text-lg mb-4">
-            {t('sites.noSiteFound')}
-          </p>
-          {searchQuery || typeFilter !== 'all' ? (
-            <p className="text-gray-400 dark:text-gray-500">
-              {t('sites.adjustFilters')}
-            </p>
-          ) : (
-            <button
-              onClick={handleCreate}
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              ➕ {t('sites.createFirstSite')}
-            </button>
-          )}
+      {/* Sites Grid with DataList sort buttons */}
+      <DataList
+        table={table}
+        sortableColumns={SITE_SORTABLE_COLUMNS}
+        emptyMessage={t('sites.noSiteFound')}
+        renderItem={renderSiteCard}
+        itemsClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+      />
+
+      {/* Create button when no sites and no filters */}
+      {filteredSites.length === 0 && !searchQuery && typeFilter === 'all' && (
+        <div className="text-center mt-4">
+          <button
+            onClick={handleCreate}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            ➕ {t('sites.createFirstSite')}
+          </button>
         </div>
       )}
 
