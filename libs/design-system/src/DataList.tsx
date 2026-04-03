@@ -65,9 +65,7 @@ export function DataList<TData>({
                 onClick={() => {
                   const column = table.getColumn(col.id);
                   if (column) {
-                    column.toggleSorting(
-                      currentSort ? !currentSort.desc : false
-                    );
+                    column.toggleSorting();
                   }
                 }}
               >
