@@ -588,4 +588,28 @@ export const handlers = [
       created_at: new Date().toISOString(),
     });
   }),
+
+  // ============================================
+  // APP SETTINGS
+  // ============================================
+
+  // GET /api/settings
+  ...createHandler('get', '/settings', () => {
+    return HttpResponse.json({
+      cache_ttl_default: '3600',
+      cache_ttl_summary: '3600',
+      scheduler_interval_minutes: '30',
+      redis_connect_timeout: '5',
+      redis_socket_timeout: '5',
+    });
+  }),
+
+  // PUT /api/settings
+  ...createHandler('put', '/settings', async ({ request }) => {
+    const body = (await request.json()) as Record<string, string>;
+    return HttpResponse.json({
+      success: true,
+      updated: body,
+    });
+  }),
 ];
