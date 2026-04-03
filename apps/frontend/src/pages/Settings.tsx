@@ -629,7 +629,9 @@ export default function Settings() {
               imported.cacheSettings.freshnessLevel as FreshnessLevel
             )
           ) {
-            setFreshnessLevel(imported.cacheSettings.freshnessLevel as FreshnessLevel);
+            setFreshnessLevel(
+              imported.cacheSettings.freshnessLevel as FreshnessLevel
+            );
           }
           if (imported.cacheSettings.autoRefreshWeather !== undefined)
             setAutoRefreshWeather(imported.cacheSettings.autoRefreshWeather);
@@ -640,7 +642,6 @@ export default function Settings() {
           ) {
             setHttpTimeout(imported.cacheSettings.httpTimeout as HttpTimeout);
           }
-        }
         }
         alert(t('settings.data.importSuccess'));
       } catch {
