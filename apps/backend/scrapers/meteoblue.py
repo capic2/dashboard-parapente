@@ -178,9 +178,12 @@ class MeteoblueScraper(PlaywrightScraper):
         # Debug: dump HTML when METEOBLUE_DEBUG_HTML env var is set
         debug_path = os.environ.get("METEOBLUE_DEBUG_HTML")
         if debug_path:
-            with open(debug_path, "w", encoding="utf-8") as f:
-                f.write(html)
-            self.logger.info(f"Debug HTML saved to {debug_path}")
+            try:
+                with open(debug_path, "w", encoding="utf-8") as f:
+                    f.write(html)
+                self.logger.info(f"Debug HTML saved to {debug_path}")
+            except OSError as e:
+                self.logger.warning(f"Could not save debug HTML to {debug_path}: {e}")
 
         # Parse HTML to extract forecast data
         hourly_data = self._parse_html(html)
