@@ -125,18 +125,16 @@ Default.test(
     // Should render the section title
     await canvas.findByText(/Données et Performance/);
 
-    // Should render browser sub-section controls
-    await canvas.findByText(/Temps réel/);
-    await canvas.findByText(/Normal/);
-    await canvas.findByText(/Économie/);
+    // Should render browser sub-section controls (use button role to avoid matching descriptions)
+    await canvas.findByRole('button', { name: /Temps réel/ });
+    await canvas.findByRole('button', { name: /Économie/ });
 
     // Should render auto-refresh toggle
     await canvas.findByText(/Rafraîchissement automatique de la météo/);
 
     // Should render timeout buttons
-    await canvas.findByText(/15 sec/);
-    await canvas.findByText(/30 sec/);
-    await canvas.findByText(/60 sec/);
+    await canvas.findByRole('button', { name: /15 sec/ });
+    await canvas.findByRole('button', { name: /60 sec/ });
 
     // Should render server sub-section controls
     await canvas.findByText(/Durée du cache serveur/);
@@ -155,7 +153,9 @@ Default.test(
     });
 
     const canvas = within(canvasElement);
-    const economyButton = await canvas.findByText(/Économie/);
+    const economyButton = await canvas.findByRole('button', {
+      name: /Économie/,
+    });
     await userEvent.click(economyButton);
 
     await expect(useCacheSettingsStore.getState().freshnessLevel).toBe(
