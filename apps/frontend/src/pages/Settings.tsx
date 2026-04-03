@@ -578,10 +578,16 @@ export default function Settings() {
 
   // Export data
   const exportData = () => {
+    const cacheSettings = useCacheSettingsStore.getState();
     const data = {
       settings,
+      cacheSettings: {
+        freshnessLevel: cacheSettings.freshnessLevel,
+        autoRefreshWeather: cacheSettings.autoRefreshWeather,
+        httpTimeout: cacheSettings.httpTimeout,
+      },
       exportDate: new Date().toISOString(),
-      version: '1.0',
+      version: '1.1',
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: 'application/json',
@@ -606,8 +612,18 @@ export default function Settings() {
         if (imported.settings) {
           setSettings(imported.settings);
           saveSettings();
-          alert(t('settings.data.importSuccess'));
         }
+        if (imported.cacheSettings) {
+          const { setFreshnessLevel, setAutoRefreshWeather, setHttpTimeout } =
+            useCacheSettingsStore.getState();
+          if (imported.cacheSettings.freshnessLevel)
+            setFreshnessLevel(imported.cacheSettings.freshnessLevel);
+          if (imported.cacheSettings.autoRefreshWeather !== undefined)
+            setAutoRefreshWeather(imported.cacheSettings.autoRefreshWeather);
+          if (imported.cacheSettings.httpTimeout)
+            setHttpTimeout(imported.cacheSettings.httpTimeout);
+        }
+        alert(t('settings.data.importSuccess'));
       } catch {
         alert(t('settings.data.importError'));
       }
@@ -620,6 +636,12 @@ export default function Settings() {
     if (window.confirm(t('settings.data.resetConfirm'))) {
       setSettings(DEFAULT_SETTINGS);
       localStorage.removeItem('paragliding-settings');
+      // Reset cache settings to defaults
+      const { setFreshnessLevel, setAutoRefreshWeather, setHttpTimeout } =
+        useCacheSettingsStore.getState();
+      setFreshnessLevel('normal');
+      setAutoRefreshWeather(true);
+      setHttpTimeout(30000);
       alert(t('settings.data.resetSuccess'));
     }
   };

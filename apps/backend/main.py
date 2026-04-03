@@ -540,8 +540,10 @@ async def lifespan(app: FastAPI):
         from app_settings import reload_cache as reload_settings_cache
 
         db = SessionLocal()
-        reload_settings_cache(db)
-        db.close()
+        try:
+            reload_settings_cache(db)
+        finally:
+            db.close()
     except Exception as e:
         logger.warning(f"⚠️ Could not load app settings: {e}")
 

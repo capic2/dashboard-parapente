@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 def _get_cache_functions():
     """Lazy import of cache module to handle missing Redis gracefully"""
     try:
-        from cache import CACHE_TTL, get_cached, set_cached
+        from cache import get_cache_ttl, get_cached, set_cached
 
-        return get_cached, set_cached, CACHE_TTL
+        return get_cached, set_cached, get_cache_ttl
     except (ImportError, ModuleNotFoundError) as e:
         logger.warning(f"Redis not available, caching disabled: {e}")
         return None, None, None
@@ -533,7 +533,7 @@ async def get_best_spot_cached(db: Session, day_index: int = 0) -> dict[str, Any
         Best spot data or None
     """
     cache_key = f"best_spot:day_{day_index}"
-    get_cached_func, set_cached_func, cache_ttl = _get_cache_functions()
+    get_cached_func, set_cached_func, get_cache_ttl_func = _get_cache_functions()
 
     # If cache module is not available, just calculate directly
     if get_cached_func is None:
@@ -552,8 +552,8 @@ async def get_best_spot_cached(db: Session, day_index: int = 0) -> dict[str, Any
         logger.info(f"Cache miss, calculating best spot for day {day_index}...")
         best_spot = await calculate_best_spot_from_cache(db, day_index)
 
-        if best_spot and cache_ttl:
-            ttl = cache_ttl.get("summary", 3600)  # 60 minutes
+        if best_spot and get_cache_ttl_func:
+            ttl = get_cache_ttl_func().get("summary", 3600)  # 60 minutes
             await set_cached_func(cache_key, best_spot, ttl)
             logger.info(f"✅ Best spot for day {day_index} cached for {ttl}s")
 
@@ -575,7 +575,7 @@ async def refresh_best_spot_cache(db: Session):
     """
     logger.info("♻️ Refreshing best spot cache for today (day 0)...")
 
-    get_cached_func, set_cached_func, cache_ttl = _get_cache_functions()
+    get_cached_func, set_cached_func, get_cache_ttl_func = _get_cache_functions()
 
     try:
         # Calculate best spot for today only (day_index=0)
@@ -583,9 +583,9 @@ async def refresh_best_spot_cache(db: Session):
 
         if best_spot:
             # Store in cache if cache module is available
-            if set_cached_func and cache_ttl:
+            if set_cached_func and get_cache_ttl_func:
                 cache_key = "best_spot:day_0"
-                ttl = cache_ttl.get("summary", 3600)
+                ttl = get_cache_ttl_func().get("summary", 3600)
 
                 await set_cached_func(cache_key, best_spot, ttl)
                 logger.info(f"✅ Best spot cache refreshed for today: {best_spot['site']['name']}")

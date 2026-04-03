@@ -55,9 +55,9 @@ def get_setting(key: str, db: Session | None = None, default: str | None = None)
             return row.value
 
     # Fallback to defaults
-    if default is not None:
-        return default
-    return DEFAULTS.get(key, "")
+    if key in DEFAULTS:
+        return DEFAULTS[key]
+    return default if default is not None else ""
 
 
 def get_setting_int(key: str, db: Session | None = None, default: int = 0) -> int:

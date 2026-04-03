@@ -19,8 +19,8 @@ else:
 logger = logging.getLogger(__name__)
 
 
-def _get_cache_ttl() -> dict[str, int]:
-    """Build CACHE_TTL dict from app_settings (in-memory cache)."""
+def get_cache_ttl() -> dict[str, int]:
+    """Build CACHE_TTL dict from app_settings (in-memory cache). Always returns fresh values."""
     from app_settings import get_setting_int
 
     ttl_default = get_setting_int("cache_ttl_default", default=3600)
@@ -36,9 +36,8 @@ def _get_cache_ttl() -> dict[str, int]:
     }
 
 
-# Legacy accessor — kept so existing code reading CACHE_TTL still works.
-# Prefer calling _get_cache_ttl() for fresh values after a setting change.
-CACHE_TTL = _get_cache_ttl()
+# Legacy accessor — kept for backwards compat. Consumers should prefer get_cache_ttl().
+CACHE_TTL = get_cache_ttl()
 
 # Redis connection pool (singleton)
 _redis_pool: Any | None = None
@@ -252,7 +251,7 @@ def cached(prefix: str, ttl_key: str):
             result = await func(*args, **kwargs)
 
             # Cache result (read fresh TTL from settings)
-            ttl = _get_cache_ttl().get(ttl_key, 300)
+            ttl = get_cache_ttl().get(ttl_key, 300)
             await set_cached(cache_key, result, ttl)
 
             return result

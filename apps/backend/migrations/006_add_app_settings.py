@@ -48,8 +48,9 @@ def upgrade():
         for key, value in DEFAULT_SETTINGS.items():
             conn.execute(
                 text("""
-                    INSERT OR IGNORE INTO app_settings (key, value, updated_at)
+                    INSERT INTO app_settings (key, value, updated_at)
                     VALUES (:key, :value, :updated_at)
+                    ON CONFLICT(key) DO NOTHING
                 """),
                 {"key": key, "value": value, "updated_at": now},
             )

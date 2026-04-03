@@ -4455,6 +4455,7 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
         updated[key] = value
 
     # If scheduler interval changed, reschedule dynamically
+    scheduler_error = None
     if "scheduler_interval_minutes" in updated:
         try:
             from scheduler import reschedule
@@ -4463,9 +4464,12 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
             reschedule(new_interval)
             logger.info(f"Scheduler rescheduled to {new_interval} minutes")
         except Exception as e:
-            logger.warning(f"Failed to reschedule scheduler: {e}")
+            logger.error(f"Failed to reschedule scheduler: {e}")
+            scheduler_error = str(e)
 
     result = {"success": True, "updated": updated}
     if rejected:
         result["rejected_keys"] = rejected
+    if scheduler_error:
+        result["scheduler_warning"] = f"Setting saved but reschedule failed: {scheduler_error}"
     return result

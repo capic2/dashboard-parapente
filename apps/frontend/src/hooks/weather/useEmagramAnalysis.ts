@@ -46,7 +46,7 @@ export function useLatestEmagram(
     enabled: !!siteId && options?.enabled !== false,
     staleTime: getStaleTime(5 * 60 * 1000),
     refetchInterval: (query) =>
-      query.state.data ? getWeatherRefetchInterval(10 * 60 * 1000) : 30 * 1000,
+      getWeatherRefetchInterval(query.state.data ? 10 * 60 * 1000 : 30 * 1000),
   });
 }
 

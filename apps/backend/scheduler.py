@@ -258,12 +258,13 @@ def _get_scheduler_interval() -> int:
     try:
         from app_settings import get_setting_int
 
-        return get_setting_int("scheduler_interval_minutes", default=30)
+        interval = get_setting_int("scheduler_interval_minutes", default=30)
+        return interval if interval > 0 else 30
     except Exception:
         try:
             from config import SCHEDULER_INTERVAL_MINUTES
 
-            return SCHEDULER_INTERVAL_MINUTES
+            return SCHEDULER_INTERVAL_MINUTES if SCHEDULER_INTERVAL_MINUTES > 0 else 30
         except Exception:
             return 30
 
@@ -295,14 +296,13 @@ def start_scheduler():
 
 def reschedule(interval_minutes: int):
     """Reschedule the weather fetch job with a new interval (called from API)."""
-    try:
-        scheduler.reschedule_job(
-            "weather_fetch",
-            trigger=IntervalTrigger(minutes=interval_minutes),
-        )
-        logger.info(f"✅ Scheduler rescheduled to every {interval_minutes} minutes")
-    except Exception as e:
-        logger.error(f"Failed to reschedule: {e}")
+    if interval_minutes <= 0:
+        raise ValueError("scheduler interval must be > 0 minutes")
+    scheduler.reschedule_job(
+        "weather_fetch",
+        trigger=IntervalTrigger(minutes=interval_minutes),
+    )
+    logger.info(f"✅ Scheduler rescheduled to every {interval_minutes} minutes")
 
 
 def stop_scheduler():
