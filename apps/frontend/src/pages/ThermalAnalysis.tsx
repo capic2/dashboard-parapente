@@ -4,12 +4,108 @@
 
 import { useState } from 'react';
 import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  createColumnHelper,
+  type SortingState,
+} from '@tanstack/react-table';
+import {
   useLatestEmagram,
   useEmagramHistory,
   useTriggerEmagram,
 } from '../hooks/weather/useEmagramAnalysis';
 import { useSite } from '../hooks/sites/useSites';
 import { parseAlerts, getScoreColor } from '../types/emagram';
+import type { EmagramListItem } from '../types/emagram';
+import { DataTable } from '@dashboard-parapente/design-system';
+
+const historyColumnHelper = createColumnHelper<EmagramListItem>();
+
+const historyColumns = [
+  historyColumnHelper.accessor('created_at', {
+    header: 'Date',
+    cell: (info) => new Date(info.getValue()).toLocaleDateString(),
+    sortingFn: 'alphanumeric',
+  }),
+  historyColumnHelper.accessor('score_volabilite', {
+    header: 'Score',
+    cell: (info) => {
+      const score = info.getValue();
+      return (
+        <span
+          className="px-2 py-1 rounded-full text-sm font-bold"
+          style={{
+            backgroundColor: `${getScoreColor(score)}20`,
+            color: getScoreColor(score),
+          }}
+        >
+          {score || '-'}
+        </span>
+      );
+    },
+    sortingFn: (rowA, rowB) => {
+      const a = rowA.original.score_volabilite ?? -Infinity;
+      const b = rowB.original.score_volabilite ?? -Infinity;
+      return a - b;
+    },
+  }),
+  historyColumnHelper.accessor('plafond_thermique_m', {
+    header: 'Plafond',
+    cell: (info) => {
+      const val = info.getValue();
+      return val ? `${val}m` : '-';
+    },
+    sortingFn: (rowA, rowB) => {
+      const a = rowA.original.plafond_thermique_m ?? -Infinity;
+      const b = rowB.original.plafond_thermique_m ?? -Infinity;
+      return a - b;
+    },
+  }),
+  historyColumnHelper.accessor('force_thermique_ms', {
+    header: 'Force',
+    cell: (info) => {
+      const val = info.getValue();
+      return val ? `${val.toFixed(1)} m/s` : '-';
+    },
+    sortingFn: (rowA, rowB) => {
+      const a = rowA.original.force_thermique_ms ?? -Infinity;
+      const b = rowB.original.force_thermique_ms ?? -Infinity;
+      return a - b;
+    },
+  }),
+  historyColumnHelper.accessor('analysis_method', {
+    header: 'Méthode',
+    cell: (info) => (
+      <span className="text-xs text-gray-500 dark:text-gray-400">
+        {info.getValue() === 'llm_vision' ? '🤖 IA' : '📊 Classique'}
+      </span>
+    ),
+  }),
+];
+
+function ThermalHistoryTable({ history }: { history: EmagramListItem[] }) {
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: 'created_at', desc: true },
+  ]);
+
+  const table = useReactTable({
+    data: history,
+    columns: historyColumns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getRowId: (row) => row.id,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
+      <h2 className="text-lg font-bold mb-4">📈 Historique 7 Jours</h2>
+      <DataTable table={table} />
+    </div>
+  );
+}
 
 export default function ThermalAnalysis() {
   const [selectedSiteId] = useState<string>('site-mont-poupet-ouest');
@@ -121,7 +217,9 @@ export default function ThermalAnalysis() {
                 >
                   {score}
                 </span>
-                <span className="text-sm text-gray-500 dark:text-gray-400">/ 100</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  / 100
+                </span>
               </div>
             </div>
           </div>
@@ -130,14 +228,18 @@ export default function ThermalAnalysis() {
           <div className="space-y-3">
             {latest.plafond_thermique_m && (
               <div className="flex justify-between items-center border-b dark:border-gray-700 pb-2">
-                <span className="text-gray-600 dark:text-gray-300">☁️ Plafond</span>
+                <span className="text-gray-600 dark:text-gray-300">
+                  ☁️ Plafond
+                </span>
                 <span className="font-bold">{latest.plafond_thermique_m}m</span>
               </div>
             )}
 
             {latest.force_thermique_ms && (
               <div className="flex justify-between items-center border-b dark:border-gray-700 pb-2">
-                <span className="text-gray-600 dark:text-gray-300">📈 Force</span>
+                <span className="text-gray-600 dark:text-gray-300">
+                  📈 Force
+                </span>
                 <span className="font-bold">
                   {latest.force_thermique_ms.toFixed(1)} m/s
                 </span>
@@ -146,7 +248,9 @@ export default function ThermalAnalysis() {
 
             {latest.cape_jkg && (
               <div className="flex justify-between items-center border-b dark:border-gray-700 pb-2">
-                <span className="text-gray-600 dark:text-gray-300">⚡ CAPE</span>
+                <span className="text-gray-600 dark:text-gray-300">
+                  ⚡ CAPE
+                </span>
                 <span className="font-bold">
                   {latest.cape_jkg.toFixed(0)} J/kg
                 </span>
@@ -155,7 +259,9 @@ export default function ThermalAnalysis() {
 
             {latest.flyable_hours_formatted && (
               <div className="flex justify-between items-center border-b dark:border-gray-700 pb-2">
-                <span className="text-gray-600 dark:text-gray-300">⏰ Heures</span>
+                <span className="text-gray-600 dark:text-gray-300">
+                  ⏰ Heures
+                </span>
                 <span className="font-bold">
                   {latest.flyable_hours_formatted}
                 </span>
@@ -225,7 +331,10 @@ export default function ThermalAnalysis() {
           </h2>
           <ul className="space-y-2">
             {alerts.map((alert, idx) => (
-              <li key={idx} className="flex items-start gap-2 text-red-800 dark:text-red-200">
+              <li
+                key={idx}
+                className="flex items-start gap-2 text-red-800 dark:text-red-200"
+              >
                 <span>•</span>
                 <span>{alert}</span>
               </li>
@@ -236,58 +345,7 @@ export default function ThermalAnalysis() {
 
       {/* History */}
       {history && history.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-          <h2 className="text-lg font-bold mb-4">📈 Historique 7 Jours</h2>
-
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b dark:border-gray-700">
-                  <th className="text-left py-2">Date</th>
-                  <th className="text-center py-2">Score</th>
-                  <th className="text-center py-2">Plafond</th>
-                  <th className="text-center py-2">Force</th>
-                  <th className="text-center py-2">Méthode</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.slice(0, 10).map((item) => (
-                  <tr key={item.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="py-2">
-                      {new Date(item.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="text-center">
-                      <span
-                        className="px-2 py-1 rounded-full text-sm font-bold"
-                        style={{
-                          backgroundColor: `${getScoreColor(item.score_volabilite)}20`,
-                          color: getScoreColor(item.score_volabilite),
-                        }}
-                      >
-                        {item.score_volabilite || '-'}
-                      </span>
-                    </td>
-                    <td className="text-center">
-                      {item.plafond_thermique_m
-                        ? `${item.plafond_thermique_m}m`
-                        : '-'}
-                    </td>
-                    <td className="text-center">
-                      {item.force_thermique_ms
-                        ? `${item.force_thermique_ms.toFixed(1)} m/s`
-                        : '-'}
-                    </td>
-                    <td className="text-center text-xs text-gray-500 dark:text-gray-400">
-                      {item.analysis_method === 'llm_vision'
-                        ? '🤖 IA'
-                        : '📊 Classique'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <ThermalHistoryTable history={history} />
       )}
     </div>
   );
