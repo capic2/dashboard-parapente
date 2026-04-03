@@ -5,6 +5,7 @@ import {
   queryOptions,
 } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { getStaleTime } from '../../lib/cacheConfig';
 import {
   SitesApiResponseSchema,
   SiteSchema,
@@ -38,7 +39,7 @@ export const sitesQueryOptions = () =>
       }
       return validation.data.sites;
     },
-    staleTime: 1000 * 60 * 30,
+    staleTime: getStaleTime(1000 * 60 * 30),
   });
 
 export const useSites = () => {
@@ -61,7 +62,7 @@ export const useSite = (siteId: string) => {
       return validation.data as Site;
     },
     enabled: !!siteId,
-    staleTime: 1000 * 60 * 30,
+    staleTime: getStaleTime(1000 * 60 * 30),
   });
 };
 

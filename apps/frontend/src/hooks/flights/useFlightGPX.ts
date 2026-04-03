@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { getStaleTime } from '../../lib/cacheConfig';
 import { GeoPoint } from '../../types/flight';
 
 interface GPXData {
@@ -31,6 +32,6 @@ export const useFlightGPX = (flightId: string) => {
       return data.data;
     },
     enabled: !!flightId,
-    staleTime: 1000 * 60 * 60, // 1 hour
+    staleTime: getStaleTime(1000 * 60 * 60), // 1 hour
   });
 };

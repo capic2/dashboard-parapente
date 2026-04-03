@@ -12,6 +12,7 @@
 
 import { useQuery, queryOptions } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { getStaleTime } from '../../lib/cacheConfig';
 import {
   BestSpotResultSchema,
   type BestSpotResult,
@@ -25,7 +26,7 @@ export const bestSpotQueryOptions = (dayIndex = 0) =>
       const response = await api.get(`spots/best?${params}`).json();
       return BestSpotResultSchema.parse(response);
     },
-    staleTime: 1000 * 60 * 60,
+    staleTime: getStaleTime(1000 * 60 * 60),
     gcTime: 1000 * 60 * 60 * 2,
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),

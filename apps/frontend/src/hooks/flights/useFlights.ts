@@ -6,8 +6,14 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import {api} from '../../lib/api';
-import type {Flight, FlightFilters, FlightFormData, FlightRecords, FlightStats,} from '../../types';
+import { api } from '../../lib/api';
+import type {
+  Flight,
+  FlightFilters,
+  FlightFormData,
+  FlightRecords,
+  FlightStats,
+} from '../../types';
 import {
   ApiResponseSchema,
   FlightRecordsSchema,
@@ -15,7 +21,8 @@ import {
   FlightSchema,
   FlightStatsSchema,
 } from '@dashboard-parapente/shared-types';
-import {HTTPError} from 'ky';
+import { HTTPError } from 'ky';
+import { getStaleTime } from '../../lib/cacheConfig';
 
 export const flightsQueryOptions = (filters: FlightFilters = {}) => {
   const searchParams = Object.entries(filters).reduce(
@@ -38,7 +45,7 @@ export const flightsQueryOptions = (filters: FlightFilters = {}) => {
       }
       return validation.data.flights;
     },
-    staleTime: 1000 * 60 * 10,
+    staleTime: getStaleTime(1000 * 60 * 10),
   });
 };
 
@@ -53,7 +60,7 @@ export const flightStatsQueryOptions = () =>
       }
       return validation.data;
     },
-    staleTime: 1000 * 60 * 60,
+    staleTime: getStaleTime(1000 * 60 * 60),
   });
 
 export const flightRecordsQueryOptions = () =>
@@ -67,7 +74,7 @@ export const flightRecordsQueryOptions = () =>
       }
       return validation.data;
     },
-    staleTime: 1000 * 60 * 60,
+    staleTime: getStaleTime(1000 * 60 * 60),
   });
 
 /**
@@ -127,7 +134,6 @@ export const useUpdateFlight = (
     },
   });
 };
-
 
 /**
  * Synchroniser les vols Strava pour une période donnée

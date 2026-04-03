@@ -47,6 +47,18 @@ const defaultMswHandlers = [
     })
   ),
   http.get('*/api/sites/:siteId/landings', () => HttpResponse.json([])),
+  http.get('*/api/settings', () =>
+    HttpResponse.json({
+      cache_ttl_default: '3600',
+      cache_ttl_summary: '3600',
+      scheduler_interval_minutes: '30',
+      redis_connect_timeout: '5',
+      redis_socket_timeout: '5',
+    })
+  ),
+  http.put('*/api/settings', () =>
+    HttpResponse.json({ success: true, updated: {} })
+  ),
 ];
 
 const initializeMsw = (

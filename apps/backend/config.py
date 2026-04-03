@@ -89,6 +89,12 @@ SCHEDULER_ENABLED = os.getenv("BACKEND_SCHEDULER_ENABLED", "true").lower() == "t
 SCHEDULER_INTERVAL_MINUTES = int(os.getenv("BACKEND_SCHEDULER_INTERVAL_MINUTES", "30"))
 
 # ============================================================================
+# CACHE (default values, can be overridden from UI via app_settings table)
+# ============================================================================
+CACHE_TTL_DEFAULT = int(os.getenv("BACKEND_CACHE_TTL_DEFAULT", "3600"))
+CACHE_TTL_SUMMARY = int(os.getenv("BACKEND_CACHE_TTL_SUMMARY", "3600"))
+
+# ============================================================================
 # LOGGING
 # ============================================================================
 LOG_LEVEL = os.getenv("BACKEND_LOG_LEVEL", "INFO")

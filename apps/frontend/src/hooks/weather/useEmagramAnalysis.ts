@@ -3,6 +3,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getStaleTime, getWeatherRefetchInterval } from '../../lib/cacheConfig';
 import { EmagramAnalysis, EmagramListItem } from '../../types/emagram';
 
 const emagramKeys = {
@@ -43,8 +44,9 @@ export function useLatestEmagram(
       return response.json();
     },
     enabled: !!siteId && options?.enabled !== false,
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: (query) => (query.state.data ? 10 * 60 * 1000 : 30 * 1000),
+    staleTime: getStaleTime(5 * 60 * 1000),
+    refetchInterval: (query) =>
+      getWeatherRefetchInterval(query.state.data ? 10 * 60 * 1000 : 30 * 1000),
   });
 }
 
@@ -83,7 +85,7 @@ export function useEmagramHistory(
       return response.json();
     },
     enabled: userLat !== null && userLon !== null && options?.enabled !== false,
-    staleTime: 10 * 60 * 1000,
+    staleTime: getStaleTime(10 * 60 * 1000),
   });
 }
 

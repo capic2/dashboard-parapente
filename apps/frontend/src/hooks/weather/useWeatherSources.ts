@@ -5,6 +5,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { getStaleTime } from '../../lib/cacheConfig';
 import type {
   WeatherSource,
   WeatherSourceUpdate,
@@ -23,7 +24,7 @@ export const useWeatherSources = (enabledOnly = false) => {
       const params = enabledOnly ? '?enabled_only=true' : '';
       return await api.get(`weather-sources${params}`).json<WeatherSource[]>();
     },
-    staleTime: 30000, // 30 seconds
+    staleTime: getStaleTime(30000), // 30 seconds
   });
 };
 
@@ -36,7 +37,7 @@ export const useWeatherSourceStats = () => {
     queryFn: async () => {
       return await api.get('weather-sources/stats').json<WeatherSourceStats>();
     },
-    staleTime: 30000,
+    staleTime: getStaleTime(30000),
   });
 };
 

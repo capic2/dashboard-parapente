@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { getStaleTime } from '../../lib/cacheConfig';
 import {
   LandingAssociationSchema,
   type LandingAssociation,
@@ -14,7 +15,7 @@ export const useLandingAssociations = (siteId: string) => {
       return z.array(LandingAssociationSchema).parse(data);
     },
     enabled: !!siteId,
-    staleTime: 1000 * 60 * 5,
+    staleTime: getStaleTime(1000 * 60 * 5),
   });
 };
 
@@ -125,6 +126,6 @@ export const useLandingWeather = (siteId: string, dayIndex: number) => {
         .json<LandingWeatherEntry[]>();
     },
     enabled: !!siteId,
-    staleTime: 1000 * 60 * 5,
+    staleTime: getStaleTime(1000 * 60 * 5),
   });
 };

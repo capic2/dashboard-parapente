@@ -658,7 +658,7 @@ async def get_normalized_forecast(
     """
     import logging
 
-    from cache import CACHE_TTL, generate_cache_key, get_cached, set_cached
+    from cache import generate_cache_key, get_cache_ttl, get_cached, set_cached
 
     logger = logging.getLogger(__name__)
 
@@ -700,7 +700,7 @@ async def get_normalized_forecast(
 
     # Cache result
     try:
-        await set_cached(cache_key, result, CACHE_TTL["forecast"])
+        await set_cached(cache_key, result, get_cache_ttl()["forecast"])
         logger.info(f"💾 Cached forecast: {cache_key}")
     except Exception as e:
         logger.warning(f"Cache set error: {e}, continuing without cache")

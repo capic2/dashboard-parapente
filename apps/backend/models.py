@@ -18,6 +18,16 @@ from sqlalchemy.orm import relationship
 from database import Base
 
 
+class AppSetting(Base):
+    """Key-value store for application settings configurable from the UI"""
+
+    __tablename__ = "app_settings"
+
+    key = Column(String, primary_key=True)
+    value = Column(String, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class ParaglidingSpot(Base):
     """
     External paragliding sites from OpenAIP and ParaglidingSpots.com
