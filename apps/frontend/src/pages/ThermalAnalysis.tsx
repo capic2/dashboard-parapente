@@ -40,7 +40,7 @@ const historyColumns = [
             color: getScoreColor(score),
           }}
         >
-          {score || '-'}
+          {score ?? '-'}
         </span>
       );
     },
@@ -54,7 +54,7 @@ const historyColumns = [
     header: 'Plafond',
     cell: (info) => {
       const val = info.getValue();
-      return val ? `${val}m` : '-';
+      return val == null ? '-' : `${val}m`;
     },
     sortingFn: (rowA, rowB) => {
       const a = rowA.original.plafond_thermique_m ?? -Infinity;
@@ -66,7 +66,7 @@ const historyColumns = [
     header: 'Force',
     cell: (info) => {
       const val = info.getValue();
-      return val ? `${val.toFixed(1)} m/s` : '-';
+      return val == null ? '-' : `${val.toFixed(1)} m/s`;
     },
     sortingFn: (rowA, rowB) => {
       const a = rowA.original.force_thermique_ms ?? -Infinity;
