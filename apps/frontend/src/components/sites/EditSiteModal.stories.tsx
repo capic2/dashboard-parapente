@@ -1,8 +1,8 @@
-import {http, HttpResponse} from 'msw';
+import { http, HttpResponse } from 'msw';
 import preview from '../../../.storybook/preview';
-import {expect, fn} from 'storybook/test';
-import {EditSiteModal} from './EditSiteModal';
-import type {Site} from '@dashboard-parapente/shared-types';
+import { expect, fn, screen, within } from 'storybook/test';
+import { EditSiteModal } from './EditSiteModal';
+import type { Site } from '@dashboard-parapente/shared-types';
 
 const meta = preview.meta({
   title: 'Components/Forms/EditSiteModal',
@@ -18,8 +18,6 @@ const meta = preview.meta({
   },
   tags: ['autodocs'],
 });
-
-
 
 // Mock site data
 const mockSite: Site = {
@@ -61,7 +59,8 @@ export const Closed = meta.story({
     site: null,
     isOpen: false,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
@@ -72,7 +71,8 @@ export const EditMode = meta.story({
     site: mockSite,
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
@@ -83,7 +83,8 @@ export const CreateMode = meta.story({
     site: null,
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
@@ -94,7 +95,8 @@ export const EditMinimalData = meta.story({
     site: mockSiteMinimal,
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
@@ -105,7 +107,8 @@ export const TakeoffOnly = meta.story({
     site: { ...mockSite, usage_type: 'takeoff' },
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
@@ -116,7 +119,8 @@ export const LandingOnly = meta.story({
     site: { ...mockSite, usage_type: 'landing' },
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
@@ -127,7 +131,8 @@ export const OrientationSouth = meta.story({
     site: { ...mockSite, orientation: 'S' },
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
@@ -138,7 +143,8 @@ export const CountrySwitzerland = meta.story({
     site: { ...mockSite, country: 'CH' },
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
@@ -149,7 +155,8 @@ export const CustomCameraSettings = meta.story({
     site: { ...mockSite, camera_angle: 90, camera_distance: 1500 },
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
@@ -160,14 +167,16 @@ export const SavingState = meta.story({
     site: mockSite,
     isOpen: true,
     onClose: fn(),
-    onSave: fn(async () => {
+    onUpdate: fn(async () => {
       await new Promise((resolve) => setTimeout(resolve, 10000));
     }),
+    onCreate: fn(),
   },
 });
 
-SavingState.test('interaction test', async ({ canvas, userEvent }) => {
-  const saveButton = canvas.getByText('💾 Enregistrer');
+SavingState.test('interaction test', async ({ userEvent }) => {
+  const dialog = within(screen.getByRole('dialog'));
+  const saveButton = dialog.getByText('💾 Enregistrer');
   await userEvent.click(saveButton);
 });
 
@@ -179,7 +188,8 @@ export const DisplaysSiteData = meta.story({
     site: mockSite,
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
@@ -189,12 +199,13 @@ export const ShowsCreateModeTitle = meta.story({
     site: null,
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
-ShowsCreateModeTitle.test('shows create mode title', async ({ canvas }) => {
-  await expect(canvas.getByText('Nouveau site')).toBeInTheDocument();
+ShowsCreateModeTitle.test('shows create mode title', async () => {
+  await expect(screen.getByText('Nouveau site')).toBeInTheDocument();
 });
 
 export const DisablesCodeInEditMode = meta.story({
@@ -203,7 +214,8 @@ export const DisablesCodeInEditMode = meta.story({
     site: mockSite,
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
@@ -227,7 +239,8 @@ export const AllowsCodeInCreateMode = meta.story({
     site: null,
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
@@ -246,7 +259,8 @@ export const EditsNameField = meta.story({
     site: mockSite,
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
@@ -256,12 +270,14 @@ export const SelectsUsageType = meta.story({
     site: mockSite,
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
-SelectsUsageType.test('selects usage type', async ({ canvas, userEvent }) => {
-  const takeoffRadio = canvas.getByLabelText('Décollage uniquement');
+SelectsUsageType.test('selects usage type', async ({ userEvent }) => {
+  const dialog = within(screen.getByRole('dialog'));
+  const takeoffRadio = dialog.getByLabelText('Décollage uniquement');
   await userEvent.click(takeoffRadio);
 
   await expect(takeoffRadio).toBeChecked();
@@ -274,7 +290,8 @@ export const ChangesOrientation = meta.story({
     site: mockSite,
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
@@ -293,7 +310,8 @@ export const AdjustsCameraAngle = meta.story({
     site: mockSite,
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
@@ -313,14 +331,16 @@ export const CallsOnCloseWhenCancelled = meta.story({
     site: mockSite,
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
 CallsOnCloseWhenCancelled.test(
   'calls onClose when cancelled',
-  async ({ args, canvas, userEvent }) => {
-    const cancelButton = canvas.getByText('Annuler');
+  async ({ args, userEvent }) => {
+    const dialog = within(screen.getByRole('dialog'));
+    const cancelButton = dialog.getByText('Annuler');
     await userEvent.click(cancelButton);
 
     await expect(args.onClose).toHaveBeenCalled();
@@ -334,7 +354,8 @@ export const ValidatesRequiredFields = meta.story({
     site: null,
     isOpen: true,
     onClose: fn(),
-    onSave: fn(),
+    onUpdate: fn(),
+    onCreate: fn(),
   },
 });
 
@@ -356,9 +377,10 @@ export const SavesSuccessfully = meta.story({
     site: mockSite,
     isOpen: true,
     onClose: fn(),
-    onSave: fn(async () => {
+    onUpdate: fn(async () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }),
+    onCreate: fn(),
   },
 });
 
@@ -373,7 +395,7 @@ export const SavesSuccessfully = meta.story({
     await userEvent.click(saveButton);
 
     await waitFor(() => {
-      expect(args.onSave).toHaveBeenCalled();
+      expect(args.onUpdate).toHaveBeenCalled();
     });
 
     await waitFor(() => {
@@ -388,9 +410,10 @@ export const ShowsSavingState = meta.story({
     site: mockSite,
     isOpen: true,
     onClose: fn(),
-    onSave: fn(async () => {
+    onUpdate: fn(async () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }),
+    onCreate: fn(),
   },
 });
 
