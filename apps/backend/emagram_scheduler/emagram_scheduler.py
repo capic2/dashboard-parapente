@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,27 @@ async def cleanup_old_emagram_screenshots():
         logger.debug("No old screenshots to clean up")
 
 
+_scheduler: AsyncIOScheduler | None = None
+
+
+def _get_scheduler_interval() -> int:
+    """Read scheduler interval from app_settings (same as weather scheduler)."""
+    try:
+        from app_settings import get_setting_int
+        from database import get_db_context
+
+        with get_db_context() as db:
+            interval = get_setting_int("scheduler_interval_minutes", db=db, default=30)
+        return interval if interval > 0 else 30
+    except Exception:
+        try:
+            from config import SCHEDULER_INTERVAL_MINUTES
+
+            return SCHEDULER_INTERVAL_MINUTES if SCHEDULER_INTERVAL_MINUTES > 0 else 30
+        except Exception:
+            return 30
+
+
 def setup_emagram_scheduler(app):
     """
     Setup APScheduler for automatic emagram analysis
@@ -93,14 +115,17 @@ def setup_emagram_scheduler(app):
     Returns:
         Configured scheduler instance
     """
+    global _scheduler
+    interval = _get_scheduler_interval()
     scheduler = AsyncIOScheduler(timezone=ZoneInfo("Europe/Paris"))
+    _scheduler = scheduler
 
-    # Multi-source emagram refresh: Every 3 hours at :15
+    # Multi-source emagram refresh: same interval as weather scheduler
     scheduler.add_job(
         run_scheduled_emagram_analysis,
-        trigger=CronTrigger(hour="*/3", minute=15, timezone=ZoneInfo("Europe/Paris")),
+        trigger=IntervalTrigger(minutes=interval),
         id="emagram_refresh",
-        name="Multi-Source Emagram Refresh (Every 3 hours)",
+        name=f"Multi-Source Emagram Refresh (Every {interval} min)",
         replace_existing=True,
     )
 
@@ -114,7 +139,7 @@ def setup_emagram_scheduler(app):
     )
 
     logger.info("📅 Emagram scheduler configured:")
-    logger.info("  - Multi-source refresh: Every 3 hours at :15 (00:15, 03:15, 06:15, ...)")
+    logger.info(f"  - Multi-source refresh: Every {interval} minutes")
     logger.info("  - Screenshot cleanup: Every hour at :05")
 
     # Register shutdown event
@@ -124,6 +149,19 @@ def setup_emagram_scheduler(app):
         scheduler.shutdown()
 
     return scheduler
+
+
+def reschedule(interval_minutes: int):
+    """Reschedule the emagram refresh job with a new interval (called from API)."""
+    if _scheduler is None:
+        raise RuntimeError("Emagram scheduler not initialized")
+    if interval_minutes <= 0:
+        raise ValueError("scheduler interval must be > 0 minutes")
+    _scheduler.reschedule_job(
+        "emagram_refresh",
+        trigger=IntervalTrigger(minutes=interval_minutes),
+    )
+    logger.info(f"✅ Emagram scheduler rescheduled to every {interval_minutes} minutes")
 
 
 def start_scheduler(scheduler):
