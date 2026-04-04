@@ -1,5 +1,6 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { Row, RowSelectionState, OnChangeFn } from '@tanstack/react-table';
+import type { Selection } from 'react-aria-components';
 import { DataList } from '@dashboard-parapente/design-system';
 import { useFlightsTable, FLIGHT_SORTABLE_COLUMNS } from './useFlightsTable';
 import type { Flight } from '../../types';
@@ -30,10 +31,35 @@ export function FlightsTable({
     onRowSelectionChange,
   });
 
+  // Convert TanStack RowSelectionState to react-aria Selection
+  const selectedKeys = useMemo<Selection>(
+    () => new Set(Object.keys(rowSelection).filter((k) => rowSelection[k])),
+    [rowSelection]
+  );
+
+  // Convert react-aria Selection back to TanStack RowSelectionState
+  const handleSelectionChange = useCallback(
+    (keys: Selection) => {
+      if (keys === 'all') {
+        const allSelected: RowSelectionState = {};
+        for (const row of table.getPrePaginationRowModel().rows) {
+          allSelected[row.id] = true;
+        }
+        onRowSelectionChange(() => allSelected);
+      } else {
+        const newSelection: RowSelectionState = {};
+        for (const key of keys) {
+          newSelection[String(key)] = true;
+        }
+        onRowSelectionChange(() => newSelection);
+      }
+    },
+    [table, onRowSelectionChange]
+  );
+
   const renderFlightCard = useCallback(
-    (row: Row<Flight>) => {
+    (row: Row<Flight>, { isSelected }: { isSelected: boolean }) => {
       const flight = row.original;
-      const isSelected = selectionMode && row.getIsSelected();
       const isActive = selectedFlightId === flight.id;
 
       return (
@@ -45,14 +71,11 @@ export function FlightsTable({
                 ? 'border-sky-600 shadow-md'
                 : 'border-gray-200 dark:border-gray-700 hover:border-sky-400'
           }`}
-          onClick={() => onSelectFlight(flight)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && onSelectFlight(flight)}
-          aria-label={`Sélectionner vol du ${(() => {
-            const [year, month, day] = flight.flight_date.split('-');
-            return new Date(Number(year), Number(month) - 1, Number(day)).toLocaleDateString('fr-FR');
-          })()}`}
+          onClick={() => {
+            if (!selectionMode) {
+              onSelectFlight(flight);
+            }
+          }}
         >
           {/* Bouton supprimer au survol */}
           {!selectionMode && (
@@ -80,17 +103,6 @@ export function FlightsTable({
             </button>
           )}
           <div className="flex justify-between items-start mb-2">
-            {/* Checkbox en mode sélection */}
-            {selectionMode && (
-              <input
-                type="checkbox"
-                checked={isSelected}
-                onChange={() => row.toggleSelected()}
-                className="mr-2 mt-1 w-4 h-4 text-sky-600 rounded focus:ring-sky-500"
-                onClick={(e) => e.stopPropagation()}
-              />
-            )}
-
             <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate flex-1">
               {flight.title || 'Vol sans titre'}
             </h3>
@@ -174,6 +186,13 @@ export function FlightsTable({
       renderItem={renderFlightCard}
       sortableColumns={FLIGHT_SORTABLE_COLUMNS}
       emptyMessage="Aucun vol enregistré"
+      ariaLabel="Liste des vols"
+      selectionMode={selectionMode ? 'multiple' : 'none'}
+      selectedKeys={selectedKeys}
+      onSelectionChange={handleSelectionChange}
+      getTextValue={(row) =>
+        row.original.title || row.original.site_name || 'Vol'
+      }
     />
   );
 }

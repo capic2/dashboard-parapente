@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-table';
 import { useState } from 'react';
 import type { Row } from '@tanstack/react-table';
+import type { Selection } from 'react-aria-components';
 import { DataList } from './DataList';
 
 interface MockItem {
@@ -46,11 +47,14 @@ const sortableColumns = [
 function DataListWrapper({
   data,
   pageSize = 5,
+  selectionMode = 'none' as 'none' | 'single' | 'multiple',
 }: {
   data: MockItem[];
   pageSize?: number;
+  selectionMode?: 'none' | 'single' | 'multiple';
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [selectedKeys, setSelectedKeys] = useState<Selection>(new Set());
 
   const table = useReactTable({
     data,
@@ -70,8 +74,19 @@ function DataListWrapper({
     <DataList
       table={table}
       sortableColumns={sortableColumns}
-      renderItem={(row: Row<MockItem>) => (
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border border-gray-200 dark:border-gray-700">
+      ariaLabel="Liste de test"
+      selectionMode={selectionMode}
+      selectedKeys={selectedKeys}
+      onSelectionChange={setSelectedKeys}
+      getTextValue={(row: Row<MockItem>) => row.original.name}
+      renderItem={(row: Row<MockItem>, { isSelected }) => (
+        <div
+          className={`bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border transition-colors ${
+            isSelected
+              ? 'border-sky-500 bg-sky-50 dark:bg-sky-900/20'
+              : 'border-gray-200 dark:border-gray-700'
+          }`}
+        >
           <div className="font-semibold text-sm text-gray-900 dark:text-white">
             {row.original.name}
           </div>
@@ -101,6 +116,11 @@ export const Default = meta.story({
 export const WithPagination = meta.story({
   name: 'With Pagination',
   render: () => <DataListWrapper data={mockData} pageSize={3} />,
+});
+
+export const WithSelection = meta.story({
+  name: 'With Selection',
+  render: () => <DataListWrapper data={mockData} selectionMode="multiple" />,
 });
 
 export const Empty = meta.story({

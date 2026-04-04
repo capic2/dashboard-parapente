@@ -1,3 +1,4 @@
+import { http, HttpResponse } from 'msw';
 import { FigureWrapper } from '../../../.storybook/FigureWrapper.tsx';
 import preview from '../../../.storybook/preview.tsx';
 import {
@@ -16,6 +17,14 @@ const meta = preview.meta({
     layout: 'padded',
     chromatic: {
       disableSnapshot: false,
+    },
+    msw: {
+      handlers: [
+        http.get('*/api/sites/:siteId/landings', () => HttpResponse.json([])),
+        http.get('*/api/sites/:siteId/landings/weather', () =>
+          HttpResponse.json([])
+        ),
+      ],
     },
   },
   tags: ['!autodocs'],

@@ -7,6 +7,7 @@ import {
 } from 'react-aria-components';
 import { useTranslation } from 'react-i18next';
 import { tv } from 'tailwind-variants';
+import { ReactNode } from 'react';
 
 const modal = tv({
   base: 'bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-h-[90vh] overflow-y-auto',
@@ -27,8 +28,9 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  role?: 'dialog' | 'alertdialog';
 }
 
 export function Modal({
@@ -37,6 +39,7 @@ export function Modal({
   title,
   children,
   size = 'md',
+  role = 'dialog',
 }: ModalProps) {
   const { t } = useTranslation();
   return (
@@ -46,9 +49,12 @@ export function Modal({
       className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
     >
       <AriaModal className={modal({ size })}>
-        <Dialog className="outline-none p-6">
+        <Dialog role={role} className="outline-none p-6">
           <div className="flex justify-between items-start mb-4">
-            <Heading slot="title" className="text-xl font-bold text-gray-900 dark:text-white">
+            <Heading
+              slot="title"
+              className="text-xl font-bold text-gray-900 dark:text-white"
+            >
               {title}
             </Heading>
             <Button
