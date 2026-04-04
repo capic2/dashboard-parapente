@@ -111,7 +111,10 @@ class TestUpdateSettings:
 
     def test_scheduler_reschedule_warning_on_failure(self, client, db_session):
         """Returns scheduler_warning when reschedule fails."""
-        with patch("scheduler.reschedule", side_effect=ValueError("test error")):
+        with (
+            patch("scheduler.reschedule", side_effect=ValueError("test error")),
+            patch("emagram_scheduler.emagram_scheduler.reschedule"),
+        ):
             response = client.put(
                 f"{API_PREFIX}/settings",
                 json={"scheduler_interval_minutes": "15"},
