@@ -67,6 +67,9 @@ export interface EmagramAnalysis {
   has_thermal_data: boolean;
   flyable_hours_formatted: string | null;
 
+  // Forecast target date
+  forecast_date?: string | null; // ISO date "YYYY-MM-DD"
+
   // Multi-source support (Gemini multi-emagram analysis)
   external_source_urls?: string | null; // JSON: {"meteo-parapente": "url", ...}
   screenshot_paths?: string | null; // JSON: {"meteo-parapente": "/path/to/screenshot.png", ...}
