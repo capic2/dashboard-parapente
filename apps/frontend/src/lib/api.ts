@@ -1,5 +1,8 @@
 import ky from 'ky';
 
+// API logging: enabled in dev, disabled in tests via overrideApi({ logs: false })
+let _apiLogsEnabled = import.meta.env.DEV;
+
 // Instance Ky configurée pour l'API backend
 // eslint-disable-next-line import/no-mutable-exports
 export let api = ky.create({
@@ -13,16 +16,16 @@ export let api = ky.create({
   hooks: {
     beforeRequest: [
       (request) => {
-        // Log requêtes en dev
-        if (import.meta.env.DEV) {
+        // Log requêtes en dev (désactivé en test via overrideApi)
+        if (_apiLogsEnabled) {
           console.log(`[API] ${request.method} ${request.url}`);
         }
       },
     ],
     afterResponse: [
       async (request, _options, response) => {
-        // Log des erreurs (en dev seulement pour éviter de polluer la console en prod)
-        if (!response.ok && import.meta.env.DEV) {
+        // Log des erreurs en dev (désactivé en test via overrideApi)
+        if (!response.ok && _apiLogsEnabled) {
           console.error(
             `[API Error] ${request.method} ${request.url}:`,
             response.status
@@ -34,9 +37,15 @@ export let api = ky.create({
   },
 });
 
-// Override api configuration (used by test setup to disable retry)
-export function overrideApi(options: Parameters<typeof api.extend>[0]) {
-  api = api.extend(options);
+// Override api configuration (used by test setup to disable retry and logs)
+export function overrideApi(
+  options: Parameters<typeof api.extend>[0] & { logs?: boolean }
+) {
+  const { logs, ...kyOptions } = options;
+  if (logs !== undefined) {
+    _apiLogsEnabled = logs;
+  }
+  api = api.extend(kyOptions);
 }
 
 // Apply persisted timeout on load and react to changes
