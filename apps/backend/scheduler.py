@@ -257,8 +257,10 @@ def _get_scheduler_interval() -> int:
     """Read scheduler interval from app_settings (fallback to config/default)."""
     try:
         from app_settings import get_setting_int
+        from database import get_db_context
 
-        interval = get_setting_int("scheduler_interval_minutes", default=30)
+        with get_db_context() as db:
+            interval = get_setting_int("scheduler_interval_minutes", db=db, default=30)
         return interval if interval > 0 else 30
     except Exception:
         try:

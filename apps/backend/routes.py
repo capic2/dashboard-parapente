@@ -4457,7 +4457,18 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
     # If scheduler interval changed, reschedule dynamically
     scheduler_error = None
     if "scheduler_interval_minutes" in updated:
-        new_interval = int(updated["scheduler_interval_minutes"])
+        try:
+            new_interval = int(updated["scheduler_interval_minutes"])
+        except (TypeError, ValueError) as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid scheduler_interval_minutes: {updated['scheduler_interval_minutes']}",
+            ) from e
+        if new_interval <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="scheduler_interval_minutes must be > 0",
+            )
         # Reschedule weather scheduler
         try:
             from scheduler import reschedule
