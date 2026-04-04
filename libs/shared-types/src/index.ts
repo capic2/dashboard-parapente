@@ -345,12 +345,40 @@ export const GPXDataSchema = z.object({
 // TYPE EXPORTS
 // ============================================================================
 
+// Mutation schemas: use optional (not nullish) since we send values or omit fields
+export const SiteUpdateSchema = z
+  .object({
+    name: z.string(),
+    code: z.string(),
+    latitude: z.number(),
+    longitude: z.number(),
+    elevation_m: z.number(),
+    region: z.string(),
+    country: z.string(),
+    orientation: z.string(),
+    camera_angle: z.number(),
+    camera_distance: z.number(),
+    usage_type: z.enum(['takeoff', 'landing', 'both']),
+    description: z.string(),
+  })
+  .partial();
+
+export const CreateSiteSchema = SiteUpdateSchema.required({
+  name: true,
+  latitude: true,
+  longitude: true,
+});
+
 export type Site = z.infer<typeof SiteSchema>;
+export type SiteUpdate = z.infer<typeof SiteUpdateSchema>;
+export type CreateSiteData = z.infer<typeof CreateSiteSchema>;
 export type Flight = z.infer<typeof FlightSchema>;
 export type FlightStats = z.infer<typeof FlightStatsSchema>;
 export type Alert = z.infer<typeof AlertSchema>;
 export type ConsensusHour = z.infer<typeof ConsensusHourSchema>;
-export type BackendWeatherResponse = z.infer<typeof BackendWeatherResponseSchema>;
+export type BackendWeatherResponse = z.infer<
+  typeof BackendWeatherResponseSchema
+>;
 export type Slot = z.infer<typeof SlotSchema>;
 export type Metrics = z.infer<typeof MetricsSchema>;
 export type DailySummaryDay = z.infer<typeof DailySummaryDaySchema>;

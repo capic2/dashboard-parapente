@@ -10,16 +10,7 @@ import {
   SitesApiResponseSchema,
   SiteSchema,
 } from '@dashboard-parapente/shared-types';
-import type { Site } from '../../types';
-
-interface CreateSiteData {
-  name: string;
-  latitude: number;
-  longitude: number;
-  elevation_m?: number;
-  region?: string;
-  country?: string;
-}
+import type { Site, CreateSiteData } from '@dashboard-parapente/shared-types';
 
 interface GeocodeResult {
   name: string;
@@ -79,7 +70,7 @@ export const useCreateSite = () => {
     },
     onSuccess: () => {
       // Invalidate sites cache to refetch with new site
-      queryClient.invalidateQueries({ queryKey: ['sites'] });
+      void queryClient.invalidateQueries({ queryKey: ['sites'] });
     },
   });
 };

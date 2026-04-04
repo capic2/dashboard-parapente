@@ -1,24 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Site } from '@dashboard-parapente/shared-types';
-import { SiteUpdate } from '../../hooks/sites/useSiteMutations';
+import { TextField, Label, Input, Button } from 'react-aria-components';
+import type {
+  Site,
+  SiteUpdate,
+  CreateSiteData,
+} from '@dashboard-parapente/shared-types';
+import { Modal } from '@dashboard-parapente/design-system';
 import LandingAssociationsManager from './LandingAssociationsManager';
+
+type SiteFormData = Required<SiteUpdate>;
+
+const inputClass =
+  'w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded outline-none focus:ring-2 focus:ring-blue-500';
+const labelClass = 'block text-sm font-medium mb-1 dark:text-gray-200';
 
 interface EditSiteModalProps {
   site: Site | null; // null = create mode, Site = edit mode
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: SiteUpdate) => Promise<void>;
+  onUpdate: (data: SiteUpdate) => Promise<void>;
+  onCreate: (data: CreateSiteData) => Promise<void>;
 }
 
 export const EditSiteModal: React.FC<EditSiteModalProps> = ({
   site,
   isOpen,
   onClose,
-  onSave,
+  onUpdate,
+  onCreate,
 }) => {
   const { t } = useTranslation();
-  const [formData, setFormData] = useState<SiteUpdate>({
+  const [formData, setFormData] = useState<SiteFormData>({
     name: '',
     code: '',
     latitude: 0,
@@ -33,7 +46,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
     description: '',
   });
 
-  const [originalData, setOriginalData] = useState<SiteUpdate>({});
+  const [originalData, setOriginalData] = useState<SiteFormData | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
 
@@ -58,7 +71,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
       setOriginalData(initialData);
     } else {
       // Reset for create mode
-      const initialData: SiteUpdate = {
+      setFormData({
         name: '',
         code: '',
         latitude: 0,
@@ -71,9 +84,8 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         camera_distance: 500,
         usage_type: 'both',
         description: '',
-      };
-      setFormData(initialData);
-      setOriginalData({});
+      });
+      setOriginalData(null);
     }
     setErrors({});
   }, [site]);
@@ -110,31 +122,34 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
 
     setIsSaving(true);
     try {
-      // For edit mode: only send changed fields
-      // For create mode: send all fields with values
-      const cleanedData: SiteUpdate = {};
-
-      Object.entries(formData).forEach(([key, value]) => {
-        const typedKey = key as keyof SiteUpdate;
-        const originalValue = originalData[typedKey];
-
-        // Include field if:
-        // 1. It's a new site (no originalData) and has a non-empty value
-        // 2. It's an edit and the value has changed
-        if (Object.keys(originalData).length === 0) {
-          // Create mode: include all non-empty values
-          if (value !== '' && value !== undefined && value !== null) {
-            cleanedData[typedKey] = value;
-          }
-        } else {
-          // Edit mode: only include changed values
-          if (value !== originalValue) {
-            cleanedData[typedKey] = value;
+      if (originalData) {
+        // Edit mode: only send changed fields
+        const changedData: SiteUpdate = {};
+        for (const [key, value] of Object.entries(formData)) {
+          if (value !== originalData[key as keyof SiteFormData]) {
+            (changedData as Record<string, unknown>)[key] = value;
           }
         }
-      });
-
-      await onSave(cleanedData);
+        await onUpdate(changedData);
+      } else {
+        // Create mode: formData has all concrete values
+        await onCreate({
+          name: formData.name,
+          latitude: formData.latitude,
+          longitude: formData.longitude,
+          ...(formData.code && { code: formData.code }),
+          ...(formData.elevation_m && { elevation_m: formData.elevation_m }),
+          ...(formData.region && { region: formData.region }),
+          ...(formData.country && { country: formData.country }),
+          ...(formData.orientation && { orientation: formData.orientation }),
+          ...(formData.camera_angle && { camera_angle: formData.camera_angle }),
+          ...(formData.camera_distance && {
+            camera_distance: formData.camera_distance,
+          }),
+          ...(formData.usage_type && { usage_type: formData.usage_type }),
+          ...(formData.description && { description: formData.description }),
+        });
+      }
       onClose();
     } catch (error) {
       console.error('Failed to save site:', error);
@@ -144,316 +159,295 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold mb-4 dark:text-white">
-          {site ? `${t('editSite.title')} ${site.name}` : t('editSite.newSite')}
-        </h2>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={
+        site ? `${t('editSite.title')} ${site.name}` : t('editSite.newSite')
+      }
+      size="lg"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Nom */}
+        <TextField
+          isRequired
+          value={formData.name}
+          onChange={(v) => setFormData({ ...formData, name: v })}
+          className="flex flex-col gap-1"
+        >
+          <Label className={labelClass}>{t('editSite.siteName')} *</Label>
+          <Input className={inputClass} />
+          {errors.name && (
+            <p className="text-red-500 text-xs mt-1">{errors.name}</p>
+          )}
+        </TextField>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Nom */}
+        {/* Code */}
+        <TextField
+          value={formData.code}
+          onChange={(v) => setFormData({ ...formData, code: v })}
+          isDisabled={!!site}
+          className="flex flex-col gap-1"
+        >
+          <Label className={labelClass}>{t('editSite.code')}</Label>
+          <Input
+            className={`${inputClass} disabled:bg-gray-100 dark:disabled:bg-gray-600`}
+          />
+          {site && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {t('editSite.codeReadonly')}
+            </p>
+          )}
+        </TextField>
+
+        {/* Type de site */}
+        <div>
+          <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+            {t('editSite.siteType')} *
+          </label>
+          <div className="space-y-2">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="radio"
+                value="takeoff"
+                checked={formData.usage_type === 'takeoff'}
+                onChange={() =>
+                  setFormData({ ...formData, usage_type: 'takeoff' })
+                }
+                className="mr-2"
+              />
+              <span>{t('sites.takeoffOnly')}</span>
+            </label>
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="radio"
+                value="landing"
+                checked={formData.usage_type === 'landing'}
+                onChange={() =>
+                  setFormData({ ...formData, usage_type: 'landing' })
+                }
+                className="mr-2"
+              />
+              <span>{t('sites.landingOnly')}</span>
+            </label>
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="radio"
+                value="both"
+                checked={formData.usage_type === 'both'}
+                onChange={() =>
+                  setFormData({ ...formData, usage_type: 'both' })
+                }
+                className="mr-2"
+              />
+              <span>{t('editSite.takeoffAndLanding')}</span>
+            </label>
+          </div>
+        </div>
+
+        {/* GPS Coordinates */}
+        <div className="grid grid-cols-3 gap-3">
+          <TextField
+            isRequired
+            value={String(formData.latitude)}
+            onChange={(v) =>
+              setFormData({ ...formData, latitude: parseFloat(v) || 0 })
+            }
+            className="flex flex-col gap-1"
+          >
+            <Label className={labelClass}>{t('editSite.latitude')} *</Label>
+            <Input type="number" step={0.0001} className={inputClass} />
+            {errors.latitude && (
+              <p className="text-red-500 text-xs mt-1">{errors.latitude}</p>
+            )}
+          </TextField>
+
+          <TextField
+            isRequired
+            value={String(formData.longitude)}
+            onChange={(v) =>
+              setFormData({ ...formData, longitude: parseFloat(v) || 0 })
+            }
+            className="flex flex-col gap-1"
+          >
+            <Label className={labelClass}>{t('editSite.longitude')} *</Label>
+            <Input type="number" step={0.0001} className={inputClass} />
+            {errors.longitude && (
+              <p className="text-red-500 text-xs mt-1">{errors.longitude}</p>
+            )}
+          </TextField>
+
+          <TextField
+            value={String(formData.elevation_m)}
+            onChange={(v) =>
+              setFormData({ ...formData, elevation_m: parseInt(v) || 0 })
+            }
+            className="flex flex-col gap-1"
+          >
+            <Label className={labelClass}>{t('editSite.elevation')}</Label>
+            <Input type="number" className={inputClass} />
+          </TextField>
+        </div>
+
+        {/* Region & Country */}
+        <div className="grid grid-cols-2 gap-3">
+          <TextField
+            value={formData.region}
+            onChange={(v) => setFormData({ ...formData, region: v })}
+            className="flex flex-col gap-1"
+          >
+            <Label className={labelClass}>{t('editSite.region')}</Label>
+            <Input
+              className={inputClass}
+              placeholder={t('editSite.regionPlaceholder')}
+            />
+          </TextField>
+
           <div>
             <label className="block text-sm font-medium mb-1 dark:text-gray-200">
-              {t('editSite.siteName')} *
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded"
-              required
-            />
-            {errors.name && (
-              <p className="text-red-500 text-xs mt-1">{errors.name}</p>
-            )}
-          </div>
-
-          {/* Code */}
-          <div>
-            <label className="block text-sm font-medium mb-1 dark:text-gray-200">{t('editSite.code')}</label>
-            <input
-              type="text"
-              value={formData.code}
-              onChange={(e) =>
-                setFormData({ ...formData, code: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded disabled:bg-gray-100 dark:disabled:bg-gray-600"
-              disabled={!!site}
-            />
-            {site && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {t('editSite.codeReadonly')}
-              </p>
-            )}
-          </div>
-
-          {/* Type de site */}
-          <div>
-            <label className="block text-sm font-medium mb-2 dark:text-gray-200">
-              {t('editSite.siteType')} *
-            </label>
-            <div className="space-y-2">
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="radio"
-                  value="takeoff"
-                  checked={formData.usage_type === 'takeoff'}
-                  onChange={() =>
-                    setFormData({ ...formData, usage_type: 'takeoff' })
-                  }
-                  className="mr-2"
-                />
-                <span>{t('sites.takeoffOnly')}</span>
-              </label>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="radio"
-                  value="landing"
-                  checked={formData.usage_type === 'landing'}
-                  onChange={() =>
-                    setFormData({ ...formData, usage_type: 'landing' })
-                  }
-                  className="mr-2"
-                />
-                <span>{t('sites.landingOnly')}</span>
-              </label>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="radio"
-                  value="both"
-                  checked={formData.usage_type === 'both'}
-                  onChange={() =>
-                    setFormData({ ...formData, usage_type: 'both' })
-                  }
-                  className="mr-2"
-                />
-                <span>{t('editSite.takeoffAndLanding')}</span>
-              </label>
-            </div>
-          </div>
-
-          {/* GPS Coordinates */}
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-sm font-medium mb-1 dark:text-gray-200">
-                {t('editSite.latitude')} *
-              </label>
-              <input
-                type="number"
-                step="0.0001"
-                value={formData.latitude}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    latitude: parseFloat(e.target.value) || 0,
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded"
-                required
-              />
-              {errors.latitude && (
-                <p className="text-red-500 text-xs mt-1">{errors.latitude}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1 dark:text-gray-200">
-                {t('editSite.longitude')} *
-              </label>
-              <input
-                type="number"
-                step="0.0001"
-                value={formData.longitude}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    longitude: parseFloat(e.target.value) || 0,
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded"
-                required
-              />
-              {errors.longitude && (
-                <p className="text-red-500 text-xs mt-1">{errors.longitude}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1 dark:text-gray-200">
-                {t('editSite.elevation')}
-              </label>
-              <input
-                type="number"
-                value={formData.elevation_m}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    elevation_m: parseInt(e.target.value) || 0,
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded"
-              />
-            </div>
-          </div>
-
-          {/* Region & Country */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium mb-1 dark:text-gray-200">{t('editSite.region')}</label>
-              <input
-                type="text"
-                value={formData.region}
-                onChange={(e) =>
-                  setFormData({ ...formData, region: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded"
-                placeholder={t('editSite.regionPlaceholder')}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1 dark:text-gray-200">{t('editSite.country')}</label>
-              <select
-                value={formData.country}
-                onChange={(e) =>
-                  setFormData({ ...formData, country: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded"
-              >
-                <option value="FR">{t('editSite.france')}</option>
-                <option value="CH">{t('editSite.switzerland')}</option>
-                <option value="IT">{t('editSite.italy')}</option>
-                <option value="ES">{t('editSite.spain')}</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Orientation */}
-          <div>
-            <label className="block text-sm font-medium mb-1 dark:text-gray-200">
-              {t('editSite.orientation')}
+              {t('editSite.country')}
             </label>
             <select
-              value={formData.orientation}
+              value={formData.country}
               onChange={(e) =>
-                setFormData({ ...formData, orientation: e.target.value })
+                setFormData({ ...formData, country: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded"
+              className={inputClass}
             >
-              <option value="">{t('editSite.undefined')}</option>
-              <option value="N">Nord (N)</option>
-              <option value="NE">Nord-Est (NE)</option>
-              <option value="E">Est (E)</option>
-              <option value="SE">Sud-Est (SE)</option>
-              <option value="S">Sud (S)</option>
-              <option value="SW">Sud-Ouest (SW)</option>
-              <option value="W">Ouest (W)</option>
-              <option value="NW">Nord-Ouest (NW)</option>
+              <option value="FR">{t('editSite.france')}</option>
+              <option value="CH">{t('editSite.switzerland')}</option>
+              <option value="IT">{t('editSite.italy')}</option>
+              <option value="ES">{t('editSite.spain')}</option>
             </select>
           </div>
+        </div>
 
-          {/* Camera Settings */}
-          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-700">
-            <h4 className="text-sm font-semibold mb-3 dark:text-gray-200">
-              📷 {t('editSite.camera3D')}
-            </h4>
+        {/* Orientation */}
+        <div>
+          <label className="block text-sm font-medium mb-1 dark:text-gray-200">
+            {t('editSite.orientation')}
+          </label>
+          <select
+            value={formData.orientation}
+            onChange={(e) =>
+              setFormData({ ...formData, orientation: e.target.value })
+            }
+            className={inputClass}
+          >
+            <option value="">{t('editSite.undefined')}</option>
+            <option value="N">Nord (N)</option>
+            <option value="NE">Nord-Est (NE)</option>
+            <option value="E">Est (E)</option>
+            <option value="SE">Sud-Est (SE)</option>
+            <option value="S">Sud (S)</option>
+            <option value="SW">Sud-Ouest (SW)</option>
+            <option value="W">Ouest (W)</option>
+            <option value="NW">Nord-Ouest (NW)</option>
+          </select>
+        </div>
 
-            <div className="mb-3">
-              <label className="block text-sm mb-1">
-                {t('editSite.angle')}: {formData.camera_angle}°
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="360"
-                step="5"
-                value={formData.camera_angle}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    camera_angle: parseInt(e.target.value),
-                  })
-                }
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-                <span>0° (N)</span>
-                <span>90° (E)</span>
-                <span>180° (S)</span>
-                <span>270° (W)</span>
-              </div>
-            </div>
+        {/* Camera Settings */}
+        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-700">
+          <h4 className="text-sm font-semibold mb-3 dark:text-gray-200">
+            📷 {t('editSite.camera3D')}
+          </h4>
 
-            <div>
-              <label className="block text-sm mb-1">
-                {t('editSite.distance')}: {formData.camera_distance}m
-              </label>
-              <input
-                type="range"
-                min="100"
-                max="2000"
-                step="50"
-                value={formData.camera_distance}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    camera_distance: parseInt(e.target.value),
-                  })
-                }
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-                <span>100m</span>
-                <span>2000m</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium mb-1 dark:text-gray-200">
-              {t('editSite.description')}
+          <div className="mb-3">
+            <label className="block text-sm mb-1">
+              {t('editSite.angle')}: {formData.camera_angle}°
             </label>
-            <textarea
-              value={formData.description}
+            <input
+              type="range"
+              min="0"
+              max="360"
+              step="5"
+              value={formData.camera_angle}
               onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
+                setFormData({
+                  ...formData,
+                  camera_angle: parseInt(e.target.value),
+                })
               }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded"
-              rows={3}
-              placeholder={t('editSite.additionalInfo')}
+              className="w-full"
             />
+            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <span>0° (N)</span>
+              <span>90° (E)</span>
+              <span>180° (S)</span>
+              <span>270° (W)</span>
+            </div>
           </div>
 
-          {/* Landing Associations - only for takeoff sites in edit mode */}
-          {site &&
-            (formData.usage_type === 'takeoff' ||
-              formData.usage_type === 'both') && (
-              <LandingAssociationsManager takeoffSiteId={site.id} />
-            )}
-
-          {/* Actions */}
-          <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 rounded hover:bg-gray-300 dark:hover:bg-gray-500"
-              disabled={isSaving}
-            >
-              {t('common.cancel')}
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-              disabled={isSaving}
-            >
-              {isSaving ? `⏳ ${t('editSite.saving')}` : `💾 ${t('editSite.saveButton')}`}
-            </button>
+          <div>
+            <label className="block text-sm mb-1">
+              {t('editSite.distance')}: {formData.camera_distance}m
+            </label>
+            <input
+              type="range"
+              min="100"
+              max="2000"
+              step="50"
+              value={formData.camera_distance}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  camera_distance: parseInt(e.target.value),
+                })
+              }
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <span>100m</span>
+              <span>2000m</span>
+            </div>
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+
+        {/* Description */}
+        <div>
+          <label className="block text-sm font-medium mb-1 dark:text-gray-200">
+            {t('editSite.description')}
+          </label>
+          <textarea
+            value={formData.description}
+            onChange={(e) =>
+              setFormData({ ...formData, description: e.target.value })
+            }
+            className={inputClass}
+            rows={3}
+            placeholder={t('editSite.additionalInfo')}
+          />
+        </div>
+
+        {/* Landing Associations - only for takeoff sites in edit mode */}
+        {site &&
+          (formData.usage_type === 'takeoff' ||
+            formData.usage_type === 'both') && (
+            <LandingAssociationsManager takeoffSiteId={site.id} />
+          )}
+
+        {/* Actions */}
+        <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <Button
+            type="button"
+            onPress={onClose}
+            className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 rounded hover:bg-gray-300 dark:hover:bg-gray-500 cursor-pointer"
+            isDisabled={isSaving}
+          >
+            {t('common.cancel')}
+          </Button>
+          <Button
+            type="submit"
+            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
+            isDisabled={isSaving}
+          >
+            {isSaving
+              ? `⏳ ${t('editSite.saving')}`
+              : `💾 ${t('editSite.saveButton')}`}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 };

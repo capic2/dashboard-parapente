@@ -1,20 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import type { SiteUpdate } from '@dashboard-parapente/shared-types';
 
-export interface SiteUpdate {
-  name?: string;
-  code?: string;
-  latitude?: number;
-  longitude?: number;
-  elevation_m?: number;
-  description?: string;
-  region?: string;
-  country?: string;
-  orientation?: string;
-  camera_angle?: number;
-  camera_distance?: number;
-  usage_type?: 'takeoff' | 'landing' | 'both';
-}
+export type { SiteUpdate };
 
 /**
  * Update site mutation

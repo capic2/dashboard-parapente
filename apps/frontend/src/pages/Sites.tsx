@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
+import { Button, Input, TextField } from 'react-aria-components';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import {
   useReactTable,
@@ -11,15 +12,12 @@ import {
   type Row,
 } from '@tanstack/react-table';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
-import {
-  useUpdateSite,
-  useDeleteSite,
-  SiteUpdate,
-} from '../hooks/sites/useSiteMutations';
+import { useUpdateSite, useDeleteSite } from '../hooks/sites/useSiteMutations';
+import { useCreateSite } from '../hooks/sites/useSites';
 import type { Site } from '@dashboard-parapente/shared-types';
 import { SiteCard } from '../components/sites/SiteCard';
 import { EditSiteModal } from '../components/sites/EditSiteModal';
-import { DataList } from '@dashboard-parapente/design-system';
+import { DataList, Modal } from '@dashboard-parapente/design-system';
 
 const columnHelper = createColumnHelper<Site>();
 
@@ -55,6 +53,7 @@ export const Sites: React.FC = () => {
   const { data: sites } = useSuspenseQuery(sitesQueryOptions());
   const updateSite = useUpdateSite();
   const deleteSite = useDeleteSite();
+  const createSite = useCreateSite();
 
   // Filters & search
   const [searchQuery, setSearchQuery] = useState('');
@@ -69,6 +68,7 @@ export const Sites: React.FC = () => {
   // Modals
   const [editingSite, setEditingSite] = useState<Site | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [siteToDelete, setSiteToDelete] = useState<Site | null>(null);
 
   // Filter logic (search + type filter only, sorting handled by TanStack)
   const filteredSites = useMemo(() => {
@@ -102,39 +102,48 @@ export const Sites: React.FC = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleCreate = () => {
+  const handleOpenCreateModal = () => {
     setEditingSite(null);
     setIsEditModalOpen(true);
   };
 
-  const handleSave = async (data: SiteUpdate) => {
+  const handleUpdate = async (
+    data: Parameters<typeof updateSite.mutateAsync>[0]['data']
+  ) => {
     if (editingSite) {
       await updateSite.mutateAsync({ siteId: editingSite.id, data });
-    } else {
-      console.log('Create site:', data);
-      alert(t('sites.createViaButton'));
     }
   };
 
-  const handleDelete = async (site: Site) => {
-    if (!confirm(t('sites.deleteSiteConfirm', { name: site.name }))) {
-      return;
-    }
+  const handleCreate = async (
+    data: Parameters<typeof createSite.mutateAsync>[0]
+  ) => {
+    await createSite.mutateAsync(data);
+  };
 
+  const handleDelete = (site: Site) => {
+    setSiteToDelete(site);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!siteToDelete) return;
     try {
-      await deleteSite.mutateAsync(site.id);
-      alert(t('sites.siteDeleted', { name: site.name }));
+      await deleteSite.mutateAsync(siteToDelete.id);
     } catch (error: unknown) {
-      const errorMessage = (error as Error)?.message || t('sites.deleteError');
-      alert(errorMessage);
+      console.error('Failed to delete site:', error);
+    } finally {
+      setSiteToDelete(null);
     }
   };
 
   const handleViewFlights = (_site: Site) => {
-    void navigate({ to: '/flights' as string });
+    void navigate({ to: '/flights' });
   };
 
-  const renderSiteCard = (row: Row<Site>) => {
+  const renderSiteCard = (
+    row: Row<Site>,
+    _options: { isSelected: boolean }
+  ) => {
     const site = row.original;
     return (
       <SiteCard
@@ -152,25 +161,28 @@ export const Sites: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">{t('sites.management')}</h1>
-        <button
-          onClick={handleCreate}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        <Button
+          onPress={handleOpenCreateModal}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer"
         >
           ➕ {t('sites.newSite')}
-        </button>
+        </Button>
       </div>
 
       {/* Filters Bar */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Search */}
-          <input
-            type="text"
+          <TextField
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t('sites.searchPlaceholder')}
-            className="px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
-          />
+            onChange={setSearchQuery}
+            aria-label={t('sites.searchPlaceholder')}
+          >
+            <Input
+              placeholder={t('sites.searchPlaceholder')}
+              className="px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500 w-full"
+            />
+          </TextField>
 
           {/* Type Filter */}
           <select
@@ -201,18 +213,21 @@ export const Sites: React.FC = () => {
         sortableColumns={SITE_SORTABLE_COLUMNS}
         emptyMessage={t('sites.noSiteFound')}
         renderItem={renderSiteCard}
+        ariaLabel="Liste des sites"
+        layout="grid"
         itemsClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+        getTextValue={(row) => row.original.name}
       />
 
       {/* Create button when no sites and no filters */}
       {filteredSites.length === 0 && !searchQuery && typeFilter === 'all' && (
         <div className="text-center mt-4">
-          <button
-            onClick={handleCreate}
+          <Button
+            onPress={handleOpenCreateModal}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
             ➕ {t('sites.createFirstSite')}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -224,8 +239,33 @@ export const Sites: React.FC = () => {
           setIsEditModalOpen(false);
           setEditingSite(null);
         }}
-        onSave={handleSave}
+        onUpdate={handleUpdate}
+        onCreate={handleCreate}
       />
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        role="alertdialog"
+        isOpen={!!siteToDelete}
+        onClose={() => setSiteToDelete(null)}
+        title={t('sites.deleteSiteConfirm', { name: siteToDelete?.name })}
+        size="sm"
+      >
+        <div className="flex gap-3 pt-2">
+          <Button
+            onPress={() => setSiteToDelete(null)}
+            className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 rounded hover:bg-gray-300 dark:hover:bg-gray-500 cursor-pointer"
+          >
+            {t('common.cancel')}
+          </Button>
+          <Button
+            onPress={handleConfirmDelete}
+            className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer"
+          >
+            {t('common.delete', 'Supprimer')}
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };

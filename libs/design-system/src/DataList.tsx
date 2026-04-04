@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Table, Row } from '@tanstack/react-table';
+import { GridList, GridListItem, type Selection } from 'react-aria-components';
 import { tv } from 'tailwind-variants';
 
 const sortButton = tv({
@@ -31,11 +32,17 @@ export interface SortableColumn {
 
 interface DataListProps<TData> {
   table: Table<TData>;
-  renderItem: (row: Row<TData>) => ReactNode;
+  renderItem: (row: Row<TData>, options: { isSelected: boolean }) => ReactNode;
   sortableColumns?: SortableColumn[];
   emptyMessage?: string;
   className?: string;
   itemsClassName?: string;
+  ariaLabel?: string;
+  layout?: 'stack' | 'grid';
+  selectionMode?: 'none' | 'single' | 'multiple';
+  selectedKeys?: Selection;
+  onSelectionChange?: (keys: Selection) => void;
+  getTextValue?: (row: Row<TData>) => string;
 }
 
 export function DataList<TData>({
@@ -45,6 +52,12 @@ export function DataList<TData>({
   emptyMessage = 'Aucun élément',
   className,
   itemsClassName,
+  ariaLabel = 'Liste',
+  layout = 'stack',
+  selectionMode = 'none',
+  selectedKeys,
+  onSelectionChange,
+  getTextValue,
 }: DataListProps<TData>) {
   const rows = table.getRowModel().rows;
   const sorting = table.getState().sorting;
@@ -82,21 +95,32 @@ export function DataList<TData>({
       )}
 
       {/* Items */}
-      {rows.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center">
-          <p className="text-gray-700 dark:text-gray-300 font-medium">
-            {emptyMessage}
-          </p>
-        </div>
-      ) : (
-        <div className={itemsClassName || 'space-y-2'}>
-          {rows.map((row) => (
-            <div key={row.id} className="h-full">
-              {renderItem(row)}
-            </div>
-          ))}
-        </div>
-      )}
+      <GridList
+        items={rows}
+        aria-label={ariaLabel}
+        className={itemsClassName || 'space-y-2'}
+        layout={layout}
+        selectionMode={selectionMode}
+        selectedKeys={selectedKeys}
+        onSelectionChange={onSelectionChange}
+        renderEmptyState={() => (
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center">
+            <p className="text-gray-700 dark:text-gray-300 font-medium">
+              {emptyMessage}
+            </p>
+          </div>
+        )}
+      >
+        {(row) => (
+          <GridListItem
+            id={row.id}
+            textValue={getTextValue?.(row) || row.id}
+            className="outline-none h-full"
+          >
+            {({ isSelected }) => renderItem(row, { isSelected })}
+          </GridListItem>
+        )}
+      </GridList>
 
       {/* Pagination */}
       {pageCount > 1 && (
