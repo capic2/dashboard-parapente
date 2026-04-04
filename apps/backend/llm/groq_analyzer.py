@@ -37,7 +37,7 @@ def analyze_emagram_with_groq(
     screenshot_paths: list[str],
     spot_name: str,
     coordinates: tuple,
-    model_name: str = "llama-3.2-90b-vision-preview",
+    model_name: str = "meta-llama/llama-4-scout-17b-16e-instruct",
     max_retries: int = 2,
 ) -> dict:
     """
