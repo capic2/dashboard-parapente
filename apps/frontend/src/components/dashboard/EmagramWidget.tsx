@@ -332,13 +332,27 @@ export default function EmagramWidget({
             const screenshots = JSON.parse(emagram.screenshot_paths);
             const sourceKeys = Object.keys(screenshots);
             if (sourceKeys.length > 0) {
+              const forecastLabel = emagram.forecast_date
+                ? new Date(
+                    emagram.forecast_date + 'T00:00:00'
+                  ).toLocaleDateString('fr-FR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                  })
+                : '';
               const lightboxImages = sourceKeys.map((source) => ({
                 src: `/api/emagram/screenshot/${emagram.id}/${source}`,
-                alt: source
-                  .replace('-', ' ')
-                  .split(' ')
-                  .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                  .join(' '),
+                alt: [
+                  source
+                    .replace('-', ' ')
+                    .split(' ')
+                    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                    .join(' '),
+                  forecastLabel,
+                ]
+                  .filter(Boolean)
+                  .join(' — '),
               }));
               return (
                 <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
