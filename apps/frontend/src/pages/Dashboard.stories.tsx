@@ -94,17 +94,23 @@ const mockStats = {
 };
 
 const mockBestSpot = {
-  site_id: 'site-arguel',
-  site_name: 'Arguel',
-  cached_at: '2025-06-15T08:30:00Z',
+  site: {
+    id: 'site-arguel',
+    name: 'Arguel',
+    rating: 4,
+    orientation: 'SW',
+  },
+  paraIndex: 78,
+  windDirection: 'SW',
+  windSpeed: 12,
+  windFavorability: 'good',
   score: 82,
-  para_index: 78,
-  verdict: 'bon',
-  wind_speed: 12,
-  wind_direction: 'SW',
-  orientation: 'SW',
-  wind_favorability: 'favorable',
-  explanation: 'Vent compatible avec orientation du site',
+  verdict: 'BON',
+  reason:
+    'Bonnes conditions (Para-Index 78), 22°C, ciel dégagé, vent favorable SW 12km/h',
+  flyableSlot: '10h-17h',
+  thermalCeiling: 1850,
+  cached_at: '2025-06-15T08:30:00Z',
 };
 
 const mockDailySummary = {
