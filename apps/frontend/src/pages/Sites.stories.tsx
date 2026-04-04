@@ -236,8 +236,8 @@ Default.test(
     });
     await step('The site is deleted', async () => {
       await waitFor(async () => {
-        // Modal should close after successful creation
-        await expect(screen.queryByRole('dialog')).toBeNull();
+        // Modal should close after successful deletion
+        await expect(screen.queryByRole('alertdialog')).toBeNull();
       });
       await waitFor(async () => {
         await expect(

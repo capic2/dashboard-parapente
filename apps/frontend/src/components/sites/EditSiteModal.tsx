@@ -46,12 +46,19 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
     description: '',
   });
 
+  // Raw string values for numeric fields (avoids parsing on every keystroke)
+  const [latitudeRaw, setLatitudeRaw] = useState('0');
+  const [longitudeRaw, setLongitudeRaw] = useState('0');
+  const [elevationRaw, setElevationRaw] = useState('0');
+
   const [originalData, setOriginalData] = useState<SiteFormData | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
 
-  // Initialize form when site changes
+  // Initialize form when site changes or modal opens
   useEffect(() => {
+    if (!isOpen) return;
+
     if (site) {
       const initialData = {
         name: site.name,
@@ -69,6 +76,9 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
       };
       setFormData(initialData);
       setOriginalData(initialData);
+      setLatitudeRaw(String(initialData.latitude));
+      setLongitudeRaw(String(initialData.longitude));
+      setElevationRaw(String(initialData.elevation_m));
     } else {
       // Reset for create mode
       setFormData({
@@ -86,28 +96,40 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         description: '',
       });
       setOriginalData(null);
+      setLatitudeRaw('');
+      setLongitudeRaw('');
+      setElevationRaw('');
     }
     setErrors({});
-  }, [site]);
+  }, [site, isOpen]);
+
+  const parseNumericFields = () => {
+    const lat = parseFloat(latitudeRaw) || 0;
+    const lon = parseFloat(longitudeRaw) || 0;
+    const elev = parseInt(elevationRaw) || 0;
+    setFormData((prev) => ({
+      ...prev,
+      latitude: lat,
+      longitude: lon,
+      elevation_m: elev,
+    }));
+    return { latitude: lat, longitude: lon, elevation_m: elev };
+  };
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
+    const lat = parseFloat(latitudeRaw) || 0;
+    const lon = parseFloat(longitudeRaw) || 0;
 
     if (!formData.name || formData.name.length < 2) {
       newErrors.name = t('editSite.nameMinLength');
     }
 
-    if (
-      formData.latitude !== undefined &&
-      (formData.latitude < -90 || formData.latitude > 90)
-    ) {
+    if (lat < -90 || lat > 90) {
       newErrors.latitude = t('editSite.invalidLatitude');
     }
 
-    if (
-      formData.longitude !== undefined &&
-      (formData.longitude < -180 || formData.longitude > 180)
-    ) {
+    if (lon < -180 || lon > 180) {
       newErrors.longitude = t('editSite.invalidLongitude');
     }
 
@@ -118,14 +140,17 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const parsed = parseNumericFields();
+
     if (!validate()) return;
 
     setIsSaving(true);
     try {
       if (originalData) {
         // Edit mode: only send changed fields
+        const current = { ...formData, ...parsed };
         const changedData: SiteUpdate = {};
-        for (const [key, value] of Object.entries(formData)) {
+        for (const [key, value] of Object.entries(current)) {
           if (value !== originalData[key as keyof SiteFormData]) {
             (changedData as Record<string, unknown>)[key] = value;
           }
@@ -135,15 +160,19 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         // Create mode: formData has all concrete values
         await onCreate({
           name: formData.name,
-          latitude: formData.latitude,
-          longitude: formData.longitude,
+          latitude: parsed.latitude,
+          longitude: parsed.longitude,
           ...(formData.code && { code: formData.code }),
-          ...(formData.elevation_m && { elevation_m: formData.elevation_m }),
+          ...(parsed.elevation_m !== undefined && {
+            elevation_m: parsed.elevation_m,
+          }),
           ...(formData.region && { region: formData.region }),
           ...(formData.country && { country: formData.country }),
           ...(formData.orientation && { orientation: formData.orientation }),
-          ...(formData.camera_angle && { camera_angle: formData.camera_angle }),
-          ...(formData.camera_distance && {
+          ...(formData.camera_angle !== undefined && {
+            camera_angle: formData.camera_angle,
+          }),
+          ...(formData.camera_distance !== undefined && {
             camera_distance: formData.camera_distance,
           }),
           ...(formData.usage_type && { usage_type: formData.usage_type }),
@@ -250,10 +279,8 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         <div className="grid grid-cols-3 gap-3">
           <TextField
             isRequired
-            value={String(formData.latitude)}
-            onChange={(v) =>
-              setFormData({ ...formData, latitude: parseFloat(v) || 0 })
-            }
+            value={latitudeRaw}
+            onChange={setLatitudeRaw}
             className="flex flex-col gap-1"
           >
             <Label className={labelClass}>{t('editSite.latitude')} *</Label>
@@ -265,10 +292,8 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
 
           <TextField
             isRequired
-            value={String(formData.longitude)}
-            onChange={(v) =>
-              setFormData({ ...formData, longitude: parseFloat(v) || 0 })
-            }
+            value={longitudeRaw}
+            onChange={setLongitudeRaw}
             className="flex flex-col gap-1"
           >
             <Label className={labelClass}>{t('editSite.longitude')} *</Label>
@@ -279,10 +304,8 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           </TextField>
 
           <TextField
-            value={String(formData.elevation_m)}
-            onChange={(v) =>
-              setFormData({ ...formData, elevation_m: parseInt(v) || 0 })
-            }
+            value={elevationRaw}
+            onChange={setElevationRaw}
             className="flex flex-col gap-1"
           >
             <Label className={labelClass}>{t('editSite.elevation')}</Label>
@@ -362,7 +385,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               min="0"
               max="360"
               step="5"
-              value={formData.camera_angle}
+              value={formData.camera_angle ?? 180}
               onChange={(e) =>
                 setFormData({
                   ...formData,
@@ -388,7 +411,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               min="100"
               max="2000"
               step="50"
-              value={formData.camera_distance}
+              value={formData.camera_distance ?? 500}
               onChange={(e) =>
                 setFormData({
                   ...formData,

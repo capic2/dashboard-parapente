@@ -115,7 +115,7 @@ export function DataList<TData>({
           <GridListItem
             id={row.id}
             textValue={getTextValue?.(row) || row.id}
-            className="outline-none h-full"
+            className="outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 rounded-lg h-full"
           >
             {({ isSelected }) => renderItem(row, { isSelected })}
           </GridListItem>

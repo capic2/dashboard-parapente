@@ -42,7 +42,7 @@ export function FlightsTable({
     (keys: Selection) => {
       if (keys === 'all') {
         const allSelected: RowSelectionState = {};
-        for (const row of table.getRowModel().rows) {
+        for (const row of table.getPrePaginationRowModel().rows) {
           allSelected[row.id] = true;
         }
         onRowSelectionChange(() => allSelected);
@@ -71,7 +71,11 @@ export function FlightsTable({
                 ? 'border-sky-600 shadow-md'
                 : 'border-gray-200 dark:border-gray-700 hover:border-sky-400'
           }`}
-          onClick={() => onSelectFlight(flight)}
+          onClick={() => {
+            if (!selectionMode) {
+              onSelectFlight(flight);
+            }
+          }}
         >
           {/* Bouton supprimer au survol */}
           {!selectionMode && (

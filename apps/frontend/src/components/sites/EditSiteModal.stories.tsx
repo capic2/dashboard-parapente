@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import preview from '../../../.storybook/preview';
-import { expect, fn } from 'storybook/test';
+import { expect, fn, screen, within } from 'storybook/test';
 import { EditSiteModal } from './EditSiteModal';
 import type { Site } from '@dashboard-parapente/shared-types';
 
@@ -174,8 +174,9 @@ export const SavingState = meta.story({
   },
 });
 
-SavingState.test('interaction test', async ({ canvas, userEvent }) => {
-  const saveButton = canvas.getByText('💾 Enregistrer');
+SavingState.test('interaction test', async ({ userEvent }) => {
+  const dialog = within(screen.getByRole('dialog'));
+  const saveButton = dialog.getByText('💾 Enregistrer');
   await userEvent.click(saveButton);
 });
 
@@ -203,8 +204,8 @@ export const ShowsCreateModeTitle = meta.story({
   },
 });
 
-ShowsCreateModeTitle.test('shows create mode title', async ({ canvas }) => {
-  await expect(canvas.getByText('Nouveau site')).toBeInTheDocument();
+ShowsCreateModeTitle.test('shows create mode title', async () => {
+  await expect(screen.getByText('Nouveau site')).toBeInTheDocument();
 });
 
 export const DisablesCodeInEditMode = meta.story({
@@ -274,8 +275,9 @@ export const SelectsUsageType = meta.story({
   },
 });
 
-SelectsUsageType.test('selects usage type', async ({ canvas, userEvent }) => {
-  const takeoffRadio = canvas.getByLabelText('Décollage uniquement');
+SelectsUsageType.test('selects usage type', async ({ userEvent }) => {
+  const dialog = within(screen.getByRole('dialog'));
+  const takeoffRadio = dialog.getByLabelText('Décollage uniquement');
   await userEvent.click(takeoffRadio);
 
   await expect(takeoffRadio).toBeChecked();
@@ -336,8 +338,9 @@ export const CallsOnCloseWhenCancelled = meta.story({
 
 CallsOnCloseWhenCancelled.test(
   'calls onClose when cancelled',
-  async ({ args, canvas, userEvent }) => {
-    const cancelButton = canvas.getByText('Annuler');
+  async ({ args, userEvent }) => {
+    const dialog = within(screen.getByRole('dialog'));
+    const cancelButton = dialog.getByText('Annuler');
     await userEvent.click(cancelButton);
 
     await expect(args.onClose).toHaveBeenCalled();

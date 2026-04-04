@@ -129,10 +129,9 @@ export const Sites: React.FC = () => {
     if (!siteToDelete) return;
     try {
       await deleteSite.mutateAsync(siteToDelete.id);
+      setSiteToDelete(null);
     } catch (error: unknown) {
       console.error('Failed to delete site:', error);
-    } finally {
-      setSiteToDelete(null);
     }
   };
 
