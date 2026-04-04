@@ -363,7 +363,11 @@ export const SiteUpdateSchema = z
   })
   .partial();
 
-export const CreateSiteSchema = SiteUpdateSchema.required({
+export const CreateSiteSchema = SiteUpdateSchema.omit({
+  orientation: true,
+  camera_angle: true,
+  camera_distance: true,
+}).required({
   name: true,
   latitude: true,
   longitude: true,

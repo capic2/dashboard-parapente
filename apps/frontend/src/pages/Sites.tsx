@@ -126,7 +126,7 @@ export const Sites: React.FC = () => {
   };
 
   const handleConfirmDelete = async () => {
-    if (!siteToDelete) return;
+    if (!siteToDelete || deleteSite.isPending) return;
     try {
       await deleteSite.mutateAsync(siteToDelete.id);
       setSiteToDelete(null);
@@ -253,15 +253,17 @@ export const Sites: React.FC = () => {
         <div className="flex gap-3 pt-2">
           <Button
             onPress={() => setSiteToDelete(null)}
-            className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 rounded hover:bg-gray-300 dark:hover:bg-gray-500 cursor-pointer"
+            isDisabled={deleteSite.isPending}
+            className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 rounded hover:bg-gray-300 dark:hover:bg-gray-500 cursor-pointer disabled:opacity-50"
           >
             {t('common.cancel')}
           </Button>
           <Button
             onPress={handleConfirmDelete}
-            className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer"
+            isDisabled={deleteSite.isPending}
+            className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer disabled:opacity-50"
           >
-            {t('common.delete', 'Supprimer')}
+            {deleteSite.isPending ? '⏳ ...' : t('common.delete', 'Supprimer')}
           </Button>
         </div>
       </Modal>

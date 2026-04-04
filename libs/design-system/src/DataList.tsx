@@ -104,7 +104,7 @@ export function DataList<TData>({
         selectedKeys={selectedKeys}
         onSelectionChange={onSelectionChange}
         renderEmptyState={() => (
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center">
+          <div className="col-span-full bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center">
             <p className="text-gray-700 dark:text-gray-300 font-medium">
               {emptyMessage}
             </p>

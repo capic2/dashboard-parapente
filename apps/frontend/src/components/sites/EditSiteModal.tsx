@@ -168,13 +168,6 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           }),
           ...(formData.region && { region: formData.region }),
           ...(formData.country && { country: formData.country }),
-          ...(formData.orientation && { orientation: formData.orientation }),
-          ...(formData.camera_angle !== undefined && {
-            camera_angle: formData.camera_angle,
-          }),
-          ...(formData.camera_distance !== undefined && {
-            camera_distance: formData.camera_distance,
-          }),
           ...(formData.usage_type && { usage_type: formData.usage_type }),
           ...(formData.description && { description: formData.description }),
         });
