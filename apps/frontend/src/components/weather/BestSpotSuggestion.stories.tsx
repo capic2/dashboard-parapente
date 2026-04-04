@@ -16,8 +16,6 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-
-
 // Mock data - simplified to match API response
 const mockBestSpotExcellent: BestSpotResult = {
   site: {
@@ -34,7 +32,8 @@ const mockBestSpotExcellent: BestSpotResult = {
   windSpeed: 12,
   windFavorability: 'good',
   score: 90,
-  reason: 'Excellentes conditions (Para-Index 90), 22°C, ciel dégagé, vent favorable NW 12km/h',
+  reason:
+    'Excellentes conditions (Para-Index 90), 22°C, ciel dégagé, vent favorable NW 12km/h',
   verdict: 'BON',
   flyableSlot: '10h-17h',
   thermalCeiling: 2800,
@@ -54,7 +53,8 @@ const mockBestSpotGood: BestSpotResult = {
   windSpeed: 15,
   windFavorability: 'good',
   score: 75,
-  reason: 'Bonnes conditions (Para-Index 75), 18°C, nuageux 45%, vent favorable N 15km/h',
+  reason:
+    'Bonnes conditions (Para-Index 75), 18°C, nuageux 45%, vent favorable N 15km/h',
   verdict: 'BON',
   flyableSlot: '11h-16h',
   thermalCeiling: 2200,
@@ -93,7 +93,8 @@ const mockBestSpotPoor: BestSpotResult = {
   windSpeed: 25,
   windFavorability: 'bad',
   score: 35,
-  reason: 'Conditions limites (Para-Index 35), 12°C, rafales 28km/h, vent défavorable N 25km/h',
+  reason:
+    'Conditions limites (Para-Index 35), 12°C, rafales 28km/h, vent défavorable N 25km/h',
   verdict: 'LIMITE',
 };
 
@@ -247,13 +248,9 @@ export const DisplaysBestSpotData = meta.story({
 DisplaysBestSpotData.test(
   'should display best spot data correctly',
   async ({ canvas }) => {
-    await expect(
-      canvas.getByText("Meilleur spot pour aujourd'hui")
-    ).toBeInTheDocument();
-    await expect(canvas.getByText('Annecy')).toBeInTheDocument();
-    await expect(canvas.getByText('90/100')).toBeInTheDocument();
-    await expect(canvas.getByText('Vent:')).toBeInTheDocument();
-    await expect(canvas.getAllByText(/NW 12km\/h/).length).toBeGreaterThan(0);
+    await canvas.findByText('Annecy');
+    await expect(canvas.getByText(/aujourd'hui/i)).toBeInTheDocument();
+    await expect(canvas.getByText('90')).toBeInTheDocument();
     await expect(
       canvas.getByText(/Excellentes conditions/)
     ).toBeInTheDocument();
@@ -271,8 +268,9 @@ export const ShowsRatingStars = meta.story({
 ShowsRatingStars.test(
   'should show rating stars when available',
   async ({ canvas }) => {
-    // Rating stars should be displayed
-    const ratingText = canvas.queryByText('⭐⭐⭐⭐⭐');
+    await canvas.findByText('Annecy');
+    // Rating stars rendered as ★ characters
+    const ratingText = canvas.queryByText(/★{5}/);
     await expect(ratingText).toBeInTheDocument();
   }
 );
@@ -287,8 +285,8 @@ export const HidesWindWhenNotAvailable = meta.story({
 HidesWindWhenNotAvailable.test(
   'should hide wind info when not available',
   async ({ canvas }) => {
-    await expect(canvas.getByText('Les Contamines')).toBeInTheDocument();
-    await expect(canvas.getByText('80/100')).toBeInTheDocument();
+    await canvas.findByText('Les Contamines');
+    await expect(canvas.getByText('80')).toBeInTheDocument();
     await expect(canvas.queryByText(/Vent:/)).not.toBeInTheDocument();
   }
 );

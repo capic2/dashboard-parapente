@@ -4458,14 +4458,38 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
     scheduler_error = None
     if "scheduler_interval_minutes" in updated:
         try:
+            new_interval = int(updated["scheduler_interval_minutes"])
+        except (TypeError, ValueError) as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid scheduler_interval_minutes: {updated['scheduler_interval_minutes']}",
+            ) from e
+        if new_interval <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="scheduler_interval_minutes must be > 0",
+            )
+        # Reschedule weather scheduler
+        try:
             from scheduler import reschedule
 
-            new_interval = int(updated["scheduler_interval_minutes"])
             reschedule(new_interval)
-            logger.info(f"Scheduler rescheduled to {new_interval} minutes")
+            logger.info(f"Weather scheduler rescheduled to {new_interval} minutes")
         except Exception as e:
-            logger.error(f"Failed to reschedule scheduler: {e}")
+            logger.error(f"Failed to reschedule weather scheduler: {e}")
             scheduler_error = str(e)
+        # Reschedule emagram scheduler
+        try:
+            from emagram_scheduler.emagram_scheduler import reschedule as reschedule_emagram
+
+            reschedule_emagram(new_interval)
+            logger.info(f"Emagram scheduler rescheduled to {new_interval} minutes")
+        except Exception as e:
+            logger.error(f"Failed to reschedule emagram scheduler: {e}")
+            if scheduler_error:
+                scheduler_error += f"; emagram: {e}"
+            else:
+                scheduler_error = str(e)
 
     result = {"success": True, "updated": updated}
     if rejected:
