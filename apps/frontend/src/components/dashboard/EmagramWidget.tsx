@@ -13,6 +13,7 @@ import {
   getScoreCategory,
 } from '../../types/emagram';
 import { useState } from 'react';
+import { Lightbox } from '@dashboard-parapente/design-system';
 
 interface EmagramWidgetProps {
   siteId: string;
@@ -42,6 +43,8 @@ export default function EmagramWidget({
   dayIndex = 0,
 }: EmagramWidgetProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   const {
     data: emagram,
@@ -329,52 +332,34 @@ export default function EmagramWidget({
             const screenshots = JSON.parse(emagram.screenshot_paths);
             const sourceKeys = Object.keys(screenshots);
             if (sourceKeys.length > 0) {
+              const lightboxImages = sourceKeys.map((source) => ({
+                src: `/api/emagram/screenshot/${emagram.id}/${source}`,
+                alt: source
+                  .replace('-', ' ')
+                  .split(' ')
+                  .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                  .join(' '),
+              }));
               return (
                 <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
                   <div className="text-xs text-gray-600 dark:text-gray-300 font-semibold mb-2">
                     📊 Émagrammes capturés ({sourceKeys.length})
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {sourceKeys.map((source) => {
-                      const sourceName = source
-                        .replace('-', ' ')
-                        .split(' ')
-                        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                        .join(' ');
-                      const screenshotUrl = `/api/emagram/screenshot/${emagram.id}/${source}`;
-                      return (
-                        <div key={source} className="relative group">
-                          <a
-                            href={screenshotUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-3 py-2 text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors border border-blue-200 dark:border-blue-700"
-                          >
-                            <span>📸</span>
-                            <span>{sourceName}</span>
-                            <span className="text-blue-400">↗</span>
-                          </a>
-                          <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none">
-                            <div className="bg-white border border-gray-300 rounded-lg shadow-xl p-1">
-                              <img
-                                src={screenshotUrl}
-                                alt={`Émagramme ${sourceName}`}
-                                className="rounded w-[min(48rem,calc(100vw-2rem))] h-auto"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement)
-                                    .closest('.group')
-                                    ?.querySelector('[class*="group-hover"]')
-                                    ?.classList.add('!hidden');
-                                }}
-                              />
-                              <div className="text-xs text-center text-gray-500 dark:text-gray-400 py-1">
-                                {sourceName}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {lightboxImages.map((image, idx) => (
+                      <button
+                        key={image.alt}
+                        onClick={() => {
+                          setLightboxIndex(idx);
+                          setLightboxOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1 px-3 py-2 text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors border border-blue-200 dark:border-blue-700 cursor-pointer"
+                      >
+                        <span>📸</span>
+                        <span>{image.alt}</span>
+                        <span className="text-blue-400">🔍</span>
+                      </button>
+                    ))}
                   </div>
                   {emagram.sources_agreement && (
                     <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -384,6 +369,12 @@ export default function EmagramWidget({
                       </span>
                     </div>
                   )}
+                  <Lightbox
+                    isOpen={lightboxOpen}
+                    onClose={() => setLightboxOpen(false)}
+                    images={lightboxImages}
+                    initialIndex={lightboxIndex}
+                  />
                 </div>
               );
             }
