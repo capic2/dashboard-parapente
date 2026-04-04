@@ -448,6 +448,7 @@ def emagram_analysis_to_dict(emagram: EmagramAnalysis) -> dict[str, Any]:
             "alertes_securite": alertes,
         },
         # Metadata
+        "forecast_date": emagram.forecast_date.isoformat() if emagram.forecast_date else None,
         "sources_count": emagram.sources_count,
         "sources_agreement": emagram.sources_agreement,
         "llm_provider": emagram.llm_provider,
