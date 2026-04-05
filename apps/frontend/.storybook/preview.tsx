@@ -1,14 +1,12 @@
 import { definePreview } from '@storybook/react-vite';
 import { initialize, mswLoader } from 'msw-storybook-addon';
 import addonA11y from '@storybook/addon-a11y';
+import addonI18n from 'storybook-react-i18next';
 import { http, HttpResponse } from 'msw';
 import i18n from '../src/i18n';
 import '../src/App.css';
 import { Suspense, useEffect } from 'react';
 
-// Force French locale in Storybook context — overrides LanguageDetector which
-// detects English in CI headless browsers
-i18n.changeLanguage('fr');
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TanstackRouterDecorator } from './decorators';
 
@@ -100,7 +98,7 @@ function ThemeDecorator({
 }
 
 const preview = definePreview({
-  addons: [addonA11y()],
+  addons: [addonA11y(), addonI18n],
 
   parameters: {
     router: {
@@ -158,6 +156,7 @@ const preview = definePreview({
 
   initialGlobals: {
     theme: 'light',
+    locale: 'fr',
   },
 
   // Global decorators

@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import math
 import os
@@ -1424,6 +1425,134 @@ async def debug_cache_data(site_id: str, day_index: int = 0, db: Session = Depen
             return {"cache_key": cache_key, "found": False}
     except Exception as e:
         logger.error(f"Error debugging cache: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/admin/cache")
+async def get_cache_overview():
+    """
+    Admin endpoint: List all Redis cache keys with metadata, grouped by prefix.
+    """
+    from cache import get_redis
+
+    try:
+        redis_client = await get_redis()
+
+        # Collect all keys via scan (non-blocking)
+        keys = []
+        async for key in redis_client.scan_iter(match="*"):
+            keys.append(key)
+
+        # Batch TTL + strlen via pipeline
+        if keys:
+            pipe = redis_client.pipeline()
+            for key in keys:
+                pipe.ttl(key)
+                pipe.strlen(key)
+            results = await pipe.execute()
+        else:
+            results = []
+
+        # Group by prefix (part before 2nd colon, or full key)
+        groups: dict = {}
+        for i, key in enumerate(keys):
+            ttl = results[i * 2]
+            size = results[i * 2 + 1]
+
+            parts = key.split(":")
+            prefix = ":".join(parts[:2]) if len(parts) >= 3 else parts[0]
+
+            if prefix not in groups:
+                groups[prefix] = {"count": 0, "keys": []}
+            groups[prefix]["count"] += 1
+            groups[prefix]["keys"].append({"key": key, "ttl": ttl, "size": size})
+
+        # Total + memory info
+        total_keys = await redis_client.dbsize()
+        memory_usage = None
+        try:
+            info = await redis_client.info("memory")
+            memory_usage = info.get("used_memory_human")
+        except Exception:
+            pass
+
+        return {
+            "total_keys": total_keys,
+            "memory_usage": memory_usage,
+            "groups": groups,
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting cache overview: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/admin/cache/{key:path}")
+async def get_cache_key_detail(key: str):
+    """
+    Admin endpoint: Get full cached value for a specific key.
+    """
+    from cache import get_redis
+
+    try:
+        redis_client = await get_redis()
+        raw = await redis_client.get(key)
+
+        if raw is None:
+            raise HTTPException(status_code=404, detail=f"Key not found: {key}")
+
+        ttl = await redis_client.ttl(key)
+        size = await redis_client.strlen(key)
+
+        # Try to parse as JSON
+        try:
+            value = json.loads(raw)
+            value_type = "json"
+        except (json.JSONDecodeError, TypeError):
+            value = raw
+            value_type = "string"
+
+        return {
+            "key": key,
+            "ttl": ttl,
+            "size": size,
+            "value": value,
+            "type": value_type,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting cache key detail: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.delete("/admin/cache/{key:path}")
+async def delete_cache_key(key: str):
+    """
+    Admin endpoint: Delete a single cache key or keys matching a glob pattern.
+    """
+    from cache import get_redis
+
+    try:
+        redis_client = await get_redis()
+
+        if "*" in key:
+            # Pattern delete
+            keys_to_delete = []
+            async for k in redis_client.scan_iter(match=key):
+                keys_to_delete.append(k)
+            if keys_to_delete:
+                deleted = await redis_client.delete(*keys_to_delete)
+            else:
+                deleted = 0
+        else:
+            deleted = await redis_client.delete(key)
+
+        return {"success": True, "keys_deleted": deleted}
+
+    except Exception as e:
+        logger.error(f"Error deleting cache key: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
