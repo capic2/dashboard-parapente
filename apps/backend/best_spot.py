@@ -195,12 +195,15 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
                 # Use middle of day (12h) for wind analysis
                 midday_hours = [h for h in consensus_hours if 10 <= h.get("hour", 0) <= 14]
                 if midday_hours:
-                    avg_wind_speed = sum(h.get("wind_speed", 0) for h in midday_hours) / len(
-                        midday_hours
-                    )
+                    wind_speeds = [
+                        h.get("wind_speed") for h in midday_hours if h.get("wind_speed") is not None
+                    ]
+                    avg_wind_speed = sum(wind_speeds) / len(wind_speeds) if wind_speeds else None
                     # Get most common wind direction
                     wind_dirs = [
-                        h.get("wind_direction") for h in midday_hours if h.get("wind_direction")
+                        h.get("wind_direction")
+                        for h in midday_hours
+                        if h.get("wind_direction") is not None
                     ]
                     wind_direction = wind_dirs[0] if wind_dirs else None
                 else:

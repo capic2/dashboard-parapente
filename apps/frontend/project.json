@@ -27,6 +27,14 @@
       "options": {
         "buildTarget": "frontend:build",
         "port": 5173
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "frontend:build:development"
+        },
+        "production": {
+          "buildTarget": "frontend:build:production"
+        }
       }
     },
     "test": {
