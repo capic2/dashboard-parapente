@@ -113,11 +113,6 @@ const preview = definePreview({
       ),
     },
     i18n,
-    locale: 'fr',
-    locales: {
-      fr: 'Français',
-      en: 'English',
-    },
     controls: {
       matchers: {
         color: /(background|color)$/i,
@@ -157,6 +152,10 @@ const preview = definePreview({
   initialGlobals: {
     theme: 'light',
     locale: 'fr',
+    locales: {
+      fr: 'Français',
+      en: 'English',
+    },
   },
 
   // Global decorators
