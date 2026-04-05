@@ -159,7 +159,7 @@ Default.test(
     );
 
     names = [...mockData]
-      .sort((d1, d2) => d1.value - d2.value)
+      .sort((d1, d2) => d2.value - d1.value)
       .map((data) => data.name)
       .slice(0, pageSize);
     rowNames = canvas.getAllByRole('row').map((row) => row.ariaLabel);
