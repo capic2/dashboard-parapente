@@ -1,6 +1,12 @@
 import type { ReactNode } from 'react';
 import type { Table, Row } from '@tanstack/react-table';
-import { GridList, GridListItem, type Selection } from 'react-aria-components';
+import {
+  Button,
+  GridList,
+  GridListItem,
+  type Selection,
+} from 'react-aria-components';
+import { useTranslation } from 'react-i18next';
 import { tv } from 'tailwind-variants';
 
 const sortButton = tv({
@@ -49,7 +55,7 @@ export function DataList<TData>({
   table,
   renderItem,
   sortableColumns,
-  emptyMessage = 'Aucun élément',
+  emptyMessage,
   className,
   itemsClassName,
   ariaLabel = 'Liste',
@@ -59,6 +65,7 @@ export function DataList<TData>({
   onSelectionChange,
   getTextValue,
 }: DataListProps<TData>) {
+  const { t } = useTranslation();
   const rows = table.getRowModel().rows;
   const sorting = table.getState().sorting;
   const pageCount = table.getPageCount();
@@ -68,16 +75,31 @@ export function DataList<TData>({
     <div className={className}>
       {/* Sort bar */}
       {sortableColumns && sortableColumns.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
+        <div
+          role="group"
+          aria-label={t('dataList.sortOptions')}
+          className="flex flex-wrap gap-1.5 mb-3"
+        >
           {sortableColumns.map((col) => {
             const currentSort = sorting.find((s) => s.id === col.id);
             const isActive = !!currentSort;
 
             return (
-              <button
+              <Button
                 key={col.id}
                 className={sortButton({ active: isActive })}
-                onClick={() => {
+                aria-label={
+                  currentSort
+                    ? t(
+                        currentSort.desc
+                          ? 'dataList.sortByDesc'
+                          : 'dataList.sortByAsc',
+                        { column: col.label }
+                      )
+                    : t('dataList.sortBy', { column: col.label })
+                }
+                aria-pressed={isActive}
+                onPress={() => {
                   const column = table.getColumn(col.id);
                   if (column) {
                     column.toggleSorting();
@@ -86,9 +108,11 @@ export function DataList<TData>({
               >
                 {col.label}
                 {currentSort && (
-                  <span className="ml-1">{currentSort.desc ? '↓' : '↑'}</span>
+                  <span aria-hidden="true" className="ml-1">
+                    {currentSort.desc ? '↓' : '↑'}
+                  </span>
                 )}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -106,7 +130,7 @@ export function DataList<TData>({
         renderEmptyState={() => (
           <div className="col-span-full bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center">
             <p className="text-gray-700 dark:text-gray-300 font-medium">
-              {emptyMessage}
+              {emptyMessage ?? t('dataList.noItems')}
             </p>
           </div>
         )}
@@ -124,31 +148,39 @@ export function DataList<TData>({
 
       {/* Pagination */}
       {pageCount > 1 && (
-        <div className="flex items-center justify-between mt-3 px-1">
+        <nav
+          aria-label={t('dataList.pagination')}
+          className="flex items-center justify-between mt-3 px-1"
+        >
           <span className="text-xs text-gray-500 dark:text-gray-400">
-            Page {pageIndex + 1} / {pageCount}
+            {t('dataList.pageInfo', {
+              current: pageIndex + 1,
+              total: pageCount,
+            })}
           </span>
           <div className="flex gap-1">
-            <button
+            <Button
+              aria-label={t('dataList.previousPage')}
               className={paginationButton({
                 disabled: !table.getCanPreviousPage(),
               })}
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
+              onPress={() => table.previousPage()}
+              isDisabled={!table.getCanPreviousPage()}
             >
-              ←
-            </button>
-            <button
+              <span aria-hidden="true">←</span>
+            </Button>
+            <Button
+              aria-label={t('dataList.nextPage')}
               className={paginationButton({
                 disabled: !table.getCanNextPage(),
               })}
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
+              onPress={() => table.nextPage()}
+              isDisabled={!table.getCanNextPage()}
             >
-              →
-            </button>
+              <span aria-hidden="true">→</span>
+            </Button>
           </div>
-        </div>
+        </nav>
       )}
     </div>
   );

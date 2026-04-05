@@ -10,25 +10,41 @@ import {fileURLToPath} from "node:url";
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(),
-    storybookTest({
-      configDir: path.join(dirname, '.storybook'),
-    }),
-  ],
+  plugins: [react(), tailwindcss()],
   test: {
-    name: 'storybook',
     globals: true,
-    browser: {
-      enabled: true,
-      headless: true,
-      provider: playwright(),
-      instances: [
-        { browser: 'chromium', launch: { headless: true } },
-      ],
-    },
-    testTimeout: 15000,
-    setupFiles: [path.join(dirname, '.storybook/vitest.setup.ts')],
+    projects: [
+      {
+        test: {
+          name: 'unit',
+          environment: 'happy-dom',
+          include: ['src/**/*.{test,spec}.{ts,tsx}'],
+          exclude: ['node_modules', 'dist', '.storybook'],
+        },
+      },
+      {
+        plugins: [
+          react(),
+          tailwindcss(),
+          storybookTest({
+            configDir: path.join(dirname, '.storybook'),
+          }),
+        ],
+        test: {
+          name: 'storybook',
+          globals: true,
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright(),
+            instances: [
+              { browser: 'chromium', launch: { headless: true } },
+            ],
+          },
+          testTimeout: 15000,
+          setupFiles: [path.join(dirname, '.storybook/vitest.setup.ts')],
+        },
+      },
+    ],
   },
 })

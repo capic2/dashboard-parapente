@@ -4,12 +4,12 @@
 export { Lightbox } from './Lightbox';
 export { Modal } from './Modal';
 export { Toast, ToastContainer } from './Toast';
-export { DatePicker } from './DatePicker';
+export { DatePicker } from './components/DatePicker/DatePicker';
 export { Select } from './Select';
 export type { SelectOption } from './Select';
 export { default as ErrorBoundary } from './ErrorBoundary';
 export { default as LoadingSkeleton } from './LoadingSkeleton';
 export { IconCard } from './IconCard';
-export { DataTable } from './DataTable';
-export { DataList } from './DataList';
-export type { SortableColumn } from './DataList';
+export { DataTable } from './components/DataTable/DataTable';
+export { DataList } from './components/DataList/DataList';
+export type { SortableColumn } from './components/DataList/DataList';
