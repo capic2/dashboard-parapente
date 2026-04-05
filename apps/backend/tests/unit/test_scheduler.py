@@ -159,8 +159,8 @@ async def test_scheduled_weather_fetch(db_session):
 
         await scheduled_weather_fetch()
 
-        # Should fetch today + tomorrow for each default site
-        expected_calls = len(DEFAULT_SITES) * 2  # 6 sites × 2 days
+        # Should fetch all 7 days for each default site
+        expected_calls = len(DEFAULT_SITES) * 7  # 6 sites × 7 days
         assert mock_fetch.call_count == expected_calls
 
 
@@ -170,8 +170,8 @@ async def test_scheduled_weather_fetch_with_failures(db_session):
 
     # Simulate some failures
     async def mock_fetch_variable(site_id, day_index):
-        # Fail for day_index=1, succeed for day_index=0
-        return day_index == 0
+        # Fail for odd day indices, succeed for even ones
+        return day_index % 2 == 0
 
     with (
         patch("scheduler.fetch_and_cache_weather", new=mock_fetch_variable),
