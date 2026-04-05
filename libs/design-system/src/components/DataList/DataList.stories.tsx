@@ -146,11 +146,10 @@ export const Default = meta.story({
   ),
 });
 Default.test(
-  'It can be sort',
+  'It can be sorted',
   async ({ canvas, userEvent, context }: DataListContext) => {
-    let names = mockData
-      .map((data) => data.name)
-      .splice(0, context.parameters.dataList?.pageSize);
+    const pageSize = context.parameters.dataList?.pageSize ?? 5;
+    let names = [...mockData].map((data) => data.name).slice(0, pageSize);
     let rowNames = canvas.getAllByRole('row').map((row) => row.ariaLabel);
 
     await expect(rowNames).toEqual(names);
@@ -159,33 +158,25 @@ Default.test(
       canvas.getByRole('button', { name: 'Trier par Valeur' })
     );
 
-    names = mockData
-      .sort((d1, d2) => d2.value - d1.value)
+    names = [...mockData]
+      .sort((d1, d2) => d1.value - d2.value)
       .map((data) => data.name)
-      .splice(0, context.parameters.dataList?.pageSize);
+      .slice(0, pageSize);
     rowNames = canvas.getAllByRole('row').map((row) => row.ariaLabel);
 
     await expect(rowNames).toEqual(names);
   }
 );
 Default.test('It is paginated', async ({ canvas, context, userEvent }) => {
-  let names = mockData
-    .map((data) => data.name)
-    .splice(0, context.parameters.dataList?.pageSize);
+  const pageSize = context.parameters.dataList?.pageSize ?? 5;
+  let names = [...mockData].map((data) => data.name).slice(0, pageSize);
   let rowNames = canvas.getAllByRole('row').map((row) => row.ariaLabel);
 
   await expect(rowNames).toEqual(names);
 
   await userEvent.click(canvas.getByRole('button', { name: 'Page suivante' }));
 
-  names = mockData
-    .map((data) => data.name)
-    .splice(
-      context.parameters.dataList?.pageSize,
-      context.parameters.dataList?.pageSize +
-        context.parameters.dataList?.pageSize -
-        1
-    );
+  names = [...mockData].map((data) => data.name).slice(pageSize, pageSize * 2);
   rowNames = canvas.getAllByRole('row').map((row) => row.ariaLabel);
 
   await expect(rowNames).toEqual(names);
