@@ -218,18 +218,17 @@ async def fetch_and_cache_weather(site_id: str, day_index: int = 0, db: Session 
 async def scheduled_weather_fetch():
     """
     Main scheduled task - fetch weather for all default sites
-    OPTIMIZATION: Only polls day 0-1 (today/tomorrow) - most consulted
-    Days 2-6 are fetched on-demand and cached for 30min
+    Fetches all 7 days (0-6) for each site to pre-populate cache
     Runs every hour
     """
     logger.info(f"⏰ Scheduled weather fetch started at {datetime.now()}")
 
     tasks = []
 
-    # Fetch today and tomorrow ONLY (most consulted days)
+    # Fetch all 7 days for each default site
     for site_id in DEFAULT_SITES:
-        tasks.append(fetch_and_cache_weather(site_id, day_index=0))  # Today
-        tasks.append(fetch_and_cache_weather(site_id, day_index=1))  # Tomorrow
+        for day_index in range(7):
+            tasks.append(fetch_and_cache_weather(site_id, day_index=day_index))
 
     # Execute all fetches in parallel
     results = await asyncio.gather(*tasks, return_exceptions=True)

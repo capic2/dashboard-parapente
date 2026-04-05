@@ -458,8 +458,8 @@ async def test_refresh_best_spot_cache_success(db_session):
 
         await refresh_best_spot_cache(db_session)
 
-        # Verify cache was set
-        mock_set_cached.assert_called_once()
+        # Verify cache was set for all 7 days
+        assert mock_set_cached.call_count == 7
 
 
 @pytest.mark.asyncio
@@ -724,8 +724,8 @@ async def test_cache_key_per_day():
 
 
 @pytest.mark.asyncio
-async def test_refresh_cache_only_day_0():
-    """Test that scheduler only refreshes day 0 (today)"""
+async def test_refresh_cache_all_days():
+    """Test that scheduler refreshes all 7 days (0-6)"""
     from best_spot import refresh_best_spot_cache
 
     # Mock database
@@ -764,15 +764,20 @@ async def test_refresh_cache_only_day_0():
                 # Call refresh
                 await refresh_best_spot_cache(mock_db)
 
-                # Verify set_cached was called with day_0 key
-                mock_set_cached.assert_called_once()
-                call_args = mock_set_cached.call_args
-                assert call_args[0][0] == "best_spot:day_0"
+                # Verify set_cached was called 7 times (one per day)
+                assert mock_set_cached.call_count == 7
 
-                # Verify get_normalized_forecast was called with day_index=0
-                mock_weather.assert_called_once()
-                weather_call_args = mock_weather.call_args
-                assert weather_call_args[1]["day_index"] == 0
+                # Verify cache keys cover all days 0-6
+                cache_keys = [call[0][0] for call in mock_set_cached.call_args_list]
+                for day_index in range(7):
+                    assert f"best_spot:day_{day_index}" in cache_keys
+
+                # Verify get_normalized_forecast was called 7 times
+                assert mock_weather.call_count == 7
+
+                # Verify day_index 0-6 were all requested
+                day_indices = [call[1]["day_index"] for call in mock_weather.call_args_list]
+                assert sorted(day_indices) == list(range(7))
 
 
 @pytest.mark.asyncio
