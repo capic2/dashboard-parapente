@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@dashboard-parapente/design-system';
 import {
@@ -7,6 +7,11 @@ import {
   useDeleteCacheKey,
 } from '../hooks/admin/useCache';
 import type { CacheKeyInfo } from '../hooks/admin/useCache';
+
+interface PendingConfirm {
+  message: string;
+  onConfirm: () => void;
+}
 
 function formatTtl(ttl: number): string {
   if (ttl < 0) return '—';
@@ -30,6 +35,9 @@ export default function CacheViewer() {
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(
+    null
+  );
 
   const { data: overview, refetch } = useCacheOverview(
     autoRefresh ? 5000 : undefined
@@ -65,22 +73,27 @@ export default function CacheViewer() {
     });
   };
 
+  const requestConfirm = useCallback(
+    (message: string, onConfirm: () => void) => {
+      setPendingConfirm({ message, onConfirm });
+    },
+    []
+  );
+
   const handleDeleteKey = (key: string) => {
-    if (window.confirm(t('cache.confirmDelete'))) {
-      deleteMutation.mutate(key);
-    }
+    requestConfirm(t('cache.confirmDelete'), () => deleteMutation.mutate(key));
   };
 
   const handleClearPattern = (pattern: string) => {
-    if (window.confirm(t('cache.confirmClearPattern', { pattern }))) {
-      deleteMutation.mutate(pattern);
-    }
+    requestConfirm(t('cache.confirmClearPattern', { pattern }), () =>
+      deleteMutation.mutate(pattern)
+    );
   };
 
   const handleClearAll = () => {
-    if (window.confirm(t('cache.confirmClearAll'))) {
-      deleteMutation.mutate('*');
-    }
+    requestConfirm(t('cache.confirmClearAll'), () =>
+      deleteMutation.mutate('*')
+    );
   };
 
   return (
@@ -230,6 +243,42 @@ export default function CacheViewer() {
             <pre className="bg-gray-100 dark:bg-gray-900 rounded-lg p-4 text-xs font-mono overflow-auto max-h-[60vh] text-gray-800 dark:text-gray-200">
               {JSON.stringify(keyDetail.value, null, 2)}
             </pre>
+          </div>
+        )}
+      </Modal>
+
+      {/* Confirm dialog */}
+      <Modal
+        isOpen={pendingConfirm !== null}
+        onClose={() => setPendingConfirm(null)}
+        title={t('common.confirm')}
+        size="sm"
+        role="alertdialog"
+      >
+        {pendingConfirm && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              {pendingConfirm.message}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setPendingConfirm(null)}
+                className="px-4 py-2 rounded-md text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  pendingConfirm.onConfirm();
+                  setPendingConfirm(null);
+                }}
+                className="px-4 py-2 rounded-md text-sm text-white bg-red-600 hover:bg-red-700 transition-colors"
+              >
+                {t('common.confirm')}
+              </button>
+            </div>
           </div>
         )}
       </Modal>
