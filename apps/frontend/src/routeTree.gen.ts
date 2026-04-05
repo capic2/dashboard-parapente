@@ -14,6 +14,7 @@ import { Route as SitesRouteImport } from './routes/sites'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as FlightsRouteImport } from './routes/flights'
 import { Route as ExportViewerRouteImport } from './routes/export-viewer'
+import { Route as CacheRouteImport } from './routes/cache'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ViewerFlightIdRouteImport } from './routes/viewer.$flightId'
@@ -43,6 +44,11 @@ const ExportViewerRoute = ExportViewerRouteImport.update({
   path: '/export-viewer',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/export-viewer.lazy').then((d) => d.Route))
+const CacheRoute = CacheRouteImport.update({
+  id: '/cache',
+  path: '/cache',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/cache.lazy').then((d) => d.Route))
 const AnalyticsRoute = AnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
@@ -64,6 +70,7 @@ const ViewerFlightIdRoute = ViewerFlightIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
+  '/cache': typeof CacheRoute
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRoute
   '/settings': typeof SettingsRoute
@@ -74,6 +81,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
+  '/cache': typeof CacheRoute
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRoute
   '/settings': typeof SettingsRoute
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
+  '/cache': typeof CacheRoute
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRoute
   '/settings': typeof SettingsRoute
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/analytics'
+    | '/cache'
     | '/export-viewer'
     | '/flights'
     | '/settings'
@@ -107,6 +117,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/analytics'
+    | '/cache'
     | '/export-viewer'
     | '/flights'
     | '/settings'
@@ -117,6 +128,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/analytics'
+    | '/cache'
     | '/export-viewer'
     | '/flights'
     | '/settings'
@@ -128,6 +140,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AnalyticsRoute: typeof AnalyticsRoute
+  CacheRoute: typeof CacheRoute
   ExportViewerRoute: typeof ExportViewerRoute
   FlightsRoute: typeof FlightsRoute
   SettingsRoute: typeof SettingsRoute
@@ -173,6 +186,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ExportViewerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cache': {
+      id: '/cache'
+      path: '/cache'
+      fullPath: '/cache'
+      preLoaderRoute: typeof CacheRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/analytics': {
       id: '/analytics'
       path: '/analytics'
@@ -200,6 +220,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnalyticsRoute: AnalyticsRoute,
+  CacheRoute: CacheRoute,
   ExportViewerRoute: ExportViewerRoute,
   FlightsRoute: FlightsRoute,
   SettingsRoute: SettingsRoute,

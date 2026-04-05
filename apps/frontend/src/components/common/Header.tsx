@@ -46,6 +46,12 @@ export default function Header() {
         >
           {t('header.settings')}
         </Link>
+        <Link
+          to="/cache"
+          className="px-3.5 py-2 rounded-md text-gray-600 dark:text-gray-300 text-sm transition-all hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-sky-600 [&.active]:bg-sky-600 [&.active]:text-white"
+        >
+          {t('header.cache')}
+        </Link>
         <a
           href="http://portainer.local:9000"
           target="_blank"

@@ -5,7 +5,8 @@
     "flights": "Vols",
     "analytics": "Analyses",
     "sites": "Sites",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "cache": "Cache"
   },
   "common": {
     "loading": "Chargement...",
@@ -407,5 +408,28 @@
   },
   "datepicker": {
     "openCalendar": "Ouvrir le calendrier"
+  },
+  "cache": {
+    "title": "Visualiseur de Cache Redis",
+    "totalKeys": "Clés totales",
+    "memoryUsage": "Utilisation mémoire",
+    "groups": "Groupes",
+    "key": "Clé",
+    "ttl": "TTL",
+    "size": "Taille",
+    "actions": "Actions",
+    "view": "Voir",
+    "deleteKey": "Supprimer",
+    "clearPattern": "Vider le groupe",
+    "clearAll": "Vider tout le cache",
+    "confirmDelete": "Voulez-vous vraiment supprimer cette clé ?",
+    "confirmClearPattern": "Supprimer toutes les clés correspondant à {{pattern}} ?",
+    "confirmClearAll": "Voulez-vous vraiment vider tout le cache ?",
+    "autoRefresh": "Rafraîchissement auto",
+    "refresh": "Rafraîchir",
+    "noKeys": "Aucune clé en cache",
+    "searchPlaceholder": "Filtrer les clés...",
+    "keyDetail": "Détail de la clé",
+    "cachedAt": "Mis en cache le"
   }
 }
