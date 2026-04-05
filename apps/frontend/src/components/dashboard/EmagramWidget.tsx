@@ -52,19 +52,20 @@ function HourSlider({
 }) {
   if (hours.length === 0) return null;
 
-  const minHour = hours[0].hour;
-  const maxHour = hours[hours.length - 1].hour;
-  const current = selectedHour ?? minHour;
+  const currentIndex = Math.max(
+    0,
+    hours.findIndex((h) => h.hour === selectedHour)
+  );
 
   return (
     <div className="mb-3">
       <input
         type="range"
-        min={minHour}
-        max={maxHour}
+        min={0}
+        max={hours.length - 1}
         step={1}
-        value={current}
-        onChange={(e) => onHourChange(Number(e.target.value))}
+        value={currentIndex}
+        onChange={(e) => onHourChange(hours[Number(e.target.value)].hour)}
         className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-600"
       />
       <div className="flex justify-between mt-1">
@@ -73,7 +74,7 @@ function HourSlider({
             key={h.hour}
             onClick={() => onHourChange(h.hour)}
             className={`text-[10px] px-1 py-0.5 rounded transition-colors ${
-              h.hour === current
+              h.hour === selectedHour
                 ? 'font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30'
                 : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
             }`}
