@@ -430,6 +430,7 @@
     "noKeys": "Aucune clé en cache",
     "searchPlaceholder": "Filtrer les clés...",
     "keyDetail": "Détail de la clé",
-    "cachedAt": "Mis en cache le"
+    "cachedAt": "Mis en cache le",
+    "truncatedWarning": "Affichage limité aux 500 premières clés. Le cache contient plus d'entrées."
   }
 }

@@ -138,6 +138,13 @@ export default function CacheViewer() {
         </div>
       </div>
 
+      {/* Truncated warning */}
+      {overview.truncated && (
+        <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-xl p-3 text-sm text-amber-800 dark:text-amber-200">
+          {t('cache.truncatedWarning')}
+        </div>
+      )}
+
       {/* Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md flex flex-wrap items-center gap-3">
         <Checkbox
@@ -430,13 +437,15 @@ function GroupSection({
             {group.count}
           </span>
         </div>
-        <Button
-          onPress={() => onClearPattern()}
-          isDisabled={isPending}
-          className="px-2 py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
-        >
-          {t('cache.clearPattern')}
-        </Button>
+        <div onClick={(e) => e.stopPropagation()}>
+          <Button
+            onPress={onClearPattern}
+            isDisabled={isPending}
+            className="px-2 py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            {t('cache.clearPattern')}
+          </Button>
+        </div>
       </div>
 
       {isExpanded && (

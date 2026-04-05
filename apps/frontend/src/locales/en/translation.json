@@ -430,6 +430,7 @@
     "noKeys": "No cache keys found",
     "searchPlaceholder": "Filter keys...",
     "keyDetail": "Key Detail",
-    "cachedAt": "Cached At"
+    "cachedAt": "Cached At",
+    "truncatedWarning": "Display limited to the first 500 keys. The cache contains more entries."
   }
 }

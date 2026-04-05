@@ -6,7 +6,7 @@ import json
 from unittest.mock import patch
 
 import pytest
-from fakeredis.aioredis import FakeRedis as FakeAsyncRedis
+from fakeredis import FakeAsyncRedis
 
 
 @pytest.fixture

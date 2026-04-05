@@ -1428,6 +1428,10 @@ async def debug_cache_data(site_id: str, day_index: int = 0, db: Session = Depen
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+MAX_CACHE_KEYS = 500
+APP_CACHE_PREFIXES = ["weather:", "best_spot:", "emagram:"]
+
+
 @router.get("/admin/cache")
 async def get_cache_overview():
     """
@@ -1438,10 +1442,14 @@ async def get_cache_overview():
     try:
         redis_client = await get_redis()
 
-        # Collect all keys via scan (non-blocking)
+        # Collect keys via scan with hard cap to avoid O(N) on large databases
         keys = []
         async for key in redis_client.scan_iter(match="*"):
             keys.append(key)
+            if len(keys) >= MAX_CACHE_KEYS:
+                break
+
+        truncated = len(keys) >= MAX_CACHE_KEYS
 
         # Batch TTL + strlen via pipeline
         if keys:
@@ -1480,6 +1488,7 @@ async def get_cache_overview():
             "total_keys": total_keys,
             "memory_usage": memory_usage,
             "groups": groups,
+            "truncated": truncated,
         }
 
     except Exception as e:
@@ -1538,10 +1547,16 @@ async def delete_cache_key(key: str):
         redis_client = await get_redis()
 
         if "*" in key:
-            # Pattern delete
-            keys_to_delete = []
-            async for k in redis_client.scan_iter(match=key):
-                keys_to_delete.append(k)
+            # Pattern delete — restrict to app prefixes to avoid wiping unrelated keys
+            if key == "*":
+                keys_to_delete = []
+                for prefix in APP_CACHE_PREFIXES:
+                    async for k in redis_client.scan_iter(match=f"{prefix}*"):
+                        keys_to_delete.append(k)
+            else:
+                keys_to_delete = []
+                async for k in redis_client.scan_iter(match=key):
+                    keys_to_delete.append(k)
             if keys_to_delete:
                 deleted = await redis_client.delete(*keys_to_delete)
             else:

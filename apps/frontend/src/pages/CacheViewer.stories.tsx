@@ -121,6 +121,7 @@ function buildOverview() {
     total_keys: cacheDb.length,
     memory_usage: '1.2M',
     groups,
+    truncated: false,
   };
 }
 

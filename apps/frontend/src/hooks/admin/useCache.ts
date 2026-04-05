@@ -29,6 +29,7 @@ const CacheOverviewSchema = z.object({
   total_keys: z.number(),
   memory_usage: z.string().nullable(),
   groups: z.record(z.string(), CacheGroupSchema),
+  truncated: z.boolean(),
 });
 
 const CacheKeyDetailSchema = z.object({
