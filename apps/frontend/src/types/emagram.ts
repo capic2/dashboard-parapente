@@ -75,6 +75,7 @@ export interface EmagramAnalysis {
   screenshot_paths?: string | null; // JSON: {"meteo-parapente": "/path/to/screenshot.png", ...}
   sources_count?: number | null; // Number of sources analyzed
   sources_agreement?: string | null; // "high", "medium", "low"
+  sources_errors?: string | null; // JSON: {"meteo-parapente": "timeout", ...}
 
   // Timestamps
   created_at: string;
@@ -109,6 +110,20 @@ export function parseAlerts(alertes_securite: string | null): SafetyAlert[] {
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
+  }
+}
+
+// Helper to parse sources_errors
+export function parseSourcesErrors(
+  sources_errors: string | null | undefined
+): Record<string, string> {
+  if (!sources_errors) return {};
+
+  try {
+    const parsed = JSON.parse(sources_errors);
+    return typeof parsed === 'object' && parsed !== null ? parsed : {};
+  } catch {
+    return {};
   }
 }
 

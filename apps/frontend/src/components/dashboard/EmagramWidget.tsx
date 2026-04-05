@@ -9,6 +9,7 @@ import {
 } from '../../hooks/weather/useEmagramAnalysis';
 import {
   parseAlerts,
+  parseSourcesErrors,
   getScoreColor,
   getScoreCategory,
 } from '../../types/emagram';
@@ -147,8 +148,11 @@ export default function EmagramWidget({
     );
   }
 
-  // Display error when analysis failed or trigger mutation failed
+  // Display error when analysis failed
   if (analysisFailed) {
+    const sourcesErrors = parseSourcesErrors(emagram.sources_errors);
+    const errorEntries = Object.entries(sourcesErrors);
+
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-orange-500">
         <div className="flex items-center justify-between mb-3">
@@ -183,6 +187,24 @@ export default function EmagramWidget({
             </div>
           </div>
         </div>
+        {errorEntries.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {errorEntries.map(([source, errorMsg]) => (
+              <div
+                key={source}
+                className="flex items-start gap-2 text-xs text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/10 rounded px-2 py-1.5"
+              >
+                <span className="flex-shrink-0">📡</span>
+                <span>
+                  <span className="font-medium capitalize">
+                    {source.replace('-', ' ')}
+                  </span>{' '}
+                  — {errorMsg}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
         {triggerMutation.error && (
           <div className="mt-2 text-xs text-red-600 dark:text-red-400">
             Erreur lors du rafraîchissement : {triggerMutation.error.message}
@@ -447,6 +469,31 @@ export default function EmagramWidget({
                       </span>
                     </div>
                   )}
+                  {(() => {
+                    const srcErrors = parseSourcesErrors(
+                      emagram.sources_errors
+                    );
+                    const entries = Object.entries(srcErrors);
+                    if (entries.length === 0) return null;
+                    return (
+                      <div className="mt-2 space-y-1">
+                        {entries.map(([source, errMsg]) => (
+                          <div
+                            key={source}
+                            className="flex items-start gap-1.5 text-xs text-orange-600 dark:text-orange-400"
+                          >
+                            <span className="flex-shrink-0">⚠️</span>
+                            <span>
+                              <span className="font-medium capitalize">
+                                {source.replace('-', ' ')}
+                              </span>{' '}
+                              — {errMsg}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                   <Lightbox
                     isOpen={lightboxOpen}
                     onClose={() => setLightboxOpen(false)}

@@ -277,14 +277,18 @@ def save_emagram_analysis(
     now = datetime.utcnow()
     analysis_id = str(uuid.uuid4())
 
-    # Build external URLs and screenshot paths JSON
+    # Build external URLs, screenshot paths, and source errors JSON
     external_urls = {}
     screenshot_paths = {}
+    sources_errors = {}
     for screenshot in screenshot_result.get("screenshots", []):
         if screenshot.get("success"):
             source_name = screenshot["source"]
             external_urls[source_name] = screenshot["external_url"]
             screenshot_paths[source_name] = screenshot.get("image_path", "")
+        else:
+            source_name = screenshot.get("source", "unknown")
+            sources_errors[source_name] = screenshot.get("error", "Unknown error")
 
     # Create EmagramAnalysis object
     emagram = EmagramAnalysis(
@@ -331,6 +335,7 @@ def save_emagram_analysis(
         screenshot_paths=json.dumps(screenshot_paths, ensure_ascii=False),
         sources_count=screenshot_result.get("sources_successful", 0),
         sources_agreement=analysis_result.get("sources_agreement"),
+        sources_errors=json.dumps(sources_errors, ensure_ascii=False) if sources_errors else None,
         ai_raw_response=analysis_result.get("raw_response"),
         # Status
         analysis_status="completed",
@@ -357,6 +362,13 @@ def save_failed_analysis(
     """
     now = datetime.utcnow()
 
+    # Collect per-source errors
+    sources_errors = {}
+    for screenshot in screenshot_result.get("screenshots", []):
+        if not screenshot.get("success"):
+            source_name = screenshot.get("source", "unknown")
+            sources_errors[source_name] = screenshot.get("error", "Unknown error")
+
     emagram = EmagramAnalysis(
         id=str(uuid.uuid4()),
         analysis_date=now.date(),
@@ -373,6 +385,7 @@ def save_failed_analysis(
         analysis_method="llm_vision",
         analysis_status="failed",
         error_message=analysis_result.get("error", "Unknown error"),
+        sources_errors=json.dumps(sources_errors, ensure_ascii=False) if sources_errors else None,
         ai_raw_response=json.dumps(analysis_result, ensure_ascii=False),
     )
 

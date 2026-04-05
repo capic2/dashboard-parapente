@@ -357,6 +357,9 @@ class EmagramAnalysis(Base):
     sources_agreement = Column(
         String, nullable=True
     )  # "high", "medium", "low" - consensus level between sources
+    sources_errors = Column(
+        Text, nullable=True
+    )  # JSON: {"meteo-parapente": "timeout after 30s", ...}
 
     # Status
     analysis_status = Column(

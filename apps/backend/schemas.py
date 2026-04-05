@@ -488,6 +488,7 @@ class EmagramAnalysis(EmagramAnalysisBase):
     screenshot_paths: str | None = None  # JSON: {"meteo-parapente": "/path/to/screenshot.png", ...}
     sources_count: int | None = None  # Number of sources analyzed
     sources_agreement: str | None = None  # "high", "medium", "low"
+    sources_errors: str | None = None  # JSON: {"meteo-parapente": "timeout", ...}
 
     # Timestamps
     created_at: datetime
