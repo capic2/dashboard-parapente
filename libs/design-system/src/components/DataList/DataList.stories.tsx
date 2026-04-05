@@ -1,16 +1,27 @@
-import preview from '../.storybook/preview';
+import preview from '../../../.storybook/preview';
+import type { Row } from '@tanstack/react-table';
 import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
   createColumnHelper,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
   type SortingState,
+  useReactTable,
 } from '@tanstack/react-table';
 import { useState } from 'react';
-import type { Row } from '@tanstack/react-table';
 import type { Selection } from 'react-aria-components';
 import { DataList } from './DataList';
+import { expect, fn } from 'storybook/test';
+import { StoryContext } from '@storybook/react';
+
+interface DataListContext extends StoryContext {
+  parameters: {
+    dataList?: {
+      pageSize?: number;
+      selectionMode?: 'none' | 'single' | 'multiple';
+    };
+  };
+}
 
 interface MockItem {
   id: string;
@@ -47,11 +58,13 @@ const sortableColumns = [
 function DataListWrapper({
   data,
   pageSize = 5,
-  selectionMode = 'none' as 'none' | 'single' | 'multiple',
+  selectionMode = 'none',
+  onSelectionChange,
 }: {
   data: MockItem[];
   pageSize?: number;
   selectionMode?: 'none' | 'single' | 'multiple';
+  onSelectionChange?: (keys: Selection) => void;
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [selectedKeys, setSelectedKeys] = useState<Selection>(new Set());
@@ -77,7 +90,10 @@ function DataListWrapper({
       ariaLabel="Liste de test"
       selectionMode={selectionMode}
       selectedKeys={selectedKeys}
-      onSelectionChange={setSelectedKeys}
+      onSelectionChange={(keys) => {
+        setSelectedKeys(keys);
+        onSelectionChange?.(keys);
+      }}
       getTextValue={(row: Row<MockItem>) => row.original.name}
       renderItem={(row: Row<MockItem>, { isSelected }) => (
         <div
@@ -100,7 +116,7 @@ function DataListWrapper({
 }
 
 const meta = preview.meta({
-  title: 'Components/UI/DataList',
+  title: 'Components/DataList',
   component: DataList,
   parameters: {
     layout: 'padded',
@@ -108,20 +124,79 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
+// @ts-ignore
 export const Default = meta.story({
   name: 'Default',
-  render: () => <DataListWrapper data={mockData} />,
+  args: {
+    onSelectionChange: fn(),
+  },
+  parameters: {
+    dataList: {
+      pageSize: 5,
+      selectionMode: 'single',
+    },
+  } satisfies DataListContext['parameters'],
+  render: (args, context: DataListContext) => (
+    <DataListWrapper
+      selectionMode={context.parameters?.dataList?.selectionMode}
+      pageSize={context.parameters?.dataList?.pageSize}
+      data={mockData}
+      onSelectionChange={args.onSelectionChange}
+    />
+  ),
 });
+Default.test(
+  'It can be sort',
+  async ({ canvas, userEvent, context }: DataListContext) => {
+    let names = mockData
+      .map((data) => data.name)
+      .splice(0, context.parameters.dataList?.pageSize);
+    let rowNames = canvas.getAllByRole('row').map((row) => row.ariaLabel);
 
-export const WithPagination = meta.story({
-  name: 'With Pagination',
-  render: () => <DataListWrapper data={mockData} pageSize={3} />,
-});
+    await expect(rowNames).toEqual(names);
 
-export const WithSelection = meta.story({
-  name: 'With Selection',
-  render: () => <DataListWrapper data={mockData} selectionMode="multiple" />,
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Trier par Valeur' })
+    );
+
+    names = mockData
+      .sort((d1, d2) => d2.value - d1.value)
+      .map((data) => data.name)
+      .splice(0, context.parameters.dataList?.pageSize);
+    rowNames = canvas.getAllByRole('row').map((row) => row.ariaLabel);
+
+    await expect(rowNames).toEqual(names);
+  }
+);
+Default.test('It is paginated', async ({ canvas, context, userEvent }) => {
+  let names = mockData
+    .map((data) => data.name)
+    .splice(0, context.parameters.dataList?.pageSize);
+  let rowNames = canvas.getAllByRole('row').map((row) => row.ariaLabel);
+
+  await expect(rowNames).toEqual(names);
+
+  await userEvent.click(canvas.getByRole('button', { name: 'Page suivante' }));
+
+  names = mockData
+    .map((data) => data.name)
+    .splice(
+      context.parameters.dataList?.pageSize,
+      context.parameters.dataList?.pageSize +
+        context.parameters.dataList?.pageSize -
+        1
+    );
+  rowNames = canvas.getAllByRole('row').map((row) => row.ariaLabel);
+
+  await expect(rowNames).toEqual(names);
 });
+Default.test(
+  'triggers the onselectionchange callback',
+  async ({ canvas, args, userEvent }) => {
+    await userEvent.click(canvas.getByRole('row', { name: 'Alpha' }));
+    await expect(args.onSelectionChange).toHaveBeenCalled();
+  }
+);
 
 export const Empty = meta.story({
   name: 'Empty',

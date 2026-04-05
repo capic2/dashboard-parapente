@@ -1,7 +1,6 @@
-import preview from '../.storybook/preview';
+import preview from '../../../.storybook/preview';
 import { expect, fn, within } from 'storybook/test';
 import { DatePicker } from './DatePicker';
-
 
 const FROZEN_DATE = new Date(2026, 0, 15);
 
@@ -75,9 +74,7 @@ Empty.test(
     );
     // Calendar popover renders in a portal outside canvasElement
     const body = within(document.body);
-    await userEvent.click(
-      body.getByRole('button', { name: /15/ })
-    );
+    await userEvent.click(body.getByRole('button', { name: /15/ }));
     await expect(args.onChange).toHaveBeenCalledWith('2026-01-15');
   }
 );

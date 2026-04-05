@@ -18,7 +18,7 @@ export default definePreview({
       } else {
         Date.now = OriginalDateNow;
       }
-      return Story();
+      return <Story />;
     },
   ],
   parameters: {
