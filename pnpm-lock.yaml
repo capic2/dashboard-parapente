@@ -207,6 +207,22 @@ importers:
       tailwindcss:
         specifier: ^4.2.1
         version: 4.2.2
+    devDependencies:
+      '@storybook/addon-vitest':
+        specifier: ^10.3.4
+        version: 10.3.4(@vitest/browser-playwright@4.1.2)(@vitest/browser@4.1.2(msw@2.12.14(@types/node@24.12.2)(typescript@6.0.2))(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@24.12.2)(esbuild@0.27.5)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))(vitest@4.1.2))(@vitest/runner@4.1.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(storybook@10.3.4(@testing-library/dom@10.4.1)(prettier@3.8.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(vitest@4.1.2)
+      '@storybook/react':
+        specifier: ^10.3.4
+        version: 10.3.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(storybook@10.3.4(@testing-library/dom@10.4.1)(prettier@3.8.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(typescript@6.0.2)
+      '@vitest/browser-playwright':
+        specifier: ^4.1.2
+        version: 4.1.2(msw@2.12.14(@types/node@24.12.2)(typescript@6.0.2))(playwright@1.59.1)(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@24.12.2)(esbuild@0.27.5)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))(vitest@4.1.2)
+      happy-dom:
+        specifier: ^20.8.9
+        version: 20.8.9
+      storybook:
+        specifier: 10.3.4
+        version: 10.3.4(@testing-library/dom@10.4.1)(prettier@3.8.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
 
   libs/shared-types:
     dependencies:

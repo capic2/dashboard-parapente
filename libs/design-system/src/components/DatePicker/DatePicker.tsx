@@ -17,7 +17,7 @@ import {
 } from 'react-aria-components';
 import { parseDate, CalendarDate } from '@internationalized/date';
 import { useTranslation } from 'react-i18next';
-import { getToday } from './utils/dateUtils';
+import { getToday } from '../../utils/dateUtils';
 
 interface DatePickerProps {
   label: string;
@@ -44,7 +44,9 @@ export function DatePicker({ label, value, onChange }: DatePickerProps) {
       onChange={handleChange}
       className="flex flex-col gap-1.5"
     >
-      <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{label}</Label>
+      <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        {label}
+      </Label>
       <Group className="flex items-center border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-shadow">
         <DateInput className="flex-1 flex px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none bg-transparent">
           {(segment) => (

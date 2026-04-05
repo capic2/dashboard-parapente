@@ -7,6 +7,17 @@
   "datepicker": {
     "openCalendar": "Ouvrir le calendrier"
   },
+  "dataList": {
+    "noItems": "Aucun élément",
+    "sortOptions": "Options de tri",
+    "sortBy": "Trier par {{column}}",
+    "sortByAsc": "Trier par {{column}}, tri croissant",
+    "sortByDesc": "Trier par {{column}}, tri décroissant",
+    "pagination": "Pagination",
+    "pageInfo": "Page {{current}} / {{total}}",
+    "previousPage": "Page précédente",
+    "nextPage": "Page suivante"
+  },
   "errors": {
     "errorOccurred": "Une erreur est survenue",
     "errorMessage": "L'application a rencontré une erreur inattendue. Veuillez réessayer ou revenir à la page d'accueil.",

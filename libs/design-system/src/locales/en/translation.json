@@ -7,6 +7,17 @@
   "datepicker": {
     "openCalendar": "Open calendar"
   },
+  "dataList": {
+    "noItems": "No items",
+    "sortOptions": "Sort options",
+    "sortBy": "Sort by {{column}}",
+    "sortByAsc": "Sort by {{column}}, ascending",
+    "sortByDesc": "Sort by {{column}}, descending",
+    "pagination": "Pagination",
+    "pageInfo": "Page {{current}} / {{total}}",
+    "previousPage": "Previous page",
+    "nextPage": "Next page"
+  },
   "errors": {
     "errorOccurred": "An error occurred",
     "errorMessage": "The application encountered an unexpected error. Please try again or go back to the home page.",
