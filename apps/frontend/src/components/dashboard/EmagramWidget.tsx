@@ -105,7 +105,12 @@ export default function EmagramWidget({
 
   // Determine which hour to display: selected, or current hour if in range, or null
   const activeHour = useMemo(() => {
-    if (selectedHour !== null) return selectedHour;
+    if (
+      selectedHour !== null &&
+      hoursData?.hours?.some((h) => h.hour === selectedHour)
+    ) {
+      return selectedHour;
+    }
     if (!hoursData?.hours?.length) return null;
     const now = new Date().getHours();
     const available = hoursData.hours.map((h) => h.hour);
@@ -248,6 +253,13 @@ export default function EmagramWidget({
             </span>
           </button>
         </div>
+        {hasHourlyData && hoursData && (
+          <HourSlider
+            hours={hoursData.hours}
+            selectedHour={activeHour}
+            onHourChange={setSelectedHour}
+          />
+        )}
         <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg p-3">
           <div className="flex items-start gap-2">
             <span className="text-base flex-shrink-0">⚠️</span>
