@@ -570,34 +570,36 @@ async def get_best_spot_cached(db: Session, day_index: int = 0) -> dict[str, Any
 
 async def refresh_best_spot_cache(db: Session):
     """
-    Refresh the best spot cache for today only (called by scheduler)
+    Refresh the best spot cache for all days (called by scheduler)
 
     This should be called every hour when weather data is refreshed.
-    Only day 0 (today) is pre-calculated and cached by the scheduler.
-    Other days (1-6) are calculated on-demand when requested via the API.
+    All 7 days (0-6) are pre-calculated and cached by the scheduler.
     """
-    logger.info("♻️ Refreshing best spot cache for today (day 0)...")
+    logger.info("♻️ Refreshing best spot cache for all days (0-6)...")
 
     get_cached_func, set_cached_func, get_cache_ttl_func = _get_cache_functions()
 
     try:
-        # Calculate best spot for today only (day_index=0)
-        best_spot = await calculate_best_spot_from_cache(db, day_index=0)
+        for day_index in range(7):
+            best_spot = await calculate_best_spot_from_cache(db, day_index=day_index)
 
-        if best_spot:
-            # Store in cache if cache module is available
-            if set_cached_func and get_cache_ttl_func:
-                cache_key = "best_spot:day_0"
-                ttl = get_cache_ttl_func().get("summary", 3600)
+            if best_spot:
+                if set_cached_func and get_cache_ttl_func:
+                    cache_key = f"best_spot:day_{day_index}"
+                    ttl = get_cache_ttl_func().get("summary", 3600)
 
-                await set_cached_func(cache_key, best_spot, ttl)
-                logger.info(f"✅ Best spot cache refreshed for today: {best_spot['site']['name']}")
+                    await set_cached_func(cache_key, best_spot, ttl)
+                    logger.info(
+                        f"✅ Best spot cache refreshed for day {day_index}: {best_spot['site']['name']}"
+                    )
+                else:
+                    logger.info(
+                        f"✅ Best spot calculated for day {day_index} (no cache): {best_spot['site']['name']}"
+                    )
             else:
-                logger.info(
-                    f"✅ Best spot calculated for today (no cache): {best_spot['site']['name']}"
+                logger.warning(
+                    f"⚠️ No best spot calculated for day {day_index} (no forecast data?)"
                 )
-        else:
-            logger.warning("⚠️ No best spot calculated for today (no forecast data?)")
 
     except Exception as e:
         logger.error(f"Error refreshing best spot cache: {e}", exc_info=True)
