@@ -47,7 +47,6 @@ const DeleteCacheResponseSchema = z.object({
 // --- Inferred types ---
 
 export type CacheKeyInfo = z.infer<typeof CacheKeyInfoSchema>;
-export type CacheOverview = z.infer<typeof CacheOverviewSchema>;
 export type CacheKeyDetail = z.infer<typeof CacheKeyDetailSchema>;
 
 // --- Query options & hooks ---
