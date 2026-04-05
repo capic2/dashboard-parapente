@@ -1,7 +1,14 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, Input, TextField } from 'react-aria-components';
-import { Modal } from '@dashboard-parapente/design-system';
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type SortingState,
+} from '@tanstack/react-table';
+import { DataTable, Modal } from '@dashboard-parapente/design-system';
 import {
   useCacheOverview,
   useCacheKeyDetail,
@@ -300,6 +307,8 @@ export default function CacheViewer() {
   );
 }
 
+const columnHelper = createColumnHelper<CacheKeyInfo>();
+
 function GroupSection({
   prefix,
   group,
@@ -320,6 +329,67 @@ function GroupSection({
   isPending: boolean;
 }) {
   const { t } = useTranslation();
+  const [sorting, setSorting] = useState<SortingState>([]);
+
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('key', {
+        header: t('cache.key'),
+        cell: (info) => (
+          <span className="font-mono text-xs text-gray-700 dark:text-gray-300 truncate block max-w-xs">
+            {info.getValue()}
+          </span>
+        ),
+      }),
+      columnHelper.accessor('ttl', {
+        header: t('cache.ttl'),
+        cell: (info) => (
+          <span className="text-xs text-gray-600 dark:text-gray-400">
+            {formatTtl(info.getValue())}
+          </span>
+        ),
+      }),
+      columnHelper.accessor('size', {
+        header: t('cache.size'),
+        cell: (info) => (
+          <span className="text-xs text-gray-600 dark:text-gray-400">
+            {formatSize(info.getValue())}
+          </span>
+        ),
+      }),
+      columnHelper.display({
+        id: 'actions',
+        header: t('cache.actions'),
+        cell: (info) => (
+          <div className="flex gap-2">
+            <Button
+              onPress={() => onViewKey(info.row.original.key)}
+              className="px-2 py-1 rounded text-xs bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors cursor-pointer"
+            >
+              {t('cache.view')}
+            </Button>
+            <Button
+              onPress={() => onDeleteKey(info.row.original.key)}
+              isDisabled={isPending}
+              className="px-2 py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              {t('cache.deleteKey')}
+            </Button>
+          </div>
+        ),
+      }),
+    ],
+    [t, onViewKey, onDeleteKey, isPending]
+  );
+
+  const table = useReactTable({
+    data: group.keys,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
@@ -354,49 +424,7 @@ function GroupSection({
 
       {isExpanded && (
         <div className="border-t border-gray-200 dark:border-gray-700">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 dark:bg-gray-750 text-left text-xs text-gray-500 dark:text-gray-400">
-                <th className="px-4 py-2">{t('cache.key')}</th>
-                <th className="px-4 py-2 w-24">{t('cache.ttl')}</th>
-                <th className="px-4 py-2 w-24">{t('cache.size')}</th>
-                <th className="px-4 py-2 w-32">{t('cache.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {group.keys.map((k) => (
-                <tr
-                  key={k.key}
-                  className="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750"
-                >
-                  <td className="px-4 py-2 font-mono text-xs text-gray-700 dark:text-gray-300 truncate max-w-xs">
-                    {k.key}
-                  </td>
-                  <td className="px-4 py-2 text-xs text-gray-600 dark:text-gray-400">
-                    {formatTtl(k.ttl)}
-                  </td>
-                  <td className="px-4 py-2 text-xs text-gray-600 dark:text-gray-400">
-                    {formatSize(k.size)}
-                  </td>
-                  <td className="px-4 py-2 flex gap-2">
-                    <Button
-                      onPress={() => onViewKey(k.key)}
-                      className="px-2 py-1 rounded text-xs bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors cursor-pointer"
-                    >
-                      {t('cache.view')}
-                    </Button>
-                    <Button
-                      onPress={() => onDeleteKey(k.key)}
-                      isDisabled={isPending}
-                      className="px-2 py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
-                    >
-                      {t('cache.deleteKey')}
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable table={table} />
         </div>
       )}
     </div>
