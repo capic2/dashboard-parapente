@@ -197,7 +197,7 @@ export function BestSpotSuggestion({
         <div className="mb-4">
           <div className="flex items-end justify-between mb-1.5">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-              Score
+              {t('weather.score')}
             </span>
             <span className={`text-2xl font-bold ${scoreColor.text}`}>
               {adjustedScore}
