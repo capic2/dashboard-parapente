@@ -1,11 +1,11 @@
 import { definePreview } from '@storybook/react-vite';
 import { initialize, mswLoader } from 'msw-storybook-addon';
 import addonA11y from '@storybook/addon-a11y';
-import addonI18n from 'storybook-react-i18next';
 import { http, HttpResponse } from 'msw';
+import { I18nextProvider } from 'react-i18next';
 import i18n from './i18n';
 import '../src/App.css';
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TanstackRouterDecorator } from './decorators';
@@ -76,6 +76,37 @@ const initializeMsw = (
 // Initialize MSW with default fallback handlers
 initializeMsw({ onUnhandledRequest: 'error', quiet: true }, defaultMswHandlers);
 
+// i18n decorator — syncs the toolbar locale global with the i18n instance
+function I18nDecorator({
+  children,
+  locale,
+}: {
+  children: React.ReactNode;
+  locale: string;
+}) {
+  const [key, setKey] = useState(0);
+
+  useEffect(() => {
+    const onChanged = () => setKey(Date.now());
+    i18n.on('languageChanged', onChanged);
+    return () => {
+      i18n.off('languageChanged', onChanged);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (locale && i18n.language !== locale) {
+      i18n.changeLanguage(locale);
+    }
+  }, [locale]);
+
+  return (
+    <I18nextProvider i18n={i18n} key={key}>
+      {children}
+    </I18nextProvider>
+  );
+}
+
 // Theme decorator — applies/removes .dark class based on the current mode or toolbar global
 function ThemeDecorator({
   children,
@@ -98,7 +129,7 @@ function ThemeDecorator({
 }
 
 const preview = definePreview({
-  addons: [addonA11y(), addonI18n],
+  addons: [addonA11y()],
 
   parameters: {
     router: {
@@ -112,7 +143,6 @@ const preview = definePreview({
         </QueryClientProvider>
       ),
     },
-    i18n,
     controls: {
       matchers: {
         color: /(background|color)$/i,
@@ -163,12 +193,15 @@ const preview = definePreview({
     (Story, context) => {
       const theme =
         context.globals?.theme ?? context.parameters?.theme ?? 'light';
+      const locale = context.globals?.locale ?? 'fr';
       return (
-        <ThemeDecorator theme={theme}>
-          <div style={{ padding: '1rem' }}>
-            <Story />
-          </div>
-        </ThemeDecorator>
+        <I18nDecorator locale={locale}>
+          <ThemeDecorator theme={theme}>
+            <div style={{ padding: '1rem' }}>
+              <Story />
+            </div>
+          </ThemeDecorator>
+        </I18nDecorator>
       );
     },
     TanstackRouterDecorator,
