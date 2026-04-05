@@ -148,7 +148,7 @@ export function BestSpotSuggestion({
     verdict,
     windFavorability,
   } = bestSpot;
-  const adjustedScore = score != null ? Math.round(score) : paraIndex;
+  const adjustedScore = Math.min(100, Math.max(0, score != null ? Math.round(score) : paraIndex));
   const scoreColor = getScoreColor(adjustedScore);
   const verdictInfo = getVerdict(adjustedScore, verdict ?? undefined);
 
