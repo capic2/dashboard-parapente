@@ -9,32 +9,48 @@ import {
   useMutation,
   useQueryClient,
 } from '@tanstack/react-query';
+import { z } from 'zod';
 import { api } from '../../lib/api';
 
-export interface CacheKeyInfo {
-  key: string;
-  ttl: number;
-  size: number;
-}
+// --- Zod schemas ---
 
-export interface CacheGroup {
-  count: number;
-  keys: CacheKeyInfo[];
-}
+const CacheKeyInfoSchema = z.object({
+  key: z.string(),
+  ttl: z.number(),
+  size: z.number(),
+});
 
-export interface CacheOverview {
-  total_keys: number;
-  memory_usage: string | null;
-  groups: Record<string, CacheGroup>;
-}
+const CacheGroupSchema = z.object({
+  count: z.number(),
+  keys: z.array(CacheKeyInfoSchema),
+});
 
-export interface CacheKeyDetail {
-  key: string;
-  ttl: number;
-  size: number;
-  value: unknown;
-  type: 'json' | 'string';
-}
+const CacheOverviewSchema = z.object({
+  total_keys: z.number(),
+  memory_usage: z.string().nullable(),
+  groups: z.record(z.string(), CacheGroupSchema),
+});
+
+const CacheKeyDetailSchema = z.object({
+  key: z.string(),
+  ttl: z.number(),
+  size: z.number(),
+  value: z.unknown(),
+  type: z.enum(['json', 'string']),
+});
+
+const DeleteCacheResponseSchema = z.object({
+  success: z.boolean(),
+  keys_deleted: z.number(),
+});
+
+// --- Inferred types ---
+
+export type CacheKeyInfo = z.infer<typeof CacheKeyInfoSchema>;
+export type CacheOverview = z.infer<typeof CacheOverviewSchema>;
+export type CacheKeyDetail = z.infer<typeof CacheKeyDetailSchema>;
+
+// --- Query options & hooks ---
 
 /**
  * Query options for cache overview (reusable in loader + component)
@@ -43,7 +59,8 @@ export const cacheOverviewQueryOptions = () =>
   queryOptions({
     queryKey: ['admin-cache'],
     queryFn: async () => {
-      return await api.get('admin/cache').json<CacheOverview>();
+      const data = await api.get('admin/cache').json();
+      return CacheOverviewSchema.parse(data);
     },
   });
 
@@ -64,9 +81,10 @@ export const useCacheKeyDetail = (key: string | null) => {
   return useQuery({
     queryKey: ['admin-cache', key],
     queryFn: async () => {
-      return await api
+      const data = await api
         .get(`admin/cache/${encodeURIComponent(key ?? '')}`)
-        .json<CacheKeyDetail>();
+        .json();
+      return CacheKeyDetailSchema.parse(data);
     },
     enabled: key !== null,
   });
@@ -80,9 +98,10 @@ export const useDeleteCacheKey = () => {
 
   return useMutation({
     mutationFn: async (key: string) => {
-      return await api
+      const data = await api
         .delete(`admin/cache/${encodeURIComponent(key)}`)
-        .json<{ success: boolean; keys_deleted: number }>();
+        .json();
+      return DeleteCacheResponseSchema.parse(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-cache'] });
