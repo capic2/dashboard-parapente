@@ -1,6 +1,6 @@
 // Core domain types
 // Re-export types from Zod schemas to ensure consistency between validation and types
-import {Key} from "react-aria-components";
+import { Key } from 'react-aria-components';
 
 export type {
   Site,
@@ -22,6 +22,7 @@ export interface FlightFilters {
 export interface WeatherData {
   spot_name: string;
   para_index: number;
+  score?: number;
   verdict: string;
   temperature: number;
   wind_speed: number;

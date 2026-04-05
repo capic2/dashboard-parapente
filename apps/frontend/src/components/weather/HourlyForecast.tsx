@@ -168,9 +168,12 @@ const getFlyabilityDisplay = (
 
 const getVerdictClass = (verdict: string): string => {
   const v = verdict.toLowerCase();
-  if (v === 'bon') return 'bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30';
-  if (v === 'moyen') return 'bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/30';
-  if (v === 'limite') return 'bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30';
+  if (v === 'bon')
+    return 'bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30';
+  if (v === 'moyen')
+    return 'bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/30';
+  if (v === 'limite')
+    return 'bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30';
   return 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30';
 };
 
@@ -361,7 +364,11 @@ const VerdictTooltip = ({
                   {criterion.met ? '✓' : '✗'}
                 </span>
                 <span
-                  className={criterion.met ? 'text-gray-700 dark:text-gray-300' : 'text-gray-500 dark:text-gray-400'}
+                  className={
+                    criterion.met
+                      ? 'text-gray-700 dark:text-gray-300'
+                      : 'text-gray-500 dark:text-gray-400'
+                  }
                 >
                   {criterion.label}
                 </span>
@@ -424,7 +431,10 @@ const SourceDataTooltip = ({
 
           if (!sourceData) {
             return (
-              <div key={sourceKey} className="text-xs text-gray-400 dark:text-gray-500">
+              <div
+                key={sourceKey}
+                className="text-xs text-gray-400 dark:text-gray-500"
+              >
                 <span className="font-semibold">{sourceName}:</span> (non
                 disponible)
               </div>
@@ -506,7 +516,10 @@ const SourceDataTooltip = ({
           // General case
           if (value === null || value === undefined) {
             return (
-              <div key={sourceKey} className="text-xs text-gray-400 dark:text-gray-500">
+              <div
+                key={sourceKey}
+                className="text-xs text-gray-400 dark:text-gray-500"
+              >
                 <span className="font-semibold">{sourceName}:</span> (non
                 dispo.)
               </div>
@@ -792,7 +805,10 @@ export default function HourlyForecast({
     }
   };
 
-  const cellEventHandlers = (cellType: CellType, hourData: HourlyForecastItem) => ({
+  const cellEventHandlers = (
+    cellType: CellType,
+    hourData: HourlyForecastItem
+  ) => ({
     onClick: (e: React.MouseEvent) =>
       handleCellInteraction(cellType, hourData, e),
   });
@@ -811,37 +827,59 @@ export default function HourlyForecast({
           <thead>
             <tr className="border-b-2 border-gray-200 dark:border-gray-600">
               <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
-                <span className="inline-flex items-center justify-center gap-1"><Clock size={14} /> Heure</span>
+                <span className="inline-flex items-center justify-center gap-1">
+                  <Clock size={14} /> Heure
+                </span>
               </th>
               <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
-                <span className="inline-flex items-center justify-center gap-1"><Gauge size={14} /> Para-Index</span>
+                <span className="inline-flex items-center justify-center gap-1">
+                  <Gauge size={14} /> Para-Index
+                </span>
               </th>
               <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
-                <span className="inline-flex items-center justify-center gap-1"><Thermometer size={14} /> Temp (°C)</span>
+                <span className="inline-flex items-center justify-center gap-1">
+                  <Wind size={14} /> Vent (km/h)
+                </span>
               </th>
               <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
-                <span className="inline-flex items-center justify-center gap-1"><Wind size={14} /> Vent (km/h)</span>
+                <span className="inline-flex items-center justify-center gap-1">
+                  <Zap size={14} /> Rafales (km/h)
+                </span>
               </th>
               <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
-                <span className="inline-flex items-center justify-center gap-1"><Zap size={14} /> Rafales (km/h)</span>
+                <span className="inline-flex items-center justify-center gap-1">
+                  <Compass size={14} /> Direction
+                </span>
               </th>
               <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
-                <span className="inline-flex items-center justify-center gap-1"><Compass size={14} /> Direction</span>
+                <span className="inline-flex items-center justify-center gap-1">
+                  <Thermometer size={14} /> Temp (°C)
+                </span>
               </th>
               <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
-                <span className="inline-flex items-center justify-center gap-1"><CloudRain size={14} /> Précip. (mm)</span>
+                <span className="inline-flex items-center justify-center gap-1">
+                  <CloudRain size={14} /> Précip. (mm)
+                </span>
               </th>
               <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
-                <span className="inline-flex items-center justify-center gap-1"><Cloud size={14} /> Nuages (%)</span>
+                <span className="inline-flex items-center justify-center gap-1">
+                  <Cloud size={14} /> Nuages (%)
+                </span>
               </th>
               <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
-                <span className="inline-flex items-center justify-center gap-1"><Zap size={14} /> CAPE (J/kg)</span>
+                <span className="inline-flex items-center justify-center gap-1">
+                  <Zap size={14} /> CAPE (J/kg)
+                </span>
               </th>
               <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
-                <span className="inline-flex items-center justify-center gap-1"><Flame size={14} /> Thermiques</span>
+                <span className="inline-flex items-center justify-center gap-1">
+                  <Flame size={14} /> Thermiques
+                </span>
               </th>
               <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
-                <span className="inline-flex items-center justify-center gap-1"><CircleCheck size={14} /> Volabilité</span>
+                <span className="inline-flex items-center justify-center gap-1">
+                  <CircleCheck size={14} /> Volabilité
+                </span>
               </th>
             </tr>
           </thead>
@@ -867,7 +905,9 @@ export default function HourlyForecast({
                     key={index}
                     className={`border-b border-gray-100 dark:border-gray-700 ${getVerdictClass(hour.verdict)}`}
                   >
-                    <td className="py-2.5 px-2 font-medium text-center">{hour.hour}</td>
+                    <td className="py-2.5 px-2 font-medium text-center">
+                      {hour.hour}
+                    </td>
 
                     <td
                       className="py-2.5 px-2 text-center cursor-help hover:bg-sky-100 dark:hover:bg-sky-900/30 transition-colors"
@@ -876,13 +916,6 @@ export default function HourlyForecast({
                       <strong className="text-sky-600">
                         {hour.para_index}/100
                       </strong>
-                    </td>
-
-                    <td
-                      className="py-2.5 px-2 text-center cursor-help hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                      {...cellEventHandlers('temperature', hour)}
-                    >
-                      {hour.temp}
                     </td>
 
                     <td
@@ -897,8 +930,8 @@ export default function HourlyForecast({
                       {...cellEventHandlers('gust', hour)}
                     >
                       {gustValue !== null && gustValue !== undefined
-                          ? gustValue.toFixed(1)
-                          : '—'}
+                        ? gustValue.toFixed(1)
+                        : '—'}
                     </td>
 
                     <td
@@ -906,10 +939,20 @@ export default function HourlyForecast({
                       {...cellEventHandlers('direction', hour)}
                     >
                       {hour.wind_direction_deg != null ? (
-                        <WindArrow degrees={hour.wind_direction_deg} className="text-violet-600 dark:text-violet-400" />
+                        <WindArrow
+                          degrees={hour.wind_direction_deg}
+                          className="text-violet-600 dark:text-violet-400"
+                        />
                       ) : (
                         '—'
                       )}
+                    </td>
+
+                    <td
+                      className="py-2.5 px-2 text-center cursor-help hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      {...cellEventHandlers('temperature', hour)}
+                    >
+                      {hour.temp}
                     </td>
 
                     <td
@@ -917,9 +960,9 @@ export default function HourlyForecast({
                       {...cellEventHandlers('precipitation', hour)}
                     >
                       {hour.precipitation !== null &&
-                        hour.precipitation !== undefined
-                          ? hour.precipitation.toFixed(1)
-                          : '—'}
+                      hour.precipitation !== undefined
+                        ? hour.precipitation.toFixed(1)
+                        : '—'}
                     </td>
 
                     <td
@@ -927,14 +970,14 @@ export default function HourlyForecast({
                       {...cellEventHandlers('cloud-cover', hour)}
                     >
                       {cloudCover !== null && cloudCover !== undefined
-                          ? Math.round(cloudCover)
-                          : '—'}
+                        ? Math.round(cloudCover)
+                        : '—'}
                     </td>
 
                     <td className="py-2.5 px-2 text-center">
                       {hour.cape !== null && hour.cape !== undefined
-                          ? Math.round(hour.cape)
-                          : '—'}
+                        ? Math.round(hour.cape)
+                        : '—'}
                     </td>
 
                     <td className="py-2.5 px-2 text-center">
@@ -956,7 +999,10 @@ export default function HourlyForecast({
               })
             ) : (
               <tr>
-                <td colSpan={11} className="py-8 text-center text-gray-500 dark:text-gray-400">
+                <td
+                  colSpan={11}
+                  className="py-8 text-center text-gray-500 dark:text-gray-400"
+                >
                   Aucune donnée horaire disponible
                 </td>
               </tr>

@@ -17,6 +17,13 @@ import {
 } from '../../types/emagram';
 import { useState, useMemo } from 'react';
 import { Lightbox } from '@dashboard-parapente/design-system';
+import {
+  Slider,
+  SliderTrack,
+  SliderThumb,
+  SliderOutput,
+  Button,
+} from 'react-aria-components';
 
 interface EmagramWidgetProps {
   siteId: string;
@@ -58,35 +65,55 @@ function HourSlider({
 
   return (
     <div className="mb-3">
-      <input
-        type="range"
-        min={0}
-        max={hours.length - 1}
+      <Slider
+        minValue={0}
+        maxValue={hours.length - 1}
         step={1}
         value={currentIndex}
-        onChange={(e) => onHourChange(hours[Number(e.target.value)].hour)}
-        className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-600"
-      />
-      <div className="flex justify-between mt-1">
-        {hours.map((h) => (
-          <button
-            key={h.hour}
-            onClick={() => onHourChange(h.hour)}
-            className={`text-[10px] px-1 py-0.5 rounded transition-colors ${
-              h.hour === effectiveHour
-                ? 'font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30'
-                : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
-            }`}
-          >
-            {h.hour}h
-            {h.score != null && h.status === 'completed' && (
-              <span
-                className="block w-1.5 h-1.5 rounded-full mx-auto mt-0.5"
-                style={{ backgroundColor: getScoreColor(h.score) }}
+        onChange={(value) => onHourChange(hours[value].hour)}
+        aria-label="Sélection de l'heure"
+      >
+        <SliderOutput className="text-xs text-purple-700 dark:text-purple-300 font-semibold mb-1 block text-center">
+          {effectiveHour}h
+        </SliderOutput>
+        <SliderTrack className="relative w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full">
+          {({ state }) => (
+            <>
+              {/* Fill */}
+              <div
+                className="absolute h-full bg-purple-600 rounded-full"
+                style={{ width: `${state.getThumbPercent(0) * 100}%` }}
               />
-            )}
-          </button>
-        ))}
+              <SliderThumb className="top-1/2 h-4 w-4 rounded-full bg-purple-600 border-2 border-white dark:border-gray-800 shadow-md cursor-grab dragging:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple-400 focus-visible:outline-offset-1 transition-shadow" />
+            </>
+          )}
+        </SliderTrack>
+      </Slider>
+      <div className="relative mt-1 h-7">
+        {hours.map((h, idx) => {
+          const percent =
+            hours.length > 1 ? (idx / (hours.length - 1)) * 100 : 50;
+          return (
+            <Button
+              key={h.hour}
+              onPress={() => onHourChange(h.hour)}
+              className={`absolute -translate-x-1/2 text-[10px] px-1 py-0.5 rounded transition-colors ${
+                h.hour === effectiveHour
+                  ? 'font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30'
+                  : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+              }`}
+              style={{ left: `${percent}%` }}
+            >
+              {h.hour}h
+              {h.score != null && h.status === 'completed' && (
+                <span
+                  className="block w-1.5 h-1.5 rounded-full mx-auto mt-0.5"
+                  style={{ backgroundColor: getScoreColor(h.score) }}
+                />
+              )}
+            </Button>
+          );
+        })}
       </div>
     </div>
   );
@@ -169,18 +196,18 @@ export default function EmagramWidget({
           <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
             🌡️ Analyse Thermique (Émagramme)
           </h2>
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing || !siteId}
+          <Button
+            onPress={handleRefresh}
+            isDisabled={isRefreshing || !siteId}
             className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-            title="Réessayer"
+            aria-label="Réessayer"
           >
             <span
               className={`text-base ${isRefreshing ? 'animate-spin inline-block' : ''}`}
             >
               🔄
             </span>
-          </button>
+          </Button>
         </div>
         <div className="text-red-600 dark:text-red-400 text-sm">
           Erreur : {error.message}
@@ -199,18 +226,18 @@ export default function EmagramWidget({
           <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
             🌡️ Analyse Thermique (Émagramme)
           </h2>
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing || !siteId}
+          <Button
+            onPress={handleRefresh}
+            isDisabled={isRefreshing || !siteId}
             className="p-1.5 rounded-full hover:bg-gray-100 transition-colors disabled:opacity-50"
-            title="Actualiser"
+            aria-label="Actualiser"
           >
             <span
               className={`text-lg ${isRefreshing ? 'animate-spin inline-block' : ''}`}
             >
               🔄
             </span>
-          </button>
+          </Button>
         </div>
         <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
           {!siteId ? 'Aucun site selectionne' : 'Analyse en cours...'}
@@ -235,18 +262,18 @@ export default function EmagramWidget({
           <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
             🌡️ Analyse Thermique (Émagramme)
           </h2>
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
+          <Button
+            onPress={handleRefresh}
+            isDisabled={isRefreshing}
             className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-            title="Réessayer"
+            aria-label="Réessayer"
           >
             <span
               className={`text-base ${isRefreshing ? 'animate-spin inline-block' : ''}`}
             >
               🔄
             </span>
-          </button>
+          </Button>
         </div>
         <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg p-3">
           <div className="flex items-start gap-2">
@@ -306,18 +333,18 @@ export default function EmagramWidget({
         <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
           🌡️ Analyse Thermique (Émagramme)
         </h2>
-        <button
-          onClick={handleRefresh}
-          disabled={isRefreshing}
+        <Button
+          onPress={handleRefresh}
+          isDisabled={isRefreshing}
           className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-          title="Actualiser"
+          aria-label="Actualiser"
         >
           <span
             className={`text-base ${isRefreshing ? 'animate-spin inline-block' : ''}`}
           >
             🔄
           </span>
-        </button>
+        </Button>
       </div>
 
       {/* Hour Slider */}
@@ -329,127 +356,90 @@ export default function EmagramWidget({
         />
       )}
 
-      {/* Score Gauge */}
-      <div className="flex items-center gap-4 mb-4">
-        <div className="relative w-24 h-24">
-          <svg className="w-24 h-24 transform -rotate-90">
-            {/* Background circle */}
-            <circle
-              cx="48"
-              cy="48"
-              r="40"
-              stroke="#e5e7eb"
-              strokeWidth="8"
-              fill="none"
-            />
-            {/* Score arc */}
-            <circle
-              cx="48"
-              cy="48"
-              r="40"
-              stroke={scoreColor}
-              strokeWidth="8"
-              fill="none"
-              strokeDasharray={`${2 * Math.PI * 40 * (score / 100)} ${2 * Math.PI * 40}`}
-              strokeLinecap="round"
-            />
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center flex-col">
-            <span className="text-2xl font-bold" style={{ color: scoreColor }}>
-              {score}
-            </span>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              / 100
-            </span>
-          </div>
+      {/* Verdict + metadata */}
+      <div className="flex items-center justify-between mb-3">
+        <div
+          className="text-lg font-bold capitalize"
+          style={{ color: scoreColor }}
+        >
+          {translateCategory(scoreCategory)}
         </div>
-
-        <div className="flex-1">
-          <div
-            className="text-lg font-semibold capitalize mb-1"
-            style={{ color: scoreColor }}
-          >
-            {translateCategory(scoreCategory)}
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-1">
-            <span>📍</span>
-            <span>
-              {emagram.station_name}
-              {emagram.distance_km != null &&
-                ` (${emagram.distance_km.toFixed(0)} km)`}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-gray-500">
-            <span>🕒</span>
-            <span>
-              {timeAgo} • {emagram.sounding_time}
-            </span>
-          </div>
+        <div className="text-xs text-gray-500 dark:text-gray-400 text-right">
+          <span>
+            📍 {emagram.station_name}
+            {emagram.distance_km != null &&
+              ` (${emagram.distance_km.toFixed(0)} km)`}
+          </span>
+          <span className="ml-2">🕒 {timeAgo}</span>
         </div>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        {/* Plafond thermique */}
-        {emagram.plafond_thermique_m && (
-          <div className="flex items-center gap-2 bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-900/20 dark:to-sky-900/20 rounded-lg p-2.5">
-            <span className="text-xl flex-shrink-0">☁️</span>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs text-gray-600 dark:text-gray-300">
-                Plafond
-              </div>
-              <div className="text-base font-bold text-gray-900 dark:text-white truncate">
-                {emagram.plafond_thermique_m}m
-              </div>
-            </div>
-          </div>
+      {/* Thermal condition badges */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {emagram.force_thermique_ms != null && (
+          <ThermalBadge
+            icon={getThermalStrengthIcon(emagram.force_thermique_ms)}
+            label={getThermalStrengthLabel(emagram.force_thermique_ms)}
+            detail={`${emagram.force_thermique_ms.toFixed(1)} m/s`}
+            color={getThermalStrengthColor(emagram.force_thermique_ms)}
+          />
         )}
-
-        {/* Force thermique */}
-        {emagram.force_thermique_ms && (
-          <div className="flex items-center gap-2 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-lg p-2.5">
-            <span className="text-xl flex-shrink-0">📈</span>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs text-gray-600 dark:text-gray-300">
-                Force
-              </div>
-              <div className="text-base font-bold text-gray-900 dark:text-white truncate">
-                {emagram.force_thermique_ms.toFixed(1)} m/s
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Heures volables */}
-        {emagram.flyable_hours_formatted && (
-          <div className="flex items-center gap-2 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg p-2.5">
-            <span className="text-xl flex-shrink-0">⏰</span>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs text-gray-600 dark:text-gray-300">
-                Heures
-              </div>
-              <div className="text-sm font-bold text-gray-900 dark:text-white truncate">
-                {emagram.flyable_hours_formatted}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Stabilité */}
+        {emagram.plafond_thermique_m != null &&
+          emagram.plafond_thermique_m > 0 && (
+            <ThermalBadge
+              icon="☁️"
+              label={`Plafond ${emagram.plafond_thermique_m}m`}
+              color={
+                emagram.plafond_thermique_m >= 2000
+                  ? 'green'
+                  : emagram.plafond_thermique_m >= 1200
+                    ? 'amber'
+                    : 'gray'
+              }
+            />
+          )}
         {emagram.stabilite_atmospherique && (
-          <div className="flex items-center gap-2 bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20 rounded-lg p-2.5">
-            <span className="text-xl flex-shrink-0">
-              {getStabilityEmoji(emagram.stabilite_atmospherique)}
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs text-gray-600 dark:text-gray-300">
-                Stabilité
-              </div>
-              <div className="text-sm font-semibold text-gray-900 dark:text-white truncate capitalize">
-                {emagram.stabilite_atmospherique}
-              </div>
-            </div>
-          </div>
+          <ThermalBadge
+            icon={getStabilityEmoji(emagram.stabilite_atmospherique)}
+            label={emagram.stabilite_atmospherique}
+            color={getStabilityBadgeColor(emagram.stabilite_atmospherique)}
+          />
+        )}
+        {emagram.cisaillement_vent &&
+          emagram.cisaillement_vent.toLowerCase() !== 'faible' && (
+            <ThermalBadge
+              icon={
+                emagram.cisaillement_vent.toLowerCase().includes('fort')
+                  ? '⚡'
+                  : '💨'
+              }
+              label={`Cisaillement ${emagram.cisaillement_vent.toLowerCase()}`}
+              color={
+                emagram.cisaillement_vent.toLowerCase().includes('fort')
+                  ? 'red'
+                  : 'amber'
+              }
+            />
+          )}
+        {emagram.risque_orage &&
+          emagram.risque_orage.toLowerCase() !== 'faible' &&
+          emagram.risque_orage.toLowerCase() !== 'nul' && (
+            <ThermalBadge
+              icon={getRiskEmoji(emagram.risque_orage)}
+              label={`Orage ${emagram.risque_orage.toLowerCase()}`}
+              color={
+                emagram.risque_orage.toLowerCase().includes('élev')
+                  ? 'red'
+                  : 'amber'
+              }
+            />
+          )}
+        {emagram.flyable_hours_formatted && (
+          <ThermalBadge
+            icon="⏰"
+            label={emagram.flyable_hours_formatted}
+            color="blue"
+          />
         )}
       </div>
 
@@ -532,9 +522,9 @@ export default function EmagramWidget({
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {lightboxImages.map((image, idx) => (
-                      <button
+                      <Button
                         key={image.alt}
-                        onClick={() => {
+                        onPress={() => {
                           setLightboxIndex(idx);
                           setLightboxOpen(true);
                         }}
@@ -543,7 +533,7 @@ export default function EmagramWidget({
                         <span>📸</span>
                         <span>{image.alt}</span>
                         <span className="text-blue-400">🔍</span>
-                      </button>
+                      </Button>
                     ))}
                   </div>
                   {emagram.sources_agreement && (
@@ -602,15 +592,73 @@ export default function EmagramWidget({
               ? `🤖 Analyse IA (${emagram.llm_model?.split('-')[0] || 'AI'})`
               : '📊 Calculs classiques'}
           </span>
-          {emagram.risque_orage && (
-            <span className="flex items-center gap-1">
-              {getRiskEmoji(emagram.risque_orage)} Orage: {emagram.risque_orage}
-            </span>
-          )}
+          <span>{emagram.sounding_time}</span>
         </div>
       </div>
     </div>
   );
+}
+
+// Badge colors mapping
+const badgeColors: Record<string, string> = {
+  green: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200',
+  amber: 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200',
+  red: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200',
+  blue: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200',
+  purple:
+    'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200',
+  gray: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
+};
+
+function ThermalBadge({
+  icon,
+  label,
+  detail,
+  color,
+}: {
+  icon: string;
+  label: string;
+  detail?: string;
+  color: string;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${badgeColors[color] || badgeColors.gray}`}
+    >
+      <span>{icon}</span>
+      <span className="capitalize">{label}</span>
+      {detail && <span className="opacity-70">({detail})</span>}
+    </span>
+  );
+}
+
+function getThermalStrengthIcon(force: number): string {
+  if (force >= 3) return '🔥';
+  if (force >= 1.5) return '🌀';
+  if (force >= 0.5) return '↑';
+  return '—';
+}
+
+function getThermalStrengthLabel(force: number): string {
+  if (force >= 3) return 'Thermiques forts';
+  if (force >= 1.5) return 'Thermiques modérés';
+  if (force >= 0.5) return 'Thermiques faibles';
+  return 'Pas de thermiques';
+}
+
+function getThermalStrengthColor(force: number): string {
+  if (force >= 3) return 'red';
+  if (force >= 1.5) return 'green';
+  if (force >= 0.5) return 'amber';
+  return 'gray';
+}
+
+function getStabilityBadgeColor(stabilite: string): string {
+  const s = stabilite.toLowerCase();
+  if (s.includes('très instable')) return 'red';
+  if (s.includes('instable')) return 'amber';
+  if (s.includes('stable')) return 'green';
+  return 'gray';
 }
 
 // Helper function to format time ago

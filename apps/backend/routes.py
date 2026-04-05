@@ -1612,6 +1612,23 @@ async def get_weather(
     # Calculate para_index (using only flyable hours)
     para_result = calculate_para_index(flyable_consensus)
 
+    # Calculate wind-adjusted score (same logic as best_spot)
+    from best_spot import degrees_to_cardinal, get_wind_favorability, get_wind_score_multiplier
+
+    midday_hours = [h for h in flyable_consensus if 10 <= h.get("hour", 0) <= 14]
+    if midday_hours:
+        wind_dirs = [h.get("wind_direction") for h in midday_hours if h.get("wind_direction")]
+        mid_wind_dir = wind_dirs[0] if wind_dirs else None
+        mid_wind_speed = sum(h.get("wind_speed", 0) for h in midday_hours) / len(midday_hours)
+    else:
+        mid_wind_dir = None
+        mid_wind_speed = None
+
+    wind_dir_str = degrees_to_cardinal(mid_wind_dir) if mid_wind_dir is not None else None
+    wind_favorability = get_wind_favorability(wind_dir_str, site.orientation, mid_wind_speed)
+    wind_multiplier = get_wind_score_multiplier(wind_favorability)
+    score = round(para_result["para_index"] * wind_multiplier)
+
     # Analyze hourly slots (also only flyable hours)
     slots = analyze_hourly_slots(flyable_consensus)
     slots_summary = format_slots_summary(slots)
@@ -1649,6 +1666,7 @@ async def get_weather(
         "sources_metadata": sources_metadata,  # ← New field with source metadata
         "consensus": all_consensus,
         "para_index": para_result["para_index"],
+        "score": score,
         "verdict": para_result["verdict"],
         "emoji": para_result["emoji"],
         "explanation": para_result["explanation"],
@@ -1816,11 +1834,30 @@ async def get_daily_summary(spot_id: str, days: int = 7, db: Session = Depends(g
                 continue
 
             if day_result:
+                # Calculate wind-adjusted score
+                from best_spot import (
+                    degrees_to_cardinal,
+                    get_wind_favorability,
+                    get_wind_score_multiplier,
+                )
+
+                wind_dir_str = (
+                    degrees_to_cardinal(day_result["wind_direction_avg"])
+                    if day_result.get("wind_direction_avg") is not None
+                    else None
+                )
+                wind_fav = get_wind_favorability(
+                    wind_dir_str, site.orientation, day_result["wind_avg"]
+                )
+                wind_mult = get_wind_score_multiplier(wind_fav)
+                day_score = round(day_result["para_index"] * wind_mult)
+
                 summary_days.append(
                     {
                         "day_index": idx,
                         "date": day_result["date"],
                         "para_index": day_result["para_index"],
+                        "score": day_score,
                         "verdict": day_result["verdict"],
                         "emoji": day_result["emoji"],
                         "temp_min": day_result["temp_min"],
@@ -3854,6 +3891,7 @@ async def get_emagram_hours(
                 EmagramAnalysis.score_volabilite,
                 EmagramAnalysis.analysis_status,
                 EmagramAnalysis.id,
+                EmagramAnalysis.analysis_datetime,
             )
             .filter(
                 EmagramAnalysis.station_code == site_id,
@@ -3861,9 +3899,17 @@ async def get_emagram_hours(
                 EmagramAnalysis.forecast_hour.isnot(None),
                 EmagramAnalysis.analysis_method == "llm_vision",
             )
-            .order_by(EmagramAnalysis.forecast_hour)
+            .order_by(EmagramAnalysis.forecast_hour, EmagramAnalysis.analysis_datetime.desc())
             .all()
         )
+
+        # Deduplicate: keep only the most recent analysis per hour
+        seen_hours: set[int] = set()
+        unique_analyses = []
+        for a in analyses:
+            if a.forecast_hour not in seen_hours:
+                seen_hours.add(a.forecast_hour)
+                unique_analyses.append(a)
 
         return {
             "site_id": site_id,
@@ -3875,7 +3921,7 @@ async def get_emagram_hours(
                     "status": a.analysis_status,
                     "id": a.id,
                 }
-                for a in analyses
+                for a in unique_analyses
             ],
         }
     except Exception as e:
