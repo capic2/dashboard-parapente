@@ -222,10 +222,11 @@ Default.test('can open key detail modal', async ({ canvas, userEvent }) => {
   await userEvent.click(viewButtons[0]);
 
   // Modal should show key detail
+  const modal = await screen.findByRole('dialog');
   await expect(
-    await screen.findByText(i18n.t('cache.keyDetail'))
+    within(modal).getByText(i18n.t('cache.keyDetail'))
   ).toBeInTheDocument();
-  await expect(await screen.findByText('"Arguel"')).toBeInTheDocument();
+  await expect(within(modal).getByText('best_spot:day_0')).toBeInTheDocument();
 });
 
 Default.test('can delete a single key', async ({ canvas, userEvent }) => {
@@ -246,6 +247,27 @@ Default.test('can delete a single key', async ({ canvas, userEvent }) => {
 
   // best_spot group should now show 1 key
   await expect(await canvas.findByText('best_spot')).toBeInTheDocument();
+});
+
+Default.test('can clear a group', async ({ canvas, userEvent }) => {
+  // Click "clear group" on weather:forecast (3 keys)
+  const clearButtons = await canvas.findAllByRole('button', {
+    name: i18n.t('cache.clearPattern'),
+  });
+  // weather:forecast is first alphabetically (before best_spot? no — best_spot < emagram < weather)
+  // Groups sorted: best_spot, emagram:sounding, weather:forecast → index 2
+  await userEvent.click(clearButtons[2]);
+
+  // Confirm in alertdialog
+  const dialog = within(await screen.findByRole('alertdialog'));
+  await userEvent.click(
+    dialog.getByRole('button', { name: i18n.t('common.confirm') })
+  );
+
+  // weather:forecast group should be gone, others remain
+  await expect(await canvas.findByText('best_spot')).toBeInTheDocument();
+  await expect(await canvas.findByText('emagram:sounding')).toBeInTheDocument();
+  await expect(canvas.queryByText('weather:forecast')).toBeNull();
 });
 
 Default.test('can clear all cache', async ({ canvas, userEvent }) => {
