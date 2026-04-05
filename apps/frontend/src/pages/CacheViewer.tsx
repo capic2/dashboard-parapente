@@ -31,16 +31,13 @@ export default function CacheViewer() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
-  const {
-    data: overview,
-    isLoading,
-    refetch,
-  } = useCacheOverview(autoRefresh ? 5000 : undefined);
+  const { data: overview, refetch } = useCacheOverview(
+    autoRefresh ? 5000 : undefined
+  );
   const { data: keyDetail } = useCacheKeyDetail(selectedKey);
   const deleteMutation = useDeleteCacheKey();
 
   const filteredGroups = useMemo(() => {
-    if (!overview) return {};
     if (!searchFilter) return overview.groups;
 
     const lower = searchFilter.toLowerCase();
@@ -86,17 +83,6 @@ export default function CacheViewer() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="py-8">
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md animate-pulse">
-          <div className="h-8 bg-gray-200 dark:bg-gray-600 rounded mb-4 w-1/3" />
-          <div className="h-64 bg-gray-200 dark:bg-gray-600 rounded" />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="py-4 space-y-4">
       <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
@@ -107,7 +93,7 @@ export default function CacheViewer() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
           <div className="text-3xl font-bold text-sky-600">
-            {overview?.total_keys ?? 0}
+            {overview.total_keys}
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
             {t('cache.totalKeys')}
@@ -115,7 +101,7 @@ export default function CacheViewer() {
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
           <div className="text-3xl font-bold text-sky-600">
-            {overview?.memory_usage ?? '—'}
+            {overview.memory_usage ?? '—'}
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
             {t('cache.memoryUsage')}
@@ -123,7 +109,7 @@ export default function CacheViewer() {
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
           <div className="text-3xl font-bold text-sky-600">
-            {overview ? Object.keys(overview.groups).length : 0}
+            {Object.keys(overview.groups).length}
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
             {t('cache.groups')}

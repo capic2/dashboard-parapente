@@ -2,7 +2,13 @@
  * React Query hooks for Redis cache admin endpoints
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  queryOptions,
+  useSuspenseQuery,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { api } from '../../lib/api';
 
 export interface CacheKeyInfo {
@@ -31,14 +37,22 @@ export interface CacheKeyDetail {
 }
 
 /**
- * Fetch cache overview (all keys grouped by prefix)
+ * Query options for cache overview (reusable in loader + component)
  */
-export const useCacheOverview = (refetchInterval?: number) => {
-  return useQuery({
+export const cacheOverviewQueryOptions = () =>
+  queryOptions({
     queryKey: ['admin-cache'],
     queryFn: async () => {
       return await api.get('admin/cache').json<CacheOverview>();
     },
+  });
+
+/**
+ * Fetch cache overview (all keys grouped by prefix)
+ */
+export const useCacheOverview = (refetchInterval?: number) => {
+  return useSuspenseQuery({
+    ...cacheOverviewQueryOptions(),
     refetchInterval: refetchInterval || false,
   });
 };
