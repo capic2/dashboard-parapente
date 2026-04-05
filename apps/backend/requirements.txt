@@ -70,7 +70,7 @@ isort==8.0.1
 # ============================================
 # File Upload Support
 # ============================================
-python-multipart==0.0.22
+python-multipart==0.0.23
 
 # ============================================
 # Meteorology & Scientific Computing
