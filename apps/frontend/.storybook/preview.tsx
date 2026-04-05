@@ -3,7 +3,7 @@ import { initialize, mswLoader } from 'msw-storybook-addon';
 import addonA11y from '@storybook/addon-a11y';
 import addonI18n from 'storybook-react-i18next';
 import { http, HttpResponse } from 'msw';
-import i18n from '../src/i18n';
+import i18n from './i18n';
 import '../src/App.css';
 import { Suspense, useEffect } from 'react';
 

@@ -19,4 +19,4 @@ i18n
     },
   });
 
-export default i18n;
+// Side-effect only — imported by main.tsx as `import './i18n'`
