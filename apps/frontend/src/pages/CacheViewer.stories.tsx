@@ -1,5 +1,5 @@
 import preview from '../../.storybook/preview';
-import { expect, screen, within } from 'storybook/test';
+import { expect, screen, waitFor, within } from 'storybook/test';
 import { http, HttpResponse } from 'msw';
 import CacheViewer from './CacheViewer';
 import type { CacheKeyDetail } from '../hooks/admin/useCache';
@@ -285,6 +285,61 @@ Default.test('can clear all cache', async ({ canvas, userEvent }) => {
   await expect(
     await canvas.findByText(i18n.t('cache.noKeys'))
   ).toBeInTheDocument();
+});
+
+Default.test('can refresh manually', async ({ canvas, userEvent }) => {
+  // Verify initial state
+  await expect(await canvas.findByText('weather:forecast')).toBeInTheDocument();
+
+  // Mutate cacheDb externally (simulate server-side change)
+  cacheDb.push({
+    key: 'weather:forecast:newkey',
+    ttl: 3600,
+    size: 1024,
+    value: JSON.stringify({
+      temperature: 25,
+      cached_at: '2026-01-15T12:00:00+00:00',
+    }),
+  });
+
+  // Click refresh
+  await userEvent.click(
+    await canvas.findByRole('button', { name: i18n.t('cache.refresh') })
+  );
+
+  // Expand weather:forecast to see the new key
+  await userEvent.click(await canvas.findByText('weather:forecast'));
+  await expect(
+    await canvas.findByText('weather:forecast:newkey')
+  ).toBeInTheDocument();
+});
+
+Default.test('auto-refresh updates data', async ({ canvas, userEvent }) => {
+  // Enable auto-refresh
+  await userEvent.click(
+    await canvas.findByRole('checkbox', { name: i18n.t('cache.autoRefresh') })
+  );
+
+  // Mutate cacheDb externally
+  cacheDb.push({
+    key: 'best_spot:day_3',
+    ttl: 1800,
+    size: 256,
+    value: JSON.stringify({
+      site: 'new',
+      cached_at: '2026-01-15T12:00:00+00:00',
+    }),
+  });
+
+  // Wait for auto-refresh to pick up the change (interval is 5s)
+  await waitFor(
+    async () => {
+      await expect(
+        await canvas.findByText('best_spot:day_3')
+      ).toBeInTheDocument();
+    },
+    { timeout: 10000 }
+  );
 });
 
 export const Empty = meta.story({
