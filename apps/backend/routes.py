@@ -3686,24 +3686,31 @@ async def test_weather_source(
 _pending_emagram_analyses: set[str] = set()
 
 
-def _auto_emagram_analysis(site_id: str, day_index: int = 0):
+def _auto_emagram_analysis(site_id: str, day_index: int = 0, hour: int | None = None):
     """Background task: auto-trigger emagram analysis for a site."""
     import asyncio
 
     from database import get_db_context
     from emagram_multi_source import generate_multi_source_emagram_for_spot
 
-    key = f"{site_id}:{day_index}"
+    key = f"{site_id}:{day_index}:{hour}"
     if key in _pending_emagram_analyses:
         return
     _pending_emagram_analyses.add(key)
     try:
         with get_db_context() as db:
             asyncio.run(
-                generate_multi_source_emagram_for_spot(site_id=site_id, db=db, day_index=day_index)
+                generate_multi_source_emagram_for_spot(
+                    site_id=site_id,
+                    db=db,
+                    day_index=day_index,
+                    hour=hour,
+                )
             )
     except Exception as e:
-        logger.error(f"Auto emagram analysis failed for {site_id} day_index={day_index}: {e}")
+        logger.error(
+            f"Auto emagram analysis failed for {site_id} day_index={day_index} hour={hour}: {e}"
+        )
     finally:
         _pending_emagram_analyses.discard(key)
 
@@ -3714,6 +3721,7 @@ async def get_latest_emagram(
     user_lat: float | None = Query(None, description="User latitude"),
     user_lon: float | None = Query(None, description="User longitude"),
     day_index: int = Query(0, description="Day index (0=today, 1=tomorrow, ...)"),
+    hour: int | None = Query(None, description="Specific hour (0-23) for hourly analysis"),
     max_distance_km: float = Query(200, description="Maximum station distance in km"),
     auto_analyze: bool = Query(False, description="Auto-trigger analysis if none found"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
@@ -3752,12 +3760,16 @@ async def get_latest_emagram(
         # Filter by forecast target date
         target_date = (datetime.utcnow() + timedelta(days=day_index)).date()
 
+        analysis_filters = [
+            EmagramAnalysis.forecast_date == target_date,
+            EmagramAnalysis.analysis_status == "completed",
+        ]
+        if hour is not None:
+            analysis_filters.append(EmagramAnalysis.forecast_hour == hour)
+
         recent_analyses = (
             db.query(EmagramAnalysis)
-            .filter(
-                EmagramAnalysis.forecast_date == target_date,
-                EmagramAnalysis.analysis_status == "completed",
-            )
+            .filter(*analysis_filters)
             .order_by(EmagramAnalysis.analysis_datetime.desc())
             .all()
         )
@@ -3792,14 +3804,18 @@ async def get_latest_emagram(
 
         # If no completed analysis, check for recent failed ones to show the error
         if result is None and site_id:
+            failed_filters = [
+                EmagramAnalysis.forecast_date == target_date,
+                EmagramAnalysis.station_code == site_id,
+                EmagramAnalysis.analysis_method == "llm_vision",
+                EmagramAnalysis.analysis_status == "failed",
+            ]
+            if hour is not None:
+                failed_filters.append(EmagramAnalysis.forecast_hour == hour)
+
             failed_analysis = (
                 db.query(EmagramAnalysis)
-                .filter(
-                    EmagramAnalysis.forecast_date == target_date,
-                    EmagramAnalysis.station_code == site_id,
-                    EmagramAnalysis.analysis_method == "llm_vision",
-                    EmagramAnalysis.analysis_status == "failed",
-                )
+                .filter(*failed_filters)
                 .order_by(EmagramAnalysis.analysis_datetime.desc())
                 .first()
             )
@@ -3808,7 +3824,7 @@ async def get_latest_emagram(
 
         # Auto-trigger analysis in background if no data found
         if result is None and auto_analyze and site_id:
-            background_tasks.add_task(_auto_emagram_analysis, site_id, day_index)
+            background_tasks.add_task(_auto_emagram_analysis, site_id, day_index, hour)
 
         return result
 
@@ -3816,6 +3832,54 @@ async def get_latest_emagram(
         raise
     except Exception as e:
         logger.error(f"Failed to get latest emagram: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/emagram/hours", tags=["Emagram"])
+async def get_emagram_hours(
+    site_id: str = Query(..., description="Site ID"),
+    day_index: int = Query(0, description="Day index (0=today, 1=tomorrow, ...)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get available hourly emagram analyses for a site and day.
+    Returns a list of hours with their scores, used to populate the hour slider.
+    """
+    try:
+        target_date = (datetime.utcnow() + timedelta(days=day_index)).date()
+
+        analyses = (
+            db.query(
+                EmagramAnalysis.forecast_hour,
+                EmagramAnalysis.score_volabilite,
+                EmagramAnalysis.analysis_status,
+                EmagramAnalysis.id,
+            )
+            .filter(
+                EmagramAnalysis.station_code == site_id,
+                EmagramAnalysis.forecast_date == target_date,
+                EmagramAnalysis.forecast_hour.isnot(None),
+                EmagramAnalysis.analysis_method == "llm_vision",
+            )
+            .order_by(EmagramAnalysis.forecast_hour)
+            .all()
+        )
+
+        return {
+            "site_id": site_id,
+            "forecast_date": target_date.isoformat(),
+            "hours": [
+                {
+                    "hour": a.forecast_hour,
+                    "score": a.score_volabilite,
+                    "status": a.analysis_status,
+                    "id": a.id,
+                }
+                for a in analyses
+            ],
+        }
+    except Exception as e:
+        logger.error(f"Failed to get emagram hours: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -4070,10 +4134,11 @@ async def trigger_emagram_analysis(
         # Step 2: Check for recent analysis (unless force_refresh)
         forecast_date = (datetime.utcnow() + timedelta(days=request.day_index)).date()
 
-        if not request.force_refresh:
+        # Step 2a: If no specific hour, trigger hourly batch in background
+        if request.hour is None and not request.force_refresh:
+            # Check if any hourly analyses exist already
             cutoff_time = datetime.utcnow() - timedelta(hours=3)
-
-            existing = (
+            existing_count = (
                 db.query(EmagramAnalysis)
                 .filter(
                     EmagramAnalysis.station_code == closest_site.id,
@@ -4082,24 +4147,56 @@ async def trigger_emagram_analysis(
                     EmagramAnalysis.analysis_status == "completed",
                     EmagramAnalysis.forecast_date == forecast_date,
                 )
-                .order_by(EmagramAnalysis.analysis_datetime.desc())
-                .first()
+                .count()
             )
-
-            if existing:
-                logger.info(
-                    f"Returning cached multi-source emagram from {existing.analysis_datetime}"
+            if existing_count > 0:
+                # Return the most recent one
+                existing = (
+                    db.query(EmagramAnalysis)
+                    .filter(
+                        EmagramAnalysis.station_code == closest_site.id,
+                        EmagramAnalysis.analysis_method == "llm_vision",
+                        EmagramAnalysis.analysis_datetime >= cutoff_time,
+                        EmagramAnalysis.analysis_status == "completed",
+                        EmagramAnalysis.forecast_date == forecast_date,
+                    )
+                    .order_by(EmagramAnalysis.analysis_datetime.desc())
+                    .first()
                 )
                 return existing
 
-        # Step 3: Generate new multi-source analysis
-        logger.info(f"Generating multi-source emagram for {closest_site.name}...")
+        # Step 2b: Check cache for specific hour
+        if request.hour is not None and not request.force_refresh:
+            cutoff_time = datetime.utcnow() - timedelta(hours=3)
+            cache_filters = [
+                EmagramAnalysis.station_code == closest_site.id,
+                EmagramAnalysis.analysis_method == "llm_vision",
+                EmagramAnalysis.analysis_datetime >= cutoff_time,
+                EmagramAnalysis.analysis_status == "completed",
+                EmagramAnalysis.forecast_date == forecast_date,
+                EmagramAnalysis.forecast_hour == request.hour,
+            ]
+            existing = (
+                db.query(EmagramAnalysis)
+                .filter(*cache_filters)
+                .order_by(EmagramAnalysis.analysis_datetime.desc())
+                .first()
+            )
+            if existing:
+                logger.info(
+                    f"Returning cached emagram for hour {request.hour} from {existing.analysis_datetime}"
+                )
+                return existing
+
+        # Step 3: Generate new analysis
+        logger.info(f"Generating emagram for {closest_site.name} (hour={request.hour})...")
 
         result = await generate_multi_source_emagram_for_spot(
             site_id=closest_site.id,
             db=db,
             force_refresh=request.force_refresh,
             day_index=request.day_index,
+            hour=request.hour,
         )
 
         if not result.get("success"):

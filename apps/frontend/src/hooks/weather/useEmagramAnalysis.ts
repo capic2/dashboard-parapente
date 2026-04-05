@@ -8,8 +8,10 @@ import { EmagramAnalysis, EmagramListItem } from '../../types/emagram';
 
 const emagramKeys = {
   all: ['emagram'] as const,
-  latest: (siteId: string, dayIndex: number) =>
-    ['emagram', 'latest', siteId, dayIndex] as const,
+  latest: (siteId: string, dayIndex: number, hour?: number | null) =>
+    ['emagram', 'latest', siteId, dayIndex, hour ?? 'any'] as const,
+  hours: (siteId: string, dayIndex: number) =>
+    ['emagram', 'hours', siteId, dayIndex] as const,
   history: (lat: number, lon: number, days: number) =>
     ['emagram', 'history', lat, lon, days] as const,
 };
@@ -20,10 +22,11 @@ const emagramKeys = {
 export function useLatestEmagram(
   siteId: string,
   dayIndex = 0,
+  hour?: number | null,
   options?: { enabled?: boolean }
 ) {
   return useQuery({
-    queryKey: emagramKeys.latest(siteId, dayIndex),
+    queryKey: emagramKeys.latest(siteId, dayIndex, hour),
     queryFn: async (): Promise<EmagramAnalysis | null> => {
       if (!siteId) return null;
 
@@ -32,6 +35,9 @@ export function useLatestEmagram(
         day_index: dayIndex.toString(),
         auto_analyze: 'true',
       });
+      if (hour != null) {
+        params.set('hour', hour.toString());
+      }
 
       const response = await fetch(`/api/emagram/latest?${params}`);
 
@@ -47,6 +53,54 @@ export function useLatestEmagram(
     staleTime: getStaleTime(5 * 60 * 1000),
     refetchInterval: (query) =>
       getWeatherRefetchInterval(query.state.data ? 10 * 60 * 1000 : 30 * 1000),
+  });
+}
+
+export interface EmagramHourEntry {
+  hour: number;
+  score: number | null;
+  status: string;
+  id: string;
+}
+
+export interface EmagramHoursResponse {
+  site_id: string;
+  forecast_date: string;
+  hours: EmagramHourEntry[];
+}
+
+/**
+ * Fetch available hourly emagram analyses for slider
+ */
+export function useEmagramHours(
+  siteId: string,
+  dayIndex = 0,
+  options?: { enabled?: boolean }
+) {
+  return useQuery({
+    queryKey: emagramKeys.hours(siteId, dayIndex),
+    queryFn: async (): Promise<EmagramHoursResponse> => {
+      const params = new URLSearchParams({
+        site_id: siteId,
+        day_index: dayIndex.toString(),
+      });
+
+      const response = await fetch(`/api/emagram/hours?${params}`);
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch emagram hours: ${response.statusText}`
+        );
+      }
+
+      return response.json();
+    },
+    enabled: !!siteId && options?.enabled !== false,
+    staleTime: getStaleTime(2 * 60 * 1000),
+    refetchInterval: (query) =>
+      getWeatherRefetchInterval(
+        query.state.data?.hours?.length ? 5 * 60 * 1000 : 30 * 1000
+      ),
   });
 }
 
@@ -102,6 +156,7 @@ export function useTriggerEmagram() {
       user_longitude?: number;
       force_refresh?: boolean;
       day_index?: number;
+      hour?: number | null;
     }): Promise<EmagramAnalysis> => {
       const response = await fetch('/api/emagram/analyze', {
         method: 'POST',

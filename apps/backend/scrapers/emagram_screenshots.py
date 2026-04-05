@@ -19,7 +19,12 @@ EMAGRAM_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 async def screenshot_meteo_parapente(
-    latitude: float, longitude: float, spot_name: str, timeout: int = 30000, day_index: int = 0
+    latitude: float,
+    longitude: float,
+    spot_name: str,
+    timeout: int = 30000,
+    day_index: int = 0,
+    hour: int | None = None,
 ) -> dict[str, Any]:
     """
     Screenshot emagram from Meteo-Parapente
@@ -42,7 +47,10 @@ async def screenshot_meteo_parapente(
     """
     url = f"https://meteo-parapente.com/#/sounding/{latitude}/{longitude}"
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    filename = f"{spot_name.replace(' ', '_')}_meteo-parapente_d{day_index}_{timestamp}.png"
+    hour_suffix = f"_h{hour}" if hour is not None else ""
+    filename = (
+        f"{spot_name.replace(' ', '_')}_meteo-parapente_d{day_index}{hour_suffix}_{timestamp}.png"
+    )
     image_path = EMAGRAM_CACHE_DIR / filename
 
     try:
@@ -117,6 +125,57 @@ async def screenshot_meteo_parapente(
                         raise RuntimeError(
                             f"Could not navigate Meteo-Parapente to day_index={day_index}"
                         )
+
+            # Navigate to the correct hour if specified
+            if hour is not None:
+                logger.info(f"Navigating to hour {hour}h on Meteo-Parapente...")
+                hour_navigated = False
+                try:
+                    # Strategy 1: Try clicking hour buttons/labels
+                    hour_selectors = [
+                        f"[data-hour='{hour}']",
+                        f"button:has-text('{hour}h')",
+                        f"button:has-text('{hour}:00')",
+                        f".hour-label:has-text('{hour}')",
+                    ]
+                    for sel in hour_selectors:
+                        try:
+                            el = page.locator(sel).first
+                            if await el.count() > 0:
+                                await el.click(timeout=2000)
+                                hour_navigated = True
+                                logger.info(f"Clicked hour selector: {sel}")
+                                break
+                        except Exception:
+                            continue
+
+                    # Strategy 2: Try to set a range slider via JS
+                    if not hour_navigated:
+                        slider_selectors = [
+                            "input[type='range']",
+                            ".time-slider input",
+                            ".slider input",
+                        ]
+                        for sel in slider_selectors:
+                            try:
+                                slider = page.locator(sel).first
+                                if await slider.count() > 0:
+                                    await slider.evaluate(
+                                        f"el => {{ el.value = {hour}; el.dispatchEvent(new Event('input', {{bubbles: true}})); el.dispatchEvent(new Event('change', {{bubbles: true}})); }}"
+                                    )
+                                    hour_navigated = True
+                                    logger.info(f"Set hour via slider: {sel}")
+                                    break
+                            except Exception:
+                                continue
+
+                    if not hour_navigated:
+                        logger.warning(
+                            f"Could not navigate to hour {hour} on Meteo-Parapente, "
+                            "capturing default hour"
+                        )
+                except Exception as e:
+                    logger.warning(f"Hour navigation failed: {e}")
 
             # Wait for emagram to render
             await page.wait_for_timeout(5000)
@@ -198,7 +257,12 @@ async def screenshot_topmeteo(
 
 
 async def screenshot_meteociel_emagram(
-    latitude: float, longitude: float, spot_name: str, timeout: int = 25000, day_index: int = 0
+    latitude: float,
+    longitude: float,
+    spot_name: str,
+    timeout: int = 25000,
+    day_index: int = 0,
+    hour: int | None = None,
 ) -> dict[str, Any]:
     """
     Screenshot emagram from Meteociel
@@ -206,10 +270,14 @@ async def screenshot_meteociel_emagram(
 
     mode=0 = emagram display, ech = forecast step in hours from model run
     """
-    ech = 3 + (day_index * 24)
+    if hour is not None:
+        ech = hour + (day_index * 24)
+    else:
+        ech = 3 + (day_index * 24)
     url = f"https://www.meteociel.fr/modeles/sondage2.php?mode=0&lon={longitude}&lat={latitude}&ech={ech}&map=0"
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    filename = f"{spot_name.replace(' ', '_')}_meteociel_d{day_index}_{timestamp}.png"
+    hour_suffix = f"_h{hour}" if hour is not None else ""
+    filename = f"{spot_name.replace(' ', '_')}_meteociel_d{day_index}{hour_suffix}_{timestamp}.png"
     image_path = EMAGRAM_CACHE_DIR / filename
 
     try:
@@ -271,7 +339,12 @@ async def screenshot_meteociel_emagram(
 
 
 async def fetch_all_emagram_screenshots(
-    spot_id: str, latitude: float, longitude: float, spot_name: str, day_index: int = 0
+    spot_id: str,
+    latitude: float,
+    longitude: float,
+    spot_name: str,
+    day_index: int = 0,
+    hour: int | None = None,
 ) -> dict[str, Any]:
     """
     Fetch emagram screenshots from all 3 sources in parallel
@@ -303,8 +376,10 @@ async def fetch_all_emagram_screenshots(
 
     # Fetch sources in parallel
     tasks = [
-        screenshot_meteo_parapente(latitude, longitude, spot_name, day_index=day_index),
-        screenshot_meteociel_emagram(latitude, longitude, spot_name, day_index=day_index),
+        screenshot_meteo_parapente(latitude, longitude, spot_name, day_index=day_index, hour=hour),
+        screenshot_meteociel_emagram(
+            latitude, longitude, spot_name, day_index=day_index, hour=hour
+        ),
     ]
 
     screenshots = await asyncio.gather(*tasks, return_exceptions=True)

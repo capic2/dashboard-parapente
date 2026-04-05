@@ -361,6 +361,11 @@ class EmagramAnalysis(Base):
         Text, nullable=True
     )  # JSON: {"meteo-parapente": "timeout after 30s", ...}
 
+    # Hourly forecast
+    forecast_hour = Column(
+        Integer, nullable=True, index=True
+    )  # 0-23, specific hour of the forecast
+
     # Status
     analysis_status = Column(
         String, nullable=False, default="completed", index=True

@@ -3,6 +3,7 @@ Multi-Source Emagram Orchestrator
 Coordinates screenshot capture, LLM analysis, and database storage
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -25,7 +26,11 @@ logger = logging.getLogger(__name__)
 
 
 async def generate_multi_source_emagram_for_spot(
-    site_id: str, db: Session, force_refresh: bool = False, day_index: int = 0
+    site_id: str,
+    db: Session,
+    force_refresh: bool = False,
+    day_index: int = 0,
+    hour: int | None = None,
 ) -> dict[str, Any]:
     """
     Complete workflow to generate multi-source emagram analysis for a spot
@@ -75,15 +80,19 @@ async def generate_multi_source_emagram_for_spot(
         if not force_refresh:
             cutoff_time = datetime.utcnow() - timedelta(hours=3)
 
+            cache_filters = [
+                EmagramAnalysis.station_code == site_id,
+                EmagramAnalysis.analysis_method == "llm_vision",
+                EmagramAnalysis.analysis_datetime >= cutoff_time,
+                EmagramAnalysis.analysis_status == "completed",
+                EmagramAnalysis.forecast_date == forecast_date,
+            ]
+            if hour is not None:
+                cache_filters.append(EmagramAnalysis.forecast_hour == hour)
+
             existing = (
                 db.query(EmagramAnalysis)
-                .filter(
-                    EmagramAnalysis.station_code == site_id,
-                    EmagramAnalysis.analysis_method == "llm_vision",
-                    EmagramAnalysis.analysis_datetime >= cutoff_time,
-                    EmagramAnalysis.analysis_status == "completed",
-                    EmagramAnalysis.forecast_date == forecast_date,
-                )
+                .filter(*cache_filters)
                 .order_by(EmagramAnalysis.analysis_datetime.desc())
                 .first()
             )
@@ -101,6 +110,7 @@ async def generate_multi_source_emagram_for_spot(
             longitude=site.longitude,
             spot_name=site.name,
             day_index=day_index,
+            hour=hour,
         )
 
         if not screenshot_result.get("success"):
@@ -236,7 +246,12 @@ async def generate_multi_source_emagram_for_spot(
             logger.error(f"LLM analysis failed: {analysis_result.get('error')}")
             # Save failed analysis to DB for debugging
             save_failed_analysis(
-                db, site, screenshot_result, analysis_result, forecast_date=forecast_date
+                db,
+                site,
+                screenshot_result,
+                analysis_result,
+                forecast_date=forecast_date,
+                forecast_hour=hour,
             )
             return {"success": False, "error": "LLM analysis failed", "details": analysis_result}
 
@@ -252,6 +267,7 @@ async def generate_multi_source_emagram_for_spot(
             screenshot_result=screenshot_result,
             analysis_result=analysis_result,
             forecast_date=forecast_date,
+            forecast_hour=hour,
         )
 
         logger.info(f"✅ Multi-source emagram analysis complete for {site.name}")
@@ -269,6 +285,7 @@ def save_emagram_analysis(
     screenshot_result: dict[str, Any],
     analysis_result: dict[str, Any],
     forecast_date=None,
+    forecast_hour: int | None = None,
 ) -> EmagramAnalysis:
     """
     Save emagram analysis to database
@@ -297,6 +314,7 @@ def save_emagram_analysis(
         analysis_time=now.time(),
         analysis_datetime=now,
         forecast_date=forecast_date or now.date(),
+        forecast_hour=forecast_hour,
         # Station info (using site_id as station_code for multi-source)
         station_code=site.id,
         station_name=site.name,
@@ -356,6 +374,7 @@ def save_failed_analysis(
     screenshot_result: dict[str, Any],
     analysis_result: dict[str, Any],
     forecast_date=None,
+    forecast_hour: int | None = None,
 ):
     """
     Save failed analysis attempt for debugging
@@ -375,6 +394,7 @@ def save_failed_analysis(
         analysis_time=now.time(),
         analysis_datetime=now,
         forecast_date=forecast_date or now.date(),
+        forecast_hour=forecast_hour,
         station_code=site.id,
         station_name=site.name,
         station_latitude=site.latitude,
@@ -462,6 +482,7 @@ def emagram_analysis_to_dict(emagram: EmagramAnalysis) -> dict[str, Any]:
         },
         # Metadata
         "forecast_date": emagram.forecast_date.isoformat() if emagram.forecast_date else None,
+        "forecast_hour": emagram.forecast_hour,
         "sources_count": emagram.sources_count,
         "sources_agreement": emagram.sources_agreement,
         "llm_provider": emagram.llm_provider,
@@ -472,3 +493,74 @@ def emagram_analysis_to_dict(emagram: EmagramAnalysis) -> dict[str, Any]:
             + __import__("datetime").timedelta(hours=3)
         ).isoformat(),
     }
+
+
+async def generate_hourly_emagram_for_spot(
+    site_id: str,
+    db: Session,
+    force_refresh: bool = False,
+    day_index: int = 0,
+) -> list[dict[str, Any]]:
+    """
+    Generate emagram analyses for every hour between sunrise and sunset.
+
+    Uses the weather pipeline to determine sunrise/sunset, then calls
+    generate_multi_source_emagram_for_spot for each hour.
+    """
+    from weather_pipeline import get_normalized_forecast
+
+    # Get site coordinates
+    site = db.query(Site).filter(Site.id == site_id).first()
+    if not site or not site.latitude or not site.longitude:
+        logger.error(f"Site {site_id} not found or has no coordinates")
+        return [{"success": False, "error": f"Site {site_id} not found or has no coordinates"}]
+
+    # Get sunrise/sunset from weather pipeline
+    try:
+        forecast = await get_normalized_forecast(
+            lat=site.latitude,
+            lon=site.longitude,
+            day_index=day_index,
+            db=db,
+        )
+        sunrise = forecast.get("sunrise")  # "HH:MM"
+        sunset = forecast.get("sunset")  # "HH:MM"
+    except Exception as e:
+        logger.warning(f"Could not get sunrise/sunset: {e}, using defaults")
+        sunrise = None
+        sunset = None
+
+    # Parse hours, with seasonal defaults for France
+    start_hour = int(sunrise.split(":")[0]) if sunrise else 7
+    end_hour = int(sunset.split(":")[0]) if sunset else 20
+    hours = list(range(start_hour, end_hour + 1))
+
+    logger.info(
+        f"Generating hourly emagram for {site.name}: "
+        f"hours {start_hour}-{end_hour} ({len(hours)} hours)"
+    )
+
+    results = []
+    for h in hours:
+        try:
+            result = await generate_multi_source_emagram_for_spot(
+                site_id=site_id,
+                db=db,
+                force_refresh=force_refresh,
+                day_index=day_index,
+                hour=h,
+            )
+            results.append(result)
+        except Exception as e:
+            logger.error(f"Hour {h} failed for {site.name}: {e}")
+            results.append({"success": False, "hour": h, "error": str(e)})
+
+        # Small delay between hours to avoid rate limiting
+        await asyncio.sleep(2)
+
+    success_count = sum(1 for r in results if r.get("success"))
+    logger.info(
+        f"Hourly emagram complete for {site.name}: "
+        f"{success_count}/{len(hours)} hours successful"
+    )
+    return results
