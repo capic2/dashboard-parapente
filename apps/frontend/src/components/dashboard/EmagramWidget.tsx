@@ -88,13 +88,32 @@ export default function EmagramWidget({
   if (error) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-red-500">
-        <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
-          🌡️ Analyse Thermique (Émagramme)
-        </h2>
-        <div className="text-red-600 text-sm">Erreur : {error.message}</div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
+            🌡️ Analyse Thermique (Émagramme)
+          </h2>
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing || !siteId}
+            className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+            title="Réessayer"
+          >
+            <span
+              className={`text-base ${isRefreshing ? 'animate-spin inline-block' : ''}`}
+            >
+              🔄
+            </span>
+          </button>
+        </div>
+        <div className="text-red-600 dark:text-red-400 text-sm">
+          Erreur : {error.message}
+        </div>
       </div>
     );
   }
+
+  // Analysis returned but failed
+  const analysisFailed = emagram?.analysis_status === 'failed';
 
   if (!emagram) {
     return (
@@ -122,6 +141,51 @@ export default function EmagramWidget({
         {siteId && (
           <div className="flex justify-center mt-2">
             <div className="animate-spin h-6 w-6 border-2 border-purple-600 border-t-transparent rounded-full" />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Display error when analysis failed or trigger mutation failed
+  if (analysisFailed) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-orange-500">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
+            🌡️ Analyse Thermique (Émagramme)
+          </h2>
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+            title="Réessayer"
+          >
+            <span
+              className={`text-base ${isRefreshing ? 'animate-spin inline-block' : ''}`}
+            >
+              🔄
+            </span>
+          </button>
+        </div>
+        <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg p-3">
+          <div className="flex items-start gap-2">
+            <span className="text-base flex-shrink-0">⚠️</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-1">
+                L&apos;analyse a échoué
+              </div>
+              {emagram.error_message && (
+                <p className="text-xs text-orange-700 dark:text-orange-300 break-words">
+                  {emagram.error_message}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+        {triggerMutation.error && (
+          <div className="mt-2 text-xs text-red-600 dark:text-red-400">
+            Erreur lors du rafraîchissement : {triggerMutation.error.message}
           </div>
         )}
       </div>

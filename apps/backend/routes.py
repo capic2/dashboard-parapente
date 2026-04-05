@@ -3790,6 +3790,22 @@ async def get_latest_emagram(
                     min_distance = dist
                     result = analysis
 
+        # If no completed analysis, check for recent failed ones to show the error
+        if result is None and site_id:
+            failed_analysis = (
+                db.query(EmagramAnalysis)
+                .filter(
+                    EmagramAnalysis.forecast_date == target_date,
+                    EmagramAnalysis.station_code == site_id,
+                    EmagramAnalysis.analysis_method == "llm_vision",
+                    EmagramAnalysis.analysis_status == "failed",
+                )
+                .order_by(EmagramAnalysis.analysis_datetime.desc())
+                .first()
+            )
+            if failed_analysis:
+                return failed_analysis
+
         # Auto-trigger analysis in background if no data found
         if result is None and auto_analyze and site_id:
             background_tasks.add_task(_auto_emagram_analysis, site_id, day_index)
