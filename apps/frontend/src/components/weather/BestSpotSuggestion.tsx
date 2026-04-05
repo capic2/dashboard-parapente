@@ -139,6 +139,7 @@ export function BestSpotSuggestion({
   const {
     site,
     paraIndex,
+    score,
     windDirection,
     windSpeed,
     reason,
@@ -147,8 +148,9 @@ export function BestSpotSuggestion({
     verdict,
     windFavorability,
   } = bestSpot;
-  const scoreColor = getScoreColor(paraIndex);
-  const verdictInfo = getVerdict(paraIndex, verdict ?? undefined);
+  const adjustedScore = Math.min(100, Math.max(0, score != null ? Math.round(score) : paraIndex));
+  const scoreColor = getScoreColor(adjustedScore);
+  const verdictInfo = getVerdict(adjustedScore, verdict ?? undefined);
 
   return (
     <div
@@ -191,23 +193,28 @@ export function BestSpotSuggestion({
           )}
         </div>
 
-        {/* Para-Index gauge */}
+        {/* Score gauge */}
         <div className="mb-4">
           <div className="flex items-end justify-between mb-1.5">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-              {t('weather.paraIndex')}
+              {t('weather.score')}
             </span>
             <span className={`text-2xl font-bold ${scoreColor.text}`}>
-              {paraIndex}
+              {adjustedScore}
               <span className="text-sm font-normal text-gray-400">/100</span>
             </span>
           </div>
           <div className="w-full h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full ${scoreColor.bg} transition-all duration-500`}
-              style={{ width: `${paraIndex}%` }}
+              style={{ width: `${adjustedScore}%` }}
             />
           </div>
+          {score != null && score !== paraIndex && (
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {t('weather.paraIndex')} {paraIndex}/100
+            </div>
+          )}
         </div>
 
         {/* Metrics grid */}
@@ -331,8 +338,9 @@ export function BestSpotSuggestionCompact({
     return null;
   }
 
-  const { site, paraIndex, windDirection, windSpeed } = bestSpot;
-  const scoreColor = getScoreColor(paraIndex);
+  const { site, paraIndex, score, windDirection, windSpeed } = bestSpot;
+  const adjustedScore = score != null ? Math.round(score) : paraIndex;
+  const scoreColor = getScoreColor(adjustedScore);
 
   return (
     <button
@@ -359,11 +367,11 @@ export function BestSpotSuggestionCompact({
         <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full ${scoreColor.bg}`}
-            style={{ width: `${paraIndex}%` }}
+            style={{ width: `${adjustedScore}%` }}
           />
         </div>
         <span className={`text-sm font-bold ${scoreColor.text}`}>
-          {paraIndex}
+          {adjustedScore}
         </span>
       </div>
     </button>
