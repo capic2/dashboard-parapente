@@ -20,10 +20,10 @@ async def run_scheduled_emagram_analysis():
     Called by scheduler every 3 hours
     """
     from database import get_db_context
-    from emagram_multi_source import generate_multi_source_emagram_for_spot
+    from emagram_multi_source import generate_hourly_emagram_for_spot
     from models import Site
 
-    logger.info("📸 Starting scheduled multi-source emagram analysis...")
+    logger.info("📸 Starting scheduled hourly emagram analysis...")
 
     success_count = 0
     error_count = 0
@@ -34,28 +34,25 @@ async def run_scheduled_emagram_analysis():
 
         logger.info(f"Found {len(sites)} sites to analyze")
 
-    # Process each site (using db context from above loop)
+    # Process each site with hourly analysis
     for site in sites:
         try:
-            logger.info(f"Analyzing {site.name} ({site.id})...")
+            logger.info(f"Analyzing {site.name} ({site.id}) — all hours...")
 
-            # Run complete multi-source workflow
             with get_db_context() as db_session:
-                result = await generate_multi_source_emagram_for_spot(
+                results = await generate_hourly_emagram_for_spot(
                     site_id=site.id,
                     db=db_session,
                     force_refresh=False,  # Use cache if < 3 hours old
                 )
 
-            if result.get("success"):
-                score = result.get("analysis", {}).get("score_volabilite", 0)
-                logger.info(f"  ✅ {site.name}: Score {score}/100")
-                success_count += 1
-            else:
-                logger.warning(f"  ❌ {site.name}: {result.get('error')}")
-                error_count += 1
+            site_success = sum(1 for r in results if r.get("success"))
+            site_total = len(results)
+            logger.info(f"  {site.name}: {site_success}/{site_total} hours successful")
+            success_count += site_success
+            error_count += site_total - site_success
 
-            # Small delay between sites to avoid overwhelming servers
+            # Delay between sites to avoid overwhelming servers
             await asyncio.sleep(5)
 
         except Exception as e:
@@ -63,7 +60,7 @@ async def run_scheduled_emagram_analysis():
             error_count += 1
 
     logger.info(
-        f"✅ Scheduled emagram analysis complete: {success_count} success, {error_count} errors"
+        f"✅ Scheduled hourly emagram analysis complete: {success_count} success, {error_count} errors"
     )
 
 

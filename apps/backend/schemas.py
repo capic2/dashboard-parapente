@@ -406,6 +406,7 @@ class EmagramAnalysisBase(BaseModel):
     analysis_date: date
     analysis_time: time
     forecast_date: date | None = None
+    forecast_hour: int | None = None
     station_code: str
     station_name: str
     station_latitude: float
@@ -513,6 +514,7 @@ class EmagramAnalysisListItem(BaseModel):
     heures_volables_total: float | None = None
     analysis_method: str
     analysis_status: str
+    forecast_hour: int | None = None
     created_at: datetime
 
     class Config:
@@ -527,6 +529,7 @@ class EmagramTriggerRequest(BaseModel):
     user_longitude: float | None = None
     force_refresh: bool = False
     day_index: int = 0
+    hour: int | None = None
 
     @validator("user_latitude")
     def validate_latitude(cls, v):

@@ -5,7 +5,9 @@
 
 import {
   useLatestEmagram,
+  useEmagramHours,
   useTriggerEmagram,
+  type EmagramHourEntry,
 } from '../../hooks/weather/useEmagramAnalysis';
 import {
   parseAlerts,
@@ -13,7 +15,7 @@ import {
   getScoreColor,
   getScoreCategory,
 } from '../../types/emagram';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Lightbox } from '@dashboard-parapente/design-system';
 
 interface EmagramWidgetProps {
@@ -39,6 +41,57 @@ const getRiskEmoji = (risque: string | null): string => {
   return '';
 };
 
+function HourSlider({
+  hours,
+  selectedHour,
+  onHourChange,
+}: {
+  hours: EmagramHourEntry[];
+  selectedHour: number | null;
+  onHourChange: (hour: number) => void;
+}) {
+  if (hours.length === 0) return null;
+
+  const minHour = hours[0].hour;
+  const maxHour = hours[hours.length - 1].hour;
+  const current = selectedHour ?? minHour;
+
+  return (
+    <div className="mb-3">
+      <input
+        type="range"
+        min={minHour}
+        max={maxHour}
+        step={1}
+        value={current}
+        onChange={(e) => onHourChange(Number(e.target.value))}
+        className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-600"
+      />
+      <div className="flex justify-between mt-1">
+        {hours.map((h) => (
+          <button
+            key={h.hour}
+            onClick={() => onHourChange(h.hour)}
+            className={`text-[10px] px-1 py-0.5 rounded transition-colors ${
+              h.hour === current
+                ? 'font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30'
+                : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+            }`}
+          >
+            {h.hour}h
+            {h.score != null && h.status === 'completed' && (
+              <span
+                className="block w-1.5 h-1.5 rounded-full mx-auto mt-0.5"
+                style={{ backgroundColor: getScoreColor(h.score) }}
+              />
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function EmagramWidget({
   siteId,
   dayIndex = 0,
@@ -46,13 +99,35 @@ export default function EmagramWidget({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [selectedHour, setSelectedHour] = useState<number | null>(null);
+
+  const { data: hoursData } = useEmagramHours(siteId, dayIndex);
+
+  // Determine which hour to display: selected, or current hour if in range, or null
+  const activeHour = useMemo(() => {
+    if (selectedHour !== null) return selectedHour;
+    if (!hoursData?.hours?.length) return null;
+    const now = new Date().getHours();
+    const available = hoursData.hours.map((h) => h.hour);
+    if (available.includes(now)) return now;
+    // Default to closest available hour
+    return available.reduce((prev, curr) =>
+      Math.abs(curr - now) < Math.abs(prev - now) ? curr : prev
+    );
+  }, [selectedHour, hoursData]);
+
+  const hasHourlyData = (hoursData?.hours?.length ?? 0) > 0;
 
   const {
     data: emagram,
     isLoading,
     error,
     refetch,
-  } = useLatestEmagram(siteId, dayIndex);
+  } = useLatestEmagram(
+    siteId,
+    dayIndex,
+    hasHourlyData ? activeHour : undefined
+  );
   const triggerMutation = useTriggerEmagram();
 
   const handleRefresh = async () => {
@@ -64,6 +139,7 @@ export default function EmagramWidget({
         site_id: siteId,
         force_refresh: true,
         day_index: dayIndex,
+        hour: activeHour,
       });
       await refetch();
     } catch {
@@ -243,6 +319,15 @@ export default function EmagramWidget({
           </span>
         </button>
       </div>
+
+      {/* Hour Slider */}
+      {hasHourlyData && hoursData && (
+        <HourSlider
+          hours={hoursData.hours}
+          selectedHour={activeHour}
+          onHourChange={setSelectedHour}
+        />
+      )}
 
       {/* Score Gauge */}
       <div className="flex items-center gap-4 mb-4">
