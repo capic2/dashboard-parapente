@@ -143,24 +143,36 @@ export default function CacheViewer() {
         <Checkbox
           isSelected={autoRefresh}
           onChange={setAutoRefresh}
-          className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
+          className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 group"
         >
-          <div className="w-4 h-4 rounded border border-gray-400 dark:border-gray-500 flex items-center justify-center bg-white dark:bg-gray-700 data-[selected]:bg-sky-600 data-[selected]:border-sky-600 transition-colors">
-            <svg
-              className="w-3 h-3 text-white hidden [[data-selected]_&]:block"
-              viewBox="0 0 14 14"
-              fill="none"
-            >
-              <path
-                d="M3 7l3 3 5-6"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
-          {t('cache.autoRefresh')}
+          {({ isSelected }) => (
+            <>
+              <div
+                className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                  isSelected
+                    ? 'bg-sky-600 border-sky-600'
+                    : 'border-gray-400 dark:border-gray-500 bg-white dark:bg-gray-700'
+                }`}
+              >
+                {isSelected && (
+                  <svg
+                    className="w-3 h-3 text-white"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                  >
+                    <path
+                      d="M3 7l3 3 5-6"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </div>
+              {t('cache.autoRefresh')}
+            </>
+          )}
         </Checkbox>
         <Button
           onPress={() => refetch()}

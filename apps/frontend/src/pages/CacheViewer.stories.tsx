@@ -315,12 +315,15 @@ Default.test('can refresh manually', async ({ canvas, userEvent }) => {
 });
 
 Default.test('auto-refresh updates data', async ({ canvas, userEvent }) => {
+  // Verify initial total keys
+  await expect(await canvas.findByText('6')).toBeInTheDocument();
+
   // Enable auto-refresh
   await userEvent.click(
     await canvas.findByRole('checkbox', { name: i18n.t('cache.autoRefresh') })
   );
 
-  // Mutate cacheDb externally
+  // Mutate cacheDb externally (simulate server-side change)
   cacheDb.push({
     key: 'best_spot:day_3',
     ttl: 1800,
@@ -332,11 +335,10 @@ Default.test('auto-refresh updates data', async ({ canvas, userEvent }) => {
   });
 
   // Wait for auto-refresh to pick up the change (interval is 5s)
+  // Total keys should go from 6 to 7
   await waitFor(
     async () => {
-      await expect(
-        await canvas.findByText('best_spot:day_3')
-      ).toBeInTheDocument();
+      await expect(await canvas.findByText('7')).toBeInTheDocument();
     },
     { timeout: 10000 }
   );
