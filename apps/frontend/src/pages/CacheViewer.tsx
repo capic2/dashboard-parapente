@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button, Checkbox, Input, TextField } from 'react-aria-components';
 import { Modal } from '@dashboard-parapente/design-system';
 import {
   useCacheOverview,
@@ -132,37 +133,52 @@ export default function CacheViewer() {
 
       {/* Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <input
-            type="checkbox"
-            checked={autoRefresh}
-            onChange={(e) => setAutoRefresh(e.target.checked)}
-            className="rounded"
-          />
+        <Checkbox
+          isSelected={autoRefresh}
+          onChange={setAutoRefresh}
+          className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
+        >
+          <div className="w-4 h-4 rounded border border-gray-400 dark:border-gray-500 flex items-center justify-center bg-white dark:bg-gray-700 data-[selected]:bg-sky-600 data-[selected]:border-sky-600 transition-colors">
+            <svg
+              className="w-3 h-3 text-white hidden [[data-selected]_&]:block"
+              viewBox="0 0 14 14"
+              fill="none"
+            >
+              <path
+                d="M3 7l3 3 5-6"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
           {t('cache.autoRefresh')}
-        </label>
-        <button
-          type="button"
-          onClick={() => refetch()}
-          className="px-3 py-1.5 rounded-md bg-sky-600 text-white text-sm hover:bg-sky-700 transition-colors"
+        </Checkbox>
+        <Button
+          onPress={() => refetch()}
+          className="px-3 py-1.5 rounded-md bg-sky-600 text-white text-sm hover:bg-sky-700 transition-colors cursor-pointer"
         >
           {t('cache.refresh')}
-        </button>
-        <input
-          type="text"
+        </Button>
+        <TextField
           value={searchFilter}
-          onChange={(e) => setSearchFilter(e.target.value)}
-          placeholder={t('cache.searchPlaceholder')}
-          className="flex-1 min-w-[200px] px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-800 dark:text-gray-200 placeholder-gray-400"
-        />
-        <button
-          type="button"
-          onClick={handleClearAll}
-          disabled={deleteMutation.isPending}
-          className="px-3 py-1.5 rounded-md bg-red-600 text-white text-sm hover:bg-red-700 transition-colors disabled:opacity-50"
+          onChange={setSearchFilter}
+          aria-label={t('cache.searchPlaceholder')}
+          className="flex-1 min-w-[200px]"
+        >
+          <Input
+            placeholder={t('cache.searchPlaceholder')}
+            className="w-full px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-800 dark:text-gray-200 placeholder-gray-400 outline-none focus:ring-2 focus:ring-sky-500"
+          />
+        </TextField>
+        <Button
+          onPress={handleClearAll}
+          isDisabled={deleteMutation.isPending}
+          className="px-3 py-1.5 rounded-md bg-red-600 text-white text-sm hover:bg-red-700 transition-colors disabled:opacity-50 cursor-pointer"
         >
           {t('cache.clearAll')}
-        </button>
+        </Button>
       </div>
 
       {/* Groups */}
@@ -261,23 +277,21 @@ export default function CacheViewer() {
               {pendingConfirm.message}
             </p>
             <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setPendingConfirm(null)}
-                className="px-4 py-2 rounded-md text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              <Button
+                onPress={() => setPendingConfirm(null)}
+                className="px-4 py-2 rounded-md text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors cursor-pointer"
               >
                 {t('common.cancel')}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
+              </Button>
+              <Button
+                onPress={() => {
                   pendingConfirm.onConfirm();
                   setPendingConfirm(null);
                 }}
-                className="px-4 py-2 rounded-md text-sm text-white bg-red-600 hover:bg-red-700 transition-colors"
+                className="px-4 py-2 rounded-md text-sm text-white bg-red-600 hover:bg-red-700 transition-colors cursor-pointer"
               >
                 {t('common.confirm')}
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -329,17 +343,13 @@ function GroupSection({
             {group.count}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClearPattern();
-          }}
-          disabled={isPending}
-          className="px-2 py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50"
+        <Button
+          onPress={() => onClearPattern()}
+          isDisabled={isPending}
+          className="px-2 py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
         >
           {t('cache.clearPattern')}
-        </button>
+        </Button>
       </div>
 
       {isExpanded && (
@@ -369,21 +379,19 @@ function GroupSection({
                     {formatSize(k.size)}
                   </td>
                   <td className="px-4 py-2 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onViewKey(k.key)}
-                      className="px-2 py-1 rounded text-xs bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors"
+                    <Button
+                      onPress={() => onViewKey(k.key)}
+                      className="px-2 py-1 rounded text-xs bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors cursor-pointer"
                     >
                       {t('cache.view')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onDeleteKey(k.key)}
-                      disabled={isPending}
-                      className="px-2 py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50"
+                    </Button>
+                    <Button
+                      onPress={() => onDeleteKey(k.key)}
+                      isDisabled={isPending}
+                      className="px-2 py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
                     >
                       {t('cache.deleteKey')}
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
