@@ -784,6 +784,10 @@ async def get_daily_aggregate(
         h.get("precipitation") for h in flyable_consensus if h.get("precipitation") is not None
     ]
 
+    wind_dirs = [
+        h.get("wind_direction") for h in flyable_consensus if h.get("wind_direction") is not None
+    ]
+
     if not temps or not winds:
         return None
 
@@ -791,6 +795,14 @@ async def get_daily_aggregate(
     temp_max = round(max(temps))
     wind_avg = round(sum(winds) / len(winds), 1)
     precip_total = round(sum(precips), 1) if precips else 0.0
+
+    # Average wind direction (use midday hours 10-14 for best representation)
+    midday_dirs = [
+        h.get("wind_direction")
+        for h in flyable_consensus
+        if 10 <= h.get("hour", 0) <= 14 and h.get("wind_direction") is not None
+    ]
+    wind_direction_avg = midday_dirs[0] if midday_dirs else (wind_dirs[0] if wind_dirs else None)
 
     # Use the SAME para_index calculation as /weather endpoint for consistency
     # Calculate on flyable hours only (same filtering as /weather)
@@ -808,6 +820,7 @@ async def get_daily_aggregate(
         "temp_min": temp_min,
         "temp_max": temp_max,
         "wind_avg": wind_avg,
+        "wind_direction_avg": wind_direction_avg,
         "precip_total": precip_total,
         "cached_at": forecast_result.get("cached_at"),
     }

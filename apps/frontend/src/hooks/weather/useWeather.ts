@@ -224,6 +224,7 @@ export const createWeatherQueryFn =
     const transformed: WeatherData = {
       spot_name: data.site_name || 'Unknown',
       para_index: data.para_index || 0,
+      score: data.score,
       verdict: data.verdict || 'N/A',
       temperature: currentHour.temperature || metrics.avg_temp_c || 0,
       wind_speed: currentHour.wind_speed || metrics.avg_wind_kmh || 0,

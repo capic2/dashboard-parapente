@@ -134,7 +134,7 @@ export default function Forecast7Day({
               </div>
               <div className="flex items-center justify-center gap-2 mb-2">
                 <span className="text-2xl font-bold text-sky-600">
-                  {day.para_index}
+                  {day.score != null ? day.score : day.para_index}
                 </span>
                 <span
                   className={`text-xl ${getVerdictClass(day.verdict)} px-1.5 py-0.5 rounded-full`}
