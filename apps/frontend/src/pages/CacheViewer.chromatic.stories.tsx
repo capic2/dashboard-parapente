@@ -1,6 +1,6 @@
 import { FigureWrapper } from '../../.storybook/FigureWrapper.tsx';
 import preview from '../../.storybook/preview.tsx';
-import { Default, Empty } from './CacheViewer.stories.tsx';
+import { Default } from './CacheViewer.stories.tsx';
 import { defaultHandlers } from './CacheViewer.stories.handlers';
 
 const meta = preview.meta({
@@ -21,9 +21,9 @@ export const CacheViewerChromatic = meta.story({
       <FigureWrapper title={Default.composed.name}>
         <Default.Component />
       </FigureWrapper>
-      <FigureWrapper title={Empty.composed.name}>
+      {/*<FigureWrapper title={Empty.composed.name}>
         <Empty.Component />
-      </FigureWrapper>
+      </FigureWrapper>*/}
     </div>
   ),
 });
