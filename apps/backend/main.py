@@ -413,7 +413,7 @@ def run_migrations():
     """
     from database import DB_PATH
 
-    migrations_dir = Path(__file__).parent / "db" / "migrations"
+    migrations_dir = Path(__file__).parent / "sql_migrations"
 
     if not migrations_dir.exists():
         logger.warning(f"Migrations directory not found: {migrations_dir}")
@@ -445,7 +445,9 @@ def run_migrations():
 
         for raw_statement in sql.split(";"):
             # Strip comment lines and whitespace
-            lines = [l for l in raw_statement.splitlines() if not l.strip().startswith("--")]
+            lines = [
+                line for line in raw_statement.splitlines() if not line.strip().startswith("--")
+            ]
             clean = "\n".join(lines).strip()
             if not clean:
                 continue
@@ -454,19 +456,27 @@ def run_migrations():
                 cursor.execute(clean)
                 conn.commit()
                 applied += 1
+            except sqlite3.IntegrityError:
+                # Row already exists (UNIQUE constraint) — idempotent, skip
+                conn.rollback()
+                skipped += 1
             except sqlite3.OperationalError as e:
                 err_msg = str(e).lower()
                 if "already exists" in err_msg or "duplicate column name" in err_msg:
                     skipped += 1
                 else:
-                    logger.error(f"✗ Migration {migration_file.name} failed on statement: {clean[:100]}")
+                    logger.error(
+                        f"✗ Migration {migration_file.name} failed on statement: {clean[:100]}"
+                    )
                     logger.error(f"  Error: {e}")
                     raise
 
         if skipped > 0 and applied == 0:
             logger.info(f"⊙ Migration {migration_file.name} already applied (skipping)")
         elif skipped > 0:
-            logger.info(f"✓ Migration {migration_file.name}: {applied} applied, {skipped} already existed")
+            logger.info(
+                f"✓ Migration {migration_file.name}: {applied} applied, {skipped} already existed"
+            )
         else:
             logger.info(f"✓ Migration {migration_file.name} applied successfully")
 
@@ -525,21 +535,23 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"⚠️ Could not load app settings: {e}")
 
-    # Start weather scheduler
-    start_scheduler()
+    # Start schedulers and cache warmup (skip in E2E/CI to avoid noisy external calls)
+    if config.SCHEDULER_ENABLED:
+        start_scheduler()
 
-    # Start emagram scheduler
-    from emagram_scheduler.emagram_scheduler import (
-        setup_emagram_scheduler,
-    )
-    from emagram_scheduler.emagram_scheduler import start_scheduler as start_emagram
+        from emagram_scheduler.emagram_scheduler import (
+            setup_emagram_scheduler,
+        )
+        from emagram_scheduler.emagram_scheduler import start_scheduler as start_emagram
 
-    emagram_scheduler = setup_emagram_scheduler(app)
-    start_emagram(emagram_scheduler)
+        emagram_scheduler = setup_emagram_scheduler(app)
+        start_emagram(emagram_scheduler)
 
-    # Initial cache warmup (non-blocking)
-    logger.info("🔥 Triggering initial cache warmup...")
-    asyncio.create_task(initial_cache_warmup())
+        # Initial cache warmup (non-blocking)
+        logger.info("🔥 Triggering initial cache warmup...")
+        asyncio.create_task(initial_cache_warmup())
+    else:
+        logger.info("📅 Scheduler disabled, skipping cache warmup")
 
     yield
 
