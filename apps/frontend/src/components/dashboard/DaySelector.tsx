@@ -30,7 +30,9 @@ export default function DaySelector({
         return (
           <button
             key={i}
+            type="button"
             onClick={() => onSelectDay(i)}
+            aria-pressed={isSelected}
             className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
               isSelected
                 ? 'bg-sky-600 text-white shadow-md'
