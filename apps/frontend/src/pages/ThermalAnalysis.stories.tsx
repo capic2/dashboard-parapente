@@ -87,7 +87,11 @@ export const NoData = meta.story({
       handlers: [
         http.get('/api/spots/:id', () => HttpResponse.json(mockSite)),
         http.get('/api/emagram/hours', () =>
-          HttpResponse.json(mockEmagramHours)
+          HttpResponse.json({
+            site_id: mockEmagramHours.site_id,
+            forecast_date: mockEmagramHours.forecast_date,
+            hours: [],
+          })
         ),
         http.get('/api/emagram/latest', () => HttpResponse.json(null)),
         http.get('/api/emagram/history', () => HttpResponse.json([])),
