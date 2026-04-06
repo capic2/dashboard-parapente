@@ -9,7 +9,7 @@ import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import { useBestSpotAPI } from '../hooks/weather/useBestSpotAPI';
 import { createWeatherQueryFn } from '../hooks/weather/useWeather';
-import { getStaleTime } from '../lib/cacheConfig';
+import { getStaleTime, getWeatherRefetchInterval } from '../lib/cacheConfig';
 import type { WeatherData } from '../types';
 import type { SiteWeatherEntry } from '../components/dashboard/AllSitesConditions';
 
@@ -26,7 +26,7 @@ export default function Dashboard() {
       queryKey: ['weather', 'combined', site.id, 0] as const,
       queryFn: createWeatherQueryFn(site.id, 0),
       staleTime: getStaleTime(1000 * 60 * 30),
-      refetchInterval: 1000 * 60 * 60,
+      refetchInterval: getWeatherRefetchInterval(1000 * 60 * 60),
       enabled: !!site.id,
     })),
   });
