@@ -109,11 +109,7 @@ function SiteConditionCard({
                 {site.orientation && (
                   <WindIndicator
                     windDirection={weather.wind_direction}
-                    siteOrientation={
-                      Array.isArray(site.orientation)
-                        ? site.orientation[0]
-                        : site.orientation
-                    }
+                    siteOrientation={site.orientation}
                     windSpeed={weather.wind_speed}
                     showLabel={false}
                     size="sm"
