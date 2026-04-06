@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 const API_BASE = 'http://localhost:8001/api';
+const ALLOWED_STATUSES = new Set([200, 404]);
 
 test.describe('API Health & Schema Validation', () => {
   test('GET /api/health should return 200', async ({ request }) => {
@@ -8,22 +9,18 @@ test.describe('API Health & Schema Validation', () => {
     expect(response.status()).toBe(200);
   });
 
-  test('GET /api/emagram/hours should not return 500 (schema check)', async ({
+  test('GET /api/emagram/hours should return 200 or 404', async ({
     request,
   }) => {
     const response = await request.get(
       `${API_BASE}/emagram/hours?site_id=site-arguel&day_index=0`
     );
-    // 200 = data found, 404 = no data, both are fine
-    // 500 = schema mismatch (missing columns) — this is the bug we're catching
-    expect(response.status()).not.toBe(500);
+    expect(ALLOWED_STATUSES.has(response.status())).toBeTruthy();
   });
 
-  test('GET /api/best-spot should not return 500 (schema check)', async ({
-    request,
-  }) => {
+  test('GET /api/best-spot should return 200 or 404', async ({ request }) => {
     const response = await request.get(`${API_BASE}/best-spot?day_index=0`);
-    expect(response.status()).not.toBe(500);
+    expect(ALLOWED_STATUSES.has(response.status())).toBeTruthy();
   });
 
   test('all SQLAlchemy model columns exist in database', async ({ request }) => {
@@ -32,8 +29,8 @@ test.describe('API Health & Schema Validation', () => {
     const response = await request.get(
       `${API_BASE}/emagram/hours?site_id=site-arguel&day_index=0`
     );
-    const body = await response.text();
+    const body = (await response.text()).toLowerCase();
     expect(body).not.toContain('no such column');
-    expect(body).not.toContain('OperationalError');
+    expect(body).not.toContain('operationalerror');
   });
 });
