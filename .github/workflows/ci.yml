@@ -274,7 +274,7 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          pnpm exec nx e2e e2e --configuration=ci 2>&1 | tee /tmp/e2e.log
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 pnpm exec nx e2e e2e --configuration=ci --skipInstall 2>&1 | tee /tmp/e2e.log
         env:
           TESTING: false
           BACKEND_DATABASE_URL: sqlite:///./test.db
@@ -289,7 +289,7 @@ jobs:
             echo "NX Cloud credits exhausted - retrying with local cache"
             gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels \
               -f "labels[]=nx-cloud-no-credit" -f "labels[]=skip-nx-cloud" || true
-            NX_NO_CLOUD=true pnpm exec nx e2e e2e --configuration=ci
+            NX_NO_CLOUD=true PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 pnpm exec nx e2e e2e --configuration=ci --skipInstall
           else
             echo "E2E failed for non-NX-Cloud reason"
             exit 1
