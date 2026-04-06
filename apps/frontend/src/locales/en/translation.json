@@ -5,7 +5,8 @@
     "flights": "Flights",
     "analytics": "Analytics",
     "sites": "Sites",
-    "settings": "Settings"
+    "settings": "Settings",
+    "cache": "Cache"
   },
   "common": {
     "loading": "Loading...",
@@ -407,5 +408,29 @@
   },
   "datepicker": {
     "openCalendar": "Open calendar"
+  },
+  "cache": {
+    "title": "Redis Cache Viewer",
+    "totalKeys": "Total Keys",
+    "memoryUsage": "Memory Usage",
+    "groups": "Groups",
+    "key": "Key",
+    "ttl": "TTL",
+    "size": "Size",
+    "actions": "Actions",
+    "view": "View",
+    "deleteKey": "Delete",
+    "clearPattern": "Clear Group",
+    "clearAll": "Clear All Cache",
+    "confirmDelete": "Are you sure you want to delete this key?",
+    "confirmClearPattern": "Delete all keys matching {{pattern}}?",
+    "confirmClearAll": "Are you sure you want to clear the entire cache?",
+    "autoRefresh": "Auto-refresh",
+    "refresh": "Refresh",
+    "noKeys": "No cache keys found",
+    "searchPlaceholder": "Filter keys...",
+    "keyDetail": "Key Detail",
+    "cachedAt": "Cached At",
+    "truncatedWarning": "Display limited to the first 500 keys. The cache contains more entries."
   }
 }

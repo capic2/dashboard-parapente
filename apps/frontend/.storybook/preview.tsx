@@ -2,13 +2,11 @@ import { definePreview } from '@storybook/react-vite';
 import { initialize, mswLoader } from 'msw-storybook-addon';
 import addonA11y from '@storybook/addon-a11y';
 import { http, HttpResponse } from 'msw';
-import i18n from '../src/i18n';
+import { I18nextProvider } from 'react-i18next';
+import i18n from './i18n';
 import '../src/App.css';
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 
-// Force French locale in Storybook context — overrides LanguageDetector which
-// detects English in CI headless browsers
-i18n.changeLanguage('fr');
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TanstackRouterDecorator } from './decorators';
 
@@ -47,6 +45,12 @@ const defaultMswHandlers = [
     })
   ),
   http.get('*/api/sites/:siteId/landings', () => HttpResponse.json([])),
+  http.get('*/api/emagram/latest', () => HttpResponse.json(null)),
+  http.get('*/api/emagram/hours', () =>
+    HttpResponse.json({ site_id: '', forecast_date: '', hours: [] })
+  ),
+  http.get('*/api/emagram/history', () => HttpResponse.json([])),
+  http.post('*/api/emagram/analyze', () => HttpResponse.json({})),
   http.get('*/api/settings', () =>
     HttpResponse.json({
       cache_ttl_default: '3600',
@@ -77,6 +81,37 @@ const initializeMsw = (
 };
 // Initialize MSW with default fallback handlers
 initializeMsw({ onUnhandledRequest: 'error', quiet: true }, defaultMswHandlers);
+
+// i18n decorator — syncs the toolbar locale global with the i18n instance
+function I18nDecorator({
+  children,
+  locale,
+}: {
+  children: React.ReactNode;
+  locale: string;
+}) {
+  const [key, setKey] = useState(0);
+
+  useEffect(() => {
+    const onChanged = () => setKey(Date.now());
+    i18n.on('languageChanged', onChanged);
+    return () => {
+      i18n.off('languageChanged', onChanged);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (locale && i18n.language !== locale) {
+      i18n.changeLanguage(locale);
+    }
+  }, [locale]);
+
+  return (
+    <I18nextProvider i18n={i18n} key={key}>
+      {children}
+    </I18nextProvider>
+  );
+}
 
 // Theme decorator — applies/removes .dark class based on the current mode or toolbar global
 function ThemeDecorator({
@@ -113,12 +148,6 @@ const preview = definePreview({
           </Suspense>
         </QueryClientProvider>
       ),
-    },
-    i18n,
-    locale: 'fr',
-    locales: {
-      fr: 'Français',
-      en: 'English',
     },
     controls: {
       matchers: {
@@ -158,6 +187,11 @@ const preview = definePreview({
 
   initialGlobals: {
     theme: 'light',
+    locale: 'fr',
+    locales: {
+      fr: 'Français',
+      en: 'English',
+    },
   },
 
   // Global decorators
@@ -165,12 +199,15 @@ const preview = definePreview({
     (Story, context) => {
       const theme =
         context.globals?.theme ?? context.parameters?.theme ?? 'light';
+      const locale = context.globals?.locale ?? 'fr';
       return (
-        <ThemeDecorator theme={theme}>
-          <div style={{ padding: '1rem' }}>
-            <Story />
-          </div>
-        </ThemeDecorator>
+        <I18nDecorator locale={locale}>
+          <ThemeDecorator theme={theme}>
+            <div style={{ padding: '1rem' }}>
+              <Story />
+            </div>
+          </ThemeDecorator>
+        </I18nDecorator>
       );
     },
     TanstackRouterDecorator,

@@ -1,6 +1,5 @@
-import { FigureWrapper } from '../../.storybook/FigureWrapper.tsx';
 import preview from '../../.storybook/preview.tsx';
-import { Default, Loading } from './Settings.stories.tsx';
+import { defaultHandlers } from './Settings.stories.tsx';
 
 const meta = preview.meta({
   title: 'Pages/Settings/Chromatic',
@@ -9,6 +8,7 @@ const meta = preview.meta({
     chromatic: {
       disableSnapshot: false,
     },
+    msw: { handlers: defaultHandlers },
   },
   tags: ['!autodocs'],
 });
@@ -16,12 +16,13 @@ const meta = preview.meta({
 export const SettingsChromatic = meta.story({
   render: () => (
     <div className="flex flex-col gap-2">
-      <FigureWrapper title={Default.composed.name}>
+      {/*   <FigureWrapper title={Default.composed.name}>
         <Default.Component />
       </FigureWrapper>
-      <FigureWrapper title={Loading.composed.name}>
+*/}
+      {/* <FigureWrapper title={Loading.composed.name}>
         <Loading.Component />
-      </FigureWrapper>
+      </FigureWrapper>*/}
     </div>
   ),
 });

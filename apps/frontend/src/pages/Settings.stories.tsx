@@ -84,7 +84,7 @@ const mockSettings = {
   redis_socket_timeout: '5',
 };
 
-const defaultHandlers = [
+export const defaultHandlers = [
   http.get('*/api/spots', () => HttpResponse.json(mockSites)),
   http.get('*/api/weather-sources', () =>
     HttpResponse.json(mockWeatherSources)
