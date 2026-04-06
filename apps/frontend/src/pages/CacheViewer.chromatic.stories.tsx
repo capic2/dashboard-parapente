@@ -1,6 +1,7 @@
 import { FigureWrapper } from '../../.storybook/FigureWrapper.tsx';
 import preview from '../../.storybook/preview.tsx';
-import { Default, Empty, defaultHandlers } from './CacheViewer.stories.tsx';
+import { Default, Empty } from './CacheViewer.stories.tsx';
+import { defaultHandlers } from './CacheViewer.stories.handlers';
 
 const meta = preview.meta({
   title: 'Pages/CacheViewer/Chromatic',
