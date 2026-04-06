@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WeatherRouteImport } from './routes/weather'
 import { Route as ThermalRouteImport } from './routes/thermal'
 import { Route as SitesRouteImport } from './routes/sites'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -19,6 +20,11 @@ import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ViewerFlightIdRouteImport } from './routes/viewer.$flightId'
 
+const WeatherRoute = WeatherRouteImport.update({
+  id: '/weather',
+  path: '/weather',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/weather.lazy').then((d) => d.Route))
 const ThermalRoute = ThermalRouteImport.update({
   id: '/thermal',
   path: '/thermal',
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
+  '/weather': typeof WeatherRoute
   '/viewer/$flightId': typeof ViewerFlightIdRoute
 }
 export interface FileRoutesByTo {
@@ -87,6 +94,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
+  '/weather': typeof WeatherRoute
   '/viewer/$flightId': typeof ViewerFlightIdRoute
 }
 export interface FileRoutesById {
@@ -99,6 +107,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
+  '/weather': typeof WeatherRoute
   '/viewer/$flightId': typeof ViewerFlightIdRoute
 }
 export interface FileRouteTypes {
@@ -112,6 +121,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/sites'
     | '/thermal'
+    | '/weather'
     | '/viewer/$flightId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -123,6 +133,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/sites'
     | '/thermal'
+    | '/weather'
     | '/viewer/$flightId'
   id:
     | '__root__'
@@ -134,6 +145,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/sites'
     | '/thermal'
+    | '/weather'
     | '/viewer/$flightId'
   fileRoutesById: FileRoutesById
 }
@@ -146,11 +158,19 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SitesRoute: typeof SitesRoute
   ThermalRoute: typeof ThermalRoute
+  WeatherRoute: typeof WeatherRoute
   ViewerFlightIdRoute: typeof ViewerFlightIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/weather': {
+      id: '/weather'
+      path: '/weather'
+      fullPath: '/weather'
+      preLoaderRoute: typeof WeatherRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/thermal': {
       id: '/thermal'
       path: '/thermal'
@@ -226,6 +246,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SitesRoute: SitesRoute,
   ThermalRoute: ThermalRoute,
+  WeatherRoute: WeatherRoute,
   ViewerFlightIdRoute: ViewerFlightIdRoute,
 }
 export const routeTree = rootRouteImport

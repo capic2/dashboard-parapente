@@ -6,7 +6,8 @@
     "analytics": "Analytics",
     "sites": "Sites",
     "settings": "Settings",
-    "cache": "Cache"
+    "cache": "Cache",
+    "weather": "Weather"
   },
   "common": {
     "loading": "Loading...",
@@ -44,7 +45,8 @@
   "dashboard": {
     "loadingError": "Loading error",
     "loadingMessage": "Loading dashboard...",
-    "sitesLoaded": "Sites loaded: {{count}}"
+    "sitesLoaded": "Sites loaded: {{count}}",
+    "allSitesConditions": "Current conditions — all sites"
   },
   "stats": {
     "title": "Statistics",
