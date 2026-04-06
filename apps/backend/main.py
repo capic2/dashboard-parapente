@@ -407,7 +407,9 @@ def seed_weather_sources():
 
 def run_migrations():
     """
-    Run SQL migrations from db/migrations directory
+    Run SQL migrations from db/migrations directory.
+    Each SQL statement is executed individually to handle idempotent migrations
+    gracefully (e.g., ALTER TABLE ADD COLUMN that already exists).
     """
     from database import DB_PATH
 
@@ -432,65 +434,41 @@ def run_migrations():
     for migration_file in migration_files:
         logger.info(f"Applying migration: {migration_file.name}")
 
-        try:
-            with open(migration_file) as f:
-                sql = f.read()
+        with open(migration_file) as f:
+            sql = f.read()
 
-            # Execute migration (handle multi-statement SQL)
-            cursor.executescript(sql)
-            conn.commit()
+        # Execute each statement individually so that one "already exists" error
+        # doesn't prevent subsequent statements in the same migration from running.
+        # Split by semicolons, strip comments, and skip empty statements.
+        applied = 0
+        skipped = 0
+
+        for raw_statement in sql.split(";"):
+            # Strip comment lines and whitespace
+            lines = [l for l in raw_statement.splitlines() if not l.strip().startswith("--")]
+            clean = "\n".join(lines).strip()
+            if not clean:
+                continue
+
+            try:
+                cursor.execute(clean)
+                conn.commit()
+                applied += 1
+            except sqlite3.OperationalError as e:
+                err_msg = str(e).lower()
+                if "already exists" in err_msg or "duplicate column name" in err_msg:
+                    skipped += 1
+                else:
+                    logger.error(f"✗ Migration {migration_file.name} failed on statement: {clean[:100]}")
+                    logger.error(f"  Error: {e}")
+                    raise
+
+        if skipped > 0 and applied == 0:
+            logger.info(f"⊙ Migration {migration_file.name} already applied (skipping)")
+        elif skipped > 0:
+            logger.info(f"✓ Migration {migration_file.name}: {applied} applied, {skipped} already existed")
+        else:
             logger.info(f"✓ Migration {migration_file.name} applied successfully")
-
-        except sqlite3.OperationalError as e:
-            if "already exists" in str(e) or "duplicate column name" in str(e):
-                logger.info(f"⊙ Migration {migration_file.name} already applied (skipping)")
-            else:
-                logger.error(f"✗ Migration {migration_file.name} failed: {e}")
-                raise
-
-    # Add new columns to sites table (handle gracefully if already exist)
-    try:
-        cursor.execute("ALTER TABLE sites ADD COLUMN site_type VARCHAR DEFAULT 'user_spot'")
-        conn.commit()
-        logger.info("✓ Added site_type column to sites table")
-    except sqlite3.OperationalError as e:
-        if "duplicate column name" in str(e):
-            logger.info("⊙ Column site_type already exists (skipping)")
-        else:
-            raise
-
-    try:
-        cursor.execute(
-            "ALTER TABLE sites ADD COLUMN linked_spot_id VARCHAR REFERENCES paragliding_spots(id)"
-        )
-        conn.commit()
-        logger.info("✓ Added linked_spot_id column to sites table")
-    except sqlite3.OperationalError as e:
-        if "duplicate column name" in str(e):
-            logger.info("⊙ Column linked_spot_id already exists (skipping)")
-        else:
-            raise
-
-    # Ensure forecast_date column exists on emagram_analysis (critical migration)
-    try:
-        cursor.execute("PRAGMA table_info(emagram_analysis)")
-        existing_columns = {row[1] for row in cursor.fetchall()}
-        if existing_columns and "forecast_date" not in existing_columns:
-            logger.info("Adding missing forecast_date column to emagram_analysis...")
-            cursor.execute("ALTER TABLE emagram_analysis ADD COLUMN forecast_date DATE")
-            cursor.execute(
-                "UPDATE emagram_analysis SET forecast_date = analysis_date WHERE forecast_date IS NULL"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_emagram_analysis_forecast_date ON emagram_analysis (forecast_date)"
-            )
-            conn.commit()
-            logger.info("✓ forecast_date column added successfully")
-    except sqlite3.OperationalError as e:
-        if "duplicate column name" in str(e):
-            logger.info("⊙ forecast_date column already exists (skipping)")
-        else:
-            logger.error(f"✗ Failed to add forecast_date column: {e}")
 
     conn.close()
     logger.info("✓ All migrations completed")
