@@ -45,6 +45,12 @@ const defaultMswHandlers = [
     })
   ),
   http.get('*/api/sites/:siteId/landings', () => HttpResponse.json([])),
+  http.get('*/api/emagram/latest', () => HttpResponse.json(null)),
+  http.get('*/api/emagram/hours', () =>
+    HttpResponse.json({ site_id: '', forecast_date: '', hours: [] })
+  ),
+  http.get('*/api/emagram/history', () => HttpResponse.json([])),
+  http.post('*/api/emagram/analyze', () => HttpResponse.json({})),
   http.get('*/api/settings', () =>
     HttpResponse.json({
       cache_ttl_default: '3600',

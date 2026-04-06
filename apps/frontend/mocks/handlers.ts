@@ -571,6 +571,360 @@ export const handlers = [
   }),
 
   // ============================================
+  // LANDING ASSOCIATIONS
+  // ============================================
+
+  // GET /api/sites/:siteId/landings - Retourne les associations d'atterrissage
+  // IMPORTANT: Must be BEFORE /sites/:siteId to match the more specific path first
+  ...createHandler('get', '/sites/:siteId/landings/weather', ({ params, request }) => {
+    const { siteId } = params;
+    const url = new URL(request.url);
+    const dayIndex = parseInt(url.searchParams.get('day_index') || '0', 10);
+
+    // Find landing sites associated with this takeoff site
+    const landingSite = sites.find((s) => s.id !== siteId);
+
+    if (!landingSite) {
+      return HttpResponse.json([]);
+    }
+
+    return HttpResponse.json([
+      {
+        landing_site_id: landingSite.id,
+        landing_site_name: landingSite.name,
+        distance_km: 2.5,
+        is_primary: true,
+        weather: {
+          consensus: weatherData[landingSite.id]?.consensus || [],
+          para_index: 75,
+          verdict: 'BON',
+          emoji: '✅',
+          sunrise: '06:30',
+          sunset: '20:45',
+          day_index: dayIndex,
+        },
+      },
+    ]);
+  }),
+
+  // GET /api/sites/:siteId/landings - Retourne les associations d'atterrissage
+  ...createHandler('get', '/sites/:siteId/landings', ({ params }) => {
+    const { siteId } = params;
+
+    // Find a different site to use as landing
+    const landingSite = sites.find((s) => s.id !== siteId);
+
+    if (!landingSite) {
+      return HttpResponse.json([]);
+    }
+
+    return HttpResponse.json([
+      {
+        id: 'assoc-1',
+        takeoff_site_id: siteId,
+        landing_site_id: landingSite.id,
+        is_primary: true,
+        distance_km: 2.5,
+        notes: 'Atterrissage principal',
+        landing_site: landingSite,
+        created_at: '2025-01-15T10:00:00Z',
+      },
+    ]);
+  }),
+
+  // POST /api/sites/:siteId/landings - Créer une association d'atterrissage
+  ...createHandler('post', '/sites/:siteId/landings', async ({ params, request }) => {
+    const body = (await request.json()) as any;
+    const landingSite = sites.find((s) => s.id === body.landing_site_id);
+
+    return HttpResponse.json({
+      id: `assoc-${Date.now()}`,
+      takeoff_site_id: params.siteId,
+      landing_site_id: body.landing_site_id,
+      is_primary: body.is_primary ?? false,
+      distance_km: null,
+      notes: body.notes ?? null,
+      landing_site: landingSite || null,
+      created_at: new Date().toISOString(),
+    });
+  }),
+
+  // PATCH /api/sites/:siteId/landings/:assocId - Mettre à jour une association
+  ...createHandler('patch', '/sites/:siteId/landings/:assocId', async ({ params, request }) => {
+    const body = (await request.json()) as any;
+
+    return HttpResponse.json({
+      id: params.assocId,
+      takeoff_site_id: params.siteId,
+      landing_site_id: 'landing-1',
+      is_primary: body.is_primary ?? false,
+      distance_km: 2.5,
+      notes: body.notes ?? null,
+      created_at: '2025-01-15T10:00:00Z',
+    });
+  }),
+
+  // DELETE /api/sites/:siteId/landings/:assocId - Supprimer une association
+  ...createHandler('delete', '/sites/:siteId/landings/:assocId', () => {
+    return HttpResponse.json({ success: true });
+  }),
+
+  // ============================================
+  // ADMIN CACHE
+  // ============================================
+
+  // GET /api/admin/cache - Retourne l'aperçu du cache Redis
+  ...createHandler('get', '/admin/cache', () => {
+    return HttpResponse.json({
+      total_keys: 12,
+      memory_usage: '2.4 MB',
+      groups: {
+        weather: {
+          count: 5,
+          keys: [
+            { key: 'weather:site-1:day-0', ttl: 3600, size: 1024 },
+            { key: 'weather:site-1:day-1', ttl: 3200, size: 980 },
+            { key: 'weather:site-2:day-0', ttl: 3500, size: 1100 },
+            { key: 'weather:site-2:day-1', ttl: 3100, size: 950 },
+            { key: 'weather:site-3:day-0', ttl: 2800, size: 1050 },
+          ],
+        },
+        summary: {
+          count: 4,
+          keys: [
+            { key: 'summary:site-1', ttl: 7200, size: 512 },
+            { key: 'summary:site-2', ttl: 7000, size: 480 },
+            { key: 'summary:site-3', ttl: 6800, size: 520 },
+            { key: 'summary:site-4', ttl: 6500, size: 490 },
+          ],
+        },
+        'best-spot': {
+          count: 3,
+          keys: [
+            { key: 'best-spot:day-0', ttl: 1800, size: 256 },
+            { key: 'best-spot:day-1', ttl: 1600, size: 260 },
+            { key: 'best-spot:day-2', ttl: 1400, size: 248 },
+          ],
+        },
+      },
+      truncated: false,
+    });
+  }),
+
+  // GET /api/admin/cache/:key - Retourne le détail d'une clé de cache
+  http.get(/\/api\/admin\/cache\/(.+)/, ({ request }) => {
+    const url = new URL(request.url);
+    const key = decodeURIComponent(
+      url.pathname.replace(/.*\/api\/admin\/cache\//, '')
+    );
+
+    return HttpResponse.json({
+      key,
+      ttl: 3600,
+      size: 1024,
+      value: { site_id: 'site-1', data: 'mock cached value' },
+      type: 'json' as const,
+    });
+  }),
+
+  // DELETE /api/admin/cache/:key - Supprimer une clé ou un pattern de cache
+  http.delete(/\/api\/admin\/cache\/(.+)/, () => {
+    return HttpResponse.json({
+      success: true,
+      keys_deleted: 1,
+    });
+  }),
+
+  // ============================================
+  // EMAGRAM ANALYSIS
+  // ============================================
+
+  // GET /api/emagram/latest - Dernière analyse émagramme
+  ...createHandler('get', '/emagram/latest', ({ request }) => {
+    const url = new URL(request.url);
+    const hour = url.searchParams.get('hour');
+
+    return HttpResponse.json({
+      id: 'emagram-001',
+      analysis_date: '2025-06-15',
+      analysis_time: '12:00',
+      analysis_datetime: '2025-06-15T12:00:00Z',
+      station_code: 'LFQN',
+      station_name: 'Besançon',
+      station_latitude: 47.25,
+      station_longitude: 6.08,
+      distance_km: 15.3,
+      data_source: 'meteofrance',
+      sounding_time: '12Z',
+      llm_provider: 'anthropic',
+      llm_model: 'claude-sonnet-4-20250514',
+      llm_tokens_used: 1200,
+      llm_cost_usd: 0.004,
+      analysis_method: 'llm_vision',
+      plafond_thermique_m: 2200,
+      force_thermique_ms: 2.5,
+      cape_jkg: 450,
+      stabilite_atmospherique: 'Instable conditionnel',
+      cisaillement_vent: 'Faible',
+      heure_debut_thermiques: '11:00',
+      heure_fin_thermiques: '17:00',
+      heures_volables_total: 6,
+      risque_orage: 'Faible',
+      score_volabilite: 75,
+      resume_conditions: 'Bonnes conditions thermiques prévues avec plafond à 2200m.',
+      conseils_vol: 'Décollage recommandé entre 11h et 14h.',
+      alertes_securite: '[]',
+      lcl_m: 800,
+      lfc_m: 1200,
+      el_m: 8000,
+      lifted_index: -2.5,
+      k_index: 28,
+      total_totals: 48,
+      showalter_index: -1.5,
+      wind_shear_0_3km_ms: 3.2,
+      wind_shear_0_6km_ms: 5.8,
+      skewt_image_path: null,
+      raw_sounding_data: null,
+      ai_raw_response: null,
+      analysis_status: 'completed',
+      error_message: null,
+      is_from_llm: true,
+      has_thermal_data: true,
+      flyable_hours_formatted: '11:00 - 17:00',
+      forecast_date: '2025-06-15',
+      forecast_hour: hour ? parseInt(hour, 10) : null,
+      external_source_urls: null,
+      screenshot_paths: null,
+      sources_count: null,
+      sources_agreement: null,
+      sources_errors: null,
+      created_at: '2025-06-15T08:00:00Z',
+      updated_at: '2025-06-15T12:00:00Z',
+    });
+  }),
+
+  // GET /api/emagram/hours - Heures disponibles pour l'émagramme
+  ...createHandler('get', '/emagram/hours', ({ request }) => {
+    const url = new URL(request.url);
+    const siteId = url.searchParams.get('site_id') || 'site-1';
+
+    return HttpResponse.json({
+      site_id: siteId,
+      forecast_date: '2025-06-15',
+      hours: [
+        { hour: 9, score: 40, status: 'completed', id: 'emagram-h09' },
+        { hour: 10, score: 55, status: 'completed', id: 'emagram-h10' },
+        { hour: 11, score: 65, status: 'completed', id: 'emagram-h11' },
+        { hour: 12, score: 75, status: 'completed', id: 'emagram-h12' },
+        { hour: 13, score: 80, status: 'completed', id: 'emagram-h13' },
+        { hour: 14, score: 72, status: 'completed', id: 'emagram-h14' },
+        { hour: 15, score: 60, status: 'completed', id: 'emagram-h15' },
+        { hour: 16, score: 45, status: 'completed', id: 'emagram-h16' },
+        { hour: 17, score: 30, status: 'completed', id: 'emagram-h17' },
+      ],
+    });
+  }),
+
+  // GET /api/emagram/history - Historique des analyses
+  ...createHandler('get', '/emagram/history', () => {
+    return HttpResponse.json([
+      {
+        id: 'emagram-001',
+        analysis_date: '2025-06-15',
+        analysis_time: '12:00',
+        station_code: 'LFQN',
+        station_name: 'Besançon',
+        distance_km: 15.3,
+        score_volabilite: 75,
+        plafond_thermique_m: 2200,
+        force_thermique_ms: 2.5,
+        heures_volables_total: 6,
+        analysis_method: 'llm_vision',
+        analysis_status: 'completed',
+        created_at: '2025-06-15T08:00:00Z',
+      },
+      {
+        id: 'emagram-002',
+        analysis_date: '2025-06-14',
+        analysis_time: '12:00',
+        station_code: 'LFQN',
+        station_name: 'Besançon',
+        distance_km: 15.3,
+        score_volabilite: 60,
+        plafond_thermique_m: 1800,
+        force_thermique_ms: 1.8,
+        heures_volables_total: 4,
+        analysis_method: 'llm_vision',
+        analysis_status: 'completed',
+        created_at: '2025-06-14T08:00:00Z',
+      },
+    ]);
+  }),
+
+  // POST /api/emagram/analyze - Déclencher une analyse
+  ...createHandler('post', '/emagram/analyze', async ({ request }) => {
+    const body = (await request.json()) as any;
+
+    return HttpResponse.json({
+      id: `emagram-${Date.now()}`,
+      analysis_date: '2025-06-15',
+      analysis_time: '12:00',
+      analysis_datetime: '2025-06-15T12:00:00Z',
+      station_code: 'LFQN',
+      station_name: 'Besançon',
+      station_latitude: 47.25,
+      station_longitude: 6.08,
+      distance_km: 15.3,
+      data_source: 'meteofrance',
+      sounding_time: '12Z',
+      llm_provider: 'anthropic',
+      llm_model: 'claude-sonnet-4-20250514',
+      llm_tokens_used: 1200,
+      llm_cost_usd: 0.004,
+      analysis_method: 'llm_vision',
+      plafond_thermique_m: 2200,
+      force_thermique_ms: 2.5,
+      cape_jkg: 450,
+      stabilite_atmospherique: 'Instable conditionnel',
+      cisaillement_vent: 'Faible',
+      heure_debut_thermiques: '11:00',
+      heure_fin_thermiques: '17:00',
+      heures_volables_total: 6,
+      risque_orage: 'Faible',
+      score_volabilite: 75,
+      resume_conditions: 'Bonnes conditions thermiques prévues.',
+      conseils_vol: 'Décollage recommandé entre 11h et 14h.',
+      alertes_securite: '[]',
+      lcl_m: 800,
+      lfc_m: 1200,
+      el_m: 8000,
+      lifted_index: -2.5,
+      k_index: 28,
+      total_totals: 48,
+      showalter_index: -1.5,
+      wind_shear_0_3km_ms: 3.2,
+      wind_shear_0_6km_ms: 5.8,
+      skewt_image_path: null,
+      raw_sounding_data: null,
+      ai_raw_response: null,
+      analysis_status: 'completed',
+      error_message: null,
+      is_from_llm: true,
+      has_thermal_data: true,
+      flyable_hours_formatted: '11:00 - 17:00',
+      forecast_date: body.day_index ? '2025-06-15' : '2025-06-15',
+      forecast_hour: body.hour ?? null,
+      external_source_urls: null,
+      screenshot_paths: null,
+      sources_count: null,
+      sources_agreement: null,
+      sources_errors: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+  }),
+
+  // ============================================
   // ALERTS / ALERTES
   // ============================================
 

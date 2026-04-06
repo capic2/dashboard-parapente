@@ -128,10 +128,13 @@ function buildOverview() {
 // --- MSW handlers reading/modifying cacheDb ---
 
 const defaultHandlers = [
-  http.get('/api/admin/cache', () => HttpResponse.json(buildOverview())),
+  http.get('*/api/admin/cache', () => HttpResponse.json(buildOverview())),
 
-  http.get('/api/admin/cache/:key', ({ params }) => {
-    const key = decodeURIComponent(params.key as string);
+  http.get('*/api/admin/cache/:key', ({ request }) => {
+    const url = new URL(request.url);
+    const key = decodeURIComponent(
+      url.pathname.replace(/.*\/api\/admin\/cache\//, '')
+    );
     const entry = cacheDb.find((e) => e.key === key);
     if (!entry) {
       return new HttpResponse(null, { status: 404 });
@@ -154,8 +157,11 @@ const defaultHandlers = [
     } satisfies CacheKeyDetail);
   }),
 
-  http.delete('/api/admin/cache/:key', ({ params }) => {
-    const key = decodeURIComponent(params.key as string);
+  http.delete('*/api/admin/cache/:key', ({ request }) => {
+    const url = new URL(request.url);
+    const key = decodeURIComponent(
+      url.pathname.replace(/.*\/api\/admin\/cache\//, '')
+    );
 
     if (key.includes('*')) {
       const pattern = key.replace(/\*/g, '');
@@ -227,7 +233,9 @@ Default.test('can open key detail modal', async ({ canvas, userEvent }) => {
   await expect(
     within(modal).getByText(i18n.t('cache.keyDetail'))
   ).toBeInTheDocument();
-  await expect(within(modal).getByText('best_spot:day_0')).toBeInTheDocument();
+  await expect(
+    await within(modal).findByText('best_spot:day_0')
+  ).toBeInTheDocument();
 });
 
 Default.test('can delete a single key', async ({ canvas, userEvent }) => {
@@ -268,7 +276,9 @@ Default.test('can clear a group', async ({ canvas, userEvent }) => {
   // weather:forecast group should be gone, others remain
   await expect(await canvas.findByText('best_spot')).toBeInTheDocument();
   await expect(await canvas.findByText('emagram:sounding')).toBeInTheDocument();
-  await expect(canvas.queryByText('weather:forecast')).toBeNull();
+  await waitFor(() => {
+    expect(canvas.queryByText('weather:forecast')).toBeNull();
+  });
 });
 
 Default.test('can clear all cache', async ({ canvas, userEvent }) => {
