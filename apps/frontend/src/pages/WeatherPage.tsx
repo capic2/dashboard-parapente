@@ -16,12 +16,10 @@ export default function WeatherPage() {
   const navigate = useNavigate();
   const { data: sites } = useSuspenseQuery(sitesQueryOptions());
   const search = useSearch({ from: '/weather' });
-  const initialSiteId = (search as { siteId?: string }).siteId || '';
-
-  const [userSelectedSiteId, setSelectedSiteId] = useState(initialSiteId);
+  const routeSiteId = search ? search.siteId : '';
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const selectedSiteId =
-    userSelectedSiteId || (sites.length > 0 ? sites[0].id : '');
+    sites.find((site) => site.id === routeSiteId)?.id ?? sites[0]?.id ?? '';
 
   const [weatherDataMap] = useState<Map<string, Record<string, unknown>>>(
     new Map()
@@ -57,7 +55,9 @@ export default function WeatherPage() {
         {/* Site Selector */}
         <SiteSelector
           selectedSiteId={selectedSiteId}
-          onSelectSite={setSelectedSiteId}
+          onSelectSite={(siteId) =>
+            void navigate({ to: '/weather', search: { siteId } })
+          }
           weatherData={weatherDataMap}
         />
 
