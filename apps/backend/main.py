@@ -456,6 +456,10 @@ def run_migrations():
                 cursor.execute(clean)
                 conn.commit()
                 applied += 1
+            except sqlite3.IntegrityError:
+                # Row already exists (UNIQUE constraint) — idempotent, skip
+                conn.rollback()
+                skipped += 1
             except sqlite3.OperationalError as e:
                 err_msg = str(e).lower()
                 if "already exists" in err_msg or "duplicate column name" in err_msg:
