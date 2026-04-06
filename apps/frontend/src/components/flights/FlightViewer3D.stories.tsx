@@ -55,7 +55,7 @@ export const Default = meta.story({
     msw: {
       handlers: [
         http.get('*/api/flights/:id/gpx-data', () => {
-          return HttpResponse.json(mockGPXData);
+          return HttpResponse.json({ data: mockGPXData });
         }),
         http.get('*/api/flights/:id', () => {
           return HttpResponse.json({
