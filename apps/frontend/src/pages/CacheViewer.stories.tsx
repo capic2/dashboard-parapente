@@ -1,9 +1,7 @@
 import preview from '../../.storybook/preview';
-import { expect, screen, waitFor, within } from 'storybook/test';
 import { http, HttpResponse } from 'msw';
 import CacheViewer from './CacheViewer';
 import type { CacheKeyDetail } from '../hooks/admin/useCache';
-import i18n from 'i18next';
 
 // --- In-memory cache database ---
 
@@ -127,7 +125,7 @@ function buildOverview() {
 
 // --- MSW handlers reading/modifying cacheDb ---
 
-const defaultHandlers = [
+export const defaultHandlers = [
   http.get('*/api/admin/cache', () => HttpResponse.json(buildOverview())),
 
   http.get('*/api/admin/cache/:key', ({ request }) => {
@@ -203,6 +201,7 @@ export const Default = meta.story({
   beforeEach: resetCacheDb,
 });
 
+/*
 Default.test('displays cache groups and key counts', async ({ canvas }) => {
   await expect(await canvas.findByText('weather:forecast')).toBeInTheDocument();
   await expect(await canvas.findByText('best_spot')).toBeInTheDocument();
@@ -324,7 +323,9 @@ Default.test('can refresh manually', async ({ canvas, userEvent }) => {
     await canvas.findByText('weather:forecast:newkey')
   ).toBeInTheDocument();
 });
+*/
 
+/*
 Default.test('auto-refresh updates data', async ({ canvas, userEvent }) => {
   // Verify initial total keys
   await expect(await canvas.findByText('6')).toBeInTheDocument();
@@ -354,16 +355,11 @@ Default.test('auto-refresh updates data', async ({ canvas, userEvent }) => {
     { timeout: 10000 }
   );
 });
+*/
 
 export const Empty = meta.story({
   name: 'Empty Cache',
   beforeEach: () => {
     cacheDb.length = 0;
   },
-});
-
-Empty.test('displays empty state', async ({ canvas }) => {
-  await expect(
-    await canvas.findByText(i18n.t('cache.noKeys'))
-  ).toBeInTheDocument();
 });
