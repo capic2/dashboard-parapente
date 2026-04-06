@@ -62,6 +62,36 @@ const meta = preview.meta({
           once: true,
         }),
         http.get(
+          '/api/emagram/hours',
+          () =>
+            HttpResponse.json({
+              site_id: 'site-mont-poupet-ouest',
+              forecast_date: '2026-03-24',
+              hours: [
+                { hour: 9, score: 45, status: 'completed', id: 'emagram-h9' },
+                {
+                  hour: 12,
+                  score: 72,
+                  status: 'completed',
+                  id: 'emagram-h12',
+                },
+                {
+                  hour: 15,
+                  score: 85,
+                  status: 'completed',
+                  id: 'emagram-h15',
+                },
+                {
+                  hour: 18,
+                  score: 60,
+                  status: 'completed',
+                  id: 'emagram-h18',
+                },
+              ],
+            }),
+          { once: true }
+        ),
+        http.get(
           '/api/emagram/latest',
           () => HttpResponse.json(mockEmagramLatest),
           { once: true }
@@ -81,6 +111,16 @@ const meta = preview.meta({
         http.get('/api/spots/:id', () => HttpResponse.json(mockSite), {
           once: true,
         }),
+        http.get(
+          '/api/emagram/hours',
+          () =>
+            HttpResponse.json({
+              site_id: 'site-mont-poupet-ouest',
+              forecast_date: '2026-03-24',
+              hours: [],
+            }),
+          { once: true }
+        ),
         http.get('/api/emagram/latest', () => HttpResponse.json(null), {
           once: true,
         }),
@@ -93,6 +133,9 @@ const meta = preview.meta({
           { once: true }
         ),
         http.get('/api/spots/:id', () => HttpResponse.json(mockSite)),
+        http.get('/api/emagram/hours', async () => {
+          await new Promise(() => {});
+        }),
         http.get('/api/emagram/latest', async () => {
           await new Promise(() => {});
         }),

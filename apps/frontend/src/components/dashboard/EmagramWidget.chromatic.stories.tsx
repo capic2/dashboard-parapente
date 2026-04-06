@@ -8,7 +8,6 @@ import {
   DifferentDay,
   NoSite,
   Loading,
-  WithScreenshotPreview,
 } from './EmagramWidget.stories.tsx';
 
 // 1x1 blue PNG placeholder for screenshot preview testing
@@ -28,6 +27,18 @@ const meta = preview.meta({
     },
     msw: {
       handlers: [
+        http.get('*/api/emagram/hours', () =>
+          HttpResponse.json({
+            site_id: 'site-arguel',
+            forecast_date: '2026-03-24',
+            hours: [
+              { hour: 9, score: 45, status: 'completed', id: 'emagram-h9' },
+              { hour: 12, score: 72, status: 'completed', id: 'emagram-h12' },
+              { hour: 15, score: 85, status: 'completed', id: 'emagram-h15' },
+              { hour: 18, score: 60, status: 'completed', id: 'emagram-h18' },
+            ],
+          })
+        ),
         http.get('*/api/emagram/latest', () =>
           HttpResponse.json({
             id: 'test-emagram-1',
@@ -85,9 +96,6 @@ export const EmagramWidgetChromatic = meta.story({
       </FigureWrapper>
       <FigureWrapper title={Loading.composed.name}>
         <Loading.Component />
-      </FigureWrapper>
-      <FigureWrapper title={WithScreenshotPreview.composed.name}>
-        <WithScreenshotPreview.Component />
       </FigureWrapper>
     </div>
   ),

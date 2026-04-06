@@ -30,8 +30,6 @@ CREATE INDEX IF NOT EXISTS idx_paragliding_spots_type ON paragliding_spots (type
 CREATE INDEX IF NOT EXISTS idx_paragliding_spots_lat_lon ON paragliding_spots (latitude, longitude);
 
 -- Add new columns to sites table (backward compatible)
--- Note: SQLite doesn't support ADD COLUMN IF NOT EXISTS, so we check in Python code
--- ALTER TABLE sites ADD COLUMN site_type VARCHAR DEFAULT 'user_spot';
--- ALTER TABLE sites ADD COLUMN linked_spot_id VARCHAR REFERENCES paragliding_spots(id);
-
--- These will be added via Python to handle "column already exists" errors gracefully
+-- Each statement is executed individually by run_migrations() to handle "already exists" gracefully
+ALTER TABLE sites ADD COLUMN site_type VARCHAR DEFAULT 'user_spot';
+ALTER TABLE sites ADD COLUMN linked_spot_id VARCHAR REFERENCES paragliding_spots(id);

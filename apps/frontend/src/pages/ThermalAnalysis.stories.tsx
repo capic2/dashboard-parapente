@@ -54,8 +54,20 @@ const mockEmagramHistory = [
   { ...mockEmagramLatest, id: 'e-3', analysis_date: '2026-03-22', score: 45 },
 ];
 
+const mockEmagramHours = {
+  site_id: 'site-mont-poupet-ouest',
+  forecast_date: '2026-03-24',
+  hours: [
+    { hour: 9, score: 45, status: 'completed', id: 'emagram-h9' },
+    { hour: 12, score: 72, status: 'completed', id: 'emagram-h12' },
+    { hour: 15, score: 85, status: 'completed', id: 'emagram-h15' },
+    { hour: 18, score: 60, status: 'completed', id: 'emagram-h18' },
+  ],
+};
+
 const defaultHandlers = [
   http.get('/api/spots/:id', () => HttpResponse.json(mockSite)),
+  http.get('/api/emagram/hours', () => HttpResponse.json(mockEmagramHours)),
   http.get('/api/emagram/latest', () => HttpResponse.json(mockEmagramLatest)),
   http.get('/api/emagram/history', () => HttpResponse.json(mockEmagramHistory)),
   http.post('/api/emagram/analyze', () =>
@@ -74,6 +86,13 @@ export const NoData = meta.story({
     msw: {
       handlers: [
         http.get('/api/spots/:id', () => HttpResponse.json(mockSite)),
+        http.get('/api/emagram/hours', () =>
+          HttpResponse.json({
+            site_id: mockEmagramHours.site_id,
+            forecast_date: mockEmagramHours.forecast_date,
+            hours: [],
+          })
+        ),
         http.get('/api/emagram/latest', () => HttpResponse.json(null)),
         http.get('/api/emagram/history', () => HttpResponse.json([])),
         http.post('/api/emagram/trigger', () =>
@@ -90,6 +109,9 @@ export const Loading = meta.story({
     msw: {
       handlers: [
         http.get('/api/spots/:id', () => HttpResponse.json(mockSite)),
+        http.get('/api/emagram/hours', async () => {
+          await new Promise(() => {});
+        }),
         http.get('/api/emagram/latest', async () => {
           await new Promise(() => {});
         }),

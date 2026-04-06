@@ -143,6 +143,82 @@ const defaultHandlers = [
     HttpResponse.json(mockWeatherChalais)
   ),
   http.get('/api/flights/stats', () => HttpResponse.json(mockStats)),
+  http.get('/api/sites/:siteId/landings', () => HttpResponse.json([])),
+  http.get('/api/sites/:siteId/landings/weather', () => HttpResponse.json([])),
+  http.get('/api/emagram/hours', () =>
+    HttpResponse.json({
+      site_id: '07280',
+      forecast_date: '2026-03-24',
+      hours: [
+        { hour: 9, score: 45, status: 'completed', id: 'emagram-h9' },
+        { hour: 12, score: 72, status: 'completed', id: 'emagram-h12' },
+        { hour: 15, score: 85, status: 'completed', id: 'emagram-h15' },
+        { hour: 18, score: 60, status: 'completed', id: 'emagram-h18' },
+      ],
+    })
+  ),
+  http.get('/api/emagram/latest', () =>
+    HttpResponse.json({
+      id: 'emagram-001',
+      analysis_date: '2026-03-24',
+      analysis_time: '12:00',
+      analysis_datetime: '2026-03-24T12:00:00Z',
+      station_code: '07280',
+      station_name: 'Dijon-Longvic',
+      station_latitude: 47.27,
+      station_longitude: 5.09,
+      distance_km: 72,
+      data_source: 'open-meteo',
+      sounding_time: '12Z',
+      llm_provider: 'gemini',
+      llm_model: 'gemini-2.0-flash',
+      llm_tokens_used: 1200,
+      llm_cost_usd: 0.002,
+      analysis_method: 'llm_vision',
+      plafond_thermique_m: 1850,
+      force_thermique_ms: 2.3,
+      cape_jkg: 320,
+      stabilite_atmospherique: 'instable',
+      cisaillement_vent: 'faible',
+      heure_debut_thermiques: '11:30',
+      heure_fin_thermiques: '17:00',
+      heures_volables_total: 5.5,
+      risque_orage: 'faible',
+      score_volabilite: 76,
+      resume_conditions:
+        "Bonne journée thermique avec un plafond exploitable à 1850m. Les thermiques démarrent vers 11h30 avec une force correcte de 2.3 m/s. Vent de sud-ouest modéré, compatible avec l'orientation du site.",
+      conseils_vol:
+        'Privilégier le créneau 12h-15h pour les meilleures ascendances. Rester vigilant en fin de journée avec le renforcement du vent en altitude.',
+      alertes_securite:
+        '["Cisaillement possible au-dessus de 1500m","Brises de vallée renforcées après 15h"]',
+      lcl_m: 1200,
+      lfc_m: 1400,
+      el_m: 4500,
+      lifted_index: -2.1,
+      k_index: 28,
+      total_totals: 48,
+      showalter_index: 1.2,
+      wind_shear_0_3km_ms: 4.5,
+      wind_shear_0_6km_ms: 8.2,
+      skewt_image_path: null,
+      raw_sounding_data: null,
+      ai_raw_response: null,
+      analysis_status: 'completed',
+      error_message: null,
+      is_from_llm: true,
+      has_thermal_data: true,
+      flyable_hours_formatted: '11h30 – 17h00',
+      external_source_urls:
+        '{"meteo-parapente":"https://meteo-parapente.com/emagram/07280","open-meteo":"https://open-meteo.com/sounding/07280"}',
+      screenshot_paths:
+        '{"meteo-parapente":"/screenshots/emagram-001-meteo-parapente.png","open-meteo":"/screenshots/emagram-001-open-meteo.png"}',
+      sources_count: 2,
+      sources_agreement: 'high',
+      created_at: '2026-03-24T12:05:00Z',
+      updated_at: '2026-03-24T12:05:00Z',
+    })
+  ),
+  http.get('/api/emagram/history', () => HttpResponse.json([])),
 ];
 
 export const Default = meta.story({
