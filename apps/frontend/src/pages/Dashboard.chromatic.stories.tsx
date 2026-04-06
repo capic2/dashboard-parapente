@@ -104,6 +104,13 @@ const meta = preview.meta({
         http.get('/api/sites/:siteId/landings/weather', () =>
           HttpResponse.json([])
         ),
+        http.get('/api/emagram/hours', () =>
+          HttpResponse.json({
+            site_id: '',
+            forecast_date: '2026-03-24',
+            hours: [],
+          })
+        ),
         http.get('/api/emagram/latest', () => HttpResponse.json(null)),
         http.get('/api/emagram/history', () => HttpResponse.json([])),
       ],

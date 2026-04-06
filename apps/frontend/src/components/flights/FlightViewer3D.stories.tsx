@@ -37,8 +37,6 @@ const meta = preview.meta({
   tags: ['autodocs', 'test-skip'],
 });
 
-
-
 const mockGPXData = {
   coordinates: Array.from({ length: 100 }, (_, i) => ({
     lat: 45.9 + i * 0.001,
@@ -56,10 +54,10 @@ export const Default = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('/api/flights/:id/gpx', () => {
+        http.get('*/api/flights/:id/gpx-data', () => {
           return HttpResponse.json(mockGPXData);
         }),
-        http.get('/api/flights/:id', () => {
+        http.get('*/api/flights/:id', () => {
           return HttpResponse.json({
             id: 'flight-1',
             name: 'Test Flight',
@@ -79,7 +77,7 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('/api/flights/:id/gpx', async () => {
+        http.get('*/api/flights/:id/gpx-data', async () => {
           await new Promise(() => {});
         }),
       ],
@@ -95,7 +93,7 @@ export const Error = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('/api/flights/:id/gpx', () => {
+        http.get('*/api/flights/:id/gpx-data', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       ],
