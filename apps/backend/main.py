@@ -535,21 +535,23 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"⚠️ Could not load app settings: {e}")
 
-    # Start weather scheduler
-    start_scheduler()
+    # Start schedulers and cache warmup (skip in E2E/CI to avoid noisy external calls)
+    if config.SCHEDULER_ENABLED:
+        start_scheduler()
 
-    # Start emagram scheduler
-    from emagram_scheduler.emagram_scheduler import (
-        setup_emagram_scheduler,
-    )
-    from emagram_scheduler.emagram_scheduler import start_scheduler as start_emagram
+        from emagram_scheduler.emagram_scheduler import (
+            setup_emagram_scheduler,
+        )
+        from emagram_scheduler.emagram_scheduler import start_scheduler as start_emagram
 
-    emagram_scheduler = setup_emagram_scheduler(app)
-    start_emagram(emagram_scheduler)
+        emagram_scheduler = setup_emagram_scheduler(app)
+        start_emagram(emagram_scheduler)
 
-    # Initial cache warmup (non-blocking)
-    logger.info("🔥 Triggering initial cache warmup...")
-    asyncio.create_task(initial_cache_warmup())
+        # Initial cache warmup (non-blocking)
+        logger.info("🔥 Triggering initial cache warmup...")
+        asyncio.create_task(initial_cache_warmup())
+    else:
+        logger.info("📅 Scheduler disabled, skipping cache warmup")
 
     yield
 

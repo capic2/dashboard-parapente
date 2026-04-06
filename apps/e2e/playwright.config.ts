@@ -66,6 +66,10 @@ export default defineConfig({
         BACKEND_WEATHERAPI_KEY: process.env.BACKEND_WEATHERAPI_KEY || 'test_key',
         BACKEND_METEOBLUE_API_KEY: process.env.BACKEND_METEOBLUE_API_KEY || 'test_key',
         BACKEND_STRAVA_VERIFY_TOKEN: process.env.BACKEND_STRAVA_VERIFY_TOKEN || 'PARAPENTE_E2E_TEST',
+        // Disable schedulers in E2E to avoid noisy background fetches and external API calls
+        BACKEND_SCHEDULER_ENABLED: 'false',
+        // Use fake Redis in E2E (no Redis service in CI)
+        BACKEND_USE_FAKE_REDIS: 'true',
       },
     },
     {
