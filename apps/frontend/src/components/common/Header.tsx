@@ -17,6 +17,12 @@ export default function Header() {
           {t('header.dashboard')}
         </Link>
         <Link
+          to="/weather"
+          className="px-3.5 py-2 rounded-md text-gray-600 dark:text-gray-300 text-sm transition-all hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-sky-600 [&.active]:bg-sky-600 [&.active]:text-white"
+        >
+          {t('header.weather')}
+        </Link>
+        <Link
           to="/flights"
           className="px-3.5 py-2 rounded-md text-gray-600 dark:text-gray-300 text-sm transition-all hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-sky-600 [&.active]:bg-sky-600 [&.active]:text-white"
         >

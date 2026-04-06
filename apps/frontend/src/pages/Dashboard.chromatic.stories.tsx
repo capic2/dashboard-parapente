@@ -48,15 +48,22 @@ const meta = preview.meta({
         http.get('/api/spots', () => HttpResponse.json(mockSites)),
         http.get('/api/spots/best', () =>
           HttpResponse.json({
-            site_id: 'site-arguel',
-            site_name: 'Arguel',
+            site: {
+              id: 'site-arguel',
+              name: 'Arguel',
+              rating: 4,
+              orientation: 'SW',
+            },
+            paraIndex: 78,
+            windDirection: 'SW',
+            windSpeed: 12,
+            windFavorability: 'good',
             score: 82,
-            para_index: 78,
-            verdict: 'bon',
-            wind_speed: 12,
-            wind_direction: 'SW',
-            orientation: 'SW',
-            wind_favorability: 'favorable',
+            verdict: 'BON',
+            reason: 'Bonnes conditions',
+            flyableSlot: '10h-17h',
+            thermalCeiling: 1850,
+            cached_at: '2025-06-15T08:30:00Z',
           })
         ),
         http.get('/api/spots/:id', ({ params }) => {
@@ -65,20 +72,6 @@ const meta = preview.meta({
             ? HttpResponse.json(site)
             : new HttpResponse(null, { status: 404 });
         }),
-        http.get('/api/weather/:spotId/daily-summary', () =>
-          HttpResponse.json({
-            days: Array.from({ length: 7 }, (_, i) => ({
-              day_index: i,
-              date: `2026-03-${24 + i}`,
-              para_index: 10 * i,
-              verdict: i < 3 ? 'bon' : 'moyen',
-              emoji: i < 3 ? '🟢' : '🟡',
-              temp_min: 10 + i,
-              temp_max: 18 + i,
-              wind_avg: 10 + i * 2,
-            })),
-          })
-        ),
         http.get('/api/weather/:spotId', () =>
           HttpResponse.json({
             site_id: 'site-arguel',
@@ -87,7 +80,21 @@ const meta = preview.meta({
             days: 1,
             para_index: 78,
             verdict: 'bon',
-            consensus: [],
+            emoji: '🟢',
+            explanation: 'Conditions favorables',
+            consensus: [
+              {
+                hour: 10,
+                temperature: 18,
+                wind_speed: 12,
+                wind_gust: 18,
+                wind_direction: 225,
+                precipitation: 0,
+                cloud_cover: 20,
+                para_index: 78,
+                verdict: 'bon',
+              },
+            ],
           })
         ),
         http.get('/api/flights/stats', () =>
@@ -100,12 +107,6 @@ const meta = preview.meta({
             favorite_spot: 'Arguel',
           })
         ),
-        http.get('/api/sites/:siteId/landings', () => HttpResponse.json([])),
-        http.get('/api/sites/:siteId/landings/weather', () =>
-          HttpResponse.json([])
-        ),
-        http.get('/api/emagram/latest', () => HttpResponse.json(null)),
-        http.get('/api/emagram/history', () => HttpResponse.json([])),
       ],
     },
   },

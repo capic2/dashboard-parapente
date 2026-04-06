@@ -1,15 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import SiteSelector from '../components/dashboard/SiteSelector';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import CurrentConditions from '../components/weather/CurrentConditions';
-import Forecast7Day from '../components/weather/Forecast7Day';
-import HourlyForecast from '../components/weather/HourlyForecast';
 import StatsPanel from '../components/dashboard/StatsPanel';
-import EmagramWidget from '../components/dashboard/EmagramWidget';
+import DaySelector from '../components/dashboard/DaySelector';
+import AllSitesConditions from '../components/dashboard/AllSitesConditions';
 import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
-import WeatherMultiLanding from '../components/weather/WeatherMultiLanding';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import { useBestSpotAPI } from '../hooks/weather/useBestSpotAPI';
 
@@ -17,19 +13,8 @@ export default function Dashboard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data: sites } = useSuspenseQuery(sitesQueryOptions());
-  const [userSelectedSiteId, setSelectedSiteId] = useState<string>('');
-  const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
-  const selectedSiteId =
-    userSelectedSiteId || (sites.length > 0 ? sites[0].id : '');
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
-  const [weatherDataMap] = useState<Map<string, Record<string, unknown>>>(
-    new Map()
-  );
-
-  // Handler for day selection (no scroll)
-  const handleSelectDay = (dayIndex: number) => {
-    setSelectedDayIndex(dayIndex);
-  };
 
   if (sites.length === 0) {
     return (
@@ -58,44 +43,25 @@ export default function Dashboard() {
   return (
     <div>
       <div className="space-y-4">
-        {/* 1. Stats Panel (full width) */}
+        {/* 1. Stats Panel */}
         <StatsPanel />
 
-        {/* 2. Site Selector (full width) */}
-        <SiteSelector
-          selectedSiteId={selectedSiteId}
-          onSelectSite={setSelectedSiteId}
-          weatherData={weatherDataMap}
-        />
-
-        {/* 3. Current Conditions (full width) */}
-        <CurrentConditions spotId={selectedSiteId} />
-
-        {/* 3.5. Landing Sites Weather (if any) */}
-        <WeatherMultiLanding
-          spotId={selectedSiteId}
-          dayIndex={selectedDayIndex}
-        />
-
-        {/* 4. Day Selector - 7-Day Forecast (full width) */}
-        <Forecast7Day
-          spotId={selectedSiteId}
+        {/* 2. Day Selector + Best Spot */}
+        <DaySelector
           selectedDayIndex={selectedDayIndex}
-          onSelectDay={handleSelectDay}
+          onSelectDay={setSelectedDayIndex}
         />
 
-        {/* 5. Best Spot | Emagram (40% / 60%) */}
-        <div className="grid grid-cols-1 lg:grid-cols-[40%_60%] gap-4">
-          <BestSpotSuggestion
-            bestSpot={bestSpot ?? null}
-            onSelectSite={setSelectedSiteId}
-            selectedDayIndex={selectedDayIndex}
-          />
-          <EmagramWidget siteId={selectedSiteId} dayIndex={selectedDayIndex} />
-        </div>
+        <BestSpotSuggestion
+          bestSpot={bestSpot ?? null}
+          onSelectSite={(siteId) =>
+            void navigate({ to: '/weather', search: { siteId } })
+          }
+          selectedDayIndex={selectedDayIndex}
+        />
 
-        {/* 6. Hourly Forecast (full width) */}
-        <HourlyForecast spotId={selectedSiteId} dayIndex={selectedDayIndex} />
+        {/* 3. Current Conditions - All Sites (auto-refresh hourly) */}
+        <AllSitesConditions />
       </div>
     </div>
   );
