@@ -736,195 +736,6 @@ export const handlers = [
   }),
 
   // ============================================
-  // EMAGRAM ANALYSIS
-  // ============================================
-
-  // GET /api/emagram/latest - Dernière analyse émagramme
-  ...createHandler('get', '/emagram/latest', ({ request }) => {
-    const url = new URL(request.url);
-    const hour = url.searchParams.get('hour');
-
-    return HttpResponse.json({
-      id: 'emagram-001',
-      analysis_date: '2025-06-15',
-      analysis_time: '12:00',
-      analysis_datetime: '2025-06-15T12:00:00Z',
-      station_code: 'LFQN',
-      station_name: 'Besançon',
-      station_latitude: 47.25,
-      station_longitude: 6.08,
-      distance_km: 15.3,
-      data_source: 'meteofrance',
-      sounding_time: '12Z',
-      llm_provider: 'anthropic',
-      llm_model: 'claude-sonnet-4-20250514',
-      llm_tokens_used: 1200,
-      llm_cost_usd: 0.004,
-      analysis_method: 'llm_vision',
-      plafond_thermique_m: 2200,
-      force_thermique_ms: 2.5,
-      cape_jkg: 450,
-      stabilite_atmospherique: 'Instable conditionnel',
-      cisaillement_vent: 'Faible',
-      heure_debut_thermiques: '11:00',
-      heure_fin_thermiques: '17:00',
-      heures_volables_total: 6,
-      risque_orage: 'Faible',
-      score_volabilite: 75,
-      resume_conditions: 'Bonnes conditions thermiques prévues avec plafond à 2200m.',
-      conseils_vol: 'Décollage recommandé entre 11h et 14h.',
-      alertes_securite: '[]',
-      lcl_m: 800,
-      lfc_m: 1200,
-      el_m: 8000,
-      lifted_index: -2.5,
-      k_index: 28,
-      total_totals: 48,
-      showalter_index: -1.5,
-      wind_shear_0_3km_ms: 3.2,
-      wind_shear_0_6km_ms: 5.8,
-      skewt_image_path: null,
-      raw_sounding_data: null,
-      ai_raw_response: null,
-      analysis_status: 'completed',
-      error_message: null,
-      is_from_llm: true,
-      has_thermal_data: true,
-      flyable_hours_formatted: '11:00 - 17:00',
-      forecast_date: '2025-06-15',
-      forecast_hour: hour ? parseInt(hour, 10) : null,
-      external_source_urls: null,
-      screenshot_paths: null,
-      sources_count: null,
-      sources_agreement: null,
-      sources_errors: null,
-      created_at: '2025-06-15T08:00:00Z',
-      updated_at: '2025-06-15T12:00:00Z',
-    });
-  }),
-
-  // GET /api/emagram/hours - Heures disponibles pour l'émagramme
-  ...createHandler('get', '/emagram/hours', ({ request }) => {
-    const url = new URL(request.url);
-    const siteId = url.searchParams.get('site_id') || 'site-1';
-
-    return HttpResponse.json({
-      site_id: siteId,
-      forecast_date: '2025-06-15',
-      hours: [
-        { hour: 9, score: 40, status: 'completed', id: 'emagram-h09' },
-        { hour: 10, score: 55, status: 'completed', id: 'emagram-h10' },
-        { hour: 11, score: 65, status: 'completed', id: 'emagram-h11' },
-        { hour: 12, score: 75, status: 'completed', id: 'emagram-h12' },
-        { hour: 13, score: 80, status: 'completed', id: 'emagram-h13' },
-        { hour: 14, score: 72, status: 'completed', id: 'emagram-h14' },
-        { hour: 15, score: 60, status: 'completed', id: 'emagram-h15' },
-        { hour: 16, score: 45, status: 'completed', id: 'emagram-h16' },
-        { hour: 17, score: 30, status: 'completed', id: 'emagram-h17' },
-      ],
-    });
-  }),
-
-  // GET /api/emagram/history - Historique des analyses
-  ...createHandler('get', '/emagram/history', () => {
-    return HttpResponse.json([
-      {
-        id: 'emagram-001',
-        analysis_date: '2025-06-15',
-        analysis_time: '12:00',
-        station_code: 'LFQN',
-        station_name: 'Besançon',
-        distance_km: 15.3,
-        score_volabilite: 75,
-        plafond_thermique_m: 2200,
-        force_thermique_ms: 2.5,
-        heures_volables_total: 6,
-        analysis_method: 'llm_vision',
-        analysis_status: 'completed',
-        created_at: '2025-06-15T08:00:00Z',
-      },
-      {
-        id: 'emagram-002',
-        analysis_date: '2025-06-14',
-        analysis_time: '12:00',
-        station_code: 'LFQN',
-        station_name: 'Besançon',
-        distance_km: 15.3,
-        score_volabilite: 60,
-        plafond_thermique_m: 1800,
-        force_thermique_ms: 1.8,
-        heures_volables_total: 4,
-        analysis_method: 'llm_vision',
-        analysis_status: 'completed',
-        created_at: '2025-06-14T08:00:00Z',
-      },
-    ]);
-  }),
-
-  // POST /api/emagram/analyze - Déclencher une analyse
-  ...createHandler('post', '/emagram/analyze', async ({ request }) => {
-    const body = (await request.json()) as any;
-
-    return HttpResponse.json({
-      id: `emagram-${Date.now()}`,
-      analysis_date: '2025-06-15',
-      analysis_time: '12:00',
-      analysis_datetime: '2025-06-15T12:00:00Z',
-      station_code: 'LFQN',
-      station_name: 'Besançon',
-      station_latitude: 47.25,
-      station_longitude: 6.08,
-      distance_km: 15.3,
-      data_source: 'meteofrance',
-      sounding_time: '12Z',
-      llm_provider: 'anthropic',
-      llm_model: 'claude-sonnet-4-20250514',
-      llm_tokens_used: 1200,
-      llm_cost_usd: 0.004,
-      analysis_method: 'llm_vision',
-      plafond_thermique_m: 2200,
-      force_thermique_ms: 2.5,
-      cape_jkg: 450,
-      stabilite_atmospherique: 'Instable conditionnel',
-      cisaillement_vent: 'Faible',
-      heure_debut_thermiques: '11:00',
-      heure_fin_thermiques: '17:00',
-      heures_volables_total: 6,
-      risque_orage: 'Faible',
-      score_volabilite: 75,
-      resume_conditions: 'Bonnes conditions thermiques prévues.',
-      conseils_vol: 'Décollage recommandé entre 11h et 14h.',
-      alertes_securite: '[]',
-      lcl_m: 800,
-      lfc_m: 1200,
-      el_m: 8000,
-      lifted_index: -2.5,
-      k_index: 28,
-      total_totals: 48,
-      showalter_index: -1.5,
-      wind_shear_0_3km_ms: 3.2,
-      wind_shear_0_6km_ms: 5.8,
-      skewt_image_path: null,
-      raw_sounding_data: null,
-      ai_raw_response: null,
-      analysis_status: 'completed',
-      error_message: null,
-      is_from_llm: true,
-      has_thermal_data: true,
-      flyable_hours_formatted: '11:00 - 17:00',
-      forecast_date: body.day_index ? '2025-06-15' : '2025-06-15',
-      forecast_hour: body.hour ?? null,
-      external_source_urls: null,
-      screenshot_paths: null,
-      sources_count: null,
-      sources_agreement: null,
-      sources_errors: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-  }),
-
-  // ============================================
   // ALERTS / ALERTES
   // ============================================
 
@@ -940,6 +751,199 @@ export const handlers = [
       id: `alert-${Date.now()}`,
       ...body,
       created_at: new Date().toISOString(),
+    });
+  }),
+
+  // ============================================
+  // EMAGRAM / SOUNDING ANALYSIS
+  // ============================================
+
+  // GET /api/emagram/hours - Available hourly emagram analyses for slider
+  ...createHandler('get', '/emagram/hours', ({ request }) => {
+    const url = new URL(request.url);
+    const siteId = url.searchParams.get('site_id') || 'unknown';
+    const dayIndex = parseInt(url.searchParams.get('day_index') || '0', 10);
+
+    const baseDate = new Date('2026-04-06');
+    baseDate.setDate(baseDate.getDate() + dayIndex);
+
+    return HttpResponse.json({
+      site_id: siteId,
+      forecast_date: baseDate.toISOString().split('T')[0],
+      hours: [
+        { hour: 9, score: 45, status: 'completed', id: 'emagram-h9' },
+        { hour: 12, score: 72, status: 'completed', id: 'emagram-h12' },
+        { hour: 15, score: 85, status: 'completed', id: 'emagram-h15' },
+        { hour: 18, score: 60, status: 'completed', id: 'emagram-h18' },
+      ],
+    });
+  }),
+
+  // GET /api/emagram/latest - Latest emagram analysis for a site
+  ...createHandler('get', '/emagram/latest', ({ request }) => {
+    const url = new URL(request.url);
+    const siteId = url.searchParams.get('site_id') || 'unknown';
+    const hour = url.searchParams.get('hour');
+
+    return HttpResponse.json({
+      id: 'emagram-latest-1',
+      analysis_date: '2026-04-06',
+      analysis_time: '12:00',
+      analysis_datetime: '2026-04-06T12:00:00Z',
+      station_code: siteId,
+      station_name: 'Station Mock',
+      station_latitude: 47.24,
+      station_longitude: 6.02,
+      distance_km: 15.3,
+      data_source: 'open_meteo',
+      sounding_time: '12Z',
+      llm_provider: 'gemini',
+      llm_model: 'gemini-2.0-flash',
+      llm_tokens_used: 1200,
+      llm_cost_usd: 0.002,
+      analysis_method: 'llm_vision',
+      plafond_thermique_m: 2200,
+      force_thermique_ms: 2.5,
+      cape_jkg: 450,
+      stabilite_atmospherique: 'Instable modéré',
+      cisaillement_vent: 'Faible',
+      heure_debut_thermiques: '11:00',
+      heure_fin_thermiques: '17:00',
+      heures_volables_total: 6,
+      risque_orage: 'Faible',
+      score_volabilite: hour ? 72 : 85,
+      resume_conditions:
+        'Bonnes conditions thermiques prévues. Plafond à 2200m, thermiques modérés à forts.',
+      conseils_vol:
+        'Décoller entre 11h et 14h pour profiter des meilleures conditions. Plafond exploitable jusqu\'à 2200m.',
+      alertes_securite: '["Brise de vallée modérée après 15h"]',
+      lcl_m: 1200,
+      lfc_m: 1500,
+      el_m: 5000,
+      lifted_index: -2.5,
+      k_index: 28,
+      total_totals: 48,
+      showalter_index: -1.2,
+      wind_shear_0_3km_ms: 3.5,
+      wind_shear_0_6km_ms: 6.2,
+      skewt_image_path: null,
+      raw_sounding_data: null,
+      ai_raw_response: null,
+      analysis_status: 'completed',
+      error_message: null,
+      is_from_llm: true,
+      has_thermal_data: true,
+      flyable_hours_formatted: '11:00 - 17:00',
+      forecast_date: '2026-04-06',
+      forecast_hour: hour ? parseInt(hour, 10) : null,
+      external_source_urls: null,
+      screenshot_paths: null,
+      sources_count: 1,
+      sources_agreement: null,
+      sources_errors: null,
+      created_at: '2026-04-06T08:00:00Z',
+      updated_at: '2026-04-06T08:00:00Z',
+    });
+  }),
+
+  // GET /api/emagram/history - Historical emagram analyses
+  ...createHandler('get', '/emagram/history', () => {
+    return HttpResponse.json([
+      {
+        id: 'emagram-hist-1',
+        analysis_date: '2026-04-05',
+        analysis_time: '12:00',
+        station_code: 'LSMP',
+        station_name: 'Payerne',
+        distance_km: 45.2,
+        score_volabilite: 78,
+        plafond_thermique_m: 2100,
+        force_thermique_ms: 2.3,
+        heures_volables_total: 5,
+        analysis_method: 'llm_vision',
+        analysis_status: 'completed',
+        created_at: '2026-04-05T08:00:00Z',
+      },
+      {
+        id: 'emagram-hist-2',
+        analysis_date: '2026-04-04',
+        analysis_time: '12:00',
+        station_code: 'LSMP',
+        station_name: 'Payerne',
+        distance_km: 45.2,
+        score_volabilite: 55,
+        plafond_thermique_m: 1600,
+        force_thermique_ms: 1.5,
+        heures_volables_total: 3,
+        analysis_method: 'llm_vision',
+        analysis_status: 'completed',
+        created_at: '2026-04-04T08:00:00Z',
+      },
+    ]);
+  }),
+
+  // POST /api/emagram/analyze - Trigger manual emagram analysis
+  ...createHandler('post', '/emagram/analyze', async ({ request }) => {
+    const body = (await request.json()) as any;
+
+    return HttpResponse.json({
+      id: `emagram-${Date.now()}`,
+      analysis_date: '2026-04-06',
+      analysis_time: '12:00',
+      analysis_datetime: '2026-04-06T12:00:00Z',
+      station_code: body.site_id || 'LSMP',
+      station_name: 'Station Mock',
+      station_latitude: 47.24,
+      station_longitude: 6.02,
+      distance_km: 15.3,
+      data_source: 'open_meteo',
+      sounding_time: '12Z',
+      llm_provider: 'gemini',
+      llm_model: 'gemini-2.0-flash',
+      llm_tokens_used: 1500,
+      llm_cost_usd: 0.003,
+      analysis_method: 'llm_vision',
+      plafond_thermique_m: 2200,
+      force_thermique_ms: 2.5,
+      cape_jkg: 450,
+      stabilite_atmospherique: 'Instable modéré',
+      cisaillement_vent: 'Faible',
+      heure_debut_thermiques: '11:00',
+      heure_fin_thermiques: '17:00',
+      heures_volables_total: 6,
+      risque_orage: 'Faible',
+      score_volabilite: 82,
+      resume_conditions:
+        'Bonnes conditions thermiques. Plafond à 2200m.',
+      conseils_vol:
+        'Décoller entre 11h et 14h.',
+      alertes_securite: '[]',
+      lcl_m: 1200,
+      lfc_m: 1500,
+      el_m: 5000,
+      lifted_index: -2.5,
+      k_index: 28,
+      total_totals: 48,
+      showalter_index: -1.2,
+      wind_shear_0_3km_ms: 3.5,
+      wind_shear_0_6km_ms: 6.2,
+      skewt_image_path: null,
+      raw_sounding_data: null,
+      ai_raw_response: null,
+      analysis_status: 'completed',
+      error_message: null,
+      is_from_llm: true,
+      has_thermal_data: true,
+      flyable_hours_formatted: '11:00 - 17:00',
+      forecast_date: '2026-04-06',
+      forecast_hour: body.hour ?? null,
+      external_source_urls: null,
+      screenshot_paths: null,
+      sources_count: 1,
+      sources_agreement: null,
+      sources_errors: null,
+      created_at: '2026-04-06T12:00:00Z',
+      updated_at: '2026-04-06T12:00:00Z',
     });
   }),
 

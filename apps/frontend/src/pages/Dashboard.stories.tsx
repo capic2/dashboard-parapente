@@ -162,6 +162,18 @@ const defaultHandlers = [
   http.get('/api/flights/stats', () => HttpResponse.json(mockStats)),
   http.get('/api/sites/:siteId/landings', () => HttpResponse.json([])),
   http.get('/api/sites/:siteId/landings/weather', () => HttpResponse.json([])),
+  http.get('/api/emagram/hours', () =>
+    HttpResponse.json({
+      site_id: '07280',
+      forecast_date: '2026-03-24',
+      hours: [
+        { hour: 9, score: 45, status: 'completed', id: 'emagram-h9' },
+        { hour: 12, score: 72, status: 'completed', id: 'emagram-h12' },
+        { hour: 15, score: 85, status: 'completed', id: 'emagram-h15' },
+        { hour: 18, score: 60, status: 'completed', id: 'emagram-h18' },
+      ],
+    })
+  ),
   http.get('/api/emagram/latest', () =>
     HttpResponse.json({
       id: 'emagram-001',
