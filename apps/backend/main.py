@@ -413,7 +413,7 @@ def run_migrations():
     """
     from database import DB_PATH
 
-    migrations_dir = Path(__file__).parent / "db" / "migrations"
+    migrations_dir = Path(__file__).parent / "sql_migrations"
 
     if not migrations_dir.exists():
         logger.warning(f"Migrations directory not found: {migrations_dir}")
@@ -445,7 +445,9 @@ def run_migrations():
 
         for raw_statement in sql.split(";"):
             # Strip comment lines and whitespace
-            lines = [l for l in raw_statement.splitlines() if not l.strip().startswith("--")]
+            lines = [
+                line for line in raw_statement.splitlines() if not line.strip().startswith("--")
+            ]
             clean = "\n".join(lines).strip()
             if not clean:
                 continue
@@ -459,14 +461,18 @@ def run_migrations():
                 if "already exists" in err_msg or "duplicate column name" in err_msg:
                     skipped += 1
                 else:
-                    logger.error(f"✗ Migration {migration_file.name} failed on statement: {clean[:100]}")
+                    logger.error(
+                        f"✗ Migration {migration_file.name} failed on statement: {clean[:100]}"
+                    )
                     logger.error(f"  Error: {e}")
                     raise
 
         if skipped > 0 and applied == 0:
             logger.info(f"⊙ Migration {migration_file.name} already applied (skipping)")
         elif skipped > 0:
-            logger.info(f"✓ Migration {migration_file.name}: {applied} applied, {skipped} already existed")
+            logger.info(
+                f"✓ Migration {migration_file.name}: {applied} applied, {skipped} already existed"
+            )
         else:
             logger.info(f"✓ Migration {migration_file.name} applied successfully")
 
