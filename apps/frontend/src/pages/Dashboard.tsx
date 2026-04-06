@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSuspenseQuery } from '@tanstack/react-query';
+import { useSuspenseQuery, useQueries } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import StatsPanel from '../components/dashboard/StatsPanel';
 import DaySelector from '../components/dashboard/DaySelector';
@@ -8,6 +8,10 @@ import AllSitesConditions from '../components/dashboard/AllSitesConditions';
 import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import { useBestSpotAPI } from '../hooks/weather/useBestSpotAPI';
+import { createWeatherQueryFn } from '../hooks/weather/useWeather';
+import { getStaleTime } from '../lib/cacheConfig';
+import type { WeatherData } from '../types';
+import type { SiteWeatherEntry } from '../components/dashboard/AllSitesConditions';
 
 export default function Dashboard() {
   const { t } = useTranslation();
@@ -15,6 +19,25 @@ export default function Dashboard() {
   const { data: sites } = useSuspenseQuery(sitesQueryOptions());
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
+
+  // Fetch current weather for all sites (day 0), auto-refresh every hour
+  const weatherQueries = useQueries({
+    queries: sites.map((site) => ({
+      queryKey: ['weather', 'combined', site.id, 0] as const,
+      queryFn: createWeatherQueryFn(site.id, 0),
+      staleTime: getStaleTime(1000 * 60 * 30),
+      refetchInterval: 1000 * 60 * 60,
+      enabled: !!site.id,
+    })),
+  });
+
+  // Build entries for AllSitesConditions
+  const siteWeatherEntries: SiteWeatherEntry[] = sites.map((site, index) => ({
+    site,
+    weather: weatherQueries[index]?.data as WeatherData | undefined,
+    isLoading: weatherQueries[index]?.isLoading ?? true,
+    isError: weatherQueries[index]?.isError ?? false,
+  }));
 
   if (sites.length === 0) {
     return (
@@ -61,7 +84,7 @@ export default function Dashboard() {
         />
 
         {/* 3. Current Conditions - All Sites (auto-refresh hourly) */}
-        <AllSitesConditions />
+        <AllSitesConditions entries={siteWeatherEntries} />
       </div>
     </div>
   );

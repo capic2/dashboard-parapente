@@ -1,9 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useQueries } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { useSites } from '../../hooks/sites/useSites';
-import { createWeatherQueryFn } from '../../hooks/weather/useWeather';
-import { getStaleTime } from '../../lib/cacheConfig';
 import { WindIndicator } from '../common/WindIndicator';
 import CacheTimestamp from '../common/CacheTimestamp';
 import type { WeatherData } from '../../types';
@@ -28,17 +24,23 @@ const getVerdictEmoji = (verdict: string): string => {
   return '🔴';
 };
 
+export interface SiteWeatherEntry {
+  site: Site;
+  weather: WeatherData | undefined;
+  isLoading: boolean;
+  isError: boolean;
+}
+
+interface AllSitesConditionsProps {
+  entries: SiteWeatherEntry[];
+}
+
 function SiteConditionCard({
   site,
   weather,
   isLoading,
   isError,
-}: {
-  site: Site;
-  weather: WeatherData | undefined;
-  isLoading: boolean;
-  isError: boolean;
-}) {
+}: SiteWeatherEntry) {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -139,22 +141,12 @@ function SiteConditionCard({
   );
 }
 
-export default function AllSitesConditions() {
+export default function AllSitesConditions({
+  entries,
+}: AllSitesConditionsProps) {
   const { t } = useTranslation();
-  const { data: sites } = useSites();
-  const siteList = sites ?? [];
 
-  const weatherQueries = useQueries({
-    queries: siteList.map((site) => ({
-      queryKey: ['weather', 'combined', site.id, 0] as const,
-      queryFn: createWeatherQueryFn(site.id, 0),
-      staleTime: getStaleTime(1000 * 60 * 30),
-      refetchInterval: 1000 * 60 * 60, // auto-refresh every hour
-      enabled: !!site.id,
-    })),
-  });
-
-  if (siteList.length === 0) return null;
+  if (entries.length === 0) return null;
 
   return (
     <div>
@@ -165,14 +157,8 @@ export default function AllSitesConditions() {
         )}
       </h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {siteList.map((site, index) => (
-          <SiteConditionCard
-            key={site.id}
-            site={site}
-            weather={weatherQueries[index]?.data as WeatherData | undefined}
-            isLoading={weatherQueries[index]?.isLoading ?? true}
-            isError={weatherQueries[index]?.isError ?? false}
-          />
+        {entries.map((entry) => (
+          <SiteConditionCard key={entry.site.id} {...entry} />
         ))}
       </div>
     </div>

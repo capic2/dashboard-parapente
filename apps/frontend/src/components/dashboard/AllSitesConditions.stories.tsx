@@ -1,156 +1,90 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { http, HttpResponse } from 'msw';
 import preview from '../../../.storybook/preview';
 import AllSitesConditions from './AllSitesConditions';
+import type { SiteWeatherEntry } from './AllSitesConditions';
+import type { Site } from '@dashboard-parapente/shared-types';
+import type { WeatherData } from '../../types';
 import { expect } from 'storybook/test';
 
-// Fixed hour for deterministic mock data
-const fixedHour = 10;
+const makeSite = (id: string, name: string, orientation: string): Site =>
+  ({
+    id,
+    name,
+    code: id,
+    orientation,
+    latitude: 47.2,
+    longitude: 6.0,
+    elevation_m: 700,
+    country: 'FR',
+    is_active: true,
+  }) as Site;
 
-const mockSites = [
-  {
-    id: 'site-1',
-    name: 'Arguel',
-    code: 'arguel',
-    orientation: 'NW',
-    latitude: 47.22,
-    longitude: 6.02,
-    elevation_m: 720,
-    country: 'FR',
-    is_active: true,
-  },
-  {
-    id: 'site-2',
-    name: 'Mont Poupet Sud',
-    code: 'mont-poupet-sud',
-    orientation: 'S',
-    latitude: 46.92,
-    longitude: 5.85,
-    elevation_m: 850,
-    country: 'FR',
-    is_active: true,
-  },
-  {
-    id: 'site-3',
-    name: 'La Côte',
-    code: 'la-cote',
-    orientation: 'W',
-    latitude: 46.88,
-    longitude: 5.95,
-    elevation_m: 600,
-    country: 'FR',
-    is_active: true,
-  },
-];
-
-const makeWeatherResponse = (
-  siteId: string,
-  siteName: string,
+const makeWeather = (
+  name: string,
   paraIndex: number,
   verdict: string,
   temp: number,
   windSpeed: number,
-  windDir: number,
-  windGust: number,
-  cloudCover: number
-) => ({
-  site_id: siteId,
-  site_name: siteName,
-  day_index: 0,
-  days: 1,
+  windDir: string,
+  conditions: string
+): WeatherData => ({
+  spot_name: name,
   para_index: paraIndex,
+  score: paraIndex,
   verdict,
-  emoji: verdict === 'bon' ? '🟢' : verdict === 'moyen' ? '🟡' : '🔴',
-  explanation: `Conditions ${verdict}`,
-  consensus: [
-    {
-      hour: fixedHour,
-      temperature: temp,
-      wind_speed: windSpeed,
-      wind_gust: windGust,
-      wind_direction: windDir,
-      precipitation: verdict === 'mauvais' ? 3 : 0,
-      cloud_cover: cloudCover,
-      para_index: paraIndex,
-      verdict,
-    },
-  ],
+  temperature: temp,
+  wind_speed: windSpeed,
+  wind_direction: windDir,
+  conditions,
+  forecast_time: '2025-06-15T10:00:00Z',
+  cached_at: '2025-06-15T10:00:00Z',
 });
 
-const defaultHandlers = [
-  http.get('*/api/spots', () => HttpResponse.json({ sites: mockSites })),
-  http.get('*/api/weather/site-1', () =>
-    HttpResponse.json(
-      makeWeatherResponse('site-1', 'Arguel', 82, 'bon', 22, 12, 315, 18, 15)
-    )
-  ),
-  http.get('*/api/weather/site-2', () =>
-    HttpResponse.json(
-      makeWeatherResponse(
-        'site-2',
-        'Mont Poupet Sud',
-        55,
-        'moyen',
-        18,
-        22,
-        180,
-        30,
-        55
-      )
-    )
-  ),
-  http.get('*/api/weather/site-3', () =>
-    HttpResponse.json(
-      makeWeatherResponse(
-        'site-3',
-        'La Côte',
-        28,
-        'mauvais',
-        12,
-        35,
-        90,
-        45,
-        85
-      )
-    )
-  ),
-  http.get('*/api/spots/:id', ({ params }) => {
-    const site = mockSites.find((s) => s.id === params.id);
-    return site
-      ? HttpResponse.json(site)
-      : new HttpResponse(null, { status: 404 });
-  }),
+const threeEntries: SiteWeatherEntry[] = [
+  {
+    site: makeSite('site-1', 'Arguel', 'NW'),
+    weather: makeWeather('Arguel', 82, 'bon', 22, 12, 'NW', 'Ensoleillé'),
+    isLoading: false,
+    isError: false,
+  },
+  {
+    site: makeSite('site-2', 'Mont Poupet Sud', 'S'),
+    weather: makeWeather(
+      'Mont Poupet Sud',
+      55,
+      'moyen',
+      18,
+      22,
+      'S',
+      '45% nuages, Sec'
+    ),
+    isLoading: false,
+    isError: false,
+  },
+  {
+    site: makeSite('site-3', 'La Côte', 'W'),
+    weather: makeWeather(
+      'La Côte',
+      28,
+      'mauvais',
+      12,
+      35,
+      'E',
+      '85% nuages, 3mm pluie'
+    ),
+    isLoading: false,
+    isError: false,
+  },
 ];
 
 const meta = preview.meta({
   title: 'Components/Dashboard/AllSitesConditions',
   component: AllSitesConditions,
-  decorators: [
-    (Story) => {
-      const queryClient = new QueryClient({
-        defaultOptions: {
-          queries: {
-            retry: false,
-            gcTime: 0,
-            staleTime: 0,
-          },
-        },
-      });
-      return (
-        <QueryClientProvider client={queryClient}>
-          <div style={{ maxWidth: '900px' }}>
-            <Story />
-          </div>
-        </QueryClientProvider>
-      );
-    },
-  ],
   parameters: {
     layout: 'padded',
     docs: {
       description: {
         component:
-          'Grid of all configured sites showing current weather conditions. Auto-refreshes every hour. Click a card to navigate to the weather detail page.',
+          'Grid of all configured sites showing current weather conditions. Click a card to navigate to the weather detail page.',
       },
     },
   },
@@ -160,10 +94,8 @@ const meta = preview.meta({
 // Default with 3 sites - varied conditions
 export const Default = meta.story({
   name: 'Default (3 Sites)',
-  parameters: {
-    msw: {
-      handlers: defaultHandlers,
-    },
+  args: {
+    entries: threeEntries,
   },
 });
 
@@ -176,50 +108,33 @@ Default.test('displays all site cards', async ({ canvas }) => {
 // Loading state
 export const Loading = meta.story({
   name: 'Loading',
-  parameters: {
-    msw: {
-      handlers: [
-        http.get('*/api/spots', () => HttpResponse.json({ sites: mockSites })),
-        http.get('*/api/weather/:spotId', async () => {
-          await new Promise(() => {}); // Never resolves
-        }),
-        http.get('*/api/spots/:id', ({ params }) => {
-          const site = mockSites.find((s) => s.id === params.id);
-          return site
-            ? HttpResponse.json(site)
-            : new HttpResponse(null, { status: 404 });
-        }),
-      ],
-    },
+  args: {
+    entries: threeEntries.map((e) => ({
+      ...e,
+      weather: undefined,
+      isLoading: true,
+      isError: false,
+    })),
   },
 });
 
 // Single site
 export const SingleSite = meta.story({
   name: 'Single Site',
-  parameters: {
-    msw: {
-      handlers: [
-        http.get('*/api/spots', () =>
-          HttpResponse.json({ sites: [mockSites[0]] })
-        ),
-        http.get('*/api/weather/site-1', () =>
-          HttpResponse.json(
-            makeWeatherResponse(
-              'site-1',
-              'Arguel',
-              82,
-              'bon',
-              22,
-              12,
-              315,
-              18,
-              15
-            )
-          )
-        ),
-        http.get('*/api/spots/:id', () => HttpResponse.json(mockSites[0])),
-      ],
-    },
+  args: {
+    entries: [threeEntries[0]],
+  },
+});
+
+// Error state
+export const ErrorState = meta.story({
+  name: 'Error',
+  args: {
+    entries: threeEntries.map((e) => ({
+      ...e,
+      weather: undefined,
+      isLoading: false,
+      isError: true,
+    })),
   },
 });

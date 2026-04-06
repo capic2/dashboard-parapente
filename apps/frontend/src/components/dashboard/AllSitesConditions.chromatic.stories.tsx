@@ -1,6 +1,11 @@
 import { FigureWrapper } from '../../../.storybook/FigureWrapper.tsx';
 import preview from '../../../.storybook/preview.tsx';
-import { Default, Loading, SingleSite } from './AllSitesConditions.stories.tsx';
+import {
+  Default,
+  Loading,
+  SingleSite,
+  ErrorState,
+} from './AllSitesConditions.stories.tsx';
 
 const meta = preview.meta({
   title: 'Components/Dashboard/AllSitesConditions/Chromatic',
@@ -24,6 +29,9 @@ export const AllSitesConditionsChromatic = meta.story({
       </FigureWrapper>
       <FigureWrapper title={SingleSite.composed.name}>
         <SingleSite.Component />
+      </FigureWrapper>
+      <FigureWrapper title={ErrorState.composed.name}>
+        <ErrorState.Component />
       </FigureWrapper>
     </div>
   ),
