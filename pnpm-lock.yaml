@@ -33,8 +33,8 @@ importers:
         specifier: ^8.2.1
         version: 8.2.1
       ky:
-        specifier: ^1.14.3
-        version: 1.14.3
+        specifier: ^2.0.0
+        version: 2.0.0
       react:
         specifier: ^19.0.0
         version: 19.2.4
@@ -4359,9 +4359,9 @@ packages:
   ktx-parse@1.1.0:
     resolution: {integrity: sha512-mKp3y+FaYgR7mXWAbyyzpa/r1zDWeaunH+INJO4fou3hb45XuNSwar+7llrRyvpMWafxSIi99RNFJ05MHedaJQ==}
 
-  ky@1.14.3:
-    resolution: {integrity: sha512-9zy9lkjac+TR1c2tG+mkNSVlyOpInnWdSMiue4F+kq8TwJSgv6o8jhLRg8Ho6SnZ9wOYUq/yozts9qQCfk7bIw==}
-    engines: {node: '>=18'}
+  ky@2.0.0:
+    resolution: {integrity: sha512-KzI4Vz5AbZFAUFYGx28PCSfFWUo6/qj9Br/P6KRwDieE1xfdz0tIONepJcLw/1xLocN13GgvfJGasa+pfSkbHg==}
+    engines: {node: '>=22'}
 
   lerc@2.0.0:
     resolution: {integrity: sha512-7qo1Mq8ZNmaR4USHHm615nEW2lPeeWJ3bTyoqFbd35DLx0LUH7C6ptt5FDCTAlbIzs3+WKrk5SkJvw8AFDE2hg==}
@@ -10182,7 +10182,7 @@ snapshots:
 
   ktx-parse@1.1.0: {}
 
-  ky@1.14.3: {}
+  ky@2.0.0: {}
 
   lerc@2.0.0: {}
 
