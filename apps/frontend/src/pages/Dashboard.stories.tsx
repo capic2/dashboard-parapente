@@ -43,7 +43,7 @@ const mockSites = {
   ],
 };
 
-const mockWeather = {
+const mockWeatherArguel = {
   site_id: 'site-arguel',
   site_name: 'Arguel',
   cached_at: '2025-06-15T08:30:00Z',
@@ -65,16 +65,30 @@ const mockWeather = {
       para_index: 78,
       verdict: 'bon',
     },
+  ],
+};
+
+const mockWeatherChalais = {
+  site_id: 'site-chalais',
+  site_name: 'Chalais',
+  cached_at: '2025-06-15T08:30:00Z',
+  day_index: 0,
+  days: 1,
+  para_index: 55,
+  verdict: 'moyen',
+  emoji: '🟡',
+  explanation: 'Conditions moyennes',
+  consensus: [
     {
-      hour: 14,
-      temperature: 22,
-      wind_speed: 15,
-      wind_gust: 22,
-      wind_direction: 225,
+      hour: 10,
+      temperature: 16,
+      wind_speed: 20,
+      wind_gust: 28,
+      wind_direction: 270,
       precipitation: 0,
-      cloud_cover: 30,
-      para_index: 75,
-      verdict: 'bon',
+      cloud_cover: 45,
+      para_index: 55,
+      verdict: 'moyen',
     },
   ],
 };
@@ -113,40 +127,7 @@ const mockBestSpot = {
   cached_at: '2025-06-15T08:30:00Z',
 };
 
-const mockDailySummary = {
-  site_id: 'site-arguel',
-  site_name: 'Arguel',
-  cached_at: '2025-06-15T08:00:00Z',
-  days: Array.from({ length: 7 }, (_, i) => ({
-    day_index: i,
-    date: `2026-03-${24 + i}`,
-    para_index: 10 * i,
-    verdict: i < 3 ? 'bon' : 'moyen',
-    emoji: i < 3 ? '🟢' : '🟡',
-    temp_min: 10 + i,
-    temp_max: 18 + i,
-    wind_avg: 10 + i * 2,
-  })),
-};
-
-// 1x1 PNG placeholder for emagram screenshot previews
-const placeholderPng = (() => {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
-    <rect width="800" height="600" fill="#f3f4f6"/>
-    <text x="400" y="280" text-anchor="middle" font-family="sans-serif" font-size="24" fill="#6b7280">Émagramme</text>
-    <text x="400" y="320" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#9ca3af">Aperçu non disponible en Storybook</text>
-  </svg>`;
-  return new TextEncoder().encode(svg);
-})();
-
 const defaultHandlers = [
-  http.get(
-    '/api/emagram/screenshot/:id/:source',
-    () =>
-      new HttpResponse(placeholderPng, {
-        headers: { 'Content-Type': 'image/svg+xml' },
-      })
-  ),
   http.get('/api/spots', () => HttpResponse.json(mockSites)),
   http.get('/api/spots/best', () => HttpResponse.json(mockBestSpot)),
   http.get('/api/spots/:id', ({ params }) => {
@@ -155,10 +136,12 @@ const defaultHandlers = [
       ? HttpResponse.json(site)
       : new HttpResponse(null, { status: 404 });
   }),
-  http.get('/api/weather/:spotId/daily-summary', () =>
-    HttpResponse.json(mockDailySummary)
+  http.get('/api/weather/site-arguel', () =>
+    HttpResponse.json(mockWeatherArguel)
   ),
-  http.get('/api/weather/:spotId', () => HttpResponse.json(mockWeather)),
+  http.get('/api/weather/site-chalais', () =>
+    HttpResponse.json(mockWeatherChalais)
+  ),
   http.get('/api/flights/stats', () => HttpResponse.json(mockStats)),
   http.get('/api/sites/:siteId/landings', () => HttpResponse.json([])),
   http.get('/api/sites/:siteId/landings/weather', () => HttpResponse.json([])),
@@ -244,7 +227,7 @@ export const Default = meta.story({
 });
 
 Default.test(
-  'renders dashboard with site selector and weather',
+  'renders dashboard with best spot and all sites conditions',
   async ({ canvas }) => {
     await canvas.findByText('Arguel');
     await expect(canvas.getByText('Chalais')).toBeInTheDocument();
