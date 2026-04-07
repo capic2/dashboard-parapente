@@ -110,5 +110,10 @@
       "nx",
       "protobufjs"
     ]
+  },
+  "msw": {
+    "workerDirectory": [
+      "apps/frontend/public"
+    ]
   }
 }
