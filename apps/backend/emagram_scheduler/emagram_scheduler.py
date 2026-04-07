@@ -16,17 +16,21 @@ logger = logging.getLogger(__name__)
 
 async def run_scheduled_emagram_analysis():
     """
-    Run multi-source emagram analysis for all active sites
-    Called by scheduler every 3 hours
+    Run multi-source emagram analysis for all active sites.
+    Analyzes today (J), tomorrow (J+1), and day after (J+2).
+    Skips sites/days with MAUVAIS weather verdict to save LLM credits.
     """
     from database import get_db_context
     from emagram_multi_source import generate_hourly_emagram_for_spot
+    from llm.exceptions import QuotaExhaustedError
     from models import Site
+    from weather_pipeline import get_normalized_forecast
 
-    logger.info("📸 Starting scheduled hourly emagram analysis...")
+    logger.info("📸 Starting scheduled hourly emagram analysis (J, J+1, J+2)...")
 
     success_count = 0
     error_count = 0
+    skipped_count = 0
 
     # Get all active sites from database
     with get_db_context() as db:
@@ -34,33 +38,63 @@ async def run_scheduled_emagram_analysis():
 
         logger.info(f"Found {len(sites)} sites to analyze")
 
-    # Process each site with hourly analysis
+    # Analyze J, J+1, J+2 for each site
     for site in sites:
-        try:
-            logger.info(f"Analyzing {site.name} ({site.id}) — all hours...")
+        for day_index in range(3):
+            try:
+                # Check weather before spending LLM credits
+                with get_db_context() as db_session:
+                    forecast = await get_normalized_forecast(
+                        lat=site.latitude,
+                        lon=site.longitude,
+                        day_index=day_index,
+                        db=db_session,
+                    )
+                verdict = forecast.get("verdict", "").upper()
+                if verdict == "MAUVAIS":
+                    logger.info(f"  ⏭️ Skipping {site.name} day+{day_index} — verdict MAUVAIS")
+                    skipped_count += 1
+                    continue
 
-            with get_db_context() as db_session:
-                results = await generate_hourly_emagram_for_spot(
-                    site_id=site.id,
-                    db=db_session,
-                    force_refresh=False,  # Use cache if < 3 hours old
+                logger.info(f"Analyzing {site.name} ({site.id}) day+{day_index}...")
+
+                with get_db_context() as db_session:
+                    results = await generate_hourly_emagram_for_spot(
+                        site_id=site.id,
+                        db=db_session,
+                        force_refresh=False,  # Use cache if < 3 hours old
+                        day_index=day_index,
+                    )
+
+                site_success = sum(1 for r in results if r.get("success"))
+                site_total = len(results)
+                logger.info(
+                    f"  {site.name} day+{day_index}: {site_success}/{site_total} hours successful"
                 )
+                success_count += site_success
+                error_count += site_total - site_success
 
-            site_success = sum(1 for r in results if r.get("success"))
-            site_total = len(results)
-            logger.info(f"  {site.name}: {site_success}/{site_total} hours successful")
-            success_count += site_success
-            error_count += site_total - site_success
+                # Delay between analyses to avoid overwhelming servers
+                await asyncio.sleep(5)
 
-            # Delay between sites to avoid overwhelming servers
-            await asyncio.sleep(5)
-
-        except Exception as e:
-            logger.error(f"  ❌ Error analyzing {site.name}: {e}", exc_info=True)
-            error_count += 1
+            except QuotaExhaustedError as e:
+                logger.warning(f"  ⚠️ LLM quota exhausted during {site.name} day+{day_index}: {e}")
+                logger.warning("  Stopping all remaining analyses for this scheduler cycle.")
+                # Break both loops — quota is global, not per-site
+                logger.info(
+                    f"✅ Scheduled hourly emagram analysis stopped early (quota exhausted): "
+                    f"{success_count} success, {error_count} errors, {skipped_count} skipped"
+                )
+                return
+            except Exception as e:
+                logger.error(
+                    f"  ❌ Error analyzing {site.name} day+{day_index}: {e}", exc_info=True
+                )
+                error_count += 1
 
     logger.info(
-        f"✅ Scheduled hourly emagram analysis complete: {success_count} success, {error_count} errors"
+        f"✅ Scheduled hourly emagram analysis complete: "
+        f"{success_count} success, {error_count} errors, {skipped_count} skipped (MAUVAIS)"
     )
 
 
@@ -85,21 +119,16 @@ _scheduler: AsyncIOScheduler | None = None
 
 
 def _get_scheduler_interval() -> int:
-    """Read scheduler interval from app_settings (same as weather scheduler)."""
+    """Read emagram-specific scheduler interval (default: 180 min = 3h, matches cache TTL)."""
     try:
         from app_settings import get_setting_int
         from database import get_db_context
 
         with get_db_context() as db:
-            interval = get_setting_int("scheduler_interval_minutes", db=db, default=30)
-        return interval if interval > 0 else 30
+            interval = get_setting_int("emagram_scheduler_interval_minutes", db=db, default=180)
+        return interval if interval > 0 else 180
     except Exception:
-        try:
-            from config import SCHEDULER_INTERVAL_MINUTES
-
-            return SCHEDULER_INTERVAL_MINUTES if SCHEDULER_INTERVAL_MINUTES > 0 else 30
-        except Exception:
-            return 30
+        return 180
 
 
 def setup_emagram_scheduler(app):
