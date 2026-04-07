@@ -516,6 +516,39 @@ export const NoHourlyData = meta.story({
   },
 });
 
+// Null sunrise/sunset (e.g. AROME endpoint doesn't return daily data)
+export const NullSunriseSunset = meta.story({
+  name: 'Null Sunrise Sunset',
+  args: {
+    spotId: '1',
+    dayIndex: 0,
+  },
+  parameters: {
+    msw: {
+      handlers: [
+        http.get('*/api/weather/:spotId', () => {
+          return HttpResponse.json({
+            ...mockBackendWeatherGood,
+            sunrise: null,
+            sunset: null,
+          });
+        }),
+      ],
+    },
+  },
+});
+NullSunriseSunset.test(
+  'it renders correctly with null sunrise/sunset',
+  async ({ canvas }) => {
+    // Should render without errors - uses seasonal fallback
+    await canvas.findByText('85/100');
+
+    // Verify hours are still displayed (seasonal fallback filters hours)
+    await expect(canvas.getByText('10:00')).toBeInTheDocument();
+    await expect(canvas.getByText('12:00')).toBeInTheDocument();
+  }
+);
+
 // Different day index
 export const DayTwo = meta.story({
   name: 'Day Two',
