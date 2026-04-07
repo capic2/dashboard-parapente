@@ -32,7 +32,7 @@ class MeteoblueScraper(PlaywrightScraper):
 
     Data provided:
     - Temperature (°C)
-    - Wind speed (m/s converted from displayed km/h)
+    - Wind speed (km/h)
     - Wind direction (degrees from compass or image)
     - Precipitation (mm)
     - Cloud cover (%) - from text or inferred from picto
