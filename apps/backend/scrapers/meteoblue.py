@@ -243,6 +243,7 @@ class MeteoblueScraper(PlaywrightScraper):
                         "datetime": dt.isoformat(),
                         "temperature": None,
                         "wind_speed": None,
+                        "wind_gust": None,
                         "wind_direction": None,
                         "precipitation": 0.0,
                         "clouds": None,
@@ -287,7 +288,7 @@ class MeteoblueScraper(PlaywrightScraper):
                     wind_match = re.search(r"(\d+)", wind_text)
                     if wind_match:
                         wind_kmh = int(wind_match.group(1))
-                        hourly_data[i]["wind_speed"] = round(wind_kmh / 3.6, 1)  # km/h to m/s
+                        hourly_data[i]["wind_speed"] = wind_kmh  # Already km/h
 
                     # Try to extract wind direction from div class (format: "glyph winddir SE")
                     wind_dir_div = cell.find("div", class_="winddir")
@@ -300,6 +301,18 @@ class MeteoblueScraper(PlaywrightScraper):
                                 if direction is not None:
                                     hourly_data[i]["wind_direction"] = direction
                                     break
+
+            # Parse wind gusts row
+            gust_row = hourly_table.find("tr", class_="windgusts")
+            if gust_row:
+                gust_cells = gust_row.find_all("td")
+                for i, cell in enumerate(gust_cells):
+                    if i >= len(hourly_data):
+                        break
+                    gust_text = cell.get_text(strip=True)
+                    gust_match = re.search(r"(\d+)", gust_text)
+                    if gust_match:
+                        hourly_data[i]["wind_gust"] = int(gust_match.group(1))  # km/h
 
             # Parse precipitation row
             # Each cell contains two elements:
