@@ -48,7 +48,7 @@ async def fetch_open_meteo(lat: float, lon: float, days: int = 2) -> dict[str, A
         }
 
         if use_arome:
-            params["models"] = "arome_france_hd"
+            params["models"] = "meteofrance_arome_france_hd"
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(url, params=params)
@@ -58,6 +58,7 @@ async def fetch_open_meteo(lat: float, lon: float, days: int = 2) -> dict[str, A
         return {
             "success": True,
             "source": "open-meteo",
+            "model": "arome_france_hd" if use_arome else "best_match",
             "data": data,
             "timestamp": datetime.now().isoformat(),
         }
