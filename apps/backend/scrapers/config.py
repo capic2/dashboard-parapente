@@ -21,7 +21,7 @@ SOURCES_CONFIG = {
         "temporal_resolution": "1h",
         "coverage": "24h/day",
         "forecast_range": "7 days",
-        "model": "ICON/GFS",
+        "model": "AROME France HD (FR) / best_match (autre)",
         "provides": [
             "temperature",
             "wind_speed",

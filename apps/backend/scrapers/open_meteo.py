@@ -6,9 +6,17 @@ from typing import Any
 import httpx
 
 
+def _is_in_france(lat: float, lon: float) -> bool:
+    """Check if coordinates fall within metropolitan France bounding box."""
+    return 41.3 <= lat <= 51.1 and -5.2 <= lon <= 9.6
+
+
 async def fetch_open_meteo(lat: float, lon: float, days: int = 2) -> dict[str, Any]:
     """
     Fetch weather from Open-Meteo API (free, no auth required)
+
+    Uses AROME France HD (1.5km resolution) for French locations via the
+    Météo-France endpoint, falls back to generic best_match for other locations.
 
     Args:
         lat: Latitude coordinate
@@ -19,15 +27,28 @@ async def fetch_open_meteo(lat: float, lon: float, days: int = 2) -> dict[str, A
         Dict with success status, data, source, and timestamp
     """
     try:
-        url = "https://api.open-meteo.com/v1/forecast"
+        use_arome = _is_in_france(lat, lon)
+
+        if use_arome:
+            url = "https://api.open-meteo.com/v1/meteofrance"
+            hourly_params = "temperature_2m,windspeed_10m,wind_direction_10m,windgusts_10m,precipitation,cloudcover,cape"
+            forecast_days = min(days, 2)  # AROME HD limited to 2 days
+        else:
+            url = "https://api.open-meteo.com/v1/forecast"
+            hourly_params = "temperature_2m,windspeed_10m,wind_direction_10m,windgusts_10m,precipitation,cloudcover,cape,lifted_index"
+            forecast_days = days
+
         params = {
             "latitude": lat,
             "longitude": lon,
-            "hourly": "temperature_2m,windspeed_10m,wind_direction_10m,windgusts_10m,precipitation,cloudcover,cape,lifted_index",
+            "hourly": hourly_params,
             "daily": "sunrise,sunset",
             "timezone": "Europe/Paris",
-            "forecast_days": days,
+            "forecast_days": forecast_days,
         }
+
+        if use_arome:
+            params["models"] = "meteofrance_arome_france_hd"
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(url, params=params)
@@ -37,6 +58,7 @@ async def fetch_open_meteo(lat: float, lon: float, days: int = 2) -> dict[str, A
         return {
             "success": True,
             "source": "open-meteo",
+            "model": "arome_france_hd" if use_arome else "best_match",
             "data": data,
             "timestamp": datetime.now().isoformat(),
         }
