@@ -22,6 +22,7 @@ async def run_scheduled_emagram_analysis():
     """
     from database import get_db_context
     from emagram_multi_source import generate_hourly_emagram_for_spot
+    from llm.exceptions import QuotaExhaustedError
     from models import Site
     from weather_pipeline import get_normalized_forecast
 
@@ -76,6 +77,15 @@ async def run_scheduled_emagram_analysis():
                 # Delay between analyses to avoid overwhelming servers
                 await asyncio.sleep(5)
 
+            except QuotaExhaustedError as e:
+                logger.warning(f"  ⚠️ LLM quota exhausted during {site.name} day+{day_index}: {e}")
+                logger.warning("  Stopping all remaining analyses for this scheduler cycle.")
+                # Break both loops — quota is global, not per-site
+                logger.info(
+                    f"✅ Scheduled hourly emagram analysis stopped early (quota exhausted): "
+                    f"{success_count} success, {error_count} errors, {skipped_count} skipped"
+                )
+                return
             except Exception as e:
                 logger.error(
                     f"  ❌ Error analyzing {site.name} day+{day_index}: {e}", exc_info=True
