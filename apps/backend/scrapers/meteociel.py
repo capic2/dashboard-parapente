@@ -323,20 +323,20 @@ class MeteocielScraper(BaseScraper):
                             if direction_match:
                                 wind_direction = float(direction_match.group(1))
 
-                    # Wind speed mean (i+4, km/h - convert to m/s)
+                    # Wind speed mean (i+4, km/h)
                     if i + 4 < len(all_cells):
                         wind_text = all_cells[i + 4].get_text(strip=True)
                         wind_match = re.search(r"(\d+)", wind_text)
                         if wind_match:
-                            wind_speed = float(wind_match.group(1)) / 3.6
+                            wind_speed = float(wind_match.group(1))
 
-                    # Wind gust (i+5, km/h - convert to m/s)
+                    # Wind gust (i+5, km/h)
                     if i + 5 < len(all_cells):
                         gust_text = all_cells[i + 5].get_text(strip=True)
                         if gust_text and gust_text != "--":
                             gust_match = re.search(r"(\d+)", gust_text)
                             if gust_match:
-                                wind_gust = float(gust_match.group(1)) / 3.6
+                                wind_gust = float(gust_match.group(1))
 
                     # Precipitation (i+6, mm)
                     if i + 6 < len(all_cells):
