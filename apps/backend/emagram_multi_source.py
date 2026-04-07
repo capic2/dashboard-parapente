@@ -15,7 +15,6 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 import config
-from llm.acp_analyzer import analyze_emagram_with_acp
 from llm.gemini_analyzer import analyze_emagram_with_gemini
 from llm.groq_analyzer import analyze_emagram_with_groq
 from llm.multi_emagram_analyzer import analyze_emagrammes_with_fallback
@@ -205,37 +204,7 @@ async def generate_multi_source_emagram_for_spot(
                 logger.warning(f"Groq analysis failed: {e}")
                 analysis_result = None
 
-        # Priority 3: Try OpenClaw ACP if enabled
-        if not analysis_result and os.getenv("OPENCLAW_ACP_ENABLED", "false").lower() == "true":
-            try:
-                logger.info("🦞 Trying OpenClaw ACP analysis...")
-                acp_analysis = analyze_emagram_with_acp(
-                    screenshot_paths=image_paths,
-                    spot_name=site.name,
-                    coordinates=(site.latitude, site.longitude),
-                    openclaw_command=os.getenv("OPENCLAW_COMMAND", "openclaw"),
-                    agent_id=os.getenv("OPENCLAW_AGENT_ID"),
-                    timeout=int(os.getenv("OPENCLAW_TIMEOUT", "120")),
-                )
-
-                analysis_result = {
-                    "success": True,
-                    "plafond_thermique_m": acp_analysis["plafond_thermique_m"],
-                    "force_thermique_ms": acp_analysis["force_thermique_ms"],
-                    "heures_volables": acp_analysis["heures_volables"],
-                    "score_volabilite": acp_analysis["score_volabilite"],
-                    "conseils_vol": acp_analysis["conseils_vol"],
-                    "alertes_securite": acp_analysis["alertes_securite"],
-                    "details_analyse": acp_analysis["details_analyse"],
-                    "analyzer": "openclaw_acp",
-                }
-                logger.info("🦞 OpenClaw ACP analysis successful!")
-
-            except Exception as e:
-                logger.warning(f"OpenClaw ACP failed: {e}")
-                analysis_result = None
-
-        # Priority 4: Fallback to Anthropic direct API (paid)
+        # Priority 3: Fallback to Anthropic direct API (paid)
         if not analysis_result:
             logger.info("🤖 Using Anthropic direct API (fallback)...")
             analysis_result = await analyze_emagrammes_with_fallback(
