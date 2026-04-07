@@ -12,10 +12,13 @@ from zoneinfo import ZoneInfo
 import redis
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from auth import authenticate_user, create_access_token, get_current_user
 from database import get_db
+from models import User
 from models import (
     EmagramAnalysis,
     Flight,
@@ -60,7 +63,37 @@ from weather_pipeline import get_daily_aggregate, get_normalized_forecast
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["api"])
+# Public routes: no authentication required (weather, spots read, auth)
+public_router = APIRouter(prefix="/api", tags=["api"])
+
+# Protected routes: require valid JWT token
+router = APIRouter(prefix="/api", tags=["api"], dependencies=[Depends(get_current_user)])
+
+
+# ============================================================================
+# AUTHENTICATION ENDPOINTS (public)
+# ============================================================================
+
+
+@public_router.post("/auth/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """Authenticate with email + password, returns JWT access token."""
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    token = create_access_token(user.email)
+    return {"access_token": token, "token_type": "bearer"}
+
+
+@public_router.get("/auth/me")
+def get_me(user: User = Depends(get_current_user)):
+    """Get current authenticated user info."""
+    return {"id": user.id, "email": user.email}
+
 
 # ============================================================================
 # PARAGLIDING SPOTS SEARCH ENDPOINTS (External database)
@@ -122,7 +155,7 @@ async def sync_paragliding_spots(force: bool = False, db: Session = Depends(get_
     }
 
 
-@router.get("/spots/geocode")
+@public_router.get("/spots/geocode")
 async def geocode_location(query: str, country: str = "FR"):
     """
     Geocode a location name to coordinates
@@ -171,7 +204,7 @@ async def geocode_location(query: str, country: str = "FR"):
     return {"name": query, "latitude": lat, "longitude": lon, "display_name": display_name}
 
 
-@router.get("/spots/search")
+@public_router.get("/spots/search")
 async def search_paragliding_spots(
     city: str | None = None,
     lat: float | None = None,
@@ -229,7 +262,7 @@ async def search_paragliding_spots(
     return result
 
 
-@router.get("/spots/status")
+@public_router.get("/spots/status")
 async def get_spots_sync_status(db: Session = Depends(get_db)):
     """
     Get paragliding spots database status and statistics.
@@ -245,7 +278,7 @@ async def get_spots_sync_status(db: Session = Depends(get_db)):
     return get_sync_status(db)
 
 
-@router.get("/spots/search-with-weather")
+@public_router.get("/spots/search-with-weather")
 async def search_spots_with_weather(
     city: str | None = None,
     lat: float | None = None,
@@ -365,7 +398,7 @@ async def search_spots_with_weather(
     }
 
 
-@router.get("/spots/detail/{spot_id}")
+@public_router.get("/spots/detail/{spot_id}")
 async def get_paragliding_spot_detail(spot_id: str, db: Session = Depends(get_db)):
     """
     Get full details for a specific paragliding spot.
@@ -389,7 +422,7 @@ async def get_paragliding_spot_detail(spot_id: str, db: Session = Depends(get_db
     return spot
 
 
-@router.get("/spots/weather/{spot_id}")
+@public_router.get("/spots/weather/{spot_id}")
 async def get_spot_weather(
     spot_id: str, day_index: int = 0, days: int = 1, db: Session = Depends(get_db)
 ):
@@ -517,7 +550,7 @@ async def get_spot_weather(
 # ============================================================================
 
 
-@router.get("/spots", response_model=SpotsResponse)
+@public_router.get("/spots", response_model=SpotsResponse)
 def get_spots(db: Session = Depends(get_db)):
     """Get all user-managed paragliding spots with flight counts"""
     from sqlalchemy import func
@@ -1097,7 +1130,7 @@ async def get_landing_associations_weather(
 # IMPORTANT: This must be BEFORE /spots/{spot_id} to avoid route collision
 
 
-@router.get("/spots/best")
+@public_router.get("/spots/best")
 async def get_best_spot(
     day_index: int = Query(
         default=0, ge=0, le=6, description="Day index (0=today, 1=tomorrow, ..., 6=in 6 days)"
@@ -1161,7 +1194,7 @@ async def get_best_spot(
         ) from e
 
 
-@router.get("/spots/{spot_id}", response_model=SiteSchema)
+@public_router.get("/spots/{spot_id}", response_model=SiteSchema)
 def get_spot(spot_id: str, db: Session = Depends(get_db)):
     """Get a specific user-managed spot"""
     site = db.query(Site).filter(Site.id == spot_id).first()
@@ -1670,7 +1703,7 @@ async def link_user_sites_to_spots(db: Session = Depends(get_db)):
 # ============================================================================
 # Weather endpoints (UPDATED with pipeline + para_index)
 # ============================================================================
-@router.get("/weather/{spot_id}")
+@public_router.get("/weather/{spot_id}")
 async def get_weather(
     spot_id: str, day_index: int = 0, days: int = 1, db: Session = Depends(get_db)
 ):
@@ -1821,13 +1854,13 @@ async def get_weather(
     }
 
 
-@router.get("/weather/{spot_id}/today")
+@public_router.get("/weather/{spot_id}/today")
 async def get_weather_today(spot_id: str, db: Session = Depends(get_db)):
     """Get today's weather forecast (day_index=0)"""
     return await get_weather(spot_id, day_index=0, db=db)
 
 
-@router.get("/weather/{spot_id}/summary")
+@public_router.get("/weather/{spot_id}/summary")
 async def get_weather_summary(spot_id: str, day_index: int = 0, db: Session = Depends(get_db)):
     """
     Get lightweight weather summary for a site (optimized for site selector).
@@ -1896,7 +1929,7 @@ async def get_weather_summary(spot_id: str, day_index: int = 0, db: Session = De
     }
 
 
-@router.get("/weather/{spot_id}/daily-summary")
+@public_router.get("/weather/{spot_id}/daily-summary")
 async def get_daily_summary(spot_id: str, days: int = 7, db: Session = Depends(get_db)):
     """
     Get multi-day summary WITHOUT hourly details (MUCH FASTER).
@@ -2966,7 +2999,7 @@ def create_alert(alert_data: dict, db: Session = Depends(get_db)):
 
 
 # Health check
-@router.get("/health")
+@public_router.get("/health")
 def health_check():
     return {"status": "ok", "message": "Dashboard API healthy"}
 

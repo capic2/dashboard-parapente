@@ -95,6 +95,14 @@ CACHE_TTL_DEFAULT = int(os.getenv("BACKEND_CACHE_TTL_DEFAULT", "3600"))
 CACHE_TTL_SUMMARY = int(os.getenv("BACKEND_CACHE_TTL_SUMMARY", "3600"))
 
 # ============================================================================
+# AUTHENTICATION
+# ============================================================================
+JWT_SECRET = os.getenv("BACKEND_JWT_SECRET", "dev-secret-change-in-production")
+JWT_EXPIRE_HOURS = int(os.getenv("BACKEND_JWT_EXPIRE_HOURS", "168"))  # 7 days
+ADMIN_EMAIL = os.getenv("BACKEND_ADMIN_EMAIL", "admin@local")
+ADMIN_PASSWORD = os.getenv("BACKEND_ADMIN_PASSWORD", "admin")
+
+# ============================================================================
 # LOGGING
 # ============================================================================
 LOG_LEVEL = os.getenv("BACKEND_LOG_LEVEL", "INFO")
