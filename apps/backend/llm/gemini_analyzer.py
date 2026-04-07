@@ -118,6 +118,15 @@ def analyze_emagram_with_gemini(
 
         except Exception as e:
             last_error = e
+            error_msg = str(e).lower()
+
+            # Detect quota/rate limit errors — skip retries immediately
+            if any(kw in error_msg for kw in ["429", "quota", "rate limit", "resourceexhausted"]):
+                logger.warning(f"⚠️ Gemini quota/rate limit hit: {e}")
+                from llm.exceptions import QuotaExhaustedError
+
+                raise QuotaExhaustedError(f"Gemini quota exhausted: {e}") from e
+
             logger.warning(f"Gemini API attempt {attempt + 1} failed: {e}")
 
             if attempt < max_retries - 1:
