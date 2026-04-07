@@ -100,6 +100,11 @@ def initialize_database():
 
         if site_count > 0:
             logger.info(f"✓ Database already contains {site_count} sites - skipping seed")
+
+            # Seed admin user (idempotent - only creates if no users exist)
+            from auth import seed_admin_user
+
+            seed_admin_user()
             return True
 
         logger.info("No sites found - seeding default sites...")
