@@ -124,6 +124,15 @@ def analyze_emagram_with_groq(
 
         except Exception as e:
             last_error = e
+            error_msg = str(e).lower()
+
+            # Detect quota/rate limit errors — skip retries immediately
+            if any(kw in error_msg for kw in ["429", "quota", "rate_limit", "rate limit"]):
+                logger.warning(f"⚠️ Groq quota/rate limit hit: {e}")
+                from llm.exceptions import QuotaExhaustedError
+
+                raise QuotaExhaustedError(f"Groq quota exhausted: {e}") from e
+
             logger.warning(f"Groq attempt {attempt + 1} failed: {e}")
 
     raise RuntimeError(f"Groq analysis failed after {max_retries} attempts: {last_error}")

@@ -15,6 +15,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 import config
+from llm.exceptions import QuotaExhaustedError
 from llm.gemini_analyzer import analyze_emagram_with_gemini
 from llm.groq_analyzer import analyze_emagram_with_groq
 from llm.multi_emagram_analyzer import analyze_emagrammes_with_fallback
@@ -138,6 +139,8 @@ async def generate_multi_source_emagram_for_spot(
         sources = [s["source"] for s in successful_screenshots]
 
         analysis_result = None
+        quota_errors = 0
+        providers_tried = 0
 
         # Priority 1: Try Gemini if API key is available
         google_api_key = config.GOOGLE_API_KEY
@@ -146,6 +149,7 @@ async def generate_multi_source_emagram_for_spot(
         )
 
         if google_api_key:
+            providers_tried += 1
             logger.info("🔷 Trying Gemini Vision analysis...")
             logger.info("   API key found (configured)")
             logger.info(f"   Model: {os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')}")
@@ -173,12 +177,17 @@ async def generate_multi_source_emagram_for_spot(
                 }
                 logger.info("🔷 Gemini analysis successful!")
 
+            except QuotaExhaustedError:
+                logger.warning("⚠️ Gemini quota exhausted, trying next provider")
+                quota_errors += 1
+                analysis_result = None
             except Exception as e:
                 logger.warning(f"Gemini analysis failed: {e}")
                 analysis_result = None
 
         # Priority 2: Try Groq (free, Llama Vision)
         if not analysis_result and config.GROQ_API_KEY:
+            providers_tried += 1
             try:
                 logger.info("🟢 Trying Groq Llama Vision analysis (free)...")
                 groq_analysis = analyze_emagram_with_groq(
@@ -200,12 +209,22 @@ async def generate_multi_source_emagram_for_spot(
                 }
                 logger.info("🟢 Groq analysis successful!")
 
+            except QuotaExhaustedError:
+                logger.warning("⚠️ Groq quota exhausted, trying next provider")
+                quota_errors += 1
+                analysis_result = None
             except Exception as e:
                 logger.warning(f"Groq analysis failed: {e}")
                 analysis_result = None
 
         # Priority 3: Fallback to Anthropic direct API (paid)
         if not analysis_result:
+            # If all free providers hit quota, don't waste paid credits either
+            if quota_errors > 0 and quota_errors >= providers_tried:
+                raise QuotaExhaustedError(
+                    f"All {providers_tried} free LLM providers exhausted their quota"
+                )
+
             logger.info("🤖 Using Anthropic direct API (fallback)...")
             analysis_result = await analyze_emagrammes_with_fallback(
                 image_paths=image_paths, spot_name=site.name, sources=sources
@@ -520,6 +539,9 @@ async def generate_hourly_emagram_for_spot(
                 hour=h,
             )
             results.append(result)
+        except QuotaExhaustedError:
+            logger.warning(f"⚠️ LLM quota exhausted at hour {h} for {site.name}, stopping")
+            raise  # Propagate to scheduler to stop all remaining sites/days
         except Exception as e:
             logger.error(f"Hour {h} failed for {site.name}: {e}")
             results.append({"success": False, "hour": h, "error": str(e)})
