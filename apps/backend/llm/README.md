@@ -46,28 +46,19 @@ result = analyze_emagram_with_gemini(
 
 ---
 
-### 2. `acp_analyzer.py` - OpenClaw ACP (Alternative)
+### 2. `groq_analyzer.py` - Groq Llama Vision (Gratuit)
 
-Utilise **OpenClaw via Agent Control Protocol** pour analyser les emagrammes.
+Utilise **Groq** avec Llama Vision pour analyser les emagrammes.
 
 **Avantages:**
-- ✅ Gratuit (utilise votre installation OpenClaw locale)
-- ✅ Supporte Claude Vision, GPT-4o Vision, etc.
-- ✅ Flexible (plusieurs agents disponibles)
-
-**Inconvénients:**
-- ❌ **Complexe avec Docker**: Nécessite configuration réseau spéciale
-- ❌ Setup plus lourd (Node.js, OpenClaw Gateway)
+- ✅ Gratuit
+- ✅ Rapide (inférence Groq)
 
 **Configuration:**
 ```bash
-# Dans .env (désactivé par défaut)
-OPENCLAW_ACP_ENABLED=false  # Déconseillé en Docker
+# Dans .env
+GROQ_API_KEY=your_groq_api_key_here
 ```
-
-**Note**: OpenClaw ACP est gardé pour référence mais **non recommandé** pour les déploiements Docker. Utilisez Gemini à la place.
-
-Voir: [`docs/OPENCLAW_ACP_INTEGRATION.md`](../../docs/OPENCLAW_ACP_INTEGRATION.md)
 
 ---
 
@@ -90,35 +81,9 @@ Utilise l'**API Claude Messages** d'Anthropic directement.
 ANTHROPIC_API_KEY=sk-ant-api03-...
 ```
 
-**Utilisation:**
-```python
-from llm.multi_emagram_analyzer import analyze_emagrammes_with_fallback
-
-result = await analyze_emagrammes_with_fallback(
-    image_paths=[...],
-    spot_name="Arguel",
-    sources=["meteo-parapente", "topmeteo", "windy"]
-)
-```
-
 ---
 
-### 4. `openclaw_analyzer.py` - OpenClaw Gateway Proxy (Alternative)
-
-Utilise OpenClaw comme **proxy vers l'API Anthropic** (via WebSocket).
-
-**Note:** Similaire à l'API directe mais via OpenClaw Gateway. Utile si vous voulez centraliser vos appels API via OpenClaw.
-
-**Configuration:**
-```bash
-# Dans .env
-OPENCLAW_BASE_URL=http://192.168.1.106:3000
-OPENCLAW_API_KEY=your_key
-```
-
----
-
-### 5. `vision_analyzer.py` - Wrapper générique
+### 4. `vision_analyzer.py` - Wrapper générique
 
 Module utilitaire pour fonctions communes de vision analysis.
 
@@ -131,17 +96,17 @@ Le fichier [`emagram_multi_source.py`](../emagram_multi_source.py) utilise la st
 ```
 1. Priority 1: Google Gemini (si GOOGLE_API_KEY présente)
    └─> Gratuit (1500/jour), rapide, Docker-friendly ✨
-   
-2. Priority 2: OpenClaw ACP (si OPENCLAW_ACP_ENABLED=true)
-   └─> Gratuit, local, mais complexe avec Docker
-   
+
+2. Priority 2: Groq Llama Vision (si GROQ_API_KEY présente)
+   └─> Gratuit, rapide
+
 3. Priority 3: API Anthropic directe (si ANTHROPIC_API_KEY présente)
    └─> Payant (~50€/mois) mais très haute qualité
-   
+
 4. Échec: Retour d'erreur
 ```
 
-**Recommandation production**: Utiliser **Gemini uniquement** (Priority 1) pour la simplicité et gratuité.
+**Recommandation production**: Utiliser **Gemini** (Priority 1) avec **Groq** en fallback.
 
 ## Format de réponse
 
@@ -168,13 +133,6 @@ cd /home/capic/developements/dashboard-parapente
 python backend/test_gemini_integration.py
 ```
 
-### Test d'intégration OpenClaw ACP (Alternative)
-
-```bash
-cd /home/capic/developements/dashboard-parapente
-python backend/test_acp_integration.py
-```
-
 ### Test unitaire d'un analyseur
 
 ```bash
@@ -184,40 +142,18 @@ cd backend/llm
 export GOOGLE_API_KEY=your_key
 python gemini_analyzer.py
 
-# Test ACP
-export OPENCLAW_ACP_ENABLED=true
-python acp_analyzer.py
-
 # Test API directe
 python multi_emagram_analyzer.py
 ```
 
 ## Configuration recommandée
 
-**Pour production (Docker) - Recommandé:**
-
 ```bash
 # .env
 GOOGLE_API_KEY=your_google_api_key_here
 GEMINI_MODEL=gemini-2.5-flash
-
-# Désactiver OpenClaw ACP (complexe avec Docker)
-OPENCLAW_ACP_ENABLED=false
-```
-
-**Pour développement local (hors Docker):**
-
-```bash
-# .env
-# Priority 1: Gemini
-GOOGLE_API_KEY=your_google_api_key_here
-
-# Priority 2: OpenClaw ACP (optionnel)
-OPENCLAW_ACP_ENABLED=true
-OPENCLAW_AGENT_ID=claude
-
-# Priority 3: Anthropic (optionnel)
-ANTHROPIC_API_KEY=your_anthropic_key_here
+GROQ_API_KEY=your_groq_api_key_here  # fallback gratuit
+ANTHROPIC_API_KEY=your_anthropic_key_here  # fallback payant (optionnel)
 ```
 
 ## Dépannage
@@ -237,22 +173,6 @@ curl -H "Content-Type: application/json" \
 # https://aistudio.google.com/app/apikey
 ```
 
-### ACP ne fonctionne pas
-
-```bash
-# Vérifier OpenClaw
-openclaw status
-
-# Démarrer le gateway
-openclaw gateway --port 18789
-
-# Voir les logs
-openclaw logs --follow
-
-# Diagnostics
-openclaw doctor
-```
-
 ### API Anthropic retourne 401
 
 ```bash
@@ -265,13 +185,6 @@ curl -H "x-api-key: $ANTHROPIC_API_KEY" \
      https://api.anthropic.com/v1/messages
 ```
 
-### Timeout après 120s
-
-```bash
-# Augmenter le timeout
-export OPENCLAW_TIMEOUT=300
-```
-
 ## Ressources
 
 ### Gemini
@@ -279,11 +192,6 @@ export OPENCLAW_TIMEOUT=300
 - **Gemini Docs**: https://ai.google.dev/gemini-api/docs
 - **Python SDK**: https://github.com/google/generative-ai-python
 - **Pricing**: https://ai.google.dev/pricing (Free tier: 1500 req/day)
-
-### OpenClaw
-- **OpenClaw Docs**: https://docs.openclaw.ai
-- **ACP Spec**: https://agentclientprotocol.com
-- **Integration Guide**: [`docs/OPENCLAW_ACP_INTEGRATION.md`](../../docs/OPENCLAW_ACP_INTEGRATION.md)
 
 ### Anthropic
 - **Anthropic API**: https://docs.anthropic.com
