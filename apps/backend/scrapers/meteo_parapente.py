@@ -430,8 +430,11 @@ def extract_hourly_forecast(data: dict[str, Any], day_index: int = 0) -> list[di
 
                 # Select altitude closest to site elevation
                 altitudes = hour_data.get("z", [])
-                u_components = hour_data.get("umet", [0])
-                v_components = hour_data.get("vmet", [0])
+                u_components = hour_data.get("umet", [])
+                v_components = hour_data.get("vmet", [])
+
+                if not altitudes or not u_components or not v_components:
+                    continue
 
                 elevation = data.get("elevation_m", 500)
                 target_altitude = elevation + 10
