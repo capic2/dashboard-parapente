@@ -80,7 +80,8 @@
     "primary": "Primary",
     "windUnavailable": "Wind data unavailable",
     "flyableSlot": "Window",
-    "thermalCeiling": "Ceiling"
+    "thermalCeiling": "Ceiling",
+    "score": "Score"
   },
   "filters": {
     "title": "Filters",
