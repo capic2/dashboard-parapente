@@ -80,7 +80,8 @@
     "primary": "Principal",
     "windUnavailable": "Données vent indisponibles",
     "flyableSlot": "Créneau",
-    "thermalCeiling": "Plafond"
+    "thermalCeiling": "Plafond",
+    "score": "Score"
   },
   "filters": {
     "title": "Filtres",
