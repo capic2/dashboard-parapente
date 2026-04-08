@@ -71,7 +71,7 @@ def authenticate_user(db: Session, email: str, password: str) -> User | None:
 
 
 def seed_admin_user():
-    """Create the admin user if no users exist. Called at startup."""
+    """Create or update the admin user from env vars. Called at startup."""
     from database import SessionLocal
 
     if not config.ADMIN_EMAIL or not config.ADMIN_PASSWORD:
@@ -80,8 +80,20 @@ def seed_admin_user():
 
     db = SessionLocal()
     try:
+        admin = db.query(User).filter(User.email == config.ADMIN_EMAIL).first()
+        if admin:
+            # Update password if it changed
+            if not verify_password(config.ADMIN_PASSWORD, admin.hashed_password):
+                admin.hashed_password = hash_password(config.ADMIN_PASSWORD)
+                admin.is_active = True
+                db.commit()
+                logger.info(f"Updated admin password for: {config.ADMIN_EMAIL}")
+            return
+
+        # No admin found — create if no users exist yet
         if db.query(User).count() > 0:
             return
+
         admin = User(
             email=config.ADMIN_EMAIL,
             hashed_password=hash_password(config.ADMIN_PASSWORD),
