@@ -9,6 +9,7 @@ import HourlyForecast from '../components/weather/HourlyForecast';
 import EmagramWidget from '../components/dashboard/EmagramWidget';
 import WeatherMultiLanding from '../components/weather/WeatherMultiLanding';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
+import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from '@tanstack/react-router';
 
 export default function WeatherPage() {
@@ -21,6 +22,7 @@ export default function WeatherPage() {
   const selectedSiteId =
     sites.find((site) => site.id === routeSiteId)?.id ?? sites[0]?.id ?? '';
 
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [weatherDataMap] = useState<Map<string, Record<string, unknown>>>(
     new Map()
   );
@@ -77,8 +79,10 @@ export default function WeatherPage() {
           onSelectDay={setSelectedDayIndex}
         />
 
-        {/* Emagram Analysis */}
-        <EmagramWidget siteId={selectedSiteId} dayIndex={selectedDayIndex} />
+        {/* Emagram Analysis (authenticated only) */}
+        {isAuthenticated && (
+          <EmagramWidget siteId={selectedSiteId} dayIndex={selectedDayIndex} />
+        )}
 
         {/* Hourly Forecast */}
         <HourlyForecast spotId={selectedSiteId} dayIndex={selectedDayIndex} />
