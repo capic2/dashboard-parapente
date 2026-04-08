@@ -22,6 +22,9 @@ function globalSetup(config: FullConfig): void {
         ...process.env,
         TESTING: 'false',
         BACKEND_DATABASE_URL: absoluteDbUrl,
+        BACKEND_JWT_SECRET: process.env.BACKEND_JWT_SECRET || 'e2e-test-secret',
+        BACKEND_ADMIN_EMAIL: process.env.BACKEND_ADMIN_EMAIL || 'e2e@test.local',
+        BACKEND_ADMIN_PASSWORD: process.env.BACKEND_ADMIN_PASSWORD || 'e2e-test-password',
       },
     });
     console.log('✅ E2E test database initialized');

@@ -7,7 +7,19 @@
     "sites": "Sites",
     "settings": "Settings",
     "cache": "Cache",
-    "weather": "Weather"
+    "weather": "Weather",
+    "login": "Login",
+    "logout": "Logout"
+  },
+  "login": {
+    "title": "Paragliding Dashboard",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "loading": "Signing in...",
+    "invalidCredentials": "Invalid email or password",
+    "connectionError": "Connection error",
+    "unexpectedError": "Unexpected server response"
   },
   "common": {
     "loading": "Loading...",

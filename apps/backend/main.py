@@ -19,7 +19,7 @@ import config
 import models  # noqa: F401 - imported for side effects (model registration)
 from database import Base, SessionLocal, engine
 from models import Site  # Needed for database initialization
-from routes import router
+from routes import public_router, router
 from scheduler import start_scheduler, stop_scheduler
 from webhooks import router as webhooks_router
 
@@ -100,6 +100,11 @@ def initialize_database():
 
         if site_count > 0:
             logger.info(f"✓ Database already contains {site_count} sites - skipping seed")
+
+            # Seed admin user (idempotent - only creates if no users exist)
+            from auth import seed_admin_user
+
+            seed_admin_user()
             return True
 
         logger.info("No sites found - seeding default sites...")
@@ -237,6 +242,11 @@ def initialize_database():
             logger.warning(
                 "⚠️  Failed to seed weather sources, but continuing (sources can be added later)..."
             )
+
+        # Step 5: Seed admin user
+        from auth import seed_admin_user
+
+        seed_admin_user()
 
         logger.info("=" * 60)
         logger.info("✅ DATABASE INITIALIZATION COMPLETE")
@@ -582,7 +592,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routes
+# Include routes (public_router first for route priority)
+app.include_router(public_router)
 app.include_router(router)
 app.include_router(webhooks_router)
 

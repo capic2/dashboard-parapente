@@ -76,6 +76,11 @@ services:
       - BACKEND_TELEGRAM_BOT_TOKEN=${BACKEND_TELEGRAM_BOT_TOKEN}
       - BACKEND_TELEGRAM_CHAT_ID=${BACKEND_TELEGRAM_CHAT_ID}
 
+      # Backend - Authentication
+      - BACKEND_JWT_SECRET=${BACKEND_JWT_SECRET:?required}
+      - BACKEND_ADMIN_EMAIL=${BACKEND_ADMIN_EMAIL:?required}
+      - BACKEND_ADMIN_PASSWORD=${BACKEND_ADMIN_PASSWORD:?required}
+
       # Backend - Frontend URL
       - BACKEND_FRONTEND_URL=${BACKEND_FRONTEND_URL}
     depends_on:

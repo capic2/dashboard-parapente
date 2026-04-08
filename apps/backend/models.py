@@ -12,10 +12,23 @@ from sqlalchemy import (
     String,
     Text,
     Time,
+    func,
 )
 from sqlalchemy.orm import relationship
 
 from database import Base
+
+
+class User(Base):
+    """Application user for authentication"""
+
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    email = Column(String(320), unique=True, nullable=False, index=True)
+    hashed_password = Column(String(1024), nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, default=func.now())
 
 
 class AppSetting(Base):

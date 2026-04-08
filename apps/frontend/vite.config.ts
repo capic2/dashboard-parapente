@@ -43,7 +43,7 @@ export default defineConfig({
     outDir: '../../dist/apps/frontend',
     emptyOutDir: true,
     sourcemap: false,
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         manualChunks(id) {
           if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
