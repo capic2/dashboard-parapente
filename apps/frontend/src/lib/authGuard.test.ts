@@ -1,0 +1,20 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { useAuthStore } from '../stores/authStore';
+import { requireAuth } from './authGuard';
+
+describe('requireAuth', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useAuthStore.setState({ token: null, isAuthenticated: false });
+  });
+
+  it('throws redirect to /login when not authenticated', () => {
+    expect(() => requireAuth()).toThrow();
+  });
+
+  it('does not throw when authenticated', () => {
+    useAuthStore.setState({ token: 'valid-token', isAuthenticated: true });
+
+    expect(() => requireAuth()).not.toThrow();
+  });
+});
