@@ -1,32 +1,37 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 
 interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
-  hasHydrated: boolean;
   login: (token: string) => void;
   logout: () => void;
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      token: null,
-      isAuthenticated: false,
-      hasHydrated: false,
-      login: (token) => set({ token, isAuthenticated: true }),
-      logout: () => set({ token: null, isAuthenticated: false }),
-    }),
-    {
-      name: 'parapente-auth',
-      partialize: (state) => ({ token: state.token }),
-      onRehydrateStorage: () => (_state, error) => {
-        useAuthStore.setState({
-          isAuthenticated: !!useAuthStore.getState().token && !error,
-          hasHydrated: true,
-        });
-      },
-    }
-  )
-);
+function loadToken(): string | null {
+  try {
+    const raw = localStorage.getItem('parapente-auth');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.state?.token ?? null;
+  } catch {
+    return null;
+  }
+}
+
+const initialToken = loadToken();
+
+export const useAuthStore = create<AuthState>()((set) => ({
+  token: initialToken,
+  isAuthenticated: !!initialToken,
+  login: (token) => {
+    localStorage.setItem(
+      'parapente-auth',
+      JSON.stringify({ state: { token } })
+    );
+    set({ token, isAuthenticated: true });
+  },
+  logout: () => {
+    localStorage.removeItem('parapente-auth');
+    set({ token: null, isAuthenticated: false });
+  },
+}));
