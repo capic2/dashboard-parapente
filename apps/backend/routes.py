@@ -424,7 +424,10 @@ async def get_paragliding_spot_detail(spot_id: str, db: Session = Depends(get_db
 
 @public_router.get("/spots/weather/{spot_id}")
 async def get_spot_weather(
-    spot_id: str, day_index: int = 0, days: int = 1, db: Session = Depends(get_db)
+    spot_id: str,
+    day_index: int = Query(0, ge=0, le=6),
+    days: int = Query(1, ge=1, le=7),
+    db: Session = Depends(get_db),
 ):
     """
     Get weather forecast for ANY paragliding spot (from spots database).
@@ -1705,7 +1708,10 @@ async def link_user_sites_to_spots(db: Session = Depends(get_db)):
 # ============================================================================
 @public_router.get("/weather/{spot_id}")
 async def get_weather(
-    spot_id: str, day_index: int = 0, days: int = 1, db: Session = Depends(get_db)
+    spot_id: str,
+    day_index: int = Query(0, ge=0, le=6),
+    days: int = Query(1, ge=1, le=7),
+    db: Session = Depends(get_db),
 ):
     """
     Get weather forecast for a spot (LIVE from all sources)
@@ -1930,7 +1936,9 @@ async def get_weather_summary(spot_id: str, day_index: int = 0, db: Session = De
 
 
 @public_router.get("/weather/{spot_id}/daily-summary")
-async def get_daily_summary(spot_id: str, days: int = 7, db: Session = Depends(get_db)):
+async def get_daily_summary(
+    spot_id: str, days: int = Query(7, ge=1, le=7), db: Session = Depends(get_db)
+):
     """
     Get multi-day summary WITHOUT hourly details (MUCH FASTER).
 

@@ -74,6 +74,10 @@ def seed_admin_user():
     """Create the admin user if no users exist. Called at startup."""
     from database import SessionLocal
 
+    if not config.ADMIN_EMAIL or not config.ADMIN_PASSWORD:
+        logger.warning("ADMIN_EMAIL or ADMIN_PASSWORD not configured; skipping admin seed")
+        return
+
     db = SessionLocal()
     try:
         if db.query(User).count() > 0:

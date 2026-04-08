@@ -2,7 +2,8 @@ import { redirect } from '@tanstack/react-router';
 import { useAuthStore } from '../stores/authStore';
 
 export function requireAuth() {
-  if (!useAuthStore.getState().isAuthenticated) {
+  const { hasHydrated, isAuthenticated } = useAuthStore.getState();
+  if (hasHydrated && !isAuthenticated) {
     throw redirect({ to: '/login' });
   }
 }

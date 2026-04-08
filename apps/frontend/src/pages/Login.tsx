@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../stores/authStore';
 
 export default function Login() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -27,15 +29,19 @@ export default function Login() {
       });
 
       if (!res.ok) {
-        setError('Email ou mot de passe incorrect');
+        setError(t('login.invalidCredentials'));
         return;
       }
 
       const data = await res.json();
+      if (!data.access_token) {
+        setError(t('login.unexpectedError'));
+        return;
+      }
       login(data.access_token);
       navigate({ to: '/' });
     } catch {
-      setError('Erreur de connexion');
+      setError(t('login.connectionError'));
     } finally {
       setLoading(false);
     }
@@ -46,7 +52,7 @@ export default function Login() {
       <div className="w-full max-w-sm">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
           <h1 className="text-2xl font-semibold text-center text-sky-600 mb-6">
-            Dashboard Parapente
+            {t('login.title')}
           </h1>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -55,11 +61,11 @@ export default function Login() {
                 htmlFor="email"
                 className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
               >
-                Email
+                {t('login.email')}
               </label>
               <input
                 id="email"
-                type="text"
+                type="email"
                 autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -73,7 +79,7 @@ export default function Login() {
                 htmlFor="password"
                 className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
               >
-                Mot de passe
+                {t('login.password')}
               </label>
               <input
                 id="password"
@@ -95,7 +101,7 @@ export default function Login() {
               disabled={loading}
               className="w-full py-2.5 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white font-medium rounded-lg transition-colors"
             >
-              {loading ? 'Connexion...' : 'Se connecter'}
+              {loading ? t('login.loading') : t('login.submit')}
             </button>
           </form>
         </div>
