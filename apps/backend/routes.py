@@ -424,10 +424,7 @@ async def get_paragliding_spot_detail(spot_id: str, db: Session = Depends(get_db
 
 @public_router.get("/spots/weather/{spot_id}")
 async def get_spot_weather(
-    spot_id: str,
-    day_index: int = Query(0, ge=0, le=6),
-    days: int = Query(1, ge=1, le=7),
-    db: Session = Depends(get_db),
+    spot_id: str, day_index: int = 0, days: int = 1, db: Session = Depends(get_db)
 ):
     """
     Get weather forecast for ANY paragliding spot (from spots database).
@@ -446,6 +443,9 @@ async def get_spot_weather(
     Example:
         GET /api/spots/weather/merged_884e0213d9116315?days=3
     """
+    day_index = max(0, min(6, day_index))
+    days = max(1, min(7, days))
+
     from spots import get_spot_by_id
 
     # Get spot from paragliding_spots table
@@ -1708,10 +1708,7 @@ async def link_user_sites_to_spots(db: Session = Depends(get_db)):
 # ============================================================================
 @public_router.get("/weather/{spot_id}")
 async def get_weather(
-    spot_id: str,
-    day_index: int = Query(0, ge=0, le=6),
-    days: int = Query(1, ge=1, le=7),
-    db: Session = Depends(get_db),
+    spot_id: str, day_index: int = 0, days: int = 1, db: Session = Depends(get_db)
 ):
     """
     Get weather forecast for a spot (LIVE from all sources)
@@ -1722,6 +1719,9 @@ async def get_weather(
         day_index: 0=today, 1=tomorrow (default: 0)
         days: Number of days to return (default: 1, backward compatible)
     """
+    day_index = max(0, min(6, day_index))
+    days = max(1, min(7, days))
+
     site = db.query(Site).filter(Site.id == spot_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Spot not found")
@@ -1936,9 +1936,7 @@ async def get_weather_summary(spot_id: str, day_index: int = 0, db: Session = De
 
 
 @public_router.get("/weather/{spot_id}/daily-summary")
-async def get_daily_summary(
-    spot_id: str, days: int = Query(7, ge=1, le=7), db: Session = Depends(get_db)
-):
+async def get_daily_summary(spot_id: str, days: int = 7, db: Session = Depends(get_db)):
     """
     Get multi-day summary WITHOUT hourly details (MUCH FASTER).
 
@@ -1972,6 +1970,8 @@ async def get_daily_summary(
         }
     """
     try:
+        days = max(1, min(7, days))
+
         # Get the site
         site = db.query(Site).filter(Site.id == spot_id).first()
         if not site:
