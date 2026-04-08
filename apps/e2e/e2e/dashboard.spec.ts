@@ -1,25 +1,19 @@
 import { test, expect } from '@playwright/test';
 
-async function loginViaAPI(page: import('@playwright/test').Page) {
-  const response = await page.request.post('http://localhost:8001/api/auth/login', {
-    form: {
-      username: process.env.BACKEND_ADMIN_EMAIL || 'e2e@test.local',
-      password: process.env.BACKEND_ADMIN_PASSWORD || 'e2e-test-password',
-    },
-  });
-  const data = await response.json();
-  await page.addInitScript((token: string) => {
-    localStorage.setItem(
-      'parapente-auth',
-      JSON.stringify({ state: { token }, version: 0 })
-    );
-  }, data.access_token);
+const ADMIN_EMAIL = process.env.BACKEND_ADMIN_EMAIL || 'e2e@test.local';
+const ADMIN_PASSWORD = process.env.BACKEND_ADMIN_PASSWORD || 'e2e-test-password';
+
+async function login(page: import('@playwright/test').Page) {
+  await page.goto('/login');
+  await page.fill('input#email', ADMIN_EMAIL);
+  await page.fill('input#password', ADMIN_PASSWORD);
+  await page.click('button[type="submit"]');
+  await page.waitForURL('/');
 }
 
 test.describe('Paragliding Dashboard E2E Tests', () => {
   test.beforeEach(async ({ page }) => {
-    await loginViaAPI(page);
-    await page.goto('/');
+    await login(page);
   });
 
   test('should load dashboard and display header', async ({ page }) => {
