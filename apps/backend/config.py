@@ -95,6 +95,14 @@ CACHE_TTL_DEFAULT = int(os.getenv("BACKEND_CACHE_TTL_DEFAULT", "3600"))
 CACHE_TTL_SUMMARY = int(os.getenv("BACKEND_CACHE_TTL_SUMMARY", "3600"))
 
 # ============================================================================
+# AUTHENTICATION
+# ============================================================================
+JWT_SECRET = os.getenv("BACKEND_JWT_SECRET")
+JWT_EXPIRE_HOURS = int(os.getenv("BACKEND_JWT_EXPIRE_HOURS", "168"))  # 7 days
+ADMIN_EMAIL = os.getenv("BACKEND_ADMIN_EMAIL")
+ADMIN_PASSWORD = os.getenv("BACKEND_ADMIN_PASSWORD")
+
+# ============================================================================
 # LOGGING
 # ============================================================================
 LOG_LEVEL = os.getenv("BACKEND_LOG_LEVEL", "INFO")
@@ -117,6 +125,10 @@ FRONTEND_URL = os.getenv("BACKEND_FRONTEND_URL")
 
 # Valider les variables critiques (sauf en mode test)
 if not TESTING:
+    if not JWT_SECRET:
+        logger.error("❌ BACKEND_JWT_SECRET is required")
+        raise ValueError("BACKEND_JWT_SECRET environment variable is required")
+
     if not WEATHERAPI_KEY:
         logger.error("❌ WEATHERAPI_KEY is required")
         raise ValueError("WEATHERAPI_KEY environment variable is required")
@@ -129,7 +141,9 @@ if not TESTING:
         raise ValueError("BACKEND_STRAVA_VERIFY_TOKEN environment variable is required")
 else:
     logger.info("🧪 Testing mode: API key validation skipped")
-    # In test mode, provide a default verify token to avoid breaking tests
+    # In test mode, provide defaults to avoid breaking tests
+    if not JWT_SECRET:
+        JWT_SECRET = "test-secret-not-for-production"
     if not STRAVA_VERIFY_TOKEN:
         STRAVA_VERIFY_TOKEN = "PARAPENTE_2025"
 

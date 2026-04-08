@@ -13,6 +13,7 @@ import { Route as WeatherRouteImport } from './routes/weather'
 import { Route as ThermalRouteImport } from './routes/thermal'
 import { Route as SitesRouteImport } from './routes/sites'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as FlightsRouteImport } from './routes/flights'
 import { Route as ExportViewerRouteImport } from './routes/export-viewer'
 import { Route as CacheRouteImport } from './routes/cache'
@@ -40,6 +41,11 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/settings.lazy').then((d) => d.Route))
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FlightsRoute = FlightsRouteImport.update({
   id: '/flights',
   path: '/flights',
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/cache': typeof CacheRoute
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRoute
+  '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
   '/cache': typeof CacheRoute
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRoute
+  '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   '/cache': typeof CacheRoute
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRoute
+  '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
@@ -118,6 +127,7 @@ export interface FileRouteTypes {
     | '/cache'
     | '/export-viewer'
     | '/flights'
+    | '/login'
     | '/settings'
     | '/sites'
     | '/thermal'
@@ -130,6 +140,7 @@ export interface FileRouteTypes {
     | '/cache'
     | '/export-viewer'
     | '/flights'
+    | '/login'
     | '/settings'
     | '/sites'
     | '/thermal'
@@ -142,6 +153,7 @@ export interface FileRouteTypes {
     | '/cache'
     | '/export-viewer'
     | '/flights'
+    | '/login'
     | '/settings'
     | '/sites'
     | '/thermal'
@@ -155,6 +167,7 @@ export interface RootRouteChildren {
   CacheRoute: typeof CacheRoute
   ExportViewerRoute: typeof ExportViewerRoute
   FlightsRoute: typeof FlightsRoute
+  LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRoute
   SitesRoute: typeof SitesRoute
   ThermalRoute: typeof ThermalRoute
@@ -190,6 +203,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/flights': {
@@ -243,6 +263,7 @@ const rootRouteChildren: RootRouteChildren = {
   CacheRoute: CacheRoute,
   ExportViewerRoute: ExportViewerRoute,
   FlightsRoute: FlightsRoute,
+  LoginRoute: LoginRoute,
   SettingsRoute: SettingsRoute,
   SitesRoute: SitesRoute,
   ThermalRoute: ThermalRoute,

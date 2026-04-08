@@ -70,6 +70,10 @@ export default defineConfig({
         BACKEND_SCHEDULER_ENABLED: 'false',
         // Use fake Redis in E2E (no Redis service in CI)
         BACKEND_USE_FAKE_REDIS: 'true',
+        // Authentication
+        BACKEND_JWT_SECRET: process.env.BACKEND_JWT_SECRET || 'e2e-test-secret',
+        BACKEND_ADMIN_EMAIL: process.env.BACKEND_ADMIN_EMAIL || 'e2e@test.local',
+        BACKEND_ADMIN_PASSWORD: process.env.BACKEND_ADMIN_PASSWORD || 'e2e-test-password',
       },
     },
     {

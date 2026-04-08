@@ -7,7 +7,19 @@
     "sites": "Sites",
     "settings": "Paramètres",
     "cache": "Cache",
-    "weather": "Météo"
+    "weather": "Météo",
+    "login": "Connexion",
+    "logout": "Déconnexion"
+  },
+  "login": {
+    "title": "Dashboard Parapente",
+    "email": "Email",
+    "password": "Mot de passe",
+    "submit": "Se connecter",
+    "loading": "Connexion...",
+    "invalidCredentials": "Email ou mot de passe incorrect",
+    "connectionError": "Erreur de connexion",
+    "unexpectedError": "Réponse inattendue du serveur"
   },
   "common": {
     "loading": "Chargement...",

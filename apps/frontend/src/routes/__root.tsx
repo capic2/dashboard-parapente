@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { createRootRoute, Outlet } from '@tanstack/react-router';
+import { createRootRoute, Outlet, useMatchRoute } from '@tanstack/react-router';
 import Header from '../components/common/Header';
 
 export const Route = createRootRoute({
@@ -26,6 +26,13 @@ function PendingComponent() {
 }
 
 function RootComponent() {
+  const matchRoute = useMatchRoute();
+  const isLoginPage = matchRoute({ to: '/login' });
+
+  if (isLoginPage) {
+    return <Outlet />;
+  }
+
   return (
     <div className="min-h-screen p-3 md:p-4 overflow-x-hidden bg-gray-50 dark:bg-gray-900 transition-colors">
       <div className="max-w-7xl mx-auto">
