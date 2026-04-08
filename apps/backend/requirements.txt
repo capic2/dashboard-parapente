@@ -83,7 +83,7 @@ pillow==12.2.0
 # ============================================
 # Authentication (JWT + Password Hashing)
 # ============================================
-python-jose[cryptography]==3.4.0
+python-jose[cryptography]==3.5.0
 bcrypt>=4.0.0
 
 # ============================================
