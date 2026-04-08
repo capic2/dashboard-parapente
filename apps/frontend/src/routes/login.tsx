@@ -4,8 +4,8 @@ import Login from '../pages/Login';
 
 export const Route = createFileRoute('/login')({
   beforeLoad: () => {
-    const { hasHydrated, isAuthenticated } = useAuthStore.getState();
-    if (hasHydrated && isAuthenticated) {
+    const { isAuthenticated } = useAuthStore.getState();
+    if (isAuthenticated) {
       throw redirect({ to: '/' });
     }
   },
