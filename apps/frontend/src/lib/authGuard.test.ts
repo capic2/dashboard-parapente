@@ -9,7 +9,12 @@ describe('requireAuth', () => {
   });
 
   it('throws redirect to /login when not authenticated', () => {
-    expect(() => requireAuth()).toThrow();
+    try {
+      requireAuth();
+      throw new Error('expected requireAuth to throw');
+    } catch (error) {
+      expect(error).toMatchObject({ to: '/login' });
+    }
   });
 
   it('does not throw when authenticated', () => {
