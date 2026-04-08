@@ -65,6 +65,7 @@ export default function Login() {
                 >
                   <Label className={labelClass}>{t('login.email')}</Label>
                   <Input
+                    id="email"
                     type="email"
                     autoComplete="username"
                     className={inputClass}
@@ -82,6 +83,7 @@ export default function Login() {
                 >
                   <Label className={labelClass}>{t('login.password')}</Label>
                   <Input
+                    id="password"
                     type="password"
                     autoComplete="current-password"
                     className={inputClass}
