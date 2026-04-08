@@ -49,4 +49,3 @@ jobs:
           exitZeroOnChanges: true
           exitOnceUploaded: true
           autoAcceptChanges: main
-          skip: "renovate/**"
