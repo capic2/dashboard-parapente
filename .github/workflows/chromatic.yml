@@ -38,12 +38,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: 🎨 Publish to Chromatic
-        id: chromatic
         uses: chromaui/action@latest
-        # Known segfault in Storybook build with Vite 8 Rolldown (5000+ modules).
-        # continue-on-error prevents masking real regressions as the same red X.
-        # When this is fixed upstream, remove continue-on-error.
-        continue-on-error: true
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
         with:
@@ -55,8 +50,3 @@ jobs:
           exitOnceUploaded: true
           autoAcceptChanges: main
           skip: "renovate/**"
-
-      - name: ⚠️ Chromatic build failed
-        if: steps.chromatic.outcome == 'failure'
-        run: |
-          echo "::warning::Chromatic build failed (likely Storybook/Rolldown segfault). See https://github.com/storybookjs/storybook/issues/33789"
