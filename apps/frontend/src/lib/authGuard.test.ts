@@ -1,6 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAuthStore } from '../stores/authStore';
-import { requireAuth } from './authGuard';
+
+vi.mock('@tanstack/react-router', () => ({
+  redirect: (opts: { to: string }) => opts,
+}));
+
+// Import after mock so requireAuth uses the mocked redirect
+const { requireAuth } = await import('./authGuard');
 
 describe('requireAuth', () => {
   beforeEach(() => {
