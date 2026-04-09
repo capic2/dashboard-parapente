@@ -209,26 +209,11 @@ export function FlightEditForm({
           <form.Field name="departure_time">
             {(field) => (
               <TextField
-                value={
-                  field.state.value
-                    ? new Date(field.state.value).toLocaleTimeString('en-GB', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-                    : ''
-                }
+                value={field.state.value ? field.state.value.slice(11, 16) : ''}
                 onChange={(v) => {
                   if (v) {
-                    const [hours, minutes] = v.split(':');
                     const flightDate = form.getFieldValue('flight_date');
-                    const newDateTime = new Date(flightDate);
-                    newDateTime.setHours(
-                      parseInt(hours),
-                      parseInt(minutes),
-                      0,
-                      0
-                    );
-                    field.handleChange(newDateTime.toISOString());
+                    field.handleChange(`${flightDate}T${v}:00`);
                   } else {
                     field.handleChange('');
                   }

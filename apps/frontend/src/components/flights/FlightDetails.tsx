@@ -186,7 +186,7 @@ export function FlightDetails({
               <div>
                 <span className={labelClass}>{t('flights.durationLabel')}</span>
                 <span className={valueClass}>
-                  {flight.duration_minutes ? (
+                  {flight.duration_minutes != null ? (
                     <>
                       {Math.floor(flight.duration_minutes / 60)}h{' '}
                       {flight.duration_minutes % 60}m
