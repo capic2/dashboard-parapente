@@ -411,7 +411,8 @@
     "deleting": "⏳ Suppression...",
     "deleteButton": "🗑️ Supprimer",
     "deleteButtonCount_one": "🗑️ Supprimer {{count}} vol",
-    "deleteButtonCount_other": "🗑️ Supprimer {{count}} vols"
+    "deleteButtonCount_other": "🗑️ Supprimer {{count}} vols",
+    "gpxFileInput": "Fichier GPX"
   },
   "createSite": {
     "title": "Créer un nouveau site",

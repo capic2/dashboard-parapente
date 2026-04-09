@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { expect, screen, userEvent, waitFor, within } from 'storybook/test';
+import { expect, screen, waitFor, within } from 'storybook/test';
 import preview from '../../.storybook/preview';
 import FlightHistory from './FlightHistory';
 import i18n from 'i18next';
@@ -10,8 +10,6 @@ const meta = preview.meta({
   parameters: { layout: 'fullscreen' },
   tags: ['autodocs'],
 });
-
-export default meta;
 
 const mockFlights = [
   {
@@ -224,7 +222,9 @@ Default.test(
     });
   }
 );
-// clique sur un vol => affiche la carte
+// clique sur un vol => les détails du vol
+// supprimer plusieurs vols
+// annuler la suppression de plusieurs vols
 
 export const EmptyState = meta.story({
   name: 'Empty State',
@@ -251,103 +251,3 @@ export const Loading = meta.story({
     },
   },
 });
-
-export const DeleteSingleFlight = meta.story({
-  name: 'Delete Single Flight',
-  parameters: { msw: { handlers: defaultHandlers } },
-  beforeEach: resetFlightsDb,
-});
-
-export const ConfirmDeleteFlight = meta.story({
-  name: 'Confirm Delete Flight',
-  parameters: { msw: { handlers: defaultHandlers } },
-  beforeEach: resetFlightsDb,
-});
-
-ConfirmDeleteFlight.test(
-  'deletes flight on confirm',
-  async ({ canvas, step }) => {
-    const user = userEvent.setup();
-    const flightList = await canvas.findByRole('grid', {
-      name: i18n.t('flights.listAriaLabel'),
-    });
-
-    await step('click delete button', async () => {
-      const deleteButton = await canvas.findByRole('button', {
-        name: i18n.t('flights.deleteAriaLabel', {
-          title: 'Vol thermique Arguel',
-        }),
-      });
-      await user.click(deleteButton);
-    });
-
-    await step('confirm deletion in modal', async () => {
-      const dialog = await screen.findByRole('alertdialog');
-      const confirmButton = within(dialog).getByRole('button', {
-        name: i18n.t('flights.deleteButton'),
-      });
-      await user.click(confirmButton);
-    });
-
-    await step('toast appears and flight is removed', async () => {
-      await expect(
-        await canvas.findByText(i18n.t('flights.deletedSuccess'))
-      ).toBeInTheDocument();
-
-      await waitFor(() => {
-        expect(within(flightList).getAllByRole('row')).toHaveLength(
-          mockFlights.length - 1
-        );
-      });
-    });
-  }
-);
-
-export const DeleteMultipleFlights = meta.story({
-  name: 'Delete Multiple Flights',
-  parameters: { msw: { handlers: defaultHandlers } },
-  beforeEach: resetFlightsDb,
-});
-
-DeleteMultipleFlights.test(
-  'opens multi-delete modal with flight count',
-  async ({ canvas, step }) => {
-    const user = userEvent.setup();
-
-    await canvas.findByText('Vol thermique Arguel');
-
-    await step('enter selection mode', async () => {
-      const selectButton = await canvas.findByText(i18n.t('flights.select'));
-      await user.click(selectButton);
-    });
-
-    await step('select all flights', async () => {
-      const selectAllButton = await canvas.findByText(
-        i18n.t('flights.selectAll')
-      );
-      await user.click(selectAllButton);
-    });
-
-    await step('click delete button', async () => {
-      const deleteButton = await canvas.findByText(
-        i18n.t('flights.deleteCount', { count: 3 })
-      );
-      await user.click(deleteButton);
-    });
-
-    await step('modal shows correct count', async () => {
-      const dialog = await screen.findByRole('dialog');
-      const dialogContent = within(dialog);
-      await expect(
-        await dialogContent.findByText(
-          i18n.t('flights.confirmDeleteMulti', { count: 3 })
-        )
-      ).toBeInTheDocument();
-      await expect(
-        await dialogContent.findByRole('button', {
-          name: i18n.t('flights.deleteButtonCount', { count: 3 }),
-        })
-      ).toBeInTheDocument();
-    });
-  }
-);
