@@ -91,9 +91,9 @@ export function FlightEditForm({
       await onSubmit({
         name: value.name,
         title: value.title,
-        site_id: value.site_id ?? null,
+        site_id: value.site_id || null,
         flight_date: value.flight_date,
-        departure_time: value.departure_time ?? null,
+        departure_time: value.departure_time || null,
         duration_minutes: value.duration_minutes,
         max_altitude_m: value.max_altitude_m,
         distance_km: value.distance_km,

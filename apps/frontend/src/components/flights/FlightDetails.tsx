@@ -200,7 +200,9 @@ export function FlightDetails({
               <div>
                 <span className={labelClass}>{t('flights.distanceLabel')}</span>
                 <span className={valueClass}>
-                  {flight.distance_km?.toFixed(2)} km
+                  {flight.distance_km != null
+                    ? `${flight.distance_km.toFixed(2)} km`
+                    : 'N/A'}
                 </span>
               </div>
 
@@ -208,20 +210,30 @@ export function FlightDetails({
                 <span className={labelClass}>
                   {t('flights.maxAltitudeLabel')}
                 </span>
-                <span className={valueClass}>{flight.max_altitude_m} m</span>
+                <span className={valueClass}>
+                  {flight.max_altitude_m != null
+                    ? `${flight.max_altitude_m} m`
+                    : 'N/A'}
+                </span>
               </div>
 
               <div>
                 <span className={labelClass}>
                   {t('flights.elevationGainLabel')}
                 </span>
-                <span className={valueClass}>{flight.elevation_gain_m} m</span>
+                <span className={valueClass}>
+                  {flight.elevation_gain_m != null
+                    ? `${flight.elevation_gain_m} m`
+                    : 'N/A'}
+                </span>
               </div>
 
               <div>
                 <span className={labelClass}>{t('flights.maxSpeedLabel')}</span>
                 <span className={valueClass}>
-                  {flight.max_speed_kmh?.toFixed(2)} km/h
+                  {flight.max_speed_kmh != null
+                    ? `${flight.max_speed_kmh.toFixed(2)} km/h`
+                    : 'N/A'}
                 </span>
               </div>
             </div>
@@ -302,28 +314,36 @@ export function FlightDetails({
         )}
       </div>
 
-      {/* 3D Viewer */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
-        <Suspense
-          fallback={
-            <div className="h-96 flex items-center justify-center text-gray-500 dark:text-gray-400">
-              {t('flights.loading3dViewer')}
-            </div>
-          }
-        >
-          <FlightViewer3D
-            flightId={flight.id}
-            flightTitle={
-              flight.title ??
-              t('flights.flightOf', {
-                date: new Date(flight.flight_date).toLocaleDateString(
-                  i18n.language
-                ),
-              })
+      {/* 3D Viewer — only when GPX is available */}
+      {flight.gpx_file_path && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+          <Suspense
+            fallback={
+              <div className="h-96 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                {t('flights.loading3dViewer')}
+              </div>
             }
-          />
-        </Suspense>
-      </div>
+          >
+            <FlightViewer3D
+              flightId={flight.id}
+              flightTitle={
+                flight.title ??
+                (() => {
+                  const [y, m, d] = flight.flight_date.split('-');
+                  const localDate = new Date(
+                    Number(y),
+                    Number(m) - 1,
+                    Number(d)
+                  );
+                  return t('flights.flightOf', {
+                    date: localDate.toLocaleDateString(i18n.language),
+                  });
+                })()
+              }
+            />
+          </Suspense>
+        </div>
+      )}
     </>
   );
 }
