@@ -102,7 +102,7 @@ export default function SiteSelector({
   const siteGroups = groupSitesByBaseName(sites);
 
   return (
-    <div className="mb-4">
+    <div className="mb-4 sticky top-0 z-10">
       <div className="flex gap-2 flex-wrap bg-white dark:bg-gray-800 rounded-xl p-3 shadow-md">
         {Object.entries(siteGroups).map(([baseId, groupSites]) => {
           // Single site -> regular button
