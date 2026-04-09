@@ -9,7 +9,7 @@ export const Route = createRootRoute({
 
 function PendingComponent() {
   return (
-    <div className="min-h-screen p-3 md:p-4 overflow-x-hidden bg-gray-50 dark:bg-gray-900 transition-colors">
+    <div className="min-h-screen p-3 md:p-4 overflow-x-clip bg-gray-50 dark:bg-gray-900 transition-colors">
       <div className="max-w-7xl mx-auto">
         <Header />
         <main>
@@ -34,7 +34,7 @@ function RootComponent() {
   }
 
   return (
-    <div className="min-h-screen p-3 md:p-4 overflow-x-hidden bg-gray-50 dark:bg-gray-900 transition-colors">
+    <div className="min-h-screen p-3 md:p-4 overflow-x-clip bg-gray-50 dark:bg-gray-900 transition-colors">
       <div className="max-w-7xl mx-auto">
         <Header />
         <main>
