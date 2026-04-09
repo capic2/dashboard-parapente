@@ -134,7 +134,7 @@ importers:
         version: 4.1.4(vitest@4.1.4)
       chromatic:
         specifier: ^16.0.0
-        version: 16.1.0
+        version: 16.2.0
       happy-dom:
         specifier: ^20.8.4
         version: 20.8.9
@@ -3508,8 +3508,8 @@ packages:
       '@chromatic-com/playwright':
         optional: true
 
-  chromatic@16.1.0:
-    resolution: {integrity: sha512-7xyOUXe8jfY6c+g9S/U/cbvzVXMjdhh9cVZYvDp8dDGonjiKSbWO1dzWApdYHIiF2xj29pvWQB7N5LT6967IDw==}
+  chromatic@16.2.0:
+    resolution: {integrity: sha512-yFUC0iCumsw5JDQPmrNAgYuln25HRh79iGdJgm+dj87lv7kFatlRBgRcw8Kmzdw1si3qzGlzu36aCABS7Wg5aQ==}
     hasBin: true
     peerDependencies:
       '@chromatic-com/cypress': ^0.*.* || ^1.0.0
@@ -9416,7 +9416,7 @@ snapshots:
 
   chromatic@13.3.5: {}
 
-  chromatic@16.1.0: {}
+  chromatic@16.2.0: {}
 
   chrome-trace-event@1.0.4:
     optional: true
