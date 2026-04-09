@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Row, RowSelectionState, OnChangeFn } from '@tanstack/react-table';
 import type { Selection } from 'react-aria-components';
 import { DataList } from '@dashboard-parapente/design-system';
@@ -24,6 +25,7 @@ export function FlightsTable({
   rowSelection,
   onRowSelectionChange,
 }: FlightsTableProps) {
+  const { t, i18n } = useTranslation();
   const { table } = useFlightsTable({
     data: flights,
     selectionMode,
@@ -85,7 +87,9 @@ export function FlightsTable({
                 e.stopPropagation();
                 onDeleteFlight(flight);
               }}
-              aria-label={`Supprimer le vol ${flight.title || 'sans titre'}`}
+              aria-label={t('flights.deleteAriaLabel', {
+                title: flight.title || t('flights.untitledFlight'),
+              })}
             >
               <svg
                 className="w-4 h-4"
@@ -104,13 +108,13 @@ export function FlightsTable({
           )}
           <div className="flex justify-between items-start mb-2">
             <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate flex-1">
-              {flight.title || 'Vol sans titre'}
+              {flight.title || t('flights.untitledFlight')}
             </h3>
 
             {/* Badge GPX manquant */}
             {!flight.gpx_file_path && !selectionMode && (
               <span className="ml-2 px-2 py-0.5 text-xs bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded-full shrink-0">
-                📎 GPX manquant
+                📎 {t('flights.gpxMissing')}
               </span>
             )}
           </div>
@@ -125,7 +129,7 @@ export function FlightsTable({
                   Number(month) - 1,
                   Number(day)
                 );
-                return localDate.toLocaleDateString('fr-FR', {
+                return localDate.toLocaleDateString(i18n.language, {
                   day: '2-digit',
                   month: 'short',
                   year: 'numeric',
@@ -134,10 +138,14 @@ export function FlightsTable({
             </span>
             {flight.departure_time && (
               <span className="ml-2">
-                à{' '}
-                {new Date(flight.departure_time).toLocaleTimeString('fr-FR', {
-                  hour: '2-digit',
-                  minute: '2-digit',
+                {t('flights.at', {
+                  time: new Date(flight.departure_time).toLocaleTimeString(
+                    i18n.language,
+                    {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    }
+                  ),
                 })}
               </span>
             )}
@@ -177,7 +185,7 @@ export function FlightsTable({
         </div>
       );
     },
-    [selectionMode, selectedFlightId, onSelectFlight, onDeleteFlight]
+    [selectionMode, selectedFlightId, onSelectFlight, onDeleteFlight, t, i18n]
   );
 
   return (
@@ -185,13 +193,13 @@ export function FlightsTable({
       table={table}
       renderItem={renderFlightCard}
       sortableColumns={FLIGHT_SORTABLE_COLUMNS}
-      emptyMessage="Aucun vol enregistré"
-      ariaLabel="Liste des vols"
+      emptyMessage={t('flights.noFlights')}
+      ariaLabel={t('flights.listAriaLabel')}
       selectionMode={selectionMode ? 'multiple' : 'none'}
       selectedKeys={selectedKeys}
       onSelectionChange={handleSelectionChange}
       getTextValue={(row) =>
-        row.original.title || row.original.site_name || 'Vol'
+        row.original.title || row.original.site_name || t('common.flight_one')
       }
     />
   );
