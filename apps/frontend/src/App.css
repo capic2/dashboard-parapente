@@ -49,7 +49,7 @@ body {
 }
 
 /* Mobile drawer slide-in animation */
-`@keyframes` slide-in {
+@keyframes slide-in {
   from {
     transform: translateX(100%);
   }

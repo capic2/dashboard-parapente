@@ -184,7 +184,7 @@ export default function CacheViewer() {
         </Checkbox>
         <Button
           onPress={() => refetch()}
-          className="px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-md bg-sky-600 text-white text-sm hover:bg-sky-700 transition-colors cursor-pointer"
+          className="min-h-11 px-4 py-2.5 sm:min-h-0 sm:px-3 sm:py-1.5 rounded-md bg-sky-600 text-white text-sm hover:bg-sky-700 transition-colors cursor-pointer"
         >
           {t('cache.refresh')}
         </Button>
@@ -202,7 +202,7 @@ export default function CacheViewer() {
         <Button
           onPress={handleClearAll}
           isDisabled={deleteMutation.isPending}
-          className="px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-md bg-red-600 text-white text-sm hover:bg-red-700 transition-colors disabled:opacity-50 cursor-pointer"
+          className="min-h-11 px-4 py-2.5 sm:min-h-0 sm:px-3 sm:py-1.5 rounded-md bg-red-600 text-white text-sm hover:bg-red-700 transition-colors disabled:opacity-50 cursor-pointer"
         >
           {t('cache.clearAll')}
         </Button>
@@ -389,14 +389,14 @@ function GroupSection({
           <div className="flex gap-2">
             <Button
               onPress={() => onViewKey(info.row.original.key)}
-              className="px-3 py-2 sm:px-2 sm:py-1 rounded text-xs bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors cursor-pointer"
+              className="min-h-11 px-3 py-2 sm:min-h-0 sm:px-2 sm:py-1 rounded text-xs bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors cursor-pointer"
             >
               {t('cache.view')}
             </Button>
             <Button
               onPress={() => onDeleteKey(info.row.original.key)}
               isDisabled={isPending}
-              className="px-3 py-2 sm:px-2 sm:py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
+              className="min-h-11 px-3 py-2 sm:min-h-0 sm:px-2 sm:py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
             >
               {t('cache.deleteKey')}
             </Button>

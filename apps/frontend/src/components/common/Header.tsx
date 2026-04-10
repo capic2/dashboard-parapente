@@ -125,13 +125,13 @@ export default function Header() {
             className="fixed inset-0 z-50 bg-black/40"
             isDismissable
           >
-            <Modal className="fixed top-0 right-0 h-full w-64 bg-white dark:bg-gray-800 shadow-xl outline-none animate-[slideIn_0.2s_ease-out]">
+            <Modal className="fixed top-0 right-0 h-full w-64 bg-white dark:bg-gray-800 shadow-xl outline-none animate-[slide-in_0.2s_ease-out]">
               <Dialog className="h-full flex flex-col outline-none">
                 {({ close }) => (
                   <>
                     <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
                       <span className="text-lg font-semibold text-gray-800 dark:text-gray-100">
-                        Menu
+                        {t('header.menu', 'Menu')}
                       </span>
                       <AriaButton
                         onPress={close}

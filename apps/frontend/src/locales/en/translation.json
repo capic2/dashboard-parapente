@@ -11,7 +11,8 @@
     "login": "Login",
     "logout": "Logout",
     "openMenu": "Open menu",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "menu": "Menu"
   },
   "login": {
     "title": "Paragliding Dashboard",
