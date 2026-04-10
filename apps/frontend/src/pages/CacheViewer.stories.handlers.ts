@@ -88,31 +88,39 @@ export const cacheDb: CacheEntry[] = [...initialEntries];
 
 // --- Strava token mock state ---
 
-let stravaTokenState = {
+const getExpiresAt = (hours: number, base = Date.now()) =>
+  new Date(base + hours * 60 * 60 * 1000).toISOString();
+
+const buildStravaTokenState = (base = Date.now()) => ({
   valid: true,
-  expires_at: '2026-01-15T16:00:00Z',
-};
+  expires_at: getExpiresAt(1, base),
+});
+
+const buildStravaExpiredTokenState = (base = Date.now()) => ({
+  valid: false,
+  expires_at: getExpiresAt(-1, base),
+});
 
 let nextLogId = 4;
 
-const stravaTokenLogs: TokenLog[] = [
+const buildStravaTokenLogs = (base = Date.now()): TokenLog[] => [
   {
     id: 3,
-    timestamp: '2026-01-15T10:00:00Z',
+    timestamp: getExpiresAt(-2, base),
     success: true,
-    message: 'Access token refreshed (expires at 2026-01-15 16:00:00)',
-    expires_at: '2026-01-15T16:00:00Z',
+    message: `Access token refreshed (expires at ${getExpiresAt(-1, base)})`,
+    expires_at: getExpiresAt(-1, base),
   },
   {
     id: 2,
-    timestamp: '2026-01-15T06:00:00Z',
+    timestamp: getExpiresAt(-6, base),
     success: true,
-    message: 'Access token refreshed (expires at 2026-01-15 12:00:00)',
-    expires_at: '2026-01-15T12:00:00Z',
+    message: `Access token refreshed (expires at ${getExpiresAt(-5, base)})`,
+    expires_at: getExpiresAt(-5, base),
   },
   {
     id: 1,
-    timestamp: '2026-01-15T02:00:00Z',
+    timestamp: getExpiresAt(-10, base),
     success: false,
     message:
       'Strava API error (HTTP 401): {"message":"Bad Request","errors":[]}',
@@ -120,15 +128,56 @@ const stravaTokenLogs: TokenLog[] = [
   },
 ];
 
-const initialStravaLogs = [...stravaTokenLogs];
+const buildStravaExpiredTokenLogs = (base = Date.now()): TokenLog[] => [
+  {
+    id: 1,
+    timestamp: getExpiresAt(-1, base),
+    success: false,
+    message:
+      'Strava API error (HTTP 401): {"message":"Bad Request","errors":[]}',
+    expires_at: null,
+  },
+];
+
+let currentStravaTokenState = buildStravaTokenState();
+let currentStravaTokenLogs: TokenLog[] = buildStravaTokenLogs();
+
+const refreshStravaToken = () => {
+  const newExpiry = getExpiresAt(6);
+  const newLog: TokenLog = {
+    id: nextLogId,
+    timestamp: new Date().toISOString(),
+    success: true,
+    message: `Access token refreshed (expires at ${new Date(newExpiry).toLocaleString()})`,
+    expires_at: newExpiry,
+  };
+
+  nextLogId += 1;
+  currentStravaTokenState = {
+    valid: true,
+    expires_at: newExpiry,
+  };
+  currentStravaTokenLogs = [newLog, ...currentStravaTokenLogs];
+
+  return {
+    valid: true,
+    expires_at: newExpiry,
+    refreshed: true,
+  };
+};
+
+const getInitialStravaState = () => {
+  const now = Date.now();
+  nextLogId = 4;
+  currentStravaTokenState = buildStravaTokenState(now);
+  currentStravaTokenLogs = buildStravaTokenLogs(now);
+};
 
 export const resetCacheDb = () => {
   cacheDb.length = 0;
   cacheDb.push(...initialEntries);
   // Reset Strava state
-  stravaTokenState = { valid: true, expires_at: '2026-01-15T16:00:00Z' };
-  stravaTokenLogs.length = 0;
-  stravaTokenLogs.push(...initialStravaLogs);
+  getInitialStravaState();
   nextLogId = 4;
 };
 
@@ -169,51 +218,28 @@ function buildOverview() {
 
 const stravaHandlers = [
   http.get('*/api/admin/strava/token-status', () =>
-    HttpResponse.json(stravaTokenState)
+    HttpResponse.json(currentStravaTokenState)
   ),
 
   http.get('*/api/admin/strava/token-logs', () =>
-    HttpResponse.json(stravaTokenLogs)
+    HttpResponse.json(currentStravaTokenLogs)
   ),
 
   http.post('*/api/admin/strava/refresh-token', () => {
-    const newExpiry = '2026-01-15T22:00:00Z';
-    stravaTokenState = { valid: true, expires_at: newExpiry };
-    stravaTokenLogs.unshift({
-      id: nextLogId++,
-      timestamp: new Date().toISOString(),
-      success: true,
-      message: `Access token refreshed (expires at ${newExpiry})`,
-      expires_at: newExpiry,
-    });
-    return HttpResponse.json({
-      valid: true,
-      expires_at: newExpiry,
-      refreshed: true,
-    });
+    return HttpResponse.json(refreshStravaToken());
   }),
 ];
 
 export const stravaExpiredHandlers = [
-  http.get('*/api/admin/strava/token-status', () =>
-    HttpResponse.json({
-      valid: false,
-      expires_at: '2026-01-14T10:00:00Z',
-    })
-  ),
+  http.get('*/api/admin/strava/token-status', () => {
+    const now = Date.now();
+    return HttpResponse.json(buildStravaExpiredTokenState(now));
+  }),
 
-  http.get('*/api/admin/strava/token-logs', () =>
-    HttpResponse.json([
-      {
-        id: 1,
-        timestamp: '2026-01-15T02:00:00Z',
-        success: false,
-        message:
-          'Strava API error (HTTP 401): {"message":"Bad Request","errors":[]}',
-        expires_at: null,
-      },
-    ])
-  ),
+  http.get('*/api/admin/strava/token-logs', () => {
+    const now = Date.now();
+    return HttpResponse.json(buildStravaExpiredTokenLogs(now));
+  }),
 
   http.post('*/api/admin/strava/refresh-token', () =>
     HttpResponse.json(
