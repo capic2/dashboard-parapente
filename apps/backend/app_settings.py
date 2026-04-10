@@ -90,6 +90,10 @@ def set_setting(db: Session, key: str, value: str) -> None:
     logger.info(f"Setting updated: {key} = {_mask_value_for_logs(key, value)}")
 
 
+# Keys that must never be exposed via the public settings API
+_SENSITIVE_KEYS = {"strava_refresh_token"}
+
+
 def get_all_settings(db: Session) -> dict[str, str]:
     """Read all settings as a dict (sensitive keys excluded)."""
     if not _cache_loaded:
