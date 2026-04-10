@@ -6,7 +6,7 @@ import {
   cacheHandlers,
   resetCacheDb,
   cacheDb,
-} from './CacheViewer.stories.handlers';
+} from './InfrastructurePage.stories.handlers';
 
 // --- Stories ---
 
