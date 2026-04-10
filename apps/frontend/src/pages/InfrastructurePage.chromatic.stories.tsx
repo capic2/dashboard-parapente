@@ -1,7 +1,7 @@
 import { FigureWrapper } from '../../.storybook/FigureWrapper.tsx';
 import preview from '../../.storybook/preview.tsx';
-import { Default } from './CacheViewer.stories.tsx';
-import { defaultHandlers } from './CacheViewer.stories.handlers';
+import { Default } from './InfrastructurePage.stories.tsx';
+import { defaultHandlers } from './InfrastructurePage.stories.handlers';
 
 const meta = preview.meta({
   title: 'Pages/Infrastructure/Chromatic',
