@@ -19,14 +19,18 @@ async def run_scheduled_emagram_analysis():
     Run multi-source emagram analysis for all active sites.
     Analyzes today (J), tomorrow (J+1), and day after (J+2).
     Skips sites/days with MAUVAIS weather verdict to save LLM credits.
+
+    Uses round-robin across sites: processes one hour per site before moving
+    to the next hour. This ensures all sites get at least some hourly data
+    even if the LLM quota runs out mid-cycle.
     """
     from database import get_db_context
-    from emagram_multi_source import generate_hourly_emagram_for_spot
+    from emagram_multi_source import generate_multi_source_emagram_for_spot
     from llm.exceptions import QuotaExhaustedError
     from models import Site
     from weather_pipeline import get_normalized_forecast
 
-    logger.info("📸 Starting scheduled hourly emagram analysis (J, J+1, J+2)...")
+    logger.info("📸 Starting scheduled hourly emagram analysis (J, J+1, J+2) — round-robin...")
 
     success_count = 0
     error_count = 0
@@ -38,11 +42,13 @@ async def run_scheduled_emagram_analysis():
 
         logger.info(f"Found {len(sites)} sites to analyze")
 
-    # Analyze J, J+1, J+2 for each site
+    # Phase 1: Build per-site hour ranges and filter out MAUVAIS days
+    # Structure: list of (site, day_index, hours_list)
+    site_day_hours: list[tuple] = []
+
     for site in sites:
         for day_index in range(3):
             try:
-                # Check weather before spending LLM credits
                 with get_db_context() as db_session:
                     forecast = await get_normalized_forecast(
                         lat=site.latitude,
@@ -56,31 +62,55 @@ async def run_scheduled_emagram_analysis():
                     skipped_count += 1
                     continue
 
-                logger.info(f"Analyzing {site.name} ({site.id}) day+{day_index}...")
+                sunrise = forecast.get("sunrise")
+                sunset = forecast.get("sunset")
+                start_hour = int(sunrise.split(":")[0]) if sunrise else 7
+                end_hour = int(sunset.split(":")[0]) if sunset else 20
+                hours = list(range(start_hour, end_hour + 1))
+                site_day_hours.append((site, day_index, hours))
 
+            except Exception as e:
+                logger.error(f"  ❌ Error getting forecast for {site.name} day+{day_index}: {e}")
+                error_count += 1
+
+    if not site_day_hours:
+        logger.info("No sites/days to analyze (all skipped or errored)")
+        return
+
+    # Phase 2: Round-robin — iterate hour by hour across all site/day combos
+    # Find the maximum number of hours across all entries
+    max_hours = max(len(hours) for _, _, hours in site_day_hours)
+
+    logger.info(f"Round-robin: {len(site_day_hours)} site/day combos, up to {max_hours} hours each")
+
+    for hour_idx in range(max_hours):
+        for site, day_index, hours in site_day_hours:
+            if hour_idx >= len(hours):
+                continue
+            hour = hours[hour_idx]
+
+            try:
                 with get_db_context() as db_session:
-                    results = await generate_hourly_emagram_for_spot(
+                    result = await generate_multi_source_emagram_for_spot(
                         site_id=site.id,
                         db=db_session,
-                        force_refresh=False,  # Use cache if < 3 hours old
+                        force_refresh=False,
                         day_index=day_index,
+                        hour=hour,
                     )
 
-                site_success = sum(1 for r in results if r.get("success"))
-                site_total = len(results)
-                logger.info(
-                    f"  {site.name} day+{day_index}: {site_success}/{site_total} hours successful"
-                )
-                success_count += site_success
-                error_count += site_total - site_success
+                if result.get("success"):
+                    success_count += 1
+                else:
+                    error_count += 1
 
-                # Delay between analyses to avoid overwhelming servers
-                await asyncio.sleep(5)
+                await asyncio.sleep(2)
 
             except QuotaExhaustedError as e:
-                logger.warning(f"  ⚠️ LLM quota exhausted during {site.name} day+{day_index}: {e}")
+                logger.warning(
+                    f"  ⚠️ LLM quota exhausted during {site.name} day+{day_index} h{hour}: {e}"
+                )
                 logger.warning("  Stopping all remaining analyses for this scheduler cycle.")
-                # Break both loops — quota is global, not per-site
                 logger.info(
                     f"✅ Scheduled hourly emagram analysis stopped early (quota exhausted): "
                     f"{success_count} success, {error_count} errors, {skipped_count} skipped"
@@ -88,7 +118,8 @@ async def run_scheduled_emagram_analysis():
                 return
             except Exception as e:
                 logger.error(
-                    f"  ❌ Error analyzing {site.name} day+{day_index}: {e}", exc_info=True
+                    f"  ❌ Error analyzing {site.name} day+{day_index} h{hour}: {e}",
+                    exc_info=True,
                 )
                 error_count += 1
 

@@ -214,10 +214,17 @@ async def analyze_multiple_emagrammes(
             }
 
     except anthropic.APIError as e:
+        error_msg = str(e)
+        if "credit balance" in error_msg.lower() or (
+            hasattr(e, "status_code") and e.status_code == 429
+        ):
+            from llm.exceptions import QuotaExhaustedError
+
+            raise QuotaExhaustedError(f"Anthropic quota/credit exhausted: {error_msg}") from e
         logger.error(f"Anthropic API error: {e}")
         return {
             "success": False,
-            "error": f"Claude API error: {str(e)}",
+            "error": f"Claude API error: {error_msg}",
             "llm_provider": "anthropic",
         }
 
