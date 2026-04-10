@@ -23,6 +23,7 @@ import pytest
 from strava import (
     download_gpx,
     get_access_token,
+    get_activities_by_period,
     get_activity_details,
     parse_gpx,
     refresh_access_token,
@@ -513,3 +514,51 @@ def test_streams_to_gpx_mismatched_arrays():
     assert gpx_content is not None
     assert "<trkpt" in gpx_content
     # Should handle mismatched lengths gracefully
+
+
+# ============================================================================
+# GET ACTIVITIES BY PERIOD TESTS
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_get_activities_by_period_end_date_is_inclusive():
+    """Test that date_to is inclusive: before timestamp should be midnight of the next day"""
+
+    mock_activity = {
+        "id": 999,
+        "name": "Evening Flight",
+        "type": "Workout",
+        "start_date_local": "2026-03-15T18:00:00Z",
+    }
+
+    captured_params = {}
+
+    async def mock_get(url, **kwargs):
+        if not captured_params:
+            captured_params.update(kwargs.get("params", {}))
+            return MagicMock(
+                status_code=200,
+                json=MagicMock(return_value=[mock_activity]),
+                raise_for_status=MagicMock(),
+            )
+        return MagicMock(
+            status_code=200,
+            json=MagicMock(return_value=[]),
+            raise_for_status=MagicMock(),
+        )
+
+    with (
+        patch("strava.get_access_token", new=AsyncMock(return_value="test_token")),
+        patch("strava.httpx.AsyncClient") as mock_client,
+    ):
+        mock_client.return_value.__aenter__.return_value.get = AsyncMock(side_effect=mock_get)
+
+        await get_activities_by_period("2026-03-01", "2026-03-15")
+
+    # "before" should be 2026-03-16 00:00:00, not 2026-03-15 00:00:00
+    expected_before = int(datetime(2026, 3, 16).timestamp())
+    expected_after = int(datetime(2026, 3, 1).timestamp())
+
+    assert captured_params["after"] == expected_after
+    assert captured_params["before"] == expected_before
