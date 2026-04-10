@@ -118,44 +118,6 @@ async def test_refresh_access_token_fails_when_persist_fails(caplog):
 
 
 @pytest.mark.asyncio
-async def test_refresh_access_token_ignores_persist_failure(caplog):
-    """Test token refresh still works if token persistence fails"""
-
-    mock_response = {
-        "access_token": "fallback_access_token",
-        "refresh_token": "fallback_refresh_token",
-        "expires_at": int((datetime.now() + timedelta(hours=6)).timestamp()),
-    }
-
-    with (
-        patch("strava.STRAVA_CLIENT_ID", "test_client_id"),
-        patch("strava.STRAVA_CLIENT_SECRET", "test_secret"),
-        patch("strava.STRAVA_REFRESH_TOKEN", "test_refresh_token"),
-        patch("strava._persist_refresh_token") as mock_persist,
-        patch("strava.httpx.AsyncClient") as mock_client,
-    ):
-        mock_persist.side_effect = RuntimeError("no such table: app_settings")
-
-        mock_client.return_value.__aenter__.return_value.post = AsyncMock(
-            return_value=MagicMock(status_code=200, json=MagicMock(return_value=mock_response))
-        )
-
-        import strava
-
-        strava._access_token = None
-        strava._token_expires_at = None
-
-        with caplog.at_level("WARNING"):
-            token = await refresh_access_token()
-
-        assert token == "fallback_access_token"
-        assert strava._access_token == "fallback_access_token"
-        assert strava._refresh_token == "fallback_refresh_token"
-        assert mock_persist.call_count == 1
-        assert any("Could not persist refresh token" in record.message for record in caplog.records)
-
-
-@pytest.mark.asyncio
 async def test_refresh_access_token_uses_cached():
     """Test that cached token is used when still valid"""
 

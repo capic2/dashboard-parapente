@@ -88,22 +88,26 @@ export const cacheDb: CacheEntry[] = [...initialEntries];
 
 // --- Strava token mock state ---
 
-const getExpiresAt = (hours: number, base = Date.now()) =>
+const STRAVA_MOCK_BASE_MS = Date.parse('2026-01-15T10:00:00Z');
+const STRAVA_REFRESH_STEP_MS = 6 * 60 * 60 * 1000;
+
+const getExpiresAt = (hours: number, base = STRAVA_MOCK_BASE_MS) =>
   new Date(base + hours * 60 * 60 * 1000).toISOString();
 
-const buildStravaTokenState = (base = Date.now()) => ({
+const buildStravaTokenState = (base = STRAVA_MOCK_BASE_MS) => ({
   valid: true,
   expires_at: getExpiresAt(1, base),
 });
 
-const buildStravaExpiredTokenState = (base = Date.now()) => ({
+const buildStravaExpiredTokenState = (base = STRAVA_MOCK_BASE_MS) => ({
   valid: false,
   expires_at: getExpiresAt(-1, base),
 });
 
 let nextLogId = 4;
+let currentRefreshClock = STRAVA_MOCK_BASE_MS;
 
-const buildStravaTokenLogs = (base = Date.now()): TokenLog[] => [
+const buildStravaTokenLogs = (base = STRAVA_MOCK_BASE_MS): TokenLog[] => [
   {
     id: 3,
     timestamp: getExpiresAt(-2, base),
@@ -128,7 +132,9 @@ const buildStravaTokenLogs = (base = Date.now()): TokenLog[] => [
   },
 ];
 
-const buildStravaExpiredTokenLogs = (base = Date.now()): TokenLog[] => [
+const buildStravaExpiredTokenLogs = (
+  base = STRAVA_MOCK_BASE_MS
+): TokenLog[] => [
   {
     id: 1,
     timestamp: getExpiresAt(-1, base),
@@ -143,12 +149,13 @@ let currentStravaTokenState = buildStravaTokenState();
 let currentStravaTokenLogs: TokenLog[] = buildStravaTokenLogs();
 
 const refreshStravaToken = () => {
-  const newExpiry = getExpiresAt(6);
+  currentRefreshClock += STRAVA_REFRESH_STEP_MS;
+  const newExpiry = getExpiresAt(6, currentRefreshClock);
   const newLog: TokenLog = {
     id: nextLogId,
-    timestamp: new Date().toISOString(),
+    timestamp: new Date(currentRefreshClock).toISOString(),
     success: true,
-    message: `Access token refreshed (expires at ${new Date(newExpiry).toLocaleString()})`,
+    message: `Access token refreshed (expires at ${newExpiry})`,
     expires_at: newExpiry,
   };
 
@@ -167,10 +174,10 @@ const refreshStravaToken = () => {
 };
 
 const getInitialStravaState = () => {
-  const now = Date.now();
   nextLogId = 4;
-  currentStravaTokenState = buildStravaTokenState(now);
-  currentStravaTokenLogs = buildStravaTokenLogs(now);
+  currentRefreshClock = STRAVA_MOCK_BASE_MS;
+  currentStravaTokenState = buildStravaTokenState(currentRefreshClock);
+  currentStravaTokenLogs = buildStravaTokenLogs(currentRefreshClock);
 };
 
 export const resetCacheDb = () => {
@@ -178,7 +185,6 @@ export const resetCacheDb = () => {
   cacheDb.push(...initialEntries);
   // Reset Strava state
   getInitialStravaState();
-  nextLogId = 4;
 };
 
 // --- Helper: build overview response from cacheDb ---
@@ -232,13 +238,11 @@ const stravaHandlers = [
 
 export const stravaExpiredHandlers = [
   http.get('*/api/admin/strava/token-status', () => {
-    const now = Date.now();
-    return HttpResponse.json(buildStravaExpiredTokenState(now));
+    return HttpResponse.json(buildStravaExpiredTokenState());
   }),
 
   http.get('*/api/admin/strava/token-logs', () => {
-    const now = Date.now();
-    return HttpResponse.json(buildStravaExpiredTokenLogs(now));
+    return HttpResponse.json(buildStravaExpiredTokenLogs());
   }),
 
   http.post('*/api/admin/strava/refresh-token', () =>
