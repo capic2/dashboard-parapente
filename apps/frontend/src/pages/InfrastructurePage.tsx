@@ -214,7 +214,7 @@ function StravaTokenSection() {
 }
 
 // =============================================================================
-// CACHE SECTION (former CacheViewer)
+// CACHE SECTION
 // =============================================================================
 
 function CacheSection() {
