@@ -49,16 +49,17 @@ def _get_persisted_refresh_token() -> str | None:
 
 
 def _persist_refresh_token(token: str) -> None:
-    """Save the new refresh token to DB so it survives restarts."""
-    try:
-        from app_settings import set_setting
-        from database import get_db_context
+    """Save the new refresh token to DB so it survives restarts.
 
-        with get_db_context() as db:
-            set_setting(db, "strava_refresh_token", token)
-        logger.info("Refresh token persisted to DB")
-    except Exception as e:
-        logger.warning(f"Could not persist refresh token: {e}")
+    Raises on failure — a lost refresh token means permanent auth failure
+    after restart since Strava rotates tokens on each exchange.
+    """
+    from app_settings import set_setting
+    from database import get_db_context
+
+    with get_db_context() as db:
+        set_setting(db, "strava_refresh_token", token)
+    logger.info("Refresh token persisted to DB")
 
 
 def _log_token_refresh(success: bool, message: str, expires_at: datetime | None = None) -> None:
@@ -79,20 +80,23 @@ def _log_token_refresh(success: bool, message: str, expires_at: datetime | None 
         logger.warning(f"Could not log token refresh: {e}")
 
 
-async def refresh_access_token() -> str | None:
+async def refresh_access_token(force: bool = False) -> str | None:
     """
     Refresh Strava access token.
 
     Token priority: in-memory → DB (app_settings) → env (.env).
     After refresh, persists new refresh_token to DB and logs the attempt.
 
+    Args:
+        force: If True, skip the "still valid" check and always refresh.
+
     Returns:
         New access token or None on error
     """
     global _access_token, _token_expires_at, _refresh_token
 
-    # Check if token is still valid (with 5 min buffer)
-    if _access_token and _token_expires_at:
+    # Check if token is still valid (with 5 min buffer) — skip when forced
+    if not force and _access_token and _token_expires_at:
         if datetime.now() < _token_expires_at - timedelta(minutes=5):
             logger.info("Access token still valid")
             return _access_token

@@ -537,7 +537,11 @@
       "refreshSuccess": "Token refreshed successfully",
       "refreshError": "Token refresh failed",
       "logs": "Refresh history",
-      "noLogs": "No history"
+      "noLogs": "No history",
+      "date": "Date",
+      "message": "Message",
+      "ok": "OK",
+      "fail": "Fail"
     }
   }
 }

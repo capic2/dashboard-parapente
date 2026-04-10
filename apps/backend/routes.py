@@ -4781,17 +4781,22 @@ def strava_token_status():
 
 @router.post("/admin/strava/refresh-token")
 async def strava_refresh_token():
-    """Force a manual Strava token refresh."""
+    """Force a manual Strava token refresh (bypasses the 'still valid' check)."""
     from strava import get_token_status, refresh_access_token
 
-    token = await refresh_access_token()
+    token = await refresh_access_token(force=True)
+    if token is None:
+        raise HTTPException(status_code=502, detail="Strava token refresh failed")
     status = get_token_status()
-    status["refreshed"] = token is not None
+    status["refreshed"] = True
     return status
 
 
 @router.get("/admin/strava/token-logs")
-def strava_token_logs(limit: int = 20, db: Session = Depends(get_db)):
+def strava_token_logs(
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
     """Get recent Strava token refresh logs."""
     from models import StravaTokenLog
 
@@ -4799,10 +4804,10 @@ def strava_token_logs(limit: int = 20, db: Session = Depends(get_db)):
     return [
         {
             "id": log.id,
-            "timestamp": log.timestamp.isoformat(),
+            "timestamp": log.timestamp.isoformat() + "Z",
             "success": log.success,
             "message": log.message,
-            "expires_at": log.expires_at.isoformat() if log.expires_at else None,
+            "expires_at": log.expires_at.isoformat() + "Z" if log.expires_at else None,
         }
         for log in logs
     ]

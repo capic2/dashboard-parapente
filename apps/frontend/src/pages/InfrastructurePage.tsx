@@ -55,9 +55,35 @@ function formatDate(iso: string): string {
 
 function StravaTokenSection() {
   const { t } = useTranslation();
-  const { data: status, isLoading: statusLoading } = useStravaTokenStatus();
+  const {
+    data: status,
+    isLoading: statusLoading,
+    isError: statusError,
+  } = useStravaTokenStatus();
   const { data: logs, isLoading: logsLoading } = useStravaTokenLogs();
   const refreshMutation = useStravaRefreshToken();
+
+  const statusBadge = (() => {
+    if (statusLoading) return null;
+    if (statusError || !status) {
+      return {
+        className:
+          'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400',
+        label: t('infrastructure.strava.unknown'),
+      };
+    }
+    return status.valid
+      ? {
+          className:
+            'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300',
+          label: t('infrastructure.strava.valid'),
+        }
+      : {
+          className:
+            'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300',
+          label: t('infrastructure.strava.expired'),
+        };
+  })();
 
   return (
     <div className="space-y-4">
@@ -73,19 +99,13 @@ function StravaTokenSection() {
           </span>
           {statusLoading ? (
             <span className="text-sm text-gray-400">...</span>
-          ) : (
+          ) : statusBadge ? (
             <span
-              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                status?.valid
-                  ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                  : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-              }`}
+              className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge.className}`}
             >
-              {status?.valid
-                ? t('infrastructure.strava.valid')
-                : t('infrastructure.strava.expired')}
+              {statusBadge.label}
             </span>
-          )}
+          ) : null}
         </div>
 
         {status?.expires_at && (
@@ -141,13 +161,13 @@ function StravaTokenSection() {
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-900/50 text-left">
                   <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
-                    Date
+                    {t('infrastructure.strava.date')}
                   </th>
                   <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
                     {t('infrastructure.strava.status')}
                   </th>
                   <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
-                    Message
+                    {t('infrastructure.strava.message')}
                   </th>
                   <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
                     {t('infrastructure.strava.expiresAt')}
@@ -171,7 +191,9 @@ function StravaTokenSection() {
                             : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
                         }`}
                       >
-                        {log.success ? 'OK' : 'FAIL'}
+                        {log.success
+                          ? t('infrastructure.strava.ok')
+                          : t('infrastructure.strava.fail')}
                       </span>
                     </td>
                     <td className="px-4 py-2 text-gray-600 dark:text-gray-400 text-xs max-w-md truncate">

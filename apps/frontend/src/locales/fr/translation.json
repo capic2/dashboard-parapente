@@ -537,7 +537,11 @@
       "refreshSuccess": "Token rafraîchi avec succès",
       "refreshError": "Échec du rafraîchissement",
       "logs": "Historique des refresh",
-      "noLogs": "Aucun historique"
+      "noLogs": "Aucun historique",
+      "date": "Date",
+      "message": "Message",
+      "ok": "OK",
+      "fail": "Echec"
     }
   }
 }
