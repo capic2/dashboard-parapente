@@ -262,6 +262,18 @@ class WeatherSourceConfig(Base):
         return "active"  # All good
 
 
+class StravaTokenLog(Base):
+    """Log of Strava token refresh attempts"""
+
+    __tablename__ = "strava_token_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    success = Column(Boolean, nullable=False)
+    message = Column(String, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+
+
 class EmagramFeedback(Base):
     """Pilot feedback on emagram analysis accuracy"""
 

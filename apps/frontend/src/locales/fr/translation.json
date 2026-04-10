@@ -6,7 +6,7 @@
     "analytics": "Analyses",
     "sites": "Sites",
     "settings": "Paramètres",
-    "cache": "Cache",
+    "infrastructure": "Infrastructure",
     "weather": "Météo",
     "login": "Connexion",
     "logout": "Déconnexion"
@@ -518,5 +518,23 @@
     "keyDetail": "Détail de la clé",
     "cachedAt": "Mis en cache le",
     "truncatedWarning": "Affichage limité aux 500 premières clés. Le cache contient plus d'entrées."
+  },
+  "infrastructure": {
+    "title": "Infrastructure",
+    "strava": {
+      "title": "Token Strava",
+      "status": "Statut",
+      "valid": "Valide",
+      "expired": "Expiré",
+      "unknown": "Inconnu",
+      "expiresAt": "Expire le",
+      "lastRefresh": "Dernier refresh",
+      "refresh": "Rafraîchir le token",
+      "refreshing": "Rafraîchissement...",
+      "refreshSuccess": "Token rafraîchi avec succès",
+      "refreshError": "Échec du rafraîchissement",
+      "logs": "Historique des refresh",
+      "noLogs": "Aucun historique"
+    }
   }
 }

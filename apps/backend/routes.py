@@ -4767,6 +4767,48 @@ async def debug_gemini_api():
 
 
 # ============================================================================
+# STRAVA TOKEN MANAGEMENT
+# ============================================================================
+
+
+@router.get("/admin/strava/token-status")
+def strava_token_status():
+    """Get current Strava token status."""
+    from strava import get_token_status
+
+    return get_token_status()
+
+
+@router.post("/admin/strava/refresh-token")
+async def strava_refresh_token():
+    """Force a manual Strava token refresh."""
+    from strava import get_token_status, refresh_access_token
+
+    token = await refresh_access_token()
+    status = get_token_status()
+    status["refreshed"] = token is not None
+    return status
+
+
+@router.get("/admin/strava/token-logs")
+def strava_token_logs(limit: int = 20, db: Session = Depends(get_db)):
+    """Get recent Strava token refresh logs."""
+    from models import StravaTokenLog
+
+    logs = db.query(StravaTokenLog).order_by(StravaTokenLog.timestamp.desc()).limit(limit).all()
+    return [
+        {
+            "id": log.id,
+            "timestamp": log.timestamp.isoformat(),
+            "success": log.success,
+            "message": log.message,
+            "expires_at": log.expires_at.isoformat() if log.expires_at else None,
+        }
+        for log in logs
+    ]
+
+
+# ============================================================================
 # APP SETTINGS
 # ============================================================================
 

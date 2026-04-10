@@ -15,6 +15,13 @@ import {
   useDeleteCacheKey,
 } from '../hooks/admin/useCache';
 import type { CacheKeyInfo } from '../hooks/admin/useCache';
+import {
+  useStravaTokenStatus,
+  useStravaTokenLogs,
+  useStravaRefreshToken,
+} from '../hooks/admin/useStravaToken';
+
+// --- Helpers ---
 
 interface PendingConfirm {
   message: string;
@@ -37,7 +44,157 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
-export default function CacheViewer() {
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleString();
+}
+
+// =============================================================================
+// STRAVA TOKEN SECTION
+// =============================================================================
+
+function StravaTokenSection() {
+  const { t } = useTranslation();
+  const { data: status, isLoading: statusLoading } = useStravaTokenStatus();
+  const { data: logs, isLoading: logsLoading } = useStravaTokenLogs();
+  const refreshMutation = useStravaRefreshToken();
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+        {t('infrastructure.strava.title')}
+      </h3>
+
+      {/* Status card */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md flex flex-wrap items-center gap-6">
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {t('infrastructure.strava.status')}:
+          </span>
+          {statusLoading ? (
+            <span className="text-sm text-gray-400">...</span>
+          ) : (
+            <span
+              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                status?.valid
+                  ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                  : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
+              }`}
+            >
+              {status?.valid
+                ? t('infrastructure.strava.valid')
+                : t('infrastructure.strava.expired')}
+            </span>
+          )}
+        </div>
+
+        {status?.expires_at && (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-gray-500 dark:text-gray-400">
+              {t('infrastructure.strava.expiresAt')}:
+            </span>
+            <span className="text-gray-800 dark:text-gray-200">
+              {formatDate(status.expires_at)}
+            </span>
+          </div>
+        )}
+
+        <Button
+          onPress={() => refreshMutation.mutate()}
+          isDisabled={refreshMutation.isPending}
+          className="ml-auto px-3 py-1.5 rounded-md bg-orange-500 text-white text-sm hover:bg-orange-600 transition-colors disabled:opacity-50 cursor-pointer"
+        >
+          {refreshMutation.isPending
+            ? t('infrastructure.strava.refreshing')
+            : t('infrastructure.strava.refresh')}
+        </Button>
+      </div>
+
+      {/* Refresh success/error feedback */}
+      {refreshMutation.isSuccess && (
+        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-xl p-3 text-sm text-green-800 dark:text-green-200">
+          {t('infrastructure.strava.refreshSuccess')}
+        </div>
+      )}
+      {refreshMutation.isError && (
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-xl p-3 text-sm text-red-800 dark:text-red-200">
+          {t('infrastructure.strava.refreshError')}
+        </div>
+      )}
+
+      {/* Logs table */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {t('infrastructure.strava.logs')}
+          </h4>
+        </div>
+        {logsLoading ? (
+          <div className="p-4 text-sm text-gray-400">...</div>
+        ) : !logs || logs.length === 0 ? (
+          <div className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+            {t('infrastructure.strava.noLogs')}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-900/50 text-left">
+                  <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
+                    Date
+                  </th>
+                  <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
+                    {t('infrastructure.strava.status')}
+                  </th>
+                  <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
+                    Message
+                  </th>
+                  <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
+                    {t('infrastructure.strava.expiresAt')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((log) => (
+                  <tr
+                    key={log.id}
+                    className="border-t border-gray-100 dark:border-gray-700/50"
+                  >
+                    <td className="px-4 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      {formatDate(log.timestamp)}
+                    </td>
+                    <td className="px-4 py-2">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          log.success
+                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                            : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
+                        }`}
+                      >
+                        {log.success ? 'OK' : 'FAIL'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-gray-600 dark:text-gray-400 text-xs max-w-md truncate">
+                      {log.message}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                      {log.expires_at ? formatDate(log.expires_at) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// CACHE SECTION (former CacheViewer)
+// =============================================================================
+
+function CacheSection() {
   const { t } = useTranslation();
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
@@ -105,10 +262,10 @@ export default function CacheViewer() {
   };
 
   return (
-    <div className="py-4 space-y-4">
-      <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
         {t('cache.title')}
-      </h2>
+      </h3>
 
       {/* Stats bar */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -325,6 +482,29 @@ export default function CacheViewer() {
     </div>
   );
 }
+
+// =============================================================================
+// MAIN PAGE
+// =============================================================================
+
+export default function InfrastructurePage() {
+  const { t } = useTranslation();
+
+  return (
+    <div className="py-4 space-y-8">
+      <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+        {t('infrastructure.title')}
+      </h2>
+
+      <StravaTokenSection />
+      <CacheSection />
+    </div>
+  );
+}
+
+// =============================================================================
+// CACHE GROUP TABLE (unchanged)
+// =============================================================================
 
 const columnHelper = createColumnHelper<CacheKeyInfo>();
 

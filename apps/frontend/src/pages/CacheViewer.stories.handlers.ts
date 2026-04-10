@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import type { CacheKeyDetail } from '../hooks/admin/useCache';
+import type { TokenLog } from '../hooks/admin/useStravaToken';
 
 // --- In-memory cache database ---
 
@@ -85,6 +86,33 @@ const initialEntries: CacheEntry[] = [
 
 export const cacheDb: CacheEntry[] = [...initialEntries];
 
+// --- Strava token mock data ---
+
+const stravaTokenLogs: TokenLog[] = [
+  {
+    id: 3,
+    timestamp: '2026-01-15T10:00:00',
+    success: true,
+    message: 'Access token refreshed (expires at 2026-01-15 16:00:00)',
+    expires_at: '2026-01-15T16:00:00',
+  },
+  {
+    id: 2,
+    timestamp: '2026-01-15T06:00:00',
+    success: true,
+    message: 'Access token refreshed (expires at 2026-01-15 12:00:00)',
+    expires_at: '2026-01-15T12:00:00',
+  },
+  {
+    id: 1,
+    timestamp: '2026-01-15T02:00:00',
+    success: false,
+    message:
+      'Strava API error (HTTP 401): {"message":"Bad Request","errors":[]}',
+    expires_at: null,
+  },
+];
+
 export const resetCacheDb = () => {
   cacheDb.length = 0;
   cacheDb.push(...initialEntries);
@@ -123,7 +151,53 @@ function buildOverview() {
 
 // --- MSW handlers reading/modifying cacheDb ---
 
-export const defaultHandlers = [
+// --- Strava handlers ---
+
+const stravaHandlers = [
+  http.get('*/api/admin/strava/token-status', () =>
+    HttpResponse.json({
+      valid: true,
+      expires_at: '2026-01-15T16:00:00',
+    })
+  ),
+
+  http.get('*/api/admin/strava/token-logs', () =>
+    HttpResponse.json(stravaTokenLogs)
+  ),
+
+  http.post('*/api/admin/strava/refresh-token', () =>
+    HttpResponse.json({
+      valid: true,
+      expires_at: '2026-01-15T22:00:00',
+      refreshed: true,
+    })
+  ),
+];
+
+export const stravaExpiredHandlers = [
+  http.get('*/api/admin/strava/token-status', () =>
+    HttpResponse.json({
+      valid: false,
+      expires_at: '2026-01-14T10:00:00',
+    })
+  ),
+
+  http.get('*/api/admin/strava/token-logs', () =>
+    HttpResponse.json([stravaTokenLogs[2]])
+  ),
+
+  http.post('*/api/admin/strava/refresh-token', () =>
+    HttpResponse.json({
+      valid: false,
+      expires_at: null,
+      refreshed: false,
+    })
+  ),
+];
+
+// --- Combined handlers ---
+
+export const cacheHandlers = [
   http.get('*/api/admin/cache', () => HttpResponse.json(buildOverview())),
 
   http.get('*/api/admin/cache/:key', ({ request }) => {
@@ -181,3 +255,5 @@ export const defaultHandlers = [
     return HttpResponse.json({ success: true, keys_deleted: 0 });
   }),
 ];
+
+export const defaultHandlers = [...stravaHandlers, ...cacheHandlers];

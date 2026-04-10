@@ -44,8 +44,8 @@ export default function Header() {
             <Link to="/settings" className={linkClass}>
               {t('header.settings')}
             </Link>
-            <Link to="/cache" className={linkClass}>
-              {t('header.cache')}
+            <Link to="/infrastructure" className={linkClass}>
+              {t('header.infrastructure')}
             </Link>
             <a
               href="http://portainer.local:9000"
