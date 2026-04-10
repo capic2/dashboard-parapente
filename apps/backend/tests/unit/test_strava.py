@@ -49,6 +49,8 @@ async def test_refresh_access_token_success():
         patch("strava.STRAVA_CLIENT_ID", "test_client_id"),
         patch("strava.STRAVA_CLIENT_SECRET", "test_secret"),
         patch("strava.STRAVA_REFRESH_TOKEN", "test_refresh_token"),
+        patch("strava._get_persisted_refresh_token", return_value="test_refresh_token"),
+        patch("strava._persist_refresh_token") as mock_persist,
         patch("strava.httpx.AsyncClient") as mock_client,
     ):
 
@@ -68,11 +70,12 @@ async def test_refresh_access_token_success():
         assert strava._access_token == "new_access_token_123"
         assert strava._refresh_token == "new_refresh_token_456"
         assert strava._token_expires_at is not None
+        mock_persist.assert_called_once_with("new_refresh_token_456")
 
 
 @pytest.mark.asyncio
-async def test_refresh_access_token_ignores_persist_failure(caplog):
-    """Test token refresh still works if token persistence fails"""
+async def test_refresh_access_token_fails_when_persist_fails(caplog):
+    """Token refresh must fail if new refresh token cannot be persisted."""
 
     mock_response = {
         "access_token": "fallback_access_token",
@@ -84,6 +87,7 @@ async def test_refresh_access_token_ignores_persist_failure(caplog):
         patch("strava.STRAVA_CLIENT_ID", "test_client_id"),
         patch("strava.STRAVA_CLIENT_SECRET", "test_secret"),
         patch("strava.STRAVA_REFRESH_TOKEN", "test_refresh_token"),
+        patch("strava._get_persisted_refresh_token", return_value="test_refresh_token"),
         patch("strava._persist_refresh_token") as mock_persist,
         patch("strava.httpx.AsyncClient") as mock_client,
     ):
@@ -97,15 +101,20 @@ async def test_refresh_access_token_ignores_persist_failure(caplog):
 
         strava._access_token = None
         strava._token_expires_at = None
+        strava._refresh_token = None
 
         with caplog.at_level("WARNING"):
             token = await refresh_access_token()
 
-        assert token == "fallback_access_token"
-        assert strava._access_token == "fallback_access_token"
-        assert strava._refresh_token == "fallback_refresh_token"
+        assert token is None
+        assert strava._access_token is None
+        assert strava._refresh_token is None
         assert mock_persist.call_count == 1
-        assert any("Could not persist refresh token" in record.message for record in caplog.records)
+        assert any(
+            "Failed to refresh token" in record.message
+            and "RuntimeError: no such table: app_settings" in record.message
+            for record in caplog.records
+        )
 
 
 @pytest.mark.asyncio
@@ -510,6 +519,7 @@ async def test_refresh_access_token_expired():
     # Set an expired token
     strava._access_token = "old_token"
     strava._token_expires_at = datetime.now() - timedelta(hours=1)
+    strava._refresh_token = "cached_refresh"
 
     mock_response = {
         "access_token": "refreshed_token",
@@ -521,6 +531,7 @@ async def test_refresh_access_token_expired():
         patch("strava.STRAVA_CLIENT_ID", "test_client_id"),
         patch("strava.STRAVA_CLIENT_SECRET", "test_secret"),
         patch("strava.STRAVA_REFRESH_TOKEN", "test_refresh_token"),
+        patch("strava._persist_refresh_token") as mock_persist,
         patch("strava.httpx.AsyncClient") as mock_client,
     ):
 
@@ -536,6 +547,7 @@ async def test_refresh_access_token_expired():
 
         assert token == "refreshed_token"
         assert strava._access_token == "refreshed_token"
+        mock_persist.assert_called_once_with("new_refresh")
 
 
 def test_streams_to_gpx_mismatched_arrays():
