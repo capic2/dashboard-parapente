@@ -4,7 +4,7 @@ import { Default } from './CacheViewer.stories.tsx';
 import { defaultHandlers } from './CacheViewer.stories.handlers';
 
 const meta = preview.meta({
-  title: 'Pages/CacheViewer/Chromatic',
+  title: 'Pages/Infrastructure/Chromatic',
   parameters: {
     layout: 'padded',
     chromatic: {
@@ -15,7 +15,7 @@ const meta = preview.meta({
   tags: ['!autodocs'],
 });
 
-export const CacheViewerChromatic = meta.story({
+export const InfrastructureChromatic = meta.story({
   render: () => (
     <div className="flex flex-col gap-2">
       <FigureWrapper title={Default.composed.name}>
