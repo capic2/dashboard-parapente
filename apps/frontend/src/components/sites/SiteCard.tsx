@@ -126,21 +126,21 @@ export const SiteCard: React.FC<SiteCardProps> = ({
       <div className="flex gap-2 pt-3 border-t dark:border-gray-700">
         <button
           onClick={() => onEdit(site)}
-          className="flex-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+          className="flex-1 px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
           title={t('sites.editSite')}
         >
           ✏️ {t('common.edit')}
         </button>
         <button
           onClick={() => onViewFlights(site)}
-          className="flex-1 px-3 py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
+          className="flex-1 px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
           title={t('sites.viewFlights')}
         >
           📋 {t('header.flights')}
         </button>
         <button
           onClick={() => onDelete(site)}
-          className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+          className="px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700"
           title={t('sites.deleteSite')}
         >
           🗑️

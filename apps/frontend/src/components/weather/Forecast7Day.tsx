@@ -111,7 +111,7 @@ export default function Forecast7Day({
         <CacheTimestamp cachedAt={dailySummary.cached_at} />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
+      <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin lg:grid lg:grid-cols-7 lg:overflow-x-visible lg:pb-0 lg:snap-none">
         {dailySummary.days.map((day, index) => {
           const isSelected = index === selectedDayIndex;
 
@@ -120,7 +120,7 @@ export default function Forecast7Day({
               key={index}
               onClick={() => onSelectDay?.(index)}
               onMouseEnter={() => handleMouseEnter(index)}
-              className={`bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border-2 transition-all hover:border-sky-600 hover:-translate-y-1 hover:shadow-md cursor-pointer relative ${
+              className={`min-w-[120px] flex-shrink-0 snap-start lg:min-w-0 lg:flex-shrink bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border-2 transition-all hover:border-sky-600 hover:-translate-y-1 hover:shadow-md cursor-pointer relative ${
                 isSelected
                   ? 'border-sky-600 shadow-lg bg-sky-50 dark:bg-sky-900/20 ring-2 ring-sky-200 dark:ring-sky-700'
                   : 'border-gray-200 dark:border-gray-700'

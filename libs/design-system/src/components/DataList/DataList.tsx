@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { tv } from 'tailwind-variants';
 
 const sortButton = tv({
-  base: 'px-2 py-1 text-xs rounded-md font-medium transition-colors',
+  base: 'px-3 py-2 sm:px-2 sm:py-1 text-xs rounded-md font-medium transition-colors',
   variants: {
     active: {
       true: 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300',
@@ -21,7 +21,7 @@ const sortButton = tv({
 });
 
 const paginationButton = tv({
-  base: 'px-3 py-1 text-sm rounded-md font-medium transition-colors',
+  base: 'px-3 py-2.5 sm:py-1 text-sm rounded-md font-medium transition-colors',
   variants: {
     disabled: {
       true: 'text-gray-300 dark:text-gray-600 cursor-not-allowed',

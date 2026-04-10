@@ -3,6 +3,7 @@
  */
 
 import { useState } from 'react';
+import { useIsMobile } from '../hooks/useIsMobile';
 import {
   useReactTable,
   getCoreRowModel,
@@ -85,14 +86,19 @@ const historyColumns = [
 ];
 
 function ThermalHistoryTable({ history }: { history: EmagramListItem[] }) {
+  const isMobile = useIsMobile();
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'created_at', desc: true },
   ]);
 
+  const columnVisibility: Record<string, boolean> = isMobile
+    ? { force_thermique_ms: false, analysis_method: false }
+    : {};
+
   const table = useReactTable({
     data: history,
     columns: historyColumns,
-    state: { sorting },
+    state: { sorting, columnVisibility },
     onSortingChange: setSorting,
     getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
