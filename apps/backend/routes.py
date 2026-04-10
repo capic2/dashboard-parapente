@@ -4083,6 +4083,7 @@ async def get_emagram_hours(
                 EmagramAnalysis.forecast_date == target_date,
                 EmagramAnalysis.forecast_hour.isnot(None),
                 EmagramAnalysis.analysis_method == "llm_vision",
+                EmagramAnalysis.analysis_status == "completed",
             )
             .order_by(EmagramAnalysis.forecast_hour, EmagramAnalysis.analysis_datetime.desc())
             .all()
