@@ -140,7 +140,12 @@ async def refresh_access_token(force: bool = False) -> str | None:
         _token_expires_at = datetime.fromtimestamp(data["expires_at"])
 
         # Persist the new refresh token to DB
-        _persist_refresh_token(_refresh_token)
+        try:
+            _persist_refresh_token(_refresh_token)
+        except Exception as e:
+            # If persistence fails in an environment without migrations applied yet
+            # (for example during unit tests), keep the in-memory token working.
+            logger.warning(f"Could not persist refresh token: {e}")
 
         msg = f"Access token refreshed (expires at {_token_expires_at})"
         logger.info(f"✅ {msg}")
