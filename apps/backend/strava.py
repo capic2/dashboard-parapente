@@ -372,7 +372,7 @@ async def get_activities_by_period(
     try:
         # Convertir dates en timestamps Unix
         from_dt = datetime.strptime(date_from, "%Y-%m-%d")
-        to_dt = datetime.strptime(date_to, "%Y-%m-%d")
+        to_dt = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)
 
         after_timestamp = int(from_dt.timestamp())
         before_timestamp = int(to_dt.timestamp())
