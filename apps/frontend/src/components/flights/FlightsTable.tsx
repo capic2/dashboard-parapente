@@ -82,7 +82,7 @@ export function FlightsTable({
           {/* Bouton supprimer au survol */}
           {!selectionMode && (
             <button
-              className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full bg-red-100 text-red-500 opacity-0 group-hover:opacity-100 hover:bg-red-200 hover:text-red-700 transition-all"
+              className="absolute top-2 right-2 w-10 h-10 sm:w-7 sm:h-7 flex items-center justify-center rounded-full bg-red-100 text-red-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-red-200 hover:text-red-700 transition-all"
               onClick={(e) => {
                 e.stopPropagation();
                 onDeleteFlight(flight);

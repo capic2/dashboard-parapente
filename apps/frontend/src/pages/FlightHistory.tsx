@@ -200,20 +200,20 @@ export default function FlightHistory() {
           <div className="flex gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
             <button
               onClick={handleSelectAll}
-              className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
+              className="px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
             >
               {t('flights.selectAll')}
             </button>
             <button
               onClick={handleDeselectAll}
-              className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
+              className="px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
             >
               {t('flights.deselectAll')}
             </button>
             <button
               onClick={() => setShowMultiDeleteConfirm(true)}
               disabled={selectedCount === 0}
-              className="ml-auto px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="ml-auto px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
               {t('flights.deleteCount', { count: selectedCount })}
             </button>
