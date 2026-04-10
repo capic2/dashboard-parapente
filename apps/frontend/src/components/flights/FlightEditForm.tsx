@@ -37,12 +37,12 @@ const styles = tv({
       sm: {
         input: 'px-2 py-1',
         label: 'text-xs',
-        button: 'px-3 py-1 text-xs',
+        button: 'min-h-11 px-4 py-2.5 sm:min-h-0 sm:px-3 sm:py-1 text-xs',
       },
       md: {
         input: 'px-3 py-2',
         label: 'text-sm font-semibold',
-        button: 'px-3 py-1.5',
+        button: 'min-h-11 px-4 py-2.5 sm:min-h-0 sm:px-3 sm:py-1.5',
       },
     },
     intent: {
@@ -125,7 +125,7 @@ export function FlightEditForm({
         void form.handleSubmit();
       }}
     >
-      <div className="flex justify-between items-start mb-4">
+      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-start mb-4 gap-3">
         <div className="flex-1 space-y-2">
           <form.Field name="name">
             {(field) => (
@@ -157,7 +157,7 @@ export function FlightEditForm({
           </form.Field>
         </div>
 
-        <div className="flex gap-2 ml-4">
+        <div className="flex gap-2 sm:ml-4 justify-end">
           <form.Subscribe selector={(state) => state.isSubmitting}>
             {(isSubmitting) => (
               <Button
@@ -187,7 +187,7 @@ export function FlightEditForm({
         }
       </form.Subscribe>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-4">
         {/* Date */}
         <div>
           <span className={s.label()}>{t('flights.dateLabel')}</span>

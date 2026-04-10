@@ -48,6 +48,16 @@ body {
   background: #6b7280;
 }
 
+/* Mobile drawer slide-in animation */
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 /* Print utility */
 @media print {
   .no-print {

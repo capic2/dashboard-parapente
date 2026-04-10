@@ -9,7 +9,10 @@
     "cache": "Cache",
     "weather": "Météo",
     "login": "Connexion",
-    "logout": "Déconnexion"
+    "logout": "Déconnexion",
+    "openMenu": "Ouvrir le menu",
+    "closeMenu": "Fermer le menu",
+    "menu": "Menu"
   },
   "login": {
     "title": "Dashboard Parapente",

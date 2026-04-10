@@ -108,14 +108,14 @@ export function FlightDetails({
               </h2>
               <div className="flex gap-2 ml-4">
                 <Button
-                  className="px-3 py-1.5 text-sm bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-all"
+                  className="px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-all"
                   onPress={() => setEditingMode(true)}
                   aria-label={t('flights.editFlight')}
                 >
                   {t('flights.editButton')}
                 </Button>
                 <Button
-                  className={`px-3 py-1.5 text-sm rounded-md transition-all ${
+                  className={`px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm rounded-md transition-all ${
                     flight.gpx_file_path
                       ? 'bg-green-600 text-white hover:bg-green-700'
                       : 'bg-orange-600 text-white hover:bg-orange-700'
