@@ -16,7 +16,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FlightsRouteImport } from './routes/flights'
 import { Route as ExportViewerRouteImport } from './routes/export-viewer'
-import { Route as CacheRouteImport } from './routes/cache'
+import { Route as InfrastructureRouteImport } from './routes/infrastructure'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ViewerFlightIdRouteImport } from './routes/viewer.$flightId'
@@ -56,11 +56,11 @@ const ExportViewerRoute = ExportViewerRouteImport.update({
   path: '/export-viewer',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/export-viewer.lazy').then((d) => d.Route))
-const CacheRoute = CacheRouteImport.update({
-  id: '/cache',
-  path: '/cache',
+const InfrastructureRoute = InfrastructureRouteImport.update({
+  id: '/infrastructure',
+  path: '/infrastructure',
   getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/cache.lazy').then((d) => d.Route))
+} as any).lazy(() => import('./routes/infrastructure.lazy').then((d) => d.Route))
 const AnalyticsRoute = AnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
@@ -82,7 +82,7 @@ const ViewerFlightIdRoute = ViewerFlightIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
-  '/cache': typeof CacheRoute
+  '/infrastructure': typeof InfrastructureRoute
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRoute
   '/login': typeof LoginRoute
@@ -95,7 +95,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
-  '/cache': typeof CacheRoute
+  '/infrastructure': typeof InfrastructureRoute
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRoute
   '/login': typeof LoginRoute
@@ -109,7 +109,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
-  '/cache': typeof CacheRoute
+  '/infrastructure': typeof InfrastructureRoute
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRoute
   '/login': typeof LoginRoute
@@ -124,7 +124,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/analytics'
-    | '/cache'
+    | '/infrastructure'
     | '/export-viewer'
     | '/flights'
     | '/login'
@@ -137,7 +137,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/analytics'
-    | '/cache'
+    | '/infrastructure'
     | '/export-viewer'
     | '/flights'
     | '/login'
@@ -150,7 +150,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/analytics'
-    | '/cache'
+    | '/infrastructure'
     | '/export-viewer'
     | '/flights'
     | '/login'
@@ -164,7 +164,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AnalyticsRoute: typeof AnalyticsRoute
-  CacheRoute: typeof CacheRoute
+  InfrastructureRoute: typeof InfrastructureRoute
   ExportViewerRoute: typeof ExportViewerRoute
   FlightsRoute: typeof FlightsRoute
   LoginRoute: typeof LoginRoute
@@ -226,11 +226,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ExportViewerRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/cache': {
-      id: '/cache'
-      path: '/cache'
-      fullPath: '/cache'
-      preLoaderRoute: typeof CacheRouteImport
+    '/infrastructure': {
+      id: '/infrastructure'
+      path: '/infrastructure'
+      fullPath: '/infrastructure'
+      preLoaderRoute: typeof InfrastructureRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/analytics': {
@@ -260,7 +260,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnalyticsRoute: AnalyticsRoute,
-  CacheRoute: CacheRoute,
+  InfrastructureRoute: InfrastructureRoute,
   ExportViewerRoute: ExportViewerRoute,
   FlightsRoute: FlightsRoute,
   LoginRoute: LoginRoute,

@@ -6,7 +6,7 @@
     "analytics": "Analytics",
     "sites": "Sites",
     "settings": "Settings",
-    "cache": "Cache",
+    "infrastructure": "Infrastructure",
     "weather": "Weather",
     "login": "Login",
     "logout": "Logout",
@@ -521,5 +521,27 @@
     "keyDetail": "Key Detail",
     "cachedAt": "Cached At",
     "truncatedWarning": "Display limited to the first 500 keys. The cache contains more entries."
+  },
+  "infrastructure": {
+    "title": "Infrastructure",
+    "strava": {
+      "title": "Strava Token",
+      "status": "Status",
+      "valid": "Valid",
+      "expired": "Expired",
+      "unknown": "Unknown",
+      "expiresAt": "Expires at",
+      "lastRefresh": "Last refresh",
+      "refresh": "Refresh token",
+      "refreshing": "Refreshing...",
+      "refreshSuccess": "Token refreshed successfully",
+      "refreshError": "Token refresh failed",
+      "logs": "Refresh history",
+      "noLogs": "No history",
+      "date": "Date",
+      "message": "Message",
+      "ok": "OK",
+      "fail": "Fail"
+    }
   }
 }

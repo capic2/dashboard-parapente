@@ -20,7 +20,7 @@ import models  # noqa: F401 - imported for side effects (model registration)
 from database import Base, SessionLocal, engine
 from models import Site  # Needed for database initialization
 from routes import public_router, router
-from scheduler import start_scheduler, stop_scheduler
+from scheduler import scheduler, start_scheduler, stop_scheduler
 from webhooks import router as webhooks_router
 
 # Configure logging
@@ -556,6 +556,20 @@ async def lifespan(app: FastAPI):
 
         emagram_scheduler = setup_emagram_scheduler(app)
         start_emagram(emagram_scheduler)
+
+        # Strava token refresh every 4 hours
+        from apscheduler.triggers.interval import IntervalTrigger
+
+        from strava import refresh_access_token
+
+        scheduler.add_job(
+            refresh_access_token,
+            trigger=IntervalTrigger(hours=4),
+            id="strava_token_refresh",
+            name="Strava token refresh every 4h",
+            replace_existing=True,
+        )
+        logger.info("🔑 Strava token refresh scheduled (every 4h)")
 
         # Initial cache warmup (non-blocking)
         logger.info("🔥 Triggering initial cache warmup...")

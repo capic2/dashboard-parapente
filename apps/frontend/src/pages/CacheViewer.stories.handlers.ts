@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import type { CacheKeyDetail } from '../hooks/admin/useCache';
+import type { TokenLog } from '../hooks/admin/useStravaToken';
 
 // --- In-memory cache database ---
 
@@ -85,9 +86,50 @@ const initialEntries: CacheEntry[] = [
 
 export const cacheDb: CacheEntry[] = [...initialEntries];
 
+// --- Strava token mock state ---
+
+let stravaTokenState = {
+  valid: true,
+  expires_at: '2026-01-15T16:00:00Z',
+};
+
+let nextLogId = 4;
+
+const stravaTokenLogs: TokenLog[] = [
+  {
+    id: 3,
+    timestamp: '2026-01-15T10:00:00Z',
+    success: true,
+    message: 'Access token refreshed (expires at 2026-01-15 16:00:00)',
+    expires_at: '2026-01-15T16:00:00Z',
+  },
+  {
+    id: 2,
+    timestamp: '2026-01-15T06:00:00Z',
+    success: true,
+    message: 'Access token refreshed (expires at 2026-01-15 12:00:00)',
+    expires_at: '2026-01-15T12:00:00Z',
+  },
+  {
+    id: 1,
+    timestamp: '2026-01-15T02:00:00Z',
+    success: false,
+    message:
+      'Strava API error (HTTP 401): {"message":"Bad Request","errors":[]}',
+    expires_at: null,
+  },
+];
+
+const initialStravaLogs = [...stravaTokenLogs];
+
 export const resetCacheDb = () => {
   cacheDb.length = 0;
   cacheDb.push(...initialEntries);
+  // Reset Strava state
+  stravaTokenState = { valid: true, expires_at: '2026-01-15T16:00:00Z' };
+  stravaTokenLogs.length = 0;
+  stravaTokenLogs.push(...initialStravaLogs);
+  nextLogId = 4;
 };
 
 // --- Helper: build overview response from cacheDb ---
@@ -123,7 +165,67 @@ function buildOverview() {
 
 // --- MSW handlers reading/modifying cacheDb ---
 
-export const defaultHandlers = [
+// --- Strava handlers ---
+
+const stravaHandlers = [
+  http.get('*/api/admin/strava/token-status', () =>
+    HttpResponse.json(stravaTokenState)
+  ),
+
+  http.get('*/api/admin/strava/token-logs', () =>
+    HttpResponse.json(stravaTokenLogs)
+  ),
+
+  http.post('*/api/admin/strava/refresh-token', () => {
+    const newExpiry = '2026-01-15T22:00:00Z';
+    stravaTokenState = { valid: true, expires_at: newExpiry };
+    stravaTokenLogs.unshift({
+      id: nextLogId++,
+      timestamp: new Date().toISOString(),
+      success: true,
+      message: `Access token refreshed (expires at ${newExpiry})`,
+      expires_at: newExpiry,
+    });
+    return HttpResponse.json({
+      valid: true,
+      expires_at: newExpiry,
+      refreshed: true,
+    });
+  }),
+];
+
+export const stravaExpiredHandlers = [
+  http.get('*/api/admin/strava/token-status', () =>
+    HttpResponse.json({
+      valid: false,
+      expires_at: '2026-01-14T10:00:00Z',
+    })
+  ),
+
+  http.get('*/api/admin/strava/token-logs', () =>
+    HttpResponse.json([
+      {
+        id: 1,
+        timestamp: '2026-01-15T02:00:00Z',
+        success: false,
+        message:
+          'Strava API error (HTTP 401): {"message":"Bad Request","errors":[]}',
+        expires_at: null,
+      },
+    ])
+  ),
+
+  http.post('*/api/admin/strava/refresh-token', () =>
+    HttpResponse.json(
+      { detail: 'Strava token refresh failed' },
+      { status: 502 }
+    )
+  ),
+];
+
+// --- Combined handlers ---
+
+export const cacheHandlers = [
   http.get('*/api/admin/cache', () => HttpResponse.json(buildOverview())),
 
   http.get('*/api/admin/cache/:key', ({ request }) => {
@@ -181,3 +283,5 @@ export const defaultHandlers = [
     return HttpResponse.json({ success: true, keys_deleted: 0 });
   }),
 ];
+
+export const defaultHandlers = [...stravaHandlers, ...cacheHandlers];
