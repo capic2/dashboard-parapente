@@ -4942,6 +4942,7 @@ def strava_token_logs(
             "success": log.success,
             "message": log.message,
             "expires_at": log.expires_at.isoformat() + "Z" if log.expires_at else None,
+            "refresh_mode": log.refresh_mode,
         }
         for log in logs
     ]
