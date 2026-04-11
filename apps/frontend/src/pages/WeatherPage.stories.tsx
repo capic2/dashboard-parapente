@@ -377,6 +377,13 @@ const mockBestSpotByDay: Record<number, typeof mockBestSpot> = {
 
 const defaultHandlers = [
   http.get('*/api/spots', () => HttpResponse.json(mockSites)),
+  http.get('*/api/spots/best', ({ request }) => {
+    const dayIndex = Number(
+      new URL(request.url).searchParams.get('day_index') || '0'
+    );
+
+    return HttpResponse.json(mockBestSpotByDay[dayIndex] ?? mockBestSpot);
+  }),
   http.get('*/api/spots/:id', ({ params }) => {
     const site = mockSites.sites.find((s) => s.id === params.id);
     return site
@@ -389,13 +396,6 @@ const defaultHandlers = [
   http.get('*/api/weather/site-chalais', () =>
     HttpResponse.json(mockWeatherChalais)
   ),
-  http.get('*/api/spots/best', ({ request }) => {
-    const dayIndex = Number(
-      new URL(request.url).searchParams.get('day_index') || '0'
-    );
-
-    return HttpResponse.json(mockBestSpotByDay[dayIndex] ?? mockBestSpot);
-  }),
   http.get('*/api/weather/:spotId/daily-summary', () =>
     HttpResponse.json(mockDailySummary)
   ),
