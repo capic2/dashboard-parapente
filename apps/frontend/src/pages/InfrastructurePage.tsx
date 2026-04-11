@@ -46,7 +46,9 @@ function formatSize(bytes: number): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
+  const normalizedIso =
+    /Z$/.test(iso) || /[+-]\d{2}:\d{2}$/.test(iso) ? iso : `${iso}Z`;
+  return new Date(normalizedIso).toLocaleString();
 }
 
 export function getResolvedLabel(
@@ -101,8 +103,18 @@ function StravaTokenSection() {
     isLoading: statusLoading,
     isError: statusError,
   } = useStravaTokenStatus();
-  const { data: logs, isLoading: logsLoading } = useStravaTokenLogs();
+  const {
+    data: logs,
+    isLoading: logsLoading,
+    isError: logsError,
+  } = useStravaTokenLogs();
   const refreshMutation = useStravaRefreshToken();
+
+  const refreshSucceeded =
+    refreshMutation.isSuccess && refreshMutation.data?.refreshed === true;
+  const refreshFailed =
+    refreshMutation.isError ||
+    (refreshMutation.isSuccess && refreshMutation.data?.refreshed === false);
 
   const statusBadge = (() => {
     if (statusLoading) return null;
@@ -172,12 +184,12 @@ function StravaTokenSection() {
       </div>
 
       {/* Refresh success/error feedback */}
-      {refreshMutation.isSuccess && (
+      {refreshSucceeded && (
         <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-xl p-3 text-sm text-green-800 dark:text-green-200">
           {t('infrastructure.strava.refreshSuccess')}
         </div>
       )}
-      {refreshMutation.isError && (
+      {refreshFailed && (
         <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-xl p-3 text-sm text-red-800 dark:text-red-200">
           {t('infrastructure.strava.refreshError')}
         </div>
@@ -192,6 +204,10 @@ function StravaTokenSection() {
         </div>
         {logsLoading ? (
           <div className="p-4 text-sm text-gray-400">...</div>
+        ) : logsError ? (
+          <div className="p-4 text-sm text-red-500 dark:text-red-400 text-center">
+            {t('infrastructure.strava.unknown')}
+          </div>
         ) : !logs || logs.length === 0 ? (
           <div className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">
             {t('infrastructure.strava.noLogs')}
