@@ -9,11 +9,27 @@ interface CacheEntry {
   ttl: number;
   size: number;
   value: string; // JSON-serialized
+  resolved?: {
+    type: string;
+    label: string;
+    confidence: string;
+    details?: Record<string, unknown>;
+  } | null;
 }
 
 const initialEntries: CacheEntry[] = [
   {
     key: 'weather:forecast:abc123',
+    resolved: {
+      type: 'weather_forecast',
+      label: 'weather_forecast',
+      confidence: 'high',
+      details: {
+        day_index: 0,
+        site_code: 'arguel',
+        site_name: 'Arguel',
+      },
+    },
     ttl: 3200,
     size: 2048,
     value: JSON.stringify({
@@ -24,6 +40,7 @@ const initialEntries: CacheEntry[] = [
   },
   {
     key: 'weather:forecast:def456',
+    resolved: null,
     ttl: 1800,
     size: 1536,
     value: JSON.stringify({
@@ -34,6 +51,7 @@ const initialEntries: CacheEntry[] = [
   },
   {
     key: 'weather:forecast:ghi789',
+    resolved: null,
     ttl: 900,
     size: 1024,
     value: JSON.stringify({
@@ -44,6 +62,14 @@ const initialEntries: CacheEntry[] = [
   },
   {
     key: 'best_spot:day_0',
+    resolved: {
+      type: 'best_spot',
+      label: 'best_spot_for_day',
+      confidence: 'high',
+      details: {
+        day_index: 0,
+      },
+    },
     ttl: 3000,
     size: 512,
     value: JSON.stringify({
@@ -61,6 +87,14 @@ const initialEntries: CacheEntry[] = [
   },
   {
     key: 'best_spot:day_1',
+    resolved: {
+      type: 'best_spot',
+      label: 'best_spot_for_day',
+      confidence: 'high',
+      details: {
+        day_index: 1,
+      },
+    },
     ttl: 2500,
     size: 480,
     value: JSON.stringify({
@@ -73,6 +107,16 @@ const initialEntries: CacheEntry[] = [
   },
   {
     key: 'emagram:sounding:07145:12:2026-01-15',
+    resolved: {
+      type: 'emagram_sounding',
+      label: 'emagram_sounding',
+      confidence: 'high',
+      details: {
+        station: '07145',
+        sounding_hour: '12',
+        date: '2026-01-15',
+      },
+    },
     ttl: 80000,
     size: 4096,
     value: JSON.stringify({
@@ -192,8 +236,63 @@ export const resetCacheDb = () => {
 function buildOverview() {
   const groups: Record<
     string,
-    { count: number; keys: { key: string; ttl: number; size: number }[] }
+    {
+      count: number;
+      keys: {
+        key: string;
+        ttl: number;
+        size: number;
+        resolved?: {
+          type: string;
+          label: string;
+          confidence: string;
+          details?: Record<string, unknown>;
+        } | null;
+      }[];
+    }
   > = {};
+
+  const resolveKey = (key: string) => {
+    if (key.startsWith('weather:forecast:')) {
+      return {
+        type: 'weather_forecast',
+        label: 'weather_forecast',
+        confidence: 'high',
+        details: {
+          day_index: 0,
+          site_code: 'arguel',
+          site_name: 'Arguel',
+        },
+      };
+    }
+
+    if (key.startsWith('best_spot:day_')) {
+      return {
+        type: 'best_spot',
+        label: 'best_spot_for_day',
+        confidence: 'high',
+        details: {
+          day_index: Number(key.replace('best_spot:day_', '')),
+        },
+      };
+    }
+
+    if (key.startsWith('emagram:sounding:')) {
+      const parts = key.split(':');
+      return {
+        type: 'emagram_sounding',
+        label: 'emagram_sounding',
+        confidence: 'high',
+        details: {
+          station: parts[2] || '',
+          sounding_hour: parts[3] || '',
+          date: parts[4] || '',
+        },
+      };
+    }
+
+    return null;
+  };
 
   for (const entry of cacheDb) {
     const parts = entry.key.split(':');
@@ -202,11 +301,18 @@ function buildOverview() {
     if (!groups[prefix]) {
       groups[prefix] = { count: 0, keys: [] };
     }
+
+    const resolved =
+      typeof entry.resolved !== 'undefined'
+        ? entry.resolved
+        : resolveKey(entry.key);
+
     groups[prefix].count += 1;
     groups[prefix].keys.push({
       key: entry.key,
       ttl: entry.ttl,
       size: entry.size,
+      resolved,
     });
   }
 
@@ -263,10 +369,56 @@ export const cacheHandlers = [
     const key = decodeURIComponent(
       url.pathname.replace(/.*\/api\/admin\/cache\//, '')
     );
+    const resolveKey = () => {
+      if (key.startsWith('weather:forecast:')) {
+        return {
+          type: 'weather_forecast',
+          label: 'weather_forecast',
+          confidence: 'high',
+          details: {
+            day_index: 0,
+            site_code: 'arguel',
+            site_name: 'Arguel',
+          },
+        };
+      }
+
+      if (key.startsWith('best_spot:day_')) {
+        return {
+          type: 'best_spot',
+          label: 'best_spot_for_day',
+          confidence: 'high',
+          details: {
+            day_index: Number(key.replace('best_spot:day_', '')),
+          },
+        };
+      }
+
+      if (key.startsWith('emagram:sounding:')) {
+        const parts = key.split(':');
+        return {
+          type: 'emagram_sounding',
+          label: 'emagram_sounding',
+          confidence: 'high',
+          details: {
+            station: parts[2] || '',
+            sounding_hour: parts[3] || '',
+            date: parts[4] || '',
+          },
+        };
+      }
+
+      return null;
+    };
+
     const entry = cacheDb.find((e) => e.key === key);
     if (!entry) {
       return new HttpResponse(null, { status: 404 });
     }
+
+    const resolved =
+      typeof entry.resolved !== 'undefined' ? entry.resolved : resolveKey();
+
     let value: unknown;
     let type: 'json' | 'string';
     try {
@@ -282,6 +434,7 @@ export const cacheHandlers = [
       size: entry.size,
       value,
       type,
+      resolved,
     } satisfies CacheKeyDetail);
   }),
 

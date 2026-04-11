@@ -51,6 +51,47 @@ function formatDate(iso: string): string {
   return new Date(normalizedIso).toLocaleString();
 }
 
+export function getResolvedLabel(
+  resolved: CacheKeyInfo['resolved'],
+  t: (key: string, options?: Record<string, unknown>) => string
+) {
+  if (!resolved) {
+    return t('cache.noResolution');
+  }
+
+  if (resolved.label === 'best_spot_for_day') {
+    return t('cache.resolvedBestSpot', {
+      day: String((resolved.details || {}).day_index ?? ''),
+    });
+  }
+
+  if (resolved.label === 'weather_forecast') {
+    if (resolved.details && resolved.details.site_name) {
+      return t('cache.resolvedWeatherForecastWithSite', {
+        site: String(resolved.details.site_name),
+        day: String(
+          (resolved.details as Record<string, unknown>).day_index ?? ''
+        ),
+      });
+    }
+
+    return t('cache.resolvedWeatherForecast');
+  }
+
+  if (resolved.label === 'emagram_sounding') {
+    if (resolved.details && resolved.details.station && resolved.details.date) {
+      return t('cache.resolvedEmagram', {
+        station: String((resolved.details as Record<string, unknown>).station),
+        date: String((resolved.details as Record<string, unknown>).date),
+      });
+    }
+
+    return t('cache.resolvedEmagram');
+  }
+
+  return t('cache.resolutionGeneric');
+}
+
 // =============================================================================
 // STRAVA TOKEN SECTION
 // =============================================================================
@@ -255,15 +296,23 @@ function CacheSection() {
     const lower = searchFilter.toLowerCase();
     const result: typeof overview.groups = {};
     for (const [prefix, group] of Object.entries(overview.groups)) {
-      const filteredKeys = group.keys.filter((k) =>
-        k.key.toLowerCase().includes(lower)
-      );
+      const filteredKeys = group.keys.filter((k) => {
+        const values = [
+          k.key,
+          getResolvedLabel(k.resolved, t),
+          ...(k.resolved?.details ? Object.values(k.resolved.details) : []),
+        ];
+
+        return values
+          .map((value) => String(value).toLowerCase())
+          .some((value) => value.includes(lower));
+      });
       if (filteredKeys.length > 0) {
         result[prefix] = { count: filteredKeys.length, keys: filteredKeys };
       }
     }
     return result;
-  }, [overview, searchFilter]);
+  }, [overview, searchFilter, t]);
 
   const toggleGroup = (prefix: string) => {
     setExpandedGroups((prev) => {
@@ -448,6 +497,16 @@ function CacheSection() {
               </div>
               <div>
                 <span className="text-gray-500 dark:text-gray-400">
+                  {t('cache.resolved')}
+                </span>
+                <p className="text-gray-800 dark:text-gray-200">
+                  {keyDetail.resolved
+                    ? getResolvedLabel(keyDetail.resolved, t)
+                    : t('cache.noResolution')}
+                </p>
+              </div>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">
                   {t('cache.ttl')}
                 </span>
                 <p className="text-gray-800 dark:text-gray-200">
@@ -581,6 +640,14 @@ function GroupSection({
         cell: (info) => (
           <span className="font-mono text-xs text-gray-700 dark:text-gray-300 truncate block max-w-xs">
             {info.getValue()}
+          </span>
+        ),
+      }),
+      columnHelper.accessor('resolved', {
+        header: t('cache.resolved'),
+        cell: (info) => (
+          <span className="text-xs text-gray-600 dark:text-gray-400">
+            {getResolvedLabel(info.getValue(), t)}
           </span>
         ),
       }),

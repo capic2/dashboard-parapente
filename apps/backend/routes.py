@@ -5,6 +5,7 @@ import math
 import os
 import uuid
 import xml.etree.ElementTree as ET
+from typing import Any
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -1468,8 +1469,113 @@ MAX_CACHE_KEYS = 500
 APP_CACHE_PREFIXES = ["weather:", "best_spot:", "emagram:"]
 
 
+def _build_forecast_cache_signature_map(db: Session) -> dict[str, dict[str, Any]]:
+    """Build a reverse index from forecast hash key suffix to site metadata."""
+    from cache import generate_cache_key
+
+    signature_to_site: dict[str, dict[str, Any]] = {}
+
+    try:
+        sites = db.query(Site).all()
+    except Exception as error:
+        logger.warning("Skipping forecast cache resolution: unable to query sites (%s)", error)
+        return signature_to_site
+
+    for site in sites:
+        if site.latitude is None or site.longitude is None:
+            continue
+
+        for day_index in range(7):
+            try:
+                forecast_key = generate_cache_key(
+                    "forecast",
+                    lat=round(site.latitude, 4),
+                    lon=round(site.longitude, 4),
+                    day_index=day_index,
+                )
+                parts = forecast_key.split(":")
+                if len(parts) < 3:
+                    continue
+
+                signature_to_site[parts[2]] = {
+                    "type": "weather_forecast",
+                    "day_index": day_index,
+                    "site_id": site.id,
+                    "site_code": site.code,
+                    "site_name": site.name,
+                    "latitude": site.latitude,
+                    "longitude": site.longitude,
+                }
+            except Exception as error:
+                logger.warning(
+                    "Skipping forecast resolution for site %s (%s)",
+                    getattr(site, "id", "<unknown>"),
+                    error,
+                )
+
+    return signature_to_site
+
+
+def _resolve_cache_key(
+    key: str, forecast_signature_map: dict[str, dict[str, Any]]
+) -> dict[str, Any] | None:
+    """Return a human readable resolution for a cache key when possible."""
+    parts = key.split(":")
+
+    # best_spot:day_n
+    if key.startswith("best_spot:") and len(parts) == 2 and parts[1].startswith("day_"):
+        try:
+            day_index = int(parts[1].replace("day_", ""))
+            return {
+                "type": "best_spot",
+                "label": "best_spot_for_day",
+                "confidence": "high",
+                "details": {
+                    "day_index": day_index,
+                },
+            }
+        except ValueError:
+            pass
+
+    # emagram:sounding:<station>:<hour>:<date>
+    if key.startswith("emagram:sounding:") and len(parts) == 5:
+        return {
+            "type": "emagram_sounding",
+            "label": "emagram_sounding",
+            "confidence": "high",
+            "details": {
+                "station": parts[2],
+                "sounding_hour": parts[3],
+                "date": parts[4],
+            },
+        }
+
+    # weather:forecast:<hash>
+    if key.startswith("weather:forecast:") and len(parts) == 3:
+        hash_part = parts[2]
+        forecast_meta = forecast_signature_map.get(hash_part)
+        if forecast_meta is None:
+            return None
+
+        return {
+            "type": "weather_forecast",
+            "label": "weather_forecast",
+            "confidence": "high",
+            "details": {
+                "day_index": forecast_meta["day_index"],
+                "site_id": forecast_meta["site_id"],
+                "site_code": forecast_meta["site_code"],
+                "site_name": forecast_meta["site_name"],
+                "latitude": forecast_meta["latitude"],
+                "longitude": forecast_meta["longitude"],
+            },
+        }
+
+    return None
+
+
 @router.get("/admin/cache")
-async def get_cache_overview():
+async def get_cache_overview(db: Session = Depends(get_db)):
     """
     Admin endpoint: List all Redis cache keys with metadata, grouped by prefix.
     """
@@ -1479,6 +1585,15 @@ async def get_cache_overview():
         redis_client = await get_redis()
 
         # Collect keys via scan with hard cap to avoid O(N) on large databases
+        try:
+            forecast_signature_map = _build_forecast_cache_signature_map(db)
+        except Exception as error:
+            logger.warning(
+                "Skipping forecast cache resolution due to map build error (%s)",
+                error,
+            )
+            forecast_signature_map = {}
+
         keys = []
         async for key in redis_client.scan_iter(match="*"):
             keys.append(key)
@@ -1509,7 +1624,14 @@ async def get_cache_overview():
             if prefix not in groups:
                 groups[prefix] = {"count": 0, "keys": []}
             groups[prefix]["count"] += 1
-            groups[prefix]["keys"].append({"key": key, "ttl": ttl, "size": size})
+            groups[prefix]["keys"].append(
+                {
+                    "key": key,
+                    "ttl": ttl,
+                    "size": size,
+                    "resolved": _resolve_cache_key(key, forecast_signature_map),
+                }
+            )
 
         # Total + memory info
         total_keys = await redis_client.dbsize()
@@ -1533,7 +1655,7 @@ async def get_cache_overview():
 
 
 @router.get("/admin/cache/{key:path}")
-async def get_cache_key_detail(key: str):
+async def get_cache_key_detail(key: str, db: Session = Depends(get_db)):
     """
     Admin endpoint: Get full cached value for a specific key.
     """
@@ -1557,12 +1679,24 @@ async def get_cache_key_detail(key: str):
             value = raw
             value_type = "string"
 
+        try:
+            forecast_signature_map = _build_forecast_cache_signature_map(db)
+        except Exception as error:
+            logger.warning(
+                "Skipping forecast cache resolution due to map build error (%s)",
+                error,
+            )
+            forecast_signature_map = {}
+
+        resolved = _resolve_cache_key(key, forecast_signature_map)
+
         return {
             "key": key,
             "ttl": ttl,
             "size": size,
             "value": value,
             "type": value_type,
+            "resolved": resolved,
         }
 
     except HTTPException:
