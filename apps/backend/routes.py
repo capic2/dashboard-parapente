@@ -1475,31 +1475,43 @@ def _build_forecast_cache_signature_map(db: Session) -> dict[str, dict[str, Any]
 
     signature_to_site: dict[str, dict[str, Any]] = {}
 
-    sites = db.query(Site).all()
+    try:
+        sites = db.query(Site).all()
+    except Exception as error:
+        logger.warning("Skipping forecast cache resolution: unable to query sites (%s)", error)
+        return signature_to_site
+
     for site in sites:
         if site.latitude is None or site.longitude is None:
             continue
 
         for day_index in range(7):
-            forecast_key = generate_cache_key(
-                "forecast",
-                lat=round(site.latitude, 4),
-                lon=round(site.longitude, 4),
-                day_index=day_index,
-            )
-            parts = forecast_key.split(":")
-            if len(parts) < 3:
-                continue
+            try:
+                forecast_key = generate_cache_key(
+                    "forecast",
+                    lat=round(site.latitude, 4),
+                    lon=round(site.longitude, 4),
+                    day_index=day_index,
+                )
+                parts = forecast_key.split(":")
+                if len(parts) < 3:
+                    continue
 
-            signature_to_site[parts[2]] = {
-                "type": "weather_forecast",
-                "day_index": day_index,
-                "site_id": site.id,
-                "site_code": site.code,
-                "site_name": site.name,
-                "latitude": site.latitude,
-                "longitude": site.longitude,
-            }
+                signature_to_site[parts[2]] = {
+                    "type": "weather_forecast",
+                    "day_index": day_index,
+                    "site_id": site.id,
+                    "site_code": site.code,
+                    "site_name": site.name,
+                    "latitude": site.latitude,
+                    "longitude": site.longitude,
+                }
+            except Exception as error:
+                logger.warning(
+                    "Skipping forecast resolution for site %s (%s)",
+                    getattr(site, "id", "<unknown>"),
+                    error,
+                )
 
     return signature_to_site
 
@@ -1573,7 +1585,14 @@ async def get_cache_overview(db: Session = Depends(get_db)):
         redis_client = await get_redis()
 
         # Collect keys via scan with hard cap to avoid O(N) on large databases
-        forecast_signature_map = _build_forecast_cache_signature_map(db)
+        try:
+            forecast_signature_map = _build_forecast_cache_signature_map(db)
+        except Exception as error:
+            logger.warning(
+                "Skipping forecast cache resolution due to map build error (%s)",
+                error,
+            )
+            forecast_signature_map = {}
 
         keys = []
         async for key in redis_client.scan_iter(match="*"):
@@ -1660,7 +1679,14 @@ async def get_cache_key_detail(key: str, db: Session = Depends(get_db)):
             value = raw
             value_type = "string"
 
-        forecast_signature_map = _build_forecast_cache_signature_map(db)
+        try:
+            forecast_signature_map = _build_forecast_cache_signature_map(db)
+        except Exception as error:
+            logger.warning(
+                "Skipping forecast cache resolution due to map build error (%s)",
+                error,
+            )
+            forecast_signature_map = {}
 
         resolved = _resolve_cache_key(key, forecast_signature_map)
 

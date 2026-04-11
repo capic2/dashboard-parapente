@@ -182,6 +182,30 @@ class TestGetCacheOverview:
         assert response.status_code == 200
         assert "memory_usage" in response.json()
 
+    @pytest.mark.anyio
+    async def test_cache_overview_uses_empty_resolution_map_on_error(
+        self,
+        client,
+        db_session,
+        seeded_redis,
+    ):
+        await seeded_redis.setex(
+            "weather:forecast:abc123",
+            3600,
+            json.dumps({"temperature": 16, "cached_at": "2026-01-15T10:00:00+00:00"}),
+        )
+
+        with patch(
+            "routes._build_forecast_cache_signature_map", side_effect=RuntimeError("timeout")
+        ):
+            response = client.get("/api/admin/cache")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "weather:forecast" in data["groups"]
+        entry = data["groups"]["weather:forecast"]["keys"][0]
+        assert entry["resolved"] is None
+
 
 class TestGetCacheKeyDetail:
     """Tests for GET /api/admin/cache/{key}"""
@@ -277,6 +301,28 @@ class TestGetCacheKeyDetail:
 
         assert data["resolved"]["label"] == "best_spot_for_day"
         assert data["resolved"]["details"]["day_index"] == 3
+
+    @pytest.mark.anyio
+    async def test_key_detail_falls_back_to_null_when_resolution_map_fails(
+        self,
+        client,
+        db_session,
+        seeded_redis,
+    ):
+        await seeded_redis.setex(
+            "weather:forecast:abc123",
+            3600,
+            json.dumps({"temperature": 16, "cached_at": "2026-01-15T10:00:00+00:00"}),
+        )
+
+        with patch(
+            "routes._build_forecast_cache_signature_map", side_effect=RuntimeError("timeout")
+        ):
+            response = client.get("/api/admin/cache/weather:forecast:abc123")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["resolved"] is None
 
     @pytest.mark.anyio
     async def test_key_detail_emagram_includes_resolution(self, client, db_session, seeded_redis):

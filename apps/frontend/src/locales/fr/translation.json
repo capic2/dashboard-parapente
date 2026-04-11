@@ -517,7 +517,7 @@
     "resolved": "Signification",
     "noResolution": "Résolution indisponible",
     "resolutionGeneric": "Clé inconnue",
-    "resolvedBestSpot": "Best Spot (jour {{day}})",
+    "resolvedBestSpot": "Meilleur Spot (jour {{day}})",
     "resolvedWeatherForecast": "Prévision météo",
     "resolvedWeatherForecastWithSite": "Prévision météo - {{site}} (jour {{day}})",
     "resolvedEmagram": "Émagramme - station {{station}} ({{date}})",

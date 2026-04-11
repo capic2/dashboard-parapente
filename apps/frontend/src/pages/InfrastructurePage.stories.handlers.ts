@@ -14,12 +14,22 @@ interface CacheEntry {
     label: string;
     confidence: string;
     details?: Record<string, unknown>;
-  };
+  } | null;
 }
 
 const initialEntries: CacheEntry[] = [
   {
     key: 'weather:forecast:abc123',
+    resolved: {
+      type: 'weather_forecast',
+      label: 'weather_forecast',
+      confidence: 'high',
+      details: {
+        day_index: 0,
+        site_code: 'arguel',
+        site_name: 'Arguel',
+      },
+    },
     ttl: 3200,
     size: 2048,
     value: JSON.stringify({
@@ -30,6 +40,7 @@ const initialEntries: CacheEntry[] = [
   },
   {
     key: 'weather:forecast:def456',
+    resolved: null,
     ttl: 1800,
     size: 1536,
     value: JSON.stringify({
@@ -40,6 +51,7 @@ const initialEntries: CacheEntry[] = [
   },
   {
     key: 'weather:forecast:ghi789',
+    resolved: null,
     ttl: 900,
     size: 1024,
     value: JSON.stringify({
@@ -50,6 +62,14 @@ const initialEntries: CacheEntry[] = [
   },
   {
     key: 'best_spot:day_0',
+    resolved: {
+      type: 'best_spot',
+      label: 'best_spot_for_day',
+      confidence: 'high',
+      details: {
+        day_index: 0,
+      },
+    },
     ttl: 3000,
     size: 512,
     value: JSON.stringify({
@@ -67,6 +87,14 @@ const initialEntries: CacheEntry[] = [
   },
   {
     key: 'best_spot:day_1',
+    resolved: {
+      type: 'best_spot',
+      label: 'best_spot_for_day',
+      confidence: 'high',
+      details: {
+        day_index: 1,
+      },
+    },
     ttl: 2500,
     size: 480,
     value: JSON.stringify({
@@ -79,6 +107,16 @@ const initialEntries: CacheEntry[] = [
   },
   {
     key: 'emagram:sounding:07145:12:2026-01-15',
+    resolved: {
+      type: 'emagram_sounding',
+      label: 'emagram_sounding',
+      confidence: 'high',
+      details: {
+        station: '07145',
+        sounding_hour: '12',
+        date: '2026-01-15',
+      },
+    },
     ttl: 80000,
     size: 4096,
     value: JSON.stringify({
@@ -209,7 +247,7 @@ function buildOverview() {
           label: string;
           confidence: string;
           details?: Record<string, unknown>;
-        };
+        } | null;
       }[];
     }
   > = {};
@@ -253,7 +291,7 @@ function buildOverview() {
       };
     }
 
-    return undefined;
+    return null;
   };
 
   for (const entry of cacheDb) {
@@ -263,12 +301,18 @@ function buildOverview() {
     if (!groups[prefix]) {
       groups[prefix] = { count: 0, keys: [] };
     }
+
+    const resolved =
+      typeof entry.resolved !== 'undefined'
+        ? entry.resolved
+        : resolveKey(entry.key);
+
     groups[prefix].count += 1;
     groups[prefix].keys.push({
       key: entry.key,
       ttl: entry.ttl,
       size: entry.size,
-      resolved: resolveKey(entry.key),
+      resolved,
     });
   }
 
@@ -364,13 +408,17 @@ export const cacheHandlers = [
         };
       }
 
-      return undefined;
+      return null;
     };
 
     const entry = cacheDb.find((e) => e.key === key);
     if (!entry) {
       return new HttpResponse(null, { status: 404 });
     }
+
+    const resolved =
+      typeof entry.resolved !== 'undefined' ? entry.resolved : resolveKey();
+
     let value: unknown;
     let type: 'json' | 'string';
     try {
@@ -386,7 +434,7 @@ export const cacheHandlers = [
       size: entry.size,
       value,
       type,
-      resolved: resolveKey(),
+      resolved,
     } satisfies CacheKeyDetail);
   }),
 
