@@ -8,9 +8,11 @@ import Forecast7Day from '../components/weather/Forecast7Day';
 import HourlyForecast from '../components/weather/HourlyForecast';
 import EmagramWidget from '../components/dashboard/EmagramWidget';
 import WeatherMultiLanding from '../components/weather/WeatherMultiLanding';
+import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from '@tanstack/react-router';
+import { useBestSpotAPI } from '../hooks/weather/useBestSpotAPI';
 
 export default function WeatherPage() {
   const { t } = useTranslation();
@@ -19,6 +21,7 @@ export default function WeatherPage() {
   const search = useSearch({ from: '/weather' });
   const routeSiteId = search ? search.siteId : '';
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
   const selectedSiteId =
     sites.find((site) => site.id === routeSiteId)?.id ?? sites[0]?.id ?? '';
 
@@ -61,6 +64,15 @@ export default function WeatherPage() {
             void navigate({ to: '/weather', search: { siteId } })
           }
           weatherData={weatherDataMap}
+        />
+
+        {/* Best Spot for selected day */}
+        <BestSpotSuggestion
+          bestSpot={bestSpot ?? null}
+          onSelectSite={(siteId) =>
+            void navigate({ to: '/weather', search: { siteId } })
+          }
+          selectedDayIndex={selectedDayIndex}
         />
 
         {/* Current Conditions */}
