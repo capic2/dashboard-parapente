@@ -6,7 +6,7 @@ from datetime import datetime
 
 import pytest
 
-from models import EmagramAnalysis
+from models import EmagramAnalysis, StravaTokenLog
 
 
 class TestAdminEndpoints:
@@ -88,6 +88,27 @@ class TestAdminEndpoints:
         finally:
             # Restore original value
             config.GOOGLE_API_KEY = original_key
+
+    def test_strava_token_logs_include_refresh_mode(self, client, db_session):
+        """Token logs endpoint includes refresh mode for each entry."""
+
+        log = StravaTokenLog(
+            success=True,
+            message="Access token refreshed",
+            timestamp=datetime.utcnow(),
+            refresh_mode="manual",
+        )
+        db_session.add(log)
+        db_session.commit()
+
+        response = client.get("/api/admin/strava/token-logs")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == 1
+        assert data[0]["refresh_mode"] == "manual"
+        assert "timestamp" in data[0]
 
     @pytest.mark.integration
     def test_debug_gemini_with_api_key(self, client):

@@ -158,6 +158,7 @@ const buildStravaTokenLogs = (base = STRAVA_MOCK_BASE_MS): TokenLog[] => [
     success: true,
     message: `Access token refreshed (expires at ${getExpiresAt(-1, base)})`,
     expires_at: getExpiresAt(-1, base),
+    refresh_mode: 'automatic',
   },
   {
     id: 2,
@@ -165,6 +166,7 @@ const buildStravaTokenLogs = (base = STRAVA_MOCK_BASE_MS): TokenLog[] => [
     success: true,
     message: `Access token refreshed (expires at ${getExpiresAt(-5, base)})`,
     expires_at: getExpiresAt(-5, base),
+    refresh_mode: 'automatic',
   },
   {
     id: 1,
@@ -173,6 +175,7 @@ const buildStravaTokenLogs = (base = STRAVA_MOCK_BASE_MS): TokenLog[] => [
     message:
       'Strava API error (HTTP 401): {"message":"Bad Request","errors":[]}',
     expires_at: null,
+    refresh_mode: 'manual',
   },
 ];
 
@@ -186,6 +189,7 @@ const buildStravaExpiredTokenLogs = (
     message:
       'Strava API error (HTTP 401): {"message":"Bad Request","errors":[]}',
     expires_at: null,
+    refresh_mode: 'manual',
   },
 ];
 
@@ -201,6 +205,7 @@ const refreshStravaToken = () => {
     success: true,
     message: `Access token refreshed (expires at ${newExpiry})`,
     expires_at: newExpiry,
+    refresh_mode: 'manual',
   };
 
   nextLogId += 1;
