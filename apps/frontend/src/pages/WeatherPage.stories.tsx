@@ -340,8 +340,50 @@ const mockLandingWeather = [
   },
 ];
 
+const mockBestSpot = {
+  site: {
+    id: 'site-arguel',
+    name: 'Arguel',
+    rating: 4,
+    orientation: 'SW',
+  },
+  paraIndex: 78,
+  windDirection: 'SW',
+  windSpeed: 12,
+  windFavorability: 'good',
+  score: 82,
+  verdict: 'BON',
+  reason: 'Bonnes conditions pour le vol.',
+  flyableSlot: '10h-17h',
+  thermalCeiling: 1850,
+  cached_at: '2025-06-15T08:30:00Z',
+};
+
+const mockBestSpotByDay: Record<number, typeof mockBestSpot> = {
+  0: mockBestSpot,
+  1: {
+    ...mockBestSpot,
+    score: 74,
+    paraIndex: 74,
+    reason: 'Prévisions stables demain.',
+  },
+  2: {
+    ...mockBestSpot,
+    score: 60,
+    paraIndex: 60,
+    reason: 'Conditions moyennes.',
+  },
+};
+
 const defaultHandlers = [
   http.get('*/api/spots', () => HttpResponse.json(mockSites)),
+  http.get('*/api/spots/best', ({ request }) => {
+    const dayIndex = Number(
+      new URL(request.url).searchParams.get('day_index') || '0'
+    );
+
+    return HttpResponse.json(mockBestSpotByDay[dayIndex] ?? mockBestSpot);
+  }),
   http.get('*/api/spots/:id', ({ params }) => {
     const site = mockSites.sites.find((s) => s.id === params.id);
     return site
@@ -391,9 +433,19 @@ export const Default = meta.story({
 
 Default.test(
   'renders weather page with site selector and conditions',
-  async ({ canvas }) => {
+  async ({ canvas, userEvent }) => {
     await canvas.findByText('Arguel');
     await expect(canvas.getByText('Chalais')).toBeInTheDocument();
+    await canvas.findByText(
+      /Meilleur spot pour aujourd'hui|Best spot for today/
+    );
+
+    const tomorrowButton = await canvas.findByRole('button', {
+      name: /\b85\b/,
+    });
+    await userEvent.click(tomorrowButton);
+
+    await canvas.findByText(/Meilleur spot pour demain|Best spot for tomorrow/);
   }
 );
 
@@ -413,6 +465,7 @@ WithSelectedSite.test(
   async ({ canvas }) => {
     await canvas.findByText('Chalais');
     await expect(canvas.getByText('Arguel')).toBeInTheDocument();
+    await canvas.findByText(/Best spot for|Meilleur spot pour/);
   }
 );
 
@@ -454,6 +507,7 @@ export const WeatherError = meta.story({
     router: weatherRouteConfig,
     msw: {
       handlers: [
+        http.get('*/api/spots/best', () => HttpResponse.json(mockBestSpot)),
         http.get('*/api/spots', () => HttpResponse.json(mockSites)),
         http.get('*/api/spots/:id', ({ params }) => {
           const site = mockSites.sites.find((s) => s.id === params.id);
@@ -488,6 +542,7 @@ WeatherError.test(
   async ({ canvas }) => {
     await canvas.findByText('Arguel');
     await expect(canvas.getByText('Chalais')).toBeInTheDocument();
+    await canvas.findByText(/Best spot for|Meilleur spot pour/);
   }
 );
 
