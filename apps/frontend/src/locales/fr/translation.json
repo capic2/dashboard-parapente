@@ -546,6 +546,10 @@
       "logs": "Historique des refresh",
       "noLogs": "Aucun historique",
       "date": "Date",
+      "mode": "Mode",
+      "manual": "Manuel",
+      "automatic": "Automatique",
+      "modeUnknown": "Inconnu",
       "message": "Message",
       "ok": "OK",
       "fail": "Echec"
