@@ -9,6 +9,12 @@ interface CacheEntry {
   ttl: number;
   size: number;
   value: string; // JSON-serialized
+  resolved?: {
+    type: string;
+    label: string;
+    confidence: string;
+    details?: Record<string, unknown>;
+  };
 }
 
 const initialEntries: CacheEntry[] = [
@@ -137,8 +143,63 @@ export const resetCacheDb = () => {
 function buildOverview() {
   const groups: Record<
     string,
-    { count: number; keys: { key: string; ttl: number; size: number }[] }
+    {
+      count: number;
+      keys: {
+        key: string;
+        ttl: number;
+        size: number;
+        resolved?: {
+          type: string;
+          label: string;
+          confidence: string;
+          details?: Record<string, unknown>;
+        };
+      }[];
+    }
   > = {};
+
+  const resolveKey = (key: string) => {
+    if (key.startsWith('weather:forecast:')) {
+      return {
+        type: 'weather_forecast',
+        label: 'weather_forecast',
+        confidence: 'high',
+        details: {
+          day_index: 0,
+          site_code: 'arguel',
+          site_name: 'Arguel',
+        },
+      };
+    }
+
+    if (key.startsWith('best_spot:day_')) {
+      return {
+        type: 'best_spot',
+        label: 'best_spot_for_day',
+        confidence: 'high',
+        details: {
+          day_index: Number(key.replace('best_spot:day_', '')),
+        },
+      };
+    }
+
+    if (key.startsWith('emagram:sounding:')) {
+      const parts = key.split(':');
+      return {
+        type: 'emagram_sounding',
+        label: 'emagram_sounding',
+        confidence: 'high',
+        details: {
+          station: parts[2] || '',
+          sounding_hour: parts[3] || '',
+          date: parts[4] || '',
+        },
+      };
+    }
+
+    return undefined;
+  };
 
   for (const entry of cacheDb) {
     const parts = entry.key.split(':');
@@ -152,6 +213,7 @@ function buildOverview() {
       key: entry.key,
       ttl: entry.ttl,
       size: entry.size,
+      resolved: resolveKey(entry.key),
     });
   }
 
@@ -233,6 +295,48 @@ export const cacheHandlers = [
     const key = decodeURIComponent(
       url.pathname.replace(/.*\/api\/admin\/cache\//, '')
     );
+    const resolveKey = () => {
+      if (key.startsWith('weather:forecast:')) {
+        return {
+          type: 'weather_forecast',
+          label: 'weather_forecast',
+          confidence: 'high',
+          details: {
+            day_index: 0,
+            site_code: 'arguel',
+            site_name: 'Arguel',
+          },
+        };
+      }
+
+      if (key.startsWith('best_spot:day_')) {
+        return {
+          type: 'best_spot',
+          label: 'best_spot_for_day',
+          confidence: 'high',
+          details: {
+            day_index: Number(key.replace('best_spot:day_', '')),
+          },
+        };
+      }
+
+      if (key.startsWith('emagram:sounding:')) {
+        const parts = key.split(':');
+        return {
+          type: 'emagram_sounding',
+          label: 'emagram_sounding',
+          confidence: 'high',
+          details: {
+            station: parts[2] || '',
+            sounding_hour: parts[3] || '',
+            date: parts[4] || '',
+          },
+        };
+      }
+
+      return undefined;
+    };
+
     const entry = cacheDb.find((e) => e.key === key);
     if (!entry) {
       return new HttpResponse(null, { status: 404 });
@@ -252,6 +356,7 @@ export const cacheHandlers = [
       size: entry.size,
       value,
       type,
+      resolved: resolveKey(),
     } satisfies CacheKeyDetail);
   }),
 
