@@ -10,7 +10,6 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-import redis
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -4836,8 +4835,10 @@ async def clear_emagram_cache(db: Session = Depends(get_db)):
 
         # 2. Clear Redis cache
         try:
-            r = redis.Redis(host="redis", port=6379, decode_responses=True)
-            r.flushall()
+            from cache import get_redis
+
+            r = await get_redis()
+            await r.flushall()
             redis_cleared = True
         except Exception as redis_error:
             logger.warning(f"Redis clear failed (non-critical): {redis_error}")

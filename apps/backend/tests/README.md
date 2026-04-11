@@ -16,30 +16,32 @@ tests/
 
 ## Lancer les tests
 
-### Tous les tests
+### Tous les tests (Nx recommandé)
 ```bash
-./run_tests.sh
+pnpm nx test backend
 ```
 
 ### Tests unitaires seulement (rapides)
 ```bash
-./run_tests.sh unit
+pnpm nx test backend -- -m "not integration and not slow"
 ```
 
 ### Tests d'intégration (nécessitent APIs externes)
 ```bash
-./run_tests.sh integration
+pnpm nx test:integration backend
 ```
 
 ### Tests rapides sans coverage
 ```bash
-./run_tests.sh fast
+pnpm nx test backend -- -m "not slow" --no-cov
 ```
 
 ### Générer rapport de coverage
 ```bash
-./run_tests.sh coverage
+pnpm nx test backend -- --cov-report=html --cov-report=term
 ```
+
+> Note: `./run_tests.sh` reste disponible pour un usage local direct, mais le flux Nx est désormais la référence du monorepo.
 
 ## Marqueurs de tests
 
@@ -51,7 +53,7 @@ tests/
 
 Objectif minimum : **50%**
 
-Voir le rapport HTML : `htmlcov/index.html` après `./run_tests.sh coverage`
+Voir le rapport HTML : `htmlcov/index.html`
 
 ## Fixtures disponibles
 

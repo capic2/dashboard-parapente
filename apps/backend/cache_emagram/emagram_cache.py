@@ -4,18 +4,32 @@ Avoids re-downloading same sounding multiple times
 """
 
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Any
 
 import redis
 
+logger = logging.getLogger(__name__)
+
+
+def _get_redis_url() -> str:
+    """Build the Redis URL from shared backend config unless explicitly overridden."""
+    redis_url = os.getenv("REDIS_URL")
+    if redis_url:
+        return redis_url
+
+    from config import REDIS_HOST, REDIS_PORT
+
+    return f"redis://{REDIS_HOST}:{REDIS_PORT}"
+
 
 class EmagramCache:
     """Redis cache for sounding data"""
 
     def __init__(self):
-        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        redis_url = _get_redis_url()
         try:
             self.redis_client = redis.from_url(redis_url, decode_responses=True)
             self.enabled = True
@@ -23,6 +37,7 @@ class EmagramCache:
         except (redis.ConnectionError, redis.TimeoutError):
             self.enabled = False
             self.redis_client = None
+            logger.warning("Emagram Redis cache disabled: unable to connect to %s", redis_url)
 
     def _generate_key(self, station_code: str, sounding_time: str, date_str: str) -> str:
         """Generate cache key for sounding"""
@@ -52,7 +67,7 @@ class EmagramCache:
             return None
 
         except Exception as e:
-            print(f"Cache get error: {e}")
+            logger.warning("Cache get error: %s", e)
             return None
 
     def set_sounding(
@@ -89,7 +104,7 @@ class EmagramCache:
             return True
 
         except Exception as e:
-            print(f"Cache set error: {e}")
+            logger.warning("Cache set error: %s", e)
             return False
 
     def invalidate_sounding(self, station_code: str, sounding_time: str, date: datetime) -> bool:
@@ -104,7 +119,7 @@ class EmagramCache:
             return True
 
         except Exception as e:
-            print(f"Cache invalidate error: {e}")
+            logger.warning("Cache invalidate error: %s", e)
             return False
 
     def get_stats(self) -> dict[str, Any]:
