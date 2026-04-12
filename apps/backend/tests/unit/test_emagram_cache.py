@@ -1,6 +1,7 @@
 """Tests for the emagram Redis cache configuration."""
 
 import importlib
+import logging
 import sys
 from types import ModuleType, SimpleNamespace
 from unittest.mock import MagicMock
@@ -62,3 +63,24 @@ def test_emagram_cache_initializes_with_shared_backend_redis(monkeypatch):
     redis_module.from_url.assert_called_once_with("redis://redis:6379", decode_responses=True)
     assert cache.enabled is True
     assert cache.redis_client is redis_client
+
+
+def test_emagram_cache_connection_failures_do_not_log_password(monkeypatch, caplog):
+    """Redis password must never appear in warning logs."""
+    monkeypatch.setenv("REDIS_URL", "redis://app_user:super-secret@redis.internal:6379")
+    redis_client = MagicMock()
+
+    emagram_cache, redis_module = _load_module(monkeypatch, redis_client=redis_client)
+    redis_client.ping.side_effect = redis_module.ConnectionError("auth failed")
+
+    with caplog.at_level(logging.WARNING):
+        cache = emagram_cache.EmagramCache()
+
+    redis_module.from_url.assert_called_once_with(
+        "redis://app_user:super-secret@redis.internal:6379",
+        decode_responses=True,
+    )
+    assert cache.enabled is False
+    assert cache.redis_client is None
+    assert any("super-secret" in record.message for record in caplog.records) is False
+    assert any("***:***@redis.internal:6379" in record.message for record in caplog.records)

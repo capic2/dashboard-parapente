@@ -8,6 +8,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 import redis
 
@@ -25,6 +26,20 @@ def _get_redis_url() -> str:
     return f"redis://{REDIS_HOST}:{REDIS_PORT}"
 
 
+def _redact_redis_url(redis_url: str) -> str:
+    """Return a safe display version of Redis URL without credentials."""
+    parsed = urlsplit(redis_url)
+    if not (parsed.username or parsed.password):
+        return redis_url
+
+    host = parsed.hostname or ""
+    if parsed.port:
+        host = f"{host}:{parsed.port}"
+
+    netloc = f"***:***@{host}"
+    return urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
+
+
 class EmagramCache:
     """Redis cache for sounding data"""
 
@@ -37,7 +52,10 @@ class EmagramCache:
         except (redis.ConnectionError, redis.TimeoutError):
             self.enabled = False
             self.redis_client = None
-            logger.warning("Emagram Redis cache disabled: unable to connect to %s", redis_url)
+            logger.warning(
+                "Emagram Redis cache disabled: unable to connect to %s",
+                _redact_redis_url(redis_url),
+            )
 
     def _generate_key(self, station_code: str, sounding_time: str, date_str: str) -> str:
         """Generate cache key for sounding"""
