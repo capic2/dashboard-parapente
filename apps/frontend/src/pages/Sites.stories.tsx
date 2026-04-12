@@ -225,7 +225,7 @@ Default.test(
       await userEvent.click(
         within(await canvas.findByRole('row', { name: 'Arguel' })).getByRole(
           'button',
-          { name: '🗑️' }
+          { name: 'Supprimer le site' }
         )
       );
       await userEvent.click(
