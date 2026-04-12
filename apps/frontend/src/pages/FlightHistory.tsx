@@ -14,12 +14,15 @@ import { ToastContainer, Modal } from '@dashboard-parapente/design-system';
 import { useToast, useToastStore } from '../hooks/useToast';
 import { HTTPError } from 'ky';
 import { api } from '../lib/api';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 export default function FlightHistory() {
   const { t } = useTranslation();
   const { data: flights } = useSuspenseQuery(
     flightsQueryOptions({ limit: 50 })
   );
+
+  const isMobile = useIsMobile();
 
   const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -29,6 +32,7 @@ export default function FlightHistory() {
   const [showStravaSyncModal, setShowStravaSyncModal] = useState(false);
   const [showCreateFlightModal, setShowCreateFlightModal] = useState(false);
   const [showCreateSiteModal, setShowCreateSiteModal] = useState(false);
+  const [showMobileDetail, setShowMobileDetail] = useState(false);
 
   const selectedFlight = flights.find((f: Flight) => f.id === selectedFlightId);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -39,12 +43,21 @@ export default function FlightHistory() {
 
   const handleSelectFlight = useCallback((flight: Flight) => {
     setSelectedFlightId(flight.id);
+    if (isMobile) {
+      setShowMobileDetail(true);
+    }
+  }, [isMobile]);
+
+  const handleCloseMobileDetail = useCallback(() => {
+    setShowMobileDetail(false);
+    setSelectedFlightId(null);
   }, []);
 
   const handleToggleSelectionMode = useCallback(() => {
     setSelectionMode((prev) => !prev);
     setRowSelection({});
     setSelectedFlightId(null);
+    setShowMobileDetail(false);
   }, []);
 
   const selectedFlightIds = Object.keys(rowSelection);
@@ -104,16 +117,17 @@ export default function FlightHistory() {
 
         setRowSelection({});
         setShowMultiDeleteConfirm(false);
-      } else if (flightToDelete) {
-        await api.delete(`flights/${flightToDelete.id}`);
-        queryClient.invalidateQueries({ queryKey: ['flights'] });
-        queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] });
-        toast.success(t('flights.deletedSuccess'));
-        if (selectedFlightId === flightToDelete.id) {
-          setSelectedFlightId(null);
+        } else if (flightToDelete) {
+          await api.delete(`flights/${flightToDelete.id}`);
+          queryClient.invalidateQueries({ queryKey: ['flights'] });
+          queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] });
+          toast.success(t('flights.deletedSuccess'));
+          if (selectedFlightId === flightToDelete.id) {
+            setSelectedFlightId(null);
+            setShowMobileDetail(false);
+          }
+          setFlightToDelete(null);
         }
-        setFlightToDelete(null);
-      }
     } catch (err) {
       console.error('Failed to delete flight:', err);
       let errorMessage = t('flights.unknownError');
@@ -223,35 +237,61 @@ export default function FlightHistory() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Flight List */}
-        <div className="lg:col-span-1">
-          <FlightsTable
-            flights={flights}
-            selectedFlightId={selectedFlightId}
-            selectionMode={selectionMode}
-            onSelectFlight={handleSelectFlight}
-            onDeleteFlight={setFlightToDelete}
-            rowSelection={rowSelection}
-            onRowSelectionChange={setRowSelection}
-          />
-        </div>
-
-        {/* Detail Panel + 3D Viewer */}
-        <div className="lg:col-span-2 space-y-4">
-          {selectedFlightId && selectedFlight ? (
-            <FlightDetails
-              key={selectedFlightId}
-              flight={selectedFlight}
-              sites={sites}
-              onShowCreateSiteModal={() => setShowCreateSiteModal(true)}
+        {(!isMobile || !showMobileDetail) && (
+          <div className={isMobile ? '' : 'lg:col-span-1'}>
+            <FlightsTable
+              flights={flights}
+              selectedFlightId={selectedFlightId}
+              selectionMode={selectionMode}
+              onSelectFlight={handleSelectFlight}
+              onDeleteFlight={setFlightToDelete}
+              rowSelection={rowSelection}
+              onRowSelectionChange={setRowSelection}
             />
-          ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-12 shadow-md text-center">
-              <p className="text-gray-600 dark:text-gray-300">
-                {t('flights.selectFlightHint')}
-              </p>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Detail Panel + 3D Viewer (desktop) */}
+        {!isMobile && (
+          <div className="lg:col-span-2 space-y-4">
+            {selectedFlightId && selectedFlight ? (
+              <FlightDetails
+                key={selectedFlightId}
+                flight={selectedFlight}
+                sites={sites}
+                onShowCreateSiteModal={() => setShowCreateSiteModal(true)}
+              />
+            ) : (
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-12 shadow-md text-center">
+                <p className="text-gray-600 dark:text-gray-300">
+                  {t('flights.selectFlightHint')}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Detail Panel + 3D Viewer (mobile) */}
+        {isMobile && showMobileDetail ? (
+          <div className="space-y-4">
+            {selectedFlightId && selectedFlight ? (
+              <FlightDetails
+                key={selectedFlightId}
+                flight={selectedFlight}
+                sites={sites}
+                onShowCreateSiteModal={() => setShowCreateSiteModal(true)}
+                mobileMode
+                onCloseMobile={handleCloseMobileDetail}
+              />
+            ) : (
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-12 shadow-md text-center">
+                <p className="text-gray-600 dark:text-gray-300">
+                  {t('flights.selectFlightHint')}
+                </p>
+              </div>
+            )}
+          </div>
+        ) : null}
       </div>
 
       {/* Modal Sync Strava */}

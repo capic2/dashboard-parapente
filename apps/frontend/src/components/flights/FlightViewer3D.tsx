@@ -51,6 +51,7 @@ declare global {
 interface FlightViewer3DProps {
   flightId: string;
   flightTitle?: string;
+  compact?: boolean;
 }
 
 /**
@@ -100,6 +101,7 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
 export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   flightId,
   flightTitle = 'Flight View',
+  compact = false,
 }) => {
   const { data: gpxData, isLoading, error } = useFlightGPX(flightId);
   const { data: flight } = useFlight(flightId);
@@ -116,7 +118,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [autoOffset, setAutoOffset] = useState(0);
   const [isCalculatingOffset, setIsCalculatingOffset] = useState(false);
   const [currentProgress, setCurrentProgress] = useState(0);
-  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(compact);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentElapsedTime, setCurrentElapsedTime] = useState(0);
 
@@ -677,6 +679,27 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    setIsPanelCollapsed(compact);
+  }, [compact]);
+
+  const panelClassName = compact
+    ? isPanelCollapsed
+      ? 'p-1.5'
+      : 'p-2 max-w-[220px]'
+    : isPanelCollapsed
+      ? 'p-2'
+      : 'p-4 max-w-xs';
+
+  const fullscreenButtonClassName = compact ? 'px-2 py-1.5 text-xs' : 'px-3 py-2';
+  const compactControlButtonClassName = compact
+    ? 'px-2 py-1.5 text-xs'
+    : 'px-3 py-2 text-sm';
+  const compactTitleClass = compact ? 'text-sm font-bold' : 'text-lg font-bold';
+  const compactToggleButtonClassName = compact
+    ? 'px-1.5 py-0.5 text-xs'
+    : 'px-2 py-1 text-sm';
+
   // Cleanup export polling on unmount
   useEffect(() => {
     return () => {
@@ -1109,7 +1132,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     <div
       ref={containerDivRef}
       className="relative w-full bg-gray-900"
-      style={{ height: isFullscreen ? '100vh' : '600px' }}
+      style={{ height: isFullscreen ? '100vh' : compact ? '420px' : '600px' }}
     >
       {/* Overlay for loading/error states */}
       {renderOverlay()}
@@ -1118,7 +1141,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       {gpxData?.coordinates && (
         <button
           onClick={toggleFullscreen}
-          className="absolute top-4 right-4 z-10 px-3 py-2 bg-gray-800 text-white rounded-lg shadow-lg hover:bg-gray-700"
+          className={`absolute top-4 right-4 z-10 bg-gray-800 text-white rounded-lg shadow-lg hover:bg-gray-700 ${fullscreenButtonClassName}`}
           title={isFullscreen ? 'Quitter le plein écran' : 'Plein écran'}
         >
           {isFullscreen ? '🗗 Quitter' : '⛶ Plein écran'}
@@ -1128,17 +1151,15 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       {/* Controls - only show when data is loaded */}
       {gpxData?.coordinates && (
         <div
-          className={`absolute top-4 left-4 z-10 bg-white dark:bg-gray-800 rounded-lg shadow-lg transition-all ${
-            isPanelCollapsed ? 'p-2' : 'p-4 max-w-xs'
-          }`}
+          className={`absolute top-4 left-4 z-10 bg-white dark:bg-gray-800 rounded-lg shadow-lg transition-all ${panelClassName}`}
         >
           <div className="flex items-center justify-between mb-2">
             {!isPanelCollapsed && (
-              <h3 className="text-lg font-bold">🪂 {flightTitle}</h3>
+              <h3 className={compactTitleClass}>🪂 {flightTitle}</h3>
             )}
             <button
               onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
-              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-sm dark:text-gray-200"
+              className={`${compactToggleButtonClassName} bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-600 dark:text-gray-200`}
               title={
                 isPanelCollapsed ? 'Ouvrir le panneau' : 'Réduire le panneau'
               }
@@ -1169,13 +1190,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   <div className="flex gap-2">
                     <button
                       onClick={togglePlayPause}
-                      className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+                      className={`${compactControlButtonClassName} bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400`}
                     >
                       {isPlaying ? '⏸ Pause' : '▶ Play'}
                     </button>
                     <button
                       onClick={reset}
-                      className="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:bg-gray-400"
+                      className={`${compactControlButtonClassName} bg-gray-600 text-white rounded hover:bg-gray-700 disabled:bg-gray-400`}
                     >
                       ⏮ Reset
                     </button>
@@ -1284,7 +1305,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         disabled={isVideoExportInProgress(
                           flight.video_export_status
                         )}
-                        className={`w-full px-3 py-2 text-white rounded ${
+                        className={`w-full ${compactControlButtonClassName} text-white rounded ${
                           flight.video_export_status === 'completed'
                             ? 'mb-2'
                             : 'mb-3'
@@ -1513,7 +1534,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                       <button
                         onClick={applyCameraSettings}
                         disabled={isUpdatingCamera}
-                        className="w-full px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={`w-full ${compactControlButtonClassName} bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
                         {isUpdatingCamera ? '⏳ Mise à jour...' : '✓ Appliquer'}
                       </button>

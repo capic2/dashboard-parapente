@@ -415,7 +415,11 @@
     "deleteButton": "🗑️ Supprimer",
     "deleteButtonCount_one": "🗑️ Supprimer {{count}} vol",
     "deleteButtonCount_other": "🗑️ Supprimer {{count}} vols",
-    "gpxFileInput": "Fichier GPX"
+    "gpxFileInput": "Fichier GPX",
+    "infoTab": "Infos",
+    "replayTab": "Replay",
+    "backToList": "← Retour",
+    "replayUnavailable": "Aucun GPX disponible pour ce vol"
   },
   "createSite": {
     "title": "Créer un nouveau site",

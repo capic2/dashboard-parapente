@@ -187,6 +187,45 @@ export const WithoutGpx = meta.story({
   args: { flight: flightWithoutGpx },
 });
 
+export const Mobile = meta.story({
+  name: 'Mobile',
+  args: { flight: fullFlight, mobileMode: true },
+});
+
+Mobile.test('shows compact mobile infos tab by default', async ({ canvas }) => {
+  await expect(canvas.getByText(fullFlight.title ?? '')).toBeInTheDocument();
+  await expect(
+    canvas.getByRole('button', { name: i18n.t('flights.backToList') })
+  ).toBeInTheDocument();
+  await expect(
+    canvas.getByRole('button', { name: i18n.t('flights.infoTab') })
+  ).toBeInTheDocument();
+  await expect(
+    canvas.getByRole('button', { name: i18n.t('flights.replayTab') })
+  ).toBeInTheDocument();
+  await expect(
+    canvas.queryByText(i18n.t('flights.loading3dViewer'))
+  ).not.toBeInTheDocument();
+});
+
+export const MobileWithoutGpx = meta.story({
+  name: 'Mobile Without GPX',
+  args: { flight: flightWithoutGpx, mobileMode: true },
+});
+
+MobileWithoutGpx.test(
+  'displays unavailable replay state when GPX is missing',
+  async ({ canvas, userEvent }) => {
+    const replayTab = await canvas.findByRole('button', {
+      name: i18n.t('flights.replayTab'),
+    });
+    await userEvent.click(replayTab);
+    await expect(
+      await canvas.findByText(i18n.t('flights.replayUnavailable'))
+    ).toBeInTheDocument();
+  }
+);
+
 export const MinimalFlight = meta.story({
   name: 'Minimal Flight',
   args: { flight: minimalFlight },
