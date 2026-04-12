@@ -272,6 +272,7 @@ class StravaTokenLog(Base):
     success = Column(Boolean, nullable=False)
     message = Column(String, nullable=True)
     expires_at = Column(DateTime, nullable=True)
+    refresh_mode = Column(String(32), nullable=True)
 
 
 class EmagramFeedback(Base):

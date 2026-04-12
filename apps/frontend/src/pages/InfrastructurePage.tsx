@@ -52,6 +52,19 @@ function formatDate(iso: string): string {
   return new Date(normalizedIso).toLocaleString();
 }
 
+function getRefreshModeLabel(
+  refreshMode: 'manual' | 'automatic' | null | undefined,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string {
+  if (refreshMode === 'manual') {
+    return t('infrastructure.strava.manual');
+  }
+  if (refreshMode === 'automatic') {
+    return t('infrastructure.strava.automatic');
+  }
+  return t('infrastructure.strava.modeUnknown');
+}
+
 export function getResolvedLabel(
   resolved: CacheKeyInfo['resolved'],
   t: (key: string, options?: Record<string, unknown>) => string
@@ -225,6 +238,9 @@ function StravaTokenSection() {
                     {t('infrastructure.strava.status')}
                   </th>
                   <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
+                    {t('infrastructure.strava.mode')}
+                  </th>
+                  <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
                     {t('infrastructure.strava.message')}
                   </th>
                   <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
@@ -253,6 +269,9 @@ function StravaTokenSection() {
                           ? t('infrastructure.strava.ok')
                           : t('infrastructure.strava.fail')}
                       </span>
+                    </td>
+                    <td className="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                      {getRefreshModeLabel(log.refresh_mode, t)}
                     </td>
                     <td className="px-4 py-2 text-gray-600 dark:text-gray-400 text-xs max-w-md truncate">
                       {log.message}
