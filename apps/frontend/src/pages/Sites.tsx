@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
-import { Button, Input, TextField } from 'react-aria-components';
+import { Input, TextField } from 'react-aria-components';
+import { Button } from '@dashboard-parapente/design-system';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import {
   useReactTable,
@@ -158,11 +159,11 @@ export const Sites: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <h1 className="text-3xl font-bold">{t('sites.management')}</h1>
         <Button
           onPress={handleOpenCreateModal}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer"
+          className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer"
         >
           ➕ {t('sites.newSite')}
         </Button>
@@ -223,7 +224,7 @@ export const Sites: React.FC = () => {
         <div className="text-center mt-4">
           <Button
             onPress={handleOpenCreateModal}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
             ➕ {t('sites.createFirstSite')}
           </Button>
@@ -250,7 +251,7 @@ export const Sites: React.FC = () => {
         title={t('sites.deleteSiteConfirm', { name: siteToDelete?.name })}
         size="sm"
       >
-        <div className="flex gap-3 pt-2">
+        <div className="flex flex-col sm:flex-row gap-3 pt-2">
           <Button
             onPress={() => setSiteToDelete(null)}
             isDisabled={deleteSite.isPending}

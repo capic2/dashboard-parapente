@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, DatePicker } from '@dashboard-parapente/design-system';
+import { Modal, DatePicker, Button } from '@dashboard-parapente/design-system';
 import { useStravaSyncMutation } from '../../hooks/flights/useFlights';
 import { useToast } from '../../hooks/useToast';
 
@@ -55,7 +55,9 @@ export function StravaSyncModal({
       size="md"
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-600 dark:text-gray-300">{t('strava.description')}</p>
+        <p className="text-sm text-gray-600 dark:text-gray-300">
+          {t('strava.description')}
+        </p>
 
         <div className="grid grid-cols-2 gap-4">
           <DatePicker
@@ -96,14 +98,14 @@ export function StravaSyncModal({
 
         {/* Boutons */}
         <div className="flex gap-3 justify-end">
-          <button
+          <Button
             onClick={onClose}
             className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
             disabled={isPending}
           >
             {t('common.cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleSync}
             disabled={isPending || !dateFrom || !dateTo}
             className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
@@ -116,7 +118,7 @@ export function StravaSyncModal({
             ) : (
               `🔄 ${t('strava.sync')}`
             )}
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

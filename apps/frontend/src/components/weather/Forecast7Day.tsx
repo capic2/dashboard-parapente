@@ -6,6 +6,7 @@ import {
 } from '../../hooks/weather/useWeather';
 import { useQueryClient } from '@tanstack/react-query';
 import CacheTimestamp from '../common/CacheTimestamp';
+import { Button } from '@dashboard-parapente/design-system';
 
 interface Forecast7DayProps {
   spotId: string;
@@ -116,7 +117,7 @@ export default function Forecast7Day({
           const isSelected = index === selectedDayIndex;
 
           return (
-            <button
+            <Button
               key={index}
               onClick={() => onSelectDay?.(index)}
               onMouseEnter={() => handleMouseEnter(index)}
@@ -151,7 +152,7 @@ export default function Forecast7Day({
               <div className="text-xs text-gray-500 dark:text-gray-400 text-center truncate">
                 {day.verdict}
               </div>
-            </button>
+            </Button>
           );
         })}
       </div>
