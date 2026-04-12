@@ -9,6 +9,7 @@ import HourlyForecast from '../components/weather/HourlyForecast';
 import EmagramWidget from '../components/dashboard/EmagramWidget';
 import WeatherMultiLanding from '../components/weather/WeatherMultiLanding';
 import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
+import { Button } from '@dashboard-parapente/design-system';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from '@tanstack/react-router';
@@ -43,12 +44,12 @@ export default function WeatherPage() {
               'Ajoutez votre premier site de vol pour commencer.'
             )}
           </p>
-          <button
+          <Button
             onClick={() => void navigate({ to: '/sites' })}
             className="px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-all"
           >
             {t('dashboard.addSite', 'Ajouter un site')}
-          </button>
+          </Button>
         </div>
       </div>
     );

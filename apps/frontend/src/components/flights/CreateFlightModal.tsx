@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal } from '@dashboard-parapente/design-system';
+import { Modal, Button } from '@dashboard-parapente/design-system';
 import { useCreateFlightFromGPX } from '../../hooks/flights/useFlights';
 import { useToast } from '../../hooks/useToast';
 
@@ -46,7 +46,8 @@ export function CreateFlightModal({
     createFlight(formData, {
       onSuccess: (result) => {
         toast.success(
-          t('flights.createdSuccess') + ` ${result.flight.name || t('flights.unnamed')}`
+          t('flights.createdSuccess') +
+            ` ${result.flight.name || t('flights.unnamed')}`
         );
         onCreateComplete();
         setSelectedFile(null);
@@ -175,14 +176,14 @@ export function CreateFlightModal({
 
         {/* Boutons */}
         <div className="flex gap-3 justify-end">
-          <button
+          <Button
             onClick={handleClose}
             className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
             disabled={isPending}
           >
             {t('common.cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleUpload}
             disabled={isPending || !selectedFile}
             className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
@@ -195,7 +196,7 @@ export function CreateFlightModal({
             ) : (
               `📤 ${t('flights.createButton')}`
             )}
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

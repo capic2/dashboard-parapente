@@ -8,9 +8,8 @@ import {
   Label,
   Input,
   TextArea,
-  Button,
 } from 'react-aria-components';
-import { Select } from '@dashboard-parapente/design-system';
+import { Select, Button } from '@dashboard-parapente/design-system';
 import type { Key } from 'react-aria-components';
 import type { Flight, FlightFormData, Site } from '../../types';
 
@@ -157,7 +156,7 @@ export function FlightEditForm({
           </form.Field>
         </div>
 
-        <div className="flex gap-2 sm:ml-4 justify-end">
+        <div className="flex flex-col sm:flex-row gap-2 sm:ml-4 justify-end">
           <form.Subscribe selector={(state) => state.isSubmitting}>
             {(isSubmitting) => (
               <Button
@@ -230,7 +229,7 @@ export function FlightEditForm({
           <span className={s.label()}>{t('flights.siteLabel')}</span>
           <form.Field name="site_id">
             {(field) => (
-              <div className="flex gap-2 mt-1">
+              <div className="flex flex-col sm:flex-row gap-2 mt-1">
                 <div className="flex-1">
                   <Select
                     label=""
