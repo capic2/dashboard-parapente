@@ -103,7 +103,7 @@ export function FlightDetails({
         ) : (
           <>
             {/* Header */}
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-4">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                 {flight.title ?? t('flights.untitledFlight')}
               </h2>

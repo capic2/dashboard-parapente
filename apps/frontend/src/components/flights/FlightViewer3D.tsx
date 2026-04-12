@@ -28,7 +28,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '@dashboard-parapente/design-system';
 
-import { GPXData } from '@dashboard-parapente/shared-types';
+import type { GPXData } from '@dashboard-parapente/shared-types';
 
 declare global {
   interface Window {

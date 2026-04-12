@@ -246,6 +246,7 @@ const ParaIndexTooltip = ({
           onClick={onClose}
           tone="ghost"
           className="absolute top-2 right-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+          aria-label="Fermer l'infobulle"
         >
           ✕
         </Button>
@@ -340,6 +341,7 @@ const VerdictTooltip = ({
           onClick={onClose}
           tone="ghost"
           className="absolute top-2 right-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+          aria-label="Fermer le verdict"
         >
           ✕
         </Button>
@@ -421,6 +423,7 @@ const SourceDataTooltip = ({
           onClick={onClose}
           tone="ghost"
           className="absolute top-2 right-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+          aria-label="Fermer les données source"
         >
           ✕
         </Button>

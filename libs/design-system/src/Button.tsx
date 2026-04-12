@@ -10,18 +10,18 @@ const buttonStyles = tv({
   variants: {
     tone: {
       primary:
-        'bg-sky-600 text-white hover:bg-sky-700 pressed:bg-sky-800 shadow-sm',
+        'bg-sky-600 text-white hover:bg-sky-700 [&[data-pressed]]:bg-sky-800 shadow-sm',
       secondary:
         'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600',
       success:
-        'bg-green-600 text-white hover:bg-green-700 pressed:bg-green-800 shadow-sm',
+        'bg-green-600 text-white hover:bg-green-700 [&[data-pressed]]:bg-green-800 shadow-sm',
       warning:
-        'bg-orange-600 text-white hover:bg-orange-700 pressed:bg-orange-800 shadow-sm',
+        'bg-orange-600 text-white hover:bg-orange-700 [&[data-pressed]]:bg-orange-800 shadow-sm',
       danger:
-        'bg-red-600 text-white hover:bg-red-700 pressed:bg-red-800 shadow-sm',
+        'bg-red-600 text-white hover:bg-red-700 [&[data-pressed]]:bg-red-800 shadow-sm',
       accent:
-        'bg-purple-600 text-white hover:bg-purple-700 pressed:bg-purple-800 shadow-sm',
-      cyan: 'bg-cyan-500 text-white hover:bg-cyan-600 pressed:bg-cyan-700 shadow-sm',
+        'bg-purple-600 text-white hover:bg-purple-700 [&[data-pressed]]:bg-purple-800 shadow-sm',
+      cyan: 'bg-cyan-500 text-white hover:bg-cyan-600 [&[data-pressed]]:bg-cyan-700 shadow-sm',
       ghost:
         'bg-transparent text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700',
       outline:
