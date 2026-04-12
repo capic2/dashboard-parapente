@@ -23,6 +23,7 @@ const TokenLogSchema = z.object({
   success: z.boolean(),
   message: z.string().nullable(),
   expires_at: z.string().nullable(),
+  refresh_mode: z.enum(['manual', 'automatic']).nullable().optional(),
 });
 
 // --- Inferred types ---

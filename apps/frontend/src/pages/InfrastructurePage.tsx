@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, Input, TextField } from 'react-aria-components';
+import { Checkbox, Input, TextField } from 'react-aria-components';
+import { Button } from '@dashboard-parapente/design-system';
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -49,6 +50,19 @@ function formatDate(iso: string): string {
   const normalizedIso =
     /Z$/.test(iso) || /[+-]\d{2}:\d{2}$/.test(iso) ? iso : `${iso}Z`;
   return new Date(normalizedIso).toLocaleString();
+}
+
+function getRefreshModeLabel(
+  refreshMode: 'manual' | 'automatic' | null | undefined,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string {
+  if (refreshMode === 'manual') {
+    return t('infrastructure.strava.manual');
+  }
+  if (refreshMode === 'automatic') {
+    return t('infrastructure.strava.automatic');
+  }
+  return t('infrastructure.strava.modeUnknown');
 }
 
 export function getResolvedLabel(
@@ -224,6 +238,9 @@ function StravaTokenSection() {
                     {t('infrastructure.strava.status')}
                   </th>
                   <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
+                    {t('infrastructure.strava.mode')}
+                  </th>
+                  <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
                     {t('infrastructure.strava.message')}
                   </th>
                   <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
@@ -252,6 +269,9 @@ function StravaTokenSection() {
                           ? t('infrastructure.strava.ok')
                           : t('infrastructure.strava.fail')}
                       </span>
+                    </td>
+                    <td className="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                      {getRefreshModeLabel(log.refresh_mode, t)}
                     </td>
                     <td className="px-4 py-2 text-gray-600 dark:text-gray-400 text-xs max-w-md truncate">
                       {log.message}
@@ -391,7 +411,7 @@ function CacheSection() {
       )}
 
       {/* Controls */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md flex flex-wrap items-center gap-3">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">
         <Checkbox
           isSelected={autoRefresh}
           onChange={setAutoRefresh}
@@ -671,7 +691,7 @@ function GroupSection({
         id: 'actions',
         header: t('cache.actions'),
         cell: (info) => (
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Button
               onPress={() => onViewKey(info.row.original.key)}
               className="min-h-11 px-3 py-2 sm:min-h-0 sm:px-2 sm:py-1 rounded text-xs bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors cursor-pointer"
@@ -715,7 +735,7 @@ function GroupSection({
           }
         }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <span
             className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
           >

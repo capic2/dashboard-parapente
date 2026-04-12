@@ -546,6 +546,10 @@
       "logs": "Refresh history",
       "noLogs": "No history",
       "date": "Date",
+      "mode": "Mode",
+      "manual": "Manual",
+      "automatic": "Automatic",
+      "modeUnknown": "Unknown",
       "message": "Message",
       "ok": "OK",
       "fail": "Fail"

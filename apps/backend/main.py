@@ -526,6 +526,23 @@ async def initial_cache_warmup():
         )
 
 
+def schedule_strava_token_refresh_job():
+    """Register the periodic Strava token refresh job."""
+
+    from apscheduler.triggers.interval import IntervalTrigger
+
+    from strava import refresh_access_token
+
+    scheduler.add_job(
+        refresh_access_token,
+        trigger=IntervalTrigger(hours=4),
+        id="strava_token_refresh",
+        name="Strava token refresh every 4h (forced)",
+        replace_existing=True,
+        kwargs={"force": True},
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -559,17 +576,7 @@ async def lifespan(app: FastAPI):
         start_emagram(emagram_scheduler)
 
         # Strava token refresh every 4 hours
-        from apscheduler.triggers.interval import IntervalTrigger
-
-        from strava import refresh_access_token
-
-        scheduler.add_job(
-            refresh_access_token,
-            trigger=IntervalTrigger(hours=4),
-            id="strava_token_refresh",
-            name="Strava token refresh every 4h",
-            replace_existing=True,
-        )
+        schedule_strava_token_refresh_job()
         logger.info("🔑 Strava token refresh scheduled (every 4h)")
 
         # Initial cache warmup (non-blocking)

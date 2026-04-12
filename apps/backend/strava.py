@@ -64,7 +64,12 @@ def _persist_refresh_token(token: str) -> None:
     logger.info("Refresh token persisted to DB")
 
 
-def _log_token_refresh(success: bool, message: str, expires_at: datetime | None = None) -> None:
+def _log_token_refresh(
+    success: bool,
+    message: str,
+    expires_at: datetime | None = None,
+    refresh_mode: str | None = None,
+) -> None:
     """Insert a StravaTokenLog entry."""
     try:
         from database import get_db_context
@@ -75,6 +80,7 @@ def _log_token_refresh(success: bool, message: str, expires_at: datetime | None 
                 success=success,
                 message=message,
                 expires_at=expires_at,
+                refresh_mode=refresh_mode,
             )
             db.add(log)
             db.commit()
@@ -98,11 +104,16 @@ async def refresh_access_token(force: bool = False) -> str | None:
     global _access_token, _token_expires_at, _refresh_token
 
     async with _refresh_lock:
+        refresh_mode = "manual" if force else "automatic"
+
         # Check if token is still valid (with 5 min buffer) — skip when forced
         if not force and _access_token and _token_expires_at:
             if datetime.now() < _token_expires_at - timedelta(minutes=5):
                 logger.info("Access token still valid")
                 return _access_token
+
+        if force:
+            logger.info("Forcing token refresh (ignoring in-memory validity cache)")
 
         # Resolve the refresh token: in-memory → DB → env
         current_refresh_token = _refresh_token or _get_persisted_refresh_token()
@@ -110,13 +121,13 @@ async def refresh_access_token(force: bool = False) -> str | None:
         if not current_refresh_token:
             msg = "No refresh token available (not in memory, DB, or env)"
             logger.error(msg)
-            _log_token_refresh(False, msg)
+            _log_token_refresh(False, msg, refresh_mode=refresh_mode)
             return None
 
         if not STRAVA_CLIENT_ID or not STRAVA_CLIENT_SECRET:
             msg = f"Missing Strava credentials: CLIENT_ID={STRAVA_CLIENT_ID}, CLIENT_SECRET={'***' if STRAVA_CLIENT_SECRET else None}"
             logger.error(msg)
-            _log_token_refresh(False, msg)
+            _log_token_refresh(False, msg, refresh_mode=refresh_mode)
             return None
 
         try:
@@ -151,14 +162,14 @@ async def refresh_access_token(force: bool = False) -> str | None:
 
             msg = f"Access token refreshed (expires at {new_token_expires_at})"
             logger.info(f"✅ {msg}")
-            _log_token_refresh(True, msg, new_token_expires_at)
+            _log_token_refresh(True, msg, new_token_expires_at, refresh_mode=refresh_mode)
 
             return _access_token
 
         except httpx.HTTPStatusError as e:
             msg = f"Strava API error (HTTP {e.response.status_code}): {e.response.text}"
             logger.error(msg)
-            _log_token_refresh(False, msg)
+            _log_token_refresh(False, msg, refresh_mode=refresh_mode)
             return None
         except Exception as e:
             msg = f"Failed to refresh token: {type(e).__name__}: {e}"
@@ -166,7 +177,7 @@ async def refresh_access_token(force: bool = False) -> str | None:
             import traceback
 
             logger.error(traceback.format_exc())
-            _log_token_refresh(False, msg)
+            _log_token_refresh(False, msg, refresh_mode=refresh_mode)
             return None
 
 

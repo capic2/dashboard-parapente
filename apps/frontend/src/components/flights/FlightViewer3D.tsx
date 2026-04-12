@@ -26,6 +26,7 @@ import {
 import { api } from '../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../hooks/useToast';
+import { Button } from '@dashboard-parapente/design-system';
 
 import { GPXData, type Flight } from '@dashboard-parapente/shared-types';
 
@@ -73,10 +74,9 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
 
   return (
     <div className="border-b border-gray-200 dark:border-gray-700 last:border-0">
-      <button
+      <Button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between py-2 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded"
-        type="button"
       >
         <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
           {emoji && <span className="mr-1.5">{emoji}</span>}
@@ -88,7 +88,7 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
         >
           ▶
         </span>
-      </button>
+      </Button>
       {isOpen && <div className="pb-3 pt-1 space-y-3">{children}</div>}
     </div>
   );
@@ -1161,13 +1161,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       {/* Bouton plein écran */}
       {gpxData?.coordinates && (
-        <button
+        <Button
           onClick={toggleFullscreen}
           className="absolute top-4 right-4 z-10 px-3 py-2 bg-gray-800 text-white rounded-lg shadow-lg hover:bg-gray-700"
           title={isFullscreen ? 'Quitter le plein écran' : 'Plein écran'}
         >
           {isFullscreen ? '🗗 Quitter' : '⛶ Plein écran'}
-        </button>
+        </Button>
       )}
 
       {/* Controls - only show when data is loaded */}
@@ -1181,7 +1181,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             {!isPanelCollapsed && (
               <h3 className="text-lg font-bold">🪂 {flightTitle}</h3>
             )}
-            <button
+            <Button
               onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
               className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-sm dark:text-gray-200"
               title={
@@ -1189,7 +1189,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
               }
             >
               {isPanelCollapsed ? '▶' : '◀'}
-            </button>
+            </Button>
           </div>
 
           {!isPanelCollapsed && (
@@ -1212,19 +1212,19 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                 {/* ========== SECTION 1: LECTURE ========== */}
                 <AccordionSection title="Lecture" emoji="🎮" defaultOpen={true}>
                   <div className="flex gap-2">
-                    <button
+                    <Button
                       onClick={togglePlayPause}
                       className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
                       data-testid="flight-play-toggle"
                     >
                       {isPlaying ? '⏸ Pause' : '▶ Play'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={reset}
                       className="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:bg-gray-400"
                     >
                       ⏮ Reset
-                    </button>
+                    </Button>
                   </div>
 
                   {/* Progress Slider */}
@@ -1280,7 +1280,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   >
                     <>
                       {/* Download/Generate Button */}
-                      <button
+                      <Button
                         onClick={async () => {
                           if (
                             flight.video_export_status === 'completed' &&
@@ -1361,12 +1361,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         {flight.video_export_status === 'failed' &&
                           '🔄 Relancer la génération'}
                         {!flight.video_export_status && '🎥 Générer la vidéo'}
-                      </button>
+                      </Button>
 
                       {/* Cancel Button (only when export is active) */}
                       {isVideoExportInProgress(flight.video_export_status) &&
                         flight.video_export_job_id && (
-                          <button
+                          <Button
                             onClick={async () => {
                               if (
                                 !confirm(
@@ -1409,12 +1409,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             title="Annuler la génération vidéo en cours"
                           >
                             🛑 Annuler la génération
-                          </button>
+                          </Button>
                         )}
 
                       {/* Regenerate Button (only when video exists) */}
                       {flight.video_export_status === 'completed' && (
-                        <button
+                        <Button
                           onClick={async () => {
                             if (
                               !confirm(
@@ -1457,7 +1457,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           title="Régénérer la vidéo (remplace l'ancienne)"
                         >
                           🔄 Régénérer la vidéo
-                        </button>
+                        </Button>
                       )}
                     </>
                   </AccordionSection>
@@ -1560,14 +1560,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
                       {/* Camera Apply Buttons */}
                       <div className="space-y-2">
-                        <button
+                        <Button
                           onClick={applyCameraToCurrentPlayback}
                           className="w-full px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                           data-testid="camera-apply-button"
                         >
                           👁️ Appliquer à la lecture
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={saveCameraSettings}
                           disabled={isUpdatingCamera}
                           className="w-full px-3 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1576,9 +1576,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           {isUpdatingCamera
                             ? '⏳ Enregistrement...'
                             : '💾 Enregistrer le réglage site'}
-                        </button>
+                        </Button>
                       </div>
-
                       <p className="text-xs text-gray-600 dark:text-gray-300 mt-2">
                         💡 Appliquez d'abord à la lecture, puis enregistrez pour
                         réutiliser ce réglage sur les prochains vols du site.
@@ -1599,14 +1598,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                       <label className="block text-sm font-medium">
                         Élévation: {elevationOffset.toFixed(1)}m
                       </label>
-                      <button
+                      <Button
                         onClick={calculateAutoElevationOffset}
                         disabled={isCalculatingOffset}
                         className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
                         title="Calculer automatiquement l'offset par rapport au terrain"
                       >
                         {isCalculatingOffset ? '⏳' : '🔄'} Auto
-                      </button>
+                      </Button>
                     </div>
                     <input
                       type="range"

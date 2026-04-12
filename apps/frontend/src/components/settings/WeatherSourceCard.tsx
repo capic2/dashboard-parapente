@@ -5,14 +5,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  Switch,
-  TextField,
-  Input,
-  Text,
-  Link,
-} from 'react-aria-components';
+import { Switch, TextField, Input, Text, Link } from 'react-aria-components';
+import { Button } from '@dashboard-parapente/design-system';
 import type { WeatherSource } from '../../types/weatherSources';
 import {
   useUpdateWeatherSource,
@@ -57,10 +51,12 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
     };
 
     const statusClasses = {
-      active: 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200',
+      active:
+        'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200',
       error: 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200',
       disabled: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300',
-      unknown: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200',
+      unknown:
+        'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200',
     };
 
     return (
@@ -217,7 +213,9 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
   return (
     <article
       className={`bg-white dark:bg-gray-800 rounded-lg shadow-md p-5 border-2 transition-all ${
-        source.is_enabled ? 'border-sky-200 dark:border-sky-700' : 'border-gray-200 dark:border-gray-700'
+        source.is_enabled
+          ? 'border-sky-200 dark:border-sky-700'
+          : 'border-gray-200 dark:border-gray-700'
       }`}
       aria-label={`Configuration de la source météo ${source.display_name}`}
     >
@@ -251,7 +249,10 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
             </h3>
             {getStatusBadge()}
           </div>
-          <Text slot="description" className="text-sm text-gray-600 dark:text-gray-300">
+          <Text
+            slot="description"
+            className="text-sm text-gray-600 dark:text-gray-300"
+          >
             {source.description}
           </Text>
         </div>
@@ -302,7 +303,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
           </div>
 
           {isEditingApiKey ? (
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <TextField
                 value={apiKeyValue}
                 onChange={setApiKeyValue}
@@ -479,7 +480,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
 
       {/* Actions */}
       <div
-        className="flex gap-2"
+        className="flex flex-col sm:flex-row gap-2"
         role="group"
         aria-label="Actions sur la source météo"
       >
