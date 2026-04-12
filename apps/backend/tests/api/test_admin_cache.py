@@ -8,7 +8,10 @@ from unittest.mock import patch
 import pytest
 from fakeredis import FakeAsyncRedis
 
+from models import EmagramAnalysis
 from cache import generate_cache_key
+
+from datetime import datetime
 
 
 @pytest.fixture
@@ -30,7 +33,10 @@ def patch_get_redis(fake_async_redis):
     async def mock_get_redis():
         return fake_async_redis
 
-    with patch("cache.get_redis", side_effect=mock_get_redis):
+    with (
+        patch("cache.get_redis", side_effect=mock_get_redis),
+        patch("redis.asyncio.from_url", return_value=fake_async_redis),
+    ):
         yield
 
     cache._redis_pool = old_pool
@@ -384,3 +390,62 @@ class TestDeleteCacheKey:
         data = response.json()
         assert data["success"] is True
         assert data["keys_deleted"] == 0
+
+
+class TestClearEmagramCache:
+    """Tests for POST /api/admin/clear-emagram-cache"""
+
+    @pytest.mark.anyio
+    async def test_clear_emagram_cache_only_removes_emagram_keys(
+        self, client, db_session, seeded_redis
+    ):
+        """Clear endpoint should remove emagram keys while keeping other cache keys."""
+        now = datetime.now()
+        for i in range(2):
+            db_session.add(
+                EmagramAnalysis(
+                    id=f"clear-emagram-{i}",
+                    station_code=f"site-{i}",
+                    station_name=f"Site {i}",
+                    station_latitude=47.0 + i * 0.1,
+                    station_longitude=6.0 + i * 0.1,
+                    analysis_date=now.date(),
+                    analysis_time=now.time(),
+                    analysis_datetime=now,
+                    distance_km=0.0,
+                    data_source="wyoming",
+                    sounding_time="12Z",
+                    analysis_method="test",
+                    plafond_thermique_m=3000,
+                    force_thermique_ms=2.0,
+                    score_volabilite=75,
+                    conseils_vol="Advice",
+                    analysis_status="completed",
+                )
+            )
+        db_session.commit()
+
+        await seeded_redis.setex(
+            "emagram:sounding:07145:12:2026-01-15",
+            3600,
+            json.dumps({"station_code": "07145"}),
+        )
+        await seeded_redis.setex(
+            "weather:forecast:day_0",
+            3600,
+            json.dumps({"site_code": "ARG"}),
+        )
+
+        response = client.post("/api/admin/clear-emagram-cache")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["success"] is True
+        assert data["database_deleted"] == 2
+        assert data["redis_cleared"] is True
+        assert data["redis_keys_deleted"] == 1
+
+        assert db_session.query(EmagramAnalysis).count() == 0
+
+        assert await seeded_redis.get("emagram:sounding:07145:12:2026-01-15") is None
+        assert await seeded_redis.get("weather:forecast:day_0") is not None

@@ -33,7 +33,7 @@ Thank you for your interest in improving Dashboard Parapente. All contributions 
 - **Type hints**: Use type annotations
 - **Docstrings**: Google-style docstrings for functions
 - **Linting**: Run `flake8` before committing
-- **Testing**: Write tests with `pytest`
+- **Testing**: Write tests with `pytest` and run via Nx (`pnpm nx test backend`)
 
 ```python
 # Example
@@ -122,11 +122,10 @@ docs(readme): update installation instructions
 #### Backend Tests
 
 ```bash
-cd backend
-pytest                    # Run all tests
-pytest -v                 # Verbose output
-pytest tests/test_cache.py  # Specific test file
-pytest --cov              # Coverage report
+pnpm nx test backend                    # Run all backend tests
+pnpm nx test backend -- tests/unit/test_cache.py  # Specific test file
+pnpm nx test:integration backend        # Integration tests
+pnpm nx test backend -- --cov           # Coverage
 ```
 
 Write tests for:
@@ -229,7 +228,7 @@ Merci de votre intérêt pour améliorer Dashboard Parapente. Toutes les contrib
 - **Type hints** : Utiliser les annotations de type
 - **Docstrings** : Docstrings style Google pour les fonctions
 - **Linting** : Lancer `flake8` avant de commit
-- **Tests** : Écrire des tests avec `pytest`
+- **Tests** : Écrire des tests avec `pytest` et exécuter via Nx (`pnpm nx test backend`)
 
 ```python
 # Exemple
@@ -318,11 +317,10 @@ docs(readme): mise à jour instructions installation
 #### Tests Backend
 
 ```bash
-cd backend
-pytest                    # Lancer tous les tests
-pytest -v                 # Sortie verbose
-pytest tests/test_cache.py  # Fichier de test spécifique
-pytest --cov              # Rapport de couverture
+pnpm nx test backend                    # Lancer tous les tests backend
+pnpm nx test backend -- tests/unit/test_cache.py  # Fichier de test spécifique
+pnpm nx test:integration backend        # Tests d'intégration
+pnpm nx test backend -- --cov           # Rapport de couverture
 ```
 
 Écrire des tests pour :
