@@ -1,7 +1,8 @@
 import { useNavigate } from '@tanstack/react-router';
 import { useForm } from '@tanstack/react-form';
 import { useTranslation } from 'react-i18next';
-import { TextField, Label, Input, Button, Form } from 'react-aria-components';
+import { TextField, Label, Input, Form } from 'react-aria-components';
+import { Button } from '@dashboard-parapente/design-system';
 import { useAuthStore } from '../stores/authStore';
 
 export default function Login() {

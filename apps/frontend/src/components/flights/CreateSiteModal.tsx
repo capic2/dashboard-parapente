@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Label, Input, TextField, Button } from 'react-aria-components';
+import { Label, Input, TextField } from 'react-aria-components';
+import { Button } from '@dashboard-parapente/design-system';
 import { Modal } from '@dashboard-parapente/design-system';
 import { useCreateSite, useGeocode } from '../../hooks/sites/useSites';
 import { useFlightGPX } from '../../hooks/flights/useFlightGPX';
@@ -120,7 +121,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} title={t('createSite.title')}>
       <div className="space-y-4">
         {/* Mode selector */}
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           {flightId && gpxData?.coordinates && (
             <Button
               onPress={() => {
@@ -128,7 +129,9 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
                 setError(null);
               }}
               className={`px-4 py-2 rounded ${
-                mode === 'auto' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-600 dark:text-gray-200'
+                mode === 'auto'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-200 dark:bg-gray-600 dark:text-gray-200'
               }`}
             >
               {t('createSite.autoDetect')}
@@ -140,7 +143,9 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
               setError(null);
             }}
             className={`px-4 py-2 rounded ${
-              mode === 'search' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-600 dark:text-gray-200'
+              mode === 'search'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-200 dark:bg-gray-600 dark:text-gray-200'
             }`}
           >
             {t('createSite.search')}
@@ -151,7 +156,9 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
               setError(null);
             }}
             className={`px-4 py-2 rounded ${
-              mode === 'manual' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-600 dark:text-gray-200'
+              mode === 'manual'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-200 dark:bg-gray-600 dark:text-gray-200'
             }`}
           >
             {t('createSite.manualEntry')}
@@ -190,7 +197,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
               <Label className="block text-sm font-medium">
                 Nom de la ville
               </Label>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Input
                   type="text"
                   value={searchQuery}
@@ -211,7 +218,9 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
 
             {searchResult && (
               <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded">
-                <p className="text-sm font-medium text-green-800 dark:text-green-200">✓ Trouvé !</p>
+                <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                  ✓ Trouvé !
+                </p>
                 <p className="text-sm text-gray-600 dark:text-gray-300">
                   {searchResult.display_name}
                 </p>

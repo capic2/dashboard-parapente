@@ -4,6 +4,7 @@ import { useNavigate } from '@tanstack/react-router';
 import StatsPanel from '../components/dashboard/StatsPanel';
 import AllSitesConditions from '../components/dashboard/AllSitesConditions';
 import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
+import { Button } from '@dashboard-parapente/design-system';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import { useBestSpotAPI } from '../hooks/weather/useBestSpotAPI';
 import { createWeatherQueryFn } from '../hooks/weather/useWeather';
@@ -49,12 +50,12 @@ export default function Dashboard() {
               'Ajoutez votre premier site de vol pour commencer.'
             )}
           </p>
-          <button
+          <Button
             onClick={() => void navigate({ to: '/sites' })}
             className="px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-all"
           >
             {t('dashboard.addSite', 'Ajouter un site')}
-          </button>
+          </Button>
         </div>
       </div>
     );

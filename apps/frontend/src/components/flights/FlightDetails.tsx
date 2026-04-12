@@ -1,7 +1,8 @@
 import { useState, useRef, lazy, Suspense, ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { TextField, TextArea, Button } from 'react-aria-components';
+import { TextField, TextArea } from 'react-aria-components';
+import { Button } from '@dashboard-parapente/design-system';
 import {
   useUpdateFlight,
   useUploadGPXToFlight,
@@ -102,11 +103,11 @@ export function FlightDetails({
         ) : (
           <>
             {/* Header */}
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-4">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                 {flight.title ?? t('flights.untitledFlight')}
               </h2>
-              <div className="flex gap-2 ml-4">
+              <div className="flex flex-col sm:flex-row gap-2 ml-0 sm:ml-4 w-full sm:w-auto">
                 <Button
                   className="px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-all"
                   onPress={() => setEditingMode(true)}
@@ -256,7 +257,7 @@ export function FlightDetails({
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600 resize-none dark:bg-gray-700 dark:text-gray-100"
                     />
                   </TextField>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Button
                       className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-all disabled:opacity-50"
                       onPress={handleSaveNotes}

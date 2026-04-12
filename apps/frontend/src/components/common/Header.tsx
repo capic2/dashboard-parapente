@@ -8,6 +8,7 @@ import {
   Modal,
   ModalOverlay,
 } from 'react-aria-components';
+import { Button } from '@dashboard-parapente/design-system';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore, type ThemePreference } from '../../stores/themeStore';
 
@@ -213,12 +214,14 @@ export default function Header() {
           )}
         </div>
         {isAuthenticated ? (
-          <button
+          <Button
             onClick={handleLogout}
+            size="sm"
+            tone="secondary"
             className="px-3 py-1.5 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-medium transition-all hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900 dark:hover:text-red-300"
           >
             {t('header.logout', 'Logout')}
-          </button>
+          </Button>
         ) : (
           <Link
             to="/login"
@@ -302,7 +305,7 @@ export default function Header() {
             className="fixed inset-0 z-50 bg-black/40"
             isDismissable
           >
-            <Modal className="fixed top-0 right-0 h-full w-64 bg-white dark:bg-gray-800 shadow-xl outline-none animate-[slide-in_0.2s_ease-out]">
+            <Modal className="fixed top-0 left-0 h-full w-64 bg-white dark:bg-gray-800 shadow-xl outline-none animate-[slide-in_0.2s_ease-out]">
               <Dialog className="h-full flex flex-col outline-none">
                 {({ close }) => (
                   <>
@@ -335,15 +338,17 @@ export default function Header() {
                     </nav>
                     <div className="p-4 border-t border-gray-200 dark:border-gray-700">
                       {isAuthenticated ? (
-                        <button
+                        <Button
                           onClick={() => {
                             close();
                             handleLogout();
                           }}
+                          size="sm"
+                          tone="secondary"
                           className="w-full py-3 px-4 min-h-11 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm font-medium transition-all hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900 dark:hover:text-red-300"
                         >
                           {t('header.logout', 'Logout')}
-                        </button>
+                        </Button>
                       ) : (
                         <Link
                           to="/login"

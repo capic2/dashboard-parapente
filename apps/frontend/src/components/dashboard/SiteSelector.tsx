@@ -5,6 +5,7 @@ import { MultiOrientationSelector } from './MultiOrientationSelector';
 import { useQueryClient } from '@tanstack/react-query';
 import { createWeatherQueryFn } from '../../hooks/weather/useWeather';
 import type { Site } from '../../types';
+import { Button } from '@dashboard-parapente/design-system';
 
 interface SiteSelectorProps {
   selectedSiteId: string;
@@ -111,7 +112,7 @@ export default function SiteSelector({
             const isActive = selectedSiteId === site.id;
 
             return (
-              <button
+              <Button
                 key={site.id}
                 className={`
                   flex-1 min-w-[120px] sm:min-w-[100px] 
@@ -138,7 +139,7 @@ export default function SiteSelector({
                 >
                   {site.elevation_m || '?'}m
                 </span>
-              </button>
+              </Button>
             );
           }
 
