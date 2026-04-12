@@ -125,7 +125,7 @@ export default function Header() {
             className="fixed inset-0 z-50 bg-black/40"
             isDismissable
           >
-            <Modal className="fixed top-0 right-0 h-full w-64 bg-white dark:bg-gray-800 shadow-xl outline-none animate-[slide-in_0.2s_ease-out]">
+            <Modal className="fixed top-0 left-0 h-full w-64 bg-white dark:bg-gray-800 shadow-xl outline-none animate-[slide-in_0.2s_ease-out]">
               <Dialog className="h-full flex flex-col outline-none">
                 {({ close }) => (
                   <>

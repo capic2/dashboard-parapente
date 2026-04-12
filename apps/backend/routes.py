@@ -10,7 +10,6 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-import redis
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -4901,20 +4900,42 @@ async def clear_emagram_cache(db: Session = Depends(get_db)):
         deleted_count = db.query(EmagramAnalysis).delete()
         db.commit()
 
-        # 2. Clear Redis cache
+        # 2. Clear only emagram cache keys
         try:
-            r = redis.Redis(host="redis", port=6379, decode_responses=True)
-            r.flushall()
+            from cache_emagram.emagram_cache import _get_redis_url, _redact_redis_url
+
+            import redis.asyncio as redis_async
+
+            redis_url = _get_redis_url()
+            redis_client = redis_async.from_url(redis_url, decode_responses=True)
+
+            keys_to_clear: list[str] = []
+            async for key in redis_client.scan_iter(match="emagram:*"):
+                keys_to_clear.append(key)
+
+            if keys_to_clear:
+                deleted = await redis_client.delete(*keys_to_clear)
+            else:
+                deleted = 0
+
             redis_cleared = True
+            logger.info("Cleared %s emagram cache keys via Redis", deleted)
         except Exception as redis_error:
-            logger.warning(f"Redis clear failed (non-critical): {redis_error}")
+            redis_url = _get_redis_url()
+            logger.warning(
+                "Redis clear failed (non-critical) for %s: %s",
+                _redact_redis_url(redis_url),
+                redis_error,
+            )
             redis_cleared = False
+            deleted = 0
 
         return {
             "success": True,
             "database_deleted": deleted_count,
             "redis_cleared": redis_cleared,
-            "message": f"Cleared {deleted_count} emagram analyses and Redis cache",
+            "redis_keys_deleted": deleted,
+            "message": f"Cleared {deleted_count} emagram analyses and {deleted} emagram cache keys",
         }
     except Exception as e:
         logger.error(f"Clear cache failed: {e}")
@@ -5009,6 +5030,7 @@ def strava_token_logs(
             "success": log.success,
             "message": log.message,
             "expires_at": log.expires_at.isoformat() + "Z" if log.expires_at else None,
+            "refresh_mode": log.refresh_mode,
         }
         for log in logs
     ]
