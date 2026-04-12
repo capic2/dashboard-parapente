@@ -27,7 +27,19 @@ import { api } from '../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../hooks/useToast';
 
-import {GPXData} from "@dashboard-parapente/shared-types";
+import { GPXData } from '@dashboard-parapente/shared-types';
+
+const VIDEO_EXPORT_IN_PROGRESS = new Set([
+  'processing',
+  'queued',
+  'running',
+  'initializing',
+  'capturing',
+  'encoding',
+]);
+
+const isVideoExportInProgress = (status?: string | null) =>
+  Boolean(status && VIDEO_EXPORT_IN_PROGRESS.has(status));
 
 declare global {
   interface Window {
@@ -1028,7 +1040,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         <div className="absolute inset-0 flex items-center justify-center bg-blue-50 dark:bg-blue-900/20 z-20">
           <div className="text-center p-8">
             <p className="text-lg dark:text-white">⏳ Chargement du vol...</p>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">Flight ID: {flightId}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+              Flight ID: {flightId}
+            </p>
           </div>
         </div>
       );
@@ -1044,7 +1058,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             <p className="text-sm text-yellow-700 dark:text-yellow-300">
               Les données GPS ne sont pas disponibles pour ce vol.
             </p>
-            <p className="text-xs text-gray-600 dark:text-gray-300 mt-2">Error: {String(error)}</p>
+            <p className="text-xs text-gray-600 dark:text-gray-300 mt-2">
+              Error: {String(error)}
+            </p>
           </div>
         </div>
       );
@@ -1054,7 +1070,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       return (
         <div className="absolute inset-0 flex items-center justify-center bg-red-50 dark:bg-red-900/20 z-20">
           <div className="text-center p-8">
-            <p className="text-lg dark:text-white">❌ Aucune donnée GPS disponible</p>
+            <p className="text-lg dark:text-white">
+              ❌ Aucune donnée GPS disponible
+            </p>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
               GPX Data: {JSON.stringify(gpxData)}
             </p>
@@ -1242,7 +1260,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                               if (!response.ok) {
                                 const error = await response.json();
                                 toast.error(
-                                  error.detail || 'Impossible de lancer la génération'
+                                  error.detail ||
+                                    'Impossible de lancer la génération'
                                 );
                                 return;
                               }
@@ -1262,7 +1281,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             }
                           }
                         }}
-                        disabled={flight.video_export_status === 'processing'}
+                        disabled={isVideoExportInProgress(
+                          flight.video_export_status
+                        )}
                         className={`w-full px-3 py-2 text-white rounded ${
                           flight.video_export_status === 'completed'
                             ? 'mb-2'
@@ -1270,12 +1291,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         } ${
                           flight.video_export_status === 'completed'
                             ? 'bg-green-600 hover:bg-green-700'
-                            : flight.video_export_status === 'processing'
+                            : isVideoExportInProgress(
+                                  flight.video_export_status
+                                )
                               ? 'bg-gray-400 cursor-not-allowed'
                               : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                         title={
-                          flight.video_export_status === 'processing'
+                          isVideoExportInProgress(flight.video_export_status)
                             ? 'Génération vidéo en cours... (~60-90 min)'
                             : flight.video_export_status === 'completed'
                               ? 'Télécharger la vidéo'
@@ -1284,7 +1307,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                                 : 'Générer la vidéo du vol'
                         }
                       >
-                        {flight.video_export_status === 'processing' &&
+                        {isVideoExportInProgress(flight.video_export_status) &&
                           '⏳ Génération en cours...'}
                         {flight.video_export_status === 'completed' &&
                           '📥 Télécharger la vidéo'}
@@ -1293,8 +1316,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         {!flight.video_export_status && '🎥 Générer la vidéo'}
                       </button>
 
-                      {/* Cancel Button (only when processing) */}
-                      {flight.video_export_status === 'processing' &&
+                      {/* Cancel Button (only when export is active) */}
+                      {isVideoExportInProgress(flight.video_export_status) &&
                         flight.video_export_job_id && (
                           <button
                             onClick={async () => {
@@ -1317,7 +1340,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                                 if (!response.ok) {
                                   const error = await response.json();
                                   toast.error(
-                                    error.detail || "Impossible d'annuler la génération"
+                                    error.detail ||
+                                      "Impossible d'annuler la génération"
                                   );
                                   return;
                                 }
@@ -1364,7 +1388,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                               if (!response.ok) {
                                 const error = await response.json();
                                 toast.error(
-                                  error.detail || 'Impossible de lancer la régénération'
+                                  error.detail ||
+                                    'Impossible de lancer la régénération'
                                 );
                                 return;
                               }

@@ -18,7 +18,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from config import STRAVA_CLIENT_SECRET, STRAVA_VERIFY_TOKEN, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+import config
 from database import SessionLocal, get_db
 from models import Flight, Site
 from routes import calculate_max_speed, parse_gpx_file_from_string
@@ -27,6 +27,22 @@ from strava import download_gpx, get_activity_details, parse_gpx
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
+
+TELEGRAM_BOT_TOKEN = config.TELEGRAM_BOT_TOKEN
+TELEGRAM_CHAT_ID = config.TELEGRAM_CHAT_ID
+
+
+def _get_telegram_config() -> tuple[str | None, str | None]:
+    """Resolve Telegram credentials with env and compatibility aliases."""
+    bot_token = TELEGRAM_BOT_TOKEN
+    if bot_token is None:
+        bot_token = config.TELEGRAM_BOT_TOKEN
+
+    chat_id = TELEGRAM_CHAT_ID
+    if chat_id is None:
+        chat_id = config.TELEGRAM_CHAT_ID
+
+    return bot_token, chat_id
 
 
 @router.get("/strava")
@@ -45,7 +61,7 @@ async def strava_webhook_verification(
     if hub_mode != "subscribe":
         raise HTTPException(status_code=400, detail="Invalid hub.mode")
 
-    if hub_verify_token != STRAVA_VERIFY_TOKEN:
+    if hub_verify_token != config.STRAVA_VERIFY_TOKEN:
         raise HTTPException(status_code=403, detail="Invalid verify token")
 
     # Return challenge
@@ -72,10 +88,12 @@ async def strava_webhook_handler(request: Request, db: Session = Depends(get_db)
     body = await request.body()
 
     # Validate signature (optional but recommended)
-    if STRAVA_CLIENT_SECRET:
+    if config.STRAVA_CLIENT_SECRET:
         signature = request.headers.get("X-Hub-Signature")
         if signature:
-            expected = hmac.new(STRAVA_CLIENT_SECRET.encode(), body, hashlib.sha256).hexdigest()
+            expected = hmac.new(
+                config.STRAVA_CLIENT_SECRET.encode(), body, hashlib.sha256
+            ).hexdigest()
 
             if signature != f"sha256={expected}":
                 logger.warning("Invalid webhook signature")
@@ -320,10 +338,9 @@ async def process_strava_activity(activity_id: str, db: Session = None):
         # Trigger automatic video export if GPX available
         if gpx_file_path:
             try:
-                from config import settings
-                from video_export_manual import trigger_auto_export
+                from video_export_manual import trigger_auto_export, resolve_frontend_url
 
-                frontend_url = f"http://localhost:{settings.PORT}"
+                frontend_url = resolve_frontend_url(config.FRONTEND_URL)
                 trigger_auto_export(flight.id, db, frontend_url)
             except Exception as e:
                 logger.warning(f"Failed to trigger auto video export: {e}")
@@ -489,7 +506,9 @@ async def send_telegram_notification(flight: Flight, is_new: bool = True):
         flight: Flight object
         is_new: True if new flight, False if update
     """
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+    bot_token, chat_id = _get_telegram_config()
+
+    if not bot_token or not chat_id:
         logger.warning("Telegram not configured, skipping notification")
         return
 
@@ -521,11 +540,16 @@ async def send_telegram_notification(flight: Flight, is_new: bool = True):
             message += f"\n🔗 [Voir sur Strava]({flight.external_url})"
 
         # Send via Telegram Bot API
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
 
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                url, json={"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
+                url,
+                json={
+                    "chat_id": chat_id,
+                    "text": message,
+                    "parse_mode": "Markdown",
+                },
             )
 
             response.raise_for_status()
