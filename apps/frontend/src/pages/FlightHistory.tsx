@@ -10,7 +10,11 @@ import { CreateSiteModal } from '../components/flights/CreateSiteModal';
 import { FlightsTable } from '../components/flights/FlightsTable';
 import { FlightDetails } from '../components/flights/FlightDetails';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
-import { ToastContainer, Modal } from '@dashboard-parapente/design-system';
+import {
+  ToastContainer,
+  Modal,
+  Button,
+} from '@dashboard-parapente/design-system';
 import { useToast, useToastStore } from '../hooks/useToast';
 import { HTTPError } from 'ky';
 import { api } from '../lib/api';
@@ -148,7 +152,7 @@ export default function FlightHistory() {
       <ToastContainer toasts={toasts} onClose={removeToast} />
 
       <div className="mb-4 bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
-        <div className="flex justify-between items-center mb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
           <div>
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">
               {t('flights.history')}
@@ -164,26 +168,26 @@ export default function FlightHistory() {
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             {!selectionMode && (
-              <button
+              <Button
                 onClick={() => setShowCreateFlightModal(true)}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all flex items-center gap-2"
               >
                 {t('flights.createFlight')}
-              </button>
+              </Button>
             )}
 
             {!selectionMode && (
-              <button
+              <Button
                 onClick={() => setShowStravaSyncModal(true)}
                 className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-all flex items-center gap-2"
               >
                 {t('flights.syncStrava')}
-              </button>
+              </Button>
             )}
 
-            <button
+            <Button
               onClick={handleToggleSelectionMode}
               className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
                 selectionMode
@@ -192,31 +196,31 @@ export default function FlightHistory() {
               }`}
             >
               {selectionMode ? t('flights.cancel') : t('flights.select')}
-            </button>
+            </Button>
           </div>
         </div>
 
         {selectionMode && (
-          <div className="flex gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
-            <button
+          <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <Button
               onClick={handleSelectAll}
               className="px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
             >
               {t('flights.selectAll')}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleDeselectAll}
               className="px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
             >
               {t('flights.deselectAll')}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setShowMultiDeleteConfirm(true)}
               disabled={selectedCount === 0}
-              className="ml-auto px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="ml-0 sm:ml-auto px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
               {t('flights.deleteCount', { count: selectedCount })}
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -296,19 +300,19 @@ export default function FlightHistory() {
           . {t('flights.confirmDeleteSingleSuffix')}
         </p>
         <div className="flex gap-3 justify-end">
-          <button
+          <Button
             onClick={() => setFlightToDelete(null)}
             className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-all"
           >
             {t('common.cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleDeleteFlight}
             disabled={isDeleting}
             className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:opacity-50"
           >
             {isDeleting ? t('flights.deleting') : t('flights.deleteButton')}
-          </button>
+          </Button>
         </div>
       </Modal>
 
@@ -324,13 +328,13 @@ export default function FlightHistory() {
           {t('flights.confirmDeleteMulti', { count: selectedCount })}
         </p>
         <div className="flex gap-3 justify-end">
-          <button
+          <Button
             onClick={() => setShowMultiDeleteConfirm(false)}
             className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-all"
           >
             {t('common.cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleDeleteFlight}
             disabled={isDeleting}
             className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:opacity-50"
@@ -338,7 +342,7 @@ export default function FlightHistory() {
             {isDeleting
               ? t('flights.deleting')
               : t('flights.deleteButtonCount', { count: selectedCount })}
-          </button>
+          </Button>
         </div>
       </Modal>
     </div>

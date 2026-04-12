@@ -1,6 +1,7 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSuspenseQuery } from '@tanstack/react-query';
+import { Button } from '@dashboard-parapente/design-system';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import {
   useWeatherSources,
@@ -113,7 +114,7 @@ function SitesTab({
                   </p>
                 )}
               </div>
-              <button
+              <Button
                 onClick={() => toggleFavorite(site.id)}
                 className={`ml-4 px-4 py-2 rounded-lg font-medium transition-all ${
                   settings.favoriteSites.includes(site.id)
@@ -124,7 +125,7 @@ function SitesTab({
                 {settings.favoriteSites.includes(site.id)
                   ? '⭐ ' + t('settings.favorites.favorite')
                   : '☆ ' + t('settings.favorites.add')}
-              </button>
+              </Button>
             </div>
           ))}
         </div>
@@ -330,7 +331,7 @@ function PerformanceSection() {
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
             {t('settings.performance.freshnessHelp')}
           </p>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             {(
               [
                 {
@@ -341,7 +342,7 @@ function PerformanceSection() {
                 { value: 'economy', label: t('settings.performance.economy') },
               ] as const
             ).map((opt) => (
-              <button
+              <Button
                 key={opt.value}
                 onClick={() => setFreshnessLevel(opt.value as FreshnessLevel)}
                 className={`px-5 py-2 rounded-lg font-medium transition-all text-sm ${
@@ -351,7 +352,7 @@ function PerformanceSection() {
                 }`}
               >
                 {opt.label}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -383,7 +384,7 @@ function PerformanceSection() {
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
             {t('settings.performance.httpTimeoutHelp')}
           </p>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             {(
               [
                 {
@@ -405,7 +406,7 @@ function PerformanceSection() {
                 },
               ] as const
             ).map((opt) => (
-              <button
+              <Button
                 key={opt.value}
                 onClick={() => setHttpTimeout(opt.value as HttpTimeout)}
                 className={`px-5 py-2 rounded-lg font-medium transition-all text-sm ${
@@ -415,7 +416,7 @@ function PerformanceSection() {
                 }`}
               >
                 {opt.label}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -434,7 +435,7 @@ function PerformanceSection() {
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
             {t('settings.performance.backendCacheHelp')}
           </p>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             {(
               [
                 {
@@ -460,7 +461,7 @@ function PerformanceSection() {
                 },
               ] as const
             ).map((opt) => (
-              <button
+              <Button
                 key={opt.value}
                 onClick={() =>
                   handleBackendSetting('cache_ttl_default', opt.value)
@@ -473,7 +474,7 @@ function PerformanceSection() {
                 } disabled:opacity-50`}
               >
                 {opt.label}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -486,7 +487,7 @@ function PerformanceSection() {
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
             {t('settings.performance.schedulerIntervalHelp')}
           </p>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             {(
               [
                 {
@@ -508,7 +509,7 @@ function PerformanceSection() {
                 },
               ] as const
             ).map((opt) => (
-              <button
+              <Button
                 key={opt.value}
                 onClick={() =>
                   handleBackendSetting('scheduler_interval_minutes', opt.value)
@@ -521,7 +522,7 @@ function PerformanceSection() {
                 } disabled:opacity-50`}
               >
                 {opt.label}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -678,8 +679,8 @@ export default function Settings() {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md mb-4 p-2 flex gap-2">
-        <button
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md mb-4 p-2 grid grid-cols-2 gap-2 sm:flex">
+        <Button
           onClick={() => setActiveTab('general')}
           className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
             activeTab === 'general'
@@ -688,8 +689,8 @@ export default function Settings() {
           }`}
         >
           🎛️ {t('settings.tabs.general')}
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => setActiveTab('sites')}
           className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
             activeTab === 'sites'
@@ -698,8 +699,8 @@ export default function Settings() {
           }`}
         >
           📍 {t('settings.tabs.favoriteSites')}
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => setActiveTab('weather')}
           className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
             activeTab === 'weather'
@@ -708,8 +709,8 @@ export default function Settings() {
           }`}
         >
           🌦️ {t('settings.tabs.weatherSources')}
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => setActiveTab('data')}
           className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
             activeTab === 'data'
@@ -718,7 +719,7 @@ export default function Settings() {
           }`}
         >
           💾 {t('settings.tabs.data')}
-        </button>
+        </Button>
       </div>
 
       {/* Content */}
@@ -736,8 +737,8 @@ export default function Settings() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     {t('settings.units.distance')}
                   </label>
-                  <div className="flex gap-4">
-                    <button
+                  <div className="flex flex-wrap gap-2 sm:gap-4">
+                    <Button
                       onClick={() =>
                         setSettings((prev) => ({
                           ...prev,
@@ -751,8 +752,8 @@ export default function Settings() {
                       }`}
                     >
                       {t('settings.units.kilometers')}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() =>
                         setSettings((prev) => ({
                           ...prev,
@@ -766,7 +767,7 @@ export default function Settings() {
                       }`}
                     >
                       {t('settings.units.miles')}
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -774,8 +775,8 @@ export default function Settings() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     {t('settings.units.altitude')}
                   </label>
-                  <div className="flex gap-4">
-                    <button
+                  <div className="flex flex-wrap gap-2 sm:gap-4">
+                    <Button
                       onClick={() =>
                         setSettings((prev) => ({
                           ...prev,
@@ -789,8 +790,8 @@ export default function Settings() {
                       }`}
                     >
                       {t('settings.units.meters')}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() =>
                         setSettings((prev) => ({
                           ...prev,
@@ -804,7 +805,7 @@ export default function Settings() {
                       }`}
                     >
                       {t('settings.units.feet')}
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -812,8 +813,8 @@ export default function Settings() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     {t('settings.units.speed')}
                   </label>
-                  <div className="flex gap-4">
-                    <button
+                  <div className="flex flex-wrap gap-2 sm:gap-4">
+                    <Button
                       onClick={() =>
                         setSettings((prev) => ({
                           ...prev,
@@ -827,8 +828,8 @@ export default function Settings() {
                       }`}
                     >
                       km/h
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() =>
                         setSettings((prev) => ({
                           ...prev,
@@ -842,7 +843,7 @@ export default function Settings() {
                       }`}
                     >
                       mph
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -858,8 +859,8 @@ export default function Settings() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     {t('settings.languageTheme.language')}
                   </label>
-                  <div className="flex gap-4">
-                    <button
+                  <div className="flex flex-wrap gap-2 sm:gap-4">
+                    <Button
                       onClick={() => {
                         setSettings((prev) => ({ ...prev, language: 'fr' }));
                       }}
@@ -870,8 +871,8 @@ export default function Settings() {
                       }`}
                     >
                       🇫🇷 Français
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => {
                         setSettings((prev) => ({ ...prev, language: 'en' }));
                       }}
@@ -882,7 +883,7 @@ export default function Settings() {
                       }`}
                     >
                       🇬🇧 English
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -890,9 +891,9 @@ export default function Settings() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     {t('settings.languageTheme.theme')}
                   </label>
-                  <div className="flex gap-4">
+                  <div className="flex flex-wrap gap-2 sm:gap-4">
                     {(['light', 'dark', 'auto'] as const).map((theme) => (
-                      <button
+                      <Button
                         key={theme}
                         onClick={() => {
                           setThemePreference(theme as ThemePreference);
@@ -908,7 +909,7 @@ export default function Settings() {
                         {theme === 'dark' && '🌙 '}
                         {theme === 'auto' && '🔄 '}
                         {t(`settings.languageTheme.${theme}`)}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -1016,13 +1017,13 @@ export default function Settings() {
                 💾 {t('settings.data.backupTitle')}
               </h2>
               <div className="space-y-3">
-                <button
+                <Button
                   onClick={exportData}
                   className="w-full px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all flex items-center justify-center gap-2"
                 >
                   <span>📥</span>
                   {t('settings.data.export')}
-                </button>
+                </Button>
                 <label className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all flex items-center justify-center gap-2 cursor-pointer">
                   <span>📤</span>
                   {t('settings.data.import')}
@@ -1044,12 +1045,12 @@ export default function Settings() {
               <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
                 🗑️ {t('settings.data.resetTitle')}
               </h2>
-              <button
+              <Button
                 onClick={clearData}
                 className="w-full px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"
               >
                 {t('settings.data.resetAll')}
-              </button>
+              </Button>
               <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-sm text-red-800 dark:text-red-200">
                 ⚠️ {t('settings.data.resetWarning')}
               </div>
@@ -1075,7 +1076,7 @@ export default function Settings() {
 
       {/* Save Button */}
       <div className="mt-6 sticky bottom-4 z-10">
-        <button
+        <Button
           onClick={saveSettings}
           className={`w-full px-6 py-4 rounded-xl font-bold text-lg shadow-lg transition-all ${
             saved
@@ -1086,7 +1087,7 @@ export default function Settings() {
           {saved
             ? '✅ ' + t('settings.saved')
             : '💾 ' + t('settings.saveButton')}
-        </button>
+        </Button>
       </div>
     </div>
   );
