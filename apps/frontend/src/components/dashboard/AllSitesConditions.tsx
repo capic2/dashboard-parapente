@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
 import { WindIndicator } from '../common/WindIndicator';
 import CacheTimestamp from '../common/CacheTimestamp';
+import { Button } from '@dashboard-parapente/design-system';
 import type { WeatherData } from '../../types';
 import type { Site } from '@dashboard-parapente/shared-types';
 
@@ -49,7 +50,7 @@ function SiteConditionCard({
   };
 
   return (
-    <button
+    <Button
       onClick={handleClick}
       className="w-full text-left bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border border-gray-200 dark:border-gray-700 hover:border-sky-400 dark:hover:border-sky-500 hover:shadow-lg transition-all cursor-pointer"
     >
@@ -133,7 +134,7 @@ function SiteConditionCard({
           </div>
         </>
       )}
-    </button>
+    </Button>
   );
 }
 

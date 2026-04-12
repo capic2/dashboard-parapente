@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Site } from '@dashboard-parapente/shared-types';
+import { Button } from '@dashboard-parapente/design-system';
 
 interface SiteCardProps {
   site: Site;
@@ -123,28 +124,29 @@ export const SiteCard: React.FC<SiteCardProps> = ({
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2 pt-3 border-t dark:border-gray-700">
-        <button
+      <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t dark:border-gray-700">
+        <Button
           onClick={() => onEdit(site)}
           className="flex-1 px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
           title={t('sites.editSite')}
         >
           ✏️ {t('common.edit')}
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => onViewFlights(site)}
           className="flex-1 px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
           title={t('sites.viewFlights')}
         >
           📋 {t('header.flights')}
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => onDelete(site)}
           className="px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700"
           title={t('sites.deleteSite')}
+          aria-label={t('sites.deleteSite')}
         >
-          🗑️
-        </button>
+          <span aria-hidden="true">🗑️</span>
+        </Button>
       </div>
     </div>
   );
