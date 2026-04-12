@@ -28,7 +28,19 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '@dashboard-parapente/design-system';
 
-import type { GPXData } from '@dashboard-parapente/shared-types';
+import { GPXData } from '@dashboard-parapente/shared-types';
+
+const VIDEO_EXPORT_IN_PROGRESS = new Set([
+  'processing',
+  'queued',
+  'running',
+  'initializing',
+  'capturing',
+  'encoding',
+]);
+
+const isVideoExportInProgress = (status?: string | null) =>
+  Boolean(status && VIDEO_EXPORT_IN_PROGRESS.has(status));
 
 declare global {
   interface Window {
@@ -1269,7 +1281,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             }
                           }
                         }}
-                        disabled={flight.video_export_status === 'processing'}
+                        disabled={isVideoExportInProgress(
+                          flight.video_export_status
+                        )}
                         className={`w-full px-3 py-2 text-white rounded ${
                           flight.video_export_status === 'completed'
                             ? 'mb-2'
@@ -1277,12 +1291,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         } ${
                           flight.video_export_status === 'completed'
                             ? 'bg-green-600 hover:bg-green-700'
-                            : flight.video_export_status === 'processing'
+                            : isVideoExportInProgress(
+                                  flight.video_export_status
+                                )
                               ? 'bg-gray-400 cursor-not-allowed'
                               : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                         title={
-                          flight.video_export_status === 'processing'
+                          isVideoExportInProgress(flight.video_export_status)
                             ? 'Génération vidéo en cours... (~60-90 min)'
                             : flight.video_export_status === 'completed'
                               ? 'Télécharger la vidéo'
@@ -1291,7 +1307,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                                 : 'Générer la vidéo du vol'
                         }
                       >
-                        {flight.video_export_status === 'processing' &&
+                        {isVideoExportInProgress(flight.video_export_status) &&
                           '⏳ Génération en cours...'}
                         {flight.video_export_status === 'completed' &&
                           '📥 Télécharger la vidéo'}
@@ -1300,8 +1316,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         {!flight.video_export_status && '🎥 Générer la vidéo'}
                       </Button>
 
-                      {/* Cancel Button (only when processing) */}
-                      {flight.video_export_status === 'processing' &&
+                      {/* Cancel Button (only when export is active) */}
+                      {isVideoExportInProgress(flight.video_export_status) &&
                         flight.video_export_job_id && (
                           <Button
                             onClick={async () => {

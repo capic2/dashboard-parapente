@@ -20,6 +20,7 @@ import models  # noqa: F401 - imported for side effects (model registration)
 from database import Base, SessionLocal, engine
 from models import Site  # Needed for database initialization
 from routes import public_router, router
+from video_export_manual import start_video_export_worker, stop_video_export_worker
 from scheduler import scheduler, start_scheduler, stop_scheduler
 from webhooks import router as webhooks_router
 
@@ -577,10 +578,14 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("📅 Scheduler disabled, skipping cache warmup")
 
+    # Start manual video export worker
+    start_video_export_worker()
+
     yield
 
     # Shutdown
     logger.info("⏹️ Shutting down Dashboard Parapente API...")
+    stop_video_export_worker()
     stop_scheduler()
 
     # Close Redis connection

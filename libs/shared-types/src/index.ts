@@ -67,7 +67,19 @@ export const FlightSchema = z.object({
   gpx_elevation_gain_m: z.number().nullish(),
   external_url: z.string().nullish(),
   video_export_job_id: z.string().nullish(),
-  video_export_status: z.enum(['processing', 'completed', 'failed']).nullish(),
+  video_export_status: z
+    .enum([
+      'processing',
+      'completed',
+      'failed',
+      'queued',
+      'running',
+      'initializing',
+      'capturing',
+      'encoding',
+      'cancelled',
+    ])
+    .nullish(),
   video_file_path: z.string().nullish(),
   site: SiteSchema.optional(),
   created_at: z.string().optional(),
