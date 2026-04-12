@@ -104,6 +104,9 @@ async def refresh_access_token(force: bool = False) -> str | None:
                 logger.info("Access token still valid")
                 return _access_token
 
+        if force:
+            logger.info("Forcing token refresh (ignoring in-memory validity cache)")
+
         # Resolve the refresh token: in-memory → DB → env
         current_refresh_token = _refresh_token or _get_persisted_refresh_token()
 
