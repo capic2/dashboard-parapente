@@ -164,6 +164,37 @@ class Flight(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     site = relationship("Site", back_populates="flights")
+    export_jobs = relationship(
+        "VideoExportJob",
+        back_populates="flight",
+        cascade="all, delete-orphan",
+        order_by="VideoExportJob.created_at",
+    )
+
+
+class VideoExportJob(Base):
+    __tablename__ = "video_export_jobs"
+
+    id = Column(String, primary_key=True)
+    flight_id = Column(String, ForeignKey("flights.id"), nullable=False, index=True)
+    status = Column(String, nullable=False, index=True)
+    mode = Column(String, default="manual")
+    quality = Column(String, default="1080p")
+    fps = Column(Integer, default=15)
+    speed = Column(Integer, default=1)
+    progress = Column(Integer, default=0)
+    message = Column(Text)
+    frontend_url = Column(String)
+    video_path = Column(String)
+    total_frames = Column(Integer)
+    error = Column(Text)
+    started_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime)
+    cancelled_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    flight = relationship("Flight", back_populates="export_jobs")
 
 
 class WeatherForecast(Base):
