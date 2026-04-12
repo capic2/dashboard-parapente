@@ -16,6 +16,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+import config
 from auth import authenticate_user, create_access_token, get_current_user
 from database import get_db
 from models import User
@@ -58,10 +59,40 @@ from video_export import start_video_export_background
 from video_export_manual import cancel_video_export as cancel_video_export_manual
 from video_export_manual import get_export_status as get_export_status_manual
 from video_export_manual import list_exports as list_exports_manual
+from video_export_manual import resolve_frontend_url
 from video_export_manual import start_video_export_manual
 from weather_pipeline import get_daily_aggregate, get_normalized_forecast
 
 logger = logging.getLogger(__name__)
+
+
+_VIDEO_EXPORT_IN_PROGRESS_STATUSES = {
+    "processing",
+    "queued",
+    "running",
+    "initializing",
+    "capturing",
+    "encoding",
+}
+
+
+def _start_video_export_stream(
+    flight_id: str, quality: str, fps: int, speed: int, frontend_url: str
+) -> str:
+    """Start stream export mode and keep API response compatible."""
+    return start_video_export_background(
+        flight_id=flight_id, quality=quality, fps=fps, speed=speed, frontend_url=frontend_url
+    )
+
+
+def _mark_flight_export_processing(db: Session, flight: Flight, job_id: str):
+    """Mark flight as having a processing export when not updated via DB job hooks."""
+    flight.video_export_job_id = job_id
+    flight.video_export_status = "processing"
+    flight.video_file_path = None
+    db.commit()
+    db.refresh(flight)
+
 
 # Public routes: no authentication required (weather, spots read, auth)
 public_router = APIRouter(prefix="/api", tags=["api"])
@@ -2844,10 +2875,9 @@ async def upload_gpx_to_flight(
 
         # 5. Trigger automatic video export
         try:
-            from config import settings
             from video_export_manual import trigger_auto_export
 
-            frontend_url = f"http://localhost:{settings.PORT}"
+            frontend_url = resolve_frontend_url()
             trigger_auto_export(flight_id, db, frontend_url)
         except Exception as e:
             logger.warning(f"Failed to trigger auto video export: {e}")
@@ -2998,10 +3028,9 @@ async def create_flight_from_gpx(
 
         # 8. Trigger automatic video export
         try:
-            from config import settings
             from video_export_manual import trigger_auto_export
 
-            frontend_url = f"http://localhost:{settings.PORT}"
+            frontend_url = resolve_frontend_url()
             trigger_auto_export(flight_id, db, frontend_url)
         except Exception as e:
             logger.warning(f"Failed to trigger auto video export: {e}")
@@ -3531,6 +3560,10 @@ def start_flight_video_export(
     """
     logger.info(f"🎥 Video export requested: flight_id={flight_id}, mode={mode}")
 
+    selected_mode = mode.lower().strip()
+    if selected_mode not in ["manual", "stream"]:
+        raise HTTPException(status_code=400, detail="mode must be 'manual' or 'stream'")
+
     # Verify flight exists
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
@@ -3540,36 +3573,55 @@ def start_flight_video_export(
     logger.info(f" Flight found: {flight.title} (date: {flight.flight_date})")
 
     # Determine frontend URL
-    # In production, frontend is served on same server (port 8001)
-    # In development, frontend is on Vite dev server (port 5173)
-    frontend_url = os.getenv("FRONTEND_URL")
-    if not frontend_url:
-        # Auto-detect: check if static dir exists (production) or use dev server
-        static_dir = Path(__file__).parent / "static"
-        if static_dir.exists() and (static_dir / "index.html").exists():
-            frontend_url = "http://localhost:8001"  # Production: same server
-        else:
-            frontend_url = "http://localhost:5173"  # Development: Vite dev server
+    frontend_url = resolve_frontend_url(config.FRONTEND_URL)
 
     # Start export with selected mode
-    if mode == "manual":
+    job_id: str
+    effective_mode = selected_mode
+
+    if selected_mode == "manual":
         logger.info("Using Cesium Manual Render (slow but perfect quality)")
-        job_id = start_video_export_manual(
-            flight_id=flight_id, quality=quality, fps=fps, speed=speed, frontend_url=frontend_url
-        )
-        export_method = "manual render"
+        try:
+            job_id = start_video_export_manual(
+                flight_id=flight_id,
+                quality=quality,
+                fps=fps,
+                speed=speed,
+                frontend_url=frontend_url,
+            )
+        except Exception as e:
+            logger.warning(
+                "⚠️ Manual export failed, falling back to stream for flight %s: %s",
+                flight_id,
+                e,
+            )
+            job_id = _start_video_export_stream(
+                flight_id=flight_id,
+                quality=quality,
+                fps=fps,
+                speed=speed,
+                frontend_url=frontend_url,
+            )
+            effective_mode = "stream"
+            _mark_flight_export_processing(db=db, flight=flight, job_id=job_id)
+
     else:  # stream mode
         logger.info("Using MediaRecorder stream (fast but may stutter)")
-        job_id = start_video_export_background(
-            flight_id=flight_id, quality=quality, fps=fps, speed=speed, frontend_url=frontend_url
+        job_id = _start_video_export_stream(
+            flight_id=flight_id,
+            quality=quality,
+            fps=fps,
+            speed=speed,
+            frontend_url=frontend_url,
         )
-        export_method = "stream"
+        effective_mode = "stream"
+        _mark_flight_export_processing(db=db, flight=flight, job_id=job_id)
 
     return {
         "job_id": job_id,
-        "message": f"Video export started ({export_method})",
-        "mode": mode,
-        "status_url": f"/exports/{job_id}/status",
+        "message": f"Video export started ({'media stream' if effective_mode == 'stream' else 'manual render'})",
+        "mode": effective_mode,
+        "status_url": f"/api/exports/{job_id}/status",
     }
 
 
@@ -3595,29 +3647,44 @@ def generate_flight_video(flight_id: str, db: Session = Depends(get_db)):
     if flight.video_export_status == "completed":
         raise HTTPException(status_code=400, detail="Video already exists")
 
-    if flight.video_export_status == "processing":
+    if flight.video_export_status in _VIDEO_EXPORT_IN_PROGRESS_STATUSES:
         raise HTTPException(status_code=400, detail="Video conversion already in progress")
 
     # Determine frontend URL
-    from config import API_PORT
+    frontend_url = resolve_frontend_url(config.FRONTEND_URL)
 
-    frontend_url = f"http://localhost:{API_PORT}"
-
-    # Start conversion with optimal settings
-    job_id = start_video_export_manual(
-        flight_id=flight_id,
-        quality="1080p",
-        fps=15,
-        speed=1,
-        frontend_url=frontend_url,
-        update_db=True,
-    )
+    # Prefer manual render (high quality), fallback to stream if needed
+    try:
+        job_id = start_video_export_manual(
+            flight_id=flight_id,
+            quality="1080p",
+            fps=15,
+            speed=1,
+            frontend_url=frontend_url,
+            update_db=True,
+        )
+        started_message = "Video generation started (Manual Render, ~60-90 min)"
+    except Exception as e:
+        logger.warning(
+            "⚠️ Manual generation failed, falling back to stream for flight %s: %s",
+            flight_id,
+            e,
+        )
+        job_id = _start_video_export_stream(
+            flight_id=flight_id,
+            quality="1080p",
+            fps=15,
+            speed=1,
+            frontend_url=frontend_url,
+        )
+        started_message = "Video generation started (MediaRecorder stream fallback)"
+        _mark_flight_export_processing(db=db, flight=flight, job_id=job_id)
 
     logger.info(f" Video generation started: job_id={job_id}")
 
     return {
         "job_id": job_id,
-        "message": "Video generation started (Manual Render, ~60-90 min)",
+        "message": started_message,
         "status_url": f"/api/exports/{job_id}/status",
     }
 
