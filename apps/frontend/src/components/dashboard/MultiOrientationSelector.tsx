@@ -10,6 +10,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Site } from '../../types';
 import { WindIndicatorCompact } from '../common/WindIndicator';
+import { Button } from '@dashboard-parapente/design-system';
 
 interface MultiOrientationSelectorProps {
   sites: Site[]; // All variants of this site (different orientations)
@@ -86,7 +87,7 @@ export function MultiOrientationSelector({
   return (
     <div ref={dropdownRef} className={`relative ${className}`}>
       {/* Main button */}
-      <button
+      <Button
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full h-full p-3 sm:p-2.5 rounded-lg font-medium transition-all ${
           selectedSite
@@ -115,7 +116,7 @@ export function MultiOrientationSelector({
             />
           </svg>
         </div>
-      </button>
+      </Button>
 
       {/* Dropdown menu */}
       {isOpen && (
@@ -131,7 +132,7 @@ export function MultiOrientationSelector({
               const shortName = extractShortName(site.name, displayName);
 
               return (
-                <button
+                <Button
                   key={site.id}
                   onClick={() => handleSelect(site.id)}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-md transition-colors ${
@@ -162,7 +163,7 @@ export function MultiOrientationSelector({
                       windSpeed={weather.windSpeed}
                     />
                   )}
-                </button>
+                </Button>
               );
             })}
           </div>

@@ -51,6 +51,7 @@ async def test_refresh_access_token_success():
         patch("strava.STRAVA_REFRESH_TOKEN", "test_refresh_token"),
         patch("strava._get_persisted_refresh_token", return_value="test_refresh_token"),
         patch("strava._persist_refresh_token") as mock_persist,
+        patch("strava._log_token_refresh") as mock_log,
         patch("strava.httpx.AsyncClient") as mock_client,
     ):
 
@@ -71,6 +72,44 @@ async def test_refresh_access_token_success():
         assert strava._refresh_token == "new_refresh_token_456"
         assert strava._token_expires_at is not None
         mock_persist.assert_called_once_with("new_refresh_token_456")
+        assert mock_log.call_count == 1
+        assert mock_log.call_args.kwargs.get("refresh_mode") == "automatic"
+
+
+@pytest.mark.asyncio
+async def test_refresh_access_token_manual_mode_logged():
+    """Manual refresh uses refresh_mode='manual' in token logs."""
+
+    mock_response = {
+        "access_token": "manual_access_token",
+        "refresh_token": "manual_refresh_token",
+        "expires_at": int((datetime.now() + timedelta(hours=6)).timestamp()),
+    }
+
+    with (
+        patch("strava.STRAVA_CLIENT_ID", "test_client_id"),
+        patch("strava.STRAVA_CLIENT_SECRET", "test_secret"),
+        patch("strava.STRAVA_REFRESH_TOKEN", "test_refresh_token"),
+        patch("strava._get_persisted_refresh_token", return_value="test_refresh_token"),
+        patch("strava._persist_refresh_token"),
+        patch("strava._log_token_refresh") as mock_log,
+        patch("strava.httpx.AsyncClient") as mock_client,
+    ):
+        mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+            return_value=MagicMock(status_code=200, json=MagicMock(return_value=mock_response))
+        )
+
+        import strava
+
+        strava._access_token = None
+        strava._token_expires_at = None
+        strava._refresh_token = None
+
+        token = await refresh_access_token(force=True)
+
+        assert token == "manual_access_token"
+        assert mock_log.call_count == 1
+        assert mock_log.call_args.kwargs.get("refresh_mode") == "manual"
 
 
 @pytest.mark.asyncio
