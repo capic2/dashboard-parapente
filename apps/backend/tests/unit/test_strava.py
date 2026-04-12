@@ -173,6 +173,47 @@ async def test_refresh_access_token_uses_cached():
 
 
 @pytest.mark.asyncio
+async def test_refresh_access_token_forced_refresh_ignores_cached():
+    """Test that force=True skips cache validation and refreshes"""
+
+    import strava
+
+    # Set a valid token that would normally be returned from cache
+    strava._access_token = "cached_token"
+    strava._token_expires_at = datetime.now() + timedelta(hours=1)
+    strava._refresh_token = "cached_refresh"
+
+    mock_response = {
+        "access_token": "forced_refreshed_token",
+        "refresh_token": "forced_refresh_token",
+        "expires_at": int((datetime.now() + timedelta(hours=6)).timestamp()),
+    }
+
+    with (
+        patch("strava.STRAVA_CLIENT_ID", "test_client_id"),
+        patch("strava.STRAVA_CLIENT_SECRET", "test_secret"),
+        patch("strava._persist_refresh_token") as mock_persist,
+        patch("strava.httpx.AsyncClient") as mock_client,
+    ):
+        mock_post = AsyncMock(
+            return_value=MagicMock(
+                status_code=200,
+                json=MagicMock(return_value=mock_response),
+                raise_for_status=MagicMock(),
+            )
+        )
+        mock_client.return_value.__aenter__.return_value.post = mock_post
+
+        token = await refresh_access_token(force=True)
+
+        assert token == "forced_refreshed_token"
+        assert strava._access_token == "forced_refreshed_token"
+        assert strava._refresh_token == "forced_refresh_token"
+        mock_post.assert_awaited_once()
+        mock_persist.assert_called_once_with("forced_refresh_token")
+
+
+@pytest.mark.asyncio
 async def test_refresh_access_token_missing_credentials():
     """Test token refresh with missing credentials"""
 
