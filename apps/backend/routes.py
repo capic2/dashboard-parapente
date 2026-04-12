@@ -85,6 +85,11 @@ def _start_video_export_stream(
     )
 
 
+def _ensure_no_active_export(flight: Flight):
+    if flight.video_export_status in _VIDEO_EXPORT_IN_PROGRESS_STATUSES:
+        raise HTTPException(status_code=400, detail="Video conversion already in progress")
+
+
 def _mark_flight_export_processing(db: Session, flight: Flight, job_id: str):
     """Mark flight as having a processing export when not updated via DB job hooks."""
     flight.video_export_job_id = job_id
@@ -3570,6 +3575,8 @@ def start_flight_video_export(
         logger.error(f"❌ Flight not found in DB: {flight_id}")
         raise HTTPException(status_code=404, detail="Flight not found")
 
+    _ensure_no_active_export(flight)
+
     logger.info(f" Flight found: {flight.title} (date: {flight.flight_date})")
 
     # Determine frontend URL
@@ -3640,15 +3647,14 @@ def generate_flight_video(flight_id: str, db: Session = Depends(get_db)):
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
+    _ensure_no_active_export(flight)
+
     if not flight.gpx_file_path:
         raise HTTPException(status_code=400, detail="Flight has no GPX file")
 
-    # Check if video already exists or is processing
+    # Check if video already exists
     if flight.video_export_status == "completed":
         raise HTTPException(status_code=400, detail="Video already exists")
-
-    if flight.video_export_status in _VIDEO_EXPORT_IN_PROGRESS_STATUSES:
-        raise HTTPException(status_code=400, detail="Video conversion already in progress")
 
     # Determine frontend URL
     frontend_url = resolve_frontend_url(config.FRONTEND_URL)

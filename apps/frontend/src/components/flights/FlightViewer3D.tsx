@@ -28,7 +28,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '@dashboard-parapente/design-system';
 
-import { GPXData } from '@dashboard-parapente/shared-types';
+import { GPXData, type Flight } from '@dashboard-parapente/shared-types';
 
 const VIDEO_EXPORT_IN_PROGRESS = new Set([
   'processing',
@@ -529,7 +529,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       currentIndexRef.current = 0;
       visiblePositionsRef.current = [];
     };
-  }, [gpxData, elevationOffset, viewerReady, flight]);
+  }, [
+    gpxData,
+    elevationOffset,
+    viewerReady,
+    flight?.site?.camera_angle,
+    flight?.site?.camera_distance,
+    flight?.site?.orientation,
+  ]);
 
   // Initialize camera settings from flight data
   useEffect(() => {
@@ -943,10 +950,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
   };
 
-  const updateCameraSettings = async (angle: number, distance: number) => {
+  const updateCameraSettings = async (
+    angle: number,
+    distance: number
+  ): Promise<boolean> => {
     if (!flight?.site?.id) {
       console.error('No site ID available');
-      return;
+      return false;
     }
 
     setIsUpdatingCamera(true);
@@ -957,19 +967,42 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       await api.patch(`sites/${flight.site.id}/camera?${params.toString()}`);
 
-      // Refresh flight data to get updated site
-      await queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
+      queryClient.setQueryData<Flight | undefined>(
+        ['flights', flightId],
+        (previousFlightData) => {
+          if (!previousFlightData) {
+            return previousFlightData;
+          }
 
-      // Success - no alert needed, user already confirmed
+          const previousSite = previousFlightData.site;
+          if (!previousSite) {
+            return previousFlightData;
+          }
+
+          return {
+            ...previousFlightData,
+            site: {
+              ...previousSite,
+              camera_angle: angle,
+              camera_distance: distance,
+            },
+          };
+        }
+      );
+
+      // Keep playback stable and do not trigger a full viewer reload.
       console.log(
         `✅ Camera settings saved for site "${flight?.site?.name}": ${angle}° / ${distance}m`
       );
     } catch (error) {
       console.error('Failed to update camera settings:', error);
       toast.error('Erreur lors de la mise à jour de la caméra');
+      return false;
     } finally {
       setIsUpdatingCamera(false);
     }
+
+    return true;
   };
 
   // Function to manually reposition camera (can be called after settings update)
@@ -979,7 +1012,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
 
     const viewer = viewerRef.current;
-    const firstPosition = allPositionsRef.current[0];
+    const index =
+      allPositionsRef.current.length > 0 ? currentIndexRef.current : 0;
+    const position =
+      allPositionsRef.current[index] || allPositionsRef.current[0];
+    if (!position) {
+      return;
+    }
 
     // Update refs for replay mode
     cameraHeadingRef.current = CesiumMath.toRadians(angle);
@@ -990,7 +1029,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
     // Position camera
     viewer.camera.setView({
-      destination: firstPosition,
+      destination: position,
       orientation: {
         heading: CesiumMath.toRadians(oppositeHeading),
         pitch: CesiumMath.toRadians(-10),
@@ -1002,24 +1041,30 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     viewer.camera.moveForward(distance);
   }, []);
 
-  const applyCameraSettings = async () => {
-    // Ask for confirmation before saving
-    const confirmed = confirm(
-      `Sauvegarder les nouveaux paramètres de caméra pour le site "${flight?.site?.name}" ?\n\n` +
-        `Angle: ${tempCameraAngle}°\n` +
-        `Distance: ${tempCameraDistance}m\n\n` +
-        `Ces réglages s'appliqueront à tous les vols de ce site.`
-    );
-
-    if (!confirmed) {
+  const applyCameraToCurrentPlayback = () => {
+    if (!allPositionsRef.current.length) {
+      toast.info('Aucun tracé disponible pour appliquer la caméra.');
       return;
     }
 
-    await updateCameraSettings(tempCameraAngle, tempCameraDistance);
-    // Immediately reposition the camera with the new settings
+    repositionCamera(tempCameraAngle, tempCameraDistance);
+    toast.success('Caméra appliquée à la lecture actuelle.');
+  };
+
+  const saveCameraSettings = async () => {
+    const saved = await updateCameraSettings(
+      tempCameraAngle,
+      tempCameraDistance
+    );
+    if (!saved) {
+      return;
+    }
+    toast.success(`Caméra enregistrée pour le site "${flight?.site?.name}".`);
+
+    // Keep current viewport in sync after save without reloading the viewer.
     setTimeout(() => {
-      repositionCamera(tempCameraAngle, tempCameraDistance);
-    }, 500); // Small delay to ensure state is updated
+      applyCameraToCurrentPlayback();
+    }, 150);
   };
 
   // Render error messages as overlays instead of early returns
@@ -1170,6 +1215,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                     <Button
                       onClick={togglePlayPause}
                       className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+                      data-testid="flight-play-toggle"
                     >
                       {isPlaying ? '⏸ Pause' : '▶ Play'}
                     </Button>
@@ -1197,6 +1243,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         handleProgressChange(Number(e.target.value))
                       }
                       className="w-full"
+                      data-testid="flight-progress-slider"
                     />
                   </div>
 
@@ -1478,6 +1525,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             setTempCameraAngle(Number(e.target.value))
                           }
                           className="w-full"
+                          data-testid="camera-angle-slider"
                         />
                         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                           <span>0° (N)</span>
@@ -1502,6 +1550,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             setTempCameraDistance(Number(e.target.value))
                           }
                           className="w-full"
+                          data-testid="camera-distance-slider"
                         />
                         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                           <span>100m</span>
@@ -1509,18 +1558,29 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         </div>
                       </div>
 
-                      {/* Apply Button */}
-                      <Button
-                        onClick={applyCameraSettings}
-                        disabled={isUpdatingCamera}
-                        className="w-full px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isUpdatingCamera ? '⏳ Mise à jour...' : '✓ Appliquer'}
-                      </Button>
-
+                      {/* Camera Apply Buttons */}
+                      <div className="space-y-2">
+                        <Button
+                          onClick={applyCameraToCurrentPlayback}
+                          className="w-full px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                          data-testid="camera-apply-button"
+                        >
+                          👁️ Appliquer à la lecture
+                        </Button>
+                        <Button
+                          onClick={saveCameraSettings}
+                          disabled={isUpdatingCamera}
+                          className="w-full px-3 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          data-testid="camera-save-button"
+                        >
+                          {isUpdatingCamera
+                            ? '⏳ Enregistrement...'
+                            : '💾 Enregistrer le réglage site'}
+                        </Button>
+                      </div>
                       <p className="text-xs text-gray-600 dark:text-gray-300 mt-2">
-                        💡 Ces réglages seront sauvegardés pour le site &quot;
-                        {flight.site.name}&quot; et appliqués à tous ses vols
+                        💡 Appliquez d'abord à la lecture, puis enregistrez pour
+                        réutiliser ce réglage sur les prochains vols du site.
                       </p>
                     </div>
                   </AccordionSection>

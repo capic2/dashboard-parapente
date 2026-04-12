@@ -52,7 +52,11 @@ _TERMINAL_STATUSES = {_STATUS_COMPLETED, _STATUS_FAILED, _STATUS_CANCELLED}
 _WORKER_THREAD: threading.Thread | None = None
 _WORKER_STOP = threading.Event()
 _WORKER_LOCK = threading.Lock()
+_JOB_UPDATE_DB_LOCK = threading.Lock()
+_EXPORT_JOBS_LOCK = threading.Lock()
 _JOB_UPDATE_DB: dict[str, bool] = {}
+
+_CANCEL_CHECK_INTERVAL = 10
 
 
 def check_dependencies():
@@ -143,10 +147,32 @@ def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
 
 
 def _set_memory_snapshot(job_id: str, data: dict[str, Any] | None):
-    if data is None:
-        export_jobs.pop(job_id, None)
-    else:
-        export_jobs[job_id] = data
+    with _EXPORT_JOBS_LOCK:
+        if data is None:
+            export_jobs.pop(job_id, None)
+        else:
+            export_jobs[job_id] = data
+
+
+def _get_memory_snapshot(job_id: str) -> dict[str, Any] | None:
+    with _EXPORT_JOBS_LOCK:
+        snapshot = export_jobs.get(job_id)
+    return snapshot
+
+
+def _set_job_update_db_flag(job_id: str, should_update_db: bool):
+    with _JOB_UPDATE_DB_LOCK:
+        _JOB_UPDATE_DB[job_id] = should_update_db
+
+
+def _pop_job_update_db_flag(job_id: str) -> bool | None:
+    with _JOB_UPDATE_DB_LOCK:
+        return _JOB_UPDATE_DB.pop(job_id, None)
+
+
+def _get_job_update_db_flag(job_id: str, default: bool = True) -> bool:
+    with _JOB_UPDATE_DB_LOCK:
+        return _JOB_UPDATE_DB.get(job_id, default)
 
 
 def _get_job(job_id: str, db: Session | None = None) -> VideoExportJob | None:
@@ -190,6 +216,9 @@ def _update_job(
             setattr(job, key, value)
 
         job.updated_at = datetime.utcnow()
+        if job.status == _STATUS_RUNNING and not job.started_at:
+            job.started_at = datetime.utcnow()
+
         if job.status in _TERMINAL_STATUSES:
             if job.status == _STATUS_COMPLETED:
                 if not job.completed_at:
@@ -197,9 +226,11 @@ def _update_job(
             if job.status == _STATUS_CANCELLED and not job.cancelled_at:
                 job.cancelled_at = datetime.utcnow()
 
-            _JOB_UPDATE_DB.pop(job_id, None)
+            _pop_job_update_db_flag(job_id)
 
-        should_update_flight = _JOB_UPDATE_DB.get(job_id, True) if update_db is None else update_db
+        should_update_flight = (
+            _get_job_update_db_flag(job_id, True) if update_db is None else update_db
+        )
         if should_update_flight:
             _update_flight_from_job(db, job)
         db.commit()
@@ -210,6 +241,10 @@ def _update_job(
 
 
 def _is_cancelled(job_id: str) -> bool:
+    snapshot = _get_memory_snapshot(job_id)
+    if snapshot and snapshot.get("internal_status") == _STATUS_CANCELLED:
+        return True
+
     job = _get_job(job_id)
     return bool(job and job.status == _STATUS_CANCELLED)
 
@@ -224,15 +259,17 @@ def _mark_stale_jobs_as_queued():
             .all()
         )
 
+        if not stale_jobs:
+            return
+
         for job in stale_jobs:
-            if job.status in {_STATUS_QUEUED, _STATUS_RUNNING}:
-                job.status = _STATUS_QUEUED if job.status != _STATUS_QUEUED else job.status
-            else:
-                job.status = _STATUS_QUEUED
+            job.status = _STATUS_QUEUED
             job.message = "Recovered from restart"
             job.updated_at = datetime.utcnow()
-            db.commit()
 
+        db.commit()
+
+        for job in stale_jobs:
             _set_memory_snapshot(job.id, _snapshot_from_job(job))
 
 
@@ -250,6 +287,7 @@ def _acquire_next_job() -> str | None:
         job.status = _STATUS_RUNNING
         job.message = "Starting manual export"
         job.updated_at = datetime.utcnow()
+        job.started_at = datetime.utcnow()
         db.commit()
         _set_memory_snapshot(job.id, _snapshot_from_job(job))
         return job.id
@@ -291,7 +329,6 @@ def _worker_loop():
                 )
             else:
                 print(f"❌ Worker error: {e}")
-            traceback.print_exc()
 
 
 def start_video_export_worker():
@@ -348,16 +385,16 @@ def start_video_export_manual(
             progress=0,
             message="Job enqueued",
             frontend_url=frontend_url,
-            started_at=now,
+            started_at=None,
             updated_at=now,
             created_at=now,
         )
         db.add(job)
 
         if update_db:
-            _JOB_UPDATE_DB[job_id] = True
+            _set_job_update_db_flag(job_id, True)
         else:
-            _JOB_UPDATE_DB[job_id] = False
+            _set_job_update_db_flag(job_id, False)
 
         flight = db.query(Flight).filter(Flight.id == flight_id).first()
         if flight:
@@ -570,7 +607,7 @@ async def _export_video_manual_render(job_id: str):
             start_time = time.time()
 
             for i in range(total_frames):
-                if _is_cancelled(job_id):
+                if i % _CANCEL_CHECK_INTERVAL == 0 and _is_cancelled(job_id):
                     print("🛑 Export cancelled by user")
                     await browser.close()
                     _cleanup_frames(frames_dir)
@@ -699,7 +736,7 @@ def get_export_status(job_id: str) -> dict[str, Any] | None:
         snapshot = _snapshot_from_job(job)
         _set_memory_snapshot(job_id, snapshot)
         return snapshot
-    return export_jobs.get(job_id)
+    return _get_memory_snapshot(job_id)
 
 
 def cancel_video_export(job_id: str, update_db: bool = True) -> bool:
@@ -735,7 +772,10 @@ def list_exports(flight_id: str) -> list[dict[str, Any]]:
 
     results = [_snapshot_from_job(job) for job in jobs]
 
-    for job_id, snapshot in export_jobs.items():
+    with _EXPORT_JOBS_LOCK:
+        memory_items = list(export_jobs.items())
+
+    for job_id, snapshot in memory_items:
         if snapshot.get("flight_id") != flight_id:
             continue
         if not any(item.get("job_id") == job_id for item in results):

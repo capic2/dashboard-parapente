@@ -168,6 +168,7 @@ class Flight(Base):
         "VideoExportJob",
         back_populates="flight",
         cascade="all, delete-orphan",
+        passive_deletes=True,
         order_by="VideoExportJob.created_at",
     )
 
@@ -176,7 +177,12 @@ class VideoExportJob(Base):
     __tablename__ = "video_export_jobs"
 
     id = Column(String, primary_key=True)
-    flight_id = Column(String, ForeignKey("flights.id"), nullable=False, index=True)
+    flight_id = Column(
+        String,
+        ForeignKey("flights.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     status = Column(String, nullable=False, index=True)
     mode = Column(String, default="manual")
     quality = Column(String, default="1080p")

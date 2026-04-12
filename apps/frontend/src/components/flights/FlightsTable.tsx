@@ -66,6 +66,7 @@ export function FlightsTable({
 
       return (
         <div
+          data-testid={`flight-row-${flight.id}`}
           className={`group relative bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border-2 transition-all cursor-pointer ${
             isSelected
               ? 'border-sky-600 shadow-md bg-sky-50 dark:bg-sky-900/20'
