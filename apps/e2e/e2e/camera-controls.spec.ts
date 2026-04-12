@@ -118,6 +118,44 @@ const getFlightDetails = async (request: APIRequestContext, token: string, fligh
   };
 };
 
+const getSiteCameraState = async (
+  request: APIRequestContext,
+  token: string,
+  flightId: string
+) => {
+  const flightData = await getFlightDetails(request, token, flightId);
+  if (!flightData.site?.id) {
+    throw new Error(`Flight ${flightId} has no linked site to restore camera settings`);
+  }
+
+  return {
+    id: flightData.site.id,
+    angle: flightData.site.camera_angle ?? null,
+    distance: flightData.site.camera_distance ?? null,
+  };
+};
+
+const restoreSiteCameraState = async (
+  request: APIRequestContext,
+  token: string,
+  state: { id: string; angle: number | null; distance: number | null }
+) => {
+  const response = await request.patch(`/api/sites/${state.id}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    data: JSON.stringify({
+      camera_angle: state.angle,
+      camera_distance: state.distance,
+    }),
+  });
+
+  if (!response.ok()) {
+    console.warn(`Failed to restore camera state for site ${state.id}`, response.status());
+  }
+};
+
 test.describe('Contrôles caméra du viewer 3D', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
@@ -129,6 +167,7 @@ test.describe('Contrôles caméra du viewer 3D', () => {
   }) => {
     const token = await getAuthToken(request);
     const flight = await createFlightFromGPX(request, token);
+    const initialCameraState = await getSiteCameraState(request, token, flight.id);
 
     try {
       await page.goto('/flights');
@@ -170,6 +209,7 @@ test.describe('Contrôles caméra du viewer 3D', () => {
         }
       ).not.toBe(postApplyProgress);
     } finally {
+      await restoreSiteCameraState(request, token, initialCameraState);
       await deleteFlight(request, token, flight.id);
     }
   });
@@ -180,6 +220,7 @@ test.describe('Contrôles caméra du viewer 3D', () => {
   }) => {
     const token = await getAuthToken(request);
     const flight = await createFlightFromGPX(request, token);
+    const initialCameraState = await getSiteCameraState(request, token, flight.id);
 
     try {
       await page.goto('/flights');
@@ -204,6 +245,7 @@ test.describe('Contrôles caméra du viewer 3D', () => {
       expect(flightData.site?.camera_angle).toBe(90);
       expect(flightData.site?.camera_distance).toBe(650);
     } finally {
+      await restoreSiteCameraState(request, token, initialCameraState);
       await deleteFlight(request, token, flight.id);
     }
   });
