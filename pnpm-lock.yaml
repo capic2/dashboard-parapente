@@ -68,7 +68,7 @@ importers:
     devDependencies:
       '@chromatic-com/storybook':
         specifier: ^5.1.1
-        version: 5.1.1(storybook@10.3.5(@testing-library/dom@10.4.1)(prettier@3.8.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))
+        version: 5.1.2(storybook@10.3.5(@testing-library/dom@10.4.1)(prettier@3.8.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))
       '@nx/playwright':
         specifier: ^22.6.0
         version: 22.6.5(@babel/traverse@7.29.0)(@playwright/test@1.59.1)(@zkochan/js-yaml@0.0.7)(eslint@8.57.1)(nx@22.6.5)
@@ -793,8 +793,8 @@ packages:
     resolution: {integrity: sha512-h/hKVooXyOtUQJUtrfyBFGMIXb+Q3RLwqE6FzXfzyC0JQuuThLXCz8nRzCPbyiRuAR/aAYT/jbbhQrUxfiWqhQ==}
     engines: {node: '>=20.19.0'}
 
-  '@chromatic-com/storybook@5.1.1':
-    resolution: {integrity: sha512-BPoAXHM71XgeCK2u0jKr9i8apeQMm/Z9IWGyndA2FMijfQG9m8ox45DdWh/pxFkK5ClhGgirv5QwMhFIeHmThg==}
+  '@chromatic-com/storybook@5.1.2':
+    resolution: {integrity: sha512-H/hgvwC3E+OtseP2OT2QYUJH2VfnzT6wM3pWOkaNV6g7QI+VUdWJbeJ3o2jFqvEPQNqzhQKWDOlvM4lu+7is6g==}
     engines: {node: '>=20.0.0', yarn: '>=1.22.18'}
     peerDependencies:
       storybook: ^0.0.0-0 || ^10.1.0 || ^10.1.0-0 || ^10.2.0-0 || ^10.3.0-0 || ^10.4.0-0
@@ -6424,7 +6424,7 @@ snapshots:
       '@cesium/engine': 24.0.0
       nosleep.js: 0.12.0
 
-  '@chromatic-com/storybook@5.1.1(storybook@10.3.5(@testing-library/dom@10.4.1)(prettier@3.8.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))':
+  '@chromatic-com/storybook@5.1.2(storybook@10.3.5(@testing-library/dom@10.4.1)(prettier@3.8.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))':
     dependencies:
       '@neoconfetti/react': 1.0.0
       chromatic: 13.3.5
