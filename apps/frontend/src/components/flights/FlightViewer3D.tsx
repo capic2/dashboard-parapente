@@ -529,14 +529,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       currentIndexRef.current = 0;
       visiblePositionsRef.current = [];
     };
-  }, [
-    gpxData,
-    elevationOffset,
-    viewerReady,
-    flight?.site?.camera_angle,
-    flight?.site?.camera_distance,
-    flight?.site?.orientation,
-  ]);
+    // Intentionally exclude site camera fields to avoid replay reset after save.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gpxData, elevationOffset, viewerReady]);
 
   // Initialize camera settings from flight data
   useEffect(() => {
@@ -1041,14 +1036,16 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     viewer.camera.moveForward(distance);
   }, []);
 
-  const applyCameraToCurrentPlayback = () => {
+  const applyCameraToCurrentPlayback = (showToast = true) => {
     if (!allPositionsRef.current.length) {
       toast.info('Aucun tracé disponible pour appliquer la caméra.');
       return;
     }
 
     repositionCamera(tempCameraAngle, tempCameraDistance);
-    toast.success('Caméra appliquée à la lecture actuelle.');
+    if (showToast) {
+      toast.success('Caméra appliquée à la lecture actuelle.');
+    }
   };
 
   const saveCameraSettings = async () => {
@@ -1063,7 +1060,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
     // Keep current viewport in sync after save without reloading the viewer.
     setTimeout(() => {
-      applyCameraToCurrentPlayback();
+      applyCameraToCurrentPlayback(false);
     }, 150);
   };
 
@@ -1579,8 +1576,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         </Button>
                       </div>
                       <p className="text-xs text-gray-600 dark:text-gray-300 mt-2">
-                        💡 Appliquez d'abord à la lecture, puis enregistrez pour
-                        réutiliser ce réglage sur les prochains vols du site.
+                        💡 Appliquez d&apos;abord à la lecture, puis enregistrez
+                        pour réutiliser ce réglage sur les prochains vols du
+                        site.
                       </p>
                     </div>
                   </AccordionSection>

@@ -219,6 +219,7 @@ def _update_job(
         if job.status == _STATUS_RUNNING and not job.started_at:
             job.started_at = datetime.utcnow()
 
+        popped_update_db: bool | None = None
         if job.status in _TERMINAL_STATUSES:
             if job.status == _STATUS_COMPLETED:
                 if not job.completed_at:
@@ -226,11 +227,14 @@ def _update_job(
             if job.status == _STATUS_CANCELLED and not job.cancelled_at:
                 job.cancelled_at = datetime.utcnow()
 
-            _pop_job_update_db_flag(job_id)
+            popped_update_db = _pop_job_update_db_flag(job_id)
 
-        should_update_flight = (
-            _get_job_update_db_flag(job_id, True) if update_db is None else update_db
-        )
+        if update_db is not None:
+            should_update_flight = update_db
+        elif popped_update_db is not None:
+            should_update_flight = popped_update_db
+        else:
+            should_update_flight = _get_job_update_db_flag(job_id, True)
         if should_update_flight:
             _update_flight_from_job(db, job)
         db.commit()

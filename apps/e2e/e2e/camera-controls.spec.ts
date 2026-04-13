@@ -70,7 +70,8 @@ const getPlaybackState = async (
   const fallbackElapsedText = await page
     .locator('text=/⏱️\\s*\\d+\\s*min\\s*\\d+\\s*s\\s*\/\\s*\\d+\\s*min\\s*\\d+\\s*s/')
     .first()
-    .textContent();
+    .textContent()
+    .catch(() => null);
 
   const sliderInputValue = await progressSlider.inputValue();
   const slider = Number(sliderInputValue);
@@ -138,9 +139,11 @@ const waitForCameraSaveResponse = async (
     (res) => {
       try {
         const url = new URL(res.url());
+        const expectedPrefix = `/api/sites/${siteId}/camera`;
         return (
           res.request().method() === 'PATCH' &&
-          new RegExp(`^/api/sites/${siteId}/camera`).test(url.pathname)
+          (url.pathname === expectedPrefix ||
+            url.pathname.startsWith(`${expectedPrefix}/`))
         );
       } catch {
         return false;
@@ -226,7 +229,10 @@ const deleteFlight = async (request: APIRequestContext, token: string, flightId:
   });
 
   if (!response.ok()) {
-    console.warn('Failed to delete test flight', flightId, response.status());
+    const body = await response.text().catch(() => '');
+    throw new Error(
+      `Failed to delete test flight ${flightId}: ${response.status()} ${body}`
+    );
   }
 };
 
@@ -315,7 +321,10 @@ const restoreSiteCameraState = async (
   });
 
   if (!response.ok()) {
-    console.warn(`Failed to restore camera state for site ${state.id}`, response.status());
+    const body = await response.text().catch(() => '');
+    throw new Error(
+      `Failed to restore camera state for site ${state.id}: ${response.status()} ${body}`
+    );
   }
 };
 
@@ -333,10 +342,15 @@ test.describe('Contrôles caméra du viewer 3D', () => {
     test.setTimeout(TEST_TIMEOUT_MS);
 
     const token = await getAuthToken(request);
-    const flight = await createFlightFromGPX(request, token);
-    const initialCameraState = await getSiteCameraState(request, token, flight.id);
+    let flightId: string | null = null;
+    let initialCameraState: { id: string; angle: number | null; distance: number | null } | null =
+      null;
 
     try {
+      const flight = await createFlightFromGPX(request, token);
+      flightId = flight.id;
+      initialCameraState = await getSiteCameraState(request, token, flight.id);
+
       await page.goto('/flights');
       await expect(page).toHaveURL(/\/flights/, { timeout: 15000 });
       await waitForFlightRowAndOpen(page, flight.id);
@@ -364,8 +378,12 @@ test.describe('Contrôles caméra du viewer 3D', () => {
       const postApplyProgress = await getPlaybackState(page, progressSlider);
       await waitForPlaybackProgress(progressSlider, postApplyProgress, page);
     } finally {
-      await restoreSiteCameraState(request, token, initialCameraState);
-      await deleteFlight(request, token, flight.id);
+      if (initialCameraState) {
+        await restoreSiteCameraState(request, token, initialCameraState);
+      }
+      if (flightId) {
+        await deleteFlight(request, token, flightId);
+      }
     }
   });
 
@@ -376,10 +394,15 @@ test.describe('Contrôles caméra du viewer 3D', () => {
     test.setTimeout(TEST_TIMEOUT_MS);
 
     const token = await getAuthToken(request);
-    const flight = await createFlightFromGPX(request, token);
-    const initialCameraState = await getSiteCameraState(request, token, flight.id);
+    let flightId: string | null = null;
+    let initialCameraState: { id: string; angle: number | null; distance: number | null } | null =
+      null;
 
     try {
+      const flight = await createFlightFromGPX(request, token);
+      flightId = flight.id;
+      initialCameraState = await getSiteCameraState(request, token, flight.id);
+
       await page.goto('/flights');
       await expect(page).toHaveURL(/\/flights/, { timeout: 15000 });
       await waitForFlightRowAndOpen(page, flight.id);
@@ -432,8 +455,12 @@ test.describe('Contrôles caméra du viewer 3D', () => {
         }
       ).toBeTruthy();
     } finally {
-      await restoreSiteCameraState(request, token, initialCameraState);
-      await deleteFlight(request, token, flight.id);
+      if (initialCameraState) {
+        await restoreSiteCameraState(request, token, initialCameraState);
+      }
+      if (flightId) {
+        await deleteFlight(request, token, flightId);
+      }
     }
   });
 });
