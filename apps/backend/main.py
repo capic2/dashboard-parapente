@@ -585,8 +585,9 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("📅 Scheduler disabled, skipping cache warmup")
 
-    # Start manual video export worker
-    start_video_export_worker()
+    # Start manual video export worker (skip in tests)
+    if not config.TESTING:
+        start_video_export_worker()
 
     yield
 
