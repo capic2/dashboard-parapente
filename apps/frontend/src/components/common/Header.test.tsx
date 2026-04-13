@@ -30,6 +30,7 @@ vi.mock('react-i18next', () => ({
       return translations[key] ?? fallback ?? key;
     },
   }),
+  withTranslation: () => (Component: unknown) => Component,
 }));
 
 vi.mock('@tanstack/react-router', () => ({
