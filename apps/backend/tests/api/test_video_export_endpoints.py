@@ -4,7 +4,10 @@ Tests for video export API endpoints.
 Covers fallback behavior between manual/stream modes and internal status guards.
 """
 
+import tempfile
 from unittest.mock import patch
+
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -156,3 +159,23 @@ class TestExportStatusAndCancel:
 
         assert response.status_code == 404
         assert response.json()["detail"] == "Video file not found"
+
+    def test_export_download_returns_video_when_file_exists(self, client: TestClient):
+        """Completed export with a valid file path should stream the video."""
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_file:
+            tmp_file.write(b"dummy video bytes")
+            video_path = tmp_file.name
+
+        try:
+            with patch(
+                "routes.get_export_status_manual",
+                return_value={"status": "completed", "video_path": video_path},
+            ):
+                response = client.get(f"{API_PREFIX}/exports/job-existing/download")
+
+            assert response.status_code == 200
+            assert response.headers["content-type"].startswith("video/mp4")
+            assert response.headers["content-disposition"].startswith("attachment; filename=")
+            assert response.content == b"dummy video bytes"
+        finally:
+            Path(video_path).unlink(missing_ok=True)
