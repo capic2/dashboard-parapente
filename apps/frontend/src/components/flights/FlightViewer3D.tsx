@@ -1558,7 +1558,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                       {/* Camera Apply Buttons */}
                       <div className="space-y-2">
                         <Button
-                          onClick={applyCameraToCurrentPlayback}
+                          onClick={() => applyCameraToCurrentPlayback()}
                           className="w-full px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                           data-testid="camera-apply-button"
                         >
