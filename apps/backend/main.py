@@ -593,8 +593,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("⏹️ Shutting down Dashboard Parapente API...")
-    if not config.TESTING:
-        stop_video_export_worker()
+    stop_video_export_worker()
     stop_scheduler()
 
     # Close Redis connection
