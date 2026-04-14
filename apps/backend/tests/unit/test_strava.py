@@ -259,6 +259,33 @@ async def test_get_access_token():
         assert token == "test_token"
 
 
+def test_log_token_refresh_prunes_history_to_configured_limit():
+    """Token refresh logs are pruned to keep only the configured limit."""
+
+    import strava
+
+    db = MagicMock()
+    context_manager = MagicMock()
+    context_manager.__enter__.return_value = db
+    context_manager.__exit__.return_value = None
+
+    stale_query = MagicMock()
+    stale_query.order_by.return_value.offset.return_value.all.return_value = [(1,), (2,)]
+
+    delete_query = MagicMock()
+    db.query.side_effect = [stale_query, delete_query]
+
+    with (
+        patch("database.get_db_context", return_value=context_manager),
+        patch("strava.STRAVA_TOKEN_LOG_HISTORY_LIMIT", 3),
+    ):
+        strava._log_token_refresh(True, "ok")
+
+    assert db.add.call_count == 1
+    assert db.commit.call_count == 2
+    delete_query.filter.return_value.delete.assert_called_once_with(synchronize_session=False)
+
+
 # ============================================================================
 # GPX DOWNLOAD TESTS
 # ============================================================================
