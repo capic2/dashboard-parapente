@@ -224,7 +224,7 @@ async def fetch_wyoming_sounding(
 
             cache = get_cache()
 
-            cached_data = cache.get_sounding(station_code, sounding_time, date)
+            cached_data = await cache.get_sounding(station_code, sounding_time, date)
             if cached_data:
                 cached_data["from_cache"] = True
                 return cached_data
@@ -347,7 +347,7 @@ async def fetch_wyoming_sounding(
             from cache_emagram.emagram_cache import get_cache
 
             cache = get_cache()
-            cache.set_sounding(station_code, sounding_time, date, result)
+            await cache.set_sounding(station_code, sounding_time, date, result)
         except Exception as e:
             print(f"Cache set error: {e}")
 
