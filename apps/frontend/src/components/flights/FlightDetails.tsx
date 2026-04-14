@@ -1,4 +1,11 @@
-import { useState, useRef, lazy, Suspense, ChangeEvent, useEffect } from 'react';
+import {
+  useState,
+  useRef,
+  lazy,
+  Suspense,
+  ChangeEvent,
+  useEffect,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { TextField, TextArea } from 'react-aria-components';
@@ -51,8 +58,9 @@ export function FlightDetails({
   const [activeTab, setActiveTab] = useState<FlightDetailsTab>('infos');
 
   const hasGpx = Boolean(flight.gpx_file_path);
+  const normalizedTitle = flight.title?.trim();
   const flightTitle =
-    flight.title ??
+    normalizedTitle ||
     (() => {
       const [y, m, d] = flight.flight_date.split('-');
       const localDate = new Date(Number(y), Number(m) - 1, Number(d));
@@ -63,7 +71,10 @@ export function FlightDetails({
 
   useEffect(() => {
     setActiveTab('infos');
-  }, [flight.id]);
+    setEditingMode(false);
+    setEditingNotes(false);
+    setNotesText(flight.notes ?? '');
+  }, [flight.id, flight.notes]);
 
   const handleSubmitEdit = async (values: FlightFormData) => {
     await updateFlight.mutateAsync(values);
@@ -74,7 +85,7 @@ export function FlightDetails({
   const handleSaveNotes = async () => {
     try {
       await updateFlight.mutateAsync({
-        title: flight.title ?? '',
+        title: normalizedTitle ?? '',
         site_id: flight.site_id ?? null,
         flight_date: flight.flight_date,
         duration_minutes: flight.duration_minutes ?? 0,
@@ -227,7 +238,9 @@ export function FlightDetails({
             </div>
 
             <div>
-              <span className={labelClass}>{t('flights.maxAltitudeLabel')}</span>
+              <span className={labelClass}>
+                {t('flights.maxAltitudeLabel')}
+              </span>
               <span className={valueClass}>
                 {flight.max_altitude_m != null
                   ? `${flight.max_altitude_m} m`
@@ -236,7 +249,9 @@ export function FlightDetails({
             </div>
 
             <div>
-              <span className={labelClass}>{t('flights.elevationGainLabel')}</span>
+              <span className={labelClass}>
+                {t('flights.elevationGainLabel')}
+              </span>
               <span className={valueClass}>
                 {flight.elevation_gain_m != null
                   ? `${flight.elevation_gain_m} m`
@@ -403,5 +418,10 @@ export function FlightDetails({
     );
   }
 
-  return <>{infoCard}{hasGpx ? replayCard : null}</>;
+  return (
+    <>
+      {infoCard}
+      {hasGpx ? replayCard : null}
+    </>
+  );
 }

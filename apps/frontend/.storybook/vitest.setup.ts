@@ -9,6 +9,7 @@ beforeAll(async () => {
   await preview.composed.beforeAll();
   const worker = getWorker();
   await worker.context.activationPromise;
+  // Mock Cesium terrain heights file so 3D stories/tests avoid network JSON errors.
   worker.use(
     http.get(/approximateTerrainHeights\.json(?:\?.*)?$/, () =>
       HttpResponse.json({})

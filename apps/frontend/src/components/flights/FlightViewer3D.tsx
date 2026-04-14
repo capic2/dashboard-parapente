@@ -28,19 +28,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '@dashboard-parapente/design-system';
 
-import { GPXData, type Flight } from '@dashboard-parapente/shared-types';
-
-const VIDEO_EXPORT_IN_PROGRESS = new Set([
-  'processing',
-  'queued',
-  'running',
-  'initializing',
-  'capturing',
-  'encoding',
-]);
+import {
+  GPXData,
+  VIDEO_EXPORT_IN_PROGRESS_STATUSES,
+  type Flight,
+} from '@dashboard-parapente/shared-types';
 
 const isVideoExportInProgress = (status?: string | null) =>
-  Boolean(status && VIDEO_EXPORT_IN_PROGRESS.has(status));
+  Boolean(status && VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(status));
 
 declare global {
   interface Window {
@@ -693,7 +688,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       ? 'p-2'
       : 'p-4 max-w-xs';
 
-  const fullscreenButtonClassName = compact ? 'px-2 py-1.5 text-xs' : 'px-3 py-2';
+  const fullscreenButtonClassName = compact
+    ? 'px-2 py-1.5 text-xs'
+    : 'px-3 py-2';
   const compactControlButtonClassName = compact
     ? 'px-2 py-1.5 text-xs'
     : 'px-3 py-2 text-sm';
@@ -1106,7 +1103,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           <div className="text-center p-8">
             <p className="text-lg dark:text-white">⏳ Chargement du vol...</p>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
-              Flight ID: {flightId}
+              Chargement des donnees GPS et du relief...
             </p>
           </div>
         </div>
@@ -1124,7 +1121,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
               Les données GPS ne sont pas disponibles pour ce vol.
             </p>
             <p className="text-xs text-gray-600 dark:text-gray-300 mt-2">
-              Error: {String(error)}
+              Reessayez dans quelques instants.
             </p>
           </div>
         </div>
@@ -1139,7 +1136,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
               ❌ Aucune donnée GPS disponible
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
-              GPX Data: {JSON.stringify(gpxData)}
+              Les informations de trace sont indisponibles pour ce vol.
             </p>
           </div>
         </div>
@@ -1367,7 +1364,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             ? 'Génération vidéo en cours... (~60-90 min)'
                             : flight.video_export_status === 'completed'
                               ? 'Télécharger la vidéo'
-                              : flight.video_export_status === 'failed'
+                              : flight.video_export_status === 'failed' ||
+                                  flight.video_export_status === 'cancelled'
                                 ? 'Relancer la génération'
                                 : 'Générer la vidéo du vol'
                         }
@@ -1376,7 +1374,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           '⏳ Génération en cours...'}
                         {flight.video_export_status === 'completed' &&
                           '📥 Télécharger la vidéo'}
-                        {flight.video_export_status === 'failed' &&
+                        {(flight.video_export_status === 'failed' ||
+                          flight.video_export_status === 'cancelled') &&
                           '🔄 Relancer la génération'}
                         {!flight.video_export_status && '🎥 Générer la vidéo'}
                       </Button>
