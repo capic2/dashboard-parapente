@@ -112,7 +112,7 @@ export default function Forecast7Day({
         <CacheTimestamp cachedAt={dailySummary.cached_at} />
       </div>
 
-      <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin lg:grid lg:grid-cols-7 lg:overflow-x-visible lg:pb-0 lg:snap-none">
+      <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:pb-0 sm:snap-none md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
         {dailySummary.days.map((day, index) => {
           const isSelected = index === selectedDayIndex;
 
@@ -121,7 +121,7 @@ export default function Forecast7Day({
               key={index}
               onClick={() => onSelectDay?.(index)}
               onMouseEnter={() => handleMouseEnter(index)}
-              className={`min-w-[120px] flex-shrink-0 snap-start lg:min-w-0 lg:flex-shrink bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border-2 transition-all hover:border-sky-600 hover:-translate-y-1 hover:shadow-md cursor-pointer relative ${
+              className={`min-w-[150px] flex-shrink-0 snap-start sm:min-w-0 sm:flex-shrink bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border-2 transition-all hover:border-sky-600 hover:-translate-y-1 hover:shadow-md cursor-pointer relative min-h-[150px] ${
                 isSelected
                   ? 'border-sky-600 shadow-lg bg-sky-50 dark:bg-sky-900/20 ring-2 ring-sky-200 dark:ring-sky-700'
                   : 'border-gray-200 dark:border-gray-700'
@@ -130,27 +130,29 @@ export default function Forecast7Day({
               {isSelected && (
                 <div className="absolute top-1 right-1 w-2 h-2 bg-sky-600 rounded-full" />
               )}
-              <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 text-center">
-                {formatDate(day.date)}
-              </div>
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <span className="text-2xl font-bold text-sky-600">
-                  {day.score != null ? day.score : day.para_index}
-                </span>
-                <span
-                  className={`text-xl ${getVerdictClass(day.verdict)} px-1.5 py-0.5 rounded-full`}
-                >
-                  {getVerdictEmoji(day.verdict)}
-                </span>
-              </div>
-              <div className="text-sm text-gray-700 dark:text-gray-300 font-medium text-center mb-1">
-                {day.temp_min}° - {day.temp_max}°
-              </div>
-              <div className="text-xs text-gray-600 dark:text-gray-300 text-center mb-1">
-                💨 {Math.round(day.wind_avg)} km/h
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 text-center truncate">
-                {day.verdict}
+              <div className="flex h-full flex-col justify-between gap-1">
+                <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 text-center">
+                  {formatDate(day.date)}
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-2xl font-bold text-sky-600">
+                    {day.score != null ? day.score : day.para_index}
+                  </span>
+                  <span
+                    className={`text-xl ${getVerdictClass(day.verdict)} px-1.5 py-0.5 rounded-full`}
+                  >
+                    {getVerdictEmoji(day.verdict)}
+                  </span>
+                </div>
+                <div className="text-sm text-gray-700 dark:text-gray-300 font-medium text-center">
+                  {day.temp_min}° - {day.temp_max}°
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-300 text-center">
+                  💨 {Math.round(day.wind_avg)} km/h
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 text-center leading-tight min-h-8 break-words">
+                  {day.verdict}
+                </div>
               </div>
             </Button>
           );
