@@ -27,6 +27,7 @@ import { api } from '../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '@dashboard-parapente/design-system';
+import { HTTPError } from 'ky';
 
 import {
   GPXData,
@@ -1312,27 +1313,31 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           ) {
                             // Generate video
                             try {
-                              const response = await fetch(
-                                `/api/flights/${flightId}/generate-video`,
-                                {
-                                  method: 'POST',
-                                }
+                              await api.post(
+                                `flights/${flightId}/generate-video`
                               );
-
-                              if (!response.ok) {
-                                const error = await response.json();
-                                toast.error(
-                                  error.detail ||
-                                    'Impossible de lancer la génération'
-                                );
-                                return;
-                              }
 
                               // Refresh flight data to get updated status
                               queryClient.invalidateQueries({
                                 queryKey: ['flights', flightId],
                               });
                             } catch (error) {
+                              if (error instanceof HTTPError) {
+                                try {
+                                  const response =
+                                    (await error.response.json()) as {
+                                      detail?: string;
+                                    };
+                                  toast.error(
+                                    response.detail ||
+                                      'Impossible de lancer la génération'
+                                  );
+                                  return;
+                                } catch {
+                                  // Fall back to generic message below
+                                }
+                              }
+
                               console.error(
                                 '❌ Failed to start video generation:',
                                 error
@@ -1394,27 +1399,31 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                               }
 
                               try {
-                                const response = await fetch(
-                                  `/api/exports/${flight.video_export_job_id}/cancel`,
-                                  {
-                                    method: 'DELETE',
-                                  }
+                                await api.delete(
+                                  `exports/${flight.video_export_job_id}/cancel`
                                 );
-
-                                if (!response.ok) {
-                                  const error = await response.json();
-                                  toast.error(
-                                    error.detail ||
-                                      "Impossible d'annuler la génération"
-                                  );
-                                  return;
-                                }
 
                                 // Refresh flight data to get updated status
                                 queryClient.invalidateQueries({
                                   queryKey: ['flights', flightId],
                                 });
                               } catch (error) {
+                                if (error instanceof HTTPError) {
+                                  try {
+                                    const response =
+                                      (await error.response.json()) as {
+                                        detail?: string;
+                                      };
+                                    toast.error(
+                                      response.detail ||
+                                        "Impossible d'annuler la génération"
+                                    );
+                                    return;
+                                  } catch {
+                                    // Fall back to generic message below
+                                  }
+                                }
+
                                 console.error(
                                   'Failed to cancel video generation:',
                                   error
@@ -1442,27 +1451,31 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             }
 
                             try {
-                              const response = await fetch(
-                                `/api/flights/${flightId}/generate-video`,
-                                {
-                                  method: 'POST',
-                                }
+                              await api.post(
+                                `flights/${flightId}/generate-video`
                               );
-
-                              if (!response.ok) {
-                                const error = await response.json();
-                                toast.error(
-                                  error.detail ||
-                                    'Impossible de lancer la régénération'
-                                );
-                                return;
-                              }
 
                               // Refresh flight data to get updated status
                               queryClient.invalidateQueries({
                                 queryKey: ['flights', flightId],
                               });
                             } catch (error) {
+                              if (error instanceof HTTPError) {
+                                try {
+                                  const response =
+                                    (await error.response.json()) as {
+                                      detail?: string;
+                                    };
+                                  toast.error(
+                                    response.detail ||
+                                      'Impossible de lancer la régénération'
+                                  );
+                                  return;
+                                } catch {
+                                  // Fall back to generic message below
+                                }
+                              }
+
                               console.error(
                                 'Failed to regenerate video:',
                                 error
