@@ -4908,12 +4908,9 @@ async def clear_emagram_cache(db: Session = Depends(get_db)):
 
         # 2. Clear only emagram cache keys
         try:
-            from cache_emagram.emagram_cache import _get_redis_url, _redact_redis_url
+            from cache import get_redis
 
-            import redis.asyncio as redis_async
-
-            redis_url = _get_redis_url()
-            redis_client = redis_async.from_url(redis_url, decode_responses=True)
+            redis_client = await get_redis()
 
             keys_to_clear: list[str] = []
             async for key in redis_client.scan_iter(match="emagram:*"):
@@ -4927,12 +4924,7 @@ async def clear_emagram_cache(db: Session = Depends(get_db)):
             redis_cleared = True
             logger.info("Cleared %s emagram cache keys via Redis", deleted)
         except Exception as redis_error:
-            redis_url = _get_redis_url()
-            logger.warning(
-                "Redis clear failed (non-critical) for %s: %s",
-                _redact_redis_url(redis_url),
-                redis_error,
-            )
+            logger.warning("Redis clear failed (non-critical): %s", redis_error)
             redis_cleared = False
             deleted = 0
 
