@@ -1,19 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { getStaleTime } from '../../lib/cacheConfig';
-import type { Flight } from '@dashboard-parapente/shared-types';
-
-const IN_PROGRESS_STATUSES = new Set([
-  'processing',
-  'queued',
-  'running',
-  'initializing',
-  'capturing',
-  'encoding',
-]);
+import {
+  type Flight,
+  VIDEO_EXPORT_IN_PROGRESS_STATUSES,
+} from '@dashboard-parapente/shared-types';
 
 const isExportInProgress = (status?: string | null) =>
-  status ? IN_PROGRESS_STATUSES.has(status) : false;
+  status ? VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(status) : false;
 
 /**
  * Fetch flight details including video export status

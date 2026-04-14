@@ -282,6 +282,7 @@ def _acquire_next_job() -> str | None:
         job = (
             db.query(VideoExportJob)
             .filter(VideoExportJob.status == _STATUS_QUEUED)
+            .with_for_update(skip_locked=True)
             .order_by(VideoExportJob.created_at)
             .first()
         )
@@ -425,6 +426,7 @@ async def _export_video_manual_render(job_id: str):
     speed = job.speed or 1
     flight_id = job.flight_id
     frontend_url = resolve_frontend_url(job.frontend_url)
+    frames_dir: Path | None = None
 
     try:
         from playwright.async_api import async_playwright
@@ -654,7 +656,7 @@ async def _export_video_manual_render(job_id: str):
                         f"📸 {frame_count}/{total_frames} frames ({fps_actual:.1f} fps, ETA: {int(eta_seconds/60)}min)"
                     )
 
-                await asyncio.sleep(ms_per_frame / 1000 / 10)
+                await asyncio.sleep(ms_per_frame / 1000)
 
             total_capture_time = time.time() - start_time
             print(
@@ -700,7 +702,17 @@ async def _export_video_manual_render(job_id: str):
             ]
 
             print(f"🎬 FFmpeg command: {' '.join(ffmpeg_cmd)}")
-            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+            try:
+                result = subprocess.run(
+                    ffmpeg_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=30 * 60,
+                )
+            except subprocess.TimeoutExpired as timeout_error:
+                raise Exception(
+                    f"FFmpeg timeout after 1800s: {' '.join(ffmpeg_cmd)}"
+                ) from timeout_error
 
             if result.returncode != 0:
                 raise Exception(f"FFmpeg encoding failed: {result.stderr}")
@@ -723,6 +735,8 @@ async def _export_video_manual_render(job_id: str):
             print(f"📹 Video: {output_file} ({file_size_mb:.1f} MB)")
 
     except Exception as e:
+        if frames_dir is not None:
+            _cleanup_frames(frames_dir)
         print(f"❌ Export failed: {e}")
         traceback.print_exc()
         _update_job(

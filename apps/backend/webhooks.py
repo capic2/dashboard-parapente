@@ -61,6 +61,10 @@ async def strava_webhook_verification(
     if hub_mode != "subscribe":
         raise HTTPException(status_code=400, detail="Invalid hub.mode")
 
+    if not config.STRAVA_VERIFY_TOKEN:
+        logger.error("STRAVA_VERIFY_TOKEN is not configured")
+        raise HTTPException(status_code=500, detail="Webhook not configured")
+
     if hub_verify_token != config.STRAVA_VERIFY_TOKEN:
         raise HTTPException(status_code=403, detail="Invalid verify token")
 
