@@ -5,6 +5,19 @@
 
 import { z } from 'zod';
 
+const VIDEO_EXPORT_IN_PROGRESS_STATUS_VALUES = [
+  'processing',
+  'queued',
+  'running',
+  'initializing',
+  'capturing',
+  'encoding',
+] as const;
+
+export const VIDEO_EXPORT_IN_PROGRESS_STATUSES = new Set<string>(
+  VIDEO_EXPORT_IN_PROGRESS_STATUS_VALUES
+);
+
 // ============================================================================
 // CORE DOMAIN SCHEMAS
 // ============================================================================
