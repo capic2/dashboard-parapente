@@ -1629,13 +1629,41 @@ async def get_cache_overview(db: Session = Depends(get_db)):
             )
             forecast_signature_map = {}
 
-        keys = []
-        async for key in redis_client.scan_iter(match="*"):
-            keys.append(key)
+        keys: list[str] = []
+        seen_keys: set[str] = set()
+
+        # Prefer app cache prefixes first so important groups (incl. emagram)
+        # remain visible even when Redis also contains many unrelated keys.
+        prefix_budget = max(1, MAX_CACHE_KEYS // max(len(APP_CACHE_PREFIXES), 1))
+
+        for prefix in APP_CACHE_PREFIXES:
             if len(keys) >= MAX_CACHE_KEYS:
                 break
 
-        truncated = len(keys) >= MAX_CACHE_KEYS
+            added_for_prefix = 0
+            async for key in redis_client.scan_iter(match=f"{prefix}*"):
+                if key in seen_keys:
+                    continue
+
+                keys.append(key)
+                seen_keys.add(key)
+                added_for_prefix += 1
+
+                if added_for_prefix >= prefix_budget or len(keys) >= MAX_CACHE_KEYS:
+                    break
+
+        # Fill remaining slots with any key to preserve previous behavior for
+        # non-app prefixes that may still be useful to inspect.
+        if len(keys) < MAX_CACHE_KEYS:
+            async for key in redis_client.scan_iter(match="*"):
+                if key in seen_keys:
+                    continue
+
+                keys.append(key)
+                seen_keys.add(key)
+
+                if len(keys) >= MAX_CACHE_KEYS:
+                    break
 
         # Batch TTL + strlen via pipeline
         if keys:
@@ -1670,6 +1698,7 @@ async def get_cache_overview(db: Session = Depends(get_db)):
 
         # Total + memory info
         total_keys = await redis_client.dbsize()
+        truncated = total_keys > len(keys)
         memory_usage = None
         try:
             info = await redis_client.info("memory")
