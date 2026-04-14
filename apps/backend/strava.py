@@ -19,6 +19,7 @@ from config import (
     STRAVA_CLIENT_ID,
     STRAVA_CLIENT_SECRET,
     STRAVA_REFRESH_TOKEN,
+    STRAVA_TOKEN_LOG_HISTORY_LIMIT,
 )
 
 logger = logging.getLogger(__name__)
@@ -84,6 +85,19 @@ def _log_token_refresh(
             )
             db.add(log)
             db.commit()
+
+            stale_log_ids = [
+                row[0]
+                for row in db.query(StravaTokenLog.id)
+                .order_by(StravaTokenLog.timestamp.desc(), StravaTokenLog.id.desc())
+                .offset(STRAVA_TOKEN_LOG_HISTORY_LIMIT)
+                .all()
+            ]
+            if stale_log_ids:
+                db.query(StravaTokenLog).filter(StravaTokenLog.id.in_(stale_log_ids)).delete(
+                    synchronize_session=False
+                )
+                db.commit()
     except Exception as e:
         logger.warning(f"Could not log token refresh: {e}")
 
