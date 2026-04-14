@@ -415,7 +415,11 @@
     "deleteButton": "🗑️ Delete",
     "deleteButtonCount_one": "🗑️ Delete {{count}} flight",
     "deleteButtonCount_other": "🗑️ Delete {{count}} flights",
-    "gpxFileInput": "GPX file"
+    "gpxFileInput": "GPX file",
+    "infoTab": "Info",
+    "replayTab": "Replay",
+    "backToList": "← Back",
+    "replayUnavailable": "No GPX available for this flight"
   },
   "createSite": {
     "title": "Create a new site",

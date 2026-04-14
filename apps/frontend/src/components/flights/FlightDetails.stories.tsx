@@ -126,6 +126,9 @@ const meta = preview.meta({
   title: 'Components/Flights/FlightDetails',
   component: FlightDetails,
   decorators: [ToastDecorator],
+  beforeEach: () => {
+    useToastStore.setState({ toasts: [] });
+  },
   parameters: {
     layout: 'padded',
     msw: { handlers: defaultHandlers },
@@ -139,7 +142,7 @@ const meta = preview.meta({
 
 export const Default = meta.story({
   name: 'Default',
-  args: { flight: fullFlight },
+  args: { flight: fullFlight, mobileMode: true },
 });
 Default.test(
   'The flight can be edited',
@@ -186,6 +189,47 @@ export const WithoutGpx = meta.story({
   name: 'Without GPX',
   args: { flight: flightWithoutGpx },
 });
+
+export const Mobile = meta.story({
+  name: 'Mobile',
+  args: { flight: fullFlight, mobileMode: true },
+});
+
+Mobile.test('shows compact mobile infos tab by default', async ({ canvas }) => {
+  await expect(
+    canvas.getAllByRole('heading', { name: fullFlight.title ?? '' }).length
+  ).toBeGreaterThan(0);
+  await expect(
+    canvas.getByRole('button', { name: i18n.t('flights.backToList') })
+  ).toBeInTheDocument();
+  await expect(
+    canvas.getByRole('tab', { name: i18n.t('flights.infoTab') })
+  ).toBeInTheDocument();
+  await expect(
+    canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
+  ).toBeInTheDocument();
+  await expect(
+    canvas.queryByText(i18n.t('flights.loading3dViewer'))
+  ).not.toBeInTheDocument();
+});
+
+export const MobileWithoutGpx = meta.story({
+  name: 'Mobile Without GPX',
+  args: { flight: flightWithoutGpx, mobileMode: true },
+});
+
+MobileWithoutGpx.test(
+  'displays unavailable replay state when GPX is missing',
+  async ({ canvas, userEvent }) => {
+    const replayTab = await canvas.findByRole('tab', {
+      name: i18n.t('flights.replayTab'),
+    });
+    await userEvent.click(replayTab);
+    await expect(
+      await canvas.findByText(i18n.t('flights.replayUnavailable'))
+    ).toBeInTheDocument();
+  }
+);
 
 export const MinimalFlight = meta.story({
   name: 'Minimal Flight',

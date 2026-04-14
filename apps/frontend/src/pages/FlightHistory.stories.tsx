@@ -3,10 +3,41 @@ import { expect, screen, waitFor, within } from 'storybook/test';
 import preview from '../../.storybook/preview';
 import FlightHistory from './FlightHistory';
 import i18n from 'i18next';
+import { useToastStore } from '../hooks/useToast';
+
+type MediaQueryCallback = (event: MediaQueryListEvent) => void;
+
+function installMatchMediaMock(isMobile: boolean) {
+  const originalMatchMedia = window.matchMedia;
+
+  const createMediaQueryList = (query: string): MediaQueryList => {
+    return {
+      matches: query === '(max-width: 639px)' ? isMobile : false,
+      media: query,
+      onchange: null,
+      addEventListener: (_event: string, _listener: MediaQueryCallback) => {},
+      removeEventListener: (
+        _event: string,
+        _listener: MediaQueryCallback
+      ) => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    } as unknown as MediaQueryList;
+  };
+
+  window.matchMedia = ((query: string) =>
+    createMediaQueryList(query)) as typeof window.matchMedia;
+
+  return () => {
+    window.matchMedia = originalMatchMedia;
+  };
+}
 
 const meta = preview.meta({
   title: 'Pages/FlightHistory',
   component: FlightHistory,
+  decorators: [(Story, context) => <Story key={context.id} />],
   parameters: { layout: 'fullscreen' },
   tags: ['autodocs'],
 });
@@ -95,13 +126,51 @@ const mockSites = {
 
 const flightsDb: Record<string, unknown>[] = [...mockFlights];
 
+let gpxRequestCount = 0;
+
+const mockGPXData = {
+  coordinates: [
+    {
+      lat: 47.2,
+      lon: 6.0,
+      elevation: 800,
+      time: '2026-03-15T14:00:00.000Z',
+    },
+    {
+      lat: 47.21,
+      lon: 6.01,
+      elevation: 900,
+      time: '2026-03-15T14:01:00.000Z',
+    },
+  ],
+  max_altitude_m: 1850,
+  min_altitude_m: 700,
+  elevation_gain_m: 1200,
+  elevation_loss_m: 300,
+  total_distance_km: 18.5,
+  flight_duration_seconds: 5700,
+};
+
 const resetFlightsDb = () => {
   flightsDb.length = 0;
   flightsDb.push(...mockFlights);
 };
 
-const defaultHandlers = [
+const resetStoryState = () => {
+  resetFlightsDb();
+  gpxRequestCount = 0;
+  useToastStore.setState({ toasts: [] });
+};
+
+const createHandlers = (gpxDelayMs = 0) => [
   http.get('*/api/flights', () => HttpResponse.json({ flights: flightsDb })),
+  http.get('*/api/flights/:id/gpx-data', async () => {
+    if (gpxDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, gpxDelayMs));
+    }
+    gpxRequestCount += 1;
+    return HttpResponse.json({ data: mockGPXData });
+  }),
   http.get('*/api/flights/:id', ({ params }) => {
     const flight = flightsDb.find((f) => f.id === params.id);
     return flight
@@ -127,10 +196,12 @@ const defaultHandlers = [
   }),
 ];
 
+const defaultHandlers = createHandlers();
+
 export const Default = meta.story({
   name: 'Default',
   parameters: { msw: { handlers: defaultHandlers } },
-  beforeEach: resetFlightsDb,
+  beforeEach: resetStoryState,
 });
 
 Default.test(
@@ -222,6 +293,113 @@ Default.test(
     });
   }
 );
+export const MobileFlow = meta.story({
+  name: 'Mobile Flow',
+  parameters: { msw: { handlers: defaultHandlers } },
+  beforeEach: () => {
+    resetStoryState();
+    return installMatchMediaMock(true);
+  },
+});
+
+MobileFlow.test(
+  'opens a flight, switches tabs, and returns to list on mobile',
+  async ({ canvas, userEvent, step }) => {
+    await step('has the flight list', async () => {
+      const flightList = await canvas.findByRole('grid', {
+        name: i18n.t('flights.listAriaLabel'),
+      });
+      await expect(flightList).toBeInTheDocument();
+    });
+
+    await step('opens a flight in mobile detail mode', async () => {
+      await userEvent.click(await canvas.findByTestId('flight-row-flight-002'));
+      await expect(
+        await canvas.findByRole('button', {
+          name: i18n.t('flights.backToList'),
+        })
+      ).toBeInTheDocument();
+    });
+
+    await step('switches to Replay and shows unavailable state', async () => {
+      await userEvent.click(
+        canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
+      );
+      await expect(
+        await canvas.findByText(i18n.t('flights.replayUnavailable'))
+      ).toBeInTheDocument();
+    });
+
+    await step('returns to the list', async () => {
+      await userEvent.click(
+        canvas.getByRole('button', { name: i18n.t('flights.backToList') })
+      );
+      await expect(
+        await canvas.findByRole('grid', {
+          name: i18n.t('flights.listAriaLabel'),
+        })
+      ).toBeInTheDocument();
+      await expect(
+        canvas.queryByRole('tab', { name: i18n.t('flights.infoTab') })
+      ).not.toBeInTheDocument();
+    });
+  }
+);
+
+export const MobileFlowWithReplay = meta.story({
+  name: 'Mobile Flow With Replay',
+  parameters: {
+    msw: {
+      handlers: createHandlers(150),
+    },
+  },
+  beforeEach: () => {
+    resetStoryState();
+    return installMatchMediaMock(true);
+  },
+});
+
+MobileFlowWithReplay.test(
+  'loads GPX data only when Replay tab is selected',
+  async ({ canvas, userEvent, step }) => {
+    await step('has the flight list', async () => {
+      const flightList = await canvas.findByRole('grid', {
+        name: i18n.t('flights.listAriaLabel'),
+      });
+      await expect(flightList).toBeInTheDocument();
+    });
+
+    await step('opens a flight with GPX', async () => {
+      await userEvent.click(await canvas.findByTestId('flight-row-flight-001'));
+      await expect(
+        await canvas.findByRole('button', {
+          name: i18n.t('flights.backToList'),
+        })
+      ).toBeInTheDocument();
+    });
+
+    await step('does not load GPX while Infos tab is active', () => {
+      expect(gpxRequestCount).toBe(0);
+    });
+
+    await step('switches to Replay and shows loading state', async () => {
+      await userEvent.click(
+        canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
+      );
+
+      await expect(
+        await canvas.findByText(i18n.t('flights.loading3dViewer'))
+      ).toBeInTheDocument();
+    });
+
+    await step('triggers GPX loading once Replay is active', async () => {
+      await waitFor(() => {
+        expect(gpxRequestCount).toBeGreaterThan(0);
+      });
+    });
+  }
+);
+
 // clique sur un vol => les détails du vol
 // supprimer plusieurs vols
 // annuler la suppression de plusieurs vols
