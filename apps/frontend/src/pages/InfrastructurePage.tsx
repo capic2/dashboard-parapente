@@ -103,6 +103,18 @@ export function getResolvedLabel(
     return t('cache.resolvedEmagram');
   }
 
+  if (resolved.label === 'emagram_analysis') {
+    if (resolved.details && resolved.details.site_id && resolved.details.date) {
+      return t('cache.resolvedEmagramAnalysis', {
+        site: String((resolved.details as Record<string, unknown>).site_id),
+        date: String((resolved.details as Record<string, unknown>).date),
+        hour: String((resolved.details as Record<string, unknown>).hour ?? ''),
+      });
+    }
+
+    return t('cache.resolvedEmagramAnalysis');
+  }
+
   return t('cache.resolutionGeneric');
 }
 

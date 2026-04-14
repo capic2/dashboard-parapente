@@ -525,6 +525,7 @@
     "resolvedWeatherForecast": "Prévision météo",
     "resolvedWeatherForecastWithSite": "Prévision météo - {{site}} (jour {{day}})",
     "resolvedEmagram": "Émagramme - station {{station}} ({{date}})",
+    "resolvedEmagramAnalysis": "Analyse émagramme - site {{site}} ({{date}} {{hour}}h)",
     "autoRefresh": "Rafraîchissement auto",
     "refresh": "Rafraîchir",
     "noKeys": "Aucune clé en cache",

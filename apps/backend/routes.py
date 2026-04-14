@@ -1585,6 +1585,19 @@ def _resolve_cache_key(
             },
         }
 
+    # emagram:analysis:<site_id>:<date>:<hour_or_latest>
+    if key.startswith("emagram:analysis:") and len(parts) == 5:
+        return {
+            "type": "emagram_analysis",
+            "label": "emagram_analysis",
+            "confidence": "high",
+            "details": {
+                "site_id": parts[2],
+                "date": parts[3],
+                "hour": parts[4],
+            },
+        }
+
     # weather:forecast:<hash>
     if key.startswith("weather:forecast:") and len(parts) == 3:
         hash_part = parts[2]
@@ -4683,6 +4696,34 @@ async def trigger_emagram_analysis(
             )
 
         logger.info(f"Multi-source emagram complete: {analysis.id}")
+
+        # Keep a lightweight Redis cache marker so emagram activity is visible
+        # in the Infrastructure cache viewer.
+        try:
+            from app_settings import get_setting_int
+            from cache import get_redis
+
+            cache_ttl = get_setting_int("cache_ttl_default", default=3600)
+            cache_hour = str(request.hour) if request.hour is not None else "latest"
+            cache_key = (
+                f"emagram:analysis:{closest_site.id}:{forecast_date.isoformat()}:{cache_hour}"
+            )
+            cache_value = {
+                "analysis_id": analysis.id,
+                "site_id": closest_site.id,
+                "site_name": closest_site.name,
+                "forecast_date": forecast_date.isoformat(),
+                "hour": cache_hour,
+                "status": analysis.analysis_status,
+                "analysis_datetime": (
+                    analysis.analysis_datetime.isoformat() if analysis.analysis_datetime else None
+                ),
+            }
+
+            redis_client = await get_redis()
+            await redis_client.setex(cache_key, cache_ttl, json.dumps(cache_value))
+        except Exception as cache_error:
+            logger.warning("Failed to write emagram analysis cache marker: %s", cache_error)
 
         return analysis
 
