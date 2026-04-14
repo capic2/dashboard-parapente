@@ -10,6 +10,8 @@ describe('getResolvedLabel', () => {
       'cache.resolvedWeatherForecast': 'Weather forecast',
       'cache.resolvedWeatherForecastWithSite': `Weather forecast for ${(options.site as string) ?? ''} (day ${(options.day as string) ?? ''})`,
       'cache.resolvedEmagram': `Emagram sounding for station ${(options.station as string) ?? ''} (${(options.date as string) ?? ''})`,
+      'cache.resolvedEmagramAnalysis': `Emagram analysis for site ${(options.site as string) ?? ''} (${(options.date as string) ?? ''} ${(options.hour as string) ?? ''})`,
+      'cache.latest': 'latest',
       'cache.resolutionGeneric': 'Unknown key type',
     };
 
@@ -85,6 +87,42 @@ describe('getResolvedLabel', () => {
         t
       )
     ).toBe('Emagram sounding for station 07145 (2026-01-15)');
+  });
+
+  it('formats emagram analysis with site/date/hour', () => {
+    expect(
+      getResolvedLabel(
+        {
+          type: 'emagram_analysis',
+          label: 'emagram_analysis',
+          confidence: 'high',
+          details: {
+            site_id: 'site-arguel',
+            date: '2026-01-15',
+            hour: '12',
+          },
+        },
+        t
+      )
+    ).toBe('Emagram analysis for site site-arguel (2026-01-15 12h)');
+  });
+
+  it('formats emagram analysis with latest hour token', () => {
+    expect(
+      getResolvedLabel(
+        {
+          type: 'emagram_analysis',
+          label: 'emagram_analysis',
+          confidence: 'high',
+          details: {
+            site_id: 'site-arguel',
+            date: '2026-01-15',
+            hour: 'latest',
+          },
+        },
+        t
+      )
+    ).toBe('Emagram analysis for site site-arguel (2026-01-15 latest)');
   });
 
   it('falls back to generic label for unknown type', () => {

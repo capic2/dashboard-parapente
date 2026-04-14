@@ -525,6 +525,8 @@
     "resolvedWeatherForecast": "Weather forecast",
     "resolvedWeatherForecastWithSite": "Weather forecast for {{site}} (day {{day}})",
     "resolvedEmagram": "Emagram sounding for station {{station}} ({{date}})",
+    "resolvedEmagramAnalysis": "Emagram analysis for site {{site}} ({{date}} {{hour}})",
+    "latest": "latest",
     "autoRefresh": "Auto-refresh",
     "refresh": "Refresh",
     "noKeys": "No cache keys found",
