@@ -136,6 +136,11 @@ class TestGetCacheOverview:
             3600,
             json.dumps({"station_code": "07145", "cached_at": "2026-01-15T10:00:00+00:00"}),
         )
+        await seeded_redis.setex(
+            "emagram:analysis:site-arguel:2026-01-15:12",
+            3600,
+            json.dumps({"analysis_id": "abc123", "cached_at": "2026-01-15T10:00:00+00:00"}),
+        )
 
         response = client.get("/api/admin/cache")
         assert response.status_code == 200
@@ -154,6 +159,11 @@ class TestGetCacheOverview:
             for item in data["groups"]["emagram:sounding"]["keys"]
             if item["key"] == "emagram:sounding:07145:12:2026-01-15"
         )
+        emagram_analysis_entry = next(
+            item
+            for item in data["groups"]["emagram:analysis"]["keys"]
+            if item["key"] == "emagram:analysis:site-arguel:2026-01-15:12"
+        )
 
         assert forecast_entry["resolved"]["label"] == "weather_forecast"
         assert forecast_entry["resolved"]["details"]["site_code"] == "ARG"
@@ -164,6 +174,8 @@ class TestGetCacheOverview:
 
         assert emagram_entry["resolved"]["label"] == "emagram_sounding"
         assert emagram_entry["resolved"]["details"]["station"] == "07145"
+        assert emagram_analysis_entry["resolved"]["label"] == "emagram_analysis"
+        assert emagram_analysis_entry["resolved"]["details"]["site_id"] == "site-arguel"
 
     @pytest.mark.anyio
     async def test_cache_overview_unresolved_key(self, client, db_session, seeded_redis):
