@@ -1627,13 +1627,14 @@ async def _cache_emagram_analysis_marker(
     analysis: EmagramAnalysis,
     forecast_date: date,
     hour: int | None,
+    db: Session | None = None,
 ) -> None:
     """Store a lightweight Redis marker for Infrastructure cache visibility."""
     try:
         from app_settings import get_setting_int
         from cache import get_redis
 
-        cache_ttl = get_setting_int("cache_ttl_default", default=3600)
+        cache_ttl = get_setting_int("cache_ttl_default", db=db, default=3600)
         cache_hour = str(hour) if hour is not None else "latest"
         cache_key = f"emagram:analysis:{site.id}:{forecast_date.isoformat()}:{cache_hour}"
         cache_value = {
@@ -4677,7 +4678,7 @@ async def trigger_emagram_analysis(
                 )
                 if existing:
                     await _cache_emagram_analysis_marker(
-                        closest_site, existing, forecast_date, request.hour
+                        closest_site, existing, forecast_date, request.hour, db=db
                     )
                 return existing
 
@@ -4703,7 +4704,7 @@ async def trigger_emagram_analysis(
                     f"Returning cached emagram for hour {request.hour} from {existing.analysis_datetime}"
                 )
                 await _cache_emagram_analysis_marker(
-                    closest_site, existing, forecast_date, request.hour
+                    closest_site, existing, forecast_date, request.hour, db=db
                 )
                 return existing
 
@@ -4735,7 +4736,9 @@ async def trigger_emagram_analysis(
             )
 
         logger.info(f"Multi-source emagram complete: {analysis.id}")
-        await _cache_emagram_analysis_marker(closest_site, analysis, forecast_date, request.hour)
+        await _cache_emagram_analysis_marker(
+            closest_site, analysis, forecast_date, request.hour, db=db
+        )
 
         return analysis
 

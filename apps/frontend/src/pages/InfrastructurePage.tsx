@@ -105,10 +105,22 @@ export function getResolvedLabel(
 
   if (resolved.label === 'emagram_analysis') {
     if (resolved.details && resolved.details.site_id && resolved.details.date) {
+      const rawHour = (resolved.details as Record<string, unknown>).hour;
+      let hourLabel = '';
+
+      if (rawHour === 'latest') {
+        hourLabel = t('cache.latest');
+      } else if (rawHour !== undefined && rawHour !== '') {
+        const numericHour = Number(rawHour);
+        hourLabel = Number.isFinite(numericHour)
+          ? `${String(numericHour)}h`
+          : String(rawHour);
+      }
+
       return t('cache.resolvedEmagramAnalysis', {
         site: String((resolved.details as Record<string, unknown>).site_id),
         date: String((resolved.details as Record<string, unknown>).date),
-        hour: String((resolved.details as Record<string, unknown>).hour ?? ''),
+        hour: hourLabel,
       });
     }
 
