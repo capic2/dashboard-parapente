@@ -1,86 +1,87 @@
-"""Tests for the emagram Redis cache configuration."""
+"""Tests for emagram cache using shared backend Redis client."""
 
-import importlib
-import logging
-import sys
-from types import ModuleType, SimpleNamespace
-from unittest.mock import MagicMock
+from datetime import datetime
+from types import SimpleNamespace
+
+import pytest
+
+from cache_emagram.emagram_cache import EmagramCache, get_cache
 
 
-def _install_config_stub(monkeypatch, host="redis", port=6379):
-    monkeypatch.setitem(
-        sys.modules,
-        "config",
-        SimpleNamespace(REDIS_HOST=host, REDIS_PORT=port),
+def test_get_cache_returns_singleton_instance():
+    first = get_cache()
+    second = get_cache()
+
+    assert first is second
+
+
+@pytest.mark.asyncio
+async def test_emagram_cache_reads_written_value_from_shared_backend_client(monkeypatch):
+    calls = []
+    store = {}
+
+    async def fake_get(key):
+        calls.append(("get", key))
+        return store.get(key)
+
+    async def fake_setex(key, ttl, value):
+        calls.append(("setex", key, ttl))
+        store[key] = value
+
+    fake_client = SimpleNamespace(get=fake_get, setex=fake_setex)
+
+    async def fake_get_redis():
+        return fake_client
+
+    monkeypatch.setattr("cache.get_redis", fake_get_redis)
+
+    cache = EmagramCache()
+    date = datetime(2026, 1, 15)
+
+    written = await cache.set_sounding(
+        "07145",
+        "12",
+        date,
+        {
+            "success": True,
+            "station_code": "07145",
+            "sounding_date": "2026-01-15",
+        },
+        ttl_hours=24,
     )
 
+    payload = await cache.get_sounding("07145", "12", date)
 
-def _install_redis_stub(monkeypatch, redis_client):
-    redis_module = ModuleType("redis")
-    redis_module.ConnectionError = type("ConnectionError", (Exception,), {})
-    redis_module.TimeoutError = type("TimeoutError", (Exception,), {})
-    redis_module.from_url = MagicMock(return_value=redis_client)
-    monkeypatch.setitem(sys.modules, "redis", redis_module)
-    return redis_module
-
-
-def _load_module(monkeypatch, host="redis", port=6379, redis_client=None):
-    _install_config_stub(monkeypatch, host=host, port=port)
-    module = _install_redis_stub(monkeypatch, redis_client or MagicMock())
-    sys.modules.pop("cache_emagram.emagram_cache", None)
-    emagram_cache = importlib.import_module("cache_emagram.emagram_cache")
-    return emagram_cache, module
+    assert written is True
+    assert payload is not None
+    assert payload["success"] is True
+    assert payload["cached_at"]
+    assert ("setex", "emagram:sounding:07145:12:2026-01-15", 86400) in calls
+    assert ("get", "emagram:sounding:07145:12:2026-01-15") in calls
 
 
-def test_get_redis_url_uses_backend_config(monkeypatch):
-    monkeypatch.delenv("REDIS_URL", raising=False)
-    emagram_cache, _ = _load_module(monkeypatch, host="redis", port=6379)
+@pytest.mark.asyncio
+async def test_emagram_cache_skips_failed_payloads(monkeypatch):
+    called = False
 
-    assert emagram_cache._get_redis_url() == "redis://redis:6379"
+    async def fake_setex(*args, **kwargs):
+        nonlocal called
+        called = True
 
+    fake_client = SimpleNamespace(setex=fake_setex)
 
-def test_get_redis_url_prefers_env_override(monkeypatch):
-    monkeypatch.setenv("REDIS_URL", "redis://custom-redis:6380")
-    emagram_cache, _ = _load_module(monkeypatch, host="redis", port=6379)
+    async def fake_get_redis():
+        return fake_client
 
-    assert emagram_cache._get_redis_url() == "redis://custom-redis:6380"
+    monkeypatch.setattr("cache.get_redis", fake_get_redis)
 
-
-def test_emagram_cache_initializes_with_shared_backend_redis(monkeypatch):
-    monkeypatch.delenv("REDIS_URL", raising=False)
-    redis_client = MagicMock()
-    redis_client.ping.return_value = True
-
-    emagram_cache, redis_module = _load_module(
-        monkeypatch,
-        host="redis",
-        port=6379,
-        redis_client=redis_client,
+    cache = EmagramCache()
+    result = await cache.set_sounding(
+        "07145",
+        "12",
+        datetime(2026, 1, 15),
+        {"success": False},
     )
 
-    cache = emagram_cache.EmagramCache()
-
-    redis_module.from_url.assert_called_once_with("redis://redis:6379", decode_responses=True)
-    assert cache.enabled is True
-    assert cache.redis_client is redis_client
-
-
-def test_emagram_cache_connection_failures_do_not_log_password(monkeypatch, caplog):
-    """Redis password must never appear in warning logs."""
-    monkeypatch.setenv("REDIS_URL", "redis://app_user:super-secret@redis.internal:6379")
-    redis_client = MagicMock()
-
-    emagram_cache, redis_module = _load_module(monkeypatch, redis_client=redis_client)
-    redis_client.ping.side_effect = redis_module.ConnectionError("auth failed")
-
-    with caplog.at_level(logging.WARNING):
-        cache = emagram_cache.EmagramCache()
-
-    redis_module.from_url.assert_called_once_with(
-        "redis://app_user:super-secret@redis.internal:6379",
-        decode_responses=True,
-    )
-    assert cache.enabled is False
-    assert cache.redis_client is None
-    assert any("super-secret" in record.message for record in caplog.records) is False
-    assert any("***:***@redis.internal:6379" in record.message for record in caplog.records)
+    assert result is False
+    assert called is False
