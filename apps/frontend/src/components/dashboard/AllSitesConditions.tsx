@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
 import { WindIndicator } from '../common/WindIndicator';
 import CacheTimestamp from '../common/CacheTimestamp';
-import { Button } from '@dashboard-parapente/design-system';
 import type { WeatherData } from '../../types';
 import type { Site } from '@dashboard-parapente/shared-types';
 
@@ -50,9 +49,10 @@ function SiteConditionCard({
   };
 
   return (
-    <Button
+    <button
+      type="button"
       onClick={handleClick}
-      className="w-full text-left bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border border-gray-200 dark:border-gray-700 hover:border-sky-400 dark:hover:border-sky-500 hover:shadow-lg transition-all cursor-pointer"
+      className="w-full text-left bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border border-gray-200 dark:border-gray-700 hover:border-sky-400 dark:hover:border-sky-500 hover:shadow-lg transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900"
     >
       {/* Site name + orientation */}
       <div className="flex items-center justify-between mb-3">
@@ -134,7 +134,7 @@ function SiteConditionCard({
           </div>
         </>
       )}
-    </Button>
+    </button>
   );
 }
 
