@@ -3,6 +3,7 @@ import { expect, screen, waitFor, within } from 'storybook/test';
 import preview from '../../.storybook/preview';
 import FlightHistory from './FlightHistory';
 import i18n from 'i18next';
+import { useToastStore } from '../hooks/useToast';
 
 type MediaQueryCallback = (event: MediaQueryListEvent) => void;
 
@@ -15,14 +16,18 @@ function installMatchMediaMock(isMobile: boolean) {
       media: query,
       onchange: null,
       addEventListener: (_event: string, _listener: MediaQueryCallback) => {},
-      removeEventListener: (_event: string, _listener: MediaQueryCallback) => {},
+      removeEventListener: (
+        _event: string,
+        _listener: MediaQueryCallback
+      ) => {},
       addListener: () => {},
       removeListener: () => {},
       dispatchEvent: () => false,
     } as unknown as MediaQueryList;
   };
 
-  window.matchMedia = ((query: string) => createMediaQueryList(query)) as typeof window.matchMedia;
+  window.matchMedia = ((query: string) =>
+    createMediaQueryList(query)) as typeof window.matchMedia;
 
   return () => {
     window.matchMedia = originalMatchMedia;
@@ -32,6 +37,7 @@ function installMatchMediaMock(isMobile: boolean) {
 const meta = preview.meta({
   title: 'Pages/FlightHistory',
   component: FlightHistory,
+  decorators: [(Story, context) => <Story key={context.id} />],
   parameters: { layout: 'fullscreen' },
   tags: ['autodocs'],
 });
@@ -150,6 +156,12 @@ const resetFlightsDb = () => {
   flightsDb.push(...mockFlights);
 };
 
+const resetStoryState = () => {
+  resetFlightsDb();
+  gpxRequestCount = 0;
+  useToastStore.setState({ toasts: [] });
+};
+
 const createHandlers = (gpxDelayMs = 0) => [
   http.get('*/api/flights', () => HttpResponse.json({ flights: flightsDb })),
   http.get('*/api/flights/:id/gpx-data', async () => {
@@ -189,7 +201,7 @@ const defaultHandlers = createHandlers();
 export const Default = meta.story({
   name: 'Default',
   parameters: { msw: { handlers: defaultHandlers } },
-  beforeEach: resetFlightsDb,
+  beforeEach: resetStoryState,
 });
 
 Default.test(
@@ -284,54 +296,53 @@ Default.test(
 export const MobileFlow = meta.story({
   name: 'Mobile Flow',
   parameters: { msw: { handlers: defaultHandlers } },
-  beforeEach: resetFlightsDb,
+  beforeEach: () => {
+    resetStoryState();
+    return installMatchMediaMock(true);
+  },
 });
 
 MobileFlow.test(
   'opens a flight, switches tabs, and returns to list on mobile',
   async ({ canvas, userEvent, step }) => {
-    const cleanup = installMatchMediaMock(true);
+    await step('has the flight list', async () => {
+      const flightList = await canvas.findByRole('grid', {
+        name: i18n.t('flights.listAriaLabel'),
+      });
+      await expect(flightList).toBeInTheDocument();
+    });
 
-    try {
-      await step('has the flight list', async () => {
-        const flightList = await canvas.findByRole('grid', {
+    await step('opens a flight in mobile detail mode', async () => {
+      await userEvent.click(await canvas.findByTestId('flight-row-flight-002'));
+      await expect(
+        await canvas.findByRole('button', {
+          name: i18n.t('flights.backToList'),
+        })
+      ).toBeInTheDocument();
+    });
+
+    await step('switches to Replay and shows unavailable state', async () => {
+      await userEvent.click(
+        canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
+      );
+      await expect(
+        await canvas.findByText(i18n.t('flights.replayUnavailable'))
+      ).toBeInTheDocument();
+    });
+
+    await step('returns to the list', async () => {
+      await userEvent.click(
+        canvas.getByRole('button', { name: i18n.t('flights.backToList') })
+      );
+      await expect(
+        await canvas.findByRole('grid', {
           name: i18n.t('flights.listAriaLabel'),
-        });
-        await expect(flightList).toBeInTheDocument();
-      });
-
-      await step('opens a flight in mobile detail mode', async () => {
-        await userEvent.click(canvas.getByText('Chalais 10-03 11h00'));
-        await expect(
-          await canvas.findByRole('button', { name: i18n.t('flights.backToList') })
-        ).toBeInTheDocument();
-      });
-
-      await step('switches to Replay and shows unavailable state', async () => {
-        await userEvent.click(
-          canvas.getByRole('button', { name: i18n.t('flights.replayTab') })
-        );
-        await expect(
-          await canvas.findByText(i18n.t('flights.replayUnavailable'))
-        ).toBeInTheDocument();
-      });
-
-      await step('returns to the list', async () => {
-        await userEvent.click(
-          canvas.getByRole('button', { name: i18n.t('flights.backToList') })
-        );
-        await expect(
-          await canvas.findByRole('grid', {
-            name: i18n.t('flights.listAriaLabel'),
-          })
-        ).toBeInTheDocument();
-        await expect(
-          canvas.queryByRole('button', { name: i18n.t('flights.infoTab') })
-        ).not.toBeInTheDocument();
-      });
-    } finally {
-      cleanup();
-    }
+        })
+      ).toBeInTheDocument();
+      await expect(
+        canvas.queryByRole('tab', { name: i18n.t('flights.infoTab') })
+      ).not.toBeInTheDocument();
+    });
   }
 );
 
@@ -343,58 +354,49 @@ export const MobileFlowWithReplay = meta.story({
     },
   },
   beforeEach: () => {
-    resetFlightsDb();
-    gpxRequestCount = 0;
+    resetStoryState();
+    return installMatchMediaMock(true);
   },
 });
 
 MobileFlowWithReplay.test(
   'loads GPX data only when Replay tab is selected',
   async ({ canvas, userEvent, step }) => {
-    const cleanup = installMatchMediaMock(true);
-
-    try {
-      await step('has the flight list', async () => {
-        const flightList = await canvas.findByRole('grid', {
-          name: i18n.t('flights.listAriaLabel'),
-        });
-        await expect(flightList).toBeInTheDocument();
+    await step('has the flight list', async () => {
+      const flightList = await canvas.findByRole('grid', {
+        name: i18n.t('flights.listAriaLabel'),
       });
+      await expect(flightList).toBeInTheDocument();
+    });
 
-      await step('opens a flight with GPX', async () => {
-        await userEvent.click(canvas.getByText('Vol thermique Arguel'));
-        await expect(
-          await canvas.findByRole('button', { name: i18n.t('flights.backToList') })
-        ).toBeInTheDocument();
+    await step('opens a flight with GPX', async () => {
+      await userEvent.click(await canvas.findByTestId('flight-row-flight-001'));
+      await expect(
+        await canvas.findByRole('button', {
+          name: i18n.t('flights.backToList'),
+        })
+      ).toBeInTheDocument();
+    });
+
+    await step('does not load GPX while Infos tab is active', () => {
+      expect(gpxRequestCount).toBe(0);
+    });
+
+    await step('switches to Replay and shows loading state', async () => {
+      await userEvent.click(
+        canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
+      );
+
+      await expect(
+        await canvas.findByText(i18n.t('flights.loading3dViewer'))
+      ).toBeInTheDocument();
+    });
+
+    await step('triggers GPX loading once Replay is active', async () => {
+      await waitFor(() => {
+        expect(gpxRequestCount).toBeGreaterThan(0);
       });
-
-      await step('does not load GPX while Infos tab is active', () => {
-        expect(gpxRequestCount).toBe(0);
-      });
-
-      await step('switches to Replay and shows loading state', async () => {
-        await userEvent.click(
-          canvas.getByRole('button', { name: i18n.t('flights.replayTab') })
-        );
-
-        await expect(
-          await canvas.findByText(i18n.t('flights.loading3dViewer'))
-        ).toBeInTheDocument();
-      });
-
-      await step('triggers GPX loading once Replay is active', async () => {
-        await waitFor(() => {
-          expect(gpxRequestCount).toBeGreaterThan(0);
-        });
-        await waitFor(() => {
-          expect(
-            canvas.queryByText(i18n.t('flights.loading3dViewer'))
-          ).not.toBeInTheDocument();
-        });
-      });
-    } finally {
-      cleanup();
-    }
+    });
   }
 );
 
