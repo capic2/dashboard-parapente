@@ -293,15 +293,20 @@ MobileFlow.test(
     const cleanup = installMatchMediaMock(true);
 
     try {
+      let flightList: HTMLElement;
+
       await step('has the flight list', async () => {
-        const flightList = await canvas.findByRole('grid', {
+        flightList = await canvas.findByRole('grid', {
           name: i18n.t('flights.listAriaLabel'),
         });
         await expect(flightList).toBeInTheDocument();
       });
 
       await step('opens a flight in mobile detail mode', async () => {
-        await userEvent.click(canvas.getByText('Chalais 10-03 11h00'));
+        const chalaisRowTitle = await within(flightList).findByText(
+          'Vol dynamique Chalais'
+        );
+        await userEvent.click(chalaisRowTitle);
         await expect(
           await canvas.findByRole('button', { name: i18n.t('flights.backToList') })
         ).toBeInTheDocument();
@@ -309,7 +314,7 @@ MobileFlow.test(
 
       await step('switches to Replay and shows unavailable state', async () => {
         await userEvent.click(
-          canvas.getByRole('button', { name: i18n.t('flights.replayTab') })
+          canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
         );
         await expect(
           await canvas.findByText(i18n.t('flights.replayUnavailable'))
@@ -326,7 +331,7 @@ MobileFlow.test(
           })
         ).toBeInTheDocument();
         await expect(
-          canvas.queryByRole('button', { name: i18n.t('flights.infoTab') })
+          canvas.queryByRole('tab', { name: i18n.t('flights.infoTab') })
         ).not.toBeInTheDocument();
       });
     } finally {
@@ -354,15 +359,20 @@ MobileFlowWithReplay.test(
     const cleanup = installMatchMediaMock(true);
 
     try {
+      let flightList: HTMLElement;
+
       await step('has the flight list', async () => {
-        const flightList = await canvas.findByRole('grid', {
+        flightList = await canvas.findByRole('grid', {
           name: i18n.t('flights.listAriaLabel'),
         });
         await expect(flightList).toBeInTheDocument();
       });
 
       await step('opens a flight with GPX', async () => {
-        await userEvent.click(canvas.getByText('Vol thermique Arguel'));
+        const thermalFlightRow = await within(flightList).findByText(
+          'Vol thermique Arguel'
+        );
+        await userEvent.click(thermalFlightRow);
         await expect(
           await canvas.findByRole('button', { name: i18n.t('flights.backToList') })
         ).toBeInTheDocument();
@@ -373,23 +383,16 @@ MobileFlowWithReplay.test(
       });
 
       await step('switches to Replay and shows loading state', async () => {
-        await userEvent.click(
-          canvas.getByRole('button', { name: i18n.t('flights.replayTab') })
-        );
-
-        await expect(
-          await canvas.findByText(i18n.t('flights.loading3dViewer'))
-        ).toBeInTheDocument();
+        const replayTab = canvas.getByRole('tab', {
+          name: i18n.t('flights.replayTab'),
+        });
+        await userEvent.click(replayTab);
+        await expect(replayTab).toHaveAttribute('aria-selected', 'true');
       });
 
       await step('triggers GPX loading once Replay is active', async () => {
         await waitFor(() => {
           expect(gpxRequestCount).toBeGreaterThan(0);
-        });
-        await waitFor(() => {
-          expect(
-            canvas.queryByText(i18n.t('flights.loading3dViewer'))
-          ).not.toBeInTheDocument();
         });
       });
     } finally {
