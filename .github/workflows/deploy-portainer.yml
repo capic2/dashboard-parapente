@@ -7,7 +7,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  issues: write
+  pull-requests: write
 
 concurrency:
   group: deploy-production
@@ -21,6 +23,59 @@ jobs:
     timeout-minutes: 5
 
     steps:
+      - name: Compute deployment version
+        id: version
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const date = new Date().toISOString().slice(0, 10).replace(/-/g, '.');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const response = await github.request(
+              'GET /repos/{owner}/{repo}/git/matching-refs/{ref}',
+              {
+                owner,
+                repo,
+                ref: 'tags/deploy/',
+              }
+            );
+
+            const parsedTags = response.data
+              .map((item) => {
+                const match = item.ref.match(/^refs\/tags\/deploy\/(\d{4}\.\d{2}\.\d{2})\.(\d+)$/);
+                if (!match) return null;
+                return {
+                  ref: item.ref,
+                  date: match[1],
+                  number: Number(match[2]),
+                  sha: item.object.sha,
+                };
+              })
+              .filter(Boolean)
+              .sort((a, b) => {
+                if (a.date === b.date) return a.number - b.number;
+                return a.date.localeCompare(b.date);
+              });
+
+            const latestTag = parsedTags.length > 0 ? parsedTags[parsedTags.length - 1] : null;
+            const latestToday = parsedTags
+              .filter((tag) => tag.date === date)
+              .reduce((max, tag) => Math.max(max, tag.number), 0);
+
+            const nextNumber = latestToday + 1;
+            const version = `${date}.${nextNumber}`;
+
+            core.setOutput('version', version);
+            core.setOutput('tag_name', `deploy/${version}`);
+            core.setOutput('label_name', `version:${version}`);
+            core.setOutput('previous_deploy_sha', latestTag ? latestTag.sha : '');
+
+            core.info(`Deployment version: ${version}`);
+            if (latestTag) {
+              core.info(`Previous deployment tag: ${latestTag.ref} (${latestTag.sha})`);
+            }
+
       - name: Trigger deployment
         env:
           WEBHOOK_URL: ${{ secrets.PORTAINER_WEBHOOK_URL }}
@@ -36,5 +91,124 @@ jobs:
             --max-time 30 \
             -X POST "$WEBHOOK_URL"
 
+      - name: Create deployment tag
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ steps.version.outputs.tag_name }}
+          TARGET_SHA: ${{ github.sha }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const tagName = process.env.TAG_NAME;
+            const targetSha = process.env.TARGET_SHA;
+
+            try {
+              await github.request('POST /repos/{owner}/{repo}/git/refs', {
+                owner,
+                repo,
+                ref: `refs/tags/${tagName}`,
+                sha: targetSha,
+              });
+              core.info(`Created tag ${tagName} on ${targetSha}`);
+            } catch (error) {
+              if (error.status === 422) {
+                core.warning(`Tag ${tagName} already exists, skipping creation`);
+              } else {
+                throw error;
+              }
+            }
+
+      - name: Label merged PRs with deployed version
+        uses: actions/github-script@v7
+        env:
+          VERSION_LABEL: ${{ steps.version.outputs.label_name }}
+          PREVIOUS_DEPLOY_SHA: ${{ steps.version.outputs.previous_deploy_sha }}
+          CURRENT_SHA: ${{ github.sha }}
+          CURRENT_PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const versionLabel = process.env.VERSION_LABEL;
+            const previousDeploySha = process.env.PREVIOUS_DEPLOY_SHA;
+            const currentSha = process.env.CURRENT_SHA;
+            const currentPrNumber = process.env.CURRENT_PR_NUMBER;
+            const prNumbers = new Set();
+
+            if (currentPrNumber) {
+              prNumbers.add(Number(currentPrNumber));
+            }
+
+            if (previousDeploySha && previousDeploySha !== currentSha) {
+              const compare = await github.request(
+                'GET /repos/{owner}/{repo}/compare/{basehead}',
+                {
+                  owner,
+                  repo,
+                  basehead: `${previousDeploySha}...${currentSha}`,
+                }
+              );
+
+              for (const commit of compare.data.commits) {
+                const commitPrs = await github.request(
+                  'GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls',
+                  {
+                    owner,
+                    repo,
+                    commit_sha: commit.sha,
+                  }
+                );
+
+                for (const pr of commitPrs.data) {
+                  if (pr.base?.ref === 'main' && pr.merged_at) {
+                    prNumbers.add(pr.number);
+                  }
+                }
+              }
+            }
+
+            try {
+              await github.request('GET /repos/{owner}/{repo}/labels/{name}', {
+                owner,
+                repo,
+                name: versionLabel,
+              });
+            } catch (error) {
+              if (error.status === 404) {
+                await github.request('POST /repos/{owner}/{repo}/labels', {
+                  owner,
+                  repo,
+                  name: versionLabel,
+                  color: '1D76DB',
+                  description: 'Pull requests included in this deployed version',
+                });
+              } else {
+                throw error;
+              }
+            }
+
+            if (prNumbers.size === 0) {
+              core.info('No merged pull requests found to label for this deployment');
+              return;
+            }
+
+            for (const issue_number of prNumbers) {
+              await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/labels', {
+                owner,
+                repo,
+                issue_number,
+                labels: [versionLabel],
+              });
+            }
+
+            core.info(
+              `Applied label ${versionLabel} to PRs: ${Array.from(prNumbers)
+                .sort((a, b) => a - b)
+                .join(', ')}`
+            );
+
       - name: Confirm
-        run: echo "Portainer webhook triggered successfully"
+        run: |
+          echo "Portainer webhook triggered successfully"
+          echo "Deployment version: ${{ steps.version.outputs.version }}"
