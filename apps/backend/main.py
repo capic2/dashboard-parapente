@@ -555,7 +555,8 @@ async def lifespan(app: FastAPI):
     try:
         initialize_deployment_version()
     except OSError as error:
-        logger.warning("⚠️ Could not initialize deployment version: %s", error)
+        logger.error("❌ Could not initialize deployment version", exc_info=error)
+        raise RuntimeError("Deployment version initialization failed") from error
 
     # Load app settings into memory cache
     try:

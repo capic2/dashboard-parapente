@@ -1,8 +1,11 @@
 import json
 import logging
 import os
-from datetime import datetime
+import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
+
+import fcntl
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +20,7 @@ _current_version_payload: dict[str, int | str] | None = None
 
 
 def _today_string() -> str:
-    return datetime.now().strftime("%Y.%m.%d")
+    return datetime.now(timezone.utc).strftime("%Y.%m.%d")
 
 
 def _is_testing_mode() -> bool:
@@ -46,12 +49,16 @@ def _load_state() -> dict[str, int | str] | None:
 
 
 def _write_state(date: str, number: int) -> None:
-    VERSION_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    temp_file = VERSION_STATE_FILE.with_suffix(".tmp")
     payload = {"date": date, "number": number}
 
-    with temp_file.open("w", encoding="utf-8") as file:
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        dir=VERSION_STATE_FILE.parent,
+        delete=False,
+    ) as file:
         json.dump(payload, file)
+        temp_file = Path(file.name)
 
     temp_file.replace(VERSION_STATE_FILE)
 
@@ -69,14 +76,20 @@ def initialize_deployment_version() -> dict[str, int | str]:
         }
         return _current_version_payload
 
-    state = _load_state()
+    VERSION_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    lock_file_path = VERSION_STATE_FILE.with_suffix(".lock")
 
-    if state and state.get("date") == today:
-        next_number = int(state["number"]) + 1
-    else:
-        next_number = 1
+    with lock_file_path.open("w", encoding="utf-8") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
 
-    _write_state(today, next_number)
+        state = _load_state()
+
+        if state and state.get("date") == today:
+            next_number = int(state["number"]) + 1
+        else:
+            next_number = 1
+
+        _write_state(today, next_number)
 
     _current_version_payload = {
         "version": f"{today}.{next_number}",

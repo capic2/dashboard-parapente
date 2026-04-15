@@ -78,6 +78,7 @@ jobs:
 
       - name: Trigger deployment
         id: trigger_deploy
+        continue-on-error: true
         env:
           WEBHOOK_URL: ${{ secrets.PORTAINER_WEBHOOK_URL }}
         run: |
@@ -146,29 +147,55 @@ jobs:
             }
 
             if (previousDeploySha && previousDeploySha !== currentSha) {
-              const compare = await github.request(
+              const compareCommits = await github.paginate(
                 'GET /repos/{owner}/{repo}/compare/{basehead}',
                 {
                   owner,
                   repo,
                   basehead: `${previousDeploySha}...${currentSha}`,
-                }
+                  per_page: 100,
+                },
+                (response) => response.data.commits || []
               );
 
-              for (const commit of compare.data.commits) {
-                const commitPrs = await github.request(
-                  'GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls',
-                  {
-                    owner,
-                    repo,
-                    commit_sha: commit.sha,
-                  }
+              const commitsNeedingLookup = [];
+              const prNumberPattern = /\(#(\d+)\)|^Merge pull request #(\d+)/;
+
+              for (const commit of compareCommits) {
+                const message = commit.commit?.message || '';
+                const match = message.match(prNumberPattern);
+                const parsedPr = Number(match?.[1] || match?.[2] || 0);
+
+                if (Number.isInteger(parsedPr) && parsedPr > 0) {
+                  prNumbers.add(parsedPr);
+                } else {
+                  commitsNeedingLookup.push(commit.sha);
+                }
+              }
+
+              const chunkSize = 10;
+              for (let index = 0; index < commitsNeedingLookup.length; index += chunkSize) {
+                const chunk = commitsNeedingLookup.slice(index, index + chunkSize);
+                const responses = await Promise.all(
+                  chunk.map((commitSha) =>
+                    github.request('GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls', {
+                      owner,
+                      repo,
+                      commit_sha: commitSha,
+                    })
+                  )
                 );
 
-                for (const pr of commitPrs.data) {
-                  if (pr.base?.ref === 'main' && pr.merged_at) {
-                    prNumbers.add(pr.number);
+                for (const commitPrs of responses) {
+                  for (const pr of commitPrs.data) {
+                    if (pr.base?.ref === 'main' && pr.merged_at) {
+                      prNumbers.add(pr.number);
+                    }
                   }
+                }
+
+                if (index + chunkSize < commitsNeedingLookup.length) {
+                  await new Promise((resolve) => setTimeout(resolve, 200));
                 }
               }
             }
@@ -278,3 +305,9 @@ jobs:
         run: |
           echo "Deployment step outcome: ${{ steps.trigger_deploy.outcome }}"
           echo "Computed deployment version: ${{ steps.version.outputs.version }}"
+
+      - name: Fail job when deployment failed
+        if: steps.trigger_deploy.outcome == 'failure'
+        run: |
+          echo "Deployment webhook failed"
+          exit 1
