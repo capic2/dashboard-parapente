@@ -165,8 +165,12 @@ const login = async (page: import('@playwright/test').Page) => {
   await page.goto('/login');
   await page.fill('input#email', ADMIN_EMAIL);
   await page.fill('input#password', ADMIN_PASSWORD);
-  await page.click('button[type="submit"]');
-  await page.waitForLoadState('networkidle');
+  await Promise.all([
+    page.waitForURL((url) => !url.pathname.startsWith('/login'), {
+      timeout: 15000,
+    }),
+    page.click('button[type="submit"]'),
+  ]);
 };
 
 const getAuthToken = async (request: APIRequestContext) => {
