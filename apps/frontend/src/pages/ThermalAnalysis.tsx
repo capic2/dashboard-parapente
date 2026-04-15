@@ -20,13 +20,14 @@ import { useSite } from '../hooks/sites/useSites';
 import { parseAlerts, getScoreColor } from '../types/emagram';
 import type { EmagramListItem } from '../types/emagram';
 import { DataTable, Button } from '@dashboard-parapente/design-system';
+import { parseApiUtcDate } from '../lib/date';
 
 const historyColumnHelper = createColumnHelper<EmagramListItem>();
 
 const historyColumns = [
   historyColumnHelper.accessor('created_at', {
     header: 'Date',
-    cell: (info) => new Date(info.getValue()).toLocaleDateString(),
+    cell: (info) => parseApiUtcDate(info.getValue()).toLocaleDateString(),
     sortingFn: 'alphanumeric',
   }),
   historyColumnHelper.accessor('score_volabilite', {
@@ -293,7 +294,7 @@ export default function ThermalAnalysis() {
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
                 {latest.station_name} • {latest.sounding_time} •{' '}
-                {new Date(latest.analysis_datetime).toLocaleDateString()}
+                {parseApiUtcDate(latest.analysis_datetime).toLocaleDateString()}
               </p>
             </div>
           ) : (
