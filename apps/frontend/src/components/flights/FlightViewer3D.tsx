@@ -38,6 +38,33 @@ import {
 const isVideoExportInProgress = (status?: string | null) =>
   Boolean(status && VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(status));
 
+const getHttpErrorDetail = async (error: HTTPError): Promise<string | null> => {
+  try {
+    const body = (await error.response.json()) as {
+      detail?: unknown;
+      message?: unknown;
+    };
+    const raw = body.detail ?? body.message;
+
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      return trimmed || null;
+    }
+
+    if (Array.isArray(raw)) {
+      return raw.map((item) => String(item)).join(' • ');
+    }
+
+    if (raw && typeof raw === 'object') {
+      return JSON.stringify(raw);
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
+
 declare global {
   interface Window {
     _cesiumViewer?: CesiumViewer;
@@ -1323,19 +1350,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                               });
                             } catch (error) {
                               if (error instanceof HTTPError) {
-                                try {
-                                  const response =
-                                    (await error.response.json()) as {
-                                      detail?: string;
-                                    };
-                                  toast.error(
-                                    response.detail ||
-                                      'Impossible de lancer la génération'
-                                  );
-                                  return;
-                                } catch {
-                                  // Fall back to generic message below
-                                }
+                                const detail = await getHttpErrorDetail(error);
+                                toast.error(
+                                  detail || 'Impossible de lancer la génération'
+                                );
+                                return;
                               }
 
                               console.error(
@@ -1409,19 +1428,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                                 });
                               } catch (error) {
                                 if (error instanceof HTTPError) {
-                                  try {
-                                    const response =
-                                      (await error.response.json()) as {
-                                        detail?: string;
-                                      };
-                                    toast.error(
-                                      response.detail ||
-                                        "Impossible d'annuler la génération"
-                                    );
-                                    return;
-                                  } catch {
-                                    // Fall back to generic message below
-                                  }
+                                  const detail =
+                                    await getHttpErrorDetail(error);
+                                  toast.error(
+                                    detail ||
+                                      "Impossible d'annuler la génération"
+                                  );
+                                  return;
                                 }
 
                                 console.error(
@@ -1461,19 +1474,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                               });
                             } catch (error) {
                               if (error instanceof HTTPError) {
-                                try {
-                                  const response =
-                                    (await error.response.json()) as {
-                                      detail?: string;
-                                    };
-                                  toast.error(
-                                    response.detail ||
-                                      'Impossible de lancer la régénération'
-                                  );
-                                  return;
-                                } catch {
-                                  // Fall back to generic message below
-                                }
+                                const detail = await getHttpErrorDetail(error);
+                                toast.error(
+                                  detail ||
+                                    'Impossible de lancer la régénération'
+                                );
+                                return;
                               }
 
                               console.error(
