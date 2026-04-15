@@ -61,6 +61,7 @@ from video_export_manual import get_export_status as get_export_status_manual
 from video_export_manual import list_exports as list_exports_manual
 from video_export_manual import resolve_frontend_url
 from video_export_manual import start_video_export_manual
+from versioning import get_version_payload
 from weather_pipeline import get_daily_aggregate, get_normalized_forecast
 
 logger = logging.getLogger(__name__)
@@ -3252,6 +3253,11 @@ def create_alert(alert_data: dict, db: Session = Depends(get_db)):
 @public_router.get("/health")
 def health_check():
     return {"status": "ok", "message": "Dashboard API healthy"}
+
+
+@public_router.get("/version")
+def version_info():
+    return get_version_payload()
 
 
 # ============================================================================
