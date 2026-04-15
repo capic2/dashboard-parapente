@@ -77,6 +77,7 @@ jobs:
             }
 
       - name: Trigger deployment
+        id: trigger_deploy
         env:
           WEBHOOK_URL: ${{ secrets.PORTAINER_WEBHOOK_URL }}
         run: |
@@ -92,6 +93,7 @@ jobs:
             -X POST "$WEBHOOK_URL"
 
       - name: Create deployment tag
+        if: steps.trigger_deploy.outcome == 'success'
         uses: actions/github-script@v7
         env:
           TAG_NAME: ${{ steps.version.outputs.tag_name }}
@@ -120,9 +122,11 @@ jobs:
             }
 
       - name: Label merged PRs with deployed version
+        if: steps.trigger_deploy.outcome == 'success'
         uses: actions/github-script@v7
         env:
           VERSION_LABEL: ${{ steps.version.outputs.label_name }}
+          UNDEPLOYED_LABEL: non déployé
           PREVIOUS_DEPLOY_SHA: ${{ steps.version.outputs.previous_deploy_sha }}
           CURRENT_SHA: ${{ github.sha }}
           CURRENT_PR_NUMBER: ${{ github.event.pull_request.number || '' }}
@@ -131,6 +135,7 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const versionLabel = process.env.VERSION_LABEL;
+            const undeployedLabel = process.env.UNDEPLOYED_LABEL;
             const previousDeploySha = process.env.PREVIOUS_DEPLOY_SHA;
             const currentSha = process.env.CURRENT_SHA;
             const currentPrNumber = process.env.CURRENT_PR_NUMBER;
@@ -200,6 +205,19 @@ jobs:
                 issue_number,
                 labels: [versionLabel],
               });
+
+              try {
+                await github.request('DELETE /repos/{owner}/{repo}/issues/{issue_number}/labels/{name}', {
+                  owner,
+                  repo,
+                  issue_number,
+                  name: undeployedLabel,
+                });
+              } catch (error) {
+                if (error.status !== 404) {
+                  throw error;
+                }
+              }
             }
 
             core.info(
@@ -208,7 +226,55 @@ jobs:
                 .join(', ')}`
             );
 
+      - name: Label current PR as non deployed when deployment fails
+        if: steps.trigger_deploy.outcome == 'failure' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          UNDEPLOYED_LABEL: non déployé
+          CURRENT_PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const undeployedLabel = process.env.UNDEPLOYED_LABEL;
+            const currentPrNumber = process.env.CURRENT_PR_NUMBER;
+
+            if (!currentPrNumber) {
+              core.info('No pull request number found for failed deployment label');
+              return;
+            }
+
+            try {
+              await github.request('GET /repos/{owner}/{repo}/labels/{name}', {
+                owner,
+                repo,
+                name: undeployedLabel,
+              });
+            } catch (error) {
+              if (error.status === 404) {
+                await github.request('POST /repos/{owner}/{repo}/labels', {
+                  owner,
+                  repo,
+                  name: undeployedLabel,
+                  color: 'D73A4A',
+                  description: 'PR merged but not yet deployed successfully',
+                });
+              } else {
+                throw error;
+              }
+            }
+
+            await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/labels', {
+              owner,
+              repo,
+              issue_number: Number(currentPrNumber),
+              labels: [undeployedLabel],
+            });
+
+            core.info(`Applied label ${undeployedLabel} to PR #${currentPrNumber}`);
+
       - name: Confirm
+        if: always()
         run: |
-          echo "Portainer webhook triggered successfully"
-          echo "Deployment version: ${{ steps.version.outputs.version }}"
+          echo "Deployment step outcome: ${{ steps.trigger_deploy.outcome }}"
+          echo "Computed deployment version: ${{ steps.version.outputs.version }}"
