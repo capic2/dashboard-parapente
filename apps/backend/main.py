@@ -22,6 +22,7 @@ from models import Site  # Needed for database initialization
 from routes import public_router, router
 from video_export_manual import start_video_export_worker, stop_video_export_worker
 from scheduler import scheduler, start_scheduler, stop_scheduler
+from versioning import initialize_deployment_version
 from webhooks import router as webhooks_router
 
 # Configure logging
@@ -550,6 +551,11 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info("🚀 Starting Dashboard Parapente API...")
+
+    try:
+        initialize_deployment_version()
+    except OSError as error:
+        logger.warning("⚠️ Could not initialize deployment version: %s", error)
 
     # Load app settings into memory cache
     try:
