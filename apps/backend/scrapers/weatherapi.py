@@ -94,8 +94,8 @@ def extract_hourly_forecast(data: dict[str, any], day_index: int = 0) -> list[di
                 "time": time_str,
                 "hour": hour,
                 "temperature": hour_data.get("temp_c"),
-                "wind_speed": float(wind_kph) / 3.6 if wind_kph is not None else None,  # kph to m/s
-                "wind_gust": float(gust_kph) / 3.6 if gust_kph is not None else None,  # kph to m/s
+                "wind_speed": float(wind_kph) if wind_kph is not None else None,  # km/h
+                "wind_gust": float(gust_kph) if gust_kph is not None else None,  # km/h
                 "wind_direction": (
                     float(wind_deg) if wind_deg is not None else None
                 ),  # degrees (0-360)

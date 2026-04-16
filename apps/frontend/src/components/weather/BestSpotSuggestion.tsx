@@ -13,6 +13,7 @@ import { fr } from 'date-fns/locale';
 import CacheTimestamp from '../common/CacheTimestamp';
 import { enUS } from 'date-fns/locale';
 import { WindIndicator } from '../common/WindIndicator';
+import { Button } from '@dashboard-parapente/design-system';
 import type { BestSpotResult } from '@dashboard-parapente/shared-types';
 
 interface BestSpotSuggestionProps {
@@ -148,7 +149,10 @@ export function BestSpotSuggestion({
     verdict,
     windFavorability,
   } = bestSpot;
-  const adjustedScore = Math.min(100, Math.max(0, score != null ? Math.round(score) : paraIndex));
+  const adjustedScore = Math.min(
+    100,
+    Math.max(0, score != null ? Math.round(score) : paraIndex)
+  );
   const scoreColor = getScoreColor(adjustedScore);
   const verdictInfo = getVerdict(adjustedScore, verdict ?? undefined);
 
@@ -310,13 +314,13 @@ export function BestSpotSuggestion({
         </p>
 
         {/* Footer: button + cache */}
-        <div className="flex items-center justify-between">
-          <button
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <Button
             onClick={() => onSelectSite(site.id)}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors"
           >
             {t('weather.viewForecast')}
-          </button>
+          </Button>
           <CacheTimestamp cachedAt={bestSpot.cached_at} />
         </div>
       </div>
@@ -343,7 +347,7 @@ export function BestSpotSuggestionCompact({
   const scoreColor = getScoreColor(adjustedScore);
 
   return (
-    <button
+    <Button
       onClick={() => onSelectSite(site.id)}
       className={`w-full text-left p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors overflow-hidden ${className}`}
     >
@@ -374,6 +378,6 @@ export function BestSpotSuggestionCompact({
           {adjustedScore}
         </span>
       </div>
-    </button>
+    </Button>
   );
 }

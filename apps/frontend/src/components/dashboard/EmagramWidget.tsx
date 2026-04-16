@@ -16,6 +16,7 @@ import {
   getScoreCategory,
 } from '../../types/emagram';
 import { useState, useMemo } from 'react';
+import { parseApiUtcDate } from '../../lib/date';
 import { Lightbox } from '@dashboard-parapente/design-system';
 import {
   Slider,
@@ -335,7 +336,7 @@ export default function EmagramWidget({
   const alerts = parseAlerts(emagram.alertes_securite);
 
   // Format analysis time
-  const analysisDate = new Date(emagram.analysis_datetime);
+  const analysisDate = parseApiUtcDate(emagram.analysis_datetime);
   const timeAgo = getTimeAgo(analysisDate);
 
   return (

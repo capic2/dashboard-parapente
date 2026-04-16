@@ -260,9 +260,17 @@ if USING_NEW_ARCHITECTURE:
                     if not altitudes or not u_components or not v_components:
                         continue
 
-                    # Use surface level (index 0) for forecast
-                    # TODO: Could add elevation_m parameter to select altitude level
-                    closest_idx = 0  # Surface level
+                    # Select altitude closest to site elevation
+                    elevation = data.get("elevation_m", 500)
+                    target_altitude = elevation + 10  # 10m above site elevation
+                    closest_idx = 0
+                    if len(altitudes) > 1:
+                        min_diff = abs(altitudes[0] - target_altitude)
+                        for idx, alt in enumerate(altitudes):
+                            diff = abs(alt - target_altitude)
+                            if diff < min_diff:
+                                min_diff = diff
+                                closest_idx = idx
 
                     # Get data at that altitude
                     u = (
@@ -277,8 +285,8 @@ if USING_NEW_ARCHITECTURE:
                     )
                     temp = temps[closest_idx] if temps and closest_idx < len(temps) else None
 
-                    # Calculate wind speed and direction
-                    wind_speed = calculate_wind_speed_from_components(u, v)
+                    # Calculate wind speed (m/s -> km/h) and direction
+                    wind_speed = round(calculate_wind_speed_from_components(u, v) * 3.6, 1)
                     wind_direction = calculate_wind_direction_from_components(u, v)
 
                     hourly_forecasts.append(
@@ -336,7 +344,7 @@ async def fetch_meteo_parapente(
 
     if USING_NEW_ARCHITECTURE:
         scraper = MeteoParapenteScraper()
-        return await scraper.fetch(
+        result = await scraper.fetch(
             lat,
             lon,
             elevation_m=elevation_m or 500,
@@ -344,6 +352,8 @@ async def fetch_meteo_parapente(
             run=run,
             site_name=site_name,  # Forward site_name for coordinate refinement
         )
+        result["elevation_m"] = elevation_m or 500
+        return result
     else:
         # Standalone fallback (sans architecture)
         import httpx
@@ -374,6 +384,7 @@ async def fetch_meteo_parapente(
                 "success": True,
                 "source": "meteo_parapente",
                 "data": api_data,
+                "elevation_m": elevation_m or 500,
                 "timestamp": datetime.now().isoformat(),
             }
 
@@ -417,11 +428,39 @@ def extract_hourly_forecast(data: dict[str, Any], day_index: int = 0) -> list[di
                 hour = int(hour_str.split(":")[0])
                 hour_data = hourly_dict[hour_str]
 
-                # Get surface level data
-                u = hour_data.get("umet", [0])[0]
-                v = hour_data.get("vmet", [0])[0]
+                # Select altitude closest to site elevation
+                altitudes = hour_data.get("z", [])
+                u_components = hour_data.get("umet", [])
+                v_components = hour_data.get("vmet", [])
 
-                wind_speed = calculate_wind_speed_from_components(u, v)
+                if not altitudes or not u_components or not v_components:
+                    continue
+
+                elevation = data.get("elevation_m", 500)
+                target_altitude = elevation + 10
+                closest_idx = 0
+                if altitudes and len(altitudes) > 1:
+                    min_diff = abs(altitudes[0] - target_altitude)
+                    for idx, alt in enumerate(altitudes):
+                        diff = abs(alt - target_altitude)
+                        if diff < min_diff:
+                            min_diff = diff
+                            closest_idx = idx
+
+                u = (
+                    u_components[closest_idx]
+                    if closest_idx < len(u_components)
+                    else u_components[0]
+                )
+                v = (
+                    v_components[closest_idx]
+                    if closest_idx < len(v_components)
+                    else v_components[0]
+                )
+
+                wind_speed = round(
+                    calculate_wind_speed_from_components(u, v) * 3.6, 1
+                )  # m/s -> km/h
                 wind_direction = calculate_wind_direction_from_components(u, v)
 
                 hourly_forecasts.append(

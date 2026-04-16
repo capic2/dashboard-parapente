@@ -13,9 +13,10 @@ import { Route as WeatherRouteImport } from './routes/weather'
 import { Route as ThermalRouteImport } from './routes/thermal'
 import { Route as SitesRouteImport } from './routes/sites'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as InfrastructureRouteImport } from './routes/infrastructure'
 import { Route as FlightsRouteImport } from './routes/flights'
 import { Route as ExportViewerRouteImport } from './routes/export-viewer'
-import { Route as CacheRouteImport } from './routes/cache'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ViewerFlightIdRouteImport } from './routes/viewer.$flightId'
@@ -40,6 +41,18 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/settings.lazy').then((d) => d.Route))
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InfrastructureRoute = InfrastructureRouteImport.update({
+  id: '/infrastructure',
+  path: '/infrastructure',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/infrastructure.lazy').then((d) => d.Route),
+)
 const FlightsRoute = FlightsRouteImport.update({
   id: '/flights',
   path: '/flights',
@@ -50,11 +63,6 @@ const ExportViewerRoute = ExportViewerRouteImport.update({
   path: '/export-viewer',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/export-viewer.lazy').then((d) => d.Route))
-const CacheRoute = CacheRouteImport.update({
-  id: '/cache',
-  path: '/cache',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/cache.lazy').then((d) => d.Route))
 const AnalyticsRoute = AnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
@@ -76,9 +84,10 @@ const ViewerFlightIdRoute = ViewerFlightIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
-  '/cache': typeof CacheRoute
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRoute
+  '/infrastructure': typeof InfrastructureRoute
+  '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
@@ -88,9 +97,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
-  '/cache': typeof CacheRoute
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRoute
+  '/infrastructure': typeof InfrastructureRoute
+  '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
@@ -101,9 +111,10 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
-  '/cache': typeof CacheRoute
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRoute
+  '/infrastructure': typeof InfrastructureRoute
+  '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
@@ -115,9 +126,10 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/analytics'
-    | '/cache'
     | '/export-viewer'
     | '/flights'
+    | '/infrastructure'
+    | '/login'
     | '/settings'
     | '/sites'
     | '/thermal'
@@ -127,9 +139,10 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/analytics'
-    | '/cache'
     | '/export-viewer'
     | '/flights'
+    | '/infrastructure'
+    | '/login'
     | '/settings'
     | '/sites'
     | '/thermal'
@@ -139,9 +152,10 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/analytics'
-    | '/cache'
     | '/export-viewer'
     | '/flights'
+    | '/infrastructure'
+    | '/login'
     | '/settings'
     | '/sites'
     | '/thermal'
@@ -152,9 +166,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AnalyticsRoute: typeof AnalyticsRoute
-  CacheRoute: typeof CacheRoute
   ExportViewerRoute: typeof ExportViewerRoute
   FlightsRoute: typeof FlightsRoute
+  InfrastructureRoute: typeof InfrastructureRoute
+  LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRoute
   SitesRoute: typeof SitesRoute
   ThermalRoute: typeof ThermalRoute
@@ -192,6 +207,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/infrastructure': {
+      id: '/infrastructure'
+      path: '/infrastructure'
+      fullPath: '/infrastructure'
+      preLoaderRoute: typeof InfrastructureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/flights': {
       id: '/flights'
       path: '/flights'
@@ -204,13 +233,6 @@ declare module '@tanstack/react-router' {
       path: '/export-viewer'
       fullPath: '/export-viewer'
       preLoaderRoute: typeof ExportViewerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cache': {
-      id: '/cache'
-      path: '/cache'
-      fullPath: '/cache'
-      preLoaderRoute: typeof CacheRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/analytics': {
@@ -240,9 +262,10 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnalyticsRoute: AnalyticsRoute,
-  CacheRoute: CacheRoute,
   ExportViewerRoute: ExportViewerRoute,
   FlightsRoute: FlightsRoute,
+  InfrastructureRoute: InfrastructureRoute,
+  LoginRoute: LoginRoute,
   SettingsRoute: SettingsRoute,
   SitesRoute: SitesRoute,
   ThermalRoute: ThermalRoute,

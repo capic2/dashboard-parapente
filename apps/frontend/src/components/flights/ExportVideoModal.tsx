@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button } from '@dashboard-parapente/design-system';
 
 interface VideoExportConfig {
   quality: '720p' | '1080p' | '4K';
@@ -36,14 +37,18 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
         {/* Header */}
-        <h2 className="text-2xl font-bold mb-4 dark:text-white">🎥 Export Vidéo</h2>
+        <h2 className="text-2xl font-bold mb-4 dark:text-white">
+          🎥 Export Vidéo
+        </h2>
 
         {/* Quality Selection */}
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-2 dark:text-gray-200">Qualité</label>
+          <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+            Qualité
+          </label>
           <div className="grid grid-cols-3 gap-2">
             {(['720p', '1080p', '4K'] as const).map((q) => (
-              <button
+              <Button
                 key={q}
                 onClick={() => setQuality(q)}
                 className={`px-3 py-2 rounded border ${
@@ -53,7 +58,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
                 }`}
               >
                 {q}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -65,7 +70,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
           </label>
           <div className="grid grid-cols-2 gap-2">
             {([30, 60] as const).map((f) => (
-              <button
+              <Button
                 key={f}
                 onClick={() => setFps(f)}
                 className={`px-3 py-2 rounded border ${
@@ -75,7 +80,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
                 }`}
               >
                 {f} FPS
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -90,7 +95,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
           </label>
           <div className="grid grid-cols-4 gap-2">
             {([1, 2, 4, 8] as const).map((s) => (
-              <button
+              <Button
                 key={s}
                 onClick={() => setSpeed(s)}
                 className={`px-3 py-2 rounded border ${
@@ -100,7 +105,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
                 }`}
               >
                 {s}x
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -138,18 +143,18 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
 
         {/* Actions */}
         <div className="flex gap-2">
-          <button
+          <Button
             onClick={onCancel}
             className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-500"
           >
             Annuler
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleExport}
             className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
           >
             🎥 Exporter
-          </button>
+          </Button>
         </div>
 
         {/* Help Text */}

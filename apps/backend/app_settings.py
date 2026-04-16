@@ -27,6 +27,13 @@ DEFAULTS: dict[str, str] = {
     "redis_socket_timeout": "5",
 }
 
+# Keys that must never be exposed via the public settings API
+_SENSITIVE_KEYS = {"strava_refresh_token"}
+
+
+def _mask_value_for_logs(setting_key: str, setting_value: str) -> str:
+    return "***REDACTED***" if setting_key in _SENSITIVE_KEYS else setting_value
+
 
 def reload_cache(db: Session) -> None:
     """Reload all settings from DB into memory cache."""
@@ -80,14 +87,14 @@ def set_setting(db: Session, key: str, value: str) -> None:
         db.add(row)
     db.commit()
     _settings_cache[key] = value
-    logger.info(f"Setting updated: {key} = {value}")
+    logger.info(f"Setting updated: {key} = {_mask_value_for_logs(key, value)}")
 
 
 def get_all_settings(db: Session) -> dict[str, str]:
-    """Read all settings as a dict."""
+    """Read all settings as a dict (sensitive keys excluded)."""
     if not _cache_loaded:
         reload_cache(db)
-    return dict(_settings_cache)
+    return {k: v for k, v in _settings_cache.items() if k not in _SENSITIVE_KEYS}
 
 
 def invalidate_cache() -> None:

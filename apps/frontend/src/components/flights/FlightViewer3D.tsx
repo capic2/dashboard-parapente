@@ -26,8 +26,44 @@ import {
 import { api } from '../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../hooks/useToast';
+import { Button } from '@dashboard-parapente/design-system';
+import { HTTPError } from 'ky';
 
-import {GPXData} from "@dashboard-parapente/shared-types";
+import {
+  GPXData,
+  VIDEO_EXPORT_IN_PROGRESS_STATUSES,
+  type Flight,
+} from '@dashboard-parapente/shared-types';
+
+const isVideoExportInProgress = (status?: string | null) =>
+  Boolean(status && VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(status));
+
+const getHttpErrorDetail = async (error: HTTPError): Promise<string | null> => {
+  try {
+    const body = (await error.response.json()) as {
+      detail?: unknown;
+      message?: unknown;
+    };
+    const raw = body.detail ?? body.message;
+
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      return trimmed || null;
+    }
+
+    if (Array.isArray(raw)) {
+      return raw.map((item) => String(item)).join(' • ');
+    }
+
+    if (raw && typeof raw === 'object') {
+      return JSON.stringify(raw);
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
 
 declare global {
   interface Window {
@@ -39,6 +75,7 @@ declare global {
 interface FlightViewer3DProps {
   flightId: string;
   flightTitle?: string;
+  compact?: boolean;
 }
 
 /**
@@ -61,10 +98,9 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
 
   return (
     <div className="border-b border-gray-200 dark:border-gray-700 last:border-0">
-      <button
+      <Button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between py-2 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded"
-        type="button"
       >
         <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
           {emoji && <span className="mr-1.5">{emoji}</span>}
@@ -76,7 +112,7 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
         >
           ▶
         </span>
-      </button>
+      </Button>
       {isOpen && <div className="pb-3 pt-1 space-y-3">{children}</div>}
     </div>
   );
@@ -88,6 +124,7 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
 export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   flightId,
   flightTitle = 'Flight View',
+  compact = false,
 }) => {
   const { data: gpxData, isLoading, error } = useFlightGPX(flightId);
   const { data: flight } = useFlight(flightId);
@@ -104,7 +141,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [autoOffset, setAutoOffset] = useState(0);
   const [isCalculatingOffset, setIsCalculatingOffset] = useState(false);
   const [currentProgress, setCurrentProgress] = useState(0);
-  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(compact);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentElapsedTime, setCurrentElapsedTime] = useState(0);
 
@@ -517,7 +554,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       currentIndexRef.current = 0;
       visiblePositionsRef.current = [];
     };
-  }, [gpxData, elevationOffset, viewerReady, flight]);
+    // Intentionally exclude site camera fields to avoid replay reset after save.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gpxData, elevationOffset, viewerReady]);
 
   // Initialize camera settings from flight data
   useEffect(() => {
@@ -664,6 +703,29 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
   }, []);
+
+  useEffect(() => {
+    setIsPanelCollapsed(compact);
+  }, [compact]);
+
+  const panelClassName = compact
+    ? isPanelCollapsed
+      ? 'p-1.5'
+      : 'p-2 max-w-[220px]'
+    : isPanelCollapsed
+      ? 'p-2'
+      : 'p-4 max-w-xs';
+
+  const fullscreenButtonClassName = compact
+    ? 'px-2 py-1.5 text-xs'
+    : 'px-3 py-2';
+  const compactControlButtonClassName = compact
+    ? 'px-2 py-1.5 text-xs'
+    : 'px-3 py-2 text-sm';
+  const compactTitleClass = compact ? 'text-sm font-bold' : 'text-lg font-bold';
+  const compactToggleButtonClassName = compact
+    ? 'px-1.5 py-0.5 text-xs'
+    : 'px-2 py-1 text-sm';
 
   // Cleanup export polling on unmount
   useEffect(() => {
@@ -931,10 +993,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
   };
 
-  const updateCameraSettings = async (angle: number, distance: number) => {
+  const updateCameraSettings = async (
+    angle: number,
+    distance: number
+  ): Promise<boolean> => {
     if (!flight?.site?.id) {
       console.error('No site ID available');
-      return;
+      return false;
     }
 
     setIsUpdatingCamera(true);
@@ -945,19 +1010,42 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       await api.patch(`sites/${flight.site.id}/camera?${params.toString()}`);
 
-      // Refresh flight data to get updated site
-      await queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
+      queryClient.setQueryData<Flight | undefined>(
+        ['flights', flightId],
+        (previousFlightData) => {
+          if (!previousFlightData) {
+            return previousFlightData;
+          }
 
-      // Success - no alert needed, user already confirmed
+          const previousSite = previousFlightData.site;
+          if (!previousSite) {
+            return previousFlightData;
+          }
+
+          return {
+            ...previousFlightData,
+            site: {
+              ...previousSite,
+              camera_angle: angle,
+              camera_distance: distance,
+            },
+          };
+        }
+      );
+
+      // Keep playback stable and do not trigger a full viewer reload.
       console.log(
         `✅ Camera settings saved for site "${flight?.site?.name}": ${angle}° / ${distance}m`
       );
     } catch (error) {
       console.error('Failed to update camera settings:', error);
       toast.error('Erreur lors de la mise à jour de la caméra');
+      return false;
     } finally {
       setIsUpdatingCamera(false);
     }
+
+    return true;
   };
 
   // Function to manually reposition camera (can be called after settings update)
@@ -967,7 +1055,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
 
     const viewer = viewerRef.current;
-    const firstPosition = allPositionsRef.current[0];
+    const index =
+      allPositionsRef.current.length > 0 ? currentIndexRef.current : 0;
+    const position =
+      allPositionsRef.current[index] || allPositionsRef.current[0];
+    if (!position) {
+      return;
+    }
 
     // Update refs for replay mode
     cameraHeadingRef.current = CesiumMath.toRadians(angle);
@@ -978,7 +1072,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
     // Position camera
     viewer.camera.setView({
-      destination: firstPosition,
+      destination: position,
       orientation: {
         heading: CesiumMath.toRadians(oppositeHeading),
         pitch: CesiumMath.toRadians(-10),
@@ -990,24 +1084,32 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     viewer.camera.moveForward(distance);
   }, []);
 
-  const applyCameraSettings = async () => {
-    // Ask for confirmation before saving
-    const confirmed = confirm(
-      `Sauvegarder les nouveaux paramètres de caméra pour le site "${flight?.site?.name}" ?\n\n` +
-        `Angle: ${tempCameraAngle}°\n` +
-        `Distance: ${tempCameraDistance}m\n\n` +
-        `Ces réglages s'appliqueront à tous les vols de ce site.`
-    );
-
-    if (!confirmed) {
+  const applyCameraToCurrentPlayback = (showToast = true) => {
+    if (!allPositionsRef.current.length) {
+      toast.info('Aucun tracé disponible pour appliquer la caméra.');
       return;
     }
 
-    await updateCameraSettings(tempCameraAngle, tempCameraDistance);
-    // Immediately reposition the camera with the new settings
+    repositionCamera(tempCameraAngle, tempCameraDistance);
+    if (showToast) {
+      toast.success('Caméra appliquée à la lecture actuelle.');
+    }
+  };
+
+  const saveCameraSettings = async () => {
+    const saved = await updateCameraSettings(
+      tempCameraAngle,
+      tempCameraDistance
+    );
+    if (!saved) {
+      return;
+    }
+    toast.success(`Caméra enregistrée pour le site "${flight?.site?.name}".`);
+
+    // Keep current viewport in sync after save without reloading the viewer.
     setTimeout(() => {
-      repositionCamera(tempCameraAngle, tempCameraDistance);
-    }, 500); // Small delay to ensure state is updated
+      applyCameraToCurrentPlayback(false);
+    }, 150);
   };
 
   // Render error messages as overlays instead of early returns
@@ -1028,7 +1130,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         <div className="absolute inset-0 flex items-center justify-center bg-blue-50 dark:bg-blue-900/20 z-20">
           <div className="text-center p-8">
             <p className="text-lg dark:text-white">⏳ Chargement du vol...</p>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">Flight ID: {flightId}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+              Chargement des donnees GPS et du relief...
+            </p>
           </div>
         </div>
       );
@@ -1044,7 +1148,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             <p className="text-sm text-yellow-700 dark:text-yellow-300">
               Les données GPS ne sont pas disponibles pour ce vol.
             </p>
-            <p className="text-xs text-gray-600 dark:text-gray-300 mt-2">Error: {String(error)}</p>
+            <p className="text-xs text-gray-600 dark:text-gray-300 mt-2">
+              Reessayez dans quelques instants.
+            </p>
           </div>
         </div>
       );
@@ -1054,9 +1160,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       return (
         <div className="absolute inset-0 flex items-center justify-center bg-red-50 dark:bg-red-900/20 z-20">
           <div className="text-center p-8">
-            <p className="text-lg dark:text-white">❌ Aucune donnée GPS disponible</p>
+            <p className="text-lg dark:text-white">
+              ❌ Aucune donnée GPS disponible
+            </p>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
-              GPX Data: {JSON.stringify(gpxData)}
+              Les informations de trace sont indisponibles pour ce vol.
             </p>
           </div>
         </div>
@@ -1091,42 +1199,40 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     <div
       ref={containerDivRef}
       className="relative w-full bg-gray-900"
-      style={{ height: isFullscreen ? '100vh' : '600px' }}
+      style={{ height: isFullscreen ? '100vh' : compact ? '420px' : '600px' }}
     >
       {/* Overlay for loading/error states */}
       {renderOverlay()}
 
       {/* Bouton plein écran */}
       {gpxData?.coordinates && (
-        <button
+        <Button
           onClick={toggleFullscreen}
-          className="absolute top-4 right-4 z-10 px-3 py-2 bg-gray-800 text-white rounded-lg shadow-lg hover:bg-gray-700"
+          className={`absolute top-4 right-4 z-10 bg-gray-800 text-white rounded-lg shadow-lg hover:bg-gray-700 ${fullscreenButtonClassName}`}
           title={isFullscreen ? 'Quitter le plein écran' : 'Plein écran'}
         >
           {isFullscreen ? '🗗 Quitter' : '⛶ Plein écran'}
-        </button>
+        </Button>
       )}
 
       {/* Controls - only show when data is loaded */}
       {gpxData?.coordinates && (
         <div
-          className={`absolute top-4 left-4 z-10 bg-white dark:bg-gray-800 rounded-lg shadow-lg transition-all ${
-            isPanelCollapsed ? 'p-2' : 'p-4 max-w-xs'
-          }`}
+          className={`absolute top-4 left-4 z-10 bg-white dark:bg-gray-800 rounded-lg shadow-lg transition-all ${panelClassName}`}
         >
           <div className="flex items-center justify-between mb-2">
             {!isPanelCollapsed && (
-              <h3 className="text-lg font-bold">🪂 {flightTitle}</h3>
+              <h3 className={compactTitleClass}>🪂 {flightTitle}</h3>
             )}
-            <button
+            <Button
               onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
-              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-sm dark:text-gray-200"
+              className={`${compactToggleButtonClassName} bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-600 dark:text-gray-200`}
               title={
                 isPanelCollapsed ? 'Ouvrir le panneau' : 'Réduire le panneau'
               }
             >
               {isPanelCollapsed ? '▶' : '◀'}
-            </button>
+            </Button>
           </div>
 
           {!isPanelCollapsed && (
@@ -1149,18 +1255,19 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                 {/* ========== SECTION 1: LECTURE ========== */}
                 <AccordionSection title="Lecture" emoji="🎮" defaultOpen={true}>
                   <div className="flex gap-2">
-                    <button
+                    <Button
                       onClick={togglePlayPause}
-                      className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+                      className={`${compactControlButtonClassName} bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400`}
+                      data-testid="flight-play-toggle"
                     >
                       {isPlaying ? '⏸ Pause' : '▶ Play'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={reset}
-                      className="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:bg-gray-400"
+                      className={`${compactControlButtonClassName} bg-gray-600 text-white rounded hover:bg-gray-700 disabled:bg-gray-400`}
                     >
                       ⏮ Reset
-                    </button>
+                    </Button>
                   </div>
 
                   {/* Progress Slider */}
@@ -1179,6 +1286,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         handleProgressChange(Number(e.target.value))
                       }
                       className="w-full"
+                      data-testid="flight-progress-slider"
                     />
                   </div>
 
@@ -1215,7 +1323,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   >
                     <>
                       {/* Download/Generate Button */}
-                      <button
+                      <Button
                         onClick={async () => {
                           if (
                             flight.video_export_status === 'completed' &&
@@ -1232,26 +1340,23 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           ) {
                             // Generate video
                             try {
-                              const response = await fetch(
-                                `/api/flights/${flightId}/generate-video`,
-                                {
-                                  method: 'POST',
-                                }
+                              await api.post(
+                                `flights/${flightId}/generate-video`
                               );
-
-                              if (!response.ok) {
-                                const error = await response.json();
-                                toast.error(
-                                  error.detail || 'Impossible de lancer la génération'
-                                );
-                                return;
-                              }
 
                               // Refresh flight data to get updated status
                               queryClient.invalidateQueries({
                                 queryKey: ['flights', flightId],
                               });
                             } catch (error) {
+                              if (error instanceof HTTPError) {
+                                const detail = await getHttpErrorDetail(error);
+                                toast.error(
+                                  detail || 'Impossible de lancer la génération'
+                                );
+                                return;
+                              }
+
                               console.error(
                                 '❌ Failed to start video generation:',
                                 error
@@ -1262,41 +1367,47 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             }
                           }
                         }}
-                        disabled={flight.video_export_status === 'processing'}
-                        className={`w-full px-3 py-2 text-white rounded ${
+                        disabled={isVideoExportInProgress(
+                          flight.video_export_status
+                        )}
+                        className={`w-full ${compactControlButtonClassName} text-white rounded ${
                           flight.video_export_status === 'completed'
                             ? 'mb-2'
                             : 'mb-3'
                         } ${
                           flight.video_export_status === 'completed'
                             ? 'bg-green-600 hover:bg-green-700'
-                            : flight.video_export_status === 'processing'
+                            : isVideoExportInProgress(
+                                  flight.video_export_status
+                                )
                               ? 'bg-gray-400 cursor-not-allowed'
                               : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                         title={
-                          flight.video_export_status === 'processing'
+                          isVideoExportInProgress(flight.video_export_status)
                             ? 'Génération vidéo en cours... (~60-90 min)'
                             : flight.video_export_status === 'completed'
                               ? 'Télécharger la vidéo'
-                              : flight.video_export_status === 'failed'
+                              : flight.video_export_status === 'failed' ||
+                                  flight.video_export_status === 'cancelled'
                                 ? 'Relancer la génération'
                                 : 'Générer la vidéo du vol'
                         }
                       >
-                        {flight.video_export_status === 'processing' &&
+                        {isVideoExportInProgress(flight.video_export_status) &&
                           '⏳ Génération en cours...'}
                         {flight.video_export_status === 'completed' &&
                           '📥 Télécharger la vidéo'}
-                        {flight.video_export_status === 'failed' &&
+                        {(flight.video_export_status === 'failed' ||
+                          flight.video_export_status === 'cancelled') &&
                           '🔄 Relancer la génération'}
                         {!flight.video_export_status && '🎥 Générer la vidéo'}
-                      </button>
+                      </Button>
 
-                      {/* Cancel Button (only when processing) */}
-                      {flight.video_export_status === 'processing' &&
+                      {/* Cancel Button (only when export is active) */}
+                      {isVideoExportInProgress(flight.video_export_status) &&
                         flight.video_export_job_id && (
-                          <button
+                          <Button
                             onClick={async () => {
                               if (
                                 !confirm(
@@ -1307,26 +1418,25 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                               }
 
                               try {
-                                const response = await fetch(
-                                  `/api/exports/${flight.video_export_job_id}/cancel`,
-                                  {
-                                    method: 'DELETE',
-                                  }
+                                await api.delete(
+                                  `exports/${flight.video_export_job_id}/cancel`
                                 );
-
-                                if (!response.ok) {
-                                  const error = await response.json();
-                                  toast.error(
-                                    error.detail || "Impossible d'annuler la génération"
-                                  );
-                                  return;
-                                }
 
                                 // Refresh flight data to get updated status
                                 queryClient.invalidateQueries({
                                   queryKey: ['flights', flightId],
                                 });
                               } catch (error) {
+                                if (error instanceof HTTPError) {
+                                  const detail =
+                                    await getHttpErrorDetail(error);
+                                  toast.error(
+                                    detail ||
+                                      "Impossible d'annuler la génération"
+                                  );
+                                  return;
+                                }
+
                                 console.error(
                                   'Failed to cancel video generation:',
                                   error
@@ -1338,12 +1448,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             title="Annuler la génération vidéo en cours"
                           >
                             🛑 Annuler la génération
-                          </button>
+                          </Button>
                         )}
 
                       {/* Regenerate Button (only when video exists) */}
                       {flight.video_export_status === 'completed' && (
-                        <button
+                        <Button
                           onClick={async () => {
                             if (
                               !confirm(
@@ -1354,26 +1464,24 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             }
 
                             try {
-                              const response = await fetch(
-                                `/api/flights/${flightId}/generate-video`,
-                                {
-                                  method: 'POST',
-                                }
+                              await api.post(
+                                `flights/${flightId}/generate-video`
                               );
-
-                              if (!response.ok) {
-                                const error = await response.json();
-                                toast.error(
-                                  error.detail || 'Impossible de lancer la régénération'
-                                );
-                                return;
-                              }
 
                               // Refresh flight data to get updated status
                               queryClient.invalidateQueries({
                                 queryKey: ['flights', flightId],
                               });
                             } catch (error) {
+                              if (error instanceof HTTPError) {
+                                const detail = await getHttpErrorDetail(error);
+                                toast.error(
+                                  detail ||
+                                    'Impossible de lancer la régénération'
+                                );
+                                return;
+                              }
+
                               console.error(
                                 'Failed to regenerate video:',
                                 error
@@ -1385,7 +1493,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           title="Régénérer la vidéo (remplace l'ancienne)"
                         >
                           🔄 Régénérer la vidéo
-                        </button>
+                        </Button>
                       )}
                     </>
                   </AccordionSection>
@@ -1453,6 +1561,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             setTempCameraAngle(Number(e.target.value))
                           }
                           className="w-full"
+                          data-testid="camera-angle-slider"
                         />
                         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                           <span>0° (N)</span>
@@ -1477,6 +1586,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             setTempCameraDistance(Number(e.target.value))
                           }
                           className="w-full"
+                          data-testid="camera-distance-slider"
                         />
                         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                           <span>100m</span>
@@ -1484,18 +1594,30 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         </div>
                       </div>
 
-                      {/* Apply Button */}
-                      <button
-                        onClick={applyCameraSettings}
-                        disabled={isUpdatingCamera}
-                        className="w-full px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isUpdatingCamera ? '⏳ Mise à jour...' : '✓ Appliquer'}
-                      </button>
-
+                      {/* Camera Apply Buttons */}
+                      <div className="space-y-2">
+                        <Button
+                          onClick={() => applyCameraToCurrentPlayback()}
+                          className={`w-full ${compactControlButtonClassName} bg-blue-600 text-white rounded hover:bg-blue-700`}
+                          data-testid="camera-apply-button"
+                        >
+                          👁️ Appliquer à la lecture
+                        </Button>
+                        <Button
+                          onClick={saveCameraSettings}
+                          disabled={isUpdatingCamera}
+                          className={`w-full ${compactControlButtonClassName} bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed`}
+                          data-testid="camera-save-button"
+                        >
+                          {isUpdatingCamera
+                            ? '⏳ Enregistrement...'
+                            : '💾 Enregistrer le réglage site'}
+                        </Button>
+                      </div>
                       <p className="text-xs text-gray-600 dark:text-gray-300 mt-2">
-                        💡 Ces réglages seront sauvegardés pour le site &quot;
-                        {flight.site.name}&quot; et appliqués à tous ses vols
+                        💡 Appliquez d&apos;abord à la lecture, puis enregistrez
+                        pour réutiliser ce réglage sur les prochains vols du
+                        site.
                       </p>
                     </div>
                   </AccordionSection>
@@ -1513,14 +1635,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                       <label className="block text-sm font-medium">
                         Élévation: {elevationOffset.toFixed(1)}m
                       </label>
-                      <button
+                      <Button
                         onClick={calculateAutoElevationOffset}
                         disabled={isCalculatingOffset}
                         className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
                         title="Calculer automatiquement l'offset par rapport au terrain"
                       >
                         {isCalculatingOffset ? '⏳' : '🔄'} Auto
-                      </button>
+                      </Button>
                     </div>
                     <input
                       type="range"

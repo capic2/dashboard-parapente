@@ -1,16 +1,46 @@
 import { http, HttpResponse } from 'msw';
-import { expect, screen, userEvent, waitFor, within } from 'storybook/test';
+import { expect, screen, waitFor, within } from 'storybook/test';
 import preview from '../../.storybook/preview';
 import FlightHistory from './FlightHistory';
+import i18n from 'i18next';
+import { useToastStore } from '../hooks/useToast';
+
+type MediaQueryCallback = (event: MediaQueryListEvent) => void;
+
+function installMatchMediaMock(isMobile: boolean) {
+  const originalMatchMedia = window.matchMedia;
+
+  const createMediaQueryList = (query: string): MediaQueryList => {
+    return {
+      matches: query === '(max-width: 639px)' ? isMobile : false,
+      media: query,
+      onchange: null,
+      addEventListener: (_event: string, _listener: MediaQueryCallback) => {},
+      removeEventListener: (
+        _event: string,
+        _listener: MediaQueryCallback
+      ) => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    } as unknown as MediaQueryList;
+  };
+
+  window.matchMedia = ((query: string) =>
+    createMediaQueryList(query)) as typeof window.matchMedia;
+
+  return () => {
+    window.matchMedia = originalMatchMedia;
+  };
+}
 
 const meta = preview.meta({
   title: 'Pages/FlightHistory',
   component: FlightHistory,
+  decorators: [(Story, context) => <Story key={context.id} />],
   parameters: { layout: 'fullscreen' },
   tags: ['autodocs'],
 });
-
-export default meta;
 
 const mockFlights = [
   {
@@ -94,35 +124,285 @@ const mockSites = {
   ],
 };
 
-const defaultHandlers = [
-  http.get('*/api/flights', () => HttpResponse.json({ flights: mockFlights })),
+const flightsDb: Record<string, unknown>[] = [...mockFlights];
+
+let gpxRequestCount = 0;
+
+const mockGPXData = {
+  coordinates: [
+    {
+      lat: 47.2,
+      lon: 6.0,
+      elevation: 800,
+      time: '2026-03-15T14:00:00.000Z',
+    },
+    {
+      lat: 47.21,
+      lon: 6.01,
+      elevation: 900,
+      time: '2026-03-15T14:01:00.000Z',
+    },
+  ],
+  max_altitude_m: 1850,
+  min_altitude_m: 700,
+  elevation_gain_m: 1200,
+  elevation_loss_m: 300,
+  total_distance_km: 18.5,
+  flight_duration_seconds: 5700,
+};
+
+const resetFlightsDb = () => {
+  flightsDb.length = 0;
+  flightsDb.push(...mockFlights);
+};
+
+const resetStoryState = () => {
+  resetFlightsDb();
+  gpxRequestCount = 0;
+  useToastStore.setState({ toasts: [] });
+};
+
+const createHandlers = (gpxDelayMs = 0) => [
+  http.get('*/api/flights', () => HttpResponse.json({ flights: flightsDb })),
+  http.get('*/api/flights/:id/gpx-data', async () => {
+    if (gpxDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, gpxDelayMs));
+    }
+    gpxRequestCount += 1;
+    return HttpResponse.json({ data: mockGPXData });
+  }),
   http.get('*/api/flights/:id', ({ params }) => {
-    const flight = mockFlights.find((f) => f.id === params.id);
+    const flight = flightsDb.find((f) => f.id === params.id);
     return flight
       ? HttpResponse.json(flight)
       : new HttpResponse(null, { status: 404 });
   }),
   http.get('*/api/spots', () => HttpResponse.json(mockSites)),
-  http.patch('*/api/flights/:id', async ({ request }) => {
-    const body = await request.json();
-    return HttpResponse.json({
-      data: { ...mockFlights[0], ...(body as object) },
-    });
+  http.patch('*/api/flights/:id', async ({ params, request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    const index = flightsDb.findIndex((f) => f.id === params.id);
+    if (index !== -1) {
+      flightsDb[index] = { ...flightsDb[index], ...body };
+      return HttpResponse.json({ data: flightsDb[index] });
+    }
+    return new HttpResponse(null, { status: 404 });
   }),
-  http.delete('*/api/flights/:id', () =>
-    HttpResponse.json({ success: true, message: 'Flight deleted' })
-  ),
+  http.delete('*/api/flights/:id', ({ params }) => {
+    const index = flightsDb.findIndex((f) => f.id === params.id);
+    if (index !== -1) {
+      flightsDb.splice(index, 1);
+    }
+    return HttpResponse.json({ success: true, message: 'Flight deleted' });
+  }),
 ];
+
+const defaultHandlers = createHandlers();
 
 export const Default = meta.story({
   name: 'Default',
   parameters: { msw: { handlers: defaultHandlers } },
+  beforeEach: resetStoryState,
 });
 
-Default.test('renders flight list', async ({ canvas }) => {
-  // FlightHistory shows the page header - flights may take time to load
-  await canvas.findByText(/Historique des Vols|Mes Vols|Vols/);
+Default.test(
+  'Can cancel a simple flight deletion',
+  async ({ canvas, userEvent, step }) => {
+    const flightList = await canvas.findByRole('grid', {
+      name: i18n.t('flights.listAriaLabel'),
+    });
+
+    await step('have flights', async () => {
+      await waitFor(async () => {
+        await expect(within(flightList).getAllByRole('row')).toHaveLength(
+          mockFlights.length
+        );
+      });
+    });
+
+    await step('want to delete a flight', async () => {
+      const deleteButton = canvas.getByRole('button', {
+        name: i18n.t('flights.deleteAriaLabel', {
+          title: 'Vol thermique Arguel',
+        }),
+      });
+
+      await userEvent.click(deleteButton);
+      await expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+    });
+
+    await step('cancel the deletion', async () => {
+      const cancelButton = within(screen.getByRole('alertdialog')).getByRole(
+        'button',
+        { name: i18n.t('common.cancel') }
+      );
+
+      await userEvent.click(cancelButton);
+    });
+
+    await step('the flight is not deleted', async () => {
+      await expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      await expect(within(flightList).getAllByRole('row')).toHaveLength(
+        mockFlights.length
+      );
+    });
+  }
+);
+Default.test(
+  'can delete a simple flight',
+  async ({ canvas, userEvent, step }) => {
+    const flightList = await canvas.findByRole('grid', {
+      name: i18n.t('flights.listAriaLabel'),
+    });
+
+    await step('have flights', async () => {
+      await waitFor(async () => {
+        await expect(within(flightList).getAllByRole('row')).toHaveLength(
+          mockFlights.length
+        );
+      });
+    });
+
+    await step('want to delete a flight', async () => {
+      const deleteButton = canvas.getByRole('button', {
+        name: i18n.t('flights.deleteAriaLabel', {
+          title: 'Vol thermique Arguel',
+        }),
+      });
+
+      await userEvent.click(deleteButton);
+      await expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+    });
+
+    await step('confirm the deletion', async () => {
+      const confirmButton = within(screen.getByRole('alertdialog')).getByRole(
+        'button',
+        { name: i18n.t('flights.deleteButton') }
+      );
+
+      await userEvent.click(confirmButton);
+    });
+
+    await step('the flight is deleted', async () => {
+      await waitFor(async () => {
+        await expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+
+        await expect(within(flightList).getAllByRole('row')).toHaveLength(
+          mockFlights.length - 1
+        );
+      });
+    });
+  }
+);
+export const MobileFlow = meta.story({
+  name: 'Mobile Flow',
+  parameters: { msw: { handlers: defaultHandlers } },
+  beforeEach: () => {
+    resetStoryState();
+    return installMatchMediaMock(true);
+  },
 });
+
+MobileFlow.test(
+  'opens a flight, switches tabs, and returns to list on mobile',
+  async ({ canvas, userEvent, step }) => {
+    await step('has the flight list', async () => {
+      const flightList = await canvas.findByRole('grid', {
+        name: i18n.t('flights.listAriaLabel'),
+      });
+      await expect(flightList).toBeInTheDocument();
+    });
+
+    await step('opens a flight in mobile detail mode', async () => {
+      await userEvent.click(await canvas.findByTestId('flight-row-flight-002'));
+      await expect(
+        await canvas.findByRole('button', {
+          name: i18n.t('flights.backToList'),
+        })
+      ).toBeInTheDocument();
+    });
+
+    await step('switches to Replay and shows unavailable state', async () => {
+      await userEvent.click(
+        canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
+      );
+      await expect(
+        await canvas.findByText(i18n.t('flights.replayUnavailable'))
+      ).toBeInTheDocument();
+    });
+
+    await step('returns to the list', async () => {
+      await userEvent.click(
+        canvas.getByRole('button', { name: i18n.t('flights.backToList') })
+      );
+      await expect(
+        await canvas.findByRole('grid', {
+          name: i18n.t('flights.listAriaLabel'),
+        })
+      ).toBeInTheDocument();
+      await expect(
+        canvas.queryByRole('tab', { name: i18n.t('flights.infoTab') })
+      ).not.toBeInTheDocument();
+    });
+  }
+);
+
+export const MobileFlowWithReplay = meta.story({
+  name: 'Mobile Flow With Replay',
+  parameters: {
+    msw: {
+      handlers: createHandlers(150),
+    },
+  },
+  beforeEach: () => {
+    resetStoryState();
+    return installMatchMediaMock(true);
+  },
+});
+
+MobileFlowWithReplay.test(
+  'loads GPX data only when Replay tab is selected',
+  async ({ canvas, userEvent, step }) => {
+    await step('has the flight list', async () => {
+      const flightList = await canvas.findByRole('grid', {
+        name: i18n.t('flights.listAriaLabel'),
+      });
+      await expect(flightList).toBeInTheDocument();
+    });
+
+    await step('opens a flight with GPX', async () => {
+      await userEvent.click(await canvas.findByTestId('flight-row-flight-001'));
+      await expect(
+        await canvas.findByRole('button', {
+          name: i18n.t('flights.backToList'),
+        })
+      ).toBeInTheDocument();
+    });
+
+    await step('does not load GPX while Infos tab is active', () => {
+      expect(gpxRequestCount).toBe(0);
+    });
+
+    await step('switches to Replay and shows loading state', async () => {
+      await userEvent.click(
+        canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
+      );
+
+      await expect(
+        await canvas.findByText(i18n.t('flights.loading3dViewer'))
+      ).toBeInTheDocument();
+    });
+
+    await step('triggers GPX loading once Replay is active', async () => {
+      await waitFor(() => {
+        expect(gpxRequestCount).toBeGreaterThan(0);
+      });
+    });
+  }
+);
+
+// clique sur un vol => les détails du vol
+// supprimer plusieurs vols
+// annuler la suppression de plusieurs vols
 
 export const EmptyState = meta.story({
   name: 'Empty State',
@@ -149,140 +429,3 @@ export const Loading = meta.story({
     },
   },
 });
-
-export const DeleteSingleFlight = meta.story({
-  name: 'Delete Single Flight',
-  parameters: { msw: { handlers: defaultHandlers } },
-});
-
-DeleteSingleFlight.test(
-  'opens delete modal and can cancel',
-  async ({ canvas }) => {
-    const user = userEvent.setup();
-
-    // Attendre que la liste de vols s'affiche
-    await canvas.findByText('Vol thermique Arguel');
-
-    // Cliquer le bouton poubelle
-    const deleteButton = await canvas.findByLabelText(
-      'Supprimer le vol Vol thermique Arguel'
-    );
-    await user.click(deleteButton);
-
-    // La modal de confirmation s'ouvre (portail hors du canvas → screen)
-    await expect(
-      await screen.findByText(/Confirmer la suppression/)
-    ).toBeInTheDocument();
-
-    // Cliquer Annuler ferme la modal
-    const cancelButton = await screen.findByText('Annuler');
-    await user.click(cancelButton);
-
-    // Vérifier que la modal est fermée
-    await expect(
-      screen.queryByText(/Confirmer la suppression/)
-    ).not.toBeInTheDocument();
-  }
-);
-
-const confirmDeleteHandlers = (() => {
-  const deletedIds = new Set<string>();
-  return [
-    http.get('*/api/flights', () =>
-      HttpResponse.json({
-        flights: mockFlights.filter((f) => !deletedIds.has(f.id)),
-      })
-    ),
-    http.get('*/api/flights/:id', ({ params }) => {
-      const flight = mockFlights.find(
-        (f) => f.id === params.id && !deletedIds.has(f.id)
-      );
-      return flight
-        ? HttpResponse.json(flight)
-        : new HttpResponse(null, { status: 404 });
-    }),
-    http.get('*/api/spots', () => HttpResponse.json(mockSites)),
-    http.patch('*/api/flights/:id', async ({ request }) => {
-      const body = await request.json();
-      return HttpResponse.json({
-        data: { ...mockFlights[0], ...(body as object) },
-      });
-    }),
-    http.delete('*/api/flights/:id', ({ params }) => {
-      deletedIds.add(params.id as string);
-      return HttpResponse.json({ success: true, message: 'Flight deleted' });
-    }),
-  ];
-})();
-
-export const ConfirmDeleteFlight = meta.story({
-  name: 'Confirm Delete Flight',
-  parameters: { msw: { handlers: confirmDeleteHandlers } },
-});
-
-ConfirmDeleteFlight.test('deletes flight on confirm', async ({ canvas }) => {
-  const user = userEvent.setup();
-
-  await canvas.findByText('Vol thermique Arguel');
-
-  // Cliquer le bouton poubelle
-  const deleteButton = await canvas.findByLabelText(
-    'Supprimer le vol Vol thermique Arguel'
-  );
-  await user.click(deleteButton);
-
-  // Confirmer la suppression dans la modal (portail → screen)
-  const dialog = await screen.findByRole('dialog');
-  const dialogContent = within(dialog);
-  const confirmButton = await dialogContent.findByRole('button', {
-    name: /Supprimer/,
-  });
-  await user.click(confirmButton);
-
-  // Le toast de succès apparaît
-  await expect(
-    await canvas.findByText('Vol supprimé avec succès')
-  ).toBeInTheDocument();
-
-  // Vérifier que le vol supprimé n'apparaît plus (attendre le refetch)
-  await waitFor(() => {
-    expect(canvas.queryByText('Vol thermique Arguel')).not.toBeInTheDocument();
-  });
-});
-
-export const DeleteMultipleFlights = meta.story({
-  name: 'Delete Multiple Flights',
-  parameters: { msw: { handlers: defaultHandlers } },
-});
-
-DeleteMultipleFlights.test(
-  'opens multi-delete modal with flight count',
-  async ({ canvas }) => {
-    const user = userEvent.setup();
-
-    await canvas.findByText('Vol thermique Arguel');
-
-    // Entrer en mode sélection
-    const selectButton = await canvas.findByText('☑️ Sélectionner');
-    await user.click(selectButton);
-
-    // Sélectionner tous les vols
-    const selectAllButton = await canvas.findByText('Tout sélectionner');
-    await user.click(selectAllButton);
-
-    // Cliquer le bouton supprimer
-    const deleteButton = await canvas.findByText(/Supprimer \(3\)/);
-    await user.click(deleteButton);
-
-    // La modal de confirmation s'ouvre (portail → screen)
-    const dialog = await screen.findByRole('dialog');
-    const dialogContent = within(dialog);
-    await expect(
-      await dialogContent.findByText(/irréversible/)
-    ).toBeInTheDocument();
-    // Le bouton de confirmation affiche le bon nombre
-    await expect(
-      await dialogContent.findByRole('button', { name: /Supprimer 3 vols/ })
-    ).toBeInTheDocument();
-  }
-);

@@ -23,6 +23,7 @@ import pytest
 from strava import (
     download_gpx,
     get_access_token,
+    get_activities_by_period,
     get_activity_details,
     parse_gpx,
     refresh_access_token,
@@ -48,6 +49,9 @@ async def test_refresh_access_token_success():
         patch("strava.STRAVA_CLIENT_ID", "test_client_id"),
         patch("strava.STRAVA_CLIENT_SECRET", "test_secret"),
         patch("strava.STRAVA_REFRESH_TOKEN", "test_refresh_token"),
+        patch("strava._get_persisted_refresh_token", return_value="test_refresh_token"),
+        patch("strava._persist_refresh_token") as mock_persist,
+        patch("strava._log_token_refresh") as mock_log,
         patch("strava.httpx.AsyncClient") as mock_client,
     ):
 
@@ -67,6 +71,89 @@ async def test_refresh_access_token_success():
         assert strava._access_token == "new_access_token_123"
         assert strava._refresh_token == "new_refresh_token_456"
         assert strava._token_expires_at is not None
+        mock_persist.assert_called_once_with("new_refresh_token_456")
+        assert mock_log.call_count == 1
+        assert mock_log.call_args.kwargs.get("refresh_mode") == "automatic"
+
+
+@pytest.mark.asyncio
+async def test_refresh_access_token_manual_mode_logged():
+    """Manual refresh uses refresh_mode='manual' in token logs."""
+
+    mock_response = {
+        "access_token": "manual_access_token",
+        "refresh_token": "manual_refresh_token",
+        "expires_at": int((datetime.now() + timedelta(hours=6)).timestamp()),
+    }
+
+    with (
+        patch("strava.STRAVA_CLIENT_ID", "test_client_id"),
+        patch("strava.STRAVA_CLIENT_SECRET", "test_secret"),
+        patch("strava.STRAVA_REFRESH_TOKEN", "test_refresh_token"),
+        patch("strava._get_persisted_refresh_token", return_value="test_refresh_token"),
+        patch("strava._persist_refresh_token"),
+        patch("strava._log_token_refresh") as mock_log,
+        patch("strava.httpx.AsyncClient") as mock_client,
+    ):
+        mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+            return_value=MagicMock(status_code=200, json=MagicMock(return_value=mock_response))
+        )
+
+        import strava
+
+        strava._access_token = None
+        strava._token_expires_at = None
+        strava._refresh_token = None
+
+        token = await refresh_access_token(force=True)
+
+        assert token == "manual_access_token"
+        assert mock_log.call_count == 1
+        assert mock_log.call_args.kwargs.get("refresh_mode") == "manual"
+
+
+@pytest.mark.asyncio
+async def test_refresh_access_token_fails_when_persist_fails(caplog):
+    """Token refresh must fail if new refresh token cannot be persisted."""
+
+    mock_response = {
+        "access_token": "fallback_access_token",
+        "refresh_token": "fallback_refresh_token",
+        "expires_at": int((datetime.now() + timedelta(hours=6)).timestamp()),
+    }
+
+    with (
+        patch("strava.STRAVA_CLIENT_ID", "test_client_id"),
+        patch("strava.STRAVA_CLIENT_SECRET", "test_secret"),
+        patch("strava.STRAVA_REFRESH_TOKEN", "test_refresh_token"),
+        patch("strava._get_persisted_refresh_token", return_value="test_refresh_token"),
+        patch("strava._persist_refresh_token") as mock_persist,
+        patch("strava.httpx.AsyncClient") as mock_client,
+    ):
+        mock_persist.side_effect = RuntimeError("no such table: app_settings")
+
+        mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+            return_value=MagicMock(status_code=200, json=MagicMock(return_value=mock_response))
+        )
+
+        import strava
+
+        strava._access_token = None
+        strava._token_expires_at = None
+        strava._refresh_token = None
+
+        with caplog.at_level("WARNING"):
+            token = await refresh_access_token()
+
+        assert token is None
+        assert strava._access_token is None
+        assert strava._refresh_token is None
+        assert mock_persist.call_count == 1
+        assert any(
+            "Failed to refresh token" in record.message
+            and "RuntimeError: no such table: app_settings" in record.message
+            for record in caplog.records
+        )
 
 
 @pytest.mark.asyncio
@@ -83,6 +170,47 @@ async def test_refresh_access_token_uses_cached():
     token = await refresh_access_token()
 
     assert token == "cached_token"
+
+
+@pytest.mark.asyncio
+async def test_refresh_access_token_forced_refresh_ignores_cached():
+    """Test that force=True skips cache validation and refreshes"""
+
+    import strava
+
+    # Set a valid token that would normally be returned from cache
+    strava._access_token = "cached_token"
+    strava._token_expires_at = datetime.now() + timedelta(hours=1)
+    strava._refresh_token = "cached_refresh"
+
+    mock_response = {
+        "access_token": "forced_refreshed_token",
+        "refresh_token": "forced_refresh_token",
+        "expires_at": int((datetime.now() + timedelta(hours=6)).timestamp()),
+    }
+
+    with (
+        patch("strava.STRAVA_CLIENT_ID", "test_client_id"),
+        patch("strava.STRAVA_CLIENT_SECRET", "test_secret"),
+        patch("strava._persist_refresh_token") as mock_persist,
+        patch("strava.httpx.AsyncClient") as mock_client,
+    ):
+        mock_post = AsyncMock(
+            return_value=MagicMock(
+                status_code=200,
+                json=MagicMock(return_value=mock_response),
+                raise_for_status=MagicMock(),
+            )
+        )
+        mock_client.return_value.__aenter__.return_value.post = mock_post
+
+        token = await refresh_access_token(force=True)
+
+        assert token == "forced_refreshed_token"
+        assert strava._access_token == "forced_refreshed_token"
+        assert strava._refresh_token == "forced_refresh_token"
+        mock_post.assert_awaited_once()
+        mock_persist.assert_called_once_with("forced_refresh_token")
 
 
 @pytest.mark.asyncio
@@ -129,6 +257,33 @@ async def test_get_access_token():
     with patch("strava.refresh_access_token", new=AsyncMock(return_value="test_token")):
         token = await get_access_token()
         assert token == "test_token"
+
+
+def test_log_token_refresh_prunes_history_to_configured_limit():
+    """Token refresh logs are pruned to keep only the configured limit."""
+
+    import strava
+
+    db = MagicMock()
+    context_manager = MagicMock()
+    context_manager.__enter__.return_value = db
+    context_manager.__exit__.return_value = None
+
+    stale_query = MagicMock()
+    stale_query.order_by.return_value.offset.return_value.all.return_value = [(1,), (2,)]
+
+    delete_query = MagicMock()
+    db.query.side_effect = [stale_query, delete_query]
+
+    with (
+        patch("database.get_db_context", return_value=context_manager),
+        patch("strava.STRAVA_TOKEN_LOG_HISTORY_LIMIT", 3),
+    ):
+        strava._log_token_refresh(True, "ok")
+
+    assert db.add.call_count == 1
+    assert db.commit.call_count == 2
+    delete_query.filter.return_value.delete.assert_called_once_with(synchronize_session=False)
 
 
 # ============================================================================
@@ -471,6 +626,7 @@ async def test_refresh_access_token_expired():
     # Set an expired token
     strava._access_token = "old_token"
     strava._token_expires_at = datetime.now() - timedelta(hours=1)
+    strava._refresh_token = "cached_refresh"
 
     mock_response = {
         "access_token": "refreshed_token",
@@ -482,6 +638,7 @@ async def test_refresh_access_token_expired():
         patch("strava.STRAVA_CLIENT_ID", "test_client_id"),
         patch("strava.STRAVA_CLIENT_SECRET", "test_secret"),
         patch("strava.STRAVA_REFRESH_TOKEN", "test_refresh_token"),
+        patch("strava._persist_refresh_token") as mock_persist,
         patch("strava.httpx.AsyncClient") as mock_client,
     ):
 
@@ -497,6 +654,7 @@ async def test_refresh_access_token_expired():
 
         assert token == "refreshed_token"
         assert strava._access_token == "refreshed_token"
+        mock_persist.assert_called_once_with("new_refresh")
 
 
 def test_streams_to_gpx_mismatched_arrays():
@@ -513,3 +671,51 @@ def test_streams_to_gpx_mismatched_arrays():
     assert gpx_content is not None
     assert "<trkpt" in gpx_content
     # Should handle mismatched lengths gracefully
+
+
+# ============================================================================
+# GET ACTIVITIES BY PERIOD TESTS
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_get_activities_by_period_end_date_is_inclusive():
+    """Test that date_to is inclusive: before timestamp should be midnight of the next day"""
+
+    mock_activity = {
+        "id": 999,
+        "name": "Evening Flight",
+        "type": "Workout",
+        "start_date_local": "2026-03-15T18:00:00Z",
+    }
+
+    captured_params = {}
+
+    async def mock_get(url, **kwargs):
+        if not captured_params:
+            captured_params.update(kwargs.get("params", {}))
+            return MagicMock(
+                status_code=200,
+                json=MagicMock(return_value=[mock_activity]),
+                raise_for_status=MagicMock(),
+            )
+        return MagicMock(
+            status_code=200,
+            json=MagicMock(return_value=[]),
+            raise_for_status=MagicMock(),
+        )
+
+    with (
+        patch("strava.get_access_token", new=AsyncMock(return_value="test_token")),
+        patch("strava.httpx.AsyncClient") as mock_client,
+    ):
+        mock_client.return_value.__aenter__.return_value.get = AsyncMock(side_effect=mock_get)
+
+        await get_activities_by_period("2026-03-01", "2026-03-15")
+
+    # "before" should be 2026-03-16 00:00:00, not 2026-03-15 00:00:00
+    expected_before = int(datetime(2026, 3, 16).timestamp())
+    expected_after = int(datetime(2026, 3, 1).timestamp())
+
+    assert captured_params["after"] == expected_after
+    assert captured_params["before"] == expected_before

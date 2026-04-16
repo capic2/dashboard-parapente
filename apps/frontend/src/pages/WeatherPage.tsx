@@ -8,8 +8,12 @@ import Forecast7Day from '../components/weather/Forecast7Day';
 import HourlyForecast from '../components/weather/HourlyForecast';
 import EmagramWidget from '../components/dashboard/EmagramWidget';
 import WeatherMultiLanding from '../components/weather/WeatherMultiLanding';
+import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
+import { Button } from '@dashboard-parapente/design-system';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
+import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from '@tanstack/react-router';
+import { useBestSpotAPI } from '../hooks/weather/useBestSpotAPI';
 
 export default function WeatherPage() {
   const { t } = useTranslation();
@@ -18,9 +22,11 @@ export default function WeatherPage() {
   const search = useSearch({ from: '/weather' });
   const routeSiteId = search ? search.siteId : '';
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
   const selectedSiteId =
     sites.find((site) => site.id === routeSiteId)?.id ?? sites[0]?.id ?? '';
 
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [weatherDataMap] = useState<Map<string, Record<string, unknown>>>(
     new Map()
   );
@@ -38,12 +44,12 @@ export default function WeatherPage() {
               'Ajoutez votre premier site de vol pour commencer.'
             )}
           </p>
-          <button
+          <Button
             onClick={() => void navigate({ to: '/sites' })}
             className="px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-all"
           >
             {t('dashboard.addSite', 'Ajouter un site')}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -59,6 +65,15 @@ export default function WeatherPage() {
             void navigate({ to: '/weather', search: { siteId } })
           }
           weatherData={weatherDataMap}
+        />
+
+        {/* Best Spot for selected day */}
+        <BestSpotSuggestion
+          bestSpot={bestSpot ?? null}
+          onSelectSite={(siteId) =>
+            void navigate({ to: '/weather', search: { siteId } })
+          }
+          selectedDayIndex={selectedDayIndex}
         />
 
         {/* Current Conditions */}
@@ -77,8 +92,10 @@ export default function WeatherPage() {
           onSelectDay={setSelectedDayIndex}
         />
 
-        {/* Emagram Analysis */}
-        <EmagramWidget siteId={selectedSiteId} dayIndex={selectedDayIndex} />
+        {/* Emagram Analysis (authenticated only) */}
+        {isAuthenticated && (
+          <EmagramWidget siteId={selectedSiteId} dayIndex={selectedDayIndex} />
+        )}
 
         {/* Hourly Forecast */}
         <HourlyForecast spotId={selectedSiteId} dayIndex={selectedDayIndex} />

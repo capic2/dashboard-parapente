@@ -18,6 +18,15 @@ const CacheKeyInfoSchema = z.object({
   key: z.string(),
   ttl: z.number(),
   size: z.number(),
+  resolved: z
+    .object({
+      type: z.string(),
+      label: z.string(),
+      confidence: z.string(),
+      details: z.record(z.string(), z.unknown()).optional(),
+    })
+    .nullable()
+    .optional(),
 });
 
 const CacheGroupSchema = z.object({
@@ -38,6 +47,15 @@ const CacheKeyDetailSchema = z.object({
   size: z.number(),
   value: z.unknown(),
   type: z.enum(['json', 'string']),
+  resolved: z
+    .object({
+      type: z.string(),
+      label: z.string(),
+      confidence: z.string(),
+      details: z.record(z.string(), z.unknown()).optional(),
+    })
+    .nullable()
+    .optional(),
 });
 
 const DeleteCacheResponseSchema = z.object({

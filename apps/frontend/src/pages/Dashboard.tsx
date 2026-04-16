@@ -1,11 +1,10 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSuspenseQuery, useQueries } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import StatsPanel from '../components/dashboard/StatsPanel';
-import DaySelector from '../components/dashboard/DaySelector';
 import AllSitesConditions from '../components/dashboard/AllSitesConditions';
 import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
+import { Button } from '@dashboard-parapente/design-system';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import { useBestSpotAPI } from '../hooks/weather/useBestSpotAPI';
 import { createWeatherQueryFn } from '../hooks/weather/useWeather';
@@ -17,8 +16,7 @@ export default function Dashboard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data: sites } = useSuspenseQuery(sitesQueryOptions());
-  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
-  const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
+  const { data: bestSpot } = useBestSpotAPI(0);
 
   // Fetch current weather for all sites (day 0), auto-refresh every hour
   const weatherQueries = useQueries({
@@ -52,12 +50,12 @@ export default function Dashboard() {
               'Ajoutez votre premier site de vol pour commencer.'
             )}
           </p>
-          <button
+          <Button
             onClick={() => void navigate({ to: '/sites' })}
             className="px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-all"
           >
             {t('dashboard.addSite', 'Ajouter un site')}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -69,18 +67,13 @@ export default function Dashboard() {
         {/* 1. Stats Panel */}
         <StatsPanel />
 
-        {/* 2. Day Selector + Best Spot */}
-        <DaySelector
-          selectedDayIndex={selectedDayIndex}
-          onSelectDay={setSelectedDayIndex}
-        />
-
+        {/* 2. Best Spot (Today) */}
         <BestSpotSuggestion
           bestSpot={bestSpot ?? null}
           onSelectSite={(siteId) =>
             void navigate({ to: '/weather', search: { siteId } })
           }
-          selectedDayIndex={selectedDayIndex}
+          selectedDayIndex={0}
         />
 
         {/* 3. Current Conditions - All Sites (auto-refresh hourly) */}

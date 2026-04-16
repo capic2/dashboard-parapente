@@ -34,10 +34,19 @@ from main import app
 # IMPORTANT: Import all models BEFORE importing main.app
 # This ensures all tables are registered with SQLAlchemy Base.metadata
 # before Base.metadata.create_all() is called in the test_db fixture
+from auth import get_current_user
 from models import (
     Flight,
     Site,
+    User,
 )
+
+# Fake authenticated user for tests
+_test_user = User(id=1, email="test@local", hashed_password="", is_active=True)
+
+
+def _override_get_current_user():
+    return _test_user
 
 
 # Use temporary file SQLite for tests
@@ -63,6 +72,7 @@ def test_db():
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = _override_get_current_user
     yield SessionLocal
 
     # Cleanup
@@ -78,7 +88,7 @@ def test_db():
 
 @pytest.fixture(scope="function")
 def client(test_db):
-    """FastAPI TestClient with test database"""
+    """FastAPI TestClient with test database (authenticated)"""
     return TestClient(app)
 
 

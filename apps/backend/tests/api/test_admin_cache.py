@@ -8,6 +8,11 @@ from unittest.mock import patch
 import pytest
 from fakeredis import FakeAsyncRedis
 
+from models import EmagramAnalysis
+from cache import generate_cache_key
+
+from datetime import datetime
+
 
 @pytest.fixture
 def fake_async_redis():
@@ -28,7 +33,10 @@ def patch_get_redis(fake_async_redis):
     async def mock_get_redis():
         return fake_async_redis
 
-    with patch("cache.get_redis", side_effect=mock_get_redis):
+    with (
+        patch("cache.get_redis", side_effect=mock_get_redis),
+        patch("redis.asyncio.from_url", return_value=fake_async_redis),
+    ):
         yield
 
     cache._redis_pool = old_pool
@@ -98,11 +106,123 @@ class TestGetCacheOverview:
             assert k["ttl"] > 0
             assert k["size"] > 0
 
+    @pytest.mark.anyio
+    async def test_cache_overview_resolves_known_keys(
+        self,
+        client,
+        db_session,
+        seeded_redis,
+        arguel_site,
+    ):
+        forecast_key = generate_cache_key(
+            "forecast",
+            lat=round(arguel_site.latitude, 4),
+            lon=round(arguel_site.longitude, 4),
+            day_index=2,
+        )
+
+        await seeded_redis.setex(
+            forecast_key,
+            3600,
+            json.dumps({"temperature": 16, "cached_at": "2026-01-15T10:00:00+00:00"}),
+        )
+        await seeded_redis.setex(
+            "best_spot:day_2",
+            3600,
+            json.dumps({"site": "arguel", "cached_at": "2026-01-15T10:00:00+00:00"}),
+        )
+        await seeded_redis.setex(
+            "emagram:sounding:07145:12:2026-01-15",
+            3600,
+            json.dumps({"station_code": "07145", "cached_at": "2026-01-15T10:00:00+00:00"}),
+        )
+        await seeded_redis.setex(
+            "emagram:analysis:site-arguel:2026-01-15:12",
+            3600,
+            json.dumps({"analysis_id": "abc123", "cached_at": "2026-01-15T10:00:00+00:00"}),
+        )
+
+        response = client.get("/api/admin/cache")
+        assert response.status_code == 200
+        data = response.json()
+
+        forecast_entry = next(
+            item
+            for item in data["groups"]["weather:forecast"]["keys"]
+            if item["key"] == forecast_key
+        )
+        best_spot_entry = next(
+            item for item in data["groups"]["best_spot"]["keys"] if item["key"] == "best_spot:day_2"
+        )
+        emagram_entry = next(
+            item
+            for item in data["groups"]["emagram:sounding"]["keys"]
+            if item["key"] == "emagram:sounding:07145:12:2026-01-15"
+        )
+        emagram_analysis_entry = next(
+            item
+            for item in data["groups"]["emagram:analysis"]["keys"]
+            if item["key"] == "emagram:analysis:site-arguel:2026-01-15:12"
+        )
+
+        assert forecast_entry["resolved"]["label"] == "weather_forecast"
+        assert forecast_entry["resolved"]["details"]["site_code"] == "ARG"
+        assert forecast_entry["resolved"]["details"]["day_index"] == 2
+
+        assert best_spot_entry["resolved"]["label"] == "best_spot_for_day"
+        assert best_spot_entry["resolved"]["details"]["day_index"] == 2
+
+        assert emagram_entry["resolved"]["label"] == "emagram_sounding"
+        assert emagram_entry["resolved"]["details"]["station"] == "07145"
+        assert emagram_analysis_entry["resolved"]["label"] == "emagram_analysis"
+        assert emagram_analysis_entry["resolved"]["details"]["site_id"] == "site-arguel"
+
+    @pytest.mark.anyio
+    async def test_cache_overview_unresolved_key(self, client, db_session, seeded_redis):
+        """Unknown cache keys keep compatibility by returning null resolution."""
+        await seeded_redis.setex(
+            "custom:key:raw",
+            300,
+            json.dumps({"payload": "value"}),
+        )
+
+        response = client.get("/api/admin/cache")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert "custom:key" in data["groups"]
+        entry = data["groups"]["custom:key"]["keys"][0]
+        assert entry["resolved"] is None
+
     def test_cache_overview_has_memory_usage_field(self, client, db_session):
         """Memory usage field is present (may be None with fakeredis)."""
         response = client.get("/api/admin/cache")
         assert response.status_code == 200
         assert "memory_usage" in response.json()
+
+    @pytest.mark.anyio
+    async def test_cache_overview_uses_empty_resolution_map_on_error(
+        self,
+        client,
+        db_session,
+        seeded_redis,
+    ):
+        await seeded_redis.setex(
+            "weather:forecast:abc123",
+            3600,
+            json.dumps({"temperature": 16, "cached_at": "2026-01-15T10:00:00+00:00"}),
+        )
+
+        with patch(
+            "routes._build_forecast_cache_signature_map", side_effect=RuntimeError("timeout")
+        ):
+            response = client.get("/api/admin/cache")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "weather:forecast" in data["groups"]
+        entry = data["groups"]["weather:forecast"]["keys"][0]
+        assert entry["resolved"] is None
 
 
 class TestGetCacheKeyDetail:
@@ -144,6 +264,100 @@ class TestGetCacheKeyDetail:
 
         assert data["type"] == "string"
         assert data["value"] == "just a string value"
+
+    @pytest.mark.anyio
+    async def test_key_detail_unknown_key_no_resolution(
+        self,
+        client,
+        db_session,
+        seeded_redis,
+    ):
+        await seeded_redis.setex("custom:key:raw", 300, json.dumps({"payload": "value"}))
+
+        response = client.get("/api/admin/cache/custom:key:raw")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["resolved"] is None
+
+    @pytest.mark.anyio
+    async def test_key_detail_includes_resolution(
+        self, client, db_session, seeded_redis, arguel_site
+    ):
+        forecast_key = generate_cache_key(
+            "forecast",
+            lat=round(arguel_site.latitude, 4),
+            lon=round(arguel_site.longitude, 4),
+            day_index=1,
+        )
+
+        await seeded_redis.setex(
+            forecast_key,
+            3600,
+            json.dumps({"site": "arguel", "cached_at": "2026-01-15T10:00:00+00:00"}),
+        )
+
+        response = client.get(f"/api/admin/cache/{forecast_key}")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["resolved"]["label"] == "weather_forecast"
+        assert data["resolved"]["details"]["site_code"] == "ARG"
+        assert data["resolved"]["details"]["day_index"] == 1
+
+    @pytest.mark.anyio
+    async def test_key_detail_best_spot_includes_resolution(self, client, db_session, seeded_redis):
+        await seeded_redis.setex(
+            "best_spot:day_3",
+            3600,
+            json.dumps({"site": "arguel", "cached_at": "2026-01-15T10:00:00+00:00"}),
+        )
+
+        response = client.get("/api/admin/cache/best_spot:day_3")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["resolved"]["label"] == "best_spot_for_day"
+        assert data["resolved"]["details"]["day_index"] == 3
+
+    @pytest.mark.anyio
+    async def test_key_detail_falls_back_to_null_when_resolution_map_fails(
+        self,
+        client,
+        db_session,
+        seeded_redis,
+    ):
+        await seeded_redis.setex(
+            "weather:forecast:abc123",
+            3600,
+            json.dumps({"temperature": 16, "cached_at": "2026-01-15T10:00:00+00:00"}),
+        )
+
+        with patch(
+            "routes._build_forecast_cache_signature_map", side_effect=RuntimeError("timeout")
+        ):
+            response = client.get("/api/admin/cache/weather:forecast:abc123")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["resolved"] is None
+
+    @pytest.mark.anyio
+    async def test_key_detail_emagram_includes_resolution(self, client, db_session, seeded_redis):
+        await seeded_redis.setex(
+            "emagram:sounding:07145:12:2026-01-15",
+            3600,
+            json.dumps({"station_code": "07145", "cached_at": "2026-01-15T10:00:00+00:00"}),
+        )
+
+        response = client.get("/api/admin/cache/emagram:sounding:07145:12:2026-01-15")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["resolved"]["label"] == "emagram_sounding"
+        assert data["resolved"]["details"]["station"] == "07145"
+        assert data["resolved"]["details"]["sounding_hour"] == "12"
+        assert data["resolved"]["details"]["date"] == "2026-01-15"
 
 
 class TestDeleteCacheKey:
@@ -188,3 +402,62 @@ class TestDeleteCacheKey:
         data = response.json()
         assert data["success"] is True
         assert data["keys_deleted"] == 0
+
+
+class TestClearEmagramCache:
+    """Tests for POST /api/admin/clear-emagram-cache"""
+
+    @pytest.mark.anyio
+    async def test_clear_emagram_cache_only_removes_emagram_keys(
+        self, client, db_session, seeded_redis
+    ):
+        """Clear endpoint should remove emagram keys while keeping other cache keys."""
+        now = datetime.now()
+        for i in range(2):
+            db_session.add(
+                EmagramAnalysis(
+                    id=f"clear-emagram-{i}",
+                    station_code=f"site-{i}",
+                    station_name=f"Site {i}",
+                    station_latitude=47.0 + i * 0.1,
+                    station_longitude=6.0 + i * 0.1,
+                    analysis_date=now.date(),
+                    analysis_time=now.time(),
+                    analysis_datetime=now,
+                    distance_km=0.0,
+                    data_source="wyoming",
+                    sounding_time="12Z",
+                    analysis_method="test",
+                    plafond_thermique_m=3000,
+                    force_thermique_ms=2.0,
+                    score_volabilite=75,
+                    conseils_vol="Advice",
+                    analysis_status="completed",
+                )
+            )
+        db_session.commit()
+
+        await seeded_redis.setex(
+            "emagram:sounding:07145:12:2026-01-15",
+            3600,
+            json.dumps({"station_code": "07145"}),
+        )
+        await seeded_redis.setex(
+            "weather:forecast:day_0",
+            3600,
+            json.dumps({"site_code": "ARG"}),
+        )
+
+        response = client.post("/api/admin/clear-emagram-cache")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["success"] is True
+        assert data["database_deleted"] == 2
+        assert data["redis_cleared"] is True
+        assert data["redis_keys_deleted"] == 1
+
+        assert db_session.query(EmagramAnalysis).count() == 0
+
+        assert await seeded_redis.get("emagram:sounding:07145:12:2026-01-15") is None
+        assert await seeded_redis.get("weather:forecast:day_0") is not None

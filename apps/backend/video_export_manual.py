@@ -2,29 +2,65 @@
 Video export using Cesium Manual Render approach
 Based on: https://cesium.com/blog/2018/01/24/cesium-scene-rendering-performance/
 
-This approach renders frame-by-frame with full control over Cesium's render loop.
-Slower but guarantees perfect quality with 0 stuttering.
+This module now stores export jobs in the database and runs from a single background
+worker while keeping a small in-memory status snapshot for compatibility.
 """
 
 import asyncio
 import shutil
 import subprocess
 import threading
+import uuid
+import traceback
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy.orm import Session
 
-# Storage for export jobs
-export_jobs: dict[str, dict] = {}
+import config
+from database import SessionLocal
+from models import Flight, VideoExportJob
+
+# Storage for export jobs (compatibility snapshot)
+export_jobs: dict[str, dict[str, Any]] = {}
 
 EXPORTS_DIR = Path(__file__).parent / "exports" / "videos"
 EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
+_STATUS_QUEUED = "queued"
+_STATUS_RUNNING = "running"
+_STATUS_CAPTURING = "capturing"
+_STATUS_ENCODING = "encoding"
+_STATUS_INITIALIZING = "initializing"
+_STATUS_COMPLETED = "completed"
+_STATUS_FAILED = "failed"
+_STATUS_CANCELLED = "cancelled"
+
+_ACTIVE_STATUSES = {
+    _STATUS_QUEUED,
+    _STATUS_RUNNING,
+    _STATUS_CAPTURING,
+    _STATUS_ENCODING,
+    _STATUS_INITIALIZING,
+}
+
+_TERMINAL_STATUSES = {_STATUS_COMPLETED, _STATUS_FAILED, _STATUS_CANCELLED}
+
+_WORKER_THREAD: threading.Thread | None = None
+_WORKER_STOP = threading.Event()
+_WORKER_LOCK = threading.Lock()
+_JOB_UPDATE_DB_LOCK = threading.Lock()
+_EXPORT_JOBS_LOCK = threading.Lock()
+_JOB_UPDATE_DB: dict[str, bool] = {}
+
+_CANCEL_CHECK_INTERVAL = 10
+
+
 def check_dependencies():
-    """Check if required system dependencies are installed"""
+    """Check if required system dependencies are installed."""
     missing = []
 
     if not shutil.which("ffmpeg"):
@@ -42,6 +78,289 @@ def check_dependencies():
 _dependencies_ok = check_dependencies()
 
 
+def _to_public_status(status: str) -> str:
+    """Map internal job status to frontend-compatible status."""
+    if status == _STATUS_COMPLETED:
+        return "completed"
+    if status in {_STATUS_FAILED, _STATUS_CANCELLED}:
+        return "failed"
+    return "processing"
+
+
+def _to_iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _default_frontend_url() -> str:
+    if config.FRONTEND_URL:
+        return config.FRONTEND_URL.rstrip("/")
+
+    static_index = Path(__file__).parent / "static" / "index.html"
+    if static_index.exists():
+        host = "localhost" if config.API_HOST == "0.0.0.0" else config.API_HOST
+        return f"http://{host}:{config.API_PORT}"
+
+    return "http://localhost:5173"
+
+
+def resolve_frontend_url(frontend_url: str | None = None) -> str:
+    """Return a usable frontend base URL for browser automation."""
+    if frontend_url:
+        return _normalize_frontend_url(frontend_url)
+    return _default_frontend_url()
+
+
+def _normalize_frontend_url(frontend_url: str) -> str:
+    candidate = frontend_url.rstrip("/") if frontend_url else _default_frontend_url()
+    static_index = Path(__file__).parent / "static" / "index.html"
+
+    if not candidate and static_index.exists():
+        host = "localhost" if config.API_HOST == "0.0.0.0" else config.API_HOST
+        return f"http://{host}:{config.API_PORT}"
+
+    if not candidate:
+        return "http://localhost:5173"
+
+    if "/export-viewer" in candidate:
+        candidate = candidate.split("/export-viewer")[0]
+
+    return candidate.rstrip("/")
+
+
+def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
+    return {
+        "job_id": job.id,
+        "flight_id": job.flight_id,
+        "status": _to_public_status(job.status),
+        "internal_status": job.status,
+        "progress": job.progress or 0,
+        "message": job.message,
+        "started_at": _to_iso(job.started_at),
+        "completed_at": _to_iso(job.completed_at),
+        "video_path": job.video_path,
+        "error": job.error,
+        "total_frames": job.total_frames,
+        "fps": job.fps,
+        "quality": job.quality,
+        "speed": job.speed,
+    }
+
+
+def _set_memory_snapshot(job_id: str, data: dict[str, Any] | None):
+    with _EXPORT_JOBS_LOCK:
+        if data is None:
+            export_jobs.pop(job_id, None)
+        else:
+            export_jobs[job_id] = data
+
+
+def _get_memory_snapshot(job_id: str) -> dict[str, Any] | None:
+    with _EXPORT_JOBS_LOCK:
+        snapshot = export_jobs.get(job_id)
+    return snapshot
+
+
+def _set_job_update_db_flag(job_id: str, should_update_db: bool):
+    with _JOB_UPDATE_DB_LOCK:
+        _JOB_UPDATE_DB[job_id] = should_update_db
+
+
+def _pop_job_update_db_flag(job_id: str) -> bool | None:
+    with _JOB_UPDATE_DB_LOCK:
+        return _JOB_UPDATE_DB.pop(job_id, None)
+
+
+def _get_job_update_db_flag(job_id: str, default: bool = True) -> bool:
+    with _JOB_UPDATE_DB_LOCK:
+        return _JOB_UPDATE_DB.get(job_id, default)
+
+
+def _get_job(job_id: str, db: Session | None = None) -> VideoExportJob | None:
+    owns_session = False
+    if db is None:
+        db = SessionLocal()
+        owns_session = True
+    try:
+        return db.query(VideoExportJob).filter(VideoExportJob.id == job_id).first()
+    finally:
+        if owns_session:
+            db.close()
+
+
+def _update_flight_from_job(db: Session, job: VideoExportJob):
+    flight = db.query(Flight).filter(Flight.id == job.flight_id).first()
+    if not flight:
+        return
+
+    flight.video_export_job_id = job.id
+    flight.video_export_status = _to_public_status(job.status)
+
+    if job.status == _STATUS_COMPLETED:
+        flight.video_file_path = job.video_path
+    elif job.status == _STATUS_QUEUED:
+        flight.video_file_path = None
+
+
+def _update_job(
+    job_id: str,
+    *,
+    update_db: bool | None = None,
+    **kwargs,
+) -> VideoExportJob | None:
+    with SessionLocal() as db:
+        job = db.query(VideoExportJob).filter(VideoExportJob.id == job_id).first()
+        if not job:
+            return None
+
+        for key, value in kwargs.items():
+            setattr(job, key, value)
+
+        job.updated_at = datetime.utcnow()
+        if job.status == _STATUS_RUNNING and not job.started_at:
+            job.started_at = datetime.utcnow()
+
+        popped_update_db: bool | None = None
+        if job.status in _TERMINAL_STATUSES:
+            if job.status == _STATUS_COMPLETED:
+                if not job.completed_at:
+                    job.completed_at = datetime.utcnow()
+            if job.status == _STATUS_CANCELLED and not job.cancelled_at:
+                job.cancelled_at = datetime.utcnow()
+
+            popped_update_db = _pop_job_update_db_flag(job_id)
+
+        if update_db is not None:
+            should_update_flight = update_db
+        elif popped_update_db is not None:
+            should_update_flight = popped_update_db
+        else:
+            should_update_flight = _get_job_update_db_flag(job_id, True)
+        if should_update_flight:
+            _update_flight_from_job(db, job)
+        db.commit()
+
+        snapshot = _snapshot_from_job(job)
+        _set_memory_snapshot(job_id, snapshot)
+        return job
+
+
+def _is_cancelled(job_id: str) -> bool:
+    snapshot = _get_memory_snapshot(job_id)
+    if snapshot and snapshot.get("internal_status") == _STATUS_CANCELLED:
+        return True
+
+    job = _get_job(job_id)
+    return bool(job and job.status == _STATUS_CANCELLED)
+
+
+def _mark_stale_jobs_as_queued():
+    with SessionLocal() as db:
+        cutoff = datetime.utcnow() - timedelta(minutes=2)
+        stale_jobs = (
+            db.query(VideoExportJob)
+            .filter(VideoExportJob.status.in_(list(_ACTIVE_STATUSES)))
+            .filter(VideoExportJob.updated_at < cutoff)
+            .all()
+        )
+
+        if not stale_jobs:
+            return
+
+        for job in stale_jobs:
+            job.status = _STATUS_QUEUED
+            job.message = "Recovered from restart"
+            job.updated_at = datetime.utcnow()
+
+        db.commit()
+
+        for job in stale_jobs:
+            _set_memory_snapshot(job.id, _snapshot_from_job(job))
+
+
+def _acquire_next_job() -> str | None:
+    with SessionLocal() as db:
+        job = (
+            db.query(VideoExportJob)
+            .filter(VideoExportJob.status == _STATUS_QUEUED)
+            .with_for_update(skip_locked=True)
+            .order_by(VideoExportJob.created_at)
+            .first()
+        )
+        if not job:
+            return None
+
+        job.status = _STATUS_RUNNING
+        job.message = "Starting manual export"
+        job.updated_at = datetime.utcnow()
+        job.started_at = datetime.utcnow()
+        db.commit()
+        _set_memory_snapshot(job.id, _snapshot_from_job(job))
+        return job.id
+
+
+def _cleanup_frames(frames_dir: Path):
+    if not frames_dir.exists():
+        return
+
+    for frame_file in frames_dir.glob("*.png"):
+        frame_file.unlink()
+    try:
+        frames_dir.rmdir()
+    except OSError:
+        pass
+
+
+def _worker_loop():
+    print("🚀 Manual video export worker started")
+    while not _WORKER_STOP.is_set():
+        job_id = None
+        try:
+            job_id = _acquire_next_job()
+
+            if not job_id:
+                _WORKER_STOP.wait(1)
+                continue
+
+            asyncio.run(_export_video_manual_render(job_id))
+        except Exception as e:
+            if job_id:
+                print(f"❌ Worker failed for job {job_id}: {e}")
+                traceback.print_exc()
+                _update_job(
+                    job_id,
+                    status=_STATUS_FAILED,
+                    error=str(e),
+                    message="Worker internal error",
+                )
+            else:
+                print(f"❌ Worker error: {e}")
+
+
+def start_video_export_worker():
+    """Start the singleton background worker for manual exports."""
+    global _WORKER_THREAD
+    with _WORKER_LOCK:
+        if _WORKER_THREAD and _WORKER_THREAD.is_alive():
+            return
+
+        _WORKER_STOP.clear()
+        _mark_stale_jobs_as_queued()
+
+        _WORKER_THREAD = threading.Thread(
+            target=_worker_loop,
+            name="video-export-manual-worker",
+            daemon=True,
+        )
+        _WORKER_THREAD.start()
+
+
+def stop_video_export_worker():
+    """Stop the manual export worker (used during shutdown)."""
+    _WORKER_STOP.set()
+    if _WORKER_THREAD and _WORKER_THREAD.is_alive():
+        _WORKER_THREAD.join(timeout=5)
+
+
 def start_video_export_manual(
     flight_id: str,
     quality: str = "1080p",
@@ -51,108 +370,90 @@ def start_video_export_manual(
     update_db: bool = True,
 ):
     """
-    Start video export using Cesium manual render approach
-
-    Args:
-        flight_id: ID of the flight to export
-        quality: Video quality (720p, 1080p, 4K)
-        fps: Frames per second (default 15)
-        speed: Playback speed multiplier (default 1)
-        frontend_url: URL of the frontend
-        update_db: Whether to update database (default True)
+    Create a new export job and enqueue it for the singleton worker.
     """
-    job_id = f"{flight_id}-{int(time.time())}"
+    if not _dependencies_ok:
+        raise RuntimeError("Missing dependencies for video export")
 
-    export_jobs[job_id] = {
-        "flight_id": flight_id,
-        "status": "started",
-        "progress": 0,
-        "message": "Initializing manual render export...",
-        "started_at": datetime.now().isoformat(),
-        "video_path": None,
-        "error": None,
-        "total_frames": None,
-        "cancelled": False,
-    }
+    job_id = str(uuid.uuid4())
+    now = datetime.utcnow()
 
-    # Update flight status in database if requested
-    if update_db:
-        from database import SessionLocal
-        from models import Flight
-
-        db = SessionLocal()
-        try:
-            flight = db.query(Flight).filter(Flight.id == flight_id).first()
-            if flight:
-                flight.video_export_job_id = job_id
-                flight.video_export_status = "processing"
-                flight.video_file_path = None
-                db.commit()
-        finally:
-            db.close()
-
-    # Start export in background thread (will create its own DB session)
-    thread = threading.Thread(
-        target=lambda: asyncio.run(
-            _export_video_manual_render(
-                job_id, flight_id, quality, fps, speed, frontend_url, update_db
-            )
+    with SessionLocal() as db:
+        job = VideoExportJob(
+            id=job_id,
+            flight_id=flight_id,
+            status=_STATUS_QUEUED,
+            mode="manual",
+            quality=quality,
+            fps=fps,
+            speed=speed,
+            progress=0,
+            message="Job enqueued",
+            frontend_url=frontend_url,
+            started_at=None,
+            updated_at=now,
+            created_at=now,
         )
-    )
-    thread.start()
+        db.add(job)
 
+        if update_db:
+            _set_job_update_db_flag(job_id, True)
+        else:
+            _set_job_update_db_flag(job_id, False)
+
+        flight = db.query(Flight).filter(Flight.id == flight_id).first()
+        if flight:
+            if update_db:
+                flight.video_export_job_id = job_id
+                flight.video_export_status = _to_public_status(_STATUS_QUEUED)
+                flight.video_file_path = None
+
+        db.commit()
+        _set_memory_snapshot(job_id, _snapshot_from_job(job))
+
+    start_video_export_worker()
     return job_id
 
 
-async def _export_video_manual_render(
-    job_id: str,
-    flight_id: str,
-    quality: str,
-    fps: int,
-    speed: int,
-    frontend_url: str,
-    update_db: bool = True,
-):
-    """
-    Export video using Cesium manual render - frame by frame
-    """
+async def _export_video_manual_render(job_id: str):
+    """Export video using Cesium manual render - frame by frame."""
+    job = _get_job(job_id)
+    if not job:
+        return
+
+    quality = job.quality or "1080p"
+    fps = job.fps or 15
+    speed = job.speed or 1
+    flight_id = job.flight_id
+    frontend_url = resolve_frontend_url(job.frontend_url)
+    frames_dir: Path | None = None
+
     try:
         from playwright.async_api import async_playwright
 
-        export_jobs[job_id]["status"] = "initializing"
-        export_jobs[job_id]["message"] = "Setting up Cesium manual render..."
+        _update_job(job_id, status=_STATUS_INITIALIZING, message="Setting up manual render")
 
         # Resolution mapping
         resolutions = {"720p": (1280, 720), "1080p": (1920, 1080), "4K": (3840, 2160)}
         width, height = resolutions.get(quality, (1920, 1080))
 
-        # Check if frontend is built for production
-        static_index = Path(__file__).parent / "static" / "index.html"
-        if static_index.exists():
-            frontend_url = "http://localhost:8001"
-            print(f"📦 Using production frontend at {frontend_url}")
-
         async with async_playwright() as p:
-            # Launch browser with maximum resources
             browser = await p.chromium.launch(
                 headless=True,
                 args=[
-                    # GPU acceleration
                     "--enable-gpu",
                     "--use-gl=egl",
                     "--enable-webgl",
                     "--enable-webgl2",
                     "--ignore-gpu-blocklist",
                     "--disable-gpu-vsync",
-                    # Performance
                     "--disable-dev-shm-usage",
                     "--no-sandbox",
                     "--disable-setuid-sandbox",
-                    "--js-flags=--max-old-space-size=8192",  # 8GB heap
+                    "--js-flags=--max-old-space-size=8192",
                     "--disable-background-timer-throttling",
                     "--disable-backgrounding-occluded-windows",
                     "--disable-renderer-backgrounding",
-                    # Rendering
                     "--force-device-scale-factor=1",
                     "--high-dpi-support=1",
                 ],
@@ -165,60 +466,46 @@ async def _export_video_manual_render(
             )
             page = await context.new_page()
 
-            # Console logging
             page.on("console", lambda msg: print(f"🖥️  [{msg.type}]: {msg.text}"))
             page.on("pageerror", lambda err: print(f"❌ Browser error: {err}"))
 
-            # Navigate to export viewer
             url = f"{frontend_url}/export-viewer?flightId={flight_id}"
             print(f"📺 Opening {url}")
 
-            export_jobs[job_id]["message"] = "Loading page..."
+            _update_job(job_id, message="Loading export viewer")
             response = await page.goto(url, wait_until="networkidle", timeout=60000)
             if response.status >= 400:
                 raise Exception(f"Page returned HTTP {response.status}")
 
-            # Wait for Cesium viewer
-            export_jobs[job_id]["message"] = "Waiting for Cesium viewer..."
-            print("⏳ Waiting for Cesium viewer...")
-
+            _update_job(job_id, message="Waiting for Cesium viewer")
             await page.wait_for_selector("canvas", timeout=60000, state="attached")
-            await asyncio.sleep(3)  # Let Cesium initialize
+            await asyncio.sleep(3)
 
             print("✅ Cesium viewer found")
 
-            # Setup Cesium in manual render mode
-            export_jobs[job_id]["message"] = "Configuring Cesium manual render mode..."
-            print("🔧 Configuring Cesium for manual render...")
+            _update_job(job_id, message="Configuring manual render mode")
 
             setup_result = await page.evaluate("""
                 () => {
-                    // Find Cesium viewer
                     const cesiumContainer = document.querySelector('.cesium-viewer');
                     if (!cesiumContainer) {
                         throw new Error('Cesium viewer container not found');
                     }
 
-                    // Wait for viewer to be ready
                     return new Promise((resolve) => {
                         const checkViewer = () => {
-                            // Try to find viewer in window or container
                             const viewer = window._cesiumViewer ||
                                           window.viewer ||
                                           cesiumContainer._viewer;
 
                             if (viewer && viewer.scene) {
-                                // Disable automatic render loop
                                 viewer.useDefaultRenderLoop = false;
                                 viewer.clock.shouldAnimate = false;
 
-                                // Store viewer globally
                                 window._cesiumViewer = viewer;
                                 window._exportMode = 'manual_render';
 
                                 console.log('✅ Cesium configured for manual render');
-                                console.log('  - useDefaultRenderLoop: false');
-                                console.log('  - shouldAnimate: false');
 
                                 resolve({ success: true });
                             } else {
@@ -235,10 +522,7 @@ async def _export_video_manual_render(
 
             print("✅ Cesium manual render mode configured")
 
-            # Wait for terrain to load
-            export_jobs[job_id]["message"] = "Waiting for terrain..."
-            print("⏳ Waiting for terrain to load...")
-
+            _update_job(job_id, message="Waiting for terrain")
             try:
                 await asyncio.wait_for(
                     page.evaluate("""
@@ -265,16 +549,10 @@ async def _export_video_manual_render(
 
             await asyncio.sleep(2)
 
-            # Get GPS points and flight duration
-            export_jobs[job_id]["message"] = "Extracting GPS data..."
-            print("📍 Extracting GPS points...")
+            _update_job(job_id, message="Extracting GPS data")
 
             flight_data = await page.evaluate("""
                 () => {
-                    const viewer = window._cesiumViewer;
-
-                    // Try to get GPS data from the page
-                    // This depends on how FlightViewer3D stores the data
                     const gpxData = window._gpxData || {};
                     const coordinates = gpxData.coordinates || [];
 
@@ -282,7 +560,7 @@ async def _export_video_manual_render(
 
                     return {
                         totalPoints: coordinates.length,
-                        duration: coordinates.length > 0 ? coordinates.length : 300 // Default 5min
+                        duration: coordinates.length > 0 ? coordinates.length : 300
                     };
                 }
             """)
@@ -291,36 +569,35 @@ async def _export_video_manual_render(
             duration_seconds = flight_data["duration"]
 
             if total_gps_points == 0:
-                # Fallback: estimate from video duration
                 total_gps_points = duration_seconds
                 print(f"⚠️  No GPS data found, using estimated {total_gps_points} points")
 
             print(f"📊 GPS Points: {total_gps_points}")
             print(f"📊 Duration: {duration_seconds}s")
 
-            # Calculate frames needed
-            video_duration = duration_seconds / speed
+            video_duration = float(duration_seconds) / max(speed, 1)
             total_frames = int(video_duration * fps)
+            if total_frames <= 0:
+                total_frames = 1
 
             print(f"🎬 Will capture {total_frames} frames at {fps} FPS")
 
-            export_jobs[job_id]["total_frames"] = total_frames
-            export_jobs[job_id]["message"] = f"Preparing to capture {total_frames} frames..."
+            _update_job(
+                job_id,
+                status=_STATUS_INITIALIZING,
+                total_frames=total_frames,
+                message=f"Preparing to capture {total_frames} frames",
+            )
 
-            # Create frames directory
             frames_dir = EXPORTS_DIR / f"frames_{job_id}"
             frames_dir.mkdir(exist_ok=True)
 
             print(f"📁 Frames directory: {frames_dir}")
 
-            # Start playback
-            export_jobs[job_id]["status"] = "capturing"
-            export_jobs[job_id]["message"] = "Starting frame capture..."
-            print("▶️  Starting frame-by-frame capture...")
+            _update_job(job_id, status=_STATUS_CAPTURING, message="Starting frame capture")
 
             await page.evaluate("""
                 () => {
-                    // Click play button
                     const playButton = Array.from(document.querySelectorAll('button'))
                         .find(btn => btn.textContent.includes('Play') || btn.textContent.includes('▶'));
                     if (playButton) {
@@ -330,64 +607,56 @@ async def _export_video_manual_render(
                 }
             """)
 
-            # Capture frames manually
             frame_count = 0
-            ms_per_frame = (duration_seconds * 1000) / total_frames
-
+            ms_per_frame = (duration_seconds * 1000) / max(total_frames, 1)
             print(f"⏱️  Capturing 1 frame every {ms_per_frame:.1f}ms")
-
             start_time = time.time()
 
             for i in range(total_frames):
-                # Check for cancellation
-                if export_jobs[job_id].get("cancelled"):
+                if i % _CANCEL_CHECK_INTERVAL == 0 and _is_cancelled(job_id):
                     print("🛑 Export cancelled by user")
                     await browser.close()
-                    # Cleanup frames
-                    for frame_file in frames_dir.glob("*.png"):
-                        frame_file.unlink()
-                    frames_dir.rmdir()
+                    _cleanup_frames(frames_dir)
+                    _update_job(
+                        job_id,
+                        status=_STATUS_CANCELLED,
+                        message="Export cancelled by user",
+                    )
                     return
 
-                # Render this frame in Cesium
                 tiles_loaded = await page.evaluate("""
                     () => {
                         const viewer = window._cesiumViewer;
-
-                        // Force render
                         viewer.scene.render(viewer.clock.currentTime);
-
-                        // Check if tiles are loaded
                         return viewer.scene.globe.tilesLoaded;
                     }
                 """)
 
-                # Wait a bit if tiles not loaded
                 if not tiles_loaded:
                     await asyncio.sleep(0.1)
 
-                # Capture screenshot
                 frame_path = frames_dir / f"frame{i:05d}.png"
                 await page.screenshot(path=str(frame_path), timeout=60000)
 
                 frame_count += 1
-
-                # Update progress every 10 frames
                 if frame_count % 10 == 0:
-                    progress = int((frame_count / total_frames) * 50)  # 0-50% for capture
-                    export_jobs[job_id]["progress"] = progress
-                    export_jobs[job_id]["message"] = f"Captured {frame_count}/{total_frames} frames"
-
+                    progress = int((frame_count / total_frames) * 50)
                     elapsed = time.time() - start_time
                     fps_actual = frame_count / elapsed if elapsed > 0 else 0
                     eta_seconds = (total_frames - frame_count) / fps_actual if fps_actual > 0 else 0
+
+                    _update_job(
+                        job_id,
+                        status=_STATUS_CAPTURING,
+                        progress=progress,
+                        message=f"Captured {frame_count}/{total_frames} frames",
+                    )
 
                     print(
                         f"📸 {frame_count}/{total_frames} frames ({fps_actual:.1f} fps, ETA: {int(eta_seconds/60)}min)"
                     )
 
-                # Wait for next frame time
-                await asyncio.sleep(ms_per_frame / 1000 / 10)  # Advance slowly
+                await asyncio.sleep(ms_per_frame / 1000)
 
             total_capture_time = time.time() - start_time
             print(
@@ -396,25 +665,23 @@ async def _export_video_manual_render(
 
             await browser.close()
 
-            # Check for cancellation before encoding
-            if export_jobs[job_id].get("cancelled"):
+            if _is_cancelled(job_id):
                 print("🛑 Export cancelled by user before encoding")
-                # Cleanup frames
-                for frame_file in frames_dir.glob("*.png"):
-                    frame_file.unlink()
-                frames_dir.rmdir()
+                _cleanup_frames(frames_dir)
+                _update_job(
+                    job_id,
+                    status=_STATUS_CANCELLED,
+                    message="Export cancelled before encoding",
+                )
                 return
 
-            # Encode with FFmpeg
-            export_jobs[job_id]["status"] = "encoding"
-            export_jobs[job_id]["progress"] = 50
-            export_jobs[job_id]["message"] = "Encoding video with FFmpeg..."
-
-            print("🎬 Encoding video with FFmpeg...")
-
-            output_file = (
-                EXPORTS_DIR / f"flight-{flight_id}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.mp4"
+            _update_job(
+                job_id, status=_STATUS_ENCODING, progress=50, message="Encoding with FFmpeg"
             )
+
+            timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+            filename = f"flight-{flight_id}-{timestamp}.mp4"
+            output_file = EXPORTS_DIR / filename
 
             ffmpeg_cmd = [
                 "ffmpeg",
@@ -427,7 +694,7 @@ async def _export_video_manual_render(
                 "-preset",
                 "medium",
                 "-crf",
-                "18",  # Higher quality (lower CRF)
+                "18",
                 "-pix_fmt",
                 "yuv420p",
                 "-y",
@@ -435,141 +702,116 @@ async def _export_video_manual_render(
             ]
 
             print(f"🎬 FFmpeg command: {' '.join(ffmpeg_cmd)}")
-
-            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+            try:
+                result = subprocess.run(
+                    ffmpeg_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=30 * 60,
+                )
+            except subprocess.TimeoutExpired as timeout_error:
+                raise Exception(
+                    f"FFmpeg timeout after 1800s: {' '.join(ffmpeg_cmd)}"
+                ) from timeout_error
 
             if result.returncode != 0:
                 raise Exception(f"FFmpeg encoding failed: {result.stderr}")
 
             print(f"✅ Video encoded: {output_file}")
 
-            # Cleanup frames
-            print("🗑️  Cleaning up frames...")
-            for frame_file in frames_dir.glob("*.png"):
-                frame_file.unlink()
-            frames_dir.rmdir()
+            _cleanup_frames(frames_dir)
 
-            # Success
             file_size_mb = output_file.stat().st_size / (1024 * 1024)
-            export_jobs[job_id]["status"] = "completed"
-            export_jobs[job_id]["progress"] = 100
-            export_jobs[job_id]["message"] = f"Video ready! ({file_size_mb:.1f} MB)"
-            export_jobs[job_id]["video_path"] = str(output_file)
-            export_jobs[job_id]["completed_at"] = datetime.now().isoformat()
-
-            # Update flight status in database
-            if update_db:
-                from database import SessionLocal
-                from models import Flight
-
-                db = SessionLocal()
-                try:
-                    flight = db.query(Flight).filter(Flight.id == flight_id).first()
-                    if flight:
-                        flight.video_export_status = "completed"
-                        flight.video_file_path = f"exports/videos/flight_{flight_id}.mp4"
-                        db.commit()
-                finally:
-                    db.close()
+            _update_job(
+                job_id,
+                status=_STATUS_COMPLETED,
+                progress=100,
+                message=f"Video ready! ({file_size_mb:.1f} MB)",
+                video_path=str(output_file),
+            )
 
             capture_time_min = int(total_capture_time / 60)
-            print(f"✅ Export completed in {capture_time_min} minutes!")
+            print(f"✅ Export completed in {capture_time_min} minutes")
             print(f"📹 Video: {output_file} ({file_size_mb:.1f} MB)")
 
     except Exception as e:
-        print(f"❌ Export failed: {str(e)}")
-        import traceback
-
+        if frames_dir is not None:
+            _cleanup_frames(frames_dir)
+        print(f"❌ Export failed: {e}")
         traceback.print_exc()
-
-        export_jobs[job_id]["status"] = "failed"
-        export_jobs[job_id]["error"] = str(e)
-        export_jobs[job_id]["message"] = f"Error: {str(e)}"
-
-        # Update flight status in database
-        if update_db:
-            from database import SessionLocal
-            from models import Flight
-
-            db = SessionLocal()
-            try:
-                flight = db.query(Flight).filter(Flight.id == flight_id).first()
-                if flight:
-                    flight.video_export_status = "failed"
-                    db.commit()
-            finally:
-                db.close()
+        _update_job(
+            job_id,
+            status=_STATUS_FAILED,
+            error=str(e),
+            message=f"Error: {e}",
+        )
 
 
-def get_export_status(job_id: str) -> dict | None:
-    """Get status of an export job"""
-    return export_jobs.get(job_id)
+def get_export_status(job_id: str) -> dict[str, Any] | None:
+    """Get status of an export job."""
+    job = _get_job(job_id)
+    if job:
+        snapshot = _snapshot_from_job(job)
+        _set_memory_snapshot(job_id, snapshot)
+        return snapshot
+    return _get_memory_snapshot(job_id)
 
 
 def cancel_video_export(job_id: str, update_db: bool = True) -> bool:
-    """
-    Cancel an ongoing video export
-
-    Args:
-        job_id: ID of the export job to cancel
-        update_db: Whether to update database (default True)
-
-    Returns:
-        True if cancellation was successful, False if job not found or already completed
-    """
-    job = export_jobs.get(job_id)
+    """Cancel an ongoing video export."""
+    job = _get_job(job_id)
     if not job:
         return False
 
-    # Can only cancel jobs that are in progress
-    if job["status"] in ["completed", "failed"]:
+    if job.status in _TERMINAL_STATUSES:
         return False
 
-    # Set cancellation flag
-    job["cancelled"] = True
-    job["status"] = "cancelled"
-    job["message"] = "Export cancelled by user"
-
-    # Update flight status in database
-    if update_db:
-        from database import SessionLocal
-        from models import Flight
-
-        db = SessionLocal()
-        try:
-            flight = db.query(Flight).filter(Flight.id == job["flight_id"]).first()
-            if flight:
-                flight.video_export_status = "failed"  # Reset to failed
-                flight.video_export_job_id = None
-                db.commit()
-        finally:
-            db.close()
+    _update_job(
+        job_id,
+        status=_STATUS_CANCELLED,
+        message="Export cancelled by user",
+        error=None,
+        update_db=update_db,
+    )
 
     print(f"🛑 Video export {job_id} cancelled")
     return True
 
 
-def list_exports(flight_id: str) -> list:
-    """List all exports for a flight"""
-    return [job for job_id, job in export_jobs.items() if job["flight_id"] == flight_id]
+def list_exports(flight_id: str) -> list[dict[str, Any]]:
+    """List all exports for a flight from DB and in-memory snapshots."""
+    with SessionLocal() as db:
+        jobs = (
+            db.query(VideoExportJob)
+            .filter(VideoExportJob.flight_id == flight_id)
+            .order_by(VideoExportJob.created_at.desc())
+            .all()
+        )
+
+    results = [_snapshot_from_job(job) for job in jobs]
+
+    with _EXPORT_JOBS_LOCK:
+        memory_items = list(export_jobs.items())
+
+    for job_id, snapshot in memory_items:
+        if snapshot.get("flight_id") != flight_id:
+            continue
+        if not any(item.get("job_id") == job_id for item in results):
+            results.append(snapshot)
+
+    return results
 
 
-def trigger_auto_export(flight_id: str, db: Session, frontend_url: str = "http://localhost:5173"):
+def trigger_auto_export(
+    flight_id: str,
+    db: Session,
+    frontend_url: str = "http://localhost:5173",
+):
     """
-    Automatically trigger video export for a flight with GPX
-    Called after GPX upload/processing
+    Automatically trigger video export for a flight with GPX.
 
-    Args:
-        flight_id: ID of the flight
-        db: Database session (only used to check if export needed)
-        frontend_url: URL of the frontend
-
-    Returns:
-        job_id if export started, None otherwise
+    Called after GPX upload/processing.
     """
-    from models import Flight
-
-    # Check if flight has GPX and doesn't already have a video export in progress
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
 
     if not flight:
@@ -580,23 +822,46 @@ def trigger_auto_export(flight_id: str, db: Session, frontend_url: str = "http:/
         print(f"⚠️  Flight {flight_id} has no GPX, skipping auto-export")
         return None
 
-    if flight.video_export_status in ["processing", "completed"]:
+    if flight.video_export_status in [
+        "processing",
+        "completed",
+        "queued",
+        "running",
+        "initializing",
+        "capturing",
+        "encoding",
+    ]:
         print(
             f"ℹ️  Flight {flight_id} already has video export status: {flight.video_export_status}"
         )
         return None
 
     print(f"🚀 Auto-triggering video export for flight {flight_id}")
+    try:
+        job_id = start_video_export_manual(
+            flight_id=flight_id,
+            quality="1080p",
+            fps=15,
+            speed=1,
+            frontend_url=frontend_url,
+            update_db=True,
+        )
+        print(f"✅ Manual auto export job {job_id} started for flight {flight_id}")
+        return job_id
+    except Exception as e:
+        print(f"⚠️ Manual auto-export failed for flight {flight_id}, fallback stream: {e}")
+        from video_export import start_video_export_background
 
-    # Start export with optimal settings (creates its own DB session in thread)
-    job_id = start_video_export_manual(
-        flight_id=flight_id,
-        quality="1080p",  # Optimal quality
-        fps=15,  # Optimal FPS for smooth playback
-        speed=1,  # Real-time speed
-        frontend_url=frontend_url,
-        update_db=True,  # Update DB from within the thread
-    )
-
-    print(f"✅ Video export job {job_id} started for flight {flight_id}")
-    return job_id
+        job_id = start_video_export_background(
+            flight_id=flight_id,
+            quality="1080p",
+            fps=15,
+            speed=1,
+            frontend_url=frontend_url,
+        )
+        flight.video_export_job_id = job_id
+        flight.video_export_status = "processing"
+        flight.video_file_path = None
+        db.commit()
+        print(f"✅ Stream fallback auto export job {job_id} started for flight {flight_id}")
+        return job_id

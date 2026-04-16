@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSites } from '../../hooks/sites/useSites';
+import { Button } from '@dashboard-parapente/design-system';
 import {
   useLandingAssociations,
   useAddLandingAssociation,
@@ -94,7 +95,8 @@ export default function LandingAssociationsManager({
               className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded px-2 py-1.5 text-sm"
             >
               <div className="flex items-center gap-2 min-w-0">
-                <button
+                <Button
+                  size="icon"
                   type="button"
                   onClick={() => handleSetPrimary(assoc.id)}
                   className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${
@@ -118,14 +120,16 @@ export default function LandingAssociationsManager({
                   </span>
                 </div>
               </div>
-              <button
+              <Button
+                size="icon"
                 type="button"
                 onClick={() => handleRemove(assoc.id)}
+                tone="ghost"
                 className="text-red-400 hover:text-red-600 flex-shrink-0 ml-2"
                 title="Supprimer"
               >
                 &times;
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -133,14 +137,15 @@ export default function LandingAssociationsManager({
 
       {/* Add new association */}
       {!showAddDropdown ? (
-        <button
+        <Button
           type="button"
           onClick={() => setShowAddDropdown(true)}
+          tone="ghost"
           className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
           disabled={availableLandings.length === 0}
         >
           + {t('landings.addLanding')}
-        </button>
+        </Button>
       ) : (
         <div className="space-y-2 bg-gray-50 dark:bg-gray-700 rounded p-2">
           <select
@@ -164,25 +169,27 @@ export default function LandingAssociationsManager({
             className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 rounded px-2 py-1"
           />
           <div className="flex gap-2">
-            <button
+            <Button
               type="button"
               onClick={handleAdd}
+              tone="ghost"
               disabled={!selectedLandingId || addMutation.isPending}
               className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
             >
               {addMutation.isPending ? t('landings.adding') : t('common.add')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={() => {
                 setShowAddDropdown(false);
                 setSelectedLandingId('');
                 setNewNotes('');
               }}
+              tone="ghost"
               className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             >
               {t('common.cancel')}
-            </button>
+            </Button>
           </div>
         </div>
       )}

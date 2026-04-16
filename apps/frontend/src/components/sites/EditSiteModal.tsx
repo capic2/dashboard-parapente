@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TextField, Label, Input, Button } from 'react-aria-components';
+import { TextField, Label, Input } from 'react-aria-components';
+import { Button } from '@dashboard-parapente/design-system';
 import type {
   Site,
   SiteUpdate,
@@ -444,7 +445,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           )}
 
         {/* Actions */}
-        <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
           <Button
             type="button"
             onPress={onClose}
