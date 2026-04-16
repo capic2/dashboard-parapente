@@ -5,7 +5,7 @@ import { defineMain } from '@storybook/react-vite/node';
 export default defineMain({
   stories: ['../src/**/*.stories.@(js|jsx|mjs|ts|tsx)'],
   addons: [
-    //getAbsolutePath('@chromatic-com/storybook'),
+    getAbsolutePath('@chromatic-com/storybook'),
     getAbsolutePath('@storybook/addon-vitest'),
     getAbsolutePath('@storybook/addon-a11y'),
     getAbsolutePath('@storybook/addon-docs'),
