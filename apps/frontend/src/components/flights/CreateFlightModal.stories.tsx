@@ -211,7 +211,7 @@ FlightModal.test(
     // Wait for error message to appear
     await waitFor(
       async () => {
-        expect(
+        await expect(
           await screen.findByText('❌ Erreur lors de la création')
         ).toBeInTheDocument();
       },
@@ -220,7 +220,7 @@ FlightModal.test(
 
     // Verify the error message contains helpful text
     await expect(
-      await screen.findByText(/données de vol valides/i)
+      await screen.findByText('Le fichier GPX ne contient pas de données de vol valides')
     ).toBeInTheDocument();
 
     // Verify that onCreateComplete was NOT called (since upload failed)

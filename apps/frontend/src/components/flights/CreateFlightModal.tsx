@@ -58,6 +58,7 @@ export function CreateFlightModal({
         setTimeout(() => onClose(), 2000); // Fermer après 2s
       },
       onError: (error: Error) => {
+        console.log({error})
         const errorMessage = error.message || t('flights.createGenericError');
         setError(errorMessage);
         toast.error(t('flights.createFailure') + ` ${errorMessage}`);
