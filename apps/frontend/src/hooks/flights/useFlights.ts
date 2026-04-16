@@ -21,7 +21,7 @@ import {
   FlightSchema,
   FlightStatsSchema,
 } from '@dashboard-parapente/shared-types';
-import { HTTPError } from 'ky';
+import { isHTTPError } from 'ky';
 import { getStaleTime } from '../../lib/cacheConfig';
 
 export const flightsQueryOptions = (filters: FlightFilters = {}) => {
@@ -192,15 +192,15 @@ export function useCreateFlightFromGPX() {
           }>();
         return data;
       } catch (error) {
+        console.log({ error });
         // Handle HTTPError from ky
-        if (error instanceof HTTPError) {
+        if (isHTTPError<{ error: string; message: string }>(error)) {
           let errorMessage = 'Erreur lors de la création du vol';
           try {
-            const errorData = (await error.response.json()) as {
-              message?: string;
-              error?: string;
-            };
-            errorMessage = errorData.message || errorData.error || errorMessage;
+            errorMessage =
+              typeof error.data === 'string'
+                ? error.data
+                : error.data?.message || error.data?.error || errorMessage;
           } catch {
             // Response is not JSON, use default message
           }
