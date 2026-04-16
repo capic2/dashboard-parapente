@@ -6,7 +6,7 @@ let _apiLogsEnabled = import.meta.env.DEV;
 // Instance Ky configurée pour l'API backend
 // eslint-disable-next-line import/no-mutable-exports
 export let api = ky.create({
-  prefixUrl: '/api', // Toutes les requêtes préfixées par /api
+  prefix: '/api', // Toutes les requêtes préfixées par /api
   timeout: 30000, // 30 secondes
   retry: {
     limit: 2, // Retry 2 fois en cas d'échec
@@ -15,7 +15,7 @@ export let api = ky.create({
   },
   hooks: {
     beforeRequest: [
-      (request) => {
+      ({request}) => {
         // Log requêtes en dev (désactivé en test via overrideApi)
         if (_apiLogsEnabled) {
           console.log(`[API] ${request.method} ${request.url}`);
@@ -23,7 +23,7 @@ export let api = ky.create({
       },
     ],
     afterResponse: [
-      async (request, _options, response) => {
+      async ({request, response}) => {
         // Log des erreurs en dev (désactivé en test via overrideApi)
         if (!response.ok && _apiLogsEnabled) {
           console.error(
