@@ -7,7 +7,7 @@ let _apiLogsEnabled = import.meta.env.DEV;
 // Instance Ky configurée pour l'API backend
 // eslint-disable-next-line import/no-mutable-exports
 export let api = ky.create({
-  prefixUrl: '/api', // Toutes les requêtes préfixées par /api
+  prefix: '/api', // Toutes les requêtes préfixées par /api
   timeout: 30000, // 30 secondes
   retry: {
     limit: 2, // Retry 2 fois en cas d'échec
@@ -16,7 +16,7 @@ export let api = ky.create({
   },
   hooks: {
     beforeRequest: [
-      (request) => {
+      ({request}) => {
         // Attach JWT token if available
         const token = useAuthStore.getState().token;
         if (token) {
@@ -30,7 +30,7 @@ export let api = ky.create({
       },
     ],
     afterResponse: [
-      async (request, _options, response) => {
+      async ({request, response}) => {
         // On 401, clear auth and redirect to login
         if (response.status === 401) {
           const { isAuthenticated, logout } = useAuthStore.getState();

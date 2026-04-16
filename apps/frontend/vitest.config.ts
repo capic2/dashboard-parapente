@@ -33,13 +33,14 @@ export default defineConfig({
           environment: 'happy-dom',
           setupFiles: ['./src/test/setup.ts'],
           include: ['src/**/*.{test,spec}.{ts,tsx}'],
-          exclude: ['node_modules', 'dist', '.storybook'],
+          exclude: [
+            'node_modules',
+            'dist',
+            '.storybook',
+          ],
           env: {
             VITE_API_URL: 'http://localhost:8001',
             VITE_ENABLE_MSW: 'false',
-          },
-          onConsoleLog(log, type) {
-            if (type === 'stdout') return false;
           },
         },
       },
@@ -58,7 +59,7 @@ export default defineConfig({
             enabled: true,
             headless: true,
             provider: playwright(),
-            instances: [{ browser: 'chromium', launch: { headless: true } }],
+            instances: [{ browser: 'chromium' }],
           },
           exclude: [
             'node_modules',
@@ -66,6 +67,7 @@ export default defineConfig({
             '**/FlightViewer3D.stories.tsx',
             '**/FlightViewer3D.chromatic.stories.tsx',
             '**/EmagramWidget.stories.tsx',
+            '*.chromatic.stories.tsx',
           ],
           testTimeout: 15000,
           setupFiles: ['./.storybook/vitest.setup.ts'],
