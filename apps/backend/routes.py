@@ -5,17 +5,21 @@ import math
 import os
 import uuid
 import xml.etree.ElementTree as ET
+from typing import Any
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-import redis
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+import config
+from auth import authenticate_user, create_access_token, get_current_user
 from database import get_db
+from models import User
 from models import (
     EmagramAnalysis,
     Flight,
@@ -55,12 +59,78 @@ from video_export import start_video_export_background
 from video_export_manual import cancel_video_export as cancel_video_export_manual
 from video_export_manual import get_export_status as get_export_status_manual
 from video_export_manual import list_exports as list_exports_manual
+from video_export_manual import resolve_frontend_url
 from video_export_manual import start_video_export_manual
+from versioning import get_version_payload
 from weather_pipeline import get_daily_aggregate, get_normalized_forecast
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["api"])
+
+_VIDEO_EXPORT_IN_PROGRESS_STATUSES = {
+    "processing",
+    "queued",
+    "running",
+    "initializing",
+    "capturing",
+    "encoding",
+}
+
+
+def _start_video_export_stream(
+    flight_id: str, quality: str, fps: int, speed: int, frontend_url: str
+) -> str:
+    """Start stream export mode and keep API response compatible."""
+    return start_video_export_background(
+        flight_id=flight_id, quality=quality, fps=fps, speed=speed, frontend_url=frontend_url
+    )
+
+
+def _ensure_no_active_export(flight: Flight):
+    if flight.video_export_status in _VIDEO_EXPORT_IN_PROGRESS_STATUSES:
+        raise HTTPException(status_code=400, detail="Video conversion already in progress")
+
+
+def _mark_flight_export_processing(db: Session, flight: Flight, job_id: str):
+    """Mark flight as having a processing export when not updated via DB job hooks."""
+    flight.video_export_job_id = job_id
+    flight.video_export_status = "processing"
+    flight.video_file_path = None
+    db.commit()
+    db.refresh(flight)
+
+
+# Public routes: no authentication required (weather, spots read, auth)
+public_router = APIRouter(prefix="/api", tags=["api"])
+
+# Protected routes: require valid JWT token
+router = APIRouter(prefix="/api", tags=["api"], dependencies=[Depends(get_current_user)])
+
+
+# ============================================================================
+# AUTHENTICATION ENDPOINTS (public)
+# ============================================================================
+
+
+@public_router.post("/auth/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """Authenticate with email + password, returns JWT access token."""
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    token = create_access_token(user.email)
+    return {"access_token": token, "token_type": "bearer"}
+
+
+@public_router.get("/auth/me")
+def get_me(user: User = Depends(get_current_user)):
+    """Get current authenticated user info."""
+    return {"id": user.id, "email": user.email}
+
 
 # ============================================================================
 # PARAGLIDING SPOTS SEARCH ENDPOINTS (External database)
@@ -122,7 +192,7 @@ async def sync_paragliding_spots(force: bool = False, db: Session = Depends(get_
     }
 
 
-@router.get("/spots/geocode")
+@public_router.get("/spots/geocode")
 async def geocode_location(query: str, country: str = "FR"):
     """
     Geocode a location name to coordinates
@@ -171,7 +241,7 @@ async def geocode_location(query: str, country: str = "FR"):
     return {"name": query, "latitude": lat, "longitude": lon, "display_name": display_name}
 
 
-@router.get("/spots/search")
+@public_router.get("/spots/search")
 async def search_paragliding_spots(
     city: str | None = None,
     lat: float | None = None,
@@ -229,7 +299,7 @@ async def search_paragliding_spots(
     return result
 
 
-@router.get("/spots/status")
+@public_router.get("/spots/status")
 async def get_spots_sync_status(db: Session = Depends(get_db)):
     """
     Get paragliding spots database status and statistics.
@@ -245,7 +315,7 @@ async def get_spots_sync_status(db: Session = Depends(get_db)):
     return get_sync_status(db)
 
 
-@router.get("/spots/search-with-weather")
+@public_router.get("/spots/search-with-weather")
 async def search_spots_with_weather(
     city: str | None = None,
     lat: float | None = None,
@@ -365,7 +435,7 @@ async def search_spots_with_weather(
     }
 
 
-@router.get("/spots/detail/{spot_id}")
+@public_router.get("/spots/detail/{spot_id}")
 async def get_paragliding_spot_detail(spot_id: str, db: Session = Depends(get_db)):
     """
     Get full details for a specific paragliding spot.
@@ -389,7 +459,7 @@ async def get_paragliding_spot_detail(spot_id: str, db: Session = Depends(get_db
     return spot
 
 
-@router.get("/spots/weather/{spot_id}")
+@public_router.get("/spots/weather/{spot_id}")
 async def get_spot_weather(
     spot_id: str, day_index: int = 0, days: int = 1, db: Session = Depends(get_db)
 ):
@@ -410,6 +480,9 @@ async def get_spot_weather(
     Example:
         GET /api/spots/weather/merged_884e0213d9116315?days=3
     """
+    day_index = max(0, min(6, day_index))
+    days = max(1, min(7, days))
+
     from spots import get_spot_by_id
 
     # Get spot from paragliding_spots table
@@ -517,7 +590,7 @@ async def get_spot_weather(
 # ============================================================================
 
 
-@router.get("/spots", response_model=SpotsResponse)
+@public_router.get("/spots", response_model=SpotsResponse)
 def get_spots(db: Session = Depends(get_db)):
     """Get all user-managed paragliding spots with flight counts"""
     from sqlalchemy import func
@@ -1097,7 +1170,7 @@ async def get_landing_associations_weather(
 # IMPORTANT: This must be BEFORE /spots/{spot_id} to avoid route collision
 
 
-@router.get("/spots/best")
+@public_router.get("/spots/best")
 async def get_best_spot(
     day_index: int = Query(
         default=0, ge=0, le=6, description="Day index (0=today, 1=tomorrow, ..., 6=in 6 days)"
@@ -1161,7 +1234,7 @@ async def get_best_spot(
         ) from e
 
 
-@router.get("/spots/{spot_id}", response_model=SiteSchema)
+@public_router.get("/spots/{spot_id}", response_model=SiteSchema)
 def get_spot(spot_id: str, db: Session = Depends(get_db)):
     """Get a specific user-managed spot"""
     site = db.query(Site).filter(Site.id == spot_id).first()
@@ -1432,8 +1505,159 @@ MAX_CACHE_KEYS = 500
 APP_CACHE_PREFIXES = ["weather:", "best_spot:", "emagram:"]
 
 
+def _build_forecast_cache_signature_map(db: Session) -> dict[str, dict[str, Any]]:
+    """Build a reverse index from forecast hash key suffix to site metadata."""
+    from cache import generate_cache_key
+
+    signature_to_site: dict[str, dict[str, Any]] = {}
+
+    try:
+        sites = db.query(Site).all()
+    except Exception as error:
+        logger.warning("Skipping forecast cache resolution: unable to query sites (%s)", error)
+        return signature_to_site
+
+    for site in sites:
+        if site.latitude is None or site.longitude is None:
+            continue
+
+        for day_index in range(7):
+            try:
+                forecast_key = generate_cache_key(
+                    "forecast",
+                    lat=round(site.latitude, 4),
+                    lon=round(site.longitude, 4),
+                    day_index=day_index,
+                )
+                parts = forecast_key.split(":")
+                if len(parts) < 3:
+                    continue
+
+                signature_to_site[parts[2]] = {
+                    "type": "weather_forecast",
+                    "day_index": day_index,
+                    "site_id": site.id,
+                    "site_code": site.code,
+                    "site_name": site.name,
+                    "latitude": site.latitude,
+                    "longitude": site.longitude,
+                }
+            except Exception as error:
+                logger.warning(
+                    "Skipping forecast resolution for site %s (%s)",
+                    getattr(site, "id", "<unknown>"),
+                    error,
+                )
+
+    return signature_to_site
+
+
+def _resolve_cache_key(
+    key: str, forecast_signature_map: dict[str, dict[str, Any]]
+) -> dict[str, Any] | None:
+    """Return a human readable resolution for a cache key when possible."""
+    parts = key.split(":")
+
+    # best_spot:day_n
+    if key.startswith("best_spot:") and len(parts) == 2 and parts[1].startswith("day_"):
+        try:
+            day_index = int(parts[1].replace("day_", ""))
+            return {
+                "type": "best_spot",
+                "label": "best_spot_for_day",
+                "confidence": "high",
+                "details": {
+                    "day_index": day_index,
+                },
+            }
+        except ValueError:
+            pass
+
+    # emagram:sounding:<station>:<hour>:<date>
+    if key.startswith("emagram:sounding:") and len(parts) == 5:
+        return {
+            "type": "emagram_sounding",
+            "label": "emagram_sounding",
+            "confidence": "high",
+            "details": {
+                "station": parts[2],
+                "sounding_hour": parts[3],
+                "date": parts[4],
+            },
+        }
+
+    # emagram:analysis:<site_id>:<date>:<hour_or_latest>
+    if key.startswith("emagram:analysis:") and len(parts) == 5:
+        return {
+            "type": "emagram_analysis",
+            "label": "emagram_analysis",
+            "confidence": "high",
+            "details": {
+                "site_id": parts[2],
+                "date": parts[3],
+                "hour": parts[4],
+            },
+        }
+
+    # weather:forecast:<hash>
+    if key.startswith("weather:forecast:") and len(parts) == 3:
+        hash_part = parts[2]
+        forecast_meta = forecast_signature_map.get(hash_part)
+        if forecast_meta is None:
+            return None
+
+        return {
+            "type": "weather_forecast",
+            "label": "weather_forecast",
+            "confidence": "high",
+            "details": {
+                "day_index": forecast_meta["day_index"],
+                "site_id": forecast_meta["site_id"],
+                "site_code": forecast_meta["site_code"],
+                "site_name": forecast_meta["site_name"],
+                "latitude": forecast_meta["latitude"],
+                "longitude": forecast_meta["longitude"],
+            },
+        }
+
+    return None
+
+
+async def _cache_emagram_analysis_marker(
+    site: Site,
+    analysis: EmagramAnalysis,
+    forecast_date: date,
+    hour: int | None,
+    db: Session | None = None,
+) -> None:
+    """Store a lightweight Redis marker for Infrastructure cache visibility."""
+    try:
+        from app_settings import get_setting_int
+        from cache import get_redis
+
+        cache_ttl = get_setting_int("cache_ttl_default", db=db, default=3600)
+        cache_hour = str(hour) if hour is not None else "latest"
+        cache_key = f"emagram:analysis:{site.id}:{forecast_date.isoformat()}:{cache_hour}"
+        cache_value = {
+            "analysis_id": analysis.id,
+            "site_id": site.id,
+            "site_name": site.name,
+            "forecast_date": forecast_date.isoformat(),
+            "hour": cache_hour,
+            "status": analysis.analysis_status,
+            "analysis_datetime": (
+                analysis.analysis_datetime.isoformat() if analysis.analysis_datetime else None
+            ),
+        }
+
+        redis_client = await get_redis()
+        await redis_client.setex(cache_key, cache_ttl, json.dumps(cache_value))
+    except Exception as cache_error:
+        logger.warning("Failed to write emagram analysis cache marker: %s", cache_error)
+
+
 @router.get("/admin/cache")
-async def get_cache_overview():
+async def get_cache_overview(db: Session = Depends(get_db)):
     """
     Admin endpoint: List all Redis cache keys with metadata, grouped by prefix.
     """
@@ -1443,13 +1667,50 @@ async def get_cache_overview():
         redis_client = await get_redis()
 
         # Collect keys via scan with hard cap to avoid O(N) on large databases
-        keys = []
-        async for key in redis_client.scan_iter(match="*"):
-            keys.append(key)
+        try:
+            forecast_signature_map = _build_forecast_cache_signature_map(db)
+        except Exception as error:
+            logger.warning(
+                "Skipping forecast cache resolution due to map build error (%s)",
+                error,
+            )
+            forecast_signature_map = {}
+
+        keys: list[str] = []
+        seen_keys: set[str] = set()
+
+        # Prefer app cache prefixes first so important groups (incl. emagram)
+        # remain visible even when Redis also contains many unrelated keys.
+        prefix_budget = max(1, MAX_CACHE_KEYS // max(len(APP_CACHE_PREFIXES), 1))
+
+        for prefix in APP_CACHE_PREFIXES:
             if len(keys) >= MAX_CACHE_KEYS:
                 break
 
-        truncated = len(keys) >= MAX_CACHE_KEYS
+            added_for_prefix = 0
+            async for key in redis_client.scan_iter(match=f"{prefix}*"):
+                if key in seen_keys:
+                    continue
+
+                keys.append(key)
+                seen_keys.add(key)
+                added_for_prefix += 1
+
+                if added_for_prefix >= prefix_budget or len(keys) >= MAX_CACHE_KEYS:
+                    break
+
+        # Fill remaining slots with any key to preserve previous behavior for
+        # non-app prefixes that may still be useful to inspect.
+        if len(keys) < MAX_CACHE_KEYS:
+            async for key in redis_client.scan_iter(match="*"):
+                if key in seen_keys:
+                    continue
+
+                keys.append(key)
+                seen_keys.add(key)
+
+                if len(keys) >= MAX_CACHE_KEYS:
+                    break
 
         # Batch TTL + strlen via pipeline
         if keys:
@@ -1473,10 +1734,18 @@ async def get_cache_overview():
             if prefix not in groups:
                 groups[prefix] = {"count": 0, "keys": []}
             groups[prefix]["count"] += 1
-            groups[prefix]["keys"].append({"key": key, "ttl": ttl, "size": size})
+            groups[prefix]["keys"].append(
+                {
+                    "key": key,
+                    "ttl": ttl,
+                    "size": size,
+                    "resolved": _resolve_cache_key(key, forecast_signature_map),
+                }
+            )
 
         # Total + memory info
         total_keys = await redis_client.dbsize()
+        truncated = total_keys > len(keys)
         memory_usage = None
         try:
             info = await redis_client.info("memory")
@@ -1497,7 +1766,7 @@ async def get_cache_overview():
 
 
 @router.get("/admin/cache/{key:path}")
-async def get_cache_key_detail(key: str):
+async def get_cache_key_detail(key: str, db: Session = Depends(get_db)):
     """
     Admin endpoint: Get full cached value for a specific key.
     """
@@ -1521,12 +1790,24 @@ async def get_cache_key_detail(key: str):
             value = raw
             value_type = "string"
 
+        try:
+            forecast_signature_map = _build_forecast_cache_signature_map(db)
+        except Exception as error:
+            logger.warning(
+                "Skipping forecast cache resolution due to map build error (%s)",
+                error,
+            )
+            forecast_signature_map = {}
+
+        resolved = _resolve_cache_key(key, forecast_signature_map)
+
         return {
             "key": key,
             "ttl": ttl,
             "size": size,
             "value": value,
             "type": value_type,
+            "resolved": resolved,
         }
 
     except HTTPException:
@@ -1670,7 +1951,7 @@ async def link_user_sites_to_spots(db: Session = Depends(get_db)):
 # ============================================================================
 # Weather endpoints (UPDATED with pipeline + para_index)
 # ============================================================================
-@router.get("/weather/{spot_id}")
+@public_router.get("/weather/{spot_id}")
 async def get_weather(
     spot_id: str, day_index: int = 0, days: int = 1, db: Session = Depends(get_db)
 ):
@@ -1683,6 +1964,9 @@ async def get_weather(
         day_index: 0=today, 1=tomorrow (default: 0)
         days: Number of days to return (default: 1, backward compatible)
     """
+    day_index = max(0, min(6, day_index))
+    days = max(1, min(7, days))
+
     site = db.query(Site).filter(Site.id == spot_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Spot not found")
@@ -1821,13 +2105,13 @@ async def get_weather(
     }
 
 
-@router.get("/weather/{spot_id}/today")
+@public_router.get("/weather/{spot_id}/today")
 async def get_weather_today(spot_id: str, db: Session = Depends(get_db)):
     """Get today's weather forecast (day_index=0)"""
     return await get_weather(spot_id, day_index=0, db=db)
 
 
-@router.get("/weather/{spot_id}/summary")
+@public_router.get("/weather/{spot_id}/summary")
 async def get_weather_summary(spot_id: str, day_index: int = 0, db: Session = Depends(get_db)):
     """
     Get lightweight weather summary for a site (optimized for site selector).
@@ -1896,7 +2180,7 @@ async def get_weather_summary(spot_id: str, day_index: int = 0, db: Session = De
     }
 
 
-@router.get("/weather/{spot_id}/daily-summary")
+@public_router.get("/weather/{spot_id}/daily-summary")
 async def get_daily_summary(spot_id: str, days: int = 7, db: Session = Depends(get_db)):
     """
     Get multi-day summary WITHOUT hourly details (MUCH FASTER).
@@ -1931,6 +2215,8 @@ async def get_daily_summary(spot_id: str, days: int = 7, db: Session = Depends(g
         }
     """
     try:
+        days = max(1, min(7, days))
+
         # Get the site
         site = db.query(Site).filter(Site.id == spot_id).first()
         if not site:
@@ -2670,10 +2956,9 @@ async def upload_gpx_to_flight(
 
         # 5. Trigger automatic video export
         try:
-            from config import settings
             from video_export_manual import trigger_auto_export
 
-            frontend_url = f"http://localhost:{settings.PORT}"
+            frontend_url = resolve_frontend_url()
             trigger_auto_export(flight_id, db, frontend_url)
         except Exception as e:
             logger.warning(f"Failed to trigger auto video export: {e}")
@@ -2824,10 +3109,9 @@ async def create_flight_from_gpx(
 
         # 8. Trigger automatic video export
         try:
-            from config import settings
             from video_export_manual import trigger_auto_export
 
-            frontend_url = f"http://localhost:{settings.PORT}"
+            frontend_url = resolve_frontend_url()
             trigger_auto_export(flight_id, db, frontend_url)
         except Exception as e:
             logger.warning(f"Failed to trigger auto video export: {e}")
@@ -2966,9 +3250,14 @@ def create_alert(alert_data: dict, db: Session = Depends(get_db)):
 
 
 # Health check
-@router.get("/health")
+@public_router.get("/health")
 def health_check():
     return {"status": "ok", "message": "Dashboard API healthy"}
+
+
+@public_router.get("/version")
+def version_info():
+    return get_version_payload()
 
 
 # ============================================================================
@@ -3357,45 +3646,70 @@ def start_flight_video_export(
     """
     logger.info(f"🎥 Video export requested: flight_id={flight_id}, mode={mode}")
 
+    selected_mode = mode.lower().strip()
+    if selected_mode not in ["manual", "stream"]:
+        raise HTTPException(status_code=400, detail="mode must be 'manual' or 'stream'")
+
     # Verify flight exists
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
         logger.error(f"❌ Flight not found in DB: {flight_id}")
         raise HTTPException(status_code=404, detail="Flight not found")
 
+    _ensure_no_active_export(flight)
+
     logger.info(f" Flight found: {flight.title} (date: {flight.flight_date})")
 
     # Determine frontend URL
-    # In production, frontend is served on same server (port 8001)
-    # In development, frontend is on Vite dev server (port 5173)
-    frontend_url = os.getenv("FRONTEND_URL")
-    if not frontend_url:
-        # Auto-detect: check if static dir exists (production) or use dev server
-        static_dir = Path(__file__).parent / "static"
-        if static_dir.exists() and (static_dir / "index.html").exists():
-            frontend_url = "http://localhost:8001"  # Production: same server
-        else:
-            frontend_url = "http://localhost:5173"  # Development: Vite dev server
+    frontend_url = resolve_frontend_url(config.FRONTEND_URL)
 
     # Start export with selected mode
-    if mode == "manual":
+    job_id: str
+    effective_mode = selected_mode
+
+    if selected_mode == "manual":
         logger.info("Using Cesium Manual Render (slow but perfect quality)")
-        job_id = start_video_export_manual(
-            flight_id=flight_id, quality=quality, fps=fps, speed=speed, frontend_url=frontend_url
-        )
-        export_method = "manual render"
+        try:
+            job_id = start_video_export_manual(
+                flight_id=flight_id,
+                quality=quality,
+                fps=fps,
+                speed=speed,
+                frontend_url=frontend_url,
+            )
+        except Exception as e:
+            logger.warning(
+                "⚠️ Manual export failed, falling back to stream for flight %s: %s",
+                flight_id,
+                e,
+            )
+            job_id = _start_video_export_stream(
+                flight_id=flight_id,
+                quality=quality,
+                fps=fps,
+                speed=speed,
+                frontend_url=frontend_url,
+            )
+            effective_mode = "stream"
+            _mark_flight_export_processing(db=db, flight=flight, job_id=job_id)
+
     else:  # stream mode
         logger.info("Using MediaRecorder stream (fast but may stutter)")
-        job_id = start_video_export_background(
-            flight_id=flight_id, quality=quality, fps=fps, speed=speed, frontend_url=frontend_url
+        job_id = _start_video_export_stream(
+            flight_id=flight_id,
+            quality=quality,
+            fps=fps,
+            speed=speed,
+            frontend_url=frontend_url,
         )
-        export_method = "stream"
+        effective_mode = "stream"
+        _mark_flight_export_processing(db=db, flight=flight, job_id=job_id)
 
     return {
         "job_id": job_id,
-        "message": f"Video export started ({export_method})",
-        "mode": mode,
-        "status_url": f"/exports/{job_id}/status",
+        "message": f"Video export started ({'media stream' if effective_mode == 'stream' else 'manual render'})",
+        "mode": effective_mode,
+        "status_url": f"/api/exports/{job_id}/status",
     }
 
 
@@ -3414,36 +3728,50 @@ def generate_flight_video(flight_id: str, db: Session = Depends(get_db)):
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
+    _ensure_no_active_export(flight)
+
     if not flight.gpx_file_path:
         raise HTTPException(status_code=400, detail="Flight has no GPX file")
 
-    # Check if video already exists or is processing
+    # Check if video already exists
     if flight.video_export_status == "completed":
         raise HTTPException(status_code=400, detail="Video already exists")
 
-    if flight.video_export_status == "processing":
-        raise HTTPException(status_code=400, detail="Video conversion already in progress")
-
     # Determine frontend URL
-    from config import API_PORT
+    frontend_url = resolve_frontend_url(config.FRONTEND_URL)
 
-    frontend_url = f"http://localhost:{API_PORT}"
-
-    # Start conversion with optimal settings
-    job_id = start_video_export_manual(
-        flight_id=flight_id,
-        quality="1080p",
-        fps=15,
-        speed=1,
-        frontend_url=frontend_url,
-        update_db=True,
-    )
+    # Prefer manual render (high quality), fallback to stream if needed
+    try:
+        job_id = start_video_export_manual(
+            flight_id=flight_id,
+            quality="1080p",
+            fps=15,
+            speed=1,
+            frontend_url=frontend_url,
+            update_db=True,
+        )
+        started_message = "Video generation started (Manual Render, ~60-90 min)"
+    except Exception as e:
+        logger.warning(
+            "⚠️ Manual generation failed, falling back to stream for flight %s: %s",
+            flight_id,
+            e,
+        )
+        job_id = _start_video_export_stream(
+            flight_id=flight_id,
+            quality="1080p",
+            fps=15,
+            speed=1,
+            frontend_url=frontend_url,
+        )
+        started_message = "Video generation started (MediaRecorder stream fallback)"
+        _mark_flight_export_processing(db=db, flight=flight, job_id=job_id)
 
     logger.info(f" Video generation started: job_id={job_id}")
 
     return {
         "job_id": job_id,
-        "message": "Video generation started (Manual Render, ~60-90 min)",
+        "message": started_message,
         "status_url": f"/api/exports/{job_id}/status",
     }
 
@@ -4042,6 +4370,7 @@ async def get_emagram_hours(
                 EmagramAnalysis.forecast_date == target_date,
                 EmagramAnalysis.forecast_hour.isnot(None),
                 EmagramAnalysis.analysis_method == "llm_vision",
+                EmagramAnalysis.analysis_status == "completed",
             )
             .order_by(EmagramAnalysis.forecast_hour, EmagramAnalysis.analysis_datetime.desc())
             .all()
@@ -4353,6 +4682,10 @@ async def trigger_emagram_analysis(
                     .order_by(EmagramAnalysis.analysis_datetime.desc())
                     .first()
                 )
+                if existing:
+                    await _cache_emagram_analysis_marker(
+                        closest_site, existing, forecast_date, request.hour, db=db
+                    )
                 return existing
 
         # Step 2b: Check cache for specific hour
@@ -4375,6 +4708,9 @@ async def trigger_emagram_analysis(
             if existing:
                 logger.info(
                     f"Returning cached emagram for hour {request.hour} from {existing.analysis_datetime}"
+                )
+                await _cache_emagram_analysis_marker(
+                    closest_site, existing, forecast_date, request.hour, db=db
                 )
                 return existing
 
@@ -4406,6 +4742,9 @@ async def trigger_emagram_analysis(
             )
 
         logger.info(f"Multi-source emagram complete: {analysis.id}")
+        await _cache_emagram_analysis_marker(
+            closest_site, analysis, forecast_date, request.hour, db=db
+        )
 
         return analysis
 
@@ -4658,20 +4997,34 @@ async def clear_emagram_cache(db: Session = Depends(get_db)):
         deleted_count = db.query(EmagramAnalysis).delete()
         db.commit()
 
-        # 2. Clear Redis cache
+        # 2. Clear only emagram cache keys
         try:
-            r = redis.Redis(host="redis", port=6379, decode_responses=True)
-            r.flushall()
+            from cache import get_redis
+
+            redis_client = await get_redis()
+
+            keys_to_clear: list[str] = []
+            async for key in redis_client.scan_iter(match="emagram:*"):
+                keys_to_clear.append(key)
+
+            if keys_to_clear:
+                deleted = await redis_client.delete(*keys_to_clear)
+            else:
+                deleted = 0
+
             redis_cleared = True
+            logger.info("Cleared %s emagram cache keys via Redis", deleted)
         except Exception as redis_error:
-            logger.warning(f"Redis clear failed (non-critical): {redis_error}")
+            logger.warning("Redis clear failed (non-critical): %s", redis_error)
             redis_cleared = False
+            deleted = 0
 
         return {
             "success": True,
             "database_deleted": deleted_count,
             "redis_cleared": redis_cleared,
-            "message": f"Cleared {deleted_count} emagram analyses and Redis cache",
+            "redis_keys_deleted": deleted,
+            "message": f"Cleared {deleted_count} emagram analyses and {deleted} emagram cache keys",
         }
     except Exception as e:
         logger.error(f"Clear cache failed: {e}")
@@ -4722,6 +5075,54 @@ async def debug_gemini_api():
     except Exception as e:
         logger.error(f"Gemini debug test failed: {e}", exc_info=True)
         return {"success": False, "error": str(e), "error_type": type(e).__name__}
+
+
+# ============================================================================
+# STRAVA TOKEN MANAGEMENT
+# ============================================================================
+
+
+@router.get("/admin/strava/token-status")
+def strava_token_status():
+    """Get current Strava token status."""
+    from strava import get_token_status
+
+    return get_token_status()
+
+
+@router.post("/admin/strava/refresh-token")
+async def strava_refresh_token():
+    """Force a manual Strava token refresh (bypasses the 'still valid' check)."""
+    from strava import get_token_status, refresh_access_token
+
+    token = await refresh_access_token(force=True)
+    if token is None:
+        raise HTTPException(status_code=502, detail="Strava token refresh failed")
+    status = get_token_status()
+    status["refreshed"] = True
+    return status
+
+
+@router.get("/admin/strava/token-logs")
+def strava_token_logs(
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Get recent Strava token refresh logs."""
+    from models import StravaTokenLog
+
+    logs = db.query(StravaTokenLog).order_by(StravaTokenLog.timestamp.desc()).limit(limit).all()
+    return [
+        {
+            "id": log.id,
+            "timestamp": log.timestamp.isoformat() + "Z",
+            "success": log.success,
+            "message": log.message,
+            "expires_at": log.expires_at.isoformat() + "Z" if log.expires_at else None,
+            "refresh_mode": log.refresh_mode,
+        }
+        for log in logs
+    ]
 
 
 # ============================================================================

@@ -11,6 +11,7 @@ import {
   Flame,
   CircleCheck,
 } from 'lucide-react';
+import { Button } from '@dashboard-parapente/design-system';
 import { useWeather } from '../../hooks/weather/useWeather';
 import type { HourlyForecastItem } from '../../types';
 import CacheTimestamp from '../common/CacheTimestamp';
@@ -241,12 +242,14 @@ const ParaIndexTooltip = ({
       }
     >
       {onClose && (
-        <button
+        <Button
           onClick={onClose}
+          tone="ghost"
           className="absolute top-2 right-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+          aria-label="Fermer l'infobulle"
         >
           ✕
-        </button>
+        </Button>
       )}
       <div className="font-bold mb-3 text-sky-700 dark:text-sky-400 flex items-center gap-2">
         📊 Para-Index - {hour}
@@ -334,12 +337,14 @@ const VerdictTooltip = ({
       }
     >
       {onClose && (
-        <button
+        <Button
           onClick={onClose}
+          tone="ghost"
           className="absolute top-2 right-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+          aria-label="Fermer le verdict"
         >
           ✕
-        </button>
+        </Button>
       )}
       <div className="font-bold mb-3 text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
         ✓ Verdict - {hour}
@@ -414,12 +419,14 @@ const SourceDataTooltip = ({
       }
     >
       {onClose && (
-        <button
+        <Button
           onClick={onClose}
+          tone="ghost"
           className="absolute top-2 right-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+          aria-label="Fermer les données source"
         >
           ✕
-        </button>
+        </Button>
       )}
       <div className="font-bold mb-3 text-gray-800 dark:text-gray-100 flex items-center gap-2">
         {label} - {hour}

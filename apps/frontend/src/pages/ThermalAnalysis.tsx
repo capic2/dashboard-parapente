@@ -3,6 +3,7 @@
  */
 
 import { useState } from 'react';
+import { useIsMobile } from '../hooks/useIsMobile';
 import {
   useReactTable,
   getCoreRowModel,
@@ -18,14 +19,15 @@ import {
 import { useSite } from '../hooks/sites/useSites';
 import { parseAlerts, getScoreColor } from '../types/emagram';
 import type { EmagramListItem } from '../types/emagram';
-import { DataTable } from '@dashboard-parapente/design-system';
+import { DataTable, Button } from '@dashboard-parapente/design-system';
+import { parseApiUtcDate } from '../lib/date';
 
 const historyColumnHelper = createColumnHelper<EmagramListItem>();
 
 const historyColumns = [
   historyColumnHelper.accessor('created_at', {
     header: 'Date',
-    cell: (info) => new Date(info.getValue()).toLocaleDateString(),
+    cell: (info) => parseApiUtcDate(info.getValue()).toLocaleDateString(),
     sortingFn: 'alphanumeric',
   }),
   historyColumnHelper.accessor('score_volabilite', {
@@ -85,14 +87,19 @@ const historyColumns = [
 ];
 
 function ThermalHistoryTable({ history }: { history: EmagramListItem[] }) {
+  const isMobile = useIsMobile();
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'created_at', desc: true },
   ]);
 
+  const columnVisibility: Record<string, boolean> = isMobile
+    ? { force_thermique_ms: false, analysis_method: false }
+    : {};
+
   const table = useReactTable({
     data: history,
     columns: historyColumns,
-    state: { sorting },
+    state: { sorting, columnVisibility },
     onSortingChange: setSorting,
     getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
@@ -149,7 +156,7 @@ export default function ThermalAnalysis() {
           <p className="text-gray-600 dark:text-gray-300 mb-4">
             Aucune analyse récente disponible
           </p>
-          <button
+          <Button
             onClick={handleRefresh}
             disabled={triggerMutation.isPending}
             className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
@@ -157,7 +164,7 @@ export default function ThermalAnalysis() {
             {triggerMutation.isPending
               ? 'Analyse en cours...'
               : 'Lancer une analyse'}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -170,15 +177,15 @@ export default function ThermalAnalysis() {
   return (
     <div className="p-4 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <h1 className="text-3xl font-bold">🌡️ Analyse Thermique</h1>
-        <button
+        <Button
           onClick={handleRefresh}
           disabled={triggerMutation.isPending}
           className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
         >
           {triggerMutation.isPending ? '⏳ En cours...' : '🔄 Actualiser'}
-        </button>
+        </Button>
       </div>
 
       {/* Main Analysis Card */}
@@ -287,7 +294,7 @@ export default function ThermalAnalysis() {
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
                 {latest.station_name} • {latest.sounding_time} •{' '}
-                {new Date(latest.analysis_datetime).toLocaleDateString()}
+                {parseApiUtcDate(latest.analysis_datetime).toLocaleDateString()}
               </p>
             </div>
           ) : (

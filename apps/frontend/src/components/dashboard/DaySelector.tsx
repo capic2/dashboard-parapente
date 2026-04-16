@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { addDays } from 'date-fns';
+import { Button } from '@dashboard-parapente/design-system';
 
 interface DaySelectorProps {
   selectedDayIndex: number;
@@ -24,23 +25,23 @@ export default function DaySelector({
   };
 
   return (
-    <div className="flex gap-2 flex-wrap">
+    <div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-thin sm:flex-wrap sm:overflow-x-visible sm:pb-0 sm:snap-none">
       {Array.from({ length: 7 }, (_, i) => {
         const isSelected = i === selectedDayIndex;
         return (
-          <button
+          <Button
             key={i}
             type="button"
             onClick={() => onSelectDay(i)}
             aria-pressed={isSelected}
-            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 snap-start sm:flex-shrink sm:whitespace-normal ${
               isSelected
                 ? 'bg-sky-600 text-white shadow-md'
                 : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:border-sky-400 hover:text-sky-600'
             }`}
           >
             {getDayLabel(i)}
-          </button>
+          </Button>
         );
       })}
     </div>

@@ -5,6 +5,19 @@
 
 import { z } from 'zod';
 
+const VIDEO_EXPORT_IN_PROGRESS_STATUS_VALUES = [
+  'processing',
+  'queued',
+  'running',
+  'initializing',
+  'capturing',
+  'encoding',
+] as const;
+
+export const VIDEO_EXPORT_IN_PROGRESS_STATUSES = new Set<string>(
+  VIDEO_EXPORT_IN_PROGRESS_STATUS_VALUES
+);
+
 // ============================================================================
 // CORE DOMAIN SCHEMAS
 // ============================================================================
@@ -67,7 +80,19 @@ export const FlightSchema = z.object({
   gpx_elevation_gain_m: z.number().nullish(),
   external_url: z.string().nullish(),
   video_export_job_id: z.string().nullish(),
-  video_export_status: z.enum(['processing', 'completed', 'failed']).nullish(),
+  video_export_status: z
+    .enum([
+      'processing',
+      'completed',
+      'failed',
+      'queued',
+      'running',
+      'initializing',
+      'capturing',
+      'encoding',
+      'cancelled',
+    ])
+    .nullish(),
   video_file_path: z.string().nullish(),
   site: SiteSchema.optional(),
   created_at: z.string().optional(),

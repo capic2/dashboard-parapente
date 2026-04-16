@@ -5,6 +5,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getStaleTime, getWeatherRefetchInterval } from '../../lib/cacheConfig';
 import { EmagramAnalysis, EmagramListItem } from '../../types/emagram';
+import { api } from '../../lib/api';
 
 const emagramKeys = {
   all: ['emagram'] as const,
@@ -39,15 +40,7 @@ export function useLatestEmagram(
         params.set('hour', hour.toString());
       }
 
-      const response = await fetch(`/api/emagram/latest?${params}`);
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch latest emagram: ${response.statusText}`
-        );
-      }
-
-      return response.json();
+      return api.get(`emagram/latest?${params}`).json<EmagramAnalysis | null>();
     },
     enabled: !!siteId && options?.enabled !== false,
     staleTime: getStaleTime(5 * 60 * 1000),
@@ -85,15 +78,7 @@ export function useEmagramHours(
         day_index: dayIndex.toString(),
       });
 
-      const response = await fetch(`/api/emagram/hours?${params}`);
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch emagram hours: ${response.statusText}`
-        );
-      }
-
-      return response.json();
+      return api.get(`emagram/hours?${params}`).json<EmagramHoursResponse>();
     },
     enabled: !!siteId && options?.enabled !== false,
     staleTime: getStaleTime(2 * 60 * 1000),
@@ -128,15 +113,7 @@ export function useEmagramHistory(
         max_distance_km: maxDistanceKm.toString(),
       });
 
-      const response = await fetch(`/api/emagram/history?${params}`);
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch emagram history: ${response.statusText}`
-        );
-      }
-
-      return response.json();
+      return api.get(`emagram/history?${params}`).json<EmagramListItem[]>();
     },
     enabled: userLat !== null && userLon !== null && options?.enabled !== false,
     staleTime: getStaleTime(10 * 60 * 1000),
@@ -158,18 +135,9 @@ export function useTriggerEmagram() {
       day_index?: number;
       hour?: number | null;
     }): Promise<EmagramAnalysis> => {
-      const response = await fetch('/api/emagram/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Failed to trigger emagram analysis');
-      }
-
-      return response.json();
+      return api
+        .post('emagram/analyze', { json: request })
+        .json<EmagramAnalysis>();
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: emagramKeys.all });

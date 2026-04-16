@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useFiltersStore } from '../../stores/filtersStore';
-import { DatePicker, Select } from '@dashboard-parapente/design-system';
+import { DatePicker, Select, Button } from '@dashboard-parapente/design-system';
 import type { Site } from '@dashboard-parapente/shared-types';
 
 interface FilterBarProps {
@@ -32,12 +32,14 @@ export function FilterBar({ sites }: FilterBarProps) {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             {t('filters.title')}
           </h3>
-          <button
+          <Button
             onClick={resetFilters}
+            tone="ghost"
+            size="sm"
             className="text-sm text-sky-600 hover:text-sky-700 font-medium"
           >
             {t('filters.reset')}
-          </button>
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

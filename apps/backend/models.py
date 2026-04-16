@@ -12,10 +12,23 @@ from sqlalchemy import (
     String,
     Text,
     Time,
+    func,
 )
 from sqlalchemy.orm import relationship
 
 from database import Base
+
+
+class User(Base):
+    """Application user for authentication"""
+
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    email = Column(String(320), unique=True, nullable=False, index=True)
+    hashed_password = Column(String(1024), nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, default=func.now())
 
 
 class AppSetting(Base):
@@ -151,6 +164,43 @@ class Flight(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     site = relationship("Site", back_populates="flights")
+    export_jobs = relationship(
+        "VideoExportJob",
+        back_populates="flight",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="VideoExportJob.created_at",
+    )
+
+
+class VideoExportJob(Base):
+    __tablename__ = "video_export_jobs"
+
+    id = Column(String, primary_key=True)
+    flight_id = Column(
+        String,
+        ForeignKey("flights.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    status = Column(String, nullable=False, index=True)
+    mode = Column(String, default="manual")
+    quality = Column(String, default="1080p")
+    fps = Column(Integer, default=15)
+    speed = Column(Integer, default=1)
+    progress = Column(Integer, default=0)
+    message = Column(Text)
+    frontend_url = Column(String)
+    video_path = Column(String)
+    total_frames = Column(Integer)
+    error = Column(Text)
+    started_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime)
+    cancelled_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    flight = relationship("Flight", back_populates="export_jobs")
 
 
 class WeatherForecast(Base):
@@ -247,6 +297,19 @@ class WeatherSourceConfig(Base):
         ):
             return "error"  # Last attempt failed
         return "active"  # All good
+
+
+class StravaTokenLog(Base):
+    """Log of Strava token refresh attempts"""
+
+    __tablename__ = "strava_token_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    success = Column(Boolean, nullable=False)
+    message = Column(String, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    refresh_mode = Column(String(32), nullable=True)
 
 
 class EmagramFeedback(Base):

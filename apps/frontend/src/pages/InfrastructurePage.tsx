@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, Input, TextField } from 'react-aria-components';
+import { Checkbox, Input, TextField } from 'react-aria-components';
+import { Button } from '@dashboard-parapente/design-system';
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -15,6 +17,13 @@ import {
   useDeleteCacheKey,
 } from '../hooks/admin/useCache';
 import type { CacheKeyInfo } from '../hooks/admin/useCache';
+import {
+  useStravaTokenStatus,
+  useStravaTokenLogs,
+  useStravaRefreshToken,
+} from '../hooks/admin/useStravaToken';
+
+// --- Helpers ---
 
 interface PendingConfirm {
   message: string;
@@ -37,7 +46,279 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
-export default function CacheViewer() {
+function formatDate(iso: string): string {
+  const normalizedIso =
+    /Z$/.test(iso) || /[+-]\d{2}:\d{2}$/.test(iso) ? iso : `${iso}Z`;
+  return new Date(normalizedIso).toLocaleString();
+}
+
+function getRefreshModeLabel(
+  refreshMode: 'manual' | 'automatic' | null | undefined,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string {
+  if (refreshMode === 'manual') {
+    return t('infrastructure.strava.manual');
+  }
+  if (refreshMode === 'automatic') {
+    return t('infrastructure.strava.automatic');
+  }
+  return t('infrastructure.strava.modeUnknown');
+}
+
+export function getResolvedLabel(
+  resolved: CacheKeyInfo['resolved'],
+  t: (key: string, options?: Record<string, unknown>) => string
+) {
+  if (!resolved) {
+    return t('cache.noResolution');
+  }
+
+  if (resolved.label === 'best_spot_for_day') {
+    return t('cache.resolvedBestSpot', {
+      day: String((resolved.details || {}).day_index ?? ''),
+    });
+  }
+
+  if (resolved.label === 'weather_forecast') {
+    if (resolved.details && resolved.details.site_name) {
+      return t('cache.resolvedWeatherForecastWithSite', {
+        site: String(resolved.details.site_name),
+        day: String(
+          (resolved.details as Record<string, unknown>).day_index ?? ''
+        ),
+      });
+    }
+
+    return t('cache.resolvedWeatherForecast');
+  }
+
+  if (resolved.label === 'emagram_sounding') {
+    if (resolved.details && resolved.details.station && resolved.details.date) {
+      return t('cache.resolvedEmagram', {
+        station: String((resolved.details as Record<string, unknown>).station),
+        date: String((resolved.details as Record<string, unknown>).date),
+      });
+    }
+
+    return t('cache.resolvedEmagram');
+  }
+
+  if (resolved.label === 'emagram_analysis') {
+    if (resolved.details && resolved.details.site_id && resolved.details.date) {
+      const rawHour = (resolved.details as Record<string, unknown>).hour;
+      let hourLabel = '';
+
+      if (rawHour === 'latest') {
+        hourLabel = t('cache.latest');
+      } else if (rawHour !== undefined && rawHour !== '') {
+        const numericHour = Number(rawHour);
+        hourLabel = Number.isFinite(numericHour)
+          ? `${String(numericHour)}h`
+          : String(rawHour);
+      }
+
+      return t('cache.resolvedEmagramAnalysis', {
+        site: String((resolved.details as Record<string, unknown>).site_id),
+        date: String((resolved.details as Record<string, unknown>).date),
+        hour: hourLabel,
+      });
+    }
+
+    return t('cache.resolvedEmagramAnalysis');
+  }
+
+  return t('cache.resolutionGeneric');
+}
+
+// =============================================================================
+// STRAVA TOKEN SECTION
+// =============================================================================
+
+function StravaTokenSection() {
+  const { t } = useTranslation();
+  const {
+    data: status,
+    isLoading: statusLoading,
+    isError: statusError,
+  } = useStravaTokenStatus();
+  const {
+    data: logs,
+    isLoading: logsLoading,
+    isError: logsError,
+  } = useStravaTokenLogs();
+  const refreshMutation = useStravaRefreshToken();
+
+  const refreshSucceeded =
+    refreshMutation.isSuccess && refreshMutation.data?.refreshed === true;
+  const refreshFailed =
+    refreshMutation.isError ||
+    (refreshMutation.isSuccess && refreshMutation.data?.refreshed === false);
+
+  const statusBadge = (() => {
+    if (statusLoading) return null;
+    if (statusError || !status) {
+      return {
+        className:
+          'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400',
+        label: t('infrastructure.strava.unknown'),
+      };
+    }
+    return status.valid
+      ? {
+          className:
+            'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300',
+          label: t('infrastructure.strava.valid'),
+        }
+      : {
+          className:
+            'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300',
+          label: t('infrastructure.strava.expired'),
+        };
+  })();
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+        {t('infrastructure.strava.title')}
+      </h3>
+
+      {/* Status card */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md flex flex-wrap items-center gap-6">
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {t('infrastructure.strava.status')}:
+          </span>
+          {statusLoading ? (
+            <span className="text-sm text-gray-400">...</span>
+          ) : statusBadge ? (
+            <span
+              className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge.className}`}
+            >
+              {statusBadge.label}
+            </span>
+          ) : null}
+        </div>
+
+        {status?.expires_at && (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-gray-500 dark:text-gray-400">
+              {t('infrastructure.strava.expiresAt')}:
+            </span>
+            <span className="text-gray-800 dark:text-gray-200">
+              {formatDate(status.expires_at)}
+            </span>
+          </div>
+        )}
+
+        <Button
+          onPress={() => refreshMutation.mutate()}
+          isDisabled={refreshMutation.isPending}
+          className="ml-auto px-3 py-1.5 rounded-md bg-orange-500 text-white text-sm hover:bg-orange-600 transition-colors disabled:opacity-50 cursor-pointer"
+        >
+          {refreshMutation.isPending
+            ? t('infrastructure.strava.refreshing')
+            : t('infrastructure.strava.refresh')}
+        </Button>
+      </div>
+
+      {/* Refresh success/error feedback */}
+      {refreshSucceeded && (
+        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-xl p-3 text-sm text-green-800 dark:text-green-200">
+          {t('infrastructure.strava.refreshSuccess')}
+        </div>
+      )}
+      {refreshFailed && (
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-xl p-3 text-sm text-red-800 dark:text-red-200">
+          {t('infrastructure.strava.refreshError')}
+        </div>
+      )}
+
+      {/* Logs table */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {t('infrastructure.strava.logs')}
+          </h4>
+        </div>
+        {logsLoading ? (
+          <div className="p-4 text-sm text-gray-400">...</div>
+        ) : logsError ? (
+          <div className="p-4 text-sm text-red-500 dark:text-red-400 text-center">
+            {t('infrastructure.strava.unknown')}
+          </div>
+        ) : !logs || logs.length === 0 ? (
+          <div className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+            {t('infrastructure.strava.noLogs')}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-900/50 text-left">
+                  <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
+                    {t('infrastructure.strava.date')}
+                  </th>
+                  <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
+                    {t('infrastructure.strava.status')}
+                  </th>
+                  <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
+                    {t('infrastructure.strava.mode')}
+                  </th>
+                  <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
+                    {t('infrastructure.strava.message')}
+                  </th>
+                  <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
+                    {t('infrastructure.strava.expiresAt')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((log) => (
+                  <tr
+                    key={log.id}
+                    className="border-t border-gray-100 dark:border-gray-700/50"
+                  >
+                    <td className="px-4 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      {formatDate(log.timestamp)}
+                    </td>
+                    <td className="px-4 py-2">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          log.success
+                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                            : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
+                        }`}
+                      >
+                        {log.success
+                          ? t('infrastructure.strava.ok')
+                          : t('infrastructure.strava.fail')}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                      {getRefreshModeLabel(log.refresh_mode, t)}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600 dark:text-gray-400 text-xs max-w-md truncate">
+                      {log.message}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                      {log.expires_at ? formatDate(log.expires_at) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// CACHE SECTION
+// =============================================================================
+
+function CacheSection() {
   const { t } = useTranslation();
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
@@ -59,15 +340,23 @@ export default function CacheViewer() {
     const lower = searchFilter.toLowerCase();
     const result: typeof overview.groups = {};
     for (const [prefix, group] of Object.entries(overview.groups)) {
-      const filteredKeys = group.keys.filter((k) =>
-        k.key.toLowerCase().includes(lower)
-      );
+      const filteredKeys = group.keys.filter((k) => {
+        const values = [
+          k.key,
+          getResolvedLabel(k.resolved, t),
+          ...(k.resolved?.details ? Object.values(k.resolved.details) : []),
+        ];
+
+        return values
+          .map((value) => String(value).toLowerCase())
+          .some((value) => value.includes(lower));
+      });
       if (filteredKeys.length > 0) {
         result[prefix] = { count: filteredKeys.length, keys: filteredKeys };
       }
     }
     return result;
-  }, [overview, searchFilter]);
+  }, [overview, searchFilter, t]);
 
   const toggleGroup = (prefix: string) => {
     setExpandedGroups((prev) => {
@@ -105,10 +394,10 @@ export default function CacheViewer() {
   };
 
   return (
-    <div className="py-4 space-y-4">
-      <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
         {t('cache.title')}
-      </h2>
+      </h3>
 
       {/* Stats bar */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -146,7 +435,7 @@ export default function CacheViewer() {
       )}
 
       {/* Controls */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md flex flex-wrap items-center gap-3">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">
         <Checkbox
           isSelected={autoRefresh}
           onChange={setAutoRefresh}
@@ -183,7 +472,7 @@ export default function CacheViewer() {
         </Checkbox>
         <Button
           onPress={() => refetch()}
-          className="px-3 py-1.5 rounded-md bg-sky-600 text-white text-sm hover:bg-sky-700 transition-colors cursor-pointer"
+          className="min-h-11 px-4 py-2.5 sm:min-h-0 sm:px-3 sm:py-1.5 rounded-md bg-sky-600 text-white text-sm hover:bg-sky-700 transition-colors cursor-pointer"
         >
           {t('cache.refresh')}
         </Button>
@@ -201,7 +490,7 @@ export default function CacheViewer() {
         <Button
           onPress={handleClearAll}
           isDisabled={deleteMutation.isPending}
-          className="px-3 py-1.5 rounded-md bg-red-600 text-white text-sm hover:bg-red-700 transition-colors disabled:opacity-50 cursor-pointer"
+          className="min-h-11 px-4 py-2.5 sm:min-h-0 sm:px-3 sm:py-1.5 rounded-md bg-red-600 text-white text-sm hover:bg-red-700 transition-colors disabled:opacity-50 cursor-pointer"
         >
           {t('cache.clearAll')}
         </Button>
@@ -248,6 +537,16 @@ export default function CacheViewer() {
                 </span>
                 <p className="font-mono text-xs break-all text-gray-800 dark:text-gray-200">
                   {keyDetail.key}
+                </p>
+              </div>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">
+                  {t('cache.resolved')}
+                </span>
+                <p className="text-gray-800 dark:text-gray-200">
+                  {keyDetail.resolved
+                    ? getResolvedLabel(keyDetail.resolved, t)
+                    : t('cache.noResolution')}
                 </p>
               </div>
               <div>
@@ -326,6 +625,29 @@ export default function CacheViewer() {
   );
 }
 
+// =============================================================================
+// MAIN PAGE
+// =============================================================================
+
+export default function InfrastructurePage() {
+  const { t } = useTranslation();
+
+  return (
+    <div className="py-4 space-y-8">
+      <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+        {t('infrastructure.title')}
+      </h2>
+
+      <StravaTokenSection />
+      <CacheSection />
+    </div>
+  );
+}
+
+// =============================================================================
+// CACHE GROUP TABLE (unchanged)
+// =============================================================================
+
 const columnHelper = createColumnHelper<CacheKeyInfo>();
 
 function GroupSection({
@@ -348,7 +670,12 @@ function GroupSection({
   isPending: boolean;
 }) {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
   const [sorting, setSorting] = useState<SortingState>([]);
+
+  const columnVisibility: Record<string, boolean> = isMobile
+    ? { ttl: false, size: false }
+    : {};
 
   const columns = useMemo(
     () => [
@@ -357,6 +684,14 @@ function GroupSection({
         cell: (info) => (
           <span className="font-mono text-xs text-gray-700 dark:text-gray-300 truncate block max-w-xs">
             {info.getValue()}
+          </span>
+        ),
+      }),
+      columnHelper.accessor('resolved', {
+        header: t('cache.resolved'),
+        cell: (info) => (
+          <span className="text-xs text-gray-600 dark:text-gray-400">
+            {getResolvedLabel(info.getValue(), t)}
           </span>
         ),
       }),
@@ -380,17 +715,17 @@ function GroupSection({
         id: 'actions',
         header: t('cache.actions'),
         cell: (info) => (
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Button
               onPress={() => onViewKey(info.row.original.key)}
-              className="px-2 py-1 rounded text-xs bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors cursor-pointer"
+              className="min-h-11 px-3 py-2 sm:min-h-0 sm:px-2 sm:py-1 rounded text-xs bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors cursor-pointer"
             >
               {t('cache.view')}
             </Button>
             <Button
               onPress={() => onDeleteKey(info.row.original.key)}
               isDisabled={isPending}
-              className="px-2 py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
+              className="min-h-11 px-3 py-2 sm:min-h-0 sm:px-2 sm:py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
             >
               {t('cache.deleteKey')}
             </Button>
@@ -404,7 +739,7 @@ function GroupSection({
   const table = useReactTable({
     data: group.keys,
     columns,
-    state: { sorting },
+    state: { sorting, columnVisibility },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -424,7 +759,7 @@ function GroupSection({
           }
         }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <span
             className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
           >
@@ -441,7 +776,7 @@ function GroupSection({
           <Button
             onPress={onClearPattern}
             isDisabled={isPending}
-            className="px-2 py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
+            className="px-3 py-2 sm:px-2 sm:py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
           >
             {t('cache.clearPattern')}
           </Button>

@@ -19,8 +19,10 @@ import config
 import models  # noqa: F401 - imported for side effects (model registration)
 from database import Base, SessionLocal, engine
 from models import Site  # Needed for database initialization
-from routes import router
-from scheduler import start_scheduler, stop_scheduler
+from routes import public_router, router
+from video_export_manual import start_video_export_worker, stop_video_export_worker
+from scheduler import scheduler, start_scheduler, stop_scheduler
+from versioning import initialize_deployment_version
 from webhooks import router as webhooks_router
 
 # Configure logging
@@ -100,6 +102,11 @@ def initialize_database():
 
         if site_count > 0:
             logger.info(f"✓ Database already contains {site_count} sites - skipping seed")
+
+            # Seed admin user (idempotent - only creates if no users exist)
+            from auth import seed_admin_user
+
+            seed_admin_user()
             return True
 
         logger.info("No sites found - seeding default sites...")
@@ -237,6 +244,11 @@ def initialize_database():
             logger.warning(
                 "⚠️  Failed to seed weather sources, but continuing (sources can be added later)..."
             )
+
+        # Step 5: Seed admin user
+        from auth import seed_admin_user
+
+        seed_admin_user()
 
         logger.info("=" * 60)
         logger.info("✅ DATABASE INITIALIZATION COMPLETE")
@@ -515,6 +527,23 @@ async def initial_cache_warmup():
         )
 
 
+def schedule_strava_token_refresh_job():
+    """Register the periodic Strava token refresh job."""
+
+    from apscheduler.triggers.interval import IntervalTrigger
+
+    from strava import refresh_access_token
+
+    scheduler.add_job(
+        refresh_access_token,
+        trigger=IntervalTrigger(hours=4),
+        id="strava_token_refresh",
+        name="Strava token refresh every 4h (forced)",
+        replace_existing=True,
+        kwargs={"force": True},
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -522,6 +551,12 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info("🚀 Starting Dashboard Parapente API...")
+
+    try:
+        initialize_deployment_version()
+    except OSError as error:
+        logger.error("❌ Could not initialize deployment version", exc_info=error)
+        raise RuntimeError("Deployment version initialization failed") from error
 
     # Load app settings into memory cache
     try:
@@ -547,16 +582,25 @@ async def lifespan(app: FastAPI):
         emagram_scheduler = setup_emagram_scheduler(app)
         start_emagram(emagram_scheduler)
 
+        # Strava token refresh every 4 hours
+        schedule_strava_token_refresh_job()
+        logger.info("🔑 Strava token refresh scheduled (every 4h)")
+
         # Initial cache warmup (non-blocking)
         logger.info("🔥 Triggering initial cache warmup...")
         asyncio.create_task(initial_cache_warmup())
     else:
         logger.info("📅 Scheduler disabled, skipping cache warmup")
 
+    # Start manual video export worker (skip in tests)
+    if not config.TESTING:
+        start_video_export_worker()
+
     yield
 
     # Shutdown
     logger.info("⏹️ Shutting down Dashboard Parapente API...")
+    stop_video_export_worker()
     stop_scheduler()
 
     # Close Redis connection
@@ -582,7 +626,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routes
+# Include routes (public_router first for route priority)
+app.include_router(public_router)
 app.include_router(router)
 app.include_router(webhooks_router)
 

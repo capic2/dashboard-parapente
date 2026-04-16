@@ -146,6 +146,7 @@ jobs:
           BACKEND_DATABASE_URL: sqlite:///./test.db
           BACKEND_WEATHERAPI_KEY: test_key
           BACKEND_METEOBLUE_API_KEY: test_key
+          BACKEND_JWT_SECRET: ci-test-secret-not-for-production
 
       - name: 💡 Handle NX Cloud credits exhaustion
         if: steps.nx_tasks.outcome == 'failure' && env.NX_CLOUD_EXHAUSTED == 'true'
@@ -169,6 +170,7 @@ jobs:
           BACKEND_DATABASE_URL: sqlite:///./test.db
           BACKEND_WEATHERAPI_KEY: test_key
           BACKEND_METEOBLUE_API_KEY: test_key
+          BACKEND_JWT_SECRET: ci-test-secret-not-for-production
 
       - name: ❌ Fail if non-NX-Cloud error
         if: steps.nx_tasks.outcome == 'failure' && env.NX_CLOUD_EXHAUSTED != 'true'
@@ -281,6 +283,7 @@ jobs:
           BACKEND_WEATHERAPI_KEY: test_key
           BACKEND_METEOBLUE_API_KEY: test_key
           BACKEND_STRAVA_VERIFY_TOKEN: PARAPENTE_E2E_TEST
+          BACKEND_JWT_SECRET: ci-test-secret-not-for-production
 
       - name: 🔄 Retry E2E with local cache (if NX Cloud exhausted)
         if: steps.e2e.outcome == 'failure'
@@ -301,6 +304,7 @@ jobs:
           BACKEND_WEATHERAPI_KEY: test_key
           BACKEND_METEOBLUE_API_KEY: test_key
           BACKEND_STRAVA_VERIFY_TOKEN: PARAPENTE_E2E_TEST
+          BACKEND_JWT_SECRET: ci-test-secret-not-for-production
 
       - name: 📤 Upload E2E artifacts
         if: failure()

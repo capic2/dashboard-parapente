@@ -5,6 +5,22 @@ import App from './App';
 import './App.css';
 import { initTheme } from './stores/themeStore';
 
+async function logAppVersion() {
+  try {
+    const response = await fetch('/api/version');
+
+    if (!response.ok) {
+      throw new Error(`Version endpoint returned ${response.status}`);
+    }
+
+    const payload = (await response.json()) as { version?: string };
+    const version = payload.version ?? 'unknown';
+    console.info(`[Dashboard Parapente] Version ${version}`);
+  } catch {
+    console.info('[Dashboard Parapente] Version unknown');
+  }
+}
+
 // Initialiser MSW en mode développement (peut être désactivé via VITE_ENABLE_MSW=false)
 async function enableMocking() {
   const enableMSW = import.meta.env.VITE_ENABLE_MSW !== 'false';
@@ -28,6 +44,7 @@ if (!rootElement) {
 
 // Initialiser le thème avant le rendu pour éviter le FOUC
 initTheme();
+void logAppVersion();
 
 // Attendre que MSW soit prêt avant de rendre l'app
 enableMocking().then(() => {

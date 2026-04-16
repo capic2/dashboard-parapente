@@ -137,14 +137,17 @@ See `.env.example` for all available options.
 ## Testing
 
 ```bash
-# Run all tests
-pytest
+# Run all backend tests via Nx (from repo root)
+pnpm nx test backend
 
-# With coverage
-pytest --cov
+# Targeted unit test (example)
+pnpm nx test backend -- tests/unit/test_cache.py
 
-# Specific file
-pytest tests/test_cache.py
+# Run tests with coverage
+pnpm nx test backend -- --cov
+
+# Run integration tests
+pnpm nx test:integration backend
 ```
 
 ---
