@@ -15,8 +15,7 @@ This file defines frontend rules for `apps/frontend`.
 
 ## Storybook
 
-- Create stories using CSF Factory.
-- Add a `*.test.ts` or `*.test.tsx` file when behavior needs verification.
+- Create stories using CSF Factory, annd use STORY.test() when behavior needs verification.
 - Keep stories focused on clear, reproducible states/variants.
 
 ## Chromatic
