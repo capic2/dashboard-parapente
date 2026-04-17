@@ -1186,7 +1186,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         </p>
         <div className="bg-white dark:bg-gray-800 p-4 rounded text-left text-xs font-mono">
           <p className="font-bold mb-2 dark:text-white">Erreur:</p>
-          <p className="text-red-600">{viewerError}</p>
+          <p className="text-red-600 dark:text-red-400">{viewerError}</p>
         </div>
         <p className="text-xs text-gray-600 dark:text-gray-300 mt-4">
           Vérifiez la console du navigateur (F12) pour plus de détails.

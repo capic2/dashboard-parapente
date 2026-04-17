@@ -202,7 +202,9 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           <Label className={labelClass}>{t('editSite.siteName')} *</Label>
           <Input className={inputClass} />
           {errors.name && (
-            <p className="text-red-500 text-xs mt-1">{errors.name}</p>
+            <p className="text-red-500 dark:text-red-400 text-xs mt-1">
+              {errors.name}
+            </p>
           )}
         </TextField>
 
@@ -280,7 +282,9 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
             <Label className={labelClass}>{t('editSite.latitude')} *</Label>
             <Input type="number" step={0.0001} className={inputClass} />
             {errors.latitude && (
-              <p className="text-red-500 text-xs mt-1">{errors.latitude}</p>
+              <p className="text-red-500 dark:text-red-400 text-xs mt-1">
+                {errors.latitude}
+              </p>
             )}
           </TextField>
 
@@ -293,7 +297,9 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
             <Label className={labelClass}>{t('editSite.longitude')} *</Label>
             <Input type="number" step={0.0001} className={inputClass} />
             {errors.longitude && (
-              <p className="text-red-500 text-xs mt-1">{errors.longitude}</p>
+              <p className="text-red-500 dark:text-red-400 text-xs mt-1">
+                {errors.longitude}
+              </p>
             )}
           </TextField>
 

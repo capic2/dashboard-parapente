@@ -85,7 +85,7 @@ export function FlightsTable({
             <Button
               size="icon"
               tone="danger"
-              className="absolute top-2 right-2 w-10 h-10 sm:w-7 sm:h-7 flex items-center justify-center rounded-full bg-red-100 text-red-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-red-200 hover:text-red-700 transition-all"
+              className="absolute top-2 right-2 w-10 h-10 sm:w-7 sm:h-7 flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30 text-red-500 dark:text-red-300 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-red-200 dark:hover:bg-red-900/50 hover:text-red-700 dark:hover:text-red-200 transition-all"
               onClick={(e) => {
                 e.stopPropagation();
                 onDeleteFlight(flight);

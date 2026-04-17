@@ -69,7 +69,9 @@ export default function ProgressChart({ flights }: ProgressChartProps) {
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
           📈 {t('charts.flightProgress')}
         </h3>
-        <p className="text-red-600 text-sm">{t('charts.noData')}</p>
+        <p className="text-red-600 dark:text-red-400 text-sm">
+          {t('charts.noData')}
+        </p>
       </div>
     );
   }

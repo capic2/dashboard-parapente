@@ -78,7 +78,9 @@ export default function WeatherMultiLanding({
                 </div>
 
                 {hasError ? (
-                  <p className="text-xs text-red-500">{weather.error}</p>
+                  <p className="text-xs text-red-500 dark:text-red-400">
+                    {weather.error}
+                  </p>
                 ) : (
                   <div className="flex items-center gap-3">
                     <span className="text-lg" title={verdict}>
