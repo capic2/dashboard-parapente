@@ -76,7 +76,7 @@ export default function CurrentConditions({ spotId }: CurrentConditionsProps) {
       </div>
       {weather.score != null && weather.score !== weather.para_index && (
         <div className="text-xs text-gray-500 dark:text-gray-400 -mt-3 mb-3">
-          Para-Index {weather.para_index}/100
+          {t('weather.paraIndex')} {weather.para_index}/100
         </div>
       )}
 
