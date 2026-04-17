@@ -15,9 +15,12 @@ async function logAppVersion() {
 
     const payload = (await response.json()) as { version?: string };
     const version = payload.version ?? 'unknown';
-    console.info(`[Dashboard Parapente] Version ${version}`);
-  } catch {
-    console.info('[Dashboard Parapente] Version unknown');
+    const appWindow = window as Window & { __APP_VERSION__?: string };
+    appWindow.__APP_VERSION__ = version;
+    window.dispatchEvent(new CustomEvent('app-version-ready', { detail: version }));
+    console.log(`[Dashboard Parapente] Version ${version}`);
+  } catch (error) {
+    console.warn('[Dashboard Parapente] Version unknown', error);
   }
 }
 
