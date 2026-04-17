@@ -189,7 +189,7 @@ function StravaTokenSection() {
             {t('infrastructure.strava.status')}:
           </span>
           {statusLoading ? (
-            <span className="text-sm text-gray-400 dark:text-gray-500">
+            <span className="text-sm text-gray-400 dark:text-gray-300">
               ...
             </span>
           ) : statusBadge ? (
