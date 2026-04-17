@@ -416,9 +416,21 @@ const weatherRouteConfig = {
     {
       path: '/weather',
       element: 'story' as const,
-      validateSearch: (search: Record<string, unknown>) => ({
-        siteId: typeof search.siteId === 'string' ? search.siteId : undefined,
-      }),
+      validateSearch: (search: Record<string, unknown>) => {
+        const rawDay = search.day;
+        const parsedDay =
+          typeof rawDay === 'string' || typeof rawDay === 'number'
+            ? Number(rawDay)
+            : Number.NaN;
+
+        return {
+          siteId: typeof search.siteId === 'string' ? search.siteId : undefined,
+          day:
+            Number.isInteger(parsedDay) && parsedDay >= 0 && parsedDay <= 6
+              ? parsedDay
+              : undefined,
+        };
+      },
     },
   ],
 };
