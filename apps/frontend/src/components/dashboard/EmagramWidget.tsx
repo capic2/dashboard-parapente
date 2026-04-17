@@ -139,26 +139,31 @@ export default function EmagramWidget({
 
   const { data: hoursData } = useEmagramHours(siteId, dayIndex);
 
+  const availableHours = useMemo(
+    () => [...(hoursData?.hours ?? [])].sort((a, b) => a.hour - b.hour),
+    [hoursData?.hours]
+  );
+
   // Determine which hour to display: selected, or current hour if in range, or null
   const activeHour = useMemo(() => {
     if (
       selectedHour !== null &&
-      hoursData?.hours?.some((h) => h.hour === selectedHour)
+      availableHours.some((h) => h.hour === selectedHour)
     ) {
       return selectedHour;
     }
-    if (!hoursData?.hours?.length) return null;
-    if (dayIndex > 0) return null;
-    const now = new Date().getHours();
-    const available = hoursData.hours.map((h) => h.hour);
-    if (available.includes(now)) return now;
-    // Default to closest available hour
-    return available.reduce((prev, curr) =>
-      Math.abs(curr - now) < Math.abs(prev - now) ? curr : prev
-    );
-  }, [selectedHour, hoursData, dayIndex]);
+    if (!availableHours.length) return null;
+    const targetHour = dayIndex > 0 ? 14 : new Date().getHours();
+    const hours = availableHours.map((h) => h.hour);
 
-  const hasHourlyData = (hoursData?.hours?.length ?? 0) > 0;
+    if (hours.includes(targetHour)) return targetHour;
+    // Default to closest available hour
+    return hours.reduce((prev, curr) =>
+      Math.abs(curr - targetHour) < Math.abs(prev - targetHour) ? curr : prev
+    );
+  }, [selectedHour, availableHours, dayIndex]);
+
+  const hasHourlyData = availableHours.length > 0;
   const shouldFetchEmagram =
     !!siteId && (dayIndex === 0 || hasRequestedDisplay);
 
@@ -319,7 +324,7 @@ export default function EmagramWidget({
         </div>
         {hasHourlyData && hoursData && (
           <HourSlider
-            hours={hoursData.hours}
+            hours={availableHours}
             selectedHour={activeHour}
             onHourChange={setSelectedHour}
           />
@@ -399,7 +404,7 @@ export default function EmagramWidget({
       {/* Hour Slider */}
       {hasHourlyData && hoursData && (
         <HourSlider
-          hours={hoursData.hours}
+          hours={availableHours}
           selectedHour={activeHour}
           onHourChange={setSelectedHour}
         />
