@@ -1,44 +1,44 @@
-# AGENTS - Regles globales
+# AGENTS - Global Rules
 
-Ce fichier definit les regles globales pour tout le monorepo.
+This file defines global rules for the entire monorepo.
 
-## Hierarchie des regles
+## Rule Hierarchy
 
-1. Le fichier `AGENTS.md` le plus proche du code modifie est prioritaire.
-2. En cas de conflit, la regle locale remplace la regle parent.
-3. Les regles globales restent actives si elles ne sont pas surchargees localement.
+1. The `AGENTS.md` file closest to the modified code has priority.
+2. If rules conflict, the local rule overrides the parent rule.
+3. Global rules remain active unless explicitly overridden locally.
 
-## Portee
+## Scope
 
-- Monorepo Nx: `apps/*` et `libs/*`.
-- Ce fichier couvre les regles transverses (git, securite, qualite, workflow).
+- Nx monorepo: `apps/*` and `libs/*`.
+- This file covers cross-cutting rules (git, security, quality, workflow).
 
 ## Workflow
 
-- Toujours limiter les changements au besoin de la tache.
-- Respecter les conventions deja en place avant de proposer un nouveau pattern.
-- Ne jamais modifier des fichiers hors scope sans raison explicite.
+- Always limit changes to what is required by the task.
+- Follow existing conventions before introducing a new pattern.
+- Never modify out-of-scope files without an explicit reason.
 
 ## Git
 
-- Ne pas utiliser de commandes destructives (`reset --hard`, `checkout --`, etc.).
-- Faire des commits petits et explicites.
-- Utiliser Conventional Commits quand un commit est demande.
+- Do not use destructive commands (`reset --hard`, `checkout --`, etc.).
+- Keep commits small and explicit.
+- Use Conventional Commits when a commit is requested.
 
-## Securite
+## Security
 
-- Ne jamais commiter de secrets (`.env`, cles API, tokens, credentials).
-- Ne jamais exposer de valeurs sensibles dans logs, tests, docs, ou stories.
+- Never commit secrets (`.env`, API keys, tokens, credentials).
+- Never expose sensitive values in logs, tests, docs, or stories.
 
-## Qualite minimale
+## Minimum Quality
 
-- Linter et tests cibles sur les projets touches via Nx.
-- Commandes usuelles:
+- Run lint and targeted tests on impacted projects via Nx.
+- Common commands:
   - `pnpm lint`
   - `pnpm test`
-  - ou commandes cibles: `pnpm nx lint <project>`, `pnpm nx test <project>`
+  - or targeted commands: `pnpm nx lint <project>`, `pnpm nx test <project>`
 
-## Regles locales
+## Local Rules
 
-- Backend: voir `apps/backend/AGENTS.md`.
-- Frontend: voir `apps/frontend/AGENTS.md`.
+- Backend: see `apps/backend/AGENTS.md`.
+- Frontend: see `apps/frontend/AGENTS.md`.

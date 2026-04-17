@@ -1,38 +1,38 @@
 # AGENTS - Backend
 
-Ce fichier definit les regles backend pour `apps/backend`.
+This file defines backend rules for `apps/backend`.
 
-## Portee
+## Scope
 
-- S'applique a tout fichier sous `apps/backend/**`.
-- Herite de `AGENTS.md` racine. En cas de conflit, ce fichier est prioritaire.
+- Applies to all files under `apps/backend/**`.
+- Inherits from root `AGENTS.md`. If there is a conflict, this file has priority.
 
-## Stack et style
+## Stack and Style
 
-- Python `>=3.12` avec typage explicite sur nouvelles fonctions.
-- Respecter les regles definies dans `apps/backend/pyproject.toml` (Ruff, Black, Pytest).
-- Eviter la duplication de logique: preferer des fonctions/services reutilisables.
+- Python `>=3.12` with explicit typing on new functions.
+- Follow rules defined in `apps/backend/pyproject.toml` (Ruff, Black, Pytest).
+- Avoid logic duplication: prefer reusable functions/services.
 
 ## FastAPI
 
-- Garder une separation claire: routes, schemas, logique metier, acces donnees.
-- Valider les IO API avec schemas Pydantic.
-- Gerer les erreurs de facon explicite (codes HTTP coherents, messages actionnables).
+- Keep clear separation between routes, schemas, business logic, and data access.
+- Validate API inputs/outputs with Pydantic schemas.
+- Handle errors explicitly (consistent HTTP codes, actionable messages).
 
-## Base de donnees
+## Database
 
-- Suivre les patterns SQLAlchemy deja en place.
-- Eviter les changements schema implicites: utiliser scripts/migrations dedies si necessaire.
+- Follow existing SQLAlchemy patterns.
+- Avoid implicit schema changes: use dedicated scripts/migrations when needed.
 
-## Tests et validation
+## Tests and Validation
 
-- Tout nouveau comportement metier ou correction de bug doit avoir un test pytest.
-- Utiliser des tests cibles quand possible pour accelerer la boucle.
-- Commandes recommandees:
+- Any new business behavior or bug fix must include a pytest test.
+- Use targeted tests when possible to speed up feedback loops.
+- Recommended commands:
   - `pnpm nx lint backend`
   - `pnpm nx test backend`
 
-## Hors scope
+## Out of Scope
 
-- Ne pas ajouter de regles frontend ici.
-- Pour les conventions UI/data fetching frontend, voir `apps/frontend/AGENTS.md`.
+- Do not add frontend rules here.
+- For frontend UI/data-fetching conventions, see `apps/frontend/AGENTS.md`.
