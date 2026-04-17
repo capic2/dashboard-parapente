@@ -8,6 +8,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Site } from '../../types';
 import { WindIndicatorCompact } from '../common/WindIndicator';
 import { Button } from '@dashboard-parapente/design-system';
@@ -32,6 +33,7 @@ export function MultiOrientationSelector({
   className = '',
   baseName,
 }: MultiOrientationSelectorProps) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -150,7 +152,7 @@ export function MultiOrientationSelector({
                     </span>
                     {weather?.paraIndex !== undefined && (
                       <span className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
-                        Para-Index: {weather.paraIndex}
+                        {t('weather.paraIndex')}: {weather.paraIndex}
                       </span>
                     )}
                   </div>

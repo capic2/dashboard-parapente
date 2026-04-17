@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Clock,
   Gauge,
@@ -59,6 +60,7 @@ interface SourceDataTooltipProps extends BaseTooltipProps {
 }
 
 interface ParaIndexTooltipProps extends BaseTooltipProps {
+  label: string;
   paraIndex: number;
   wind: number;
   gust: number;
@@ -67,6 +69,7 @@ interface ParaIndexTooltipProps extends BaseTooltipProps {
 }
 
 interface VerdictTooltipProps extends BaseTooltipProps {
+  label: string;
   verdict: string;
   paraIndex: number;
   wind: number;
@@ -214,6 +217,7 @@ const SOURCE_ORDER = [
 const ParaIndexTooltip = ({
   position,
   hour,
+  label,
   paraIndex,
   wind,
   gust,
@@ -252,7 +256,7 @@ const ParaIndexTooltip = ({
         </Button>
       )}
       <div className="font-bold mb-3 text-sky-700 dark:text-sky-400 flex items-center gap-2">
-        📊 Para-Index - {hour}
+        📊 {label} - {hour}
       </div>
       <div className="space-y-2 text-gray-700 dark:text-gray-300">
         <div className="text-lg font-bold text-sky-600">{paraIndex}/100</div>
@@ -287,6 +291,7 @@ const VerdictTooltip = ({
   position,
   hour,
   verdict,
+  label,
   paraIndex,
   wind,
   gust,
@@ -354,7 +359,7 @@ const VerdictTooltip = ({
           {verdict}
         </div>
         <div className="text-xs text-gray-500 dark:text-gray-400">
-          Para-Index : {paraIndex}/100
+          {label}: {paraIndex}/100
         </div>
         <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
           <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
@@ -584,6 +589,7 @@ export default function HourlyForecast({
   spotId,
   dayIndex = 0,
 }: HourlyForecastProps) {
+  const { t } = useTranslation();
   const { data: weather, isLoading, error } = useWeather(spotId, dayIndex);
   const [activeTooltip, setActiveTooltip] = useState<{
     type: CellType;
@@ -693,6 +699,7 @@ export default function HourlyForecast({
         return (
           <ParaIndexTooltip
             {...commonProps}
+            label={t('weather.paraIndex')}
             paraIndex={data.para_index}
             wind={data.wind_speed || 0}
             gust={
@@ -709,6 +716,7 @@ export default function HourlyForecast({
         return (
           <VerdictTooltip
             {...commonProps}
+            label={t('weather.paraIndex')}
             verdict={data.verdict}
             paraIndex={data.para_index}
             wind={data.wind_speed || 0}
@@ -840,7 +848,7 @@ export default function HourlyForecast({
               </th>
               <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Gauge size={14} /> Para-Index
+                  <Gauge size={14} /> {t('weather.paraIndex')}
                 </span>
               </th>
               <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
