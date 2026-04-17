@@ -329,7 +329,7 @@ GoodConditions.test('it renders the correct values', async ({ canvas }) => {
 
   // Verify table headers are present (headers now include icons and units)
   await expect(getByText('Heure')).toBeInTheDocument();
-  await expect(getByText('Para-Index')).toBeInTheDocument();
+  await expect(getByText('Conditions de vol')).toBeInTheDocument();
   await expect(getByText('Temp (°C)')).toBeInTheDocument();
   await expect(getByText('Vent (km/h)')).toBeInTheDocument();
   await expect(getByText('Rafales (km/h)')).toBeInTheDocument();

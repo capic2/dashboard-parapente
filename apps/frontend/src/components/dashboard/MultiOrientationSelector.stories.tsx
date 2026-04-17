@@ -1,7 +1,7 @@
 import preview from '../../../.storybook/preview';
-import {expect, fn, waitFor} from 'storybook/test';
-import {MultiOrientationSelector} from './MultiOrientationSelector';
-import type {Site} from '@dashboard-parapente/shared-types';
+import { expect, fn, waitFor } from 'storybook/test';
+import { MultiOrientationSelector } from './MultiOrientationSelector';
+import type { Site } from '@dashboard-parapente/shared-types';
 
 const meta = preview.meta({
   title: 'Components/Forms/MultiOrientationSelector',
@@ -11,8 +11,6 @@ const meta = preview.meta({
   },
   tags: ['autodocs'],
 });
-
-
 
 // Mock sites with multiple orientations
 const mockSitesMontPoupet: Site[] = [
@@ -316,7 +314,7 @@ DisplaysWeatherData.test(
     await userEvent.click(button);
 
     await waitFor(() => {
-      expect(canvas.getByText(/Para-Index: 85/)).toBeInTheDocument();
+      expect(canvas.getByText(/Conditions de vol: 85/)).toBeInTheDocument();
     });
   }
 );
