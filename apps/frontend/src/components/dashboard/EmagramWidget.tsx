@@ -137,7 +137,12 @@ export default function EmagramWidget({
     setHasRequestedDisplay(dayIndex === 0);
   }, [dayIndex, siteId]);
 
-  const { data: hoursData } = useEmagramHours(siteId, dayIndex);
+  const shouldFetchEmagram =
+    !!siteId && (dayIndex === 0 || hasRequestedDisplay);
+
+  const { data: hoursData } = useEmagramHours(siteId, dayIndex, {
+    enabled: shouldFetchEmagram,
+  });
 
   const availableHours = useMemo(
     () => [...(hoursData?.hours ?? [])].sort((a, b) => a.hour - b.hour),
@@ -164,8 +169,6 @@ export default function EmagramWidget({
   }, [selectedHour, availableHours, dayIndex]);
 
   const hasHourlyData = availableHours.length > 0;
-  const shouldFetchEmagram =
-    !!siteId && (dayIndex === 0 || hasRequestedDisplay);
 
   const {
     data: emagram,
