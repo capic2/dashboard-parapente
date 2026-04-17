@@ -545,7 +545,9 @@ export default function EmagramWidget({
                       >
                         <span>📸</span>
                         <span>{image.alt}</span>
-                        <span className="text-blue-400">🔍</span>
+                        <span className="text-blue-500 dark:text-blue-300">
+                          🔍
+                        </span>
                       </Button>
                     ))}
                   </div>

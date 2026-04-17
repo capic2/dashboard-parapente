@@ -67,13 +67,13 @@ function SiteConditionCard({
       </div>
 
       {isLoading && (
-        <div className="py-4 text-center text-gray-400 text-sm">
+        <div className="py-4 text-center text-gray-400 dark:text-gray-500 text-sm">
           {t('common.loading')}
         </div>
       )}
 
       {isError && (
-        <div className="py-4 text-center text-red-400 text-sm">
+        <div className="py-4 text-center text-red-500 dark:text-red-400 text-sm">
           {t('weather.loadError')}
         </div>
       )}
@@ -82,10 +82,12 @@ function SiteConditionCard({
         <>
           {/* Score + verdict */}
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-2xl font-bold text-sky-600">
+            <span className="text-2xl font-bold text-sky-600 dark:text-sky-400">
               {weather.score != null ? weather.score : weather.para_index}
             </span>
-            <span className="text-sm text-gray-400">/100</span>
+            <span className="text-sm text-gray-400 dark:text-gray-500">
+              /100
+            </span>
             <span
               className={`ml-auto px-2 py-0.5 rounded-full text-xs font-semibold ${getVerdictClass(weather.verdict)}`}
             >

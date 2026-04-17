@@ -189,7 +189,9 @@ function StravaTokenSection() {
             {t('infrastructure.strava.status')}:
           </span>
           {statusLoading ? (
-            <span className="text-sm text-gray-400">...</span>
+            <span className="text-sm text-gray-400 dark:text-gray-500">
+              ...
+            </span>
           ) : statusBadge ? (
             <span
               className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge.className}`}
@@ -241,7 +243,9 @@ function StravaTokenSection() {
           </h4>
         </div>
         {logsLoading ? (
-          <div className="p-4 text-sm text-gray-400">...</div>
+          <div className="p-4 text-sm text-gray-400 dark:text-gray-500">
+            ...
+          </div>
         ) : logsError ? (
           <div className="p-4 text-sm text-red-500 dark:text-red-400 text-center">
             {t('infrastructure.strava.unknown')}
@@ -402,7 +406,7 @@ function CacheSection() {
       {/* Stats bar */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
-          <div className="text-3xl font-bold text-sky-600">
+          <div className="text-3xl font-bold text-sky-600 dark:text-sky-400">
             {overview.total_keys}
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -410,7 +414,7 @@ function CacheSection() {
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
-          <div className="text-3xl font-bold text-sky-600">
+          <div className="text-3xl font-bold text-sky-600 dark:text-sky-400">
             {overview.memory_usage ?? '—'}
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -418,7 +422,7 @@ function CacheSection() {
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
-          <div className="text-3xl font-bold text-sky-600">
+          <div className="text-3xl font-bold text-sky-600 dark:text-sky-400">
             {Object.keys(overview.groups).length}
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -761,7 +765,7 @@ function GroupSection({
       >
         <div className="flex items-center gap-3 min-w-0">
           <span
-            className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+            className={`text-gray-400 dark:text-gray-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
           >
             &#9654;
           </span>

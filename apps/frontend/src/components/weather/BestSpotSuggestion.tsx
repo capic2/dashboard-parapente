@@ -185,7 +185,7 @@ export function BestSpotSuggestion({
             {site.name}
           </span>
           {site.rating != null && site.rating > 0 && (
-            <span className="text-sm text-amber-500">
+            <span className="text-sm text-amber-500 dark:text-amber-400">
               {'★'.repeat(site.rating)}
               {'☆'.repeat(5 - site.rating)}
             </span>
@@ -205,7 +205,9 @@ export function BestSpotSuggestion({
             </span>
             <span className={`text-2xl font-bold ${scoreColor.text}`}>
               {adjustedScore}
-              <span className="text-sm font-normal text-gray-400">/100</span>
+              <span className="text-sm font-normal text-gray-400 dark:text-gray-500">
+                /100
+              </span>
             </span>
           </div>
           <div className="w-full h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -233,7 +235,7 @@ export function BestSpotSuggestion({
                 size="sm"
               />
             ) : (
-              <div className="flex items-center gap-2 text-sm text-gray-400">
+              <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500">
                 <span>💨</span>
                 <span>—</span>
               </div>

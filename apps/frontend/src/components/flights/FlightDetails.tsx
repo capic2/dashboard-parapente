@@ -316,21 +316,21 @@ export function FlightDetails({
 
           <div className="mt-4 pt-4 border-t dark:border-gray-700">
             {flight.gpx_file_path ? (
-              <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-3 rounded-lg">
+              <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
                 <span className="text-xl">✅</span>
                 <div>
                   <p className="font-medium">{t('flights.gpxAvailable')}</p>
-                  <p className="text-xs text-green-600">
+                  <p className="text-xs text-green-600 dark:text-green-400">
                     {t('flights.viewer3dActive')}
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-sm text-orange-700 bg-orange-50 p-3 rounded-lg">
+              <div className="flex items-center gap-2 text-sm text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg">
                 <span className="text-xl">⚠️</span>
                 <div>
                   <p className="font-medium">{t('flights.gpxMissingDetail')}</p>
-                  <p className="text-xs text-orange-600">
+                  <p className="text-xs text-orange-600 dark:text-orange-400">
                     {t('flights.gpxMissingHint')}
                   </p>
                 </div>

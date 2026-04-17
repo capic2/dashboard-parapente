@@ -60,7 +60,9 @@ export default function MonthlyStats({ flights }: MonthlyStatsProps) {
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
           📅 {t('charts.monthlyStats')}
         </h3>
-        <p className="text-red-600 text-sm">{t('charts.noData')}</p>
+        <p className="text-red-600 dark:text-red-400 text-sm">
+          {t('charts.noData')}
+        </p>
       </div>
     );
   }

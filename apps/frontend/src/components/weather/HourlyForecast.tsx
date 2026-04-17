@@ -255,7 +255,9 @@ const ParaIndexTooltip = ({
         📊 Para-Index - {hour}
       </div>
       <div className="space-y-2 text-gray-700 dark:text-gray-300">
-        <div className="text-lg font-bold text-sky-600">{paraIndex}/100</div>
+        <div className="text-lg font-bold text-sky-600 dark:text-sky-400">
+          {paraIndex}/100
+        </div>
         <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
           <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
             Métriques utilisées :
@@ -364,7 +366,11 @@ const VerdictTooltip = ({
             {criteria.map((criterion, i) => (
               <div key={i} className="flex items-start gap-2">
                 <span
-                  className={criterion.met ? 'text-green-500' : 'text-red-500'}
+                  className={
+                    criterion.met
+                      ? 'text-green-500 dark:text-green-400'
+                      : 'text-red-500 dark:text-red-400'
+                  }
                 >
                   {criterion.met ? '✓' : '✗'}
                 </span>
@@ -479,7 +485,7 @@ const SourceDataTooltip = ({
                     href={sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-500 hover:text-blue-700 text-xs flex-shrink-0"
+                    className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-xs flex-shrink-0"
                     title={`Ouvrir ${sourceName}`}
                   >
                     ↗
@@ -510,7 +516,7 @@ const SourceDataTooltip = ({
                     href={sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-500 hover:text-blue-700 text-xs flex-shrink-0"
+                    className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-xs flex-shrink-0"
                     title={`Ouvrir ${sourceName}`}
                   >
                     ↗
@@ -550,7 +556,7 @@ const SourceDataTooltip = ({
                   href={sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-500 hover:text-blue-700 text-xs"
+                  className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-xs"
                   title={`Ouvrir ${sourceName}`}
                 >
                   ↗
@@ -647,7 +653,7 @@ export default function HourlyForecast({
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
           Prévisions Horaires
         </h2>
-        <div className="py-5 text-center text-red-500 text-sm">
+        <div className="py-5 text-center text-red-500 dark:text-red-400 text-sm">
           Données non disponibles
         </div>
       </div>
@@ -920,7 +926,7 @@ export default function HourlyForecast({
                       className="py-2.5 px-2 text-center cursor-help hover:bg-sky-100 dark:hover:bg-sky-900/30 transition-colors"
                       {...cellEventHandlers('para-index', hour)}
                     >
-                      <strong className="text-sky-600">
+                      <strong className="text-sky-600 dark:text-sky-400">
                         {hour.para_index}/100
                       </strong>
                     </td>
