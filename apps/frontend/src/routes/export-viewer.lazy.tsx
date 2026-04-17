@@ -1,7 +1,11 @@
 import { createLazyFileRoute } from '@tanstack/react-router';
 import { lazy, Suspense } from 'react';
 
-const FlightViewer3D = lazy(() => import('../components/flights/FlightViewer3D').then(m => ({ default: m.FlightViewer3D })));
+const FlightViewer3D = lazy(() =>
+  import('../components/flights/FlightViewer3D').then((m) => ({
+    default: m.FlightViewer3D,
+  }))
+);
 
 export const Route = createLazyFileRoute('/export-viewer')({
   component: ExportViewer,
@@ -14,7 +18,7 @@ function ExportViewer() {
   if (!flightId) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <p className="text-gray-600">
+        <p className="text-gray-600 dark:text-gray-300">
           No flight ID provided. Use ?flightId=xxx
         </p>
       </div>
@@ -23,7 +27,13 @@ function ExportViewer() {
 
   return (
     <div className="w-full h-screen">
-      <Suspense fallback={<div className="h-screen flex items-center justify-center text-gray-500">Chargement...</div>}>
+      <Suspense
+        fallback={
+          <div className="h-screen flex items-center justify-center text-gray-500 dark:text-gray-400">
+            Chargement...
+          </div>
+        }
+      >
         <FlightViewer3D flightId={flightId} />
       </Suspense>
     </div>

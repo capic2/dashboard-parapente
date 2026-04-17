@@ -125,7 +125,7 @@ export default function LandingAssociationsManager({
                 type="button"
                 onClick={() => handleRemove(assoc.id)}
                 tone="ghost"
-                className="text-red-400 hover:text-red-600 flex-shrink-0 ml-2"
+                className="text-red-400 dark:text-red-300 hover:text-red-600 dark:hover:text-red-200 flex-shrink-0 ml-2"
                 title="Supprimer"
               >
                 &times;

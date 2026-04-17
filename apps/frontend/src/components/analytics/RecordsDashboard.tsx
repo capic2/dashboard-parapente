@@ -102,7 +102,7 @@ export default function RecordsDashboard({ records }: RecordsDashboardProps) {
                   </div>
                 </>
               ) : (
-                <div className="text-gray-400 text-sm py-4">
+                <div className="text-gray-400 dark:text-gray-400 text-sm py-4">
                   {t('achievements.noData')}
                 </div>
               )}

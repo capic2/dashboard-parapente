@@ -360,7 +360,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
               href={source.documentation_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-blue-600 hover:underline mt-1 inline-block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 rounded"
+              className="text-xs text-blue-600 dark:text-blue-400 hover:underline dark:hover:text-blue-300 mt-1 inline-block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 rounded"
             >
               <span aria-hidden="true">📖 </span>
               {t('settings.weatherSources.documentation')}

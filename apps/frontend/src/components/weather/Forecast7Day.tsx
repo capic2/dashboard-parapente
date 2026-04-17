@@ -96,7 +96,7 @@ export default function Forecast7Day({
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
           {t('weather.forecast7Days')}
         </h2>
-        <div className="py-5 text-center text-red-500 text-sm">
+        <div className="py-5 text-center text-red-500 dark:text-red-400 text-sm">
           {t('common.dataUnavailable')}
         </div>
       </div>
@@ -135,7 +135,7 @@ export default function Forecast7Day({
                   {formatDate(day.date)}
                 </div>
                 <div className="flex items-center justify-center gap-2">
-                  <span className="text-2xl font-bold text-sky-600">
+                  <span className="text-2xl font-bold text-sky-600 dark:text-sky-400">
                     {day.score != null ? day.score : day.para_index}
                   </span>
                   <span

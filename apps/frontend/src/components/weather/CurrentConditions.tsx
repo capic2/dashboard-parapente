@@ -51,7 +51,7 @@ export default function CurrentConditions({ spotId }: CurrentConditionsProps) {
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3.5 font-semibold">
           {t('weather.currentConditions')}
         </h2>
-        <div className="py-5 text-center text-red-500 text-sm">
+        <div className="py-5 text-center text-red-500 dark:text-red-400 text-sm">
           {t('weather.loadError')}
         </div>
       </div>
@@ -65,7 +65,7 @@ export default function CurrentConditions({ spotId }: CurrentConditionsProps) {
       </h2>
 
       <div className="flex items-center gap-3 mb-4">
-        <div className="text-4xl sm:text-3xl font-bold text-sky-600 leading-none">
+        <div className="text-4xl sm:text-3xl font-bold text-sky-600 dark:text-sky-400 leading-none">
           {weather.score != null ? weather.score : weather.para_index}/100
         </div>
         <div

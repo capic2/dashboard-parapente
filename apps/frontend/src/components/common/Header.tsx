@@ -163,7 +163,7 @@ export default function Header() {
 
   return (
     <header className="bg-white dark:bg-gray-800 rounded-xl p-4 mb-4 shadow-lg flex justify-between items-center gap-2.5">
-      <h1 className="text-2xl sm:text-xl text-sky-600 font-semibold min-w-0 sm:min-w-[200px] m-0 truncate">
+      <h1 className="text-2xl sm:text-xl text-sky-600 dark:text-sky-400 font-semibold min-w-0 sm:min-w-[200px] m-0 truncate">
         {t('header.title')}
       </h1>
 
