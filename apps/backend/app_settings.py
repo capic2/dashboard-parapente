@@ -23,6 +23,7 @@ DEFAULTS: dict[str, str] = {
     "cache_ttl_default": "3600",
     "cache_ttl_summary": "3600",
     "scheduler_interval_minutes": "30",
+    "emagram_max_age_minutes": "180",
     "redis_connect_timeout": "5",
     "redis_socket_timeout": "5",
 }
