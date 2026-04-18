@@ -245,7 +245,7 @@ const ParaIndexTooltip = ({
         <Button
           onClick={onClose}
           tone="ghost"
-          className="absolute top-2 right-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+          className="absolute top-2 right-2 text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           aria-label="Fermer l'infobulle"
         >
           ✕
@@ -342,7 +342,7 @@ const VerdictTooltip = ({
         <Button
           onClick={onClose}
           tone="ghost"
-          className="absolute top-2 right-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+          className="absolute top-2 right-2 text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           aria-label="Fermer le verdict"
         >
           ✕
@@ -428,7 +428,7 @@ const SourceDataTooltip = ({
         <Button
           onClick={onClose}
           tone="ghost"
-          className="absolute top-2 right-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+          className="absolute top-2 right-2 text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           aria-label="Fermer les données source"
         >
           ✕
@@ -446,7 +446,7 @@ const SourceDataTooltip = ({
             return (
               <div
                 key={sourceKey}
-                className="text-xs text-gray-400 dark:text-gray-500"
+                className="text-xs text-gray-400 dark:text-gray-400"
               >
                 <span className="font-semibold">{sourceName}:</span> (non
                 disponible)
@@ -531,7 +531,7 @@ const SourceDataTooltip = ({
             return (
               <div
                 key={sourceKey}
-                className="text-xs text-gray-400 dark:text-gray-500"
+                className="text-xs text-gray-400 dark:text-gray-400"
               >
                 <span className="font-semibold">{sourceName}:</span> (non
                 dispo.)

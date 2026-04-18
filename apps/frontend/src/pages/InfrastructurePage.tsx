@@ -189,7 +189,7 @@ function StravaTokenSection() {
             {t('infrastructure.strava.status')}:
           </span>
           {statusLoading ? (
-            <span className="text-sm text-gray-400 dark:text-gray-500">
+            <span className="text-sm text-gray-400 dark:text-gray-400">
               ...
             </span>
           ) : statusBadge ? (
@@ -243,7 +243,7 @@ function StravaTokenSection() {
           </h4>
         </div>
         {logsLoading ? (
-          <div className="p-4 text-sm text-gray-400 dark:text-gray-500">
+          <div className="p-4 text-sm text-gray-400 dark:text-gray-400">
             ...
           </div>
         ) : logsError ? (
@@ -765,7 +765,7 @@ function GroupSection({
       >
         <div className="flex items-center gap-3 min-w-0">
           <span
-            className={`text-gray-400 dark:text-gray-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+            className={`text-gray-400 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
           >
             &#9654;
           </span>

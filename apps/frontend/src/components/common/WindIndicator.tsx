@@ -53,9 +53,9 @@ export function WindIndicator({
       <div
         className={`flex items-center gap-2 ${sizeClasses[size]} ${className}`}
       >
-        <span className="text-gray-400 dark:text-gray-500">⚪</span>
+        <span className="text-gray-400 dark:text-gray-400">⚪</span>
         {showLabel && (
-          <span className="text-gray-400 dark:text-gray-500">
+          <span className="text-gray-400 dark:text-gray-400">
             {t('weather.windUnavailable')}
           </span>
         )}

@@ -107,7 +107,7 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
           {title}
         </span>
         <span
-          className="text-gray-400 dark:text-gray-500 text-xs transition-transform"
+          className="text-gray-400 dark:text-gray-400 text-xs transition-transform"
           style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}
         >
           ▶

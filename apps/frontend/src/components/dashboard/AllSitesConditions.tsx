@@ -67,7 +67,7 @@ function SiteConditionCard({
       </div>
 
       {isLoading && (
-        <div className="py-4 text-center text-gray-400 dark:text-gray-500 text-sm">
+        <div className="py-4 text-center text-gray-400 dark:text-gray-400 text-sm">
           {t('common.loading')}
         </div>
       )}
@@ -85,7 +85,7 @@ function SiteConditionCard({
             <span className="text-2xl font-bold text-sky-600 dark:text-sky-400">
               {weather.score != null ? weather.score : weather.para_index}
             </span>
-            <span className="text-sm text-gray-400 dark:text-gray-500">
+            <span className="text-sm text-gray-400 dark:text-gray-400">
               /100
             </span>
             <span
