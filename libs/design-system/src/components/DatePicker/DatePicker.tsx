@@ -57,7 +57,7 @@ export function DatePicker({ label, value, onChange }: DatePickerProps) {
           )}
         </DateInput>
         <Button
-          className="cursor-pointer px-3 py-2 border-l border-gray-200 dark:border-gray-600 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-r-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="cursor-pointer px-3 py-2 border-l border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-300 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-r-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           aria-label={t('datepicker.openCalendar', 'Open calendar')}
         >
           <svg
@@ -136,7 +136,7 @@ export function DatePicker({ label, value, onChange }: DatePickerProps) {
                       disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-default
                       outside-month:text-gray-300 dark:outside-month:text-gray-600
                       focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1
-                      ${!calendarValue && date.compare(todayDate) === 0 ? 'font-bold text-blue-500' : ''}
+                      ${!calendarValue && date.compare(todayDate) === 0 ? 'font-bold text-blue-500 dark:text-blue-400' : ''}
                     `}
                   />
                 )}

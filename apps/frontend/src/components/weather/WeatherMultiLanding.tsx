@@ -49,7 +49,7 @@ export default function WeatherMultiLanding({
           {t('weather.loadingLandings')}
         </div>
       ) : !weatherData || weatherData.length === 0 ? (
-        <div className="py-3 text-center text-gray-400 dark:text-gray-500 text-sm">
+        <div className="py-3 text-center text-gray-400 dark:text-gray-400 text-sm">
           {t('weather.noWeatherData')}
         </div>
       ) : (

@@ -101,7 +101,7 @@ function HourSlider({
               className={`absolute -translate-x-1/2 text-[10px] px-1 py-0.5 rounded transition-colors ${
                 h.hour === effectiveHour
                   ? 'font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30'
-                  : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                  : 'text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
               }`}
               style={{ left: `${percent}%` }}
             >
