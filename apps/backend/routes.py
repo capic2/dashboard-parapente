@@ -5152,6 +5152,7 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
     updated = {}
     rejected = []
     positive_int_keys = {"scheduler_interval_minutes", "emagram_max_age_minutes"}
+    validated_updates: dict[str, str] = {}
 
     for key, value in settings.items():
         if key not in allowed_keys:
@@ -5173,6 +5174,9 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
                 )
             normalized_value = str(parsed_value)
 
+        validated_updates[key] = normalized_value
+
+    for key, normalized_value in validated_updates.items():
         set_setting(db, key, normalized_value)
         updated[key] = normalized_value
 

@@ -20,7 +20,7 @@ SETTING_KEY = "emagram_max_age_minutes"
 SETTING_VALUE = "180"
 
 
-def upgrade():
+def upgrade() -> None:
     """Insert emagram freshness setting if missing."""
     with engine.connect() as conn:
         conn.execute(
@@ -39,15 +39,15 @@ def upgrade():
     logger.info(f"✅ Ensured setting exists: {SETTING_KEY}={SETTING_VALUE}")
 
 
-def downgrade():
+def downgrade() -> None:
     """Safely remove seeded emagram freshness setting."""
     with engine.connect() as conn:
         conn.execute(
-            text("DELETE FROM app_settings WHERE key = :key"),
-            {"key": SETTING_KEY},
+            text("DELETE FROM app_settings WHERE key = :key AND value = :value"),
+            {"key": SETTING_KEY, "value": SETTING_VALUE},
         )
         conn.commit()
-    logger.info(f"✅ Removed setting if present: {SETTING_KEY}")
+    logger.info(f"✅ Removed seeded setting if unchanged: {SETTING_KEY}={SETTING_VALUE}")
 
 
 if __name__ == "__main__":
