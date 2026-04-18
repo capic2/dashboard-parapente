@@ -3,10 +3,11 @@ Test emagram analysis endpoints
 """
 
 import json
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 
 import pytest
 
+import app_settings
 from models import EmagramAnalysis, Site
 
 
@@ -157,6 +158,44 @@ class TestEmagramEndpoints:
 
         # day_index=3 should not find anything (no future analyses)
         response = client.get("/api/emagram/latest?site_id=site-test-day&day_index=3")
+        assert response.status_code == 200
+        assert response.json() is None
+
+    def test_get_latest_ignores_stale_analysis(self, client, db_session):
+        """Latest endpoint does not return stale analyses outside freshness window."""
+        app_settings.invalidate_cache()
+
+        site = Site(
+            id="site-stale",
+            code="STS",
+            name="Stale Site",
+            latitude=47.0,
+            longitude=6.0,
+            elevation_m=500,
+        )
+        db_session.add(site)
+
+        stale_analysis = EmagramAnalysis(
+            id="stale-analysis",
+            station_code="site-stale",
+            station_name="Stale Site",
+            station_latitude=47.0,
+            station_longitude=6.0,
+            analysis_date=datetime.utcnow().date(),
+            analysis_time=datetime.utcnow().time(),
+            analysis_datetime=datetime.utcnow() - timedelta(hours=4),
+            forecast_date=datetime.utcnow().date(),
+            distance_km=0.0,
+            data_source="test",
+            sounding_time="12Z",
+            analysis_method="llm_vision",
+            score_volabilite=65,
+            analysis_status="completed",
+        )
+        db_session.add(stale_analysis)
+        db_session.commit()
+
+        response = client.get("/api/emagram/latest?site_id=site-stale")
         assert response.status_code == 200
         assert response.json() is None
 

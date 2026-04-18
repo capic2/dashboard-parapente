@@ -15,6 +15,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 import config
+from emagram_freshness import get_emagram_cutoff_utc
 from llm.exceptions import QuotaExhaustedError
 from llm.gemini_analyzer import analyze_emagram_with_gemini
 from llm.groq_analyzer import analyze_emagram_with_groq
@@ -78,7 +79,7 @@ async def generate_multi_source_emagram_for_spot(
 
         # Step 2: Check for recent analysis (unless force_refresh)
         if not force_refresh:
-            cutoff_time = datetime.utcnow() - timedelta(hours=3)
+            cutoff_time = get_emagram_cutoff_utc(db=db)
 
             cache_filters = [
                 EmagramAnalysis.station_code == site_id,

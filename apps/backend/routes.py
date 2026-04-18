@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 import config
 from auth import authenticate_user, create_access_token, get_current_user
 from database import get_db
+from emagram_freshness import get_emagram_cutoff_utc
 from models import User
 from models import (
     EmagramAnalysis,
@@ -4268,10 +4269,12 @@ async def get_latest_emagram(
 
         # Filter by forecast target date
         target_date = (datetime.utcnow() + timedelta(days=day_index)).date()
+        cutoff_time = get_emagram_cutoff_utc(db=db)
 
         analysis_filters = [
             EmagramAnalysis.forecast_date == target_date,
             EmagramAnalysis.analysis_status == "completed",
+            EmagramAnalysis.analysis_datetime >= cutoff_time,
         ]
         if hour is not None:
             analysis_filters.append(EmagramAnalysis.forecast_hour == hour)
@@ -4318,6 +4321,7 @@ async def get_latest_emagram(
                 EmagramAnalysis.station_code == site_id,
                 EmagramAnalysis.analysis_method == "llm_vision",
                 EmagramAnalysis.analysis_status == "failed",
+                EmagramAnalysis.analysis_datetime >= cutoff_time,
             ]
             if hour is not None:
                 failed_filters.append(EmagramAnalysis.forecast_hour == hour)
@@ -4652,11 +4656,11 @@ async def trigger_emagram_analysis(
 
         # Step 2: Check for recent analysis (unless force_refresh)
         forecast_date = (datetime.utcnow() + timedelta(days=request.day_index)).date()
+        cutoff_time = None if request.force_refresh else get_emagram_cutoff_utc(db=db)
 
         # Step 2a: If no specific hour, trigger hourly batch in background
         if request.hour is None and not request.force_refresh:
             # Check if any hourly analyses exist already
-            cutoff_time = datetime.utcnow() - timedelta(hours=3)
             existing_count = (
                 db.query(EmagramAnalysis)
                 .filter(
@@ -4690,7 +4694,6 @@ async def trigger_emagram_analysis(
 
         # Step 2b: Check cache for specific hour
         if request.hour is not None and not request.force_refresh:
-            cutoff_time = datetime.utcnow() - timedelta(hours=3)
             cache_filters = [
                 EmagramAnalysis.station_code == closest_site.id,
                 EmagramAnalysis.analysis_method == "llm_vision",
@@ -4765,7 +4768,7 @@ async def get_latest_emagram_for_spot(site_id: str, db: Session = Depends(get_db
     """
     Get latest multi-source emagram analysis for a specific spot
 
-    Returns analysis from last 3 hours if available
+    Returns analysis from configured freshness window if available
 
     Example:
         GET /api/emagram/spot/arguel/latest
@@ -4792,12 +4795,10 @@ async def get_latest_emagram_for_spot(site_id: str, db: Session = Depends(get_db
             "next_update": "2024-03-07T23:15:00"
         }
     """
-    from datetime import timedelta
-
     from emagram_multi_source import emagram_analysis_to_dict
 
-    # Find most recent analysis for this site (within 3 hours)
-    cutoff_time = datetime.utcnow() - timedelta(hours=3)
+    # Find most recent analysis for this site within freshness window
+    cutoff_time = get_emagram_cutoff_utc(db=db)
 
     emagram = (
         db.query(EmagramAnalysis)
@@ -4884,9 +4885,7 @@ async def get_all_spots_latest_emagrammes(db: Session = Depends(get_db)):
             "updated_count": 5
         }
     """
-    from datetime import timedelta
-
-    cutoff_time = datetime.utcnow() - timedelta(hours=3)
+    cutoff_time = get_emagram_cutoff_utc(db=db)
 
     # Get all sites with recent emagram
     sites = db.query(Site).all()

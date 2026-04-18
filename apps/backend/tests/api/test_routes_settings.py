@@ -89,6 +89,23 @@ class TestUpdateSettings:
         data = response.json()
         assert len(data["updated"]) == 2
 
+    def test_update_emagram_max_age_minutes(self, client, db_session):
+        """Updates emagram freshness window setting."""
+        response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"emagram_max_age_minutes": "120"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["updated"]["emagram_max_age_minutes"] == "120"
+
+        row = (
+            db_session.query(AppSetting).filter(AppSetting.key == "emagram_max_age_minutes").first()
+        )
+        assert row is not None
+        assert row.value == "120"
+
     def test_update_creates_setting_if_missing(self, client, db_session):
         """Creates new row if setting key doesn't exist in DB yet."""
         response = client.put(
