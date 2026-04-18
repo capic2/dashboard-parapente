@@ -16,3 +16,9 @@ def get_emagram_max_age_minutes(db: Session | None = None) -> int:
 def get_emagram_cutoff_utc(db: Session | None = None) -> datetime:
     """Return UTC cutoff datetime used to consider an emagram as fresh."""
     return datetime.utcnow() - timedelta(minutes=get_emagram_max_age_minutes(db=db))
+
+
+def get_emagram_next_update_utc(analysis_datetime: datetime, db: Session | None = None) -> datetime:
+    """Return next expected update datetime based on configured freshness."""
+    base_datetime = analysis_datetime.replace(tzinfo=None)
+    return base_datetime + timedelta(minutes=get_emagram_max_age_minutes(db=db))

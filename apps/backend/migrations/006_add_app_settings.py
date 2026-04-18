@@ -24,7 +24,6 @@ DEFAULT_SETTINGS = {
     "cache_ttl_default": "3600",  # 60 minutes - TTL for weather sources
     "cache_ttl_summary": "3600",  # 60 minutes - TTL for summaries
     "scheduler_interval_minutes": "30",  # 30 minutes - scheduler polling interval
-    "emagram_max_age_minutes": "180",  # 3 hours - max age for emagram freshness
     "redis_connect_timeout": "5",  # 5 seconds
     "redis_socket_timeout": "5",  # 5 seconds
 }

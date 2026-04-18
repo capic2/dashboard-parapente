@@ -199,6 +199,45 @@ class TestEmagramEndpoints:
         assert response.status_code == 200
         assert response.json() is None
 
+    def test_get_emagram_hours_ignores_stale_analysis(self, client, db_session):
+        """Hourly endpoint only lists fresh analyses."""
+        app_settings.invalidate_cache()
+
+        site = Site(
+            id="site-stale-hours",
+            code="STH",
+            name="Stale Hours Site",
+            latitude=47.0,
+            longitude=6.0,
+            elevation_m=500,
+        )
+        db_session.add(site)
+
+        stale_analysis = EmagramAnalysis(
+            id="stale-hours-analysis",
+            station_code="site-stale-hours",
+            station_name="Stale Hours Site",
+            station_latitude=47.0,
+            station_longitude=6.0,
+            analysis_date=datetime.utcnow().date(),
+            analysis_time=datetime.utcnow().time(),
+            analysis_datetime=datetime.utcnow() - timedelta(hours=4),
+            forecast_date=datetime.utcnow().date(),
+            forecast_hour=14,
+            distance_km=0.0,
+            data_source="test",
+            sounding_time="12Z",
+            analysis_method="llm_vision",
+            score_volabilite=70,
+            analysis_status="completed",
+        )
+        db_session.add(stale_analysis)
+        db_session.commit()
+
+        response = client.get("/api/emagram/hours?site_id=site-stale-hours&day_index=0")
+        assert response.status_code == 200
+        assert response.json()["hours"] == []
+
     def test_analyze_with_site_id(self, client, db_session):
         """Trigger analysis accepts site_id without lat/lon"""
         response = client.post(

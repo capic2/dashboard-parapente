@@ -106,6 +106,29 @@ class TestUpdateSettings:
         assert row is not None
         assert row.value == "120"
 
+    def test_rejects_invalid_emagram_max_age_minutes(self, client, db_session):
+        """Invalid emagram freshness values are rejected with 400."""
+        response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"emagram_max_age_minutes": "abc"},
+        )
+        assert response.status_code == 400
+        assert "positive integer" in response.json()["detail"]
+
+        row = (
+            db_session.query(AppSetting).filter(AppSetting.key == "emagram_max_age_minutes").first()
+        )
+        assert row is None
+
+    def test_rejects_non_positive_emagram_max_age_minutes(self, client, db_session):
+        """Zero and negative emagram freshness values are rejected."""
+        response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"emagram_max_age_minutes": "0"},
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == "emagram_max_age_minutes must be > 0"
+
     def test_update_creates_setting_if_missing(self, client, db_session):
         """Creates new row if setting key doesn't exist in DB yet."""
         response = client.put(

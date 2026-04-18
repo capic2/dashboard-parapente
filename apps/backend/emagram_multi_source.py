@@ -15,7 +15,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 import config
-from emagram_freshness import get_emagram_cutoff_utc
+from emagram_freshness import get_emagram_cutoff_utc, get_emagram_next_update_utc
 from llm.exceptions import QuotaExhaustedError
 from llm.gemini_analyzer import analyze_emagram_with_gemini
 from llm.groq_analyzer import analyze_emagram_with_groq
@@ -102,7 +102,7 @@ async def generate_multi_source_emagram_for_spot(
                 logger.info(
                     f"✅ Found recent analysis from {existing.analysis_datetime}, using cache"
                 )
-                return emagram_analysis_to_dict(existing)
+                return emagram_analysis_to_dict(existing, db=db)
 
         # Step 3: Fetch screenshots from all sources
         screenshot_result = await fetch_all_emagram_screenshots(
@@ -261,7 +261,7 @@ async def generate_multi_source_emagram_for_spot(
 
         logger.info(f"✅ Multi-source emagram analysis complete for {site.name}")
 
-        return emagram_analysis_to_dict(emagram_analysis)
+        return emagram_analysis_to_dict(emagram_analysis, db=db)
 
     except Exception as e:
         logger.error(f"Error in multi-source emagram generation: {e}", exc_info=True)
@@ -419,7 +419,7 @@ def parse_time_string(time_str: str | None) -> dt_time | None:
         return None
 
 
-def emagram_analysis_to_dict(emagram: EmagramAnalysis) -> dict[str, Any]:
+def emagram_analysis_to_dict(emagram: EmagramAnalysis, db: Session | None = None) -> dict[str, Any]:
     """
     Convert EmagramAnalysis model to dictionary for API response
     """
@@ -476,11 +476,8 @@ def emagram_analysis_to_dict(emagram: EmagramAnalysis) -> dict[str, Any]:
         "sources_agreement": emagram.sources_agreement,
         "llm_provider": emagram.llm_provider,
         "llm_cost_usd": emagram.llm_cost_usd,
-        # Next update (3 hours from last update)
-        "next_update": (
-            emagram.analysis_datetime.replace(tzinfo=None)
-            + __import__("datetime").timedelta(hours=3)
-        ).isoformat(),
+        # Next update (configured freshness window from last update)
+        "next_update": get_emagram_next_update_utc(emagram.analysis_datetime, db=db).isoformat(),
     }
 
 

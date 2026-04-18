@@ -4360,6 +4360,7 @@ async def get_emagram_hours(
     """
     try:
         target_date = (datetime.utcnow() + timedelta(days=day_index)).date()
+        cutoff_time = get_emagram_cutoff_utc(db=db)
 
         analyses = (
             db.query(
@@ -4375,6 +4376,7 @@ async def get_emagram_hours(
                 EmagramAnalysis.forecast_hour.isnot(None),
                 EmagramAnalysis.analysis_method == "llm_vision",
                 EmagramAnalysis.analysis_status == "completed",
+                EmagramAnalysis.analysis_datetime >= cutoff_time,
             )
             .order_by(EmagramAnalysis.forecast_hour, EmagramAnalysis.analysis_datetime.desc())
             .all()
@@ -4818,7 +4820,7 @@ async def get_latest_emagram_for_spot(site_id: str, db: Session = Depends(get_db
             detail=f"No recent emagram analysis found for spot {site_id}. Try refreshing.",
         )
 
-    return emagram_analysis_to_dict(emagram)
+    return emagram_analysis_to_dict(emagram, db=db)
 
 
 @router.post("/emagram/spot/{site_id}/refresh", tags=["Emagram"])
@@ -5149,13 +5151,30 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
     allowed_keys = set(DEFAULTS.keys())
     updated = {}
     rejected = []
+    positive_int_keys = {"scheduler_interval_minutes", "emagram_max_age_minutes"}
 
     for key, value in settings.items():
         if key not in allowed_keys:
             rejected.append(key)
             continue
-        set_setting(db, key, str(value))
-        updated[key] = value
+        normalized_value = str(value)
+        if key in positive_int_keys:
+            try:
+                parsed_value = int(normalized_value)
+            except (TypeError, ValueError) as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{key} must be a positive integer",
+                ) from e
+            if parsed_value <= 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{key} must be > 0",
+                )
+            normalized_value = str(parsed_value)
+
+        set_setting(db, key, normalized_value)
+        updated[key] = normalized_value
 
     # If scheduler interval changed, reschedule dynamically
     scheduler_error = None
