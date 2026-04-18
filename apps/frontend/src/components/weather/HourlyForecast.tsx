@@ -114,18 +114,18 @@ const getFlyabilityDisplay = (
 
   // Emoji and color based on verdict
   let emoji = '🟡';
-  let color = 'text-yellow-600 dark:text-yellow-400';
+  let color = 'text-yellow-700 dark:text-yellow-300';
 
   if (verdict === 'bon') {
     emoji = '🟢';
-    color = 'text-green-600 dark:text-green-400';
+    color = 'text-green-700 dark:text-green-300';
     return { emoji, text: 'BON', color };
   } else if (verdict === 'mauvais') {
     emoji = '🔴';
-    color = 'text-red-600 dark:text-red-400';
+    color = 'text-red-700 dark:text-red-300';
   } else if (verdict === 'limite') {
     emoji = '🟠';
-    color = 'text-orange-600 dark:text-orange-400';
+    color = 'text-orange-700 dark:text-orange-300';
   }
 
   // Determine the reason when not BON
@@ -847,64 +847,64 @@ export default function HourlyForecast({
         <table className="w-full min-w-[800px] text-sm">
           <thead>
             <tr className="border-b-2 border-gray-200 dark:border-gray-600">
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Clock size={14} /> Heure
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Gauge size={14} /> {t('weather.paraIndex')}
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Wind size={14} /> Vent (km/h)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Zap size={14} /> Rafales (km/h)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Compass size={14} /> Direction
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Thermometer size={14} /> Temp (°C)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <CloudRain size={14} /> Précip. (mm)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Cloud size={14} /> Nuages (%)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Zap size={14} /> CAPE (J/kg)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Flame size={14} /> Thermiques
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <CircleCheck size={14} /> Volabilité
                 </span>
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="text-gray-800 dark:text-gray-100">
             {flyingHours.length > 0 ? (
               flyingHours.map((hour, index) => {
                 // Prefer top-level cloud_cover, fallback to sources for compatibility
