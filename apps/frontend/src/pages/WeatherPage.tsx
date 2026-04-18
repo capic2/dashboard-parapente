@@ -21,7 +21,7 @@ export default function WeatherPage() {
   const { data: sites } = useSuspenseQuery(sitesQueryOptions());
   const search = useSearch({ from: '/weather' });
   const routeSiteId = search ? search.siteId : '';
-  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const selectedDayIndex = search.day ?? 0;
   const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
   const selectedSiteId =
     sites.find((site) => site.id === routeSiteId)?.id ?? sites[0]?.id ?? '';
@@ -30,6 +30,10 @@ export default function WeatherPage() {
   const [weatherDataMap] = useState<Map<string, Record<string, unknown>>>(
     new Map()
   );
+  const weatherSearch = {
+    siteId: selectedSiteId,
+    day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
+  };
 
   if (sites.length === 0) {
     return (
@@ -62,7 +66,13 @@ export default function WeatherPage() {
         <SiteSelector
           selectedSiteId={selectedSiteId}
           onSelectSite={(siteId) =>
-            void navigate({ to: '/weather', search: { siteId } })
+            void navigate({
+              to: '/weather',
+              search: {
+                siteId,
+                day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
+              },
+            })
           }
           weatherData={weatherDataMap}
         />
@@ -71,7 +81,13 @@ export default function WeatherPage() {
         <BestSpotSuggestion
           bestSpot={bestSpot ?? null}
           onSelectSite={(siteId) =>
-            void navigate({ to: '/weather', search: { siteId } })
+            void navigate({
+              to: '/weather',
+              search: {
+                siteId,
+                day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
+              },
+            })
           }
           selectedDayIndex={selectedDayIndex}
         />
@@ -89,7 +105,15 @@ export default function WeatherPage() {
         <Forecast7Day
           spotId={selectedSiteId}
           selectedDayIndex={selectedDayIndex}
-          onSelectDay={setSelectedDayIndex}
+          onSelectDay={(day) =>
+            void navigate({
+              to: '/weather',
+              search: {
+                ...weatherSearch,
+                day: day > 0 ? day : undefined,
+              },
+            })
+          }
         />
 
         {/* Emagram Analysis (authenticated only) */}

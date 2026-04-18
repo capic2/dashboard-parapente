@@ -153,6 +153,7 @@ export function BestSpotSuggestion({
     100,
     Math.max(0, score != null ? Math.round(score) : paraIndex)
   );
+  const localizedReason = reason.replace(/Para-Index/g, t('weather.paraIndex'));
   const scoreColor = getScoreColor(adjustedScore);
   const verdictInfo = getVerdict(adjustedScore, verdict ?? undefined);
 
@@ -312,7 +313,7 @@ export function BestSpotSuggestion({
 
         {/* Reason text */}
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 leading-relaxed">
-          {reason}
+          {localizedReason}
         </p>
 
         {/* Footer: button + cache */}
