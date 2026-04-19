@@ -169,14 +169,64 @@ jobs:
             exit 1
           fi
 
-          curl --fail --show-error --silent \
+          http_status=$(curl --show-error --silent --output /tmp/portainer-webhook-response.txt --write-out "%{http_code}" \
             --retry 3 \
             --retry-delay 5 \
             --max-time 30 \
-            -X POST "$WEBHOOK_URL"
+            -X POST "$WEBHOOK_URL")
+
+          if [ "$http_status" -lt 200 ] || [ "$http_status" -ge 300 ]; then
+            echo "Portainer webhook returned HTTP $http_status"
+            exit 1
+          fi
+
+          echo "Portainer webhook accepted (HTTP $http_status)"
+
+      - name: Verify deployed version
+        id: verify_deploy
+        if: steps.trigger_deploy.outcome == 'success'
+        continue-on-error: true
+        env:
+          VERSION_ENDPOINT_URL: ${{ secrets.PRODUCTION_VERSION_URL }}
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
+          MAX_ATTEMPTS: ${{ vars.DEPLOY_VERIFY_MAX_ATTEMPTS || '30' }}
+          SLEEP_SECONDS: ${{ vars.DEPLOY_VERIFY_SLEEP_SECONDS || '10' }}
+        run: |
+          if [ -z "$VERSION_ENDPOINT_URL" ]; then
+            echo "Missing PRODUCTION_VERSION_URL secret"
+            exit 1
+          fi
+
+          if [ -z "$EXPECTED_VERSION" ]; then
+            echo "Missing expected deployment version"
+            exit 1
+          fi
+
+          attempt=1
+          while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
+            response=$(curl --show-error --silent --fail --max-time 10 "$VERSION_ENDPOINT_URL" 2>/tmp/version-check.err || true)
+            deployed_version=$(python -c "import json,sys; data=json.load(sys.stdin); print(data.get('version',''))" <<< "$response" 2>/dev/null || true)
+
+            if [ "$deployed_version" = "$EXPECTED_VERSION" ]; then
+              echo "Deployment version verified: $deployed_version"
+              exit 0
+            fi
+
+            if [ -n "$deployed_version" ]; then
+              echo "Attempt $attempt/$MAX_ATTEMPTS: expected $EXPECTED_VERSION, got $deployed_version"
+            else
+              echo "Attempt $attempt/$MAX_ATTEMPTS: version endpoint not ready"
+            fi
+
+            sleep "$SLEEP_SECONDS"
+            attempt=$((attempt + 1))
+          done
+
+          echo "Failed to verify deployed version $EXPECTED_VERSION via $VERSION_ENDPOINT_URL"
+          exit 1
 
       - name: Mark deployment as successful
-        if: steps.trigger_deploy.outcome == 'success'
+        if: steps.trigger_deploy.outcome == 'success' && steps.verify_deploy.outcome == 'success'
         uses: actions/github-script@v9
         env:
           TAG_NAME: ${{ steps.version.outputs.success_tag_name }}
@@ -220,7 +270,7 @@ jobs:
             }
 
       - name: Label merged PRs with deployed version
-        if: steps.trigger_deploy.outcome == 'success'
+        if: steps.trigger_deploy.outcome == 'success' && steps.verify_deploy.outcome == 'success'
         uses: actions/github-script@v9
         env:
           VERSION_LABEL: ${{ steps.version.outputs.label_name }}
@@ -351,7 +401,7 @@ jobs:
             );
 
       - name: Label current PR as non deployed when deployment fails
-        if: steps.trigger_deploy.outcome == 'failure' && github.event_name == 'pull_request'
+        if: (steps.trigger_deploy.outcome == 'failure' || steps.verify_deploy.outcome == 'failure') && github.event_name == 'pull_request'
         uses: actions/github-script@v9
         env:
           UNDEPLOYED_LABEL: non déployé
@@ -401,10 +451,11 @@ jobs:
         if: always()
         run: |
           echo "Deployment step outcome: ${{ steps.trigger_deploy.outcome }}"
+          echo "Verification step outcome: ${{ steps.verify_deploy.outcome }}"
           echo "Computed deployment version: ${{ steps.version.outputs.version }}"
 
       - name: Fail job when deployment failed
-        if: steps.trigger_deploy.outcome == 'failure'
+        if: steps.trigger_deploy.outcome == 'failure' || steps.verify_deploy.outcome == 'failure'
         run: |
-          echo "Deployment webhook failed"
+          echo "Deployment webhook trigger or verification failed"
           exit 1
