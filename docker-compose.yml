@@ -78,7 +78,7 @@ services:
       - BACKEND_LOG_FILE=${BACKEND_LOG_FILE:-logs/dashboard.log}
 
       # Backend - Monitoring
-      - BACKEND_METRICS_TOKEN=${BACKEND_METRICS_TOKEN}
+      - BACKEND_METRICS_TOKEN=${BACKEND_METRICS_TOKEN:?required}
 
       # Backend - Telegram (optional)
       - BACKEND_TELEGRAM_BOT_TOKEN=${BACKEND_TELEGRAM_BOT_TOKEN}

@@ -3,5 +3,5 @@
   labels:
     project: dashboard-parapente
     service: backend
-    env: prod
+    env: production
     __metrics_path__: /metrics

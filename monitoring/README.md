@@ -12,6 +12,11 @@ Stack reusable for multiple projects in Portainer.
 - node_exporter
 - cAdvisor
 
+## Notes
+
+- Alertmanager is wired as a dry-run stack for now and drops alerts via the `blackhole` receiver.
+- Promtail tails Docker JSON log files directly from `/var/lib/docker/containers`.
+
 ## App connection
 
 1. Add `BACKEND_METRICS_TOKEN` to the app stack.
