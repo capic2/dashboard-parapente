@@ -71,7 +71,7 @@ services:
       - monitoring
 
   promtail:
-    image: grafana/promtail:3.3.2
+    image: grafana/promtail:3.6.10
     container_name: monitoring-promtail
     restart: unless-stopped
     command:
