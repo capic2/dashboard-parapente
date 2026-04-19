@@ -95,6 +95,21 @@ const defaultHandlers = [
   screenshotHandler,
 ];
 
+const hoursHandlers = [
+  http.get('*/api/emagram/hours', () =>
+    HttpResponse.json({
+      site_id: 'site-arguel',
+      forecast_date: '2026-03-24',
+      hours: [
+        { hour: 9, score: 45, status: 'completed', id: 'emagram-h9' },
+        { hour: 12, score: 72, status: 'completed', id: 'emagram-h12' },
+        { hour: 15, score: 85, status: 'completed', id: 'emagram-h15' },
+      ],
+    })
+  ),
+  ...defaultHandlers,
+];
+
 export const Default = meta.story({
   name: 'Default',
   args: { siteId: 'site-arguel', dayIndex: 0 },
@@ -178,6 +193,26 @@ export const Loading = meta.story({
       ],
     },
   },
+});
+
+export const HoursWithoutAnalysis = meta.story({
+  name: 'Hours Without Analysis',
+  args: { siteId: 'site-arguel', dayIndex: 0 },
+  parameters: {
+    msw: {
+      handlers: [
+        http.get('*/api/emagram/latest', () => HttpResponse.json(null)),
+        ...hoursHandlers,
+      ],
+    },
+  },
+});
+
+HoursWithoutAnalysis.test('shows hour chooser before analysis exists', async ({ canvas }) => {
+  await canvas.findByText(/9h/);
+  await expect(canvas.getByText(/12h/)).toBeInTheDocument();
+  await expect(canvas.getByText(/15h/)).toBeInTheDocument();
+  await canvas.findByText(/Analyse en cours/);
 });
 
 export const WithScreenshotPreview = meta.story({
