@@ -98,7 +98,12 @@ jobs:
               core.info(`Assigned new deployment version ${version} for SHA ${currentSha}`);
             }
 
-            const latestSuccessfulTag = parsedSuccessTags.length > 0 ? parsedSuccessTags[parsedSuccessTags.length - 1] : null;
+            const latestSuccessfulTag =
+              parsedSuccessTags.length > 0
+                ? parsedSuccessTags[parsedSuccessTags.length - 1]
+                : parsedDeployTags
+                    .filter((tag) => tag.sha !== currentSha)
+                    .at(-1);
 
             core.setOutput('version', version);
             core.setOutput('tag_name', `deploy/${version}`);
@@ -132,7 +137,22 @@ jobs:
               core.info(`Reserved deployment tag ${tagName} on ${targetSha}`);
             } catch (error) {
               if (error.status === 422) {
-                core.info(`Deployment tag ${tagName} already exists, reusing it`);
+                const existingRef = await github.request(
+                  'GET /repos/{owner}/{repo}/git/ref/{ref}',
+                  {
+                    owner,
+                    repo,
+                    ref: `tags/${tagName}`,
+                  }
+                );
+
+                if (existingRef.data.object.sha !== targetSha) {
+                  throw new Error(
+                    `Tag ${tagName} already exists on ${existingRef.data.object.sha}, expected ${targetSha}`
+                  );
+                }
+
+                core.info(`Deployment tag ${tagName} already exists on ${targetSha}, reusing it`);
               } else {
                 throw error;
               }
@@ -178,7 +198,22 @@ jobs:
               core.info(`Created success tag ${tagName} on ${targetSha}`);
             } catch (error) {
               if (error.status === 422) {
-                core.info(`Success tag ${tagName} already exists, skipping creation`);
+                const existingRef = await github.request(
+                  'GET /repos/{owner}/{repo}/git/ref/{ref}',
+                  {
+                    owner,
+                    repo,
+                    ref: `tags/${tagName}`,
+                  }
+                );
+
+                if (existingRef.data.object.sha !== targetSha) {
+                  throw new Error(
+                    `Tag ${tagName} already exists on ${existingRef.data.object.sha}, expected ${targetSha}`
+                  );
+                }
+
+                core.info(`Success tag ${tagName} already exists on ${targetSha}, skipping creation`);
               } else {
                 throw error;
               }
