@@ -29,8 +29,9 @@ jobs:
             const date = new Date().toISOString().slice(0, 10).replace(/-/g, '.');
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+            const currentSha = context.sha;
 
-            const response = await github.request(
+            const deployTagsResponse = await github.request(
               'GET /repos/{owner}/{repo}/git/matching-refs/{ref}',
               {
                 owner,
@@ -39,7 +40,16 @@ jobs:
               }
             );
 
-            const parsedTags = response.data
+            const successTagsResponse = await github.request(
+              'GET /repos/{owner}/{repo}/git/matching-refs/{ref}',
+              {
+                owner,
+                repo,
+                ref: 'tags/deploy-success/',
+              }
+            );
+
+            const parsedDeployTags = deployTagsResponse.data
               .map((item) => {
                 const match = item.ref.match(/^refs\/tags\/deploy\/(\d{4}\.\d{2}\.\d{2})\.(\d+)$/);
                 if (!match) return null;
@@ -56,22 +66,76 @@ jobs:
                 return a.date.localeCompare(b.date);
               });
 
-            const latestTag = parsedTags.length > 0 ? parsedTags[parsedTags.length - 1] : null;
-            const latestToday = parsedTags
-              .filter((tag) => tag.date === date)
-              .reduce((max, tag) => Math.max(max, tag.number), 0);
+            const parsedSuccessTags = successTagsResponse.data
+              .map((item) => {
+                const match = item.ref.match(/^refs\/tags\/deploy-success\/(\d{4}\.\d{2}\.\d{2})\.(\d+)$/);
+                if (!match) return null;
+                return {
+                  ref: item.ref,
+                  date: match[1],
+                  number: Number(match[2]),
+                  sha: item.object.sha,
+                };
+              })
+              .filter(Boolean)
+              .sort((a, b) => {
+                if (a.date === b.date) return a.number - b.number;
+                return a.date.localeCompare(b.date);
+              });
 
-            const nextNumber = latestToday + 1;
-            const version = `${date}.${nextNumber}`;
+            const existingTagForSha = parsedDeployTags.find((tag) => tag.sha === currentSha);
+
+            let version;
+            if (existingTagForSha) {
+              version = `${existingTagForSha.date}.${existingTagForSha.number}`;
+              core.info(`Reusing deployment version ${version} for SHA ${currentSha}`);
+            } else {
+              const latestToday = parsedDeployTags
+                .filter((tag) => tag.date === date)
+                .reduce((max, tag) => Math.max(max, tag.number), 0);
+              const nextNumber = latestToday + 1;
+              version = `${date}.${nextNumber}`;
+              core.info(`Assigned new deployment version ${version} for SHA ${currentSha}`);
+            }
+
+            const latestSuccessfulTag = parsedSuccessTags.length > 0 ? parsedSuccessTags[parsedSuccessTags.length - 1] : null;
 
             core.setOutput('version', version);
             core.setOutput('tag_name', `deploy/${version}`);
+            core.setOutput('success_tag_name', `deploy-success/${version}`);
             core.setOutput('label_name', `version:${version}`);
-            core.setOutput('previous_deploy_sha', latestTag ? latestTag.sha : '');
+            core.setOutput('previous_deploy_sha', latestSuccessfulTag ? latestSuccessfulTag.sha : '');
 
-            core.info(`Deployment version: ${version}`);
-            if (latestTag) {
-              core.info(`Previous deployment tag: ${latestTag.ref} (${latestTag.sha})`);
+            if (latestSuccessfulTag) {
+              core.info(`Previous successful deployment tag: ${latestSuccessfulTag.ref} (${latestSuccessfulTag.sha})`);
+            }
+
+      - name: Reserve deployment tag
+        uses: actions/github-script@v9
+        env:
+          TAG_NAME: ${{ steps.version.outputs.tag_name }}
+          TARGET_SHA: ${{ github.sha }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const tagName = process.env.TAG_NAME;
+            const targetSha = process.env.TARGET_SHA;
+
+            try {
+              await github.request('POST /repos/{owner}/{repo}/git/refs', {
+                owner,
+                repo,
+                ref: `refs/tags/${tagName}`,
+                sha: targetSha,
+              });
+              core.info(`Reserved deployment tag ${tagName} on ${targetSha}`);
+            } catch (error) {
+              if (error.status === 422) {
+                core.info(`Deployment tag ${tagName} already exists, reusing it`);
+              } else {
+                throw error;
+              }
             }
 
       - name: Trigger deployment
@@ -91,11 +155,11 @@ jobs:
             --max-time 30 \
             -X POST "$WEBHOOK_URL"
 
-      - name: Create deployment tag
+      - name: Mark deployment as successful
         if: steps.trigger_deploy.outcome == 'success'
         uses: actions/github-script@v9
         env:
-          TAG_NAME: ${{ steps.version.outputs.tag_name }}
+          TAG_NAME: ${{ steps.version.outputs.success_tag_name }}
           TARGET_SHA: ${{ github.sha }}
         with:
           script: |
@@ -111,10 +175,10 @@ jobs:
                 ref: `refs/tags/${tagName}`,
                 sha: targetSha,
               });
-              core.info(`Created tag ${tagName} on ${targetSha}`);
+              core.info(`Created success tag ${tagName} on ${targetSha}`);
             } catch (error) {
               if (error.status === 422) {
-                core.warning(`Tag ${tagName} already exists, skipping creation`);
+                core.info(`Success tag ${tagName} already exists, skipping creation`);
               } else {
                 throw error;
               }
