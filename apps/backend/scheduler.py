@@ -5,6 +5,7 @@ Uses APScheduler to run background tasks
 
 import asyncio
 import logging
+import time
 import uuid
 from datetime import date, datetime
 
@@ -14,6 +15,12 @@ from sqlalchemy.orm import Session
 
 from database import SessionLocal
 from models import Site, WeatherForecast
+from metrics import (
+    inc_scheduler_run,
+    inc_weather_fetch,
+    observe_scheduler_run,
+    observe_weather_fetch,
+)
 from para_index import analyze_hourly_slots, calculate_para_index, format_slots_summary
 from weather_pipeline import get_normalized_forecast
 
@@ -179,6 +186,7 @@ async def fetch_and_cache_weather(site_id: str, day_index: int = 0, db: Session 
 
     # Limit concurrent database operations to prevent pool exhaustion
     async with _db_semaphore:
+        started_at = time.perf_counter()
 
         try:
             # Get site from database
@@ -186,6 +194,7 @@ async def fetch_and_cache_weather(site_id: str, day_index: int = 0, db: Session 
 
             if not site:
                 logger.error(f"Site not found: {site_id}")
+                inc_weather_fetch(site_id, day_index, "error")
                 return False
 
             logger.info(f"Fetching {site.name} (day {day_index})...")
@@ -202,15 +211,19 @@ async def fetch_and_cache_weather(site_id: str, day_index: int = 0, db: Session 
 
             if result.get("success"):
                 logger.info(f"✅ Cached {site.name} day {day_index}")
+                inc_weather_fetch(site.code, day_index, "success")
                 return True
             else:
                 logger.error(f"❌ Failed {site.name} day {day_index}: {result.get('error')}")
+                inc_weather_fetch(site.code, day_index, "error")
                 return False
 
         except Exception as e:
             logger.error(f"Error fetching {site_id} day {day_index}: {e}", exc_info=True)
+            inc_weather_fetch(site_id, day_index, "error")
             return False
         finally:
+            observe_weather_fetch(site_id, time.perf_counter() - started_at)
             if close_db:
                 db.close()
 
@@ -222,6 +235,7 @@ async def scheduled_weather_fetch():
     Runs every hour
     """
     logger.info(f"⏰ Scheduled weather fetch started at {datetime.now()}")
+    started_at = time.perf_counter()
 
     tasks = []
 
@@ -235,6 +249,8 @@ async def scheduled_weather_fetch():
 
     # Log results
     success_count = sum(1 for r in results if r and not isinstance(r, Exception))
+    inc_scheduler_run("success" if success_count else "error")
+    observe_scheduler_run(time.perf_counter() - started_at)
     logger.info(
         f"✅ Scheduled fetch completed: {success_count}/{len(tasks)} succeeded at {datetime.now()}"
     )
