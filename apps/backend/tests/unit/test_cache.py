@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from cache import close_redis, generate_cache_key, get_cached, set_cached
+from metrics import render_metrics, reset_metrics
 
 
 @pytest.fixture
@@ -15,6 +16,11 @@ def mock_redis():
     redis.get = AsyncMock(return_value=None)
     redis.setex = AsyncMock()
     return redis
+
+
+@pytest.fixture(autouse=True)
+def reset_prometheus_metrics():
+    reset_metrics()
 
 
 @pytest.mark.asyncio
@@ -38,6 +44,7 @@ async def test_set_cached_injects_cached_at(mock_redis):
     stored_data = json.loads(mock_redis.setex.call_args[0][2])
     assert "cached_at" in stored_data
     assert stored_data["temperature"] == 15
+    assert 'dashboard_cache_operations_total{operation="set",result="ok"} 1' in render_metrics()
 
 
 @pytest.mark.asyncio
@@ -50,6 +57,7 @@ async def test_set_cached_does_not_break_non_dict(mock_redis):
 
     # Should still store the data
     mock_redis.setex.assert_called_once()
+    assert 'dashboard_cache_operations_total{operation="set",result="ok"} 1' in render_metrics()
 
 
 @pytest.mark.asyncio
@@ -66,6 +74,7 @@ async def test_get_cached_returns_cached_at(mock_redis):
     assert result is not None
     assert result["cached_at"] == "2026-03-29T12:00:00+00:00"
     assert result["temp"] == 10
+    assert 'dashboard_cache_operations_total{operation="get",result="hit"} 1' in render_metrics()
 
 
 @pytest.mark.asyncio
@@ -77,6 +86,7 @@ async def test_get_cached_returns_none_on_miss(mock_redis):
         result = await get_cached("test:key")
 
     assert result is None
+    assert 'dashboard_cache_operations_total{operation="get",result="miss"} 1' in render_metrics()
 
 
 @pytest.mark.asyncio

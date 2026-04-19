@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import os
+import time
 from datetime import datetime, timezone
 from functools import wraps
 from typing import TYPE_CHECKING, Any
@@ -17,6 +18,12 @@ else:
     redis = None  # Will be imported dynamically when needed
 
 logger = logging.getLogger(__name__)
+
+
+def _metrics():
+    from metrics import inc_cache_operation, observe_cache_operation
+
+    return inc_cache_operation, observe_cache_operation
 
 
 def get_cache_ttl() -> dict[str, int]:
@@ -164,20 +171,31 @@ async def get_cached(key: str) -> Any | None:
     Returns:
         Cached data (parsed from JSON) or None if not found
     """
+    start = time.perf_counter()
     try:
+        inc_cache_operation, observe_cache_operation = _metrics()
         redis_client = await get_redis()
         cached = await redis_client.get(key)
 
         if cached:
             logger.debug(f"Cache HIT: {key}")
+            inc_cache_operation("get", "hit")
             return json.loads(cached)
         else:
             logger.debug(f"Cache MISS: {key}")
+            inc_cache_operation("get", "miss")
             return None
 
     except Exception as e:
         logger.warning(f"Cache get error for {key}: {e}")
+        inc_cache_operation, _ = _metrics()
+        inc_cache_operation("get", "error")
         return None
+    finally:
+        try:
+            observe_cache_operation("get", time.perf_counter() - start)
+        except Exception:
+            pass
 
 
 async def set_cached(key: str, data: Any, ttl: int):
@@ -189,16 +207,26 @@ async def set_cached(key: str, data: Any, ttl: int):
         data: Data to cache (will be JSON serialized)
         ttl: Time-to-live in seconds
     """
+    start = time.perf_counter()
     try:
+        inc_cache_operation, observe_cache_operation = _metrics()
         if isinstance(data, dict):
             data["cached_at"] = datetime.now(timezone.utc).isoformat()
         redis_client = await get_redis()
         serialized = json.dumps(data)
         await redis_client.setex(key, ttl, serialized)
         logger.debug(f"Cache SET: {key} (TTL: {ttl}s)")
+        inc_cache_operation("set", "ok")
 
     except Exception as e:
         logger.warning(f"Cache set error for {key}: {e}")
+        inc_cache_operation, _ = _metrics()
+        inc_cache_operation("set", "error")
+    finally:
+        try:
+            observe_cache_operation("set", time.perf_counter() - start)
+        except Exception:
+            pass
 
 
 async def delete_cached(pattern: str):
@@ -208,7 +236,9 @@ async def delete_cached(pattern: str):
     Args:
         pattern: Redis key pattern (e.g., "weather:forecast:*")
     """
+    start = time.perf_counter()
     try:
+        inc_cache_operation, observe_cache_operation = _metrics()
         redis_client = await get_redis()
         keys = []
         async for key in redis_client.scan_iter(match=pattern):
@@ -217,9 +247,17 @@ async def delete_cached(pattern: str):
         if keys:
             await redis_client.delete(*keys)
             logger.info(f"Deleted {len(keys)} cache keys matching: {pattern}")
+        inc_cache_operation("delete", "ok")
 
     except Exception as e:
         logger.warning(f"Cache delete error for pattern {pattern}: {e}")
+        inc_cache_operation, _ = _metrics()
+        inc_cache_operation("delete", "error")
+    finally:
+        try:
+            observe_cache_operation("delete", time.perf_counter() - start)
+        except Exception:
+            pass
 
 
 def cached(prefix: str, ttl_key: str):

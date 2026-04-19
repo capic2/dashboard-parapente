@@ -22,12 +22,39 @@ _COUNTER_DEFS = {
         "help": "Requests to the /metrics endpoint",
         "labels": ("status",),
     },
+    "dashboard_cache_operations_total": {
+        "help": "Cache operations by type and result",
+        "labels": ("operation", "result"),
+    },
+    "dashboard_scheduler_runs_total": {
+        "help": "Scheduler run outcomes",
+        "labels": ("result",),
+    },
+    "dashboard_weather_fetch_total": {
+        "help": "Weather fetch outcomes per site and day",
+        "labels": ("site", "day", "result"),
+    },
 }
 
 _HISTOGRAM_DEFS = {
     "dashboard_http_request_duration_seconds": {
         "help": "HTTP request duration in seconds",
         "labels": ("method", "path"),
+        "buckets": _HISTOGRAM_BUCKETS,
+    },
+    "dashboard_cache_operation_duration_seconds": {
+        "help": "Cache operation duration in seconds",
+        "labels": ("operation",),
+        "buckets": _HISTOGRAM_BUCKETS,
+    },
+    "dashboard_scheduler_run_duration_seconds": {
+        "help": "Scheduler run duration in seconds",
+        "labels": ("job",),
+        "buckets": _HISTOGRAM_BUCKETS,
+    },
+    "dashboard_weather_fetch_duration_seconds": {
+        "help": "Weather fetch duration in seconds",
+        "labels": ("site",),
         "buckets": _HISTOGRAM_BUCKETS,
     },
 }
@@ -120,6 +147,41 @@ def render_metrics() -> str:
                 lines.append(f"{metric_name}_count{_render_labels(labels)} {int(state['count'])}")
 
     return "\n".join(lines) + "\n"
+
+
+def reset_metrics() -> None:
+    with _LOCK:
+        _COUNTERS.clear()
+        _HISTOGRAMS.clear()
+
+
+def inc_cache_operation(operation: str, result: str) -> None:
+    inc_counter("dashboard_cache_operations_total", operation=operation, result=result)
+
+
+def observe_cache_operation(operation: str, duration: float) -> None:
+    observe_histogram("dashboard_cache_operation_duration_seconds", duration, operation=operation)
+
+
+def inc_scheduler_run(result: str) -> None:
+    inc_counter("dashboard_scheduler_runs_total", result=result)
+
+
+def observe_scheduler_run(duration: float, job: str = "scheduled_weather_fetch") -> None:
+    observe_histogram("dashboard_scheduler_run_duration_seconds", duration, job=job)
+
+
+def inc_weather_fetch(site: str, day: int, result: str) -> None:
+    inc_counter(
+        "dashboard_weather_fetch_total",
+        site=site,
+        day=str(day),
+        result=result,
+    )
+
+
+def observe_weather_fetch(site: str, duration: float) -> None:
+    observe_histogram("dashboard_weather_fetch_duration_seconds", duration, site=site)
 
 
 def _is_authorized(request: Request) -> bool:
