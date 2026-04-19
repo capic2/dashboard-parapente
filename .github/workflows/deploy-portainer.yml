@@ -18,7 +18,7 @@ jobs:
   deploy:
     name: Trigger Portainer webhook
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
 
     steps:
       - name: Compute deployment version
@@ -215,7 +215,12 @@ jobs:
             if [ -n "$deployed_version" ]; then
               echo "Attempt $attempt/$MAX_ATTEMPTS: expected $EXPECTED_VERSION, got $deployed_version"
             else
-              echo "Attempt $attempt/$MAX_ATTEMPTS: version endpoint not ready"
+              curl_error=$(tr -d '\n' </tmp/version-check.err)
+              if [ -n "$curl_error" ]; then
+                echo "Attempt $attempt/$MAX_ATTEMPTS: version endpoint unreachable ($curl_error)"
+              else
+                echo "Attempt $attempt/$MAX_ATTEMPTS: version endpoint not ready"
+              fi
             fi
 
             sleep "$SLEEP_SECONDS"
@@ -401,7 +406,7 @@ jobs:
             );
 
       - name: Label current PR as non deployed when deployment fails
-        if: (steps.trigger_deploy.outcome == 'failure' || steps.verify_deploy.outcome == 'failure') && github.event_name == 'pull_request'
+        if: (steps.trigger_deploy.outcome != 'success' || steps.verify_deploy.outcome != 'success') && github.event_name == 'pull_request'
         uses: actions/github-script@v9
         env:
           UNDEPLOYED_LABEL: non déployé
@@ -455,7 +460,7 @@ jobs:
           echo "Computed deployment version: ${{ steps.version.outputs.version }}"
 
       - name: Fail job when deployment failed
-        if: steps.trigger_deploy.outcome == 'failure' || steps.verify_deploy.outcome == 'failure'
+        if: steps.trigger_deploy.outcome != 'success' || steps.verify_deploy.outcome != 'success'
         run: |
           echo "Deployment webhook trigger or verification failed"
           exit 1
