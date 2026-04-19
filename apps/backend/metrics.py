@@ -14,6 +14,10 @@ _LOCK = Lock()
 _HISTOGRAM_BUCKETS = (0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10)
 
 _COUNTER_DEFS = {
+    "dashboard_app_info": {
+        "help": "Static application info metric",
+        "labels": ("project", "environment"),
+    },
     "dashboard_http_requests_total": {
         "help": "Total HTTP requests handled by the API",
         "labels": ("method", "path", "status"),
@@ -119,7 +123,13 @@ def render_metrics() -> str:
     lines: list[str] = []
 
     with _LOCK:
+        lines.append('# HELP dashboard_app_info Static application info metric')
+        lines.append('# TYPE dashboard_app_info gauge')
+        lines.append('dashboard_app_info{project="dashboard-parapente",environment="prod"} 1')
+
         for metric_name, definition in _COUNTER_DEFS.items():
+            if metric_name == "dashboard_app_info":
+                continue
             lines.append(f"# HELP {metric_name} {definition['help']}")
             lines.append(f"# TYPE {metric_name} counter")
             for labels, value in sorted(_COUNTERS[metric_name].items()):
