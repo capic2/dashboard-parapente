@@ -42,7 +42,7 @@ services:
       - monitoring
 
   alertmanager:
-    image: prom/alertmanager:v0.28.0
+    image: prom/alertmanager:v0.32.0
     container_name: monitoring-alertmanager
     restart: unless-stopped
     ports:
