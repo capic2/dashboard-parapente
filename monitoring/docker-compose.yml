@@ -57,7 +57,7 @@ services:
       - monitoring
 
   loki:
-    image: grafana/loki:3.3.2
+    image: grafana/loki:3.7.1
     container_name: monitoring-loki
     restart: unless-stopped
     ports:
