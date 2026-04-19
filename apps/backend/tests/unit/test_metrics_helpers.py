@@ -29,7 +29,4 @@ def test_scheduler_and_weather_metrics_render():
         'dashboard_scheduler_run_duration_seconds_count{job="scheduled_weather_fetch"} 1'
         in metrics_text
     )
-    assert (
-        'dashboard_weather_fetch_duration_seconds_count{site="site-arguel"} 1'
-        in metrics_text
-    )
+    assert 'dashboard_weather_fetch_duration_seconds_count{site="site-arguel"} 1' in metrics_text
