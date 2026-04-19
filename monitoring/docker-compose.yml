@@ -1,6 +1,6 @@
 services:
   grafana:
-    image: grafana/grafana-oss:11.5.2
+    image: grafana/grafana-oss:11.6.5
     container_name: monitoring-grafana
     restart: unless-stopped
     ports:
