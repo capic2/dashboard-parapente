@@ -169,6 +169,13 @@ export default function EmagramWidget({
   }, [selectedHour, availableHours, dayIndex]);
 
   const hasHourlyData = availableHours.length > 0;
+  const hourSlider = hasHourlyData ? (
+    <HourSlider
+      hours={availableHours}
+      selectedHour={activeHour}
+      onHourChange={setSelectedHour}
+    />
+  ) : null;
 
   const {
     data: emagram,
@@ -232,6 +239,7 @@ export default function EmagramWidget({
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3.5 font-semibold">
           🌡️ Analyse Thermique (Émagramme)
         </h2>
+        {hourSlider}
         <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
           Chargement...
         </div>
@@ -289,6 +297,7 @@ export default function EmagramWidget({
             </span>
           </Button>
         </div>
+        {hourSlider}
         <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
           {!siteId ? 'Aucun site selectionne' : 'Analyse en cours...'}
         </div>
@@ -325,13 +334,7 @@ export default function EmagramWidget({
             </span>
           </Button>
         </div>
-        {hasHourlyData && hoursData && (
-          <HourSlider
-            hours={availableHours}
-            selectedHour={activeHour}
-            onHourChange={setSelectedHour}
-          />
-        )}
+        {hourSlider}
         <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg p-3">
           <div className="flex items-start gap-2">
             <span className="text-base flex-shrink-0">⚠️</span>
@@ -405,13 +408,7 @@ export default function EmagramWidget({
       </div>
 
       {/* Hour Slider */}
-      {hasHourlyData && hoursData && (
-        <HourSlider
-          hours={availableHours}
-          selectedHour={activeHour}
-          onHourChange={setSelectedHour}
-        />
-      )}
+      {hourSlider}
 
       {/* Verdict + metadata */}
       <div className="flex items-center justify-between mb-3">
