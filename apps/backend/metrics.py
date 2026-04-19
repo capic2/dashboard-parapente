@@ -208,7 +208,7 @@ def _route_path(request: Request) -> str:
     route_path = getattr(route, "path", None)
     if isinstance(route_path, str) and route_path:
         return route_path
-    return request.url.path
+    return "__unmatched__"
 
 
 def setup_metrics(app: FastAPI) -> None:
