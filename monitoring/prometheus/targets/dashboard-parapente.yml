@@ -1,0 +1,7 @@
+- targets:
+    - host.docker.internal:8001
+  labels:
+    project: dashboard-parapente
+    service: backend
+    env: prod
+    __metrics_path__: /metrics
