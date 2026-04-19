@@ -1,7 +1,13 @@
 """Tests for backend Prometheus metrics."""
 
+from fastapi.testclient import TestClient
+import pytest
 
-def test_metrics_endpoint_requires_token_when_configured(client, monkeypatch):
+
+def test_metrics_endpoint_requires_token_when_configured(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     import metrics
 
     monkeypatch.setattr(metrics, "METRICS_TOKEN", "metrics-secret")
@@ -19,7 +25,7 @@ def test_metrics_endpoint_requires_token_when_configured(client, monkeypatch):
     assert "dashboard_http_requests_total" in authorized.text
 
 
-def test_metrics_endpoint_records_http_requests(client):
+def test_metrics_endpoint_records_http_requests(client: TestClient) -> None:
     response = client.get("/api/weather/non-existent-spot")
     assert response.status_code == 404
 

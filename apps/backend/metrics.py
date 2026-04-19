@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import time
 from collections import defaultdict
 from threading import Lock
@@ -123,8 +124,8 @@ def render_metrics() -> str:
     lines: list[str] = []
 
     with _LOCK:
-        lines.append('# HELP dashboard_app_info Static application info metric')
-        lines.append('# TYPE dashboard_app_info gauge')
+        lines.append("# HELP dashboard_app_info Static application info metric")
+        lines.append("# TYPE dashboard_app_info gauge")
         lines.append('dashboard_app_info{project="dashboard-parapente",environment="prod"} 1')
 
         for metric_name, definition in _COUNTER_DEFS.items():
@@ -200,7 +201,7 @@ def _is_authorized(request: Request) -> bool:
 
     auth_header = request.headers.get("authorization", "")
     expected = f"Bearer {METRICS_TOKEN}"
-    return auth_header == expected
+    return hmac.compare_digest(auth_header, expected)
 
 
 def _route_path(request: Request) -> str:

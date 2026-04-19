@@ -2,6 +2,7 @@ global:
   resolve_timeout: 5m
 
 route:
+  # Alerts are intentionally dropped until a real notification receiver is configured.
   receiver: blackhole
   group_by:
     - alertname

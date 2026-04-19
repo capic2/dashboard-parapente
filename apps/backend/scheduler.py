@@ -5,8 +5,8 @@ Uses APScheduler to run background tasks
 
 import asyncio
 import logging
-import uuid
 import time
+import uuid
 from datetime import date, datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -15,9 +15,14 @@ from sqlalchemy.orm import Session
 
 from database import SessionLocal
 from models import Site, WeatherForecast
+from metrics import (
+    inc_scheduler_run,
+    inc_weather_fetch,
+    observe_scheduler_run,
+    observe_weather_fetch,
+)
 from para_index import analyze_hourly_slots, calculate_para_index, format_slots_summary
 from weather_pipeline import get_normalized_forecast
-from metrics import inc_scheduler_run, inc_weather_fetch, observe_scheduler_run, observe_weather_fetch
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
