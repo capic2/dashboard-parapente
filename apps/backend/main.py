@@ -19,6 +19,7 @@ import config
 import models  # noqa: F401 - imported for side effects (model registration)
 from database import Base, SessionLocal, engine
 from models import Site  # Needed for database initialization
+from metrics import setup_metrics
 from routes import public_router, router
 from video_export_manual import start_video_export_worker, stop_video_export_worker
 from scheduler import scheduler, start_scheduler, stop_scheduler
@@ -616,6 +617,8 @@ app = FastAPI(
     version="0.2.0",
     lifespan=lifespan,
 )
+
+setup_metrics(app)
 
 # CORS - Allow all origins for development (restrict in production)
 app.add_middleware(

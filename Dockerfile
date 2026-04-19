@@ -27,7 +27,7 @@ RUN pnpm exec nx build frontend --configuration=production
 # ============================================
 # Stage 2: Backend Python avec Playwright
 # ============================================
-FROM python:3.14-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -72,8 +72,8 @@ COPY apps/backend/requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt
 
-# Installer Playwright et navigateur Chromium
-RUN playwright install --with-deps chromium
+# Installer Chromium pour Playwright
+RUN playwright install chromium
 
 # Copier code backend
 COPY apps/backend/ ./
