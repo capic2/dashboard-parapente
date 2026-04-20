@@ -1,7 +1,7 @@
 JOURNAL DES MODIFICATIONS
 =========================
 Date: 2026-03-01
-Auteur: Assistant Claude
+Auteur: Assistant IA
 Contexte: Implémentation architecture hybride Playwright/Scrapling
 
 NOUVEAUX FICHIERS (8)
