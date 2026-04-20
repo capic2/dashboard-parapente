@@ -303,7 +303,7 @@ jobs:
           exit 1
 
       - name: Mark deployment as successful
-        if: steps.trigger_deploy.conclusion == 'success' && steps.verify_deploy.conclusion == 'success'
+        if: steps.trigger_deploy.conclusion == 'success' && steps.verify_deploy.outcome == 'success'
         uses: actions/github-script@v9
         env:
           TAG_NAME: ${{ steps.version.outputs.success_tag_name }}
@@ -347,7 +347,7 @@ jobs:
             }
 
       - name: Label merged PRs with deployed version
-        if: steps.trigger_deploy.conclusion == 'success' && steps.verify_deploy.conclusion == 'success'
+        if: steps.trigger_deploy.conclusion == 'success' && steps.verify_deploy.outcome == 'success'
         uses: actions/github-script@v9
         env:
           VERSION_LABEL: ${{ steps.version.outputs.label_name }}
@@ -478,7 +478,7 @@ jobs:
             );
 
       - name: Label current PR as non deployed when deployment fails
-        if: (steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.conclusion != 'success') && github.event_name == 'pull_request'
+        if: (steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success') && github.event_name == 'pull_request'
         uses: actions/github-script@v9
         env:
           UNDEPLOYED_LABEL: non déployé
@@ -529,10 +529,11 @@ jobs:
         run: |
           echo "Deployment step conclusion: ${{ steps.trigger_deploy.conclusion }}"
           echo "Verification step conclusion: ${{ steps.verify_deploy.conclusion }}"
+          echo "Verification step outcome: ${{ steps.verify_deploy.outcome }}"
           echo "Computed deployment version: ${{ steps.version.outputs.version }}"
 
       - name: Fail job when deployment failed
-        if: steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.conclusion != 'success'
+        if: steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success'
         run: |
           echo "Deployment or version verification failed"
           exit 1
