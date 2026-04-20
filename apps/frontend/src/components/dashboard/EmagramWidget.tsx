@@ -24,6 +24,8 @@ import {
   SliderThumb,
   SliderOutput,
   Button,
+  Tooltip,
+  TooltipTrigger,
 } from 'react-aria-components';
 
 interface EmagramWidgetProps {
@@ -108,34 +110,50 @@ function HourSlider({
               ? 'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300'
               : 'text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300';
 
-          return (
-            <Button
-              key={h.hour}
-              onPress={() => onHourChange(h.hour)}
-              className={`absolute -translate-x-1/2 text-[10px] px-1 py-0.5 rounded transition-colors ${buttonClassName}`}
-              style={{ left: `${percent}%` }}
-              aria-label={
-                isFailed
-                  ? `Échec analyse ${h.hour}h : ${errorText}`
-                  : `Analyse ${h.hour}h`
-              }
-            >
-              <span
-                title={
-                  isFailed
-                    ? `Échec analyse ${h.hour}h : ${errorText}`
-                    : undefined
-                }
+          const label = isFailed
+            ? `Échec analyse ${h.hour}h : ${errorText}`
+            : `Analyse ${h.hour}h`;
+
+          if (!isFailed) {
+            return (
+              <Button
+                key={h.hour}
+                onPress={() => onHourChange(h.hour)}
+                className={`absolute -translate-x-1/2 text-[10px] px-1 py-0.5 rounded transition-colors ${buttonClassName}`}
+                style={{ left: `${percent}%` }}
+                aria-label={label}
               >
                 {h.hour}h
-              </span>
-              {h.score != null && h.status === 'completed' && (
-                <span
-                  className="block w-1.5 h-1.5 rounded-full mx-auto mt-0.5"
-                  style={{ backgroundColor: getScoreColor(h.score) }}
-                />
-              )}
-            </Button>
+                {h.score != null && h.status === 'completed' && (
+                  <span
+                    className="block w-1.5 h-1.5 rounded-full mx-auto mt-0.5"
+                    style={{ backgroundColor: getScoreColor(h.score) }}
+                  />
+                )}
+              </Button>
+            );
+          }
+
+          return (
+            <TooltipTrigger key={h.hour}>
+              <Button
+                onPress={() => onHourChange(h.hour)}
+                className={`absolute -translate-x-1/2 text-[10px] px-1 py-0.5 rounded transition-colors ${buttonClassName}`}
+                style={{ left: `${percent}%` }}
+                aria-label={label}
+              >
+                {h.hour}h
+                {h.score != null && h.status === 'completed' && (
+                  <span
+                    className="block w-1.5 h-1.5 rounded-full mx-auto mt-0.5"
+                    style={{ backgroundColor: getScoreColor(h.score) }}
+                  />
+                )}
+              </Button>
+              <Tooltip className="bg-red-700 text-white text-xs px-2 py-1 rounded shadow-lg max-w-56 break-words">
+                {label}
+              </Tooltip>
+            </TooltipTrigger>
           );
         })}
       </div>

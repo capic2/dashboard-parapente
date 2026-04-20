@@ -1,7 +1,7 @@
 import preview from '../../../.storybook/preview';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
-import { expect } from 'storybook/test';
+import { expect, userEvent, within } from 'storybook/test';
 import EmagramWidget from './EmagramWidget';
 
 const meta = preview.meta({
@@ -290,8 +290,16 @@ export const HourFailedTooltip = meta.story({
 });
 
 HourFailedTooltip.test('shows tooltip for failed hour', async ({ canvas }) => {
-  const failedHourButton = await canvas.findByTitle(
+  const failedHourButton = await canvas.findByRole('button', {
+    name: /Échec analyse 14h : Timeout fournisseur LLM/,
+  });
+
+  await userEvent.hover(failedHourButton);
+
+  const tooltip = await within(document.body).findByText(
     /Échec analyse 14h : Timeout fournisseur LLM/
   );
+
+  await expect(tooltip).toBeInTheDocument();
   await expect(failedHourButton).toBeInTheDocument();
 });
