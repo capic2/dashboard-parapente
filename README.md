@@ -286,6 +286,7 @@ uvicorn main:app --reload --port 8001
 
 - **`NX_MIGRATION.md`** : Guide complet du monorepo Nx
 - **`NGINX_CONFIG.md`** : Configuration reverse proxy
+- **`docs/PORTAINER_PACKMIND_STANDARD.md`** : Standard d'interaction Portainer (token, workflow, securite)
 - **`.env.example`** : Variables disponibles
 - **`/docs`** : API Swagger UI
 - **`/redoc`** : API ReDoc
