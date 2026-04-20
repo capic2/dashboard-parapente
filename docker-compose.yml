@@ -91,6 +91,9 @@ services:
 
       # Backend - Frontend URL
       - BACKEND_FRONTEND_URL=${BACKEND_FRONTEND_URL}
+
+      # Backend - Deployment metadata
+      - BACKEND_DEPLOY_VERSION=${BACKEND_DEPLOY_VERSION}
     depends_on:
       redis:
         condition: service_healthy
