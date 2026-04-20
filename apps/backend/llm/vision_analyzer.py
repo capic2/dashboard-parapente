@@ -1,5 +1,5 @@
 """
-AI Vision-based emagram analysis using Claude 3.5 Sonnet
+AI Vision-based emagram analysis
 Analyzes Skew-T diagrams to extract paragliding-specific thermal forecasts
 """
 
@@ -98,7 +98,7 @@ def parse_time_string(time_str: str) -> time | None:
 async def analyze_skewt_with_llm(
     image_path: str,
     station_name: str,
-    provider: str = "anthropic",
+    provider: str = "google",
     api_key: str | None = None,
     model: str | None = None,
 ) -> dict[str, Any]:
@@ -108,7 +108,7 @@ async def analyze_skewt_with_llm(
     Args:
         image_path: Path to Skew-T PNG/WebP image
         station_name: Name of radiosonde station
-        provider: LLM provider ("anthropic", "openai", or "google")
+        provider: LLM provider ("openai" or "google")
         api_key: API key (or from env vars)
         model: Model name (auto-selected if None)
 
@@ -118,9 +118,7 @@ async def analyze_skewt_with_llm(
     try:
         # Auto-select model based on provider
         if model is None:
-            if provider == "anthropic":
-                model = "claude-3-5-sonnet-20241022"
-            elif provider == "openai":
+            if provider == "openai":
                 model = "gpt-4-vision-preview"
             elif provider == "google":
                 model = "gemini-pro-vision"
@@ -133,9 +131,7 @@ async def analyze_skewt_with_llm(
 
         # Get API key from env if not provided
         if api_key is None:
-            if provider == "anthropic":
-                api_key = os.getenv("ANTHROPIC_API_KEY")
-            elif provider == "openai":
+            if provider == "openai":
                 api_key = os.getenv("OPENAI_API_KEY")
             elif provider == "google":
                 api_key = os.getenv("GOOGLE_API_KEY")
@@ -164,38 +160,7 @@ async def analyze_skewt_with_llm(
         output_tokens = 0
 
         # Provider-specific API calls
-        if provider == "anthropic":
-            import anthropic
-
-            client = anthropic.Anthropic(api_key=api_key)
-
-            response = client.messages.create(
-                model=model,
-                max_tokens=2048,
-                temperature=0.2,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": "image/png",
-                                    "data": image_base64,
-                                },
-                            },
-                            {"type": "text", "text": PARAGLIDING_ANALYSIS_PROMPT},
-                        ],
-                    }
-                ],
-            )
-
-            response_text = response.content[0].text.strip()
-            input_tokens = response.usage.input_tokens
-            output_tokens = response.usage.output_tokens
-
-        elif provider == "openai":
+        if provider == "openai":
             import openai
 
             client = openai.OpenAI(api_key=api_key)
@@ -281,10 +246,7 @@ async def analyze_skewt_with_llm(
             )
 
         # Calculate cost (provider-specific pricing)
-        if provider == "anthropic":
-            # Claude 3.5 Sonnet: $3/MTok input, $15/MTok output
-            cost_usd = (input_tokens / 1_000_000 * 3.0) + (output_tokens / 1_000_000 * 15.0)
-        elif provider == "openai":
+        if provider == "openai":
             # GPT-4 Vision: ~$0.01/image + $0.03/1K output tokens
             cost_usd = 0.01 + (output_tokens / 1_000 * 0.03)
         elif provider == "google":
@@ -330,13 +292,13 @@ async def analyze_emagram_with_fallback(
         sounding_data: Raw sounding data for fallback calculations
         station_name: Station name
         station_latitude: Station latitude (for solar calculations)
-        api_key: Anthropic API key
+        api_key: LLM API key
 
     Returns:
         Complete analysis with method indicator
     """
     # Determine provider from env or config
-    provider = os.getenv("LLM_PROVIDER", "anthropic")
+    provider = os.getenv("LLM_PROVIDER", "google")
 
     # Try LLM vision first
     llm_result = await analyze_skewt_with_llm(
