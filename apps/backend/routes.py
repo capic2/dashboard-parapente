@@ -4271,6 +4271,24 @@ async def get_latest_emagram(
         target_date = (datetime.utcnow() + timedelta(days=day_index)).date()
         cutoff_time = get_emagram_cutoff_utc(db=db)
 
+        # For explicit hourly queries on a specific site, return the most recent
+        # attempt regardless of status to stay consistent with /emagram/hours.
+        if site_id and hour is not None:
+            latest_attempt_for_hour = (
+                db.query(EmagramAnalysis)
+                .filter(
+                    EmagramAnalysis.forecast_date == target_date,
+                    EmagramAnalysis.station_code == site_id,
+                    EmagramAnalysis.analysis_method == "llm_vision",
+                    EmagramAnalysis.forecast_hour == hour,
+                    EmagramAnalysis.analysis_datetime >= cutoff_time,
+                )
+                .order_by(EmagramAnalysis.analysis_datetime.desc())
+                .first()
+            )
+            if latest_attempt_for_hour:
+                return latest_attempt_for_hour
+
         analysis_filters = [
             EmagramAnalysis.forecast_date == target_date,
             EmagramAnalysis.analysis_status == "completed",

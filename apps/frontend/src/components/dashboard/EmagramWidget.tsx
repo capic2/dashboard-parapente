@@ -114,6 +114,11 @@ function HourSlider({
               onPress={() => onHourChange(h.hour)}
               className={`absolute -translate-x-1/2 text-[10px] px-1 py-0.5 rounded transition-colors ${buttonClassName}`}
               style={{ left: `${percent}%` }}
+              aria-label={
+                isFailed
+                  ? `Échec analyse ${h.hour}h : ${errorText}`
+                  : `Analyse ${h.hour}h`
+              }
               title={
                 isFailed
                   ? `Échec analyse ${h.hour}h : ${errorText}`
@@ -215,6 +220,16 @@ export default function EmagramWidget({
       },
     ].sort((a, b) => a.hour - b.hour);
   }, [availableHours, emagram]);
+
+  useEffect(() => {
+    if (
+      selectedHour == null &&
+      !availableHours.length &&
+      emagram?.forecast_hour != null
+    ) {
+      setSelectedHour(emagram.forecast_hour);
+    }
+  }, [availableHours.length, emagram?.forecast_hour, selectedHour]);
 
   const hasHourlyData = displayHours.length > 0;
   const hourSlider = hasHourlyData ? (
