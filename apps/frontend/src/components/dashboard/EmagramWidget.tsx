@@ -119,13 +119,16 @@ function HourSlider({
                   ? `Échec analyse ${h.hour}h : ${errorText}`
                   : `Analyse ${h.hour}h`
               }
-              title={
-                isFailed
-                  ? `Échec analyse ${h.hour}h : ${errorText}`
-                  : undefined
-              }
             >
-              {h.hour}h
+              <span
+                title={
+                  isFailed
+                    ? `Échec analyse ${h.hour}h : ${errorText}`
+                    : undefined
+                }
+              >
+                {h.hour}h
+              </span>
               {h.score != null && h.status === 'completed' && (
                 <span
                   className="block w-1.5 h-1.5 rounded-full mx-auto mt-0.5"
