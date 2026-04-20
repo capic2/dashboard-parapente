@@ -62,28 +62,7 @@ GROQ_API_KEY=your_groq_api_key_here
 
 ---
 
-### 3. `multi_emagram_analyzer.py` - API Anthropic directe
-
-Utilise l'**API Claude Messages** d'Anthropic directement.
-
-**Avantages:**
-- ✅ API REST simple
-- ✅ Service managé (fiable)
-- ✅ Batch processing possible
-
-**Inconvénients:**
-- ❌ Coût: ~50€/mois pour 6 spots × 8 analyses/jour
-- ❌ Nécessite crédit API Anthropic
-
-**Configuration:**
-```bash
-# Dans .env
-ANTHROPIC_API_KEY=sk-ant-api03-...
-```
-
----
-
-### 4. `vision_analyzer.py` - Wrapper générique
+### 3. `vision_analyzer.py` - Wrapper générique
 
 Module utilitaire pour fonctions communes de vision analysis.
 
@@ -100,10 +79,7 @@ Le fichier [`emagram_multi_source.py`](../emagram_multi_source.py) utilise la st
 2. Priority 2: Groq Llama Vision (si GROQ_API_KEY présente)
    └─> Gratuit, rapide
 
-3. Priority 3: API Anthropic directe (si ANTHROPIC_API_KEY présente)
-   └─> Payant (~50€/mois) mais très haute qualité
-
-4. Échec: Retour d'erreur
+3. Échec: Retour d'erreur
 ```
 
 **Recommandation production**: Utiliser **Gemini** (Priority 1) avec **Groq** en fallback.
@@ -142,8 +118,9 @@ cd backend/llm
 export GOOGLE_API_KEY=your_key
 python gemini_analyzer.py
 
-# Test API directe
-python multi_emagram_analyzer.py
+# Test Groq
+export GROQ_API_KEY=your_key
+python groq_analyzer.py
 ```
 
 ## Configuration recommandée
@@ -153,7 +130,6 @@ python multi_emagram_analyzer.py
 GOOGLE_API_KEY=your_google_api_key_here
 GEMINI_MODEL=gemini-2.5-flash
 GROQ_API_KEY=your_groq_api_key_here  # fallback gratuit
-ANTHROPIC_API_KEY=your_anthropic_key_here  # fallback payant (optionnel)
 ```
 
 ## Dépannage
@@ -173,18 +149,6 @@ curl -H "Content-Type: application/json" \
 # https://aistudio.google.com/app/apikey
 ```
 
-### API Anthropic retourne 401
-
-```bash
-# Vérifier la clé API
-echo $ANTHROPIC_API_KEY
-
-# Vérifier le solde
-curl -H "x-api-key: $ANTHROPIC_API_KEY" \
-     -H "anthropic-version: 2023-06-01" \
-     https://api.anthropic.com/v1/messages
-```
-
 ## Ressources
 
 ### Gemini
@@ -192,7 +156,3 @@ curl -H "x-api-key: $ANTHROPIC_API_KEY" \
 - **Gemini Docs**: https://ai.google.dev/gemini-api/docs
 - **Python SDK**: https://github.com/google/generative-ai-python
 - **Pricing**: https://ai.google.dev/pricing (Free tier: 1500 req/day)
-
-### Anthropic
-- **Anthropic API**: https://docs.anthropic.com
-- **Pricing**: https://www.anthropic.com/pricing
