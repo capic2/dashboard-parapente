@@ -27,7 +27,7 @@ RUN pnpm exec nx build frontend --configuration=production
 # ============================================
 # Stage 2: Backend Python avec Playwright
 # ============================================
-FROM python:3.14-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
