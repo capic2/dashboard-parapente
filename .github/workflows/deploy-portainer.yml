@@ -172,14 +172,42 @@ jobs:
           script: |
             set -eu
 
-            if [ -z "${{ secrets.SSH_DEPLOY_PATH }}" ]; then
-              echo "Missing SSH_DEPLOY_PATH secret"
-              exit 1
+            REQUESTED_DEPLOY_PATH="${{ secrets.SSH_DEPLOY_PATH }}"
+            DEPLOY_PATH="$REQUESTED_DEPLOY_PATH"
+
+            if [ -n "$DEPLOY_PATH" ] && [ -d "$DEPLOY_PATH" ]; then
+              echo "Using configured deploy path: $DEPLOY_PATH"
+            else
+              if [ -n "$DEPLOY_PATH" ]; then
+                echo "Configured deploy path not found: $DEPLOY_PATH"
+              fi
+
+              INSPECT_PATH=$(docker inspect parapente-backend --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' 2>/dev/null || true)
+
+              if [ -n "$INSPECT_PATH" ] && [ -d "$INSPECT_PATH" ]; then
+                DEPLOY_PATH="$INSPECT_PATH"
+                echo "Using docker-inspected deploy path: $DEPLOY_PATH"
+              elif [ -n "$INSPECT_PATH" ]; then
+                STACK_ID="${INSPECT_PATH##*/}"
+                for base_path in /data/compose /var/lib/docker/volumes/portainer_data/_data/compose /var/lib/docker/volumes/portainer/_data/compose; do
+                  CANDIDATE_PATH="$base_path/$STACK_ID"
+                  if [ -d "$CANDIDATE_PATH" ]; then
+                    DEPLOY_PATH="$CANDIDATE_PATH"
+                    echo "Using resolved Portainer deploy path: $DEPLOY_PATH"
+                    break
+                  fi
+                done
+              fi
             fi
 
-            DEPLOY_PATH="${{ secrets.SSH_DEPLOY_PATH }}"
-            if [ ! -d "$DEPLOY_PATH" ]; then
+            if [ -z "$DEPLOY_PATH" ] || [ ! -d "$DEPLOY_PATH" ]; then
               echo "Deploy path does not exist: $DEPLOY_PATH"
+              if [ -n "$REQUESTED_DEPLOY_PATH" ]; then
+                echo "Configured SSH_DEPLOY_PATH: $REQUESTED_DEPLOY_PATH"
+              fi
+              if [ -n "${INSPECT_PATH:-}" ]; then
+                echo "Detected stack working_dir: $INSPECT_PATH"
+              fi
               exit 1
             fi
 
