@@ -174,6 +174,27 @@ jobs:
 
             REQUESTED_DEPLOY_PATH="${{ secrets.SSH_DEPLOY_PATH }}"
             DEPLOY_PATH="$REQUESTED_DEPLOY_PATH"
+            INSPECT_PATH=""
+            STACK_ID=""
+            TARGET_SHA="${{ github.sha }}"
+
+            deploy_from_host_path() {
+              path="$1"
+              cd "$path"
+
+              if [ ! -d .git ]; then
+                echo "Deploy path is not a git repository: $path"
+                return 1
+              fi
+
+              git fetch origin main --tags
+              git fetch --no-tags origin "$TARGET_SHA"
+              git checkout --detach "$TARGET_SHA"
+              test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+
+              docker compose build backend
+              docker compose up -d backend redis
+            }
 
             if [ -n "$DEPLOY_PATH" ] && [ -d "$DEPLOY_PATH" ]; then
               echo "Using configured deploy path: $DEPLOY_PATH"
@@ -200,32 +221,31 @@ jobs:
               fi
             fi
 
-            if [ -z "$DEPLOY_PATH" ] || [ ! -d "$DEPLOY_PATH" ]; then
-              echo "Deploy path does not exist: $DEPLOY_PATH"
-              if [ -n "$REQUESTED_DEPLOY_PATH" ]; then
-                echo "Configured SSH_DEPLOY_PATH: $REQUESTED_DEPLOY_PATH"
-              fi
-              if [ -n "${INSPECT_PATH:-}" ]; then
-                echo "Detected stack working_dir: $INSPECT_PATH"
-              fi
-              exit 1
+            if [ -n "$DEPLOY_PATH" ] && [ -d "$DEPLOY_PATH" ]; then
+              echo "Deploying from host path: $DEPLOY_PATH"
+              deploy_from_host_path "$DEPLOY_PATH"
+              exit 0
             fi
 
-            cd "$DEPLOY_PATH"
-
-            if [ ! -d .git ]; then
-              echo "Deploy path is not a git repository: $DEPLOY_PATH"
-              exit 1
+            if [ -n "$STACK_ID" ] && docker volume inspect portainer_data >/dev/null 2>&1; then
+              echo "Host path unavailable, deploying from Portainer volume (stack $STACK_ID)"
+              docker run --rm \
+                -v /var/run/docker.sock:/var/run/docker.sock \
+                -v portainer_data:/data \
+                -w "/data/compose/$STACK_ID" \
+                docker:27-cli sh -ceu "apk add --no-cache git docker-cli-compose >/dev/null; git fetch origin main --tags; git fetch --no-tags origin '$TARGET_SHA'; git checkout --detach '$TARGET_SHA'; test \"\$(git rev-parse HEAD)\" = '$TARGET_SHA'; docker compose build backend; docker compose up -d backend redis"
+              exit 0
             fi
 
-            TARGET_SHA="${{ github.sha }}"
-            git fetch origin main --tags
-            git fetch --no-tags origin "$TARGET_SHA"
-            git checkout --detach "$TARGET_SHA"
-            test "$(git rev-parse HEAD)" = "$TARGET_SHA"
-
-            docker compose build backend
-            docker compose up -d backend redis
+            echo "Deploy path does not exist: $DEPLOY_PATH"
+            if [ -n "$REQUESTED_DEPLOY_PATH" ]; then
+              echo "Configured SSH_DEPLOY_PATH: $REQUESTED_DEPLOY_PATH"
+            fi
+            if [ -n "$INSPECT_PATH" ]; then
+              echo "Detected stack working_dir: $INSPECT_PATH"
+            fi
+            echo "Unable to access deploy path on host and no Portainer volume fallback available"
+            exit 1
 
       - name: Verify deployed version
         id: verify_deploy
