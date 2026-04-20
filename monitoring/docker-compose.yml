@@ -1,0 +1,123 @@
+services:
+  grafana:
+    image: grafana/grafana-oss:13.0.1
+    container_name: monitoring-grafana
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:3000:3000'
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/
+      - GF_LOG_LEVEL=warn
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - monitoring
+
+  prometheus:
+    image: prom/prometheus:v3.11.2
+    container_name: monitoring-prometheus
+    restart: unless-stopped
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    ports:
+      - '127.0.0.1:9090:9090'
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+      - '--config.expand-env'
+    environment:
+      - MONITORING_METRICS_TOKEN=${MONITORING_METRICS_TOKEN:?MONITORING_METRICS_TOKEN is required}
+    volumes:
+      - prometheus-data:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - ./prometheus/targets:/etc/prometheus/targets:ro
+    networks:
+      - monitoring
+
+  alertmanager:
+    image: prom/alertmanager:v0.32.0
+    container_name: monitoring-alertmanager
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:9093:9093'
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    volumes:
+      - alertmanager-data:/alertmanager
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    networks:
+      - monitoring
+
+  loki:
+    image: grafana/loki:3.7.1
+    container_name: monitoring-loki
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:3100:3100'
+    command:
+      - '-config.file=/etc/loki/loki.yml'
+    volumes:
+      - loki-data:/loki
+      - ./loki/loki.yml:/etc/loki/loki.yml:ro
+    networks:
+      - monitoring
+
+  promtail:
+    image: grafana/promtail:3.6.10
+    container_name: monitoring-promtail
+    restart: unless-stopped
+    command:
+      - '-config.file=/etc/promtail/promtail.yml'
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./promtail/promtail.yml:/etc/promtail/promtail.yml:ro
+    depends_on:
+      - loki
+    networks:
+      - monitoring
+
+  node_exporter:
+    image: prom/node-exporter:v1.11.1
+    container_name: monitoring-node-exporter
+    restart: unless-stopped
+    command:
+      - '--path.rootfs=/host'
+    ports:
+      - '127.0.0.1:9100:9100'
+    volumes:
+      - /:/host:ro,rslave
+    networks:
+      - monitoring
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
+    container_name: monitoring-cadvisor
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - '127.0.0.1:8080:8080'
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  grafana-data:
+  prometheus-data:
+  alertmanager-data:
+  loki-data:

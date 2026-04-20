@@ -110,6 +110,9 @@ ADMIN_PASSWORD = os.getenv("BACKEND_ADMIN_PASSWORD")
 LOG_LEVEL = os.getenv("BACKEND_LOG_LEVEL", "INFO")
 LOG_FILE = os.getenv("BACKEND_LOG_FILE", "logs/dashboard.log")
 
+# Monitoring
+METRICS_TOKEN = os.getenv("BACKEND_METRICS_TOKEN")
+
 # ============================================================================
 # TELEGRAM (Optional)
 # ============================================================================
@@ -141,6 +144,10 @@ if not TESTING:
     if not STRAVA_VERIFY_TOKEN:
         logger.error("❌ STRAVA_VERIFY_TOKEN is required")
         raise ValueError("BACKEND_STRAVA_VERIFY_TOKEN environment variable is required")
+
+    if ENVIRONMENT == "production" and not METRICS_TOKEN:
+        logger.error("❌ BACKEND_METRICS_TOKEN is required in production")
+        raise ValueError("BACKEND_METRICS_TOKEN environment variable is required in production")
 else:
     logger.info("🧪 Testing mode: API key validation skipped")
     # In test mode, provide defaults to avoid breaking tests

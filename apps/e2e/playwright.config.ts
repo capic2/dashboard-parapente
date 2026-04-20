@@ -77,7 +77,8 @@ export default defineConfig({
       },
     },
     {
-      command: 'nx build frontend && npx vite preview --config apps/frontend/vite.config.ts',
+      command:
+        'bash -lc "set -o pipefail; echo [e2e:web] Building frontend; nx build frontend --output-style=stream; echo [e2e:web] Starting Vite preview; npx vite preview --config apps/frontend/vite.config.ts --strictPort --host 127.0.0.1 --port 5173"',
       url: 'http://localhost:5173',
       reuseExistingServer: !process.env.CI,
       cwd: '../..',

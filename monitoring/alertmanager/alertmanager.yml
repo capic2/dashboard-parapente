@@ -1,0 +1,16 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  # Alerts are intentionally dropped until a real notification receiver is configured.
+  receiver: blackhole
+  group_by:
+    - alertname
+    - job
+    - project
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: blackhole

@@ -199,6 +199,69 @@ class TestEmagramEndpoints:
         assert response.status_code == 200
         assert response.json() is None
 
+    def test_get_latest_hour_returns_most_recent_attempt_for_site(self, client, db_session):
+        """Latest endpoint returns newest hourly attempt even if it failed."""
+        app_settings.invalidate_cache()
+
+        site = Site(
+            id="site-latest-hour-recent",
+            code="SLR",
+            name="Latest Hour Site",
+            latitude=47.0,
+            longitude=6.0,
+            elevation_m=500,
+        )
+        db_session.add(site)
+
+        completed_old = EmagramAnalysis(
+            id="latest-hour-completed-old",
+            station_code="site-latest-hour-recent",
+            station_name="Latest Hour Site",
+            station_latitude=47.0,
+            station_longitude=6.0,
+            analysis_date=datetime.utcnow().date(),
+            analysis_time=datetime.utcnow().time(),
+            analysis_datetime=datetime.utcnow() - timedelta(hours=2),
+            forecast_date=datetime.utcnow().date(),
+            forecast_hour=13,
+            distance_km=0.0,
+            data_source="test",
+            sounding_time="12Z",
+            analysis_method="llm_vision",
+            score_volabilite=77,
+            analysis_status="completed",
+        )
+        failed_new = EmagramAnalysis(
+            id="latest-hour-failed-new",
+            station_code="site-latest-hour-recent",
+            station_name="Latest Hour Site",
+            station_latitude=47.0,
+            station_longitude=6.0,
+            analysis_date=datetime.utcnow().date(),
+            analysis_time=datetime.utcnow().time(),
+            analysis_datetime=datetime.utcnow() - timedelta(minutes=10),
+            forecast_date=datetime.utcnow().date(),
+            forecast_hour=13,
+            distance_km=0.0,
+            data_source="test",
+            sounding_time="12Z",
+            analysis_method="llm_vision",
+            analysis_status="failed",
+            error_message="Recent provider timeout",
+        )
+        db_session.add(completed_old)
+        db_session.add(failed_new)
+        db_session.commit()
+
+        response = client.get("/api/emagram/latest?site_id=site-latest-hour-recent&hour=13")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data is not None
+        assert data["forecast_hour"] == 13
+        assert data["analysis_status"] == "failed"
+        assert data["error_message"] == "Recent provider timeout"
+
     def test_get_emagram_hours_ignores_stale_analysis(self, client, db_session):
         """Hourly endpoint only lists fresh analyses."""
         app_settings.invalidate_cache()
@@ -237,6 +300,113 @@ class TestEmagramEndpoints:
         response = client.get("/api/emagram/hours?site_id=site-stale-hours&day_index=0")
         assert response.status_code == 200
         assert response.json()["hours"] == []
+
+    def test_get_emagram_hours_includes_failed_with_error(self, client, db_session):
+        """Hourly endpoint exposes failed hourly analyses and their error message."""
+        app_settings.invalidate_cache()
+
+        site = Site(
+            id="site-hours-failed",
+            code="SHF",
+            name="Failed Hours Site",
+            latitude=47.0,
+            longitude=6.0,
+            elevation_m=500,
+        )
+        db_session.add(site)
+
+        failed_analysis = EmagramAnalysis(
+            id="failed-hours-analysis",
+            station_code="site-hours-failed",
+            station_name="Failed Hours Site",
+            station_latitude=47.0,
+            station_longitude=6.0,
+            analysis_date=datetime.utcnow().date(),
+            analysis_time=datetime.utcnow().time(),
+            analysis_datetime=datetime.utcnow(),
+            forecast_date=datetime.utcnow().date(),
+            forecast_hour=14,
+            distance_km=0.0,
+            data_source="test",
+            sounding_time="12Z",
+            analysis_method="llm_vision",
+            analysis_status="failed",
+            error_message="LLM timeout",
+        )
+        db_session.add(failed_analysis)
+        db_session.commit()
+
+        response = client.get("/api/emagram/hours?site_id=site-hours-failed&day_index=0")
+        assert response.status_code == 200
+
+        hours = response.json()["hours"]
+        assert len(hours) == 1
+        assert hours[0]["hour"] == 14
+        assert hours[0]["status"] == "failed"
+        assert hours[0]["error_message"] == "LLM timeout"
+
+    def test_get_emagram_hours_keeps_most_recent_status_per_hour(self, client, db_session):
+        """Hourly endpoint returns latest attempt for a given hour."""
+        app_settings.invalidate_cache()
+
+        site = Site(
+            id="site-hours-most-recent",
+            code="SHR",
+            name="Most Recent Hours Site",
+            latitude=47.0,
+            longitude=6.0,
+            elevation_m=500,
+        )
+        db_session.add(site)
+
+        completed_old = EmagramAnalysis(
+            id="completed-old",
+            station_code="site-hours-most-recent",
+            station_name="Most Recent Hours Site",
+            station_latitude=47.0,
+            station_longitude=6.0,
+            analysis_date=datetime.utcnow().date(),
+            analysis_time=datetime.utcnow().time(),
+            analysis_datetime=datetime.utcnow() - timedelta(hours=2),
+            forecast_date=datetime.utcnow().date(),
+            forecast_hour=15,
+            distance_km=0.0,
+            data_source="test",
+            sounding_time="12Z",
+            analysis_method="llm_vision",
+            score_volabilite=78,
+            analysis_status="completed",
+        )
+        failed_new = EmagramAnalysis(
+            id="failed-new",
+            station_code="site-hours-most-recent",
+            station_name="Most Recent Hours Site",
+            station_latitude=47.0,
+            station_longitude=6.0,
+            analysis_date=datetime.utcnow().date(),
+            analysis_time=datetime.utcnow().time(),
+            analysis_datetime=datetime.utcnow() - timedelta(minutes=20),
+            forecast_date=datetime.utcnow().date(),
+            forecast_hour=15,
+            distance_km=0.0,
+            data_source="test",
+            sounding_time="12Z",
+            analysis_method="llm_vision",
+            analysis_status="failed",
+            error_message="Source scrape failed",
+        )
+        db_session.add(completed_old)
+        db_session.add(failed_new)
+        db_session.commit()
+
+        response = client.get("/api/emagram/hours?site_id=site-hours-most-recent&day_index=0")
+        assert response.status_code == 200
+
+        hours = response.json()["hours"]
+        assert len(hours) == 1
+        assert hours[0]["hour"] == 15
+        assert hours[0]["status"] == "failed"
+        assert hours[0]["error_message"] == "Source scrape failed"
 
     def test_analyze_with_site_id(self, client, db_session):
         """Trigger analysis accepts site_id without lat/lon"""

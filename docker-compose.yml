@@ -30,6 +30,10 @@ services:
     restart: unless-stopped
     ports:
       - '8001:8001'
+    labels:
+      project: dashboard-parapente
+      service: backend
+      env: ${ENVIRONMENT:-production}
     environment:
       # Global
       - ENVIRONMENT=${ENVIRONMENT:-production}
@@ -72,6 +76,9 @@ services:
       - BACKEND_LOG_LEVEL=${BACKEND_LOG_LEVEL:-INFO}
       - BACKEND_LOG_FILE=${BACKEND_LOG_FILE:-logs/dashboard.log}
 
+      # Backend - Monitoring
+      - BACKEND_METRICS_TOKEN=${BACKEND_METRICS_TOKEN:?required}
+
       # Backend - Telegram (optional)
       - BACKEND_TELEGRAM_BOT_TOKEN=${BACKEND_TELEGRAM_BOT_TOKEN}
       - BACKEND_TELEGRAM_CHAT_ID=${BACKEND_TELEGRAM_CHAT_ID}
@@ -83,6 +90,9 @@ services:
 
       # Backend - Frontend URL
       - BACKEND_FRONTEND_URL=${BACKEND_FRONTEND_URL}
+
+      # Backend - Deployment metadata
+      - BACKEND_DEPLOY_VERSION=${BACKEND_DEPLOY_VERSION}
     depends_on:
       redis:
         condition: service_healthy
