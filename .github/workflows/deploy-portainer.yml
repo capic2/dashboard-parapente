@@ -1,4 +1,4 @@
-name: Deploy to Portainer
+name: Deploy to Production (SSH)
 
 on:
   push:
@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Trigger Portainer webhook
+    name: Deploy over SSH
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -158,29 +158,44 @@ jobs:
               }
             }
 
-      - name: Trigger deployment
+      - name: Deploy on production server
         id: trigger_deploy
         continue-on-error: true
-        env:
-          WEBHOOK_URL: ${{ secrets.PORTAINER_WEBHOOK_URL }}
-        run: |
-          if [ -z "$WEBHOOK_URL" ]; then
-            echo "Missing PORTAINER_WEBHOOK_URL secret"
-            exit 1
-          fi
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SSH_PORT }}
+          script_stop: true
+          command_timeout: 15m
+          script: |
+            set -euo pipefail
 
-          http_status=$(curl --show-error --silent --output /tmp/portainer-webhook-response.txt --write-out "%{http_code}" \
-            --retry 3 \
-            --retry-delay 5 \
-            --max-time 30 \
-            -X POST "$WEBHOOK_URL")
+            if [ -z "${{ secrets.SSH_DEPLOY_PATH }}" ]; then
+              echo "Missing SSH_DEPLOY_PATH secret"
+              exit 1
+            fi
 
-          if [ "$http_status" -lt 200 ] || [ "$http_status" -ge 300 ]; then
-            echo "Portainer webhook returned HTTP $http_status"
-            exit 1
-          fi
+            DEPLOY_PATH="${{ secrets.SSH_DEPLOY_PATH }}"
+            if [ ! -d "$DEPLOY_PATH" ]; then
+              echo "Deploy path does not exist: $DEPLOY_PATH"
+              exit 1
+            fi
 
-          echo "Portainer webhook accepted (HTTP $http_status)"
+            cd "$DEPLOY_PATH"
+
+            if [ ! -d .git ]; then
+              echo "Deploy path is not a git repository: $DEPLOY_PATH"
+              exit 1
+            fi
+
+            git fetch origin main --tags
+            git checkout main
+            git pull --ff-only origin main
+
+            docker compose build backend
+            docker compose up -d backend redis
 
       - name: Verify deployed version
         id: verify_deploy
@@ -462,5 +477,5 @@ jobs:
       - name: Fail job when deployment failed
         if: steps.trigger_deploy.outcome != 'success' || steps.verify_deploy.outcome != 'success'
         run: |
-          echo "Deployment webhook trigger or verification failed"
+          echo "Deployment or version verification failed"
           exit 1
