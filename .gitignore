@@ -96,3 +96,5 @@ cache/
 storybook-static
 PORTAINER_MIGRATION.md
 .env.portainer
+.codenomad
+.codenomad

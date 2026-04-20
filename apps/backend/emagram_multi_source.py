@@ -24,6 +24,9 @@ from scrapers.emagram_screenshots import fetch_all_emagram_screenshots
 
 logger = logging.getLogger(__name__)
 
+GOOGLE_API_ENV_VAR = "BACKEND_GOOGLE_API_KEY"
+GROQ_API_ENV_VAR = "BACKEND_GROQ_API_KEY"
+
 
 async def generate_multi_source_emagram_for_spot(
     site_id: str,
@@ -136,7 +139,6 @@ async def generate_multi_source_emagram_for_spot(
 
         # Step 4: Analyze with AI (priority: Gemini > Groq)
         image_paths = [s["image_path"] for s in successful_screenshots]
-        sources = [s["source"] for s in successful_screenshots]
 
         analysis_result = None
         quota_errors = 0
@@ -173,6 +175,12 @@ async def generate_multi_source_emagram_for_spot(
                     "conseils_vol": gemini_analysis["conseils_vol"],
                     "alertes_securite": gemini_analysis["alertes_securite"],
                     "details_analyse": gemini_analysis["details_analyse"],
+                    "llm_provider": "google",
+                    "llm_model": gemini_analysis.get(
+                        "llm_model", os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+                    ),
+                    "llm_tokens_used": gemini_analysis.get("llm_tokens_used"),
+                    "llm_cost_usd": gemini_analysis.get("llm_cost_usd"),
                     "analyzer": "gemini",
                 }
                 logger.info("🔷 Gemini analysis successful!")
@@ -205,6 +213,12 @@ async def generate_multi_source_emagram_for_spot(
                     "conseils_vol": groq_analysis["conseils_vol"],
                     "alertes_securite": groq_analysis["alertes_securite"],
                     "details_analyse": groq_analysis["details_analyse"],
+                    "llm_provider": "groq",
+                    "llm_model": groq_analysis.get(
+                        "llm_model", "meta-llama/llama-4-scout-17b-16e-instruct"
+                    ),
+                    "llm_tokens_used": groq_analysis.get("llm_tokens_used"),
+                    "llm_cost_usd": groq_analysis.get("llm_cost_usd"),
                     "analyzer": "groq",
                 }
                 logger.info("🟢 Groq analysis successful!")
@@ -221,7 +235,10 @@ async def generate_multi_source_emagram_for_spot(
             if providers_tried == 0:
                 return {
                     "success": False,
-                    "error": "No LLM provider configured (set BACKEND_GOOGLE_API_KEY and/or BACKEND_GROQ_API_KEY)",
+                    "error": (
+                        "No LLM provider configured "
+                        f"(set {GOOGLE_API_ENV_VAR} and/or {GROQ_API_ENV_VAR})"
+                    ),
                 }
 
             if quota_errors > 0 and quota_errors >= providers_tried:
