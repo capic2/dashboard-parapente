@@ -118,6 +118,15 @@ def analyze_emagram_with_groq(
             result.setdefault("heures_volables", "11:00-17:00")
             result.setdefault("alertes_securite", [])
             result.setdefault("details_analyse", "Analyse par Groq Llama Vision")
+            usage = getattr(response, "usage", None)
+            prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
+            completion_tokens = getattr(usage, "completion_tokens", 0) or 0
+            total_tokens = getattr(usage, "total_tokens", 0) or (prompt_tokens + completion_tokens)
+
+            result["llm_provider"] = "groq"
+            result["llm_model"] = model_name
+            result["llm_tokens_used"] = total_tokens
+            result["llm_cost_usd"] = None
 
             logger.info(f"Groq analysis successful (attempt {attempt + 1})")
             return result

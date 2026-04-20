@@ -19,11 +19,13 @@ from emagram_freshness import get_emagram_cutoff_utc, get_emagram_next_update_ut
 from llm.exceptions import QuotaExhaustedError
 from llm.gemini_analyzer import analyze_emagram_with_gemini
 from llm.groq_analyzer import analyze_emagram_with_groq
-from llm.multi_emagram_analyzer import analyze_emagrammes_with_fallback
 from models import EmagramAnalysis, Site
 from scrapers.emagram_screenshots import fetch_all_emagram_screenshots
 
 logger = logging.getLogger(__name__)
+
+GOOGLE_API_ENV_VAR = "BACKEND_GOOGLE_API_KEY"
+GROQ_API_ENV_VAR = "BACKEND_GROQ_API_KEY"
 
 
 async def generate_multi_source_emagram_for_spot(
@@ -38,7 +40,7 @@ async def generate_multi_source_emagram_for_spot(
 
     1. Fetch spot coordinates from database
     2. Screenshot 3 emagram sources in parallel
-    3. Analyze with Claude Vision API
+    3. Analyze with AI vision providers
     4. Save EmagramAnalysis to database
     5. Return analysis results
 
@@ -135,9 +137,8 @@ async def generate_multi_source_emagram_for_spot(
 
         logger.info(f"📸 {len(successful_screenshots)}/3 screenshots successful")
 
-        # Step 4: Analyze with AI (priority: Gemini > ACP > Anthropic direct)
+        # Step 4: Analyze with AI (priority: Gemini > Groq)
         image_paths = [s["image_path"] for s in successful_screenshots]
-        sources = [s["source"] for s in successful_screenshots]
 
         analysis_result = None
         quota_errors = 0
@@ -174,6 +175,12 @@ async def generate_multi_source_emagram_for_spot(
                     "conseils_vol": gemini_analysis["conseils_vol"],
                     "alertes_securite": gemini_analysis["alertes_securite"],
                     "details_analyse": gemini_analysis["details_analyse"],
+                    "llm_provider": "google",
+                    "llm_model": gemini_analysis.get(
+                        "llm_model", os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+                    ),
+                    "llm_tokens_used": gemini_analysis.get("llm_tokens_used"),
+                    "llm_cost_usd": gemini_analysis.get("llm_cost_usd"),
                     "analyzer": "gemini",
                 }
                 logger.info("🔷 Gemini analysis successful!")
@@ -206,6 +213,12 @@ async def generate_multi_source_emagram_for_spot(
                     "conseils_vol": groq_analysis["conseils_vol"],
                     "alertes_securite": groq_analysis["alertes_securite"],
                     "details_analyse": groq_analysis["details_analyse"],
+                    "llm_provider": "groq",
+                    "llm_model": groq_analysis.get(
+                        "llm_model", "meta-llama/llama-4-scout-17b-16e-instruct"
+                    ),
+                    "llm_tokens_used": groq_analysis.get("llm_tokens_used"),
+                    "llm_cost_usd": groq_analysis.get("llm_cost_usd"),
                     "analyzer": "groq",
                 }
                 logger.info("🟢 Groq analysis successful!")
@@ -218,18 +231,25 @@ async def generate_multi_source_emagram_for_spot(
                 logger.warning(f"Groq analysis failed: {e}")
                 analysis_result = None
 
-        # Priority 3: Fallback to Anthropic direct API (paid)
         if not analysis_result:
-            # If all free providers hit quota, don't waste paid credits either
+            if providers_tried == 0:
+                return {
+                    "success": False,
+                    "error": (
+                        "No LLM provider configured "
+                        f"(set {GOOGLE_API_ENV_VAR} and/or {GROQ_API_ENV_VAR})"
+                    ),
+                }
+
             if quota_errors > 0 and quota_errors >= providers_tried:
                 raise QuotaExhaustedError(
-                    f"All {providers_tried} free LLM providers exhausted their quota"
+                    f"All {providers_tried} configured LLM providers exhausted their quota"
                 )
 
-            logger.info("🤖 Using Anthropic direct API (fallback)...")
-            analysis_result = await analyze_emagrammes_with_fallback(
-                image_paths=image_paths, spot_name=site.name, sources=sources
-            )
+            return {
+                "success": False,
+                "error": "All configured LLM providers failed",
+            }
 
         if not analysis_result.get("success"):
             logger.error(f"LLM analysis failed: {analysis_result.get('error')}")

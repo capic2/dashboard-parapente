@@ -102,7 +102,6 @@ DATABASE_URL=sqlite:///./test.db
 
 # API Keys (optionnel pour tests d'intégration)
 GOOGLE_API_KEY=your_test_key
-ANTHROPIC_API_KEY=your_test_key
 WEATHERAPI_KEY=your_test_key
 ```
 
