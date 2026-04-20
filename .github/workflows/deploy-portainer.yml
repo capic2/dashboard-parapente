@@ -166,11 +166,11 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           password: ${{ secrets.SSH_PASSWORD }}
+          fingerprint: ${{ secrets.SSH_FINGERPRINT }}
           port: ${{ secrets.SSH_PORT }}
-          script_stop: true
           command_timeout: 15m
           script: |
-            set -euo pipefail
+            set -eu
 
             if [ -z "${{ secrets.SSH_DEPLOY_PATH }}" ]; then
               echo "Missing SSH_DEPLOY_PATH secret"
@@ -190,9 +190,11 @@ jobs:
               exit 1
             fi
 
+            TARGET_SHA="${{ github.sha }}"
             git fetch origin main --tags
-            git checkout main
-            git pull --ff-only origin main
+            git fetch --no-tags origin "$TARGET_SHA"
+            git checkout --detach "$TARGET_SHA"
+            test "$(git rev-parse HEAD)" = "$TARGET_SHA"
 
             docker compose build backend
             docker compose up -d backend redis
