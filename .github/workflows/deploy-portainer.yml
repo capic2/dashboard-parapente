@@ -177,6 +177,7 @@ jobs:
             INSPECT_PATH=""
             STACK_ID=""
             TARGET_SHA="${{ github.sha }}"
+            REPO_SLUG="${{ github.repository }}"
 
             deploy_from_host_path() {
               path="$1"
@@ -230,10 +231,13 @@ jobs:
             if [ -n "$STACK_ID" ] && docker volume inspect portainer_data >/dev/null 2>&1; then
               echo "Host path unavailable, deploying from Portainer volume (stack $STACK_ID)"
               docker run --rm \
+                -e TARGET_SHA="$TARGET_SHA" \
+                -e REPO_SLUG="$REPO_SLUG" \
+                -e STACK_ID="$STACK_ID" \
                 -v /var/run/docker.sock:/var/run/docker.sock \
                 -v portainer_data:/data \
                 -w "/data/compose/$STACK_ID" \
-                docker:27-cli sh -ceu "apk add --no-cache git docker-cli-compose >/dev/null; git fetch origin main --tags; git fetch --no-tags origin '$TARGET_SHA'; git checkout --detach '$TARGET_SHA'; test \"\$(git rev-parse HEAD)\" = '$TARGET_SHA'; docker compose build backend; docker compose up -d backend redis"
+                docker:27-cli sh -ceu "apk add --no-cache curl tar docker-cli-compose >/dev/null; temp_dir=\$(mktemp -d); archive_url=\"https://codeload.github.com/\$REPO_SLUG/tar.gz/\$TARGET_SHA\"; curl -fsSL \"\$archive_url\" -o \"\$temp_dir/src.tar.gz\"; find \"/data/compose/\$STACK_ID\" -mindepth 1 -maxdepth 1 ! -name stack.env ! -name .env -exec rm -rf {} +; tar -xzf \"\$temp_dir/src.tar.gz\" -C \"/data/compose/\$STACK_ID\" --strip-components=1; rm -rf \"\$temp_dir\"; cd \"/data/compose/\$STACK_ID\"; docker compose build backend; docker compose up -d backend redis"
               exit 0
             fi
 
