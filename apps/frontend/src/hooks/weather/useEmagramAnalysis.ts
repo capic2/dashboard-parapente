@@ -53,6 +53,7 @@ export interface EmagramHourEntry {
   hour: number;
   score: number | null;
   status: string;
+  error_message?: string | null;
   id: string;
 }
 
