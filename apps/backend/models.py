@@ -368,8 +368,8 @@ class EmagramAnalysis(Base):
     # Data Source
     data_source = Column(String, nullable=False, default="wyoming")  # "wyoming", "meteociel", etc.
     sounding_time = Column(String, nullable=False)  # "00Z" or "12Z"
-    llm_provider = Column(String, nullable=True)  # "anthropic", "openai", "google"
-    llm_model = Column(String, nullable=True)  # "claude-3.5-sonnet", "gpt-4-vision", etc.
+    llm_provider = Column(String, nullable=True)  # "google", "groq", "openai"
+    llm_model = Column(String, nullable=True)  # "gemini-2.5-flash", "llama-4-scout", etc.
     llm_tokens_used = Column(Integer, nullable=True)
     llm_cost_usd = Column(Float, nullable=True)
     analysis_method = Column(String, nullable=False)  # "llm_vision" or "classic_calculation"

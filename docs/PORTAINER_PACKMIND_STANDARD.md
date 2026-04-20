@@ -1,11 +1,11 @@
 # Standard Packmind - Interaction Portainer
 
-Ce standard définit comment un agent (ou un humain) interagit avec Portainer de facon securisee et reproductible.
+Ce standard definit comment un agent (ou un humain) interagit avec Portainer de facon securisee et reproductible.
 
 ## 1) Objectif
 
 - Centraliser les bonnes pratiques pour lire et modifier les stacks Portainer.
-- Eviter les manipulations manuelles risquées.
+- Eviter les manipulations manuelles risquees.
 - Garantir la tracabilite des changements (variables, redeploy, validation).
 
 ## 2) Secrets et variables requis
@@ -69,9 +69,7 @@ Principe recommande:
 Exemple de suppression d'une variable obsolete dans le compose de stack:
 
 ```bash
-# Exemple: suppression d'une ligne dans un compose local avant redeploy
-# (adapter selon votre methode de publication de stack)
-sed -i '/BACKEND_ANTHROPIC_API_KEY/d' docker-compose.yml
+sed -i '/BACKEND_UNUSED_API_KEY/d' docker-compose.yml
 ```
 
 Si votre workflow utilise le webhook Portainer de stack:
@@ -81,34 +79,6 @@ curl -fsS -X POST "$PORTAINER_WEBHOOK_URL"
 ```
 
 ## 5) Procedure agent (checklist)
-
-## 5.1) Standard Git local (worktree)
-
-- Toute PR doit etre traitee dans un worktree dedie.
-- Installer les dependances dans ce worktree quand une execution locale est necessaire (lint, test, build, reproduction d'un bug).
-- Executer les checks necessaires dans ce worktree avant merge.
-
-Exemple:
-
-```bash
-# Depuis la racine du repo principal
-git worktree add ../wt-pr-123 -b pr-123 origin/main
-cd ../wt-pr-123
-pnpm install
-pnpm nx test <project>
-```
-
-## 5.2) Nettoyage apres merge/fermeture
-
-- Supprimer le worktree de la PR des qu'elle est mergee ou fermee.
-- Verifier qu'aucun processus ne tourne encore dans ce worktree avant suppression.
-
-Exemple:
-
-```bash
-git worktree remove ../wt-pr-123
-git worktree prune
-```
 
 Avant changement:
 

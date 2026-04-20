@@ -67,6 +67,18 @@ def initialize_deployment_version() -> dict[str, int | str]:
     global _current_version_payload
 
     today = _today_string()
+    forced_version = os.getenv("BACKEND_DEPLOY_VERSION", "").strip()
+
+    if forced_version:
+        forced_parts = forced_version.split(".")
+        build_number = int(forced_parts[-1]) if forced_parts and forced_parts[-1].isdigit() else 0
+        _current_version_payload = {
+            "version": forced_version,
+            "build_date": ".".join(forced_parts[:3]) if len(forced_parts) >= 3 else today,
+            "build_number": build_number,
+        }
+        logger.info("Deployment version forced from BACKEND_DEPLOY_VERSION: %s", forced_version)
+        return _current_version_payload
 
     if _is_testing_mode() and "BACKEND_VERSION_STATE_FILE" not in os.environ:
         _current_version_payload = {

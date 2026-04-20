@@ -1,7 +1,7 @@
 import preview from '../../../.storybook/preview';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
-import { expect } from 'storybook/test';
+import { expect, userEvent, within } from 'storybook/test';
 import EmagramWidget from './EmagramWidget';
 
 const meta = preview.meta({
@@ -103,6 +103,21 @@ const defaultHandlers = [
   http.get('*/api/emagram/latest', () => HttpResponse.json(mockEmagramData)),
   http.post('*/api/emagram/analyze', () => HttpResponse.json(mockEmagramData)),
   screenshotHandler,
+];
+
+const hoursHandlers = [
+  http.get('*/api/emagram/hours', () =>
+    HttpResponse.json({
+      site_id: 'site-arguel',
+      forecast_date: '2026-03-24',
+      hours: [
+        { hour: 9, score: 45, status: 'completed', id: 'emagram-h9' },
+        { hour: 12, score: 72, status: 'completed', id: 'emagram-h12' },
+        { hour: 15, score: 85, status: 'completed', id: 'emagram-h15' },
+      ],
+    })
+  ),
+  ...defaultHandlers,
 ];
 
 export const Default = meta.story({
@@ -211,6 +226,26 @@ export const Loading = meta.story({
   },
 });
 
+export const HoursWithoutAnalysis = meta.story({
+  name: 'Hours Without Analysis',
+  args: { siteId: 'site-arguel', dayIndex: 0 },
+  parameters: {
+    msw: {
+      handlers: [
+        http.get('*/api/emagram/latest', () => HttpResponse.json(null)),
+        ...hoursHandlers,
+      ],
+    },
+  },
+});
+
+HoursWithoutAnalysis.test('shows hour chooser before analysis exists', async ({ canvas }) => {
+  await canvas.findByText(/9h/);
+  await expect(canvas.getByText(/12h/)).toBeInTheDocument();
+  await expect(canvas.getByText(/15h/)).toBeInTheDocument();
+  await canvas.findByText(/Analyse en cours/);
+});
+
 export const WithScreenshotPreview = meta.story({
   name: 'With Screenshot Preview (hover)',
   args: { siteId: 'site-arguel', dayIndex: 0 },
@@ -255,8 +290,16 @@ export const HourFailedTooltip = meta.story({
 });
 
 HourFailedTooltip.test('shows tooltip for failed hour', async ({ canvas }) => {
-  const failedHourButton = await canvas.findByTitle(
+  const failedHourButton = await canvas.findByRole('button', {
+    name: /Échec analyse 14h : Timeout fournisseur LLM/,
+  });
+
+  await userEvent.hover(failedHourButton);
+
+  const tooltip = await within(document.body).findByText(
     /Échec analyse 14h : Timeout fournisseur LLM/
   );
+
+  await expect(tooltip).toBeInTheDocument();
   await expect(failedHourButton).toBeInTheDocument();
 });

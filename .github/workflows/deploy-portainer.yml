@@ -1,4 +1,4 @@
-name: Deploy to Portainer
+name: Deploy to Production (SSH)
 
 on:
   push:
@@ -16,9 +16,9 @@ concurrency:
 
 jobs:
   deploy:
-    name: Trigger Portainer webhook
+    name: Deploy over SSH
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
 
     steps:
       - name: Compute deployment version
@@ -29,8 +29,9 @@ jobs:
             const date = new Date().toISOString().slice(0, 10).replace(/-/g, '.');
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+            const currentSha = context.sha;
 
-            const response = await github.request(
+            const deployTagsResponse = await github.request(
               'GET /repos/{owner}/{repo}/git/matching-refs/{ref}',
               {
                 owner,
@@ -39,7 +40,16 @@ jobs:
               }
             );
 
-            const parsedTags = response.data
+            const successTagsResponse = await github.request(
+              'GET /repos/{owner}/{repo}/git/matching-refs/{ref}',
+              {
+                owner,
+                repo,
+                ref: 'tags/deploy-success/',
+              }
+            );
+
+            const parsedDeployTags = deployTagsResponse.data
               .map((item) => {
                 const match = item.ref.match(/^refs\/tags\/deploy\/(\d{4}\.\d{2}\.\d{2})\.(\d+)$/);
                 if (!match) return null;
@@ -56,43 +66,56 @@ jobs:
                 return a.date.localeCompare(b.date);
               });
 
-            const latestTag = parsedTags.length > 0 ? parsedTags[parsedTags.length - 1] : null;
-            const latestToday = parsedTags
-              .filter((tag) => tag.date === date)
-              .reduce((max, tag) => Math.max(max, tag.number), 0);
+            const parsedSuccessTags = successTagsResponse.data
+              .map((item) => {
+                const match = item.ref.match(/^refs\/tags\/deploy-success\/(\d{4}\.\d{2}\.\d{2})\.(\d+)$/);
+                if (!match) return null;
+                return {
+                  ref: item.ref,
+                  date: match[1],
+                  number: Number(match[2]),
+                  sha: item.object.sha,
+                };
+              })
+              .filter(Boolean)
+              .sort((a, b) => {
+                if (a.date === b.date) return a.number - b.number;
+                return a.date.localeCompare(b.date);
+              });
 
-            const nextNumber = latestToday + 1;
-            const version = `${date}.${nextNumber}`;
+            const existingTagForSha = parsedDeployTags.find((tag) => tag.sha === currentSha);
+
+            let version;
+            if (existingTagForSha) {
+              version = `${existingTagForSha.date}.${existingTagForSha.number}`;
+              core.info(`Reusing deployment version ${version} for SHA ${currentSha}`);
+            } else {
+              const latestToday = parsedDeployTags
+                .filter((tag) => tag.date === date)
+                .reduce((max, tag) => Math.max(max, tag.number), 0);
+              const nextNumber = latestToday + 1;
+              version = `${date}.${nextNumber}`;
+              core.info(`Assigned new deployment version ${version} for SHA ${currentSha}`);
+            }
+
+            const latestSuccessfulTag =
+              parsedSuccessTags.length > 0
+                ? parsedSuccessTags[parsedSuccessTags.length - 1]
+                : parsedDeployTags
+                    .filter((tag) => tag.sha !== currentSha)
+                    .at(-1);
 
             core.setOutput('version', version);
             core.setOutput('tag_name', `deploy/${version}`);
+            core.setOutput('success_tag_name', `deploy-success/${version}`);
             core.setOutput('label_name', `version:${version}`);
-            core.setOutput('previous_deploy_sha', latestTag ? latestTag.sha : '');
+            core.setOutput('previous_deploy_sha', latestSuccessfulTag ? latestSuccessfulTag.sha : '');
 
-            core.info(`Deployment version: ${version}`);
-            if (latestTag) {
-              core.info(`Previous deployment tag: ${latestTag.ref} (${latestTag.sha})`);
+            if (latestSuccessfulTag) {
+              core.info(`Previous successful deployment tag: ${latestSuccessfulTag.ref} (${latestSuccessfulTag.sha})`);
             }
 
-      - name: Trigger deployment
-        id: trigger_deploy
-        continue-on-error: true
-        env:
-          WEBHOOK_URL: ${{ secrets.PORTAINER_WEBHOOK_URL }}
-        run: |
-          if [ -z "$WEBHOOK_URL" ]; then
-            echo "Missing PORTAINER_WEBHOOK_URL secret"
-            exit 1
-          fi
-
-          curl --fail --show-error --silent \
-            --retry 3 \
-            --retry-delay 5 \
-            --max-time 30 \
-            -X POST "$WEBHOOK_URL"
-
-      - name: Create deployment tag
-        if: steps.trigger_deploy.outcome == 'success'
+      - name: Reserve deployment tag
         uses: actions/github-script@v9
         env:
           TAG_NAME: ${{ steps.version.outputs.tag_name }}
@@ -111,17 +134,220 @@ jobs:
                 ref: `refs/tags/${tagName}`,
                 sha: targetSha,
               });
-              core.info(`Created tag ${tagName} on ${targetSha}`);
+              core.info(`Reserved deployment tag ${tagName} on ${targetSha}`);
             } catch (error) {
               if (error.status === 422) {
-                core.warning(`Tag ${tagName} already exists, skipping creation`);
+                const existingRef = await github.request(
+                  'GET /repos/{owner}/{repo}/git/ref/{ref}',
+                  {
+                    owner,
+                    repo,
+                    ref: `tags/${tagName}`,
+                  }
+                );
+
+                if (existingRef.data.object.sha !== targetSha) {
+                  throw new Error(
+                    `Tag ${tagName} already exists on ${existingRef.data.object.sha}, expected ${targetSha}`
+                  );
+                }
+
+                core.info(`Deployment tag ${tagName} already exists on ${targetSha}, reusing it`);
+              } else {
+                throw error;
+              }
+            }
+
+      - name: Deploy on production server
+        id: trigger_deploy
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          fingerprint: ${{ secrets.SSH_FINGERPRINT }}
+          port: ${{ secrets.SSH_PORT }}
+          command_timeout: 15m
+          script: |
+            set -eu
+
+            REQUESTED_DEPLOY_PATH="${{ secrets.SSH_DEPLOY_PATH }}"
+            DEPLOY_PATH="$REQUESTED_DEPLOY_PATH"
+            INSPECT_PATH=""
+            STACK_ID=""
+            TARGET_SHA="${{ github.sha }}"
+            TARGET_VERSION="${{ steps.version.outputs.version }}"
+            REPO_SLUG="${{ github.repository }}"
+            COMPOSE_PROJECT_NAME="dashboard-parapente"
+
+            deploy_from_host_path() {
+              path="$1"
+              cd "$path"
+
+              if [ ! -d .git ]; then
+                echo "Deploy path is not a git repository: $path"
+                return 1
+              fi
+
+              git fetch origin main --tags
+              git fetch --no-tags origin "$TARGET_SHA"
+              git checkout --detach "$TARGET_SHA"
+              test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+
+              docker compose -p "$COMPOSE_PROJECT_NAME" build backend
+              BACKEND_DEPLOY_VERSION="$TARGET_VERSION" docker compose -p "$COMPOSE_PROJECT_NAME" up -d backend redis
+            }
+
+            if [ -n "$DEPLOY_PATH" ] && [ -d "$DEPLOY_PATH" ]; then
+              echo "Using configured deploy path: $DEPLOY_PATH"
+            else
+              if [ -n "$DEPLOY_PATH" ]; then
+                echo "Configured deploy path not found: $DEPLOY_PATH"
+              fi
+
+              INSPECT_PATH=$(docker inspect parapente-backend --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' 2>/dev/null || true)
+
+              if [ -n "$INSPECT_PATH" ] && [ -d "$INSPECT_PATH" ]; then
+                DEPLOY_PATH="$INSPECT_PATH"
+                echo "Using docker-inspected deploy path: $DEPLOY_PATH"
+              elif [ -n "$INSPECT_PATH" ]; then
+                STACK_ID="${INSPECT_PATH##*/}"
+                for base_path in /data/compose /var/lib/docker/volumes/portainer_data/_data/compose /var/lib/docker/volumes/portainer/_data/compose; do
+                  CANDIDATE_PATH="$base_path/$STACK_ID"
+                  if [ -d "$CANDIDATE_PATH" ]; then
+                    DEPLOY_PATH="$CANDIDATE_PATH"
+                    echo "Using resolved Portainer deploy path: $DEPLOY_PATH"
+                    break
+                  fi
+                done
+              fi
+            fi
+
+            if [ -n "$DEPLOY_PATH" ] && [ -d "$DEPLOY_PATH" ]; then
+              echo "Deploying from host path: $DEPLOY_PATH"
+              deploy_from_host_path "$DEPLOY_PATH"
+              exit 0
+            fi
+
+            if [ -n "$STACK_ID" ] && docker volume inspect portainer_data >/dev/null 2>&1; then
+              echo "Host path unavailable, deploying from Portainer volume (stack $STACK_ID)"
+              docker run --rm \
+                -e TARGET_SHA="$TARGET_SHA" \
+                -e TARGET_VERSION="$TARGET_VERSION" \
+                -e REPO_SLUG="$REPO_SLUG" \
+                -e STACK_ID="$STACK_ID" \
+                -v /var/run/docker.sock:/var/run/docker.sock \
+                -v portainer_data:/data \
+                -w "/data/compose/$STACK_ID" \
+                docker:27-cli sh -ceu "apk add --no-cache curl tar docker-cli-compose >/dev/null; temp_dir=\$(mktemp -d); archive_url=\"https://codeload.github.com/\$REPO_SLUG/tar.gz/\$TARGET_SHA\"; curl -fsSL \"\$archive_url\" -o \"\$temp_dir/src.tar.gz\"; find \"/data/compose/\$STACK_ID\" -mindepth 1 -maxdepth 1 ! -name stack.env ! -name .env -exec rm -rf {} +; tar -xzf \"\$temp_dir/src.tar.gz\" -C \"/data/compose/\$STACK_ID\" --strip-components=1; rm -rf \"\$temp_dir\"; cd \"/data/compose/\$STACK_ID\"; env_opt=\"\"; if [ -f stack.env ]; then env_opt=\"--env-file stack.env\"; elif [ -f .env ]; then env_opt=\"--env-file .env\"; fi; docker compose -p dashboard-parapente \$env_opt build backend; BACKEND_DEPLOY_VERSION=\"\$TARGET_VERSION\" docker compose -p dashboard-parapente \$env_opt up -d backend redis"
+              exit 0
+            fi
+
+            echo "Deploy path does not exist: $DEPLOY_PATH"
+            if [ -n "$REQUESTED_DEPLOY_PATH" ]; then
+              echo "Configured SSH_DEPLOY_PATH: $REQUESTED_DEPLOY_PATH"
+            fi
+            if [ -n "$INSPECT_PATH" ]; then
+              echo "Detected stack working_dir: $INSPECT_PATH"
+            fi
+            echo "Unable to access deploy path on host and no Portainer volume fallback available"
+            exit 1
+
+      - name: Verify deployed version
+        id: verify_deploy
+        if: always() && steps.trigger_deploy.conclusion == 'success'
+        continue-on-error: true
+        env:
+          VERSION_ENDPOINT_URL: ${{ secrets.PRODUCTION_VERSION_URL }}
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
+          MAX_ATTEMPTS: ${{ vars.DEPLOY_VERIFY_MAX_ATTEMPTS || '30' }}
+          SLEEP_SECONDS: ${{ vars.DEPLOY_VERIFY_SLEEP_SECONDS || '10' }}
+        run: |
+          if [ -z "$VERSION_ENDPOINT_URL" ]; then
+            echo "Missing PRODUCTION_VERSION_URL secret"
+            exit 1
+          fi
+
+          if [ -z "$EXPECTED_VERSION" ]; then
+            echo "Missing expected deployment version"
+            exit 1
+          fi
+
+          attempt=1
+          while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
+            response=$(curl --show-error --silent --fail --max-time 10 "$VERSION_ENDPOINT_URL" 2>/tmp/version-check.err || true)
+            deployed_version=$(python -c "import json,sys; data=json.load(sys.stdin); print(data.get('version',''))" <<< "$response" 2>/dev/null || true)
+
+            if [ "$deployed_version" = "$EXPECTED_VERSION" ]; then
+              echo "Deployment version verified: $deployed_version"
+              exit 0
+            fi
+
+            if [ -n "$deployed_version" ]; then
+              echo "Attempt $attempt/$MAX_ATTEMPTS: expected $EXPECTED_VERSION, got $deployed_version"
+            else
+              curl_error=$(tr -d '\n' </tmp/version-check.err)
+              if [ -n "$curl_error" ]; then
+                echo "Attempt $attempt/$MAX_ATTEMPTS: version endpoint unreachable ($curl_error)"
+              else
+                echo "Attempt $attempt/$MAX_ATTEMPTS: version endpoint not ready"
+              fi
+            fi
+
+            sleep "$SLEEP_SECONDS"
+            attempt=$((attempt + 1))
+          done
+
+          echo "Failed to verify deployed version $EXPECTED_VERSION via $VERSION_ENDPOINT_URL"
+          exit 1
+
+      - name: Mark deployment as successful
+        if: steps.trigger_deploy.conclusion == 'success' && steps.verify_deploy.outcome == 'success'
+        uses: actions/github-script@v9
+        env:
+          TAG_NAME: ${{ steps.version.outputs.success_tag_name }}
+          TARGET_SHA: ${{ github.sha }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const tagName = process.env.TAG_NAME;
+            const targetSha = process.env.TARGET_SHA;
+
+            try {
+              await github.request('POST /repos/{owner}/{repo}/git/refs', {
+                owner,
+                repo,
+                ref: `refs/tags/${tagName}`,
+                sha: targetSha,
+              });
+              core.info(`Created success tag ${tagName} on ${targetSha}`);
+            } catch (error) {
+              if (error.status === 422) {
+                const existingRef = await github.request(
+                  'GET /repos/{owner}/{repo}/git/ref/{ref}',
+                  {
+                    owner,
+                    repo,
+                    ref: `tags/${tagName}`,
+                  }
+                );
+
+                if (existingRef.data.object.sha !== targetSha) {
+                  throw new Error(
+                    `Tag ${tagName} already exists on ${existingRef.data.object.sha}, expected ${targetSha}`
+                  );
+                }
+
+                core.info(`Success tag ${tagName} already exists on ${targetSha}, skipping creation`);
               } else {
                 throw error;
               }
             }
 
       - name: Label merged PRs with deployed version
-        if: steps.trigger_deploy.outcome == 'success'
+        if: steps.trigger_deploy.conclusion == 'success' && steps.verify_deploy.outcome == 'success'
         uses: actions/github-script@v9
         env:
           VERSION_LABEL: ${{ steps.version.outputs.label_name }}
@@ -252,7 +478,7 @@ jobs:
             );
 
       - name: Label current PR as non deployed when deployment fails
-        if: steps.trigger_deploy.outcome == 'failure' && github.event_name == 'pull_request'
+        if: (steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success') && github.event_name == 'pull_request'
         uses: actions/github-script@v9
         env:
           UNDEPLOYED_LABEL: non déployé
@@ -301,11 +527,13 @@ jobs:
       - name: Confirm
         if: always()
         run: |
-          echo "Deployment step outcome: ${{ steps.trigger_deploy.outcome }}"
+          echo "Deployment step conclusion: ${{ steps.trigger_deploy.conclusion }}"
+          echo "Verification step conclusion: ${{ steps.verify_deploy.conclusion }}"
+          echo "Verification step outcome: ${{ steps.verify_deploy.outcome }}"
           echo "Computed deployment version: ${{ steps.version.outputs.version }}"
 
       - name: Fail job when deployment failed
-        if: steps.trigger_deploy.outcome == 'failure'
+        if: steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success'
         run: |
-          echo "Deployment webhook failed"
+          echo "Deployment or version verification failed"
           exit 1

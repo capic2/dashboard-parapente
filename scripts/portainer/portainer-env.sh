@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Load Portainer secrets from .env file (default: .env.portainer)
-# Usage:
-#   source scripts/portainer/portainer-env.sh
-#   PORTAINER_ENV_FILE=./ops/.env.portainer source scripts/portainer/portainer-env.sh
-
 ENV_FILE="${PORTAINER_ENV_FILE:-.env.portainer}"
 
 if [ -f "$ENV_FILE" ]; then
