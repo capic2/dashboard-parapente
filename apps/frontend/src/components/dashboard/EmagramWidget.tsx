@@ -92,18 +92,33 @@ function HourSlider({
       </Slider>
       <div className="relative mt-1 h-7">
         {hours.map((h, idx) => {
+          const isActive = h.hour === effectiveHour;
+          const isFailed = h.status === 'failed';
+          const errorText =
+            h.error_message?.trim() ||
+            'Analyse non disponible pour cette heure';
           const percent =
             hours.length > 1 ? (idx / (hours.length - 1)) * 100 : 50;
+
+          const buttonClassName = isActive
+            ? isFailed
+              ? 'font-bold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/30'
+              : 'font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30'
+            : isFailed
+              ? 'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300'
+              : 'text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300';
+
           return (
             <Button
               key={h.hour}
               onPress={() => onHourChange(h.hour)}
-              className={`absolute -translate-x-1/2 text-[10px] px-1 py-0.5 rounded transition-colors ${
-                h.hour === effectiveHour
-                  ? 'font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30'
-                  : 'text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-              }`}
+              className={`absolute -translate-x-1/2 text-[10px] px-1 py-0.5 rounded transition-colors ${buttonClassName}`}
               style={{ left: `${percent}%` }}
+              title={
+                isFailed
+                  ? `Échec analyse ${h.hour}h : ${errorText}`
+                  : undefined
+              }
             >
               {h.hour}h
               {h.score != null && h.status === 'completed' && (
@@ -157,7 +172,7 @@ export default function EmagramWidget({
     ) {
       return selectedHour;
     }
-    if (!availableHours.length) return null;
+    if (!availableHours.length) return selectedHour;
     const targetHour = dayIndex > 0 ? 14 : new Date().getHours();
     const hours = availableHours.map((h) => h.hour);
 
@@ -168,8 +183,6 @@ export default function EmagramWidget({
     );
   }, [selectedHour, availableHours, dayIndex]);
 
-  const hasHourlyData = availableHours.length > 0;
-
   const {
     data: emagram,
     isLoading,
@@ -178,9 +191,32 @@ export default function EmagramWidget({
   } = useLatestEmagram(
     siteId,
     dayIndex,
-    hasHourlyData ? activeHour : undefined,
+    activeHour,
     { enabled: shouldFetchEmagram }
   );
+
+  const displayHours = useMemo(() => {
+    if (emagram?.forecast_hour == null) {
+      return availableHours;
+    }
+
+    if (availableHours.some((h) => h.hour === emagram.forecast_hour)) {
+      return availableHours;
+    }
+
+    return [
+      ...availableHours,
+      {
+        hour: emagram.forecast_hour,
+        score: emagram.score_volabilite,
+        status: emagram.analysis_status,
+        error_message: emagram.error_message,
+        id: emagram.id,
+      },
+    ].sort((a, b) => a.hour - b.hour);
+  }, [availableHours, emagram]);
+
+  const hasHourlyData = displayHours.length > 0;
   const triggerMutation = useTriggerEmagram();
 
   const handleRefresh = async () => {
@@ -325,9 +361,9 @@ export default function EmagramWidget({
             </span>
           </Button>
         </div>
-        {hasHourlyData && hoursData && (
+        {hasHourlyData && (
           <HourSlider
-            hours={availableHours}
+            hours={displayHours}
             selectedHour={activeHour}
             onHourChange={setSelectedHour}
           />
@@ -405,9 +441,9 @@ export default function EmagramWidget({
       </div>
 
       {/* Hour Slider */}
-      {hasHourlyData && hoursData && (
+      {hasHourlyData && (
         <HourSlider
-          hours={availableHours}
+          hours={displayHours}
           selectedHour={activeHour}
           onHourChange={setSelectedHour}
         />

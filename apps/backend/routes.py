@@ -4367,6 +4367,7 @@ async def get_emagram_hours(
                 EmagramAnalysis.forecast_hour,
                 EmagramAnalysis.score_volabilite,
                 EmagramAnalysis.analysis_status,
+                EmagramAnalysis.error_message,
                 EmagramAnalysis.id,
                 EmagramAnalysis.analysis_datetime,
             )
@@ -4375,7 +4376,6 @@ async def get_emagram_hours(
                 EmagramAnalysis.forecast_date == target_date,
                 EmagramAnalysis.forecast_hour.isnot(None),
                 EmagramAnalysis.analysis_method == "llm_vision",
-                EmagramAnalysis.analysis_status == "completed",
                 EmagramAnalysis.analysis_datetime >= cutoff_time,
             )
             .order_by(EmagramAnalysis.forecast_hour, EmagramAnalysis.analysis_datetime.desc())
@@ -4398,6 +4398,7 @@ async def get_emagram_hours(
                     "hour": a.forecast_hour,
                     "score": a.score_volabilite,
                     "status": a.analysis_status,
+                    "error_message": a.error_message,
                     "id": a.id,
                 }
                 for a in unique_analyses
