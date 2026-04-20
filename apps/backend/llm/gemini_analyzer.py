@@ -113,6 +113,18 @@ def analyze_emagram_with_gemini(
             # Parse response
             analysis = _parse_gemini_response(response_text)
 
+            usage = getattr(response, "usage_metadata", None)
+            prompt_tokens = getattr(usage, "prompt_token_count", 0) or 0
+            completion_tokens = getattr(usage, "candidates_token_count", 0) or 0
+            total_tokens = getattr(usage, "total_token_count", 0) or (
+                prompt_tokens + completion_tokens
+            )
+
+            analysis["llm_provider"] = "google"
+            analysis["llm_model"] = model_name
+            analysis["llm_tokens_used"] = total_tokens
+            analysis["llm_cost_usd"] = 0.0
+
             logger.info(f"Successfully analyzed emagram for {spot_name} with Gemini")
             return analysis
 
