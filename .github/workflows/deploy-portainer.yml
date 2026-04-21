@@ -241,45 +241,7 @@ jobs:
                 -v /var/run/docker.sock:/var/run/docker.sock \
                 -v portainer_data:/data \
                 -w "/data/compose/$STACK_ID" \
-                docker:27-cli sh -seu <<'EOF'
-                  apk add --no-cache curl tar >/dev/null
-
-                  work_dir="/data/compose/$STACK_ID"
-                  temp_dir="$(mktemp -d)"
-                  stage_dir="$temp_dir/stage"
-                  extracted_dir="$temp_dir/extracted"
-                  mkdir -p "$stage_dir" "$extracted_dir"
-                  trap 'rm -rf "$temp_dir"' EXIT
-
-                  archive_url="https://codeload.github.com/$REPO_SLUG/tar.gz/$TARGET_SHA"
-                  curl -fsSL "$archive_url" -o "$temp_dir/src.tar.gz"
-                  tar -xzf "$temp_dir/src.tar.gz" -C "$extracted_dir" --strip-components=1 --exclude='.env' --exclude='stack.env'
-
-                  cp -a "$extracted_dir"/. "$stage_dir"/
-
-                  if [ -f "$work_dir/stack.env" ]; then
-                    cp -f "$work_dir/stack.env" "$stage_dir/stack.env"
-                  fi
-                  if [ -f "$work_dir/.env" ]; then
-                    cp -f "$work_dir/.env" "$stage_dir/.env"
-                  fi
-
-                  find "$work_dir" -mindepth 1 -maxdepth 1 ! -name stack.env ! -name .env -exec rm -rf {} +
-                  cp -a "$stage_dir"/. "$work_dir"/
-
-                  cd "$work_dir"
-
-                  if [ -f stack.env ]; then
-                    docker compose -p "$COMPOSE_PROJECT_NAME" --env-file stack.env build backend
-                    BACKEND_DEPLOY_VERSION="$TARGET_VERSION" docker compose -p "$COMPOSE_PROJECT_NAME" --env-file stack.env up -d backend redis
-                  elif [ -f .env ]; then
-                    docker compose -p "$COMPOSE_PROJECT_NAME" --env-file .env build backend
-                    BACKEND_DEPLOY_VERSION="$TARGET_VERSION" docker compose -p "$COMPOSE_PROJECT_NAME" --env-file .env up -d backend redis
-                  else
-                    docker compose -p "$COMPOSE_PROJECT_NAME" build backend
-                    BACKEND_DEPLOY_VERSION="$TARGET_VERSION" docker compose -p "$COMPOSE_PROJECT_NAME" up -d backend redis
-                  fi
-              EOF
+                docker:27-cli sh -ceu "apk add --no-cache curl tar >/dev/null; work_dir=/data/compose/\$STACK_ID; temp_dir=\$(mktemp -d); stage_dir=\$temp_dir/stage; extracted_dir=\$temp_dir/extracted; mkdir -p \"\$stage_dir\" \"\$extracted_dir\"; trap 'rm -rf \"\$temp_dir\"' EXIT; archive_url=\"https://codeload.github.com/\$REPO_SLUG/tar.gz/\$TARGET_SHA\"; curl -fsSL \"\$archive_url\" -o \"\$temp_dir/src.tar.gz\"; tar -xzf \"\$temp_dir/src.tar.gz\" -C \"\$extracted_dir\" --strip-components=1 --exclude='.env' --exclude='stack.env'; cp -a \"\$extracted_dir\"/. \"\$stage_dir\"/; if [ -f \"\$work_dir/stack.env\" ]; then cp -f \"\$work_dir/stack.env\" \"\$stage_dir/stack.env\"; fi; if [ -f \"\$work_dir/.env\" ]; then cp -f \"\$work_dir/.env\" \"\$stage_dir/.env\"; fi; find \"\$work_dir\" -mindepth 1 -maxdepth 1 ! -name stack.env ! -name .env -exec rm -rf {} +; cp -a \"\$stage_dir\"/. \"\$work_dir\"/; cd \"\$work_dir\"; if [ -f stack.env ]; then docker compose -p \"\$COMPOSE_PROJECT_NAME\" --env-file stack.env build backend; BACKEND_DEPLOY_VERSION=\"\$TARGET_VERSION\" docker compose -p \"\$COMPOSE_PROJECT_NAME\" --env-file stack.env up -d backend redis; elif [ -f .env ]; then docker compose -p \"\$COMPOSE_PROJECT_NAME\" --env-file .env build backend; BACKEND_DEPLOY_VERSION=\"\$TARGET_VERSION\" docker compose -p \"\$COMPOSE_PROJECT_NAME\" --env-file .env up -d backend redis; else docker compose -p \"\$COMPOSE_PROJECT_NAME\" build backend; BACKEND_DEPLOY_VERSION=\"\$TARGET_VERSION\" docker compose -p \"\$COMPOSE_PROJECT_NAME\" up -d backend redis; fi"
               exit 0
             fi
 
