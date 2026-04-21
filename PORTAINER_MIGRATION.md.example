@@ -41,7 +41,6 @@ Ce guide explique comment mettre à jour les variables d'environnement dans Port
 | *(nouvelle)* | `BACKEND_STRAVA_VERIFY_TOKEN` | `PARAPENTE_2025` |
 | `GOOGLE_API_KEY` | `BACKEND_GOOGLE_API_KEY` | `votre_clé` |
 | `GEMINI_MODEL` | `BACKEND_GEMINI_MODEL` | `gemini-2.5-flash` |
-| `ANTHROPIC_API_KEY` | `BACKEND_ANTHROPIC_API_KEY` | `votre_clé` |
 | `SCHEDULER_ENABLED` | `BACKEND_SCHEDULER_ENABLED` | `true` |
 | `SCHEDULER_INTERVAL_MINUTES` | `BACKEND_SCHEDULER_INTERVAL_MINUTES` | `30` |
 | `LOG_LEVEL` | `BACKEND_LOG_LEVEL` | `INFO` |
@@ -210,7 +209,6 @@ BACKEND_STRAVA_VERIFY_TOKEN=PARAPENTE_2025
 # Backend - AI Analysis
 BACKEND_GOOGLE_API_KEY=your_google_api_key_here
 BACKEND_GEMINI_MODEL=gemini-2.5-flash
-BACKEND_ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
 # Backend - Scheduler
 BACKEND_SCHEDULER_ENABLED=true
