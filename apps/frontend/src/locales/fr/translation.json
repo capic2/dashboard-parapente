@@ -57,6 +57,12 @@
     "siteFound_one": "{{count}} site trouvé",
     "siteFound_other": "{{count}} sites trouvés"
   },
+  "appUpdate": {
+    "title": "Nouvelle version disponible",
+    "message": "Une nouvelle version ({{version}}) est prête.",
+    "viewWhatsNew": "Voir les nouveautés",
+    "refresh": "Rafraîchir"
+  },
   "dashboard": {
     "loadingError": "Erreur de chargement",
     "loadingMessage": "Chargement du tableau de bord...",

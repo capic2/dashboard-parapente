@@ -1,8 +1,11 @@
 import { Suspense } from 'react';
 import { createRootRoute, Outlet, useMatchRoute } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
 import Header from '../components/common/Header';
+import AppUpdateBanner from '../components/common/AppUpdateBanner';
 import { queryClient } from '../lib/queryClient';
 import { appVersionQueryOptions } from '../hooks/common/useAppVersion';
+import { useVersionUpdates } from '../hooks/common/useVersionUpdates';
 
 export const Route = createRootRoute({
   loader: () => queryClient.ensureQueryData(appVersionQueryOptions()),
@@ -29,10 +32,14 @@ function PendingComponent() {
 }
 
 function RootComponent() {
+  const { t } = useTranslation();
   const matchRoute = useMatchRoute();
   const isLoginPage = matchRoute({ to: '/login' });
   const appVersion = Route.useLoaderData();
   const version = appVersion?.version ?? null;
+  const { latestVersion, releaseNotesUrl } = useVersionUpdates(
+    isLoginPage ? null : version
+  );
 
   if (isLoginPage) {
     return <Outlet />;
@@ -41,6 +48,18 @@ function RootComponent() {
   return (
     <div className="min-h-screen p-3 md:p-4 overflow-x-clip bg-gray-50 dark:bg-gray-900 transition-colors">
       <div className="max-w-7xl mx-auto">
+        {latestVersion && (
+          <AppUpdateBanner
+            title={t('appUpdate.title')}
+            message={t('appUpdate.message', {
+              version: latestVersion,
+            })}
+            viewWhatsNewLabel={t('appUpdate.viewWhatsNew')}
+            refreshLabel={t('appUpdate.refresh')}
+            releaseNotesUrl={releaseNotesUrl}
+            onRefresh={() => window.location.reload()}
+          />
+        )}
         <Header />
         <main>
           <Suspense>
