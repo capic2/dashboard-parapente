@@ -20,9 +20,7 @@ def reset_version_cache_fixture():
 
 def test_get_version_includes_release_notes_url(client, monkeypatch):
     monkeypatch.setenv("BACKEND_DEPLOY_VERSION", "2026.04.21.7")
-    monkeypatch.setenv(
-        "BACKEND_RELEASE_NOTES_URL", "https://example.com/releases/2026.04.21.7"
-    )
+    monkeypatch.setenv("BACKEND_RELEASE_NOTES_URL", "https://example.com/releases/2026.04.21.7")
     response = client.get(f"{API_PREFIX}/version")
 
     assert response.status_code == 200
@@ -33,9 +31,7 @@ def test_get_version_includes_release_notes_url(client, monkeypatch):
 
 def test_version_stream_sends_initial_version_event(monkeypatch):
     monkeypatch.setenv("BACKEND_DEPLOY_VERSION", "2026.04.22.1")
-    monkeypatch.setenv(
-        "BACKEND_RELEASE_NOTES_URL", "https://example.com/releases/2026.04.22.1"
-    )
+    monkeypatch.setenv("BACKEND_RELEASE_NOTES_URL", "https://example.com/releases/2026.04.22.1")
     payload = versioning.get_version_payload()
     chunk = serialize_sse_event("version", payload)
 
