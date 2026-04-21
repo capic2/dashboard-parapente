@@ -3,7 +3,6 @@ import json
 import logging
 import math
 import os
-import time
 import uuid
 import xml.etree.ElementTree as ET
 from typing import Any
@@ -11,7 +10,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
@@ -3262,16 +3261,20 @@ def version_info():
     return get_version_payload()
 
 
-@public_router.get("/version/stream")
-def version_stream() -> StreamingResponse:
-    def event_stream():
-        yield "retry: 5000\n\n"
-        yield f"event: version\ndata: {json.dumps(get_version_payload())}\n\n"
+def serialize_sse_event(event_name: str, payload: dict[str, Any]) -> str:
+    return f"event: {event_name}\ndata: {json.dumps(payload)}\n\n"
 
-        while True:
+
+@public_router.get("/version/stream")
+async def version_stream(request: Request) -> StreamingResponse:
+    async def event_stream():
+        yield "retry: 5000\n\n"
+        yield serialize_sse_event("version", get_version_payload())
+
+        while not await request.is_disconnected():
             heartbeat = {"timestamp": datetime.utcnow().isoformat()}
-            yield f"event: ping\ndata: {json.dumps(heartbeat)}\n\n"
-            time.sleep(25)
+            yield serialize_sse_event("ping", heartbeat)
+            await asyncio.sleep(25)
 
     return StreamingResponse(
         event_stream(),

@@ -4,6 +4,7 @@ import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 import fcntl
 
@@ -29,7 +30,15 @@ def _is_testing_mode() -> bool:
 
 def _release_notes_url() -> str | None:
     value = os.getenv("BACKEND_RELEASE_NOTES_URL", "").strip()
-    return value or None
+    if not value:
+        return None
+
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        logger.warning("Ignoring invalid BACKEND_RELEASE_NOTES_URL: %s", value)
+        return None
+
+    return value
 
 
 def _load_state() -> dict[str, int | str] | None:

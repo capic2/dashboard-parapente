@@ -37,7 +37,9 @@ function RootComponent() {
   const isLoginPage = matchRoute({ to: '/login' });
   const appVersion = Route.useLoaderData();
   const version = appVersion?.version ?? null;
-  const { latestVersion, releaseNotesUrl } = useVersionUpdates(version);
+  const { latestVersion, releaseNotesUrl } = useVersionUpdates(
+    isLoginPage ? null : version
+  );
 
   if (isLoginPage) {
     return <Outlet />;

@@ -8,20 +8,49 @@ export type AppVersionPayload = {
   release_notes_url?: string | null;
 };
 
-function isAppVersionPayload(value: unknown): value is AppVersionPayload {
+function sanitizeReleaseNotesUrl(value: unknown): string | null | undefined {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+      return value;
+    }
+    return null;
+  } catch {
+    if (value.startsWith('/') && !value.startsWith('//')) {
+      return value;
+    }
+    return null;
+  }
+}
+
+function sanitizeAppVersionPayload(value: unknown): AppVersionPayload | null {
   if (!value || typeof value !== 'object') {
-    return false;
+    return null;
   }
 
   const payload = value as Record<string, unknown>;
-  return (
-    typeof payload.version === 'string' &&
-    typeof payload.build_date === 'string' &&
-    typeof payload.build_number === 'number' &&
-    (typeof payload.release_notes_url === 'string' ||
-      payload.release_notes_url === null ||
-      payload.release_notes_url === undefined)
-  );
+  if (
+    typeof payload.version !== 'string' ||
+    typeof payload.build_date !== 'string' ||
+    typeof payload.build_number !== 'number'
+  ) {
+    return null;
+  }
+
+  return {
+    version: payload.version,
+    build_date: payload.build_date,
+    build_number: payload.build_number,
+    release_notes_url: sanitizeReleaseNotesUrl(payload.release_notes_url),
+  };
 }
 
 export const appVersionQueryOptions = () =>
@@ -31,9 +60,9 @@ export const appVersionQueryOptions = () =>
     retry: 0,
     queryFn: async () => {
       try {
-        const data = await api.get('version').json();
+        const data = sanitizeAppVersionPayload(await api.get('version').json());
 
-        if (!isAppVersionPayload(data)) {
+        if (!data) {
           throw new Error('Invalid version payload');
         }
 

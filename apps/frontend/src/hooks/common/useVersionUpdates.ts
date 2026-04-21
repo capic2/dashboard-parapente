@@ -7,6 +7,29 @@ type VersionUpdateState = {
   releaseNotesUrl: string | null;
 };
 
+function sanitizeReleaseNotesUrl(value: unknown): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return value;
+    }
+    return null;
+  } catch {
+    if (value.startsWith('/') && !value.startsWith('//')) {
+      return value;
+    }
+    return null;
+  }
+}
+
 function isAppVersionPayload(value: unknown): value is AppVersionPayload {
   if (!value || typeof value !== 'object') {
     return false;
@@ -16,10 +39,7 @@ function isAppVersionPayload(value: unknown): value is AppVersionPayload {
   return (
     typeof payload.version === 'string' &&
     typeof payload.build_date === 'string' &&
-    typeof payload.build_number === 'number' &&
-    (typeof payload.release_notes_url === 'string' ||
-      payload.release_notes_url === null ||
-      payload.release_notes_url === undefined)
+    typeof payload.build_number === 'number'
   );
 }
 
@@ -54,7 +74,9 @@ export function useVersionUpdates(
       }
 
       const nextVersion = parsed.version;
-      const nextReleaseNotesUrl = parsed.release_notes_url ?? null;
+      const nextReleaseNotesUrl = sanitizeReleaseNotesUrl(
+        parsed.release_notes_url
+      );
 
       setState((previous) => {
         if (!isVersionNewer(nextVersion, currentVersion)) {

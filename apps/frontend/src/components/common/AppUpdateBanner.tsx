@@ -18,7 +18,11 @@ export default function AppUpdateBanner({
   onRefresh,
 }: AppUpdateBannerProps) {
   return (
-    <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-700 dark:bg-amber-900/30">
+    <div
+      role="status"
+      aria-live="polite"
+      className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-700 dark:bg-amber-900/30"
+    >
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="text-sm text-amber-900 dark:text-amber-100">
           <p className="font-semibold">{title}</p>
