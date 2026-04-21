@@ -1,10 +1,11 @@
 import { queryOptions } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 
-type AppVersionPayload = {
+export type AppVersionPayload = {
   version: string;
   build_date: string;
   build_number: number;
+  release_notes_url?: string | null;
 };
 
 function isAppVersionPayload(value: unknown): value is AppVersionPayload {
@@ -16,7 +17,10 @@ function isAppVersionPayload(value: unknown): value is AppVersionPayload {
   return (
     typeof payload.version === 'string' &&
     typeof payload.build_date === 'string' &&
-    typeof payload.build_number === 'number'
+    typeof payload.build_number === 'number' &&
+    (typeof payload.release_notes_url === 'string' ||
+      payload.release_notes_url === null ||
+      payload.release_notes_url === undefined)
   );
 }
 

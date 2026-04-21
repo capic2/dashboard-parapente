@@ -3,6 +3,7 @@ import json
 import logging
 import math
 import os
+import time
 import uuid
 import xml.etree.ElementTree as ET
 from typing import Any
@@ -11,7 +12,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -3259,6 +3260,28 @@ def health_check():
 @public_router.get("/version")
 def version_info():
     return get_version_payload()
+
+
+@public_router.get("/version/stream")
+def version_stream() -> StreamingResponse:
+    def event_stream():
+        yield "retry: 5000\n\n"
+        yield f"event: version\ndata: {json.dumps(get_version_payload())}\n\n"
+
+        while True:
+            heartbeat = {"timestamp": datetime.utcnow().isoformat()}
+            yield f"event: ping\ndata: {json.dumps(heartbeat)}\n\n"
+            time.sleep(25)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # ============================================================================
