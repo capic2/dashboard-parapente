@@ -11,6 +11,7 @@ Monorepo (`apps/*`, `libs/*`).
 ## Rules
 
 * Use a dedicated `git worktree` per pull request.
+* Name each worktree with the `wt-<branch-or-pr-id>` prefix pattern.
 * Create the PR worktree from `main` (prefer `origin/main` after `git fetch`) unless a documented repository policy requires another base branch.
 * Install dependencies in the PR worktree when local execution is required (lint, test, build, bug reproduction).
 * Run required validation checks in the same worktree before merge.
