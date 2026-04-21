@@ -130,6 +130,9 @@ def _calculate_and_persist_missing_max_speed(db: Session, flight: Flight) -> boo
             return False
 
         max_speed_kmh = calculate_max_speed(coordinates)
+        if max_speed_kmh <= 0:
+            return False
+
         flight.max_speed_kmh = max_speed_kmh
         flight.updated_at = datetime.utcnow()
         return True
@@ -2410,6 +2413,8 @@ def get_flights(
     updated_flights = False
     for flight in flights:
         updated_flights = _calculate_and_persist_missing_max_speed(db, flight) or updated_flights
+        if updated_flights:
+            break
 
     if updated_flights:
         try:
@@ -2593,7 +2598,9 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
             db.commit()
         except Exception as exc:
             db.rollback()
-            logger.warning("Failed to persist calculated max speed for flight %s: %s", flight_id, exc)
+            logger.warning(
+                "Failed to persist calculated max speed for flight %s: %s", flight_id, exc
+            )
 
     # Build response with flight data
     flight_dict = {

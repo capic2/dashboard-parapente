@@ -6,6 +6,7 @@ Coverage: GET, POST, PATCH, DELETE for flights.
 """
 
 from datetime import date, timedelta
+from pathlib import Path
 
 from models import Flight
 
@@ -134,8 +135,13 @@ class TestFlightsListEndpoint:
         self, client, db_session, arguel_site, sample_gpx, tmp_path
     ):
         """GET /flights computes and persists max_speed_kmh when missing and GPX exists"""
-        gpx_file = tmp_path / "flight.gpx"
+        backend_dir = Path(__file__).resolve().parents[2]
+        gpx_dir = backend_dir / "db" / "gpx"
+        gpx_dir.mkdir(parents=True, exist_ok=True)
+        gpx_file = gpx_dir / f"test_flight_{tmp_path.name}.gpx"
         gpx_file.write_text(sample_gpx, encoding="utf-8")
+
+        relative_gpx_path = gpx_file.relative_to(backend_dir)
 
         flight = Flight(
             id="flight-missing-speed",
@@ -143,7 +149,7 @@ class TestFlightsListEndpoint:
             flight_date=date(2026, 3, 20),
             site_id="site-arguel",
             max_speed_kmh=None,
-            gpx_file_path=str(gpx_file),
+            gpx_file_path=str(relative_gpx_path),
         )
         db_session.add(flight)
         db_session.commit()
@@ -159,10 +165,19 @@ class TestFlightsListEndpoint:
         db_session.refresh(flight)
         assert flight.max_speed_kmh == returned["max_speed_kmh"]
 
-    def test_get_flights_keeps_existing_max_speed(self, client, db_session, arguel_site, sample_gpx, tmp_path):
+        gpx_file.unlink(missing_ok=True)
+
+    def test_get_flights_keeps_existing_max_speed(
+        self, client, db_session, arguel_site, sample_gpx, tmp_path
+    ):
         """GET /flights does not overwrite max_speed_kmh when already set"""
-        gpx_file = tmp_path / "flight_existing.gpx"
+        backend_dir = Path(__file__).resolve().parents[2]
+        gpx_dir = backend_dir / "db" / "gpx"
+        gpx_dir.mkdir(parents=True, exist_ok=True)
+        gpx_file = gpx_dir / f"test_flight_existing_{tmp_path.name}.gpx"
         gpx_file.write_text(sample_gpx, encoding="utf-8")
+
+        relative_gpx_path = gpx_file.relative_to(backend_dir)
 
         flight = Flight(
             id="flight-existing-speed",
@@ -170,7 +185,7 @@ class TestFlightsListEndpoint:
             flight_date=date(2026, 3, 21),
             site_id="site-arguel",
             max_speed_kmh=42.5,
-            gpx_file_path=str(gpx_file),
+            gpx_file_path=str(relative_gpx_path),
         )
         db_session.add(flight)
         db_session.commit()
@@ -185,7 +200,11 @@ class TestFlightsListEndpoint:
         db_session.refresh(flight)
         assert flight.max_speed_kmh == 42.5
 
-    def test_get_flights_missing_speed_without_gpx_stays_null(self, client, db_session, arguel_site):
+        gpx_file.unlink(missing_ok=True)
+
+    def test_get_flights_missing_speed_without_gpx_stays_null(
+        self, client, db_session, arguel_site
+    ):
         """GET /flights keeps null max_speed_kmh when there is no GPX file"""
         flight = Flight(
             id="flight-no-gpx",
@@ -207,6 +226,50 @@ class TestFlightsListEndpoint:
 
         db_session.refresh(flight)
         assert flight.max_speed_kmh is None
+
+    def test_get_flights_does_not_persist_zero_speed_when_gpx_has_no_time(
+        self, client, db_session, arguel_site, tmp_path
+    ):
+        """GET /flights keeps max_speed_kmh null when GPX has no usable timestamps"""
+        gpx_without_time = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<gpx version=\"1.1\" creator=\"Test\" xmlns=\"http://www.topografix.com/GPX/1/1\">
+  <trk><trkseg>
+    <trkpt lat=\"47.22356\" lon=\"6.01842\"><ele>427</ele></trkpt>
+    <trkpt lat=\"47.22400\" lon=\"6.01900\"><ele>550</ele></trkpt>
+  </trkseg></trk>
+</gpx>
+"""
+
+        backend_dir = Path(__file__).resolve().parents[2]
+        gpx_dir = backend_dir / "db" / "gpx"
+        gpx_dir.mkdir(parents=True, exist_ok=True)
+        gpx_file = gpx_dir / f"test_flight_no_time_{tmp_path.name}.gpx"
+        gpx_file.write_text(gpx_without_time, encoding="utf-8")
+
+        relative_gpx_path = gpx_file.relative_to(backend_dir)
+
+        flight = Flight(
+            id="flight-no-time",
+            name="No time",
+            flight_date=date(2026, 3, 24),
+            site_id="site-arguel",
+            max_speed_kmh=None,
+            gpx_file_path=str(relative_gpx_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights")
+        assert response.status_code == 200
+        data = response.json()
+
+        returned = next(f for f in data["flights"] if f["id"] == "flight-no-time")
+        assert returned["max_speed_kmh"] is None
+
+        db_session.refresh(flight)
+        assert flight.max_speed_kmh is None
+
+        gpx_file.unlink(missing_ok=True)
 
 
 class TestFlightStatsEndpoint:
@@ -368,8 +431,13 @@ class TestFlightDetailEndpoint:
         self, client, db_session, arguel_site, sample_gpx, tmp_path
     ):
         """GET /flights/{id} computes and persists max_speed_kmh when missing and GPX exists"""
-        gpx_file = tmp_path / "flight_detail.gpx"
+        backend_dir = Path(__file__).resolve().parents[2]
+        gpx_dir = backend_dir / "db" / "gpx"
+        gpx_dir.mkdir(parents=True, exist_ok=True)
+        gpx_file = gpx_dir / f"test_flight_detail_{tmp_path.name}.gpx"
         gpx_file.write_text(sample_gpx, encoding="utf-8")
+
+        relative_gpx_path = gpx_file.relative_to(backend_dir)
 
         flight = Flight(
             id="flight-detail-missing-speed",
@@ -377,7 +445,7 @@ class TestFlightDetailEndpoint:
             flight_date=date(2026, 3, 23),
             site_id="site-arguel",
             max_speed_kmh=None,
-            gpx_file_path=str(gpx_file),
+            gpx_file_path=str(relative_gpx_path),
         )
         db_session.add(flight)
         db_session.commit()
@@ -391,6 +459,8 @@ class TestFlightDetailEndpoint:
 
         db_session.refresh(flight)
         assert flight.max_speed_kmh == data["max_speed_kmh"]
+
+        gpx_file.unlink(missing_ok=True)
 
 
 class TestUpdateFlightEndpoint:
