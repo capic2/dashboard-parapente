@@ -1218,7 +1218,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       {/* Controls - only show when data is loaded */}
       {gpxData?.coordinates && (
         <div
-          className={`absolute top-4 left-4 z-10 bg-white dark:bg-gray-800 rounded-lg shadow-lg transition-all ${panelClassName}`}
+          className={`absolute top-4 left-4 z-10 bg-white dark:bg-gray-800 rounded-lg shadow-lg transition-all ${panelClassName} max-h-[calc(100%-2rem)] overflow-hidden flex flex-col`}
         >
           <div className="flex items-center justify-between mb-2">
             {!isPanelCollapsed && (
@@ -1236,7 +1236,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           </div>
 
           {!isPanelCollapsed && (
-            <>
+            <div className="min-h-0 overflow-y-auto pr-1">
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
                 Points: {gpxData?.coordinates?.length || 0}
               </p>
@@ -1721,7 +1721,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   </div>
                 </AccordionSection>
               </div>
-            </>
+            </div>
           )}
         </div>
       )}
