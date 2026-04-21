@@ -1,10 +1,21 @@
 # Enforce Git, Security, and Quality Baseline
 
 ## Scope
+
 Monorepo (`apps/*`, `libs/*`).
 
 ## When
 
+* Preparing any change for commit or PR.
+
 ## Rules
 
-* Preparing any change for commit or PR.
+* Use a dedicated `git worktree` per pull request.
+* Create the PR worktree from `main` (prefer `origin/main` after `git fetch`) unless a documented repository policy requires another base branch.
+* Install dependencies in the PR worktree when local execution is required (lint, test, build, bug reproduction).
+* Run required validation checks in the same worktree before merge.
+* Remove the PR worktree once the pull request is merged or closed, then run `git worktree prune`.
+* Do not remove a worktree while active processes are still running inside it.
+* Do not use destructive Git commands (`reset --hard`, `checkout --`, force push) unless explicitly requested and approved.
+* Never commit secrets (`.env`, tokens, API keys, credentials) or expose sensitive values in logs.
+* Run lint and tests on impacted projects before finalizing commit/PR.
