@@ -57,6 +57,12 @@
     "siteFound_one": "{{count}} site found",
     "siteFound_other": "{{count}} sites found"
   },
+  "appUpdate": {
+    "title": "New version available",
+    "message": "A new version ({{version}}) is ready.",
+    "viewWhatsNew": "See what's new",
+    "refresh": "Refresh"
+  },
   "dashboard": {
     "loadingError": "Loading error",
     "loadingMessage": "Loading dashboard...",

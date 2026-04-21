@@ -6,12 +6,21 @@ import os
 import uuid
 import xml.etree.ElementTree as ET
 from typing import Any
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -3310,6 +3319,35 @@ def health_check():
 @public_router.get("/version")
 def version_info():
     return get_version_payload()
+
+
+def serialize_sse_event(event_name: str, payload: dict[str, Any]) -> str:
+    return f"event: {event_name}\ndata: {json.dumps(payload)}\n\n"
+
+
+@public_router.get("/version/stream")
+async def version_stream(request: Request) -> StreamingResponse:
+    async def event_stream():
+        yield "retry: 5000\n\n"
+        yield serialize_sse_event("version", get_version_payload())
+
+        while True:
+            try:
+                await asyncio.wait_for(request.is_disconnected(), timeout=25)
+                break
+            except TimeoutError:
+                heartbeat = {"timestamp": datetime.now(timezone.utc).isoformat()}
+                yield serialize_sse_event("ping", heartbeat)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # ============================================================================
