@@ -16,6 +16,7 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 
@@ -97,10 +98,20 @@ def _default_frontend_url() -> str:
 
     static_index = Path(__file__).parent / "static" / "index.html"
     if static_index.exists():
-        host = "localhost" if config.API_HOST == "0.0.0.0" else config.API_HOST
-        return f"http://{host}:{config.API_PORT}"
+        return _backend_base_url()
 
     return "http://localhost:5173"
+
+
+def _backend_base_url() -> str:
+    host = "localhost" if config.API_HOST == "0.0.0.0" else config.API_HOST
+    return f"http://{host}:{config.API_PORT}"
+
+
+def _is_local_vite_url(candidate: str) -> bool:
+    parsed = urlparse(candidate)
+    hostname = (parsed.hostname or "").lower()
+    return hostname in {"localhost", "127.0.0.1", "::1"} and parsed.port == 5173
 
 
 def resolve_frontend_url(frontend_url: str | None = None) -> str:
@@ -115,14 +126,20 @@ def _normalize_frontend_url(frontend_url: str) -> str:
     static_index = Path(__file__).parent / "static" / "index.html"
 
     if not candidate and static_index.exists():
-        host = "localhost" if config.API_HOST == "0.0.0.0" else config.API_HOST
-        return f"http://{host}:{config.API_PORT}"
+        return _backend_base_url()
 
     if not candidate:
         return "http://localhost:5173"
 
     if "/export-viewer" in candidate:
         candidate = candidate.split("/export-viewer")[0]
+
+    if (
+        static_index.exists()
+        and config.ENVIRONMENT == "production"
+        and _is_local_vite_url(candidate)
+    ):
+        return _backend_base_url()
 
     return candidate.rstrip("/")
 
