@@ -279,7 +279,7 @@ jobs:
                     docker compose -p "$COMPOSE_PROJECT_NAME" build backend
                     BACKEND_DEPLOY_VERSION="$TARGET_VERSION" docker compose -p "$COMPOSE_PROJECT_NAME" up -d backend redis
                   fi
-EOF
+              EOF
               exit 0
             fi
 
