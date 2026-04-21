@@ -29,6 +29,7 @@ import config
 from auth import authenticate_user, create_access_token, get_current_user
 from database import get_db
 from emagram_freshness import get_emagram_cutoff_utc
+from flight_backfill import calculate_and_persist_missing_max_speed
 from models import User
 from models import (
     EmagramAnalysis,
@@ -108,42 +109,6 @@ def _mark_flight_export_processing(db: Session, flight: Flight, job_id: str):
     flight.video_file_path = None
     db.commit()
     db.refresh(flight)
-
-
-def _calculate_and_persist_missing_max_speed(db: Session, flight: Flight) -> bool:
-    """Calculate and persist max speed when missing and GPX/IGC is available."""
-    if flight.max_speed_kmh is not None or not flight.gpx_file_path:
-        return False
-
-    gpx_path = Path(__file__).parent / flight.gpx_file_path
-    if not gpx_path.exists():
-        logger.debug(
-            "Skipping max speed backfill for flight %s: GPX not found at %s",
-            flight.id,
-            gpx_path,
-        )
-        return False
-
-    try:
-        coordinates = parse_gpx_file(gpx_path)
-        if len(coordinates) < 2:
-            return False
-
-        max_speed_kmh = calculate_max_speed(coordinates)
-        if max_speed_kmh <= 0:
-            return False
-
-        flight.max_speed_kmh = max_speed_kmh
-        flight.updated_at = datetime.utcnow()
-        return True
-    except Exception as exc:
-        logger.warning(
-            "Failed to backfill max speed for flight %s from %s: %s",
-            flight.id,
-            gpx_path,
-            exc,
-        )
-        return False
 
 
 # Public routes: no authentication required (weather, spots read, auth)
@@ -2412,7 +2377,17 @@ def get_flights(
 
     updated_flights = False
     for flight in flights:
-        updated_flights = _calculate_and_persist_missing_max_speed(db, flight) or updated_flights
+        updated_flights = (
+            calculate_and_persist_missing_max_speed(
+                db,
+                flight,
+                parse_coordinates=parse_gpx_file,
+                calculate_speed_kmh=calculate_max_speed,
+                base_dir=Path(__file__).parent,
+                logger=logger,
+            )
+            or updated_flights
+        )
         if updated_flights:
             break
 
@@ -2593,7 +2568,14 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
-    if _calculate_and_persist_missing_max_speed(db, flight):
+    if calculate_and_persist_missing_max_speed(
+        db,
+        flight,
+        parse_coordinates=parse_gpx_file,
+        calculate_speed_kmh=calculate_max_speed,
+        base_dir=Path(__file__).parent,
+        logger=logger,
+    ):
         try:
             db.commit()
         except Exception as exc:
