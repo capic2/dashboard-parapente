@@ -101,6 +101,39 @@ def _mark_flight_export_processing(db: Session, flight: Flight, job_id: str):
     db.refresh(flight)
 
 
+def _calculate_and_persist_missing_max_speed(db: Session, flight: Flight) -> bool:
+    """Calculate and persist max speed when missing and GPX/IGC is available."""
+    if flight.max_speed_kmh is not None or not flight.gpx_file_path:
+        return False
+
+    gpx_path = Path(__file__).parent / flight.gpx_file_path
+    if not gpx_path.exists():
+        logger.debug(
+            "Skipping max speed backfill for flight %s: GPX not found at %s",
+            flight.id,
+            gpx_path,
+        )
+        return False
+
+    try:
+        coordinates = parse_gpx_file(gpx_path)
+        if len(coordinates) < 2:
+            return False
+
+        max_speed_kmh = calculate_max_speed(coordinates)
+        flight.max_speed_kmh = max_speed_kmh
+        flight.updated_at = datetime.utcnow()
+        return True
+    except Exception as exc:
+        logger.warning(
+            "Failed to backfill max speed for flight %s from %s: %s",
+            flight.id,
+            gpx_path,
+            exc,
+        )
+        return False
+
+
 # Public routes: no authentication required (weather, spots read, auth)
 public_router = APIRouter(prefix="/api", tags=["api"])
 
@@ -2365,6 +2398,17 @@ def get_flights(
 
     flights = query.order_by(Flight.flight_date.desc()).limit(limit).all()
 
+    updated_flights = False
+    for flight in flights:
+        updated_flights = _calculate_and_persist_missing_max_speed(db, flight) or updated_flights
+
+    if updated_flights:
+        try:
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.warning("Failed to persist calculated max speeds in /flights: %s", exc)
+
     # Convert to dict (user_id removed - not needed for single-user app)
     flights_data = []
     for flight in flights:
@@ -2534,6 +2578,13 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
+
+    if _calculate_and_persist_missing_max_speed(db, flight):
+        try:
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.warning("Failed to persist calculated max speed for flight %s: %s", flight_id, exc)
 
     # Build response with flight data
     flight_dict = {

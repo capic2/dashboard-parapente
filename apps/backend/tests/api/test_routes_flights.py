@@ -130,6 +130,84 @@ class TestFlightsListEndpoint:
         assert data["flights"][1]["flight_date"] == "2026-03-12"
         assert data["flights"][2]["flight_date"] == "2026-03-10"
 
+    def test_get_flights_backfills_missing_max_speed_from_gpx(
+        self, client, db_session, arguel_site, sample_gpx, tmp_path
+    ):
+        """GET /flights computes and persists max_speed_kmh when missing and GPX exists"""
+        gpx_file = tmp_path / "flight.gpx"
+        gpx_file.write_text(sample_gpx, encoding="utf-8")
+
+        flight = Flight(
+            id="flight-missing-speed",
+            name="Missing speed",
+            flight_date=date(2026, 3, 20),
+            site_id="site-arguel",
+            max_speed_kmh=None,
+            gpx_file_path=str(gpx_file),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights")
+        assert response.status_code == 200
+        data = response.json()
+
+        returned = next(f for f in data["flights"] if f["id"] == "flight-missing-speed")
+        assert returned["max_speed_kmh"] is not None
+        assert returned["max_speed_kmh"] > 0
+
+        db_session.refresh(flight)
+        assert flight.max_speed_kmh == returned["max_speed_kmh"]
+
+    def test_get_flights_keeps_existing_max_speed(self, client, db_session, arguel_site, sample_gpx, tmp_path):
+        """GET /flights does not overwrite max_speed_kmh when already set"""
+        gpx_file = tmp_path / "flight_existing.gpx"
+        gpx_file.write_text(sample_gpx, encoding="utf-8")
+
+        flight = Flight(
+            id="flight-existing-speed",
+            name="Existing speed",
+            flight_date=date(2026, 3, 21),
+            site_id="site-arguel",
+            max_speed_kmh=42.5,
+            gpx_file_path=str(gpx_file),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights")
+        assert response.status_code == 200
+        data = response.json()
+
+        returned = next(f for f in data["flights"] if f["id"] == "flight-existing-speed")
+        assert returned["max_speed_kmh"] == 42.5
+
+        db_session.refresh(flight)
+        assert flight.max_speed_kmh == 42.5
+
+    def test_get_flights_missing_speed_without_gpx_stays_null(self, client, db_session, arguel_site):
+        """GET /flights keeps null max_speed_kmh when there is no GPX file"""
+        flight = Flight(
+            id="flight-no-gpx",
+            name="No GPX",
+            flight_date=date(2026, 3, 22),
+            site_id="site-arguel",
+            max_speed_kmh=None,
+            gpx_file_path=None,
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights")
+        assert response.status_code == 200
+        data = response.json()
+
+        returned = next(f for f in data["flights"] if f["id"] == "flight-no-gpx")
+        assert returned["max_speed_kmh"] is None
+
+        db_session.refresh(flight)
+        assert flight.max_speed_kmh is None
+
 
 class TestFlightStatsEndpoint:
     """Tests for GET /flights/stats"""
@@ -285,6 +363,34 @@ class TestFlightDetailEndpoint:
         data = response.json()
         assert "site" in data
         assert data["site"]["name"] == "Arguel"
+
+    def test_get_flight_backfills_missing_max_speed_from_gpx(
+        self, client, db_session, arguel_site, sample_gpx, tmp_path
+    ):
+        """GET /flights/{id} computes and persists max_speed_kmh when missing and GPX exists"""
+        gpx_file = tmp_path / "flight_detail.gpx"
+        gpx_file.write_text(sample_gpx, encoding="utf-8")
+
+        flight = Flight(
+            id="flight-detail-missing-speed",
+            name="Detail missing speed",
+            flight_date=date(2026, 3, 23),
+            site_id="site-arguel",
+            max_speed_kmh=None,
+            gpx_file_path=str(gpx_file),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/flight-detail-missing-speed")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["max_speed_kmh"] is not None
+        assert data["max_speed_kmh"] > 0
+
+        db_session.refresh(flight)
+        assert flight.max_speed_kmh == data["max_speed_kmh"]
 
 
 class TestUpdateFlightEndpoint:
