@@ -6,7 +6,7 @@ import os
 import uuid
 import xml.etree.ElementTree as ET
 from typing import Any
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -3280,10 +3280,13 @@ async def version_stream(request: Request) -> StreamingResponse:
         yield "retry: 5000\n\n"
         yield serialize_sse_event("version", get_version_payload())
 
-        while not await request.is_disconnected():
-            heartbeat = {"timestamp": datetime.utcnow().isoformat()}
-            yield serialize_sse_event("ping", heartbeat)
-            await asyncio.sleep(25)
+        while True:
+            try:
+                await asyncio.wait_for(request.is_disconnected(), timeout=25)
+                break
+            except TimeoutError:
+                heartbeat = {"timestamp": datetime.now(timezone.utc).isoformat()}
+                yield serialize_sse_event("ping", heartbeat)
 
     return StreamingResponse(
         event_stream(),
