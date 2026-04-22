@@ -215,6 +215,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
         if (ionToken) {
           Ion.defaultAccessToken = ionToken;
+        } else if (import.meta.env.PROD) {
+          setViewerError(
+            'VITE_CESIUM_ION_TOKEN is required to initialize Cesium World Terrain in production.'
+          );
+          return;
         }
 
         const viewer = new CesiumViewer(container, {
