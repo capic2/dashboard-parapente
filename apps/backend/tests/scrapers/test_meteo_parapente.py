@@ -20,6 +20,7 @@ async def test_fetch_meteo_parapente_success():
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_fetch_meteo_parapente_timeout():
     import time
 
