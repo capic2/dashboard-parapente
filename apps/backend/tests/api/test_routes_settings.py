@@ -115,11 +115,9 @@ class TestUpdateSettings:
         assert valid_response.status_code == 200
         assert valid_response.json()["updated"]["para_gust_high_max"] == "25"
 
-        valid_row = (
-            db_session.query(AppSetting).filter(AppSetting.key == "para_gust_high_max").first()
-        )
-        assert valid_row is not None
-        assert valid_row.value == "25"
+        row = db_session.query(AppSetting).filter(AppSetting.key == "para_gust_high_max").first()
+        assert row is not None
+        assert row.value == "25"
 
         invalid_cases = [
             ("NaN", "finite number"),
@@ -138,6 +136,13 @@ class TestUpdateSettings:
 
             row = db_session.query(AppSetting).filter(AppSetting.key == "para_gust_low_max").first()
             assert row is None
+
+        verdict_response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"para_verdict_good_min": "101"},
+        )
+        assert verdict_response.status_code == 400
+        assert "between 0 and 100" in verdict_response.json()["detail"]
 
     def test_rejects_non_monotonic_threshold_groups(self, client, db_session):
         """Threshold families must keep their expected ordering."""

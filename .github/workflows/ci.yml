@@ -89,6 +89,7 @@ jobs:
           else
             pnpm exec playwright install-deps chromium
           fi
+          python -m playwright install chromium
 
       - name: 🔍 Check unused code (knip)
         run: pnpm knip
@@ -256,6 +257,7 @@ jobs:
           else
             pnpm exec playwright install-deps chromium
           fi
+          python -m playwright install chromium
 
       # Configure NX Cloud for E2E: same logic as main job
       - name: 🎛️ Configure NX Cloud execution
