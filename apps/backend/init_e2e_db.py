@@ -15,6 +15,9 @@ os.environ.setdefault("BACKEND_STRAVA_VERIFY_TOKEN", "PARAPENTE_E2E_TEST")
 
 # Import after setting env vars
 from main import initialize_database, run_migrations
+from database import SessionLocal
+
+from e2e_db_utils import disable_slow_weather_sources
 
 if __name__ == "__main__":
     print("🔧 Initializing E2E test database...")
@@ -25,6 +28,11 @@ if __name__ == "__main__":
             sys.exit(1)
 
         run_migrations()
+        db = SessionLocal()
+        try:
+            disable_slow_weather_sources(db)
+        finally:
+            db.close()
         print("✅ E2E database initialized successfully!")
         sys.exit(0)
     except Exception as e:

@@ -303,7 +303,7 @@ const ParaIndexTooltip = ({
         <span>
           📊 {label} - {hour}
         </span>
-        <ScopeBadge scope="Backend + Frontend" />
+        <ScopeBadge scope="backendFrontend" />
       </div>
       <div className="space-y-2 text-gray-700 dark:text-gray-300">
         <div className="text-lg font-bold text-sky-600 dark:text-sky-400">
@@ -403,7 +403,7 @@ const VerdictTooltip = ({
       )}
       <div className="font-bold mb-3 text-emerald-700 dark:text-emerald-400 flex items-center justify-between gap-2 pr-8">
         <span>✓ Verdict - {hour}</span>
-        <ScopeBadge scope="Backend + Frontend" />
+        <ScopeBadge scope="backendFrontend" />
       </div>
       <div className="space-y-2 text-gray-700 dark:text-gray-300">
         <div className="text-lg font-bold capitalize text-emerald-600 dark:text-emerald-400">
@@ -443,7 +443,7 @@ const VerdictTooltip = ({
         </div>
         <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between gap-2">
           <span>Raisons textuelles volabilité</span>
-          <ScopeBadge scope="Frontend only" />
+          <ScopeBadge scope="frontendOnly" />
         </div>
       </div>
     </div>
@@ -941,8 +941,8 @@ export default function HourlyForecast({
           Prévisions Horaires
         </h2>
         <div className="flex items-center gap-2">
-          <ScopeBadge scope="Backend + Frontend" />
-          <ScopeBadge scope="Frontend only" />
+          <ScopeBadge scope="backendFrontend" />
+          <ScopeBadge scope="frontendOnly" />
           <CacheTimestamp cachedAt={weather.cached_at} />
         </div>
       </div>
