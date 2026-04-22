@@ -5249,6 +5249,32 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
     updated = {}
     rejected = []
     positive_int_keys = {"scheduler_interval_minutes", "emagram_max_age_minutes"}
+    float_range_keys: dict[str, tuple[float, float]] = {
+        "para_wind_very_low_max": (0, 120),
+        "para_wind_low_max": (0, 120),
+        "para_wind_weak_max": (0, 120),
+        "para_wind_optimal_max": (0, 120),
+        "para_wind_high_max": (0, 120),
+        "para_gust_low_max": (0, 150),
+        "para_gust_moderate_max": (0, 150),
+        "para_gust_high_max": (0, 150),
+        "para_precip_none_max": (0, 100),
+        "para_precip_light_max": (0, 100),
+        "para_precip_heavy_min": (0, 100),
+        "para_slot_precipitation_max": (0, 100),
+        "para_li_stable_min": (-20, 20),
+        "para_li_slightly_unstable_min": (-20, 20),
+        "para_li_very_unstable_max": (-20, 20),
+        "para_temp_cool_min": (-50, 60),
+        "para_temp_warm_min": (-50, 60),
+        "para_verdict_good_min": (0, 100),
+        "para_verdict_medium_min": (0, 100),
+        "para_verdict_limit_min": (0, 100),
+        "ui_reason_wind_very_strong_min": (0, 150),
+        "ui_reason_gust_high_min": (0, 150),
+        "ui_reason_cloud_very_cloudy_min": (0, 100),
+        "ui_reason_wind_moderate_min": (0, 150),
+    }
     validated_updates: dict[str, str] = {}
 
     for key, value in settings.items():
@@ -5270,6 +5296,21 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
                     detail=f"{key} must be > 0",
                 )
             normalized_value = str(parsed_value)
+        elif key in float_range_keys:
+            min_value, max_value = float_range_keys[key]
+            try:
+                parsed_value = float(normalized_value)
+            except (TypeError, ValueError) as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{key} must be a number",
+                ) from e
+            if parsed_value < min_value or parsed_value > max_value:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{key} must be between {min_value:g} and {max_value:g}",
+                )
+            normalized_value = f"{parsed_value:g}"
 
         validated_updates[key] = normalized_value
 

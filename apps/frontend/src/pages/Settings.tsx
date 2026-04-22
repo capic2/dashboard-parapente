@@ -9,6 +9,7 @@ import {
   useDeleteWeatherSource,
 } from '../hooks/weather/useWeatherSources';
 import { WeatherSourceCard } from '../components/settings/WeatherSourceCard';
+import ScopeBadge from '../components/common/ScopeBadge';
 import type { WeatherSource } from '../types/weatherSources';
 import { useThemeStore } from '../stores/themeStore';
 import type { ThemePreference } from '../stores/themeStore';
@@ -311,6 +312,201 @@ function PerformanceSection() {
   const currentCacheTtl = backendSettings?.cache_ttl_default ?? '3600';
   const currentSchedulerInterval =
     backendSettings?.scheduler_interval_minutes ?? '30';
+  const thresholdSections = [
+    {
+      title: 'Vent (km/h)',
+      scope: 'Backend + Frontend',
+      help: 'Agit principalement sur le score de base du Para-Index et la categorisation vent faible/optimal/fort.',
+      fields: [
+        {
+          key: 'para_wind_very_low_max',
+          label: 'Vent tres faible max',
+          defaultValue: '3',
+          step: '1',
+        },
+        {
+          key: 'para_wind_low_max',
+          label: 'Vent faible max',
+          defaultValue: '5',
+          step: '1',
+        },
+        {
+          key: 'para_wind_weak_max',
+          label: 'Vent mini zone optimale',
+          defaultValue: '8',
+          step: '1',
+        },
+        {
+          key: 'para_wind_optimal_max',
+          label: 'Vent max zone optimale',
+          defaultValue: '15',
+          step: '1',
+        },
+        {
+          key: 'para_wind_high_max',
+          label: 'Vent eleve max',
+          defaultValue: '20',
+          step: '1',
+        },
+        {
+          key: 'ui_reason_wind_moderate_min',
+          label: 'UI: vent modere min',
+          defaultValue: '25',
+          step: '1',
+        },
+        {
+          key: 'ui_reason_wind_very_strong_min',
+          label: 'UI: vent fort min',
+          defaultValue: '35',
+          step: '1',
+        },
+      ],
+    },
+    {
+      title: 'Rafales (km/h)',
+      scope: 'Backend + Frontend',
+      help: 'Influence fortement les penalites de securite et les alertes de volatilite.',
+      fields: [
+        {
+          key: 'para_gust_low_max',
+          label: 'Rafales faibles max',
+          defaultValue: '15',
+          step: '1',
+        },
+        {
+          key: 'para_gust_moderate_max',
+          label: 'Rafales moderees max',
+          defaultValue: '20',
+          step: '1',
+        },
+        {
+          key: 'para_gust_high_max',
+          label: 'Rafales dangereuses min',
+          defaultValue: '25',
+          step: '1',
+        },
+        {
+          key: 'ui_reason_gust_high_min',
+          label: 'UI: rafales importantes min',
+          defaultValue: '45',
+          step: '1',
+        },
+      ],
+    },
+    {
+      title: 'Pluie (mm)',
+      scope: 'Backend + Frontend',
+      help: "Ajuste les bonus/malus pluie et la limite de pluie pour qu'un creneau reste volable.",
+      fields: [
+        {
+          key: 'para_precip_none_max',
+          label: 'Sans pluie max',
+          defaultValue: '0',
+          step: '0.1',
+        },
+        {
+          key: 'para_precip_light_max',
+          label: 'Pluie legere max',
+          defaultValue: '1',
+          step: '0.1',
+        },
+        {
+          key: 'para_precip_heavy_min',
+          label: 'Pluie importante min',
+          defaultValue: '2',
+          step: '0.1',
+        },
+        {
+          key: 'para_slot_precipitation_max',
+          label: 'Slot volable: pluie max',
+          defaultValue: '0.5',
+          step: '0.1',
+        },
+      ],
+    },
+    {
+      title: 'Instabilite (Lifted Index)',
+      scope: 'Backend + Frontend',
+      help: "Controle la sensibilite a l'instabilite atmospherique dans le score et les creneaux.",
+      fields: [
+        {
+          key: 'para_li_stable_min',
+          label: 'Stable au-dessus de',
+          defaultValue: '-1',
+          step: '0.1',
+        },
+        {
+          key: 'para_li_slightly_unstable_min',
+          label: 'Legerement instable au-dessus de',
+          defaultValue: '-3',
+          step: '0.1',
+        },
+        {
+          key: 'para_li_very_unstable_max',
+          label: 'Tres instable en-dessous de',
+          defaultValue: '-5',
+          step: '0.1',
+        },
+      ],
+    },
+    {
+      title: 'Temperature (°C)',
+      scope: 'Backend + Frontend',
+      help: 'Definit les seuils de bonus temperature appliques au score horaire.',
+      fields: [
+        {
+          key: 'para_temp_cool_min',
+          label: 'Bonus leger au-dessus de',
+          defaultValue: '5',
+          step: '1',
+        },
+        {
+          key: 'para_temp_warm_min',
+          label: 'Bonus fort au-dessus de',
+          defaultValue: '10',
+          step: '1',
+        },
+      ],
+    },
+    {
+      title: 'Verdict Para-Index',
+      scope: 'Backend + Frontend',
+      help: 'Definit les bornes de passage entre BON, MOYEN, LIMITE et MAUVAIS.',
+      fields: [
+        {
+          key: 'para_verdict_good_min',
+          label: 'BON min',
+          defaultValue: '65',
+          step: '1',
+        },
+        {
+          key: 'para_verdict_medium_min',
+          label: 'MOYEN min',
+          defaultValue: '45',
+          step: '1',
+        },
+        {
+          key: 'para_verdict_limit_min',
+          label: 'LIMITE min',
+          defaultValue: '30',
+          step: '1',
+        },
+      ],
+    },
+    {
+      title: 'Affichage UI',
+      scope: 'Frontend only',
+      help: 'Ajuste les raisons textuelles affichees dans la colonne Volabilite (frontend uniquement).',
+      fields: [
+        {
+          key: 'ui_reason_cloud_very_cloudy_min',
+          label: 'UI: tres nuageux min (%)',
+          defaultValue: '80',
+          step: '1',
+        },
+      ],
+    },
+  ] as const;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
@@ -525,6 +721,55 @@ function PerformanceSection() {
               </Button>
             ))}
           </div>
+        </div>
+
+        <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Seuils meteo parametres
+          </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+            Ces seuils pilotent le Para-Index backend et l'affichage frontend.
+            Sauvegarde automatique a la sortie du champ.
+          </p>
+          {thresholdSections.map((section) => (
+            <div
+              key={section.title}
+              className="rounded-lg border border-gray-200 dark:border-gray-700 p-3"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">
+                  {section.title}
+                </h4>
+                <ScopeBadge scope={section.scope} />
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                {section.help}
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {section.fields.map((item) => (
+                  <label
+                    key={`${item.key}-${backendSettings?.[item.key] ?? item.defaultValue}`}
+                    className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-900"
+                  >
+                    <span className="text-xs text-gray-600 dark:text-gray-300">
+                      {item.label}
+                    </span>
+                    <input
+                      type="number"
+                      step={item.step}
+                      defaultValue={
+                        backendSettings?.[item.key] ?? item.defaultValue
+                      }
+                      onBlur={(event) =>
+                        handleBackendSetting(item.key, event.target.value)
+                      }
+                      className="px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
 
         {updateBackend.isError && (

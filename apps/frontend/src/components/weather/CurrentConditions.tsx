@@ -3,6 +3,7 @@ import { useWeather } from '../../hooks/weather/useWeather';
 import { useSite } from '../../hooks/sites/useSites';
 import { WindIndicator } from '../common/WindIndicator';
 import CacheTimestamp from '../common/CacheTimestamp';
+import ScopeBadge from '../common/ScopeBadge';
 
 interface CurrentConditionsProps {
   spotId: string;
@@ -60,9 +61,12 @@ export default function CurrentConditions({ spotId }: CurrentConditionsProps) {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-sky-600 flex-1 flex flex-col">
-      <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3.5 font-semibold">
-        {t('weather.currentConditionsFor', { name: weather.spot_name })}
-      </h2>
+      <div className="flex items-center justify-between mb-3.5 gap-2">
+        <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
+          {t('weather.currentConditionsFor', { name: weather.spot_name })}
+        </h2>
+        <ScopeBadge scope="Backend + Frontend" />
+      </div>
 
       <div className="flex items-center gap-3 mb-4">
         <div className="text-4xl sm:text-3xl font-bold text-sky-600 dark:text-sky-400 leading-none">

@@ -6,6 +6,44 @@ Based on generate-weather-report-v5.js logic
 import statistics
 from typing import Any
 
+from app_settings import get_setting
+
+_THRESHOLD_DEFAULTS: dict[str, float] = {
+    "para_wind_very_low_max": 3.0,
+    "para_wind_low_max": 5.0,
+    "para_wind_weak_max": 8.0,
+    "para_wind_optimal_max": 15.0,
+    "para_wind_high_max": 20.0,
+    "para_gust_low_max": 15.0,
+    "para_gust_moderate_max": 20.0,
+    "para_gust_high_max": 25.0,
+    "para_precip_none_max": 0.0,
+    "para_precip_light_max": 1.0,
+    "para_precip_heavy_min": 2.0,
+    "para_slot_precipitation_max": 0.5,
+    "para_li_stable_min": -1.0,
+    "para_li_slightly_unstable_min": -3.0,
+    "para_li_very_unstable_max": -5.0,
+    "para_temp_cool_min": 5.0,
+    "para_temp_warm_min": 10.0,
+    "para_verdict_good_min": 65.0,
+    "para_verdict_medium_min": 45.0,
+    "para_verdict_limit_min": 30.0,
+}
+
+
+def get_para_index_thresholds() -> dict[str, float]:
+    """Load Para-Index thresholds from settings with safe numeric fallbacks."""
+    thresholds: dict[str, float] = {}
+    for key, default in _THRESHOLD_DEFAULTS.items():
+        raw_value = get_setting(key, default=str(default))
+        try:
+            thresholds[key] = float(raw_value)
+        except (TypeError, ValueError):
+            thresholds[key] = default
+
+    return thresholds
+
 
 def calculate_para_index(consensus_hours: list[dict[str, Any]]) -> dict[str, Any]:
     """
@@ -28,8 +66,10 @@ def calculate_para_index(consensus_hours: list[dict[str, Any]]) -> dict[str, Any
             "explanation": "Pas de données pour les heures volables",
         }
 
+    thresholds = get_para_index_thresholds()
+
     # Calculate daily score as average of hourly scores
-    hourly_scores = [calculate_hourly_para_index(h) for h in consensus_hours]
+    hourly_scores = [calculate_hourly_para_index(h, thresholds=thresholds) for h in consensus_hours]
     para_index = round(statistics.mean(hourly_scores))
 
     # Calculate metrics for explanation
@@ -43,36 +83,47 @@ def calculate_para_index(consensus_hours: list[dict[str, Any]]) -> dict[str, Any
 
     # Build explanation from metrics
     reasons = []
-    if avg_wind < 3:
-        reasons.append(f"Vent beaucoup trop insuffisant ({avg_wind:.1f} km/h < 3)")
-    elif avg_wind < 5:
-        reasons.append(f"Vent insuffisant ({avg_wind:.1f} km/h < 5)")
-    elif avg_wind < 8:
+    wind_very_low_max = thresholds["para_wind_very_low_max"]
+    wind_low_max = thresholds["para_wind_low_max"]
+    wind_weak_max = thresholds["para_wind_weak_max"]
+    wind_optimal_max = thresholds["para_wind_optimal_max"]
+    wind_high_max = thresholds["para_wind_high_max"]
+    gust_high_max = thresholds["para_gust_high_max"]
+    precip_heavy_min = thresholds["para_precip_heavy_min"]
+    li_very_unstable_max = thresholds["para_li_very_unstable_max"]
+
+    if avg_wind < wind_very_low_max:
+        reasons.append(
+            f"Vent beaucoup trop insuffisant ({avg_wind:.1f} km/h < {wind_very_low_max:g})"
+        )
+    elif avg_wind < wind_low_max:
+        reasons.append(f"Vent insuffisant ({avg_wind:.1f} km/h < {wind_low_max:g})")
+    elif avg_wind < wind_weak_max:
         reasons.append(f"Vent faible ({avg_wind:.1f} km/h)")
-    elif avg_wind <= 15:
+    elif avg_wind <= wind_optimal_max:
         reasons.append(f"Vent optimal pour thermiques ({avg_wind:.1f} km/h)")
-    elif avg_wind <= 20:
+    elif avg_wind <= wind_high_max:
         reasons.append(f"Vent élevé ({avg_wind:.1f} km/h)")
     else:
-        reasons.append(f"Vent trop fort - DANGEREUX ({avg_wind:.1f} km/h > 20)")
+        reasons.append(f"Vent trop fort - DANGEREUX ({avg_wind:.1f} km/h > {wind_high_max:g})")
 
-    if max_gust >= 25:
-        reasons.append(f"Rafales dangereuses ({max_gust:.1f} km/h > 25)")
-    if total_rain > 2:
+    if max_gust >= gust_high_max:
+        reasons.append(f"Rafales dangereuses ({max_gust:.1f} km/h >= {gust_high_max:g})")
+    if total_rain > precip_heavy_min:
         reasons.append(f"Pluie importante ({total_rain:.1f}mm)")
-    if avg_li < -5:
+    if avg_li < li_very_unstable_max:
         reasons.append(f"Thermiques très forts (LI {avg_li:.1f} - instable)")
 
     # === VERDICT ===
-    if para_index >= 65:
+    if para_index >= thresholds["para_verdict_good_min"]:
         verdict = "BON"
         emoji = "🟢"
         if not reasons or all("optimal" in r.lower() for r in reasons):
             reasons = ["Vent modéré, conditions favorables"]
-    elif para_index >= 45:
+    elif para_index >= thresholds["para_verdict_medium_min"]:
         verdict = "MOYEN"
         emoji = "🟡"
-    elif para_index >= 30:
+    elif para_index >= thresholds["para_verdict_limit_min"]:
         verdict = "LIMITE"
         emoji = "🟠"
     else:
@@ -109,6 +160,15 @@ def analyze_hourly_slots(consensus_hours: list[dict[str, Any]]) -> list[dict[str
     if not consensus_hours:
         return []
 
+    thresholds = get_para_index_thresholds()
+    wind_low_max = thresholds["para_wind_low_max"]
+    wind_weak_max = thresholds["para_wind_weak_max"]
+    wind_optimal_max = thresholds["para_wind_optimal_max"]
+    wind_high_max = thresholds["para_wind_high_max"]
+    gust_high_max = thresholds["para_gust_high_max"]
+    slot_precipitation_max = thresholds["para_slot_precipitation_max"]
+    li_very_unstable_max = thresholds["para_li_very_unstable_max"]
+
     # Analyze each hour
     hourly_verdicts = []
 
@@ -122,32 +182,32 @@ def analyze_hourly_slots(consensus_hours: list[dict[str, Any]]) -> list[dict[str
         reasons = []
 
         # Wind checks
-        if wind < 5:
+        if wind < wind_low_max:
             verdict = "🔴"
             reasons.append("Vent insuffisant")
-        elif wind < 8:
+        elif wind < wind_weak_max:
             verdict = "🟡"
             reasons.append("Vent faible")
-        elif wind > 20:
+        elif wind > wind_high_max:
             verdict = "🔴"
             reasons.append("Vent trop fort")
-        elif wind > 15:
+        elif wind > wind_optimal_max:
             verdict = "🟡"
             reasons.append("Vent élevé")
-        # 8-15: stays 🟢 (optimal)
+        # Optimal range stays 🟢
 
         # Gust checks
-        if gust > 25:
+        if gust > gust_high_max:
             verdict = "🔴" if verdict == "🟡" else verdict
             reasons.append("Rafales")
 
         # Rain checks
-        if precip > 0.5:
+        if precip > slot_precipitation_max:
             verdict = "🟡" if verdict == "🟢" else verdict
             reasons.append("Pluie")
 
         # Instability checks
-        if li < -5:
+        if li < li_very_unstable_max:
             verdict = "🔴"
             reasons.append("Instabilité")
 
@@ -285,7 +345,9 @@ def get_thermal_strength(cape: float | None, lifted_index: float | None) -> str:
     return "Faible"
 
 
-def calculate_hourly_para_index(hour: dict[str, Any]) -> int:
+def calculate_hourly_para_index(
+    hour: dict[str, Any], thresholds: dict[str, float] | None = None
+) -> int:
     """
     Calculate Para-Index for a single hour (0-100 score)
 
@@ -303,59 +365,62 @@ def calculate_hourly_para_index(hour: dict[str, Any]) -> int:
     temp = hour.get("temperature") or 0
     li = hour.get("lifted_index") or 0
 
+    if thresholds is None:
+        thresholds = get_para_index_thresholds()
+
     score = 0
 
     # === WIND SCORING (most important) ===
-    if wind < 3:
+    if wind < thresholds["para_wind_very_low_max"]:
         score -= 40
-    elif wind < 5:
+    elif wind < thresholds["para_wind_low_max"]:
         score -= 20
-    elif wind < 8:
+    elif wind < thresholds["para_wind_weak_max"]:
         score += 10
-    elif wind <= 15:  # OPTIMAL RANGE
+    elif wind <= thresholds["para_wind_optimal_max"]:  # OPTIMAL RANGE
         score += 40
-    elif wind <= 20:
+    elif wind <= thresholds["para_wind_high_max"]:
         score += 10
-    else:  # > 20 km/h
+    else:
         score -= 50
 
     # === GUST SCORING ===
-    if gust < 15:
+    if gust < thresholds["para_gust_low_max"]:
         score += 30
-    elif gust < 20:
+    elif gust < thresholds["para_gust_moderate_max"]:
         score += 20
-    elif gust < 25:
+    elif gust < thresholds["para_gust_high_max"]:
         score += 10
-    else:  # >= 25 km/h
+    else:
         score -= 50
 
     # === RAIN SCORING ===
-    if precip == 0:
+    if precip <= thresholds["para_precip_none_max"]:
         score += 20
-    elif precip < 1:
+    elif precip < thresholds["para_precip_light_max"]:
         score += 10
-    elif precip > 2:
+    elif precip > thresholds["para_precip_heavy_min"]:
         score -= 10
 
     # === STABILITY SCORING (Lifted Index) ===
-    if li > -1:
+    if li > thresholds["para_li_stable_min"]:
         score += 20
-    elif li > -3:
+    elif li > thresholds["para_li_slightly_unstable_min"]:
         score += 10
-    elif li < -5:
+    elif li < thresholds["para_li_very_unstable_max"]:
         score -= 10  # Too unstable
 
     # === TEMPERATURE SCORING ===
-    if temp > 10:
+    if temp > thresholds["para_temp_warm_min"]:
         score += 10
-    elif temp > 5:
+    elif temp > thresholds["para_temp_cool_min"]:
         score += 5
 
     # Clamp score to 0-100
     return max(0, min(100, score))
 
 
-def get_hourly_verdict(para_index: int) -> str:
+def get_hourly_verdict(para_index: int, thresholds: dict[str, float] | None = None) -> str:
     """
     Get verdict label from para-index score
 
@@ -365,11 +430,14 @@ def get_hourly_verdict(para_index: int) -> str:
     Returns:
         "BON", "MOYEN", "LIMITE", or "MAUVAIS"
     """
-    if para_index >= 65:
+    if thresholds is None:
+        thresholds = get_para_index_thresholds()
+
+    if para_index >= thresholds["para_verdict_good_min"]:
         return "BON"
-    elif para_index >= 45:
+    elif para_index >= thresholds["para_verdict_medium_min"]:
         return "MOYEN"
-    elif para_index >= 30:
+    elif para_index >= thresholds["para_verdict_limit_min"]:
         return "LIMITE"
     else:
         return "MAUVAIS"
