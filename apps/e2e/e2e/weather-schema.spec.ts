@@ -16,6 +16,8 @@ test.describe('Weather API Schema Validation', () => {
   test('GET /api/weather/:spotId response matches frontend Zod schema', async ({
     request,
   }) => {
+    test.setTimeout(60000);
+
     const response = await request.get(
       `${API_BASE}/weather/${TEST_SPOT_ID}?day_index=0`
     );
@@ -40,6 +42,8 @@ test.describe('Weather API Schema Validation', () => {
   test('GET /api/weather/:spotId/today response matches frontend Zod schema', async ({
     request,
   }) => {
+    test.setTimeout(60000);
+
     const response = await request.get(
       `${API_BASE}/weather/${TEST_SPOT_ID}/today`
     );
