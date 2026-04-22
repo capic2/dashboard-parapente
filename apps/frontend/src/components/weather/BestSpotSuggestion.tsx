@@ -173,7 +173,7 @@ export function BestSpotSuggestion({
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
               {t('weather.bestSpotFor', { date: dateLabel })}
             </h3>
-            <ScopeBadge scope="Backend + Frontend" />
+            <ScopeBadge scope="backendFrontend" />
           </div>
           <span
             className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${verdictInfo.className}`}

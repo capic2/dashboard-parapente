@@ -45,7 +45,7 @@ export default function WeatherMultiLanding({
         <h2 className="text-sm text-gray-600 dark:text-gray-400 font-semibold">
           {t('weather.landings')}
         </h2>
-        <ScopeBadge scope="Backend + Frontend" />
+        <ScopeBadge scope="backendFrontend" />
       </div>
 
       {isLoading ? (

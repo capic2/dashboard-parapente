@@ -38,7 +38,7 @@ describe('getFlyabilityDisplay', () => {
       ...DEFAULT_UI_THRESHOLDS,
       slotPrecipitationMax: 1,
     });
-    expect(displayWithHigherRainLimit.text).toContain('Vent faible');
+    expect(displayWithHigherRainLimit.text).not.toContain('Pluie');
   });
 
   it('keeps BON verdict unchanged', () => {

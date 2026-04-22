@@ -111,7 +111,7 @@ export default function Forecast7Day({
           {t('weather.forecast7Days')}
         </h2>
         <div className="flex items-center gap-2">
-          <ScopeBadge scope="Backend + Frontend" />
+          <ScopeBadge scope="backendFrontend" />
           <CacheTimestamp cachedAt={dailySummary.cached_at} />
         </div>
       </div>
