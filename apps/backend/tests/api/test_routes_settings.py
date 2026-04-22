@@ -106,6 +106,18 @@ class TestUpdateSettings:
         assert row is not None
         assert row.value == "120"
 
+    def test_rejects_non_finite_threshold_value(self, client, db_session):
+        """Non-finite numeric inputs must be rejected."""
+        response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"para_gust_high_max": "NaN"},
+        )
+        assert response.status_code == 400
+        assert "finite number" in response.json()["detail"]
+
+        row = db_session.query(AppSetting).filter(AppSetting.key == "para_gust_high_max").first()
+        assert row is None
+
     def test_rejects_invalid_emagram_max_age_minutes(self, client, db_session):
         """Invalid emagram freshness values are rejected with 400."""
         response = client.put(

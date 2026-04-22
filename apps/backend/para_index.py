@@ -197,8 +197,8 @@ def analyze_hourly_slots(consensus_hours: list[dict[str, Any]]) -> list[dict[str
         # Optimal range stays 🟢
 
         # Gust checks
-        if gust > gust_high_max:
-            verdict = "🔴" if verdict == "🟡" else verdict
+        if gust >= gust_high_max:
+            verdict = "🔴"
             reasons.append("Rafales")
 
         # Rain checks

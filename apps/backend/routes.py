@@ -5305,6 +5305,11 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
                     status_code=400,
                     detail=f"{key} must be a number",
                 ) from e
+            if not math.isfinite(parsed_value):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{key} must be a finite number",
+                )
             if parsed_value < min_value or parsed_value > max_value:
                 raise HTTPException(
                     status_code=400,

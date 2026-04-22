@@ -348,18 +348,6 @@ function PerformanceSection() {
           defaultValue: '20',
           step: '1',
         },
-        {
-          key: 'ui_reason_wind_moderate_min',
-          label: 'UI: vent modere min',
-          defaultValue: '25',
-          step: '1',
-        },
-        {
-          key: 'ui_reason_wind_very_strong_min',
-          label: 'UI: vent fort min',
-          defaultValue: '35',
-          step: '1',
-        },
       ],
     },
     {
@@ -383,12 +371,6 @@ function PerformanceSection() {
           key: 'para_gust_high_max',
           label: 'Rafales dangereuses min',
           defaultValue: '25',
-          step: '1',
-        },
-        {
-          key: 'ui_reason_gust_high_min',
-          label: 'UI: rafales importantes min',
-          defaultValue: '45',
           step: '1',
         },
       ],
@@ -498,6 +480,24 @@ function PerformanceSection() {
       scope: 'Frontend only',
       help: 'Ajuste les raisons textuelles affichees dans la colonne Volabilite (frontend uniquement).',
       fields: [
+        {
+          key: 'ui_reason_wind_moderate_min',
+          label: 'UI: vent modere min',
+          defaultValue: '25',
+          step: '1',
+        },
+        {
+          key: 'ui_reason_wind_very_strong_min',
+          label: 'UI: vent fort min',
+          defaultValue: '35',
+          step: '1',
+        },
+        {
+          key: 'ui_reason_gust_high_min',
+          label: 'UI: rafales importantes min',
+          defaultValue: '45',
+          step: '1',
+        },
         {
           key: 'ui_reason_cloud_very_cloudy_min',
           label: 'UI: tres nuageux min (%)',
