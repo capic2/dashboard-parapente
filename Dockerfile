@@ -5,6 +5,9 @@ FROM node:24-alpine AS frontend-builder
 
 WORKDIR /workspace
 
+ARG VITE_CESIUM_ION_TOKEN
+ENV VITE_CESIUM_ION_TOKEN=${VITE_CESIUM_ION_TOKEN}
+
 # Installer pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 

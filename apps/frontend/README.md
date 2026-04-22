@@ -181,12 +181,14 @@ Create `.env`:
 
 ```bash
 VITE_API_URL=http://localhost:8000
+VITE_CESIUM_ION_TOKEN=your_cesium_ion_token
 ```
 
 **Production:**
 
 ```bash
 VITE_API_URL=https://your-domain.com
+VITE_CESIUM_ION_TOKEN=your_cesium_ion_token
 ```
 
 ---

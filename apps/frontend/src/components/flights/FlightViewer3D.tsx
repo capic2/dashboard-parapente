@@ -9,6 +9,7 @@ import {
   ConstantPositionProperty,
   Entity,
   HeadingPitchRange,
+  Ion,
   JulianDate,
   Math as CesiumMath,
   sampleTerrainMostDetailed,
@@ -210,6 +211,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       }
 
       try {
+        const ionToken = import.meta.env.VITE_CESIUM_ION_TOKEN?.trim();
+
+        if (ionToken) {
+          Ion.defaultAccessToken = ionToken;
+        }
+
         const viewer = new CesiumViewer(container, {
           terrain: Terrain.fromWorldTerrain(),
           animation: false,
