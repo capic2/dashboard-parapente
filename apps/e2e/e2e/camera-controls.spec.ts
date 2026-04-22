@@ -161,16 +161,26 @@ const waitForCameraSaveResponse = async (
     .catch(() => null)) as { camera_angle?: number; camera_distance?: number } | null;
 };
 
-const login = async (page: import('@playwright/test').Page) => {
-  await page.goto('/login');
-  await page.fill('input#email', ADMIN_EMAIL);
-  await page.fill('input#password', ADMIN_PASSWORD);
-  await Promise.all([
-    page.waitForURL((url) => !url.pathname.startsWith('/login'), {
-      timeout: 15000,
-    }),
-    page.click('button[type="submit"]'),
-  ]);
+const authenticate = async (
+  page: import('@playwright/test').Page,
+  request: APIRequestContext
+) => {
+  const loginResponse = await request.post('/api/auth/login', {
+    form: {
+      username: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
+    },
+  });
+
+  expect(loginResponse.ok()).toBeTruthy();
+  const payload = (await loginResponse.json()) as { access_token?: string };
+  if (!payload.access_token) {
+    throw new Error('No access token returned by /api/auth/login');
+  }
+
+  await page.context().addInitScript((token) => {
+    localStorage.setItem('parapente-auth', JSON.stringify({ state: { token } }));
+  }, payload.access_token);
 };
 
 const getAuthToken = async (request: APIRequestContext) => {
@@ -335,8 +345,8 @@ const restoreSiteCameraState = async (
 test.describe('Contrôles caméra du viewer 3D', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test.beforeEach(async ({ page }) => {
-    await login(page);
+  test.beforeEach(async ({ page, request }) => {
+    await authenticate(page, request);
   });
 
   test('appliquer la caméra à la lecture ne doit pas interrompre la lecture', async ({

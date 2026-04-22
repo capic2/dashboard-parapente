@@ -5243,7 +5243,7 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
     Body: {"key": "value", ...}
     Only known keys are accepted.
     """
-    from app_settings import DEFAULTS, set_setting
+    from app_settings import DEFAULTS, get_all_settings, set_setting
 
     allowed_keys = set(DEFAULTS.keys())
     updated = {}
@@ -5305,6 +5305,11 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
                     status_code=400,
                     detail=f"{key} must be a number",
                 ) from e
+            if not math.isfinite(parsed_value):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{key} must be a finite number",
+                )
             if parsed_value < min_value or parsed_value > max_value:
                 raise HTTPException(
                     status_code=400,
@@ -5313,6 +5318,61 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
             normalized_value = f"{parsed_value:g}"
 
         validated_updates[key] = normalized_value
+
+    effective_settings = {**DEFAULTS, **get_all_settings(db), **validated_updates}
+    ordered_groups: list[tuple[str, tuple[str, ...], bool]] = [
+        (
+            "para_wind",
+            (
+                "para_wind_very_low_max",
+                "para_wind_low_max",
+                "para_wind_weak_max",
+                "para_wind_optimal_max",
+                "para_wind_high_max",
+            ),
+            True,
+        ),
+        (
+            "para_precipitation",
+            (
+                "para_precip_none_max",
+                "para_precip_light_max",
+                "para_precip_heavy_min",
+            ),
+            True,
+        ),
+        (
+            "para_li",
+            (
+                "para_li_stable_min",
+                "para_li_slightly_unstable_min",
+                "para_li_very_unstable_max",
+            ),
+            False,
+        ),
+        (
+            "para_verdict",
+            (
+                "para_verdict_good_min",
+                "para_verdict_medium_min",
+                "para_verdict_limit_min",
+            ),
+            False,
+        ),
+    ]
+
+    for group_name, keys, ascending in ordered_groups:
+        values = [float(effective_settings[key]) for key in keys]
+        is_invalid = any(
+            left >= right if ascending else left <= right
+            for left, right in zip(values, values[1:], strict=False)
+        )
+        if is_invalid:
+            direction = "increasing" if ascending else "decreasing"
+            raise HTTPException(
+                status_code=400,
+                detail=f"{group_name} thresholds must be strictly {direction}",
+            )
 
     for key, normalized_value in validated_updates.items():
         set_setting(db, key, normalized_value)

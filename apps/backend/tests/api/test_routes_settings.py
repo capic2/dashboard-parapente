@@ -106,6 +106,60 @@ class TestUpdateSettings:
         assert row is not None
         assert row.value == "120"
 
+    def test_validates_and_normalizes_float_thresholds(self, client, db_session):
+        """Float thresholds are normalized and reject non-finite / out-of-range values."""
+        valid_response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"para_gust_high_max": "25.0"},
+        )
+        assert valid_response.status_code == 200
+        assert valid_response.json()["updated"]["para_gust_high_max"] == "25"
+
+        row = db_session.query(AppSetting).filter(AppSetting.key == "para_gust_high_max").first()
+        assert row is not None
+        assert row.value == "25"
+
+        invalid_cases = [
+            ("NaN", "finite number"),
+            ("inf", "finite number"),
+            ("-inf", "finite number"),
+            ("151", "between 0 and 150"),
+        ]
+
+        for value, detail_fragment in invalid_cases:
+            response = client.put(
+                f"{API_PREFIX}/settings",
+                json={"para_gust_low_max": value},
+            )
+            assert response.status_code == 400
+            assert detail_fragment in response.json()["detail"]
+
+            row = db_session.query(AppSetting).filter(AppSetting.key == "para_gust_low_max").first()
+            assert row is None
+
+        verdict_response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"para_verdict_good_min": "101"},
+        )
+        assert verdict_response.status_code == 400
+        assert "between 0 and 100" in verdict_response.json()["detail"]
+
+    def test_rejects_non_monotonic_threshold_groups(self, client, db_session):
+        """Threshold families must keep their expected ordering."""
+        wind_response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"para_wind_low_max": "20"},
+        )
+        assert wind_response.status_code == 400
+        assert "para_wind thresholds" in wind_response.json()["detail"]
+
+        verdict_response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"para_verdict_good_min": "20"},
+        )
+        assert verdict_response.status_code == 400
+        assert "para_verdict thresholds" in verdict_response.json()["detail"]
+
     def test_rejects_invalid_emagram_max_age_minutes(self, client, db_session):
         """Invalid emagram freshness values are rejected with 400."""
         response = client.put(

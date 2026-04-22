@@ -1,7 +1,7 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 
-interface AppSettings {
+export interface AppSettings {
   cache_ttl_default: string;
   cache_ttl_summary: string;
   scheduler_interval_minutes: string;
@@ -45,7 +45,7 @@ export function useUpdateAppSettings() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (settings: Partial<Record<string, string>>) =>
+    mutationFn: (settings: Partial<Record<keyof AppSettings, string>>) =>
       api.put('settings', { json: settings }).json(),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['app-settings'] });
