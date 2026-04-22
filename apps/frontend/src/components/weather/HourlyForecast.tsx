@@ -167,10 +167,12 @@ export const getFlyabilityDisplay = (
     reason = 'Vent fort';
   } else if (gust > thresholds.reasonGustHighMin) {
     reason = 'Rafales importantes';
-  } else if (wind < thresholds.windWeakMax) {
+  } else if (wind < thresholds.windLowMax) {
     reason = 'Vent insuffisant';
-  } else if (wind < thresholds.windOptimalMax) {
+  } else if (wind < thresholds.windWeakMax) {
     reason = 'Vent faible';
+  } else if (wind < thresholds.windOptimalMax) {
+    reason = 'Vent acceptable';
   } else if (cloudCover > thresholds.reasonCloudVeryCloudyMin) {
     reason = 'Très nuageux';
   } else if (wind > thresholds.reasonWindModerateMin) {
@@ -244,11 +246,11 @@ const parseSettingNumber = (
   value: string | undefined,
   fallback: number
 ): number => {
-  if (value === undefined) {
+  if (value === undefined || value.trim() === '') {
     return fallback;
   }
 
-  const parsed = Number(value);
+  const parsed = Number(value.trim());
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 

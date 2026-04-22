@@ -18,6 +18,7 @@ import type { FreshnessLevel, HttpTimeout } from '../stores/cacheSettingsStore';
 import {
   useAppSettings,
   useUpdateAppSettings,
+  type AppSettings as BackendAppSettings,
 } from '../hooks/settings/useAppSettings';
 
 // Site interface as returned by API
@@ -305,7 +306,10 @@ function PerformanceSection() {
   const { data: backendSettings } = useAppSettings();
   const updateBackend = useUpdateAppSettings();
 
-  const handleBackendSetting = (key: string, value: string) => {
+  const handleBackendSetting = (
+    key: keyof BackendAppSettings,
+    value: string
+  ) => {
     updateBackend.mutate({ [key]: value });
   };
 
@@ -314,193 +318,231 @@ function PerformanceSection() {
     backendSettings?.scheduler_interval_minutes ?? '30';
   const thresholdSections = [
     {
-      title: 'Vent (km/h)',
-      scope: 'Backend + Frontend',
-      help: 'Agit principalement sur le score de base du Para-Index et la categorisation vent faible/optimal/fort.',
+      title: t('settings.thresholds.wind.title'),
+      scope: 'backendFrontend',
+      help: t('settings.thresholds.wind.help'),
       fields: [
         {
           key: 'para_wind_very_low_max',
-          label: 'Vent tres faible max',
+          label: t(
+            'settings.thresholds.wind.fields.para_wind_very_low_max.label'
+          ),
           defaultValue: '3',
           step: '1',
         },
         {
           key: 'para_wind_low_max',
-          label: 'Vent faible max',
+          label: t('settings.thresholds.wind.fields.para_wind_low_max.label'),
           defaultValue: '5',
           step: '1',
         },
         {
           key: 'para_wind_weak_max',
-          label: 'Vent mini zone optimale',
+          label: t('settings.thresholds.wind.fields.para_wind_weak_max.label'),
           defaultValue: '8',
           step: '1',
         },
         {
           key: 'para_wind_optimal_max',
-          label: 'Vent max zone optimale',
+          label: t(
+            'settings.thresholds.wind.fields.para_wind_optimal_max.label'
+          ),
           defaultValue: '15',
           step: '1',
         },
         {
           key: 'para_wind_high_max',
-          label: 'Vent eleve max',
+          label: t('settings.thresholds.wind.fields.para_wind_high_max.label'),
           defaultValue: '20',
           step: '1',
         },
       ],
     },
     {
-      title: 'Rafales (km/h)',
-      scope: 'Backend + Frontend',
-      help: 'Influence fortement les penalites de securite et les alertes de volatilite.',
+      title: t('settings.thresholds.gust.title'),
+      scope: 'backendFrontend',
+      help: t('settings.thresholds.gust.help'),
       fields: [
         {
           key: 'para_gust_low_max',
-          label: 'Rafales faibles max',
+          label: t('settings.thresholds.gust.fields.para_gust_low_max.label'),
           defaultValue: '15',
           step: '1',
         },
         {
           key: 'para_gust_moderate_max',
-          label: 'Rafales moderees max',
+          label: t(
+            'settings.thresholds.gust.fields.para_gust_moderate_max.label'
+          ),
           defaultValue: '20',
           step: '1',
         },
         {
           key: 'para_gust_high_max',
-          label: 'Rafales dangereuses min',
+          label: t('settings.thresholds.gust.fields.para_gust_high_max.label'),
           defaultValue: '25',
           step: '1',
         },
       ],
     },
     {
-      title: 'Pluie (mm)',
-      scope: 'Backend + Frontend',
-      help: "Ajuste les bonus/malus pluie et la limite de pluie pour qu'un creneau reste volable.",
+      title: t('settings.thresholds.precipitation.title'),
+      scope: 'backendFrontend',
+      help: t('settings.thresholds.precipitation.help'),
       fields: [
         {
           key: 'para_precip_none_max',
-          label: 'Sans pluie max',
+          label: t(
+            'settings.thresholds.precipitation.fields.para_precip_none_max.label'
+          ),
           defaultValue: '0',
           step: '0.1',
         },
         {
           key: 'para_precip_light_max',
-          label: 'Pluie legere max',
+          label: t(
+            'settings.thresholds.precipitation.fields.para_precip_light_max.label'
+          ),
           defaultValue: '1',
           step: '0.1',
         },
         {
           key: 'para_precip_heavy_min',
-          label: 'Pluie importante min',
+          label: t(
+            'settings.thresholds.precipitation.fields.para_precip_heavy_min.label'
+          ),
           defaultValue: '2',
           step: '0.1',
         },
         {
           key: 'para_slot_precipitation_max',
-          label: 'Slot volable: pluie max',
+          label: t(
+            'settings.thresholds.precipitation.fields.para_slot_precipitation_max.label'
+          ),
           defaultValue: '0.5',
           step: '0.1',
         },
       ],
     },
     {
-      title: 'Instabilite (Lifted Index)',
-      scope: 'Backend + Frontend',
-      help: "Controle la sensibilite a l'instabilite atmospherique dans le score et les creneaux.",
+      title: t('settings.thresholds.instability.title'),
+      scope: 'backendFrontend',
+      help: t('settings.thresholds.instability.help'),
       fields: [
         {
           key: 'para_li_stable_min',
-          label: 'Stable au-dessus de',
+          label: t(
+            'settings.thresholds.instability.fields.para_li_stable_min.label'
+          ),
           defaultValue: '-1',
           step: '0.1',
         },
         {
           key: 'para_li_slightly_unstable_min',
-          label: 'Legerement instable au-dessus de',
+          label: t(
+            'settings.thresholds.instability.fields.para_li_slightly_unstable_min.label'
+          ),
           defaultValue: '-3',
           step: '0.1',
         },
         {
           key: 'para_li_very_unstable_max',
-          label: 'Tres instable en-dessous de',
+          label: t(
+            'settings.thresholds.instability.fields.para_li_very_unstable_max.label'
+          ),
           defaultValue: '-5',
           step: '0.1',
         },
       ],
     },
     {
-      title: 'Temperature (°C)',
-      scope: 'Backend + Frontend',
-      help: 'Definit les seuils de bonus temperature appliques au score horaire.',
+      title: t('settings.thresholds.temperature.title'),
+      scope: 'backendFrontend',
+      help: t('settings.thresholds.temperature.help'),
       fields: [
         {
           key: 'para_temp_cool_min',
-          label: 'Bonus leger au-dessus de',
+          label: t(
+            'settings.thresholds.temperature.fields.para_temp_cool_min.label'
+          ),
           defaultValue: '5',
           step: '1',
         },
         {
           key: 'para_temp_warm_min',
-          label: 'Bonus fort au-dessus de',
+          label: t(
+            'settings.thresholds.temperature.fields.para_temp_warm_min.label'
+          ),
           defaultValue: '10',
           step: '1',
         },
       ],
     },
     {
-      title: 'Verdict Para-Index',
-      scope: 'Backend + Frontend',
-      help: 'Definit les bornes de passage entre BON, MOYEN, LIMITE et MAUVAIS.',
+      title: t('settings.thresholds.verdict.title'),
+      scope: 'backendFrontend',
+      help: t('settings.thresholds.verdict.help'),
       fields: [
         {
           key: 'para_verdict_good_min',
-          label: 'BON min',
+          label: t(
+            'settings.thresholds.verdict.fields.para_verdict_good_min.label'
+          ),
           defaultValue: '65',
           step: '1',
         },
         {
           key: 'para_verdict_medium_min',
-          label: 'MOYEN min',
+          label: t(
+            'settings.thresholds.verdict.fields.para_verdict_medium_min.label'
+          ),
           defaultValue: '45',
           step: '1',
         },
         {
           key: 'para_verdict_limit_min',
-          label: 'LIMITE min',
+          label: t(
+            'settings.thresholds.verdict.fields.para_verdict_limit_min.label'
+          ),
           defaultValue: '30',
           step: '1',
         },
       ],
     },
     {
-      title: 'Affichage UI',
-      scope: 'Frontend only',
-      help: 'Ajuste les raisons textuelles affichees dans la colonne Volabilite (frontend uniquement).',
+      title: t('settings.thresholds.ui.title'),
+      scope: 'frontendOnly',
+      help: t('settings.thresholds.ui.help'),
       fields: [
         {
           key: 'ui_reason_wind_moderate_min',
-          label: 'UI: vent modere min',
+          label: t(
+            'settings.thresholds.ui.fields.ui_reason_wind_moderate_min.label'
+          ),
           defaultValue: '25',
           step: '1',
         },
         {
           key: 'ui_reason_wind_very_strong_min',
-          label: 'UI: vent fort min',
+          label: t(
+            'settings.thresholds.ui.fields.ui_reason_wind_very_strong_min.label'
+          ),
           defaultValue: '35',
           step: '1',
         },
         {
           key: 'ui_reason_gust_high_min',
-          label: 'UI: rafales importantes min',
+          label: t(
+            'settings.thresholds.ui.fields.ui_reason_gust_high_min.label'
+          ),
           defaultValue: '45',
           step: '1',
         },
         {
           key: 'ui_reason_cloud_very_cloudy_min',
-          label: 'UI: tres nuageux min (%)',
+          label: t(
+            'settings.thresholds.ui.fields.ui_reason_cloud_very_cloudy_min.label'
+          ),
           defaultValue: '80',
           step: '1',
         },
@@ -725,11 +767,10 @@ function PerformanceSection() {
 
         <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Seuils meteo parametres
+            {t('settings.thresholds.title')}
           </label>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            Ces seuils pilotent le Para-Index backend et l'affichage frontend.
-            Sauvegarde automatique a la sortie du champ.
+            {t('settings.thresholds.description')}
           </p>
           {thresholdSections.map((section) => (
             <div

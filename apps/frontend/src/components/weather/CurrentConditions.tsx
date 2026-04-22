@@ -65,7 +65,7 @@ export default function CurrentConditions({ spotId }: CurrentConditionsProps) {
         <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
           {t('weather.currentConditionsFor', { name: weather.spot_name })}
         </h2>
-        <ScopeBadge scope="Backend + Frontend" />
+        <ScopeBadge scope="backendFrontend" />
       </div>
 
       <div className="flex items-center gap-3 mb-4">
