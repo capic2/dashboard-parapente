@@ -29,6 +29,7 @@ import config
 from auth import authenticate_user, create_access_token, get_current_user
 from database import get_db
 from emagram_freshness import get_emagram_cutoff_utc
+from flight_backfill import calculate_and_persist_missing_max_speed
 from models import User
 from models import (
     EmagramAnalysis,
@@ -2374,6 +2375,29 @@ def get_flights(
 
     flights = query.order_by(Flight.flight_date.desc()).limit(limit).all()
 
+    updated_flights = False
+    for flight in flights:
+        updated_flights = (
+            calculate_and_persist_missing_max_speed(
+                db,
+                flight,
+                parse_coordinates=parse_gpx_file,
+                calculate_speed_kmh=calculate_max_speed,
+                base_dir=Path(__file__).parent,
+                logger=logger,
+            )
+            or updated_flights
+        )
+        if updated_flights:
+            break
+
+    if updated_flights:
+        try:
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.warning("Failed to persist calculated max speeds in /flights: %s", exc)
+
     # Convert to dict (user_id removed - not needed for single-user app)
     flights_data = []
     for flight in flights:
@@ -2543,6 +2567,22 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
+
+    if calculate_and_persist_missing_max_speed(
+        db,
+        flight,
+        parse_coordinates=parse_gpx_file,
+        calculate_speed_kmh=calculate_max_speed,
+        base_dir=Path(__file__).parent,
+        logger=logger,
+    ):
+        try:
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.warning(
+                "Failed to persist calculated max speed for flight %s: %s", flight_id, exc
+            )
 
     # Build response with flight data
     flight_dict = {
