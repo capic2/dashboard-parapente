@@ -26,6 +26,30 @@ DEFAULTS: dict[str, str] = {
     "emagram_max_age_minutes": "180",
     "redis_connect_timeout": "5",
     "redis_socket_timeout": "5",
+    "para_wind_very_low_max": "3",
+    "para_wind_low_max": "5",
+    "para_wind_weak_max": "8",
+    "para_wind_optimal_max": "15",
+    "para_wind_high_max": "20",
+    "para_gust_low_max": "15",
+    "para_gust_moderate_max": "20",
+    "para_gust_high_max": "25",
+    "para_precip_none_max": "0",
+    "para_precip_light_max": "1",
+    "para_precip_heavy_min": "2",
+    "para_slot_precipitation_max": "0.5",
+    "para_li_stable_min": "-1",
+    "para_li_slightly_unstable_min": "-3",
+    "para_li_very_unstable_max": "-5",
+    "para_temp_cool_min": "5",
+    "para_temp_warm_min": "10",
+    "para_verdict_good_min": "65",
+    "para_verdict_medium_min": "45",
+    "para_verdict_limit_min": "30",
+    "ui_reason_wind_very_strong_min": "35",
+    "ui_reason_gust_high_min": "45",
+    "ui_reason_cloud_very_cloudy_min": "80",
+    "ui_reason_wind_moderate_min": "25",
 }
 
 # Keys that must never be exposed via the public settings API
@@ -73,6 +97,15 @@ def get_setting_int(key: str, db: Session | None = None, default: int = 0) -> in
     value = get_setting(key, db=db, default=str(default))
     try:
         return int(value)
+    except (ValueError, TypeError):
+        return default
+
+
+def get_setting_float(key: str, db: Session | None = None, default: float = 0.0) -> float:
+    """Read a setting as float."""
+    value = get_setting(key, db=db, default=str(default))
+    try:
+        return float(value)
     except (ValueError, TypeError):
         return default
 

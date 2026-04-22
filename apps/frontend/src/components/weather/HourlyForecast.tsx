@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Clock,
@@ -13,9 +13,11 @@ import {
   CircleCheck,
 } from 'lucide-react';
 import { Button } from '@dashboard-parapente/design-system';
+import { useAppSettings } from '../../hooks/settings/useAppSettings';
 import { useWeather } from '../../hooks/weather/useWeather';
 import type { HourlyForecastItem } from '../../types';
 import CacheTimestamp from '../common/CacheTimestamp';
+import ScopeBadge from '../common/ScopeBadge';
 import WindArrow from './WindArrow';
 
 interface HourlyForecastProps {
@@ -75,6 +77,20 @@ interface VerdictTooltipProps extends BaseTooltipProps {
   wind: number;
   gust: number;
   precipitation: number;
+  thresholds: UiThresholds;
+}
+
+export interface UiThresholds {
+  windLowMax: number;
+  windWeakMax: number;
+  windOptimalMax: number;
+  windHighMax: number;
+  gustHighMax: number;
+  slotPrecipitationMax: number;
+  reasonWindVeryStrongMin: number;
+  reasonGustHighMin: number;
+  reasonCloudVeryCloudyMin: number;
+  reasonWindModerateMin: number;
 }
 
 // ============================================================================
@@ -106,8 +122,9 @@ const getSourceUrl = (sourceKey: string): string | null => {
  * Get flyability display with emoji, verdict and reason
  * Format: "🟢 BON" or "🟡 MOYEN — Vent faible" or "🔴 MAUVAIS — Vent insuffisant"
  */
-const getFlyabilityDisplay = (
-  hour: HourlyForecastItem
+export const getFlyabilityDisplay = (
+  hour: HourlyForecastItem,
+  thresholds: UiThresholds
 ): { emoji: string; text: string; color: string } => {
   const verdict = hour.verdict?.toLowerCase();
   const verdictUpper = verdict?.toUpperCase() || 'MOYEN';
@@ -144,19 +161,21 @@ const getFlyabilityDisplay = (
   let reason = '';
 
   // Priority order for reason
-  if (precipitation > 0.5) {
+  if (precipitation > thresholds.slotPrecipitationMax) {
     reason = 'Pluie';
-  } else if (wind > 35) {
+  } else if (wind > thresholds.reasonWindVeryStrongMin) {
     reason = 'Vent fort';
-  } else if (gust > 45) {
+  } else if (gust > thresholds.reasonGustHighMin) {
     reason = 'Rafales importantes';
-  } else if (wind < 8) {
+  } else if (wind < thresholds.windLowMax) {
     reason = 'Vent insuffisant';
-  } else if (wind < 15) {
+  } else if (wind < thresholds.windWeakMax) {
     reason = 'Vent faible';
-  } else if (cloudCover > 80) {
+  } else if (wind < thresholds.windOptimalMax) {
+    reason = 'Vent acceptable';
+  } else if (cloudCover > thresholds.reasonCloudVeryCloudyMin) {
     reason = 'Très nuageux';
-  } else if (wind > 25) {
+  } else if (wind > thresholds.reasonWindModerateMin) {
     reason = 'Vent modéré';
   } else {
     // Generic reason based on para-index
@@ -210,6 +229,31 @@ const SOURCE_ORDER = [
   'meteoblue',
 ];
 
+export const DEFAULT_UI_THRESHOLDS: UiThresholds = {
+  windLowMax: 5,
+  windWeakMax: 8,
+  windOptimalMax: 15,
+  windHighMax: 20,
+  gustHighMax: 25,
+  slotPrecipitationMax: 0.5,
+  reasonWindVeryStrongMin: 35,
+  reasonGustHighMin: 45,
+  reasonCloudVeryCloudyMin: 80,
+  reasonWindModerateMin: 25,
+};
+
+const parseSettingNumber = (
+  value: string | undefined,
+  fallback: number
+): number => {
+  if (value === undefined || value.trim() === '') {
+    return fallback;
+  }
+
+  const parsed = Number(value.trim());
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 // ============================================================================
 // TOOLTIP COMPONENTS
 // ============================================================================
@@ -255,8 +299,11 @@ const ParaIndexTooltip = ({
           ✕
         </Button>
       )}
-      <div className="font-bold mb-3 text-sky-700 dark:text-sky-400 flex items-center gap-2">
-        📊 {label} - {hour}
+      <div className="font-bold mb-3 text-sky-700 dark:text-sky-400 flex items-center justify-between gap-2 pr-8">
+        <span>
+          📊 {label} - {hour}
+        </span>
+        <ScopeBadge scope="backendFrontend" />
       </div>
       <div className="space-y-2 text-gray-700 dark:text-gray-300">
         <div className="text-lg font-bold text-sky-600 dark:text-sky-400">
@@ -298,30 +345,31 @@ const VerdictTooltip = ({
   wind,
   gust,
   precipitation,
+  thresholds,
   onClose,
   isMobile,
   tooltipRef,
 }: VerdictTooltipProps) => {
   const criteria = [
     {
-      label: 'Vent dans plage optimale (8-15 km/h)',
-      met: wind >= 8 && wind <= 15,
+      label: `Vent dans plage optimale (${thresholds.windWeakMax}-${thresholds.windOptimalMax} km/h)`,
+      met: wind >= thresholds.windWeakMax && wind <= thresholds.windOptimalMax,
     },
     {
-      label: 'Vent pas trop faible (> 5 km/h)',
-      met: wind > 5,
+      label: `Vent pas trop faible (> ${thresholds.windLowMax} km/h)`,
+      met: wind > thresholds.windLowMax,
     },
     {
-      label: 'Vent pas trop fort (< 20 km/h)',
-      met: wind < 20,
+      label: `Vent pas trop fort (< ${thresholds.windHighMax} km/h)`,
+      met: wind < thresholds.windHighMax,
     },
     {
-      label: 'Rafales acceptables (< 25 km/h)',
-      met: gust < 25,
+      label: `Rafales acceptables (< ${thresholds.gustHighMax} km/h)`,
+      met: gust < thresholds.gustHighMax,
     },
     {
       label: 'Pas de précipitations',
-      met: precipitation < 0.5,
+      met: precipitation < thresholds.slotPrecipitationMax,
     },
   ];
 
@@ -353,8 +401,9 @@ const VerdictTooltip = ({
           ✕
         </Button>
       )}
-      <div className="font-bold mb-3 text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-        ✓ Verdict - {hour}
+      <div className="font-bold mb-3 text-emerald-700 dark:text-emerald-400 flex items-center justify-between gap-2 pr-8">
+        <span>✓ Verdict - {hour}</span>
+        <ScopeBadge scope="backendFrontend" />
       </div>
       <div className="space-y-2 text-gray-700 dark:text-gray-300">
         <div className="text-lg font-bold capitalize text-emerald-600 dark:text-emerald-400">
@@ -391,6 +440,10 @@ const VerdictTooltip = ({
               </div>
             ))}
           </div>
+        </div>
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between gap-2">
+          <span>Raisons textuelles volabilité</span>
+          <ScopeBadge scope="frontendOnly" />
         </div>
       </div>
     </div>
@@ -597,6 +650,7 @@ export default function HourlyForecast({
 }: HourlyForecastProps) {
   const { t } = useTranslation();
   const { data: weather, isLoading, error } = useWeather(spotId, dayIndex);
+  const { data: appSettings } = useAppSettings();
   const [activeTooltip, setActiveTooltip] = useState<{
     type: CellType;
     data: HourlyForecastItem;
@@ -604,6 +658,51 @@ export default function HourlyForecast({
   } | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const uiThresholds = useMemo<UiThresholds>(
+    () => ({
+      windLowMax: parseSettingNumber(
+        appSettings?.para_wind_low_max,
+        DEFAULT_UI_THRESHOLDS.windLowMax
+      ),
+      windWeakMax: parseSettingNumber(
+        appSettings?.para_wind_weak_max,
+        DEFAULT_UI_THRESHOLDS.windWeakMax
+      ),
+      windOptimalMax: parseSettingNumber(
+        appSettings?.para_wind_optimal_max,
+        DEFAULT_UI_THRESHOLDS.windOptimalMax
+      ),
+      windHighMax: parseSettingNumber(
+        appSettings?.para_wind_high_max,
+        DEFAULT_UI_THRESHOLDS.windHighMax
+      ),
+      gustHighMax: parseSettingNumber(
+        appSettings?.para_gust_high_max,
+        DEFAULT_UI_THRESHOLDS.gustHighMax
+      ),
+      slotPrecipitationMax: parseSettingNumber(
+        appSettings?.para_slot_precipitation_max,
+        DEFAULT_UI_THRESHOLDS.slotPrecipitationMax
+      ),
+      reasonWindVeryStrongMin: parseSettingNumber(
+        appSettings?.ui_reason_wind_very_strong_min,
+        DEFAULT_UI_THRESHOLDS.reasonWindVeryStrongMin
+      ),
+      reasonGustHighMin: parseSettingNumber(
+        appSettings?.ui_reason_gust_high_min,
+        DEFAULT_UI_THRESHOLDS.reasonGustHighMin
+      ),
+      reasonCloudVeryCloudyMin: parseSettingNumber(
+        appSettings?.ui_reason_cloud_very_cloudy_min,
+        DEFAULT_UI_THRESHOLDS.reasonCloudVeryCloudyMin
+      ),
+      reasonWindModerateMin: parseSettingNumber(
+        appSettings?.ui_reason_wind_moderate_min,
+        DEFAULT_UI_THRESHOLDS.reasonWindModerateMin
+      ),
+    }),
+    [appSettings]
+  );
 
   // Close tooltip when clicking outside
   useEffect(() => {
@@ -732,6 +831,7 @@ export default function HourlyForecast({
               0
             }
             precipitation={data.precipitation || 0}
+            thresholds={uiThresholds}
           />
         );
 
@@ -840,7 +940,11 @@ export default function HourlyForecast({
         <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
           Prévisions Horaires
         </h2>
-        <CacheTimestamp cachedAt={weather.cached_at} />
+        <div className="flex items-center gap-2">
+          <ScopeBadge scope="backendFrontend" />
+          <ScopeBadge scope="frontendOnly" />
+          <CacheTimestamp cachedAt={weather.cached_at} />
+        </div>
       </div>
 
       <div className="overflow-x-auto -mx-4 px-4">
@@ -1007,7 +1111,10 @@ export default function HourlyForecast({
 
                     <td className="py-2.5 px-2 text-center">
                       {(() => {
-                        const display = getFlyabilityDisplay(hour);
+                        const display = getFlyabilityDisplay(
+                          hour,
+                          uiThresholds
+                        );
                         return (
                           <span className={`font-medium ${display.color}`}>
                             {display.emoji} {display.text}

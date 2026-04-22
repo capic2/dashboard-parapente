@@ -9,6 +9,7 @@ import {
   useDeleteWeatherSource,
 } from '../hooks/weather/useWeatherSources';
 import { WeatherSourceCard } from '../components/settings/WeatherSourceCard';
+import ScopeBadge from '../components/common/ScopeBadge';
 import type { WeatherSource } from '../types/weatherSources';
 import { useThemeStore } from '../stores/themeStore';
 import type { ThemePreference } from '../stores/themeStore';
@@ -17,6 +18,7 @@ import type { FreshnessLevel, HttpTimeout } from '../stores/cacheSettingsStore';
 import {
   useAppSettings,
   useUpdateAppSettings,
+  type AppSettings as BackendAppSettings,
 } from '../hooks/settings/useAppSettings';
 
 // Site interface as returned by API
@@ -304,13 +306,249 @@ function PerformanceSection() {
   const { data: backendSettings } = useAppSettings();
   const updateBackend = useUpdateAppSettings();
 
-  const handleBackendSetting = (key: string, value: string) => {
+  const handleBackendSetting = (
+    key: keyof BackendAppSettings,
+    value: string
+  ) => {
     updateBackend.mutate({ [key]: value });
   };
 
   const currentCacheTtl = backendSettings?.cache_ttl_default ?? '3600';
   const currentSchedulerInterval =
     backendSettings?.scheduler_interval_minutes ?? '30';
+  const thresholdSections = [
+    {
+      title: t('settings.thresholds.wind.title'),
+      scope: 'backendFrontend',
+      help: t('settings.thresholds.wind.help'),
+      fields: [
+        {
+          key: 'para_wind_very_low_max',
+          label: t(
+            'settings.thresholds.wind.fields.para_wind_very_low_max.label'
+          ),
+          defaultValue: '3',
+          step: '1',
+        },
+        {
+          key: 'para_wind_low_max',
+          label: t('settings.thresholds.wind.fields.para_wind_low_max.label'),
+          defaultValue: '5',
+          step: '1',
+        },
+        {
+          key: 'para_wind_weak_max',
+          label: t('settings.thresholds.wind.fields.para_wind_weak_max.label'),
+          defaultValue: '8',
+          step: '1',
+        },
+        {
+          key: 'para_wind_optimal_max',
+          label: t(
+            'settings.thresholds.wind.fields.para_wind_optimal_max.label'
+          ),
+          defaultValue: '15',
+          step: '1',
+        },
+        {
+          key: 'para_wind_high_max',
+          label: t('settings.thresholds.wind.fields.para_wind_high_max.label'),
+          defaultValue: '20',
+          step: '1',
+        },
+      ],
+    },
+    {
+      title: t('settings.thresholds.gust.title'),
+      scope: 'backendFrontend',
+      help: t('settings.thresholds.gust.help'),
+      fields: [
+        {
+          key: 'para_gust_low_max',
+          label: t('settings.thresholds.gust.fields.para_gust_low_max.label'),
+          defaultValue: '15',
+          step: '1',
+        },
+        {
+          key: 'para_gust_moderate_max',
+          label: t(
+            'settings.thresholds.gust.fields.para_gust_moderate_max.label'
+          ),
+          defaultValue: '20',
+          step: '1',
+        },
+        {
+          key: 'para_gust_high_max',
+          label: t('settings.thresholds.gust.fields.para_gust_high_max.label'),
+          defaultValue: '25',
+          step: '1',
+        },
+      ],
+    },
+    {
+      title: t('settings.thresholds.precipitation.title'),
+      scope: 'backendFrontend',
+      help: t('settings.thresholds.precipitation.help'),
+      fields: [
+        {
+          key: 'para_precip_none_max',
+          label: t(
+            'settings.thresholds.precipitation.fields.para_precip_none_max.label'
+          ),
+          defaultValue: '0',
+          step: '0.1',
+        },
+        {
+          key: 'para_precip_light_max',
+          label: t(
+            'settings.thresholds.precipitation.fields.para_precip_light_max.label'
+          ),
+          defaultValue: '1',
+          step: '0.1',
+        },
+        {
+          key: 'para_precip_heavy_min',
+          label: t(
+            'settings.thresholds.precipitation.fields.para_precip_heavy_min.label'
+          ),
+          defaultValue: '2',
+          step: '0.1',
+        },
+        {
+          key: 'para_slot_precipitation_max',
+          label: t(
+            'settings.thresholds.precipitation.fields.para_slot_precipitation_max.label'
+          ),
+          defaultValue: '0.5',
+          step: '0.1',
+        },
+      ],
+    },
+    {
+      title: t('settings.thresholds.instability.title'),
+      scope: 'backendFrontend',
+      help: t('settings.thresholds.instability.help'),
+      fields: [
+        {
+          key: 'para_li_stable_min',
+          label: t(
+            'settings.thresholds.instability.fields.para_li_stable_min.label'
+          ),
+          defaultValue: '-1',
+          step: '0.1',
+        },
+        {
+          key: 'para_li_slightly_unstable_min',
+          label: t(
+            'settings.thresholds.instability.fields.para_li_slightly_unstable_min.label'
+          ),
+          defaultValue: '-3',
+          step: '0.1',
+        },
+        {
+          key: 'para_li_very_unstable_max',
+          label: t(
+            'settings.thresholds.instability.fields.para_li_very_unstable_max.label'
+          ),
+          defaultValue: '-5',
+          step: '0.1',
+        },
+      ],
+    },
+    {
+      title: t('settings.thresholds.temperature.title'),
+      scope: 'backendFrontend',
+      help: t('settings.thresholds.temperature.help'),
+      fields: [
+        {
+          key: 'para_temp_cool_min',
+          label: t(
+            'settings.thresholds.temperature.fields.para_temp_cool_min.label'
+          ),
+          defaultValue: '5',
+          step: '1',
+        },
+        {
+          key: 'para_temp_warm_min',
+          label: t(
+            'settings.thresholds.temperature.fields.para_temp_warm_min.label'
+          ),
+          defaultValue: '10',
+          step: '1',
+        },
+      ],
+    },
+    {
+      title: t('settings.thresholds.verdict.title'),
+      scope: 'backendFrontend',
+      help: t('settings.thresholds.verdict.help'),
+      fields: [
+        {
+          key: 'para_verdict_good_min',
+          label: t(
+            'settings.thresholds.verdict.fields.para_verdict_good_min.label'
+          ),
+          defaultValue: '65',
+          step: '1',
+        },
+        {
+          key: 'para_verdict_medium_min',
+          label: t(
+            'settings.thresholds.verdict.fields.para_verdict_medium_min.label'
+          ),
+          defaultValue: '45',
+          step: '1',
+        },
+        {
+          key: 'para_verdict_limit_min',
+          label: t(
+            'settings.thresholds.verdict.fields.para_verdict_limit_min.label'
+          ),
+          defaultValue: '30',
+          step: '1',
+        },
+      ],
+    },
+    {
+      title: t('settings.thresholds.ui.title'),
+      scope: 'frontendOnly',
+      help: t('settings.thresholds.ui.help'),
+      fields: [
+        {
+          key: 'ui_reason_wind_moderate_min',
+          label: t(
+            'settings.thresholds.ui.fields.ui_reason_wind_moderate_min.label'
+          ),
+          defaultValue: '25',
+          step: '1',
+        },
+        {
+          key: 'ui_reason_wind_very_strong_min',
+          label: t(
+            'settings.thresholds.ui.fields.ui_reason_wind_very_strong_min.label'
+          ),
+          defaultValue: '35',
+          step: '1',
+        },
+        {
+          key: 'ui_reason_gust_high_min',
+          label: t(
+            'settings.thresholds.ui.fields.ui_reason_gust_high_min.label'
+          ),
+          defaultValue: '45',
+          step: '1',
+        },
+        {
+          key: 'ui_reason_cloud_very_cloudy_min',
+          label: t(
+            'settings.thresholds.ui.fields.ui_reason_cloud_very_cloudy_min.label'
+          ),
+          defaultValue: '80',
+          step: '1',
+        },
+      ],
+    },
+  ] as const;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
@@ -525,6 +763,54 @@ function PerformanceSection() {
               </Button>
             ))}
           </div>
+        </div>
+
+        <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {t('settings.thresholds.title')}
+          </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+            {t('settings.thresholds.description')}
+          </p>
+          {thresholdSections.map((section) => (
+            <div
+              key={section.title}
+              className="rounded-lg border border-gray-200 dark:border-gray-700 p-3"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">
+                  {section.title}
+                </h4>
+                <ScopeBadge scope={section.scope} />
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                {section.help}
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {section.fields.map((item) => (
+                  <label
+                    key={`${item.key}-${backendSettings?.[item.key] ?? item.defaultValue}`}
+                    className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-900"
+                  >
+                    <span className="text-xs text-gray-600 dark:text-gray-300">
+                      {item.label}
+                    </span>
+                    <input
+                      type="number"
+                      step={item.step}
+                      defaultValue={
+                        backendSettings?.[item.key] ?? item.defaultValue
+                      }
+                      onBlur={(event) =>
+                        handleBackendSetting(item.key, event.target.value)
+                      }
+                      className="px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
 
         {updateBackend.isError && (

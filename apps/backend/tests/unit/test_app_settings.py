@@ -72,6 +72,27 @@ class TestGetSettingInt:
         assert result == 42
 
 
+class TestGetSettingFloat:
+    """Tests for get_setting_float()."""
+
+    def setup_method(self):
+        app_settings.invalidate_cache()
+
+    def test_returns_float(self):
+        app_settings._settings_cache["para_slot_precipitation_max"] = "0.75"
+        app_settings._cache_loaded = True
+
+        result = app_settings.get_setting_float("para_slot_precipitation_max")
+        assert result == 0.75
+
+    def test_returns_default_on_invalid_value(self):
+        app_settings._settings_cache["bad_float"] = "abc"
+        app_settings._cache_loaded = True
+
+        result = app_settings.get_setting_float("bad_float", default=1.5)
+        assert result == 1.5
+
+
 class TestSetSetting:
     """Tests for set_setting()."""
 

@@ -5243,12 +5243,38 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
     Body: {"key": "value", ...}
     Only known keys are accepted.
     """
-    from app_settings import DEFAULTS, set_setting
+    from app_settings import DEFAULTS, get_all_settings, set_setting
 
     allowed_keys = set(DEFAULTS.keys())
     updated = {}
     rejected = []
     positive_int_keys = {"scheduler_interval_minutes", "emagram_max_age_minutes"}
+    float_range_keys: dict[str, tuple[float, float]] = {
+        "para_wind_very_low_max": (0, 120),
+        "para_wind_low_max": (0, 120),
+        "para_wind_weak_max": (0, 120),
+        "para_wind_optimal_max": (0, 120),
+        "para_wind_high_max": (0, 120),
+        "para_gust_low_max": (0, 150),
+        "para_gust_moderate_max": (0, 150),
+        "para_gust_high_max": (0, 150),
+        "para_precip_none_max": (0, 100),
+        "para_precip_light_max": (0, 100),
+        "para_precip_heavy_min": (0, 100),
+        "para_slot_precipitation_max": (0, 100),
+        "para_li_stable_min": (-20, 20),
+        "para_li_slightly_unstable_min": (-20, 20),
+        "para_li_very_unstable_max": (-20, 20),
+        "para_temp_cool_min": (-50, 60),
+        "para_temp_warm_min": (-50, 60),
+        "para_verdict_good_min": (0, 100),
+        "para_verdict_medium_min": (0, 100),
+        "para_verdict_limit_min": (0, 100),
+        "ui_reason_wind_very_strong_min": (0, 150),
+        "ui_reason_gust_high_min": (0, 150),
+        "ui_reason_cloud_very_cloudy_min": (0, 100),
+        "ui_reason_wind_moderate_min": (0, 150),
+    }
     validated_updates: dict[str, str] = {}
 
     for key, value in settings.items():
@@ -5270,8 +5296,83 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
                     detail=f"{key} must be > 0",
                 )
             normalized_value = str(parsed_value)
+        elif key in float_range_keys:
+            min_value, max_value = float_range_keys[key]
+            try:
+                parsed_value = float(normalized_value)
+            except (TypeError, ValueError) as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{key} must be a number",
+                ) from e
+            if not math.isfinite(parsed_value):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{key} must be a finite number",
+                )
+            if parsed_value < min_value or parsed_value > max_value:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{key} must be between {min_value:g} and {max_value:g}",
+                )
+            normalized_value = f"{parsed_value:g}"
 
         validated_updates[key] = normalized_value
+
+    effective_settings = {**DEFAULTS, **get_all_settings(db), **validated_updates}
+    ordered_groups: list[tuple[str, tuple[str, ...], bool]] = [
+        (
+            "para_wind",
+            (
+                "para_wind_very_low_max",
+                "para_wind_low_max",
+                "para_wind_weak_max",
+                "para_wind_optimal_max",
+                "para_wind_high_max",
+            ),
+            True,
+        ),
+        (
+            "para_precipitation",
+            (
+                "para_precip_none_max",
+                "para_precip_light_max",
+                "para_precip_heavy_min",
+            ),
+            True,
+        ),
+        (
+            "para_li",
+            (
+                "para_li_stable_min",
+                "para_li_slightly_unstable_min",
+                "para_li_very_unstable_max",
+            ),
+            False,
+        ),
+        (
+            "para_verdict",
+            (
+                "para_verdict_good_min",
+                "para_verdict_medium_min",
+                "para_verdict_limit_min",
+            ),
+            False,
+        ),
+    ]
+
+    for group_name, keys, ascending in ordered_groups:
+        values = [float(effective_settings[key]) for key in keys]
+        is_invalid = any(
+            left >= right if ascending else left <= right
+            for left, right in zip(values, values[1:], strict=False)
+        )
+        if is_invalid:
+            direction = "increasing" if ascending else "decreasing"
+            raise HTTPException(
+                status_code=400,
+                detail=f"{group_name} thresholds must be strictly {direction}",
+            )
 
     for key, normalized_value in validated_updates.items():
         set_setting(db, key, normalized_value)

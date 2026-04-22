@@ -6,6 +6,7 @@ import {
 } from '../../hooks/weather/useWeather';
 import { useQueryClient } from '@tanstack/react-query';
 import CacheTimestamp from '../common/CacheTimestamp';
+import ScopeBadge from '../common/ScopeBadge';
 import { Button } from '@dashboard-parapente/design-system';
 
 interface Forecast7DayProps {
@@ -109,7 +110,10 @@ export default function Forecast7Day({
         <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
           {t('weather.forecast7Days')}
         </h2>
-        <CacheTimestamp cachedAt={dailySummary.cached_at} />
+        <div className="flex items-center gap-2">
+          <ScopeBadge scope="backendFrontend" />
+          <CacheTimestamp cachedAt={dailySummary.cached_at} />
+        </div>
       </div>
 
       <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:pb-0 sm:snap-none md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
