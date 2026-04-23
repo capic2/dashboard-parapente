@@ -6,7 +6,7 @@
 # FastAPI Framework & Server
 # ============================================
 fastapi==0.136.0
-uvicorn[standard]==0.45.0
+uvicorn[standard]==0.46.0
 
 # ============================================
 # Database ORM
