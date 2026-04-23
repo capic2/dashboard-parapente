@@ -1,5 +1,5 @@
 import { Suspense, useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { Button } from '@dashboard-parapente/design-system';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
@@ -133,8 +133,11 @@ function SitesTab({
         </div>
       )}
       <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-800 dark:text-blue-200">
-        💡 <strong>{t('settings.favorites.tip')}</strong>{' '}
-        {t('settings.favorites.tipText')}
+        💡{' '}
+        <Trans
+          i18nKey="settings.favorites.tipMessage"
+          components={{ strong: <strong /> }}
+        />
       </div>
     </div>
   );
@@ -324,7 +327,9 @@ function PerformanceSection() {
       fields: [
         {
           key: 'para_wind_very_low_max',
-          label: t('settings.thresholds.wind.fields.para_wind_very_low_max.label'),
+          label: t(
+            'settings.thresholds.wind.fields.para_wind_very_low_max.label'
+          ),
           defaultValue: '3',
           step: '1',
         },
@@ -342,7 +347,9 @@ function PerformanceSection() {
         },
         {
           key: 'para_wind_optimal_max',
-          label: t('settings.thresholds.wind.fields.para_wind_optimal_max.label'),
+          label: t(
+            'settings.thresholds.wind.fields.para_wind_optimal_max.label'
+          ),
           defaultValue: '15',
           step: '1',
         },
@@ -367,7 +374,9 @@ function PerformanceSection() {
         },
         {
           key: 'para_gust_moderate_max',
-          label: t('settings.thresholds.gust.fields.para_gust_moderate_max.label'),
+          label: t(
+            'settings.thresholds.gust.fields.para_gust_moderate_max.label'
+          ),
           defaultValue: '20',
           step: '1',
         },
@@ -386,25 +395,33 @@ function PerformanceSection() {
       fields: [
         {
           key: 'para_precip_none_max',
-          label: t('settings.thresholds.precipitation.fields.para_precip_none_max.label'),
+          label: t(
+            'settings.thresholds.precipitation.fields.para_precip_none_max.label'
+          ),
           defaultValue: '0',
           step: '0.1',
         },
         {
           key: 'para_precip_light_max',
-          label: t('settings.thresholds.precipitation.fields.para_precip_light_max.label'),
+          label: t(
+            'settings.thresholds.precipitation.fields.para_precip_light_max.label'
+          ),
           defaultValue: '1',
           step: '0.1',
         },
         {
           key: 'para_precip_heavy_min',
-          label: t('settings.thresholds.precipitation.fields.para_precip_heavy_min.label'),
+          label: t(
+            'settings.thresholds.precipitation.fields.para_precip_heavy_min.label'
+          ),
           defaultValue: '2',
           step: '0.1',
         },
         {
           key: 'para_slot_precipitation_max',
-          label: t('settings.thresholds.precipitation.fields.para_slot_precipitation_max.label'),
+          label: t(
+            'settings.thresholds.precipitation.fields.para_slot_precipitation_max.label'
+          ),
           defaultValue: '0.5',
           step: '0.1',
         },
@@ -417,19 +434,25 @@ function PerformanceSection() {
       fields: [
         {
           key: 'para_li_stable_min',
-          label: t('settings.thresholds.instability.fields.para_li_stable_min.label'),
+          label: t(
+            'settings.thresholds.instability.fields.para_li_stable_min.label'
+          ),
           defaultValue: '-1',
           step: '0.1',
         },
         {
           key: 'para_li_slightly_unstable_min',
-          label: t('settings.thresholds.instability.fields.para_li_slightly_unstable_min.label'),
+          label: t(
+            'settings.thresholds.instability.fields.para_li_slightly_unstable_min.label'
+          ),
           defaultValue: '-3',
           step: '0.1',
         },
         {
           key: 'para_li_very_unstable_max',
-          label: t('settings.thresholds.instability.fields.para_li_very_unstable_max.label'),
+          label: t(
+            'settings.thresholds.instability.fields.para_li_very_unstable_max.label'
+          ),
           defaultValue: '-5',
           step: '0.1',
         },
@@ -442,13 +465,17 @@ function PerformanceSection() {
       fields: [
         {
           key: 'para_temp_cool_min',
-          label: t('settings.thresholds.temperature.fields.para_temp_cool_min.label'),
+          label: t(
+            'settings.thresholds.temperature.fields.para_temp_cool_min.label'
+          ),
           defaultValue: '5',
           step: '1',
         },
         {
           key: 'para_temp_warm_min',
-          label: t('settings.thresholds.temperature.fields.para_temp_warm_min.label'),
+          label: t(
+            'settings.thresholds.temperature.fields.para_temp_warm_min.label'
+          ),
           defaultValue: '10',
           step: '1',
         },
@@ -461,19 +488,25 @@ function PerformanceSection() {
       fields: [
         {
           key: 'para_verdict_good_min',
-          label: t('settings.thresholds.verdict.fields.para_verdict_good_min.label'),
+          label: t(
+            'settings.thresholds.verdict.fields.para_verdict_good_min.label'
+          ),
           defaultValue: '65',
           step: '1',
         },
         {
           key: 'para_verdict_medium_min',
-          label: t('settings.thresholds.verdict.fields.para_verdict_medium_min.label'),
+          label: t(
+            'settings.thresholds.verdict.fields.para_verdict_medium_min.label'
+          ),
           defaultValue: '45',
           step: '1',
         },
         {
           key: 'para_verdict_limit_min',
-          label: t('settings.thresholds.verdict.fields.para_verdict_limit_min.label'),
+          label: t(
+            'settings.thresholds.verdict.fields.para_verdict_limit_min.label'
+          ),
           defaultValue: '30',
           step: '1',
         },
@@ -486,25 +519,33 @@ function PerformanceSection() {
       fields: [
         {
           key: 'ui_reason_wind_moderate_min',
-          label: t('settings.thresholds.ui.fields.ui_reason_wind_moderate_min.label'),
+          label: t(
+            'settings.thresholds.ui.fields.ui_reason_wind_moderate_min.label'
+          ),
           defaultValue: '25',
           step: '1',
         },
         {
           key: 'ui_reason_wind_very_strong_min',
-          label: t('settings.thresholds.ui.fields.ui_reason_wind_very_strong_min.label'),
+          label: t(
+            'settings.thresholds.ui.fields.ui_reason_wind_very_strong_min.label'
+          ),
           defaultValue: '35',
           step: '1',
         },
         {
           key: 'ui_reason_gust_high_min',
-          label: t('settings.thresholds.ui.fields.ui_reason_gust_high_min.label'),
+          label: t(
+            'settings.thresholds.ui.fields.ui_reason_gust_high_min.label'
+          ),
           defaultValue: '45',
           step: '1',
         },
         {
           key: 'ui_reason_cloud_very_cloudy_min',
-          label: t('settings.thresholds.ui.fields.ui_reason_cloud_very_cloudy_min.label'),
+          label: t(
+            'settings.thresholds.ui.fields.ui_reason_cloud_very_cloudy_min.label'
+          ),
           defaultValue: '80',
           step: '1',
         },

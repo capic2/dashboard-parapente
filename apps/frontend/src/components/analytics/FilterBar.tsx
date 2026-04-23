@@ -1,4 +1,4 @@
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { useFiltersStore } from '../../stores/filtersStore';
 import { DatePicker, Select, Button } from '@dashboard-parapente/design-system';
 import type { Site } from '@dashboard-parapente/shared-types';
@@ -79,14 +79,26 @@ export function FilterBar({ sites }: FilterBarProps) {
             )}
             {filters.dateFrom && (
               <span className="px-2 py-1 bg-sky-100 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 rounded">
-                {t('filters.from')}{' '}
-                {new Date(filters.dateFrom).toLocaleDateString(dateLocale)}
+                <Trans
+                  i18nKey="filters.fromDate"
+                  values={{
+                    date: new Date(filters.dateFrom).toLocaleDateString(
+                      dateLocale
+                    ),
+                  }}
+                />
               </span>
             )}
             {filters.dateTo && (
               <span className="px-2 py-1 bg-sky-100 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 rounded">
-                {t('filters.to')}{' '}
-                {new Date(filters.dateTo).toLocaleDateString(dateLocale)}
+                <Trans
+                  i18nKey="filters.toDate"
+                  values={{
+                    date: new Date(filters.dateTo).toLocaleDateString(
+                      dateLocale
+                    ),
+                  }}
+                />
               </span>
             )}
           </div>
