@@ -69,7 +69,7 @@ Full standard is available here for further request: [Keep Chromatic Config in S
 
 # Standard: Enforce Git, Security, and Quality Baseline
 
-Establish a Git, security, and quality baseline for monorepo changes under apps/* and libs/* to reduce risk and maintain consistent standards before commits or PRs. :
+Establish a Git, security, and quality baseline for monorepo changes under `apps/*` and `libs/*` to reduce risk and maintain consistent standards before commits or PRs. :
 * Preparing any change for commit or PR.
 
 Full standard is available here for further request: [Enforce Git, Security, and Quality Baseline](.packmind/standards/enforce-git-security-and-quality-baseline.md)
@@ -145,7 +145,7 @@ Full standard is available here for further request: [Require Backend Tests for 
 
 # Standard: Use Shared Fixtures in Backend Tests
 
-Prefer reusable test fixtures and loader helpers in backend tests under apps/backend/tests/** with shared definitions in apps/backend/tests/fixtures/** to reduce duplication and keep test data stable across modules. :
+Prefer reusable test fixtures and loader helpers in backend tests under `apps/backend/tests/**` with shared definitions in `apps/backend/tests/fixtures/**` to reduce duplication and keep test data stable across modules. :
 * No rules defined yet.
 
 Full standard is available here for further request: [Use Shared Fixtures in Backend Tests](.packmind/standards/use-shared-fixtures-in-backend-tests.md)

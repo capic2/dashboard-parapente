@@ -28,7 +28,7 @@ pnpm nx test frontend --skip-nx-cache && pnpm nx test backend --skip-nx-cache
 ```
 
 ### 3. Run end-to-end checks
-Execute lightweight E2E smoke command if available.
+Execute the E2E smoke command configured for this repository.
 
 ```bash
 pnpm nx e2e e2e --skip-nx-cache

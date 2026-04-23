@@ -20,8 +20,8 @@ Execute frontend and backend lint checks.
 pnpm nx lint frontend && pnpm nx lint backend
 ```
 
-### 2. Run targeted tests
-Run unit tests for changed areas.
+### 2. Run unit tests
+Run frontend and backend unit tests.
 
 ```bash
 pnpm nx test frontend --skip-nx-cache && pnpm nx test backend --skip-nx-cache
