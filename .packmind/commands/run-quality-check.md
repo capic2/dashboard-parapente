@@ -17,26 +17,26 @@ Run the project quality gates before committing code.
 Execute frontend and backend lint checks.
 
 ```bash
-nx lint frontend && nx lint backend
+pnpm nx lint frontend && pnpm nx lint backend
 ```
 
-### 2. Run formatting and typing checks
-Verify style and types.
-
-```bash
-npm run -s lint && npm run -s type-check
-```
-
-### 3. Run tests
+### 2. Run targeted tests
 Run unit tests for changed areas.
 
 ```bash
-nx test frontend --skip-nx-cache && nx test backend --skip-nx-cache
+pnpm nx test frontend --skip-nx-cache && pnpm nx test backend --skip-nx-cache
 ```
 
-### 4. Run build checks
+### 3. Run build checks
 Ensure both apps still build.
 
 ```bash
-nx build frontend --skip-nx-cache && nx build backend --skip-nx-cache
+pnpm nx build frontend --skip-nx-cache && pnpm nx build backend --skip-nx-cache
+```
+
+### 4. Optional repo-wide baseline checks
+Run full monorepo lint and tests before finalizing PR.
+
+```bash
+pnpm lint && pnpm test
 ```

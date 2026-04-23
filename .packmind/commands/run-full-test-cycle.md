@@ -17,28 +17,28 @@ Run the complete local validation pipeline for dashboard-parapente.
 Install missing dependencies before running tests.
 
 ```bash
-npm install
+pnpm install --frozen-lockfile
 ```
 
 ### 2. Run test suites
 Execute both frontend and backend tests.
 
 ```bash
-nx test frontend --skip-nx-cache && nx test backend --skip-nx-cache
+pnpm nx test frontend --skip-nx-cache && pnpm nx test backend --skip-nx-cache
 ```
 
 ### 3. Run end-to-end checks
 Execute lightweight E2E smoke command if available.
 
 ```bash
-nx e2e e2e --skip-nx-cache
+pnpm nx e2e e2e --skip-nx-cache
 ```
 
 ### 4. Run production build
 Compile production artifacts.
 
 ```bash
-nx build frontend --configuration=production --skip-nx-cache && nx build backend --skip-nx-cache
+pnpm nx build frontend --configuration=production --skip-nx-cache && pnpm nx build backend --skip-nx-cache
 ```
 
 ### 5. Summarize outcome
