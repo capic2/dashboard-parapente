@@ -1,8 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import preview from '../../../.storybook/preview';
-import { expect } from 'storybook/test';
-import WeatherMultiLanding from './WeatherMultiLanding';
+import { WeatherMultiLanding } from './WeatherMultiLanding';
 
 const meta = preview.meta({
   title: 'Components/Weather/WeatherMultiLanding',
