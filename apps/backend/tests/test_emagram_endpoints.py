@@ -4,6 +4,7 @@ Test emagram analysis endpoints
 
 import json
 from datetime import datetime, time, timedelta
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -263,7 +264,7 @@ class TestEmagramEndpoints:
         assert data["error_message"] == "Recent provider timeout"
 
     def test_get_emagram_hours_ignores_stale_analysis(self, client, db_session):
-        """Hourly endpoint only lists fresh analyses."""
+        """Hourly endpoint excludes stale analyses but still exposes pending slots."""
         app_settings.invalidate_cache()
 
         site = Site(
@@ -297,9 +298,17 @@ class TestEmagramEndpoints:
         db_session.add(stale_analysis)
         db_session.commit()
 
-        response = client.get("/api/emagram/hours?site_id=site-stale-hours&day_index=0")
+        with patch(
+            "weather_pipeline.get_normalized_forecast",
+            new=AsyncMock(side_effect=RuntimeError("forecast unavailable")),
+        ):
+            response = client.get("/api/emagram/hours?site_id=site-stale-hours&day_index=0")
         assert response.status_code == 200
-        assert response.json()["hours"] == []
+        hours = response.json()["hours"]
+        assert len(hours) == 14
+        assert hours[0]["hour"] == 7
+        assert hours[-1]["hour"] == 20
+        assert all(h["status"] == "pending" for h in hours)
 
     def test_get_emagram_hours_includes_failed_with_error(self, client, db_session):
         """Hourly endpoint exposes failed hourly analyses and their error message."""
@@ -336,14 +345,22 @@ class TestEmagramEndpoints:
         db_session.add(failed_analysis)
         db_session.commit()
 
-        response = client.get("/api/emagram/hours?site_id=site-hours-failed&day_index=0")
+        with patch(
+            "weather_pipeline.get_normalized_forecast",
+            new=AsyncMock(return_value={"sunrise": "13:45", "sunset": "15:10"}),
+        ):
+            response = client.get("/api/emagram/hours?site_id=site-hours-failed&day_index=0")
         assert response.status_code == 200
 
         hours = response.json()["hours"]
-        assert len(hours) == 1
-        assert hours[0]["hour"] == 14
-        assert hours[0]["status"] == "failed"
-        assert hours[0]["error_message"] == "LLM timeout"
+        assert [h["hour"] for h in hours] == [13, 14, 15]
+
+        failed_hour = next(h for h in hours if h["hour"] == 14)
+        assert failed_hour["status"] == "failed"
+        assert failed_hour["error_message"] == "LLM timeout"
+
+        pending_hours = [h for h in hours if h["hour"] in (13, 15)]
+        assert all(h["status"] == "pending" for h in pending_hours)
 
     def test_get_emagram_hours_keeps_most_recent_status_per_hour(self, client, db_session):
         """Hourly endpoint returns latest attempt for a given hour."""
@@ -399,14 +416,77 @@ class TestEmagramEndpoints:
         db_session.add(failed_new)
         db_session.commit()
 
-        response = client.get("/api/emagram/hours?site_id=site-hours-most-recent&day_index=0")
+        with patch(
+            "weather_pipeline.get_normalized_forecast",
+            new=AsyncMock(return_value={"sunrise": "14:00", "sunset": "16:00"}),
+        ):
+            response = client.get("/api/emagram/hours?site_id=site-hours-most-recent&day_index=0")
         assert response.status_code == 200
 
         hours = response.json()["hours"]
-        assert len(hours) == 1
-        assert hours[0]["hour"] == 15
-        assert hours[0]["status"] == "failed"
-        assert hours[0]["error_message"] == "Source scrape failed"
+        assert [h["hour"] for h in hours] == [14, 15, 16]
+
+        selected_hour = next(h for h in hours if h["hour"] == 15)
+        assert selected_hour["status"] == "failed"
+        assert selected_hour["error_message"] == "Source scrape failed"
+
+        pending_hours = [h for h in hours if h["hour"] in (14, 16)]
+        assert all(h["status"] == "pending" for h in pending_hours)
+
+    def test_get_emagram_hours_returns_pending_slots_from_sunrise_sunset(self, client, db_session):
+        """Hourly endpoint returns full sunrise/sunset range even without analyses."""
+        app_settings.invalidate_cache()
+
+        site = Site(
+            id="site-hours-pending-range",
+            code="SPR",
+            name="Pending Range Site",
+            latitude=47.0,
+            longitude=6.0,
+            elevation_m=500,
+        )
+        db_session.add(site)
+        db_session.commit()
+
+        with patch(
+            "weather_pipeline.get_normalized_forecast",
+            new=AsyncMock(return_value={"sunrise": "06:32", "sunset": "18:47"}),
+        ):
+            response = client.get("/api/emagram/hours?site_id=site-hours-pending-range&day_index=0")
+
+        assert response.status_code == 200
+        hours = response.json()["hours"]
+        assert [h["hour"] for h in hours] == list(range(6, 19))
+        assert all(h["status"] == "pending" for h in hours)
+        assert all(h["score"] is None for h in hours)
+
+    def test_get_emagram_hours_falls_back_to_default_range_on_forecast_error(
+        self, client, db_session
+    ):
+        """Hourly endpoint uses default 07-20 range when sunrise/sunset cannot be computed."""
+        app_settings.invalidate_cache()
+
+        site = Site(
+            id="site-hours-default-range",
+            code="SDR",
+            name="Default Range Site",
+            latitude=47.0,
+            longitude=6.0,
+            elevation_m=500,
+        )
+        db_session.add(site)
+        db_session.commit()
+
+        with patch(
+            "weather_pipeline.get_normalized_forecast",
+            new=AsyncMock(side_effect=RuntimeError("boom")),
+        ):
+            response = client.get("/api/emagram/hours?site_id=site-hours-default-range&day_index=0")
+
+        assert response.status_code == 200
+        hours = response.json()["hours"]
+        assert [h["hour"] for h in hours] == list(range(7, 21))
+        assert all(h["status"] == "pending" for h in hours)
 
     def test_analyze_with_site_id(self, client, db_session):
         """Trigger analysis accepts site_id without lat/lon"""
