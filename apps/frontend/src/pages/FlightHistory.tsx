@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { flightsQueryOptions } from '../hooks/flights/useFlights';
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import type { Flight, Site } from '../types';
@@ -336,11 +336,17 @@ export default function FlightHistory() {
         size="sm"
       >
         <p className="text-gray-700 dark:text-gray-300 mb-6">
-          {t('flights.confirmDeleteSinglePrefix')}{' '}
-          <span className="font-bold text-red-600 dark:text-red-400">
-            {flightToDelete?.title || t('flights.untitledFlight')}
-          </span>
-          . {t('flights.confirmDeleteSingleSuffix')}
+          <Trans
+            i18nKey="flights.confirmDeleteSingleMessage"
+            values={{
+              title: flightToDelete?.title || t('flights.untitledFlight'),
+            }}
+            components={{
+              title: (
+                <span className="font-bold text-red-600 dark:text-red-400" />
+              ),
+            }}
+          />
         </p>
         <div className="flex gap-3 justify-end">
           <Button

@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { Switch, TextField, Input, Text, Link } from 'react-aria-components';
 import { Button } from '@dashboard-parapente/design-system';
 import type { WeatherSource } from '../../types/weatherSources';
@@ -439,15 +439,19 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
         {source.last_success_at && (
           <div role="status">
             <span aria-hidden="true">✓ </span>
-            {t('settings.weatherSources.lastSuccess')}{' '}
-            {formatTimestamp(source.last_success_at)}
+            <Trans
+              i18nKey="settings.weatherSources.lastSuccessMessage"
+              values={{ date: formatTimestamp(source.last_success_at) }}
+            />
           </div>
         )}
         {source.last_error_at && (
           <div className="text-red-600 dark:text-red-400" role="alert">
             <span aria-hidden="true">✗ </span>
-            {t('settings.weatherSources.lastError')}{' '}
-            {formatTimestamp(source.last_error_at)}
+            <Trans
+              i18nKey="settings.weatherSources.lastErrorMessage"
+              values={{ date: formatTimestamp(source.last_error_at) }}
+            />
             {source.last_error_message && (
               <div
                 className="text-xs mt-1 p-1 bg-red-50 dark:bg-red-900/20 rounded truncate"
