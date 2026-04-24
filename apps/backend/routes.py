@@ -4289,6 +4289,7 @@ def _auto_emagram_analysis(site_id: str, day_index: int = 0, hour: int | None = 
     _pending_emagram_analyses.add(key)
     try:
         with get_db_context() as db:
+
             async def _run_emagram_and_cache() -> None:
                 result = await generate_multi_source_emagram_for_spot(
                     site_id=site_id,
