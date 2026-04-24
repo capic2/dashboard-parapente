@@ -7,9 +7,17 @@ from datetime import datetime, time, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from fakeredis import FakeAsyncRedis
 
 import app_settings
 from models import EmagramAnalysis, Site
+
+
+@pytest.fixture
+def fake_async_redis():
+    """Create a FakeAsyncRedis instance for emagram cache marker tests."""
+    redis = FakeAsyncRedis(decode_responses=True)
+    return redis
 
 
 class TestEmagramEndpoints:
@@ -113,6 +121,55 @@ class TestEmagramEndpoints:
         assert data is not None
         assert data["station_code"] == "site-arguel"
         assert data["score_volabilite"] == 72
+
+    @pytest.mark.anyio
+    async def test_get_latest_with_site_id_writes_cache_marker(
+        self, client, db_session, fake_async_redis
+    ):
+        """Site-based latest emagram writes emagram:analysis marker for Infrastructure cache view."""
+        today = datetime.utcnow().date()
+
+        site = Site(
+            id="site-cache-marker",
+            code="SCM",
+            name="Cache Marker Site",
+            latitude=47.2,
+            longitude=6.0,
+            elevation_m=427,
+        )
+        db_session.add(site)
+
+        analysis = EmagramAnalysis(
+            id="cache-marker-analysis",
+            station_code="site-cache-marker",
+            station_name="Cache Marker Site",
+            station_latitude=47.2,
+            station_longitude=6.0,
+            analysis_date=today,
+            analysis_time=datetime.utcnow().time(),
+            analysis_datetime=datetime.utcnow(),
+            forecast_date=today,
+            distance_km=0.0,
+            data_source="test",
+            sounding_time="12Z",
+            analysis_method="llm_vision",
+            forecast_hour=14,
+            score_volabilite=68,
+            analysis_status="completed",
+        )
+        db_session.add(analysis)
+        db_session.commit()
+
+        async def mock_get_redis():
+            return fake_async_redis
+
+        with patch("cache.get_redis", side_effect=mock_get_redis):
+            response = client.get("/api/emagram/latest?site_id=site-cache-marker")
+
+        assert response.status_code == 200
+        marker_key = f"emagram:analysis:site-cache-marker:{today.isoformat()}:latest"
+        marker = await fake_async_redis.get(marker_key)
+        assert marker is not None
 
     def test_get_latest_with_site_id_not_found(self, client, db_session):
         """Get latest emagram with non-existent site_id returns 404"""
