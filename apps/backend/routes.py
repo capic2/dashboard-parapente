@@ -4497,8 +4497,10 @@ async def get_emagram_hours(
         start_hour = 7
         end_hour = 20
         try:
+            import weather_pipeline
+
             forecast = await asyncio.wait_for(
-                get_normalized_forecast(
+                weather_pipeline.get_normalized_forecast(
                     lat=site.latitude,
                     lon=site.longitude,
                     day_index=day_index,
