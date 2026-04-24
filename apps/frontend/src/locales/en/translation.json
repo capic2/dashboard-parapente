@@ -112,7 +112,9 @@
     "dateTo": "End date",
     "activeFilters": "Active filters:",
     "from": "From",
-    "to": "To"
+    "to": "To",
+    "fromDate": "From {{date}}",
+    "toDate": "To {{date}}"
   },
   "sites": {
     "management": "Site Management",
@@ -179,7 +181,8 @@
       "favorite": "Favorite",
       "add": "Add",
       "tip": "Tip:",
-      "tipText": "Favorite sites will appear first in selectors"
+      "tipText": "Favorite sites will appear first in selectors",
+      "tipMessage": "<strong>Tip:</strong> Favorite sites will appear first in selectors"
     },
     "weatherSources": {
       "title": "Weather Sources Management",
@@ -210,6 +213,8 @@
       "calls": "Calls",
       "lastSuccess": "Last success:",
       "lastError": "Last error:",
+      "lastSuccessMessage": "Last success: {{date}}",
+      "lastErrorMessage": "Last error: {{date}}",
       "testing": "Testing...",
       "test": "Test",
       "testSuccess": "Test passed in {{time}}ms",
@@ -412,7 +417,8 @@
     "createDescription": "Upload a GPX or IGC file to automatically create a new flight. Statistics (duration, altitude, distance, speed) will be extracted from the file.",
     "gpxFile": "GPX or IGC file",
     "autoDetection": "Auto-detection:",
-    "autoDetectionText": "The takeoff site will be automatically detected from the GPS coordinates in the GPX file.",
+    "autoDetectionText": "The takeoff site will be automatically detected from the GPS coordinates in the GPX or IGC file.",
+    "autoDetectionMessage": "<strong>Auto-detection:</strong> The takeoff site will be automatically detected from the GPS coordinates in the GPX or IGC file.",
     "createSuccess": "Flight created successfully",
     "name": "Name:",
     "date": "Date:",
@@ -491,6 +497,7 @@
     "confirmDelete": "⚠️ Confirm deletion",
     "confirmDeleteSinglePrefix": "You are about to permanently delete flight",
     "confirmDeleteSingleSuffix": "This action is irreversible.",
+    "confirmDeleteSingleMessage": "You are about to permanently delete flight <title>{{title}}</title>. This action is irreversible.",
     "confirmDeleteMulti_one": "You are about to permanently delete {{count}} flight. This action is irreversible.",
     "confirmDeleteMulti_other": "You are about to permanently delete {{count}} flights. This action is irreversible.",
     "deleting": "⏳ Deleting...",

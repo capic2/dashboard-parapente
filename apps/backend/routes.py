@@ -4479,27 +4479,84 @@ async def get_emagram_hours(
         )
 
         # Deduplicate: keep only the most recent analysis per hour
-        seen_hours: set[int] = set()
-        unique_analyses = []
-        for a in analyses:
-            if a.forecast_hour not in seen_hours:
-                seen_hours.add(a.forecast_hour)
-                unique_analyses.append(a)
+        latest_by_hour: dict[int, Any] = {}
+        for analysis in analyses:
+            if analysis.forecast_hour not in latest_by_hour:
+                latest_by_hour[analysis.forecast_hour] = analysis
+
+        site = db.query(Site).filter(Site.id == site_id).first()
+        if not site:
+            raise HTTPException(status_code=404, detail="Site not found")
+        if site.latitude is None or site.longitude is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Site has no coordinates configured",
+            )
+
+        # Build expected hour range (sunrise -> sunset), fallback to 07h-20h
+        start_hour = 7
+        end_hour = 20
+        try:
+            import weather_pipeline
+
+            forecast = await asyncio.wait_for(
+                weather_pipeline.get_normalized_forecast(
+                    lat=site.latitude,
+                    lon=site.longitude,
+                    day_index=day_index,
+                    db=db,
+                ),
+                timeout=8,
+            )
+
+            sunrise = forecast.get("sunrise")
+            sunset = forecast.get("sunset")
+
+            if sunrise:
+                start_hour = int(str(sunrise).split(":", maxsplit=1)[0])
+            if sunset:
+                end_hour = int(str(sunset).split(":", maxsplit=1)[0])
+        except Exception as e:
+            logger.warning(
+                "Failed to compute emagram hour range from sunrise/sunset for site %s day_index=%s: %s",
+                site_id,
+                day_index,
+                e,
+            )
+
+        if end_hour < start_hour:
+            start_hour, end_hour = 7, 20
+
+        all_hours = sorted(set(range(start_hour, end_hour + 1)) | set(latest_by_hour.keys()))
 
         return {
             "site_id": site_id,
             "forecast_date": target_date.isoformat(),
             "hours": [
                 {
-                    "hour": a.forecast_hour,
-                    "score": a.score_volabilite,
-                    "status": a.analysis_status,
-                    "error_message": a.error_message,
-                    "id": a.id,
+                    "hour": hour,
+                    "score": (
+                        latest_by_hour[hour].score_volabilite if hour in latest_by_hour else None
+                    ),
+                    "status": (
+                        latest_by_hour[hour].analysis_status
+                        if hour in latest_by_hour
+                        else "pending"
+                    ),
+                    "error_message": (
+                        latest_by_hour[hour].error_message if hour in latest_by_hour else None
+                    ),
+                    "id": (
+                        latest_by_hour[hour].id
+                        if hour in latest_by_hour
+                        else f"pending:{site_id}:{target_date.isoformat()}:{hour}"
+                    ),
                 }
-                for a in unique_analyses
+                for hour in all_hours
             ],
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get emagram hours: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e

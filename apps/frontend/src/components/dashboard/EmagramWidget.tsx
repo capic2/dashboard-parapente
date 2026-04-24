@@ -96,6 +96,7 @@ function HourSlider({
         {hours.map((h, idx) => {
           const isActive = h.hour === effectiveHour;
           const isFailed = h.status === 'failed';
+          const isPending = h.status === 'pending';
           const errorText =
             h.error_message?.trim() ||
             'Analyse non disponible pour cette heure';
@@ -105,16 +106,22 @@ function HourSlider({
           const buttonClassName = isActive
             ? isFailed
               ? 'font-bold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/30'
-              : 'font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30'
+              : isPending
+                ? 'font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30'
+                : 'font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30'
             : isFailed
               ? 'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300'
-              : 'text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300';
+              : isPending
+                ? 'text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300'
+                : 'text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300';
 
           const label = isFailed
             ? `Échec analyse ${h.hour}h : ${errorText}`
-            : `Analyse ${h.hour}h`;
+            : isPending
+              ? `Analyse ${h.hour}h en attente`
+              : `Analyse ${h.hour}h`;
 
-          if (!isFailed) {
+          if (!isFailed && !isPending) {
             return (
               <Button
                 key={h.hour}
@@ -150,7 +157,11 @@ function HourSlider({
                   />
                 )}
               </Button>
-              <Tooltip className="bg-red-700 text-white text-xs px-2 py-1 rounded shadow-lg max-w-56 break-words">
+              <Tooltip
+                className={`${
+                  isPending ? 'bg-amber-700' : 'bg-red-700'
+                } text-white text-xs px-2 py-1 rounded shadow-lg max-w-56 break-words`}
+              >
                 {label}
               </Tooltip>
             </TooltipTrigger>
@@ -214,12 +225,9 @@ export default function EmagramWidget({
     isLoading,
     error,
     refetch,
-  } = useLatestEmagram(
-    siteId,
-    dayIndex,
-    activeHour,
-    { enabled: shouldFetchEmagram }
-  );
+  } = useLatestEmagram(siteId, dayIndex, activeHour, {
+    enabled: shouldFetchEmagram,
+  });
 
   const displayHours = useMemo(() => {
     if (emagram?.forecast_hour == null) {

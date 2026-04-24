@@ -112,7 +112,9 @@
     "dateTo": "Date de fin",
     "activeFilters": "Filtres actifs :",
     "from": "Du",
-    "to": "Au"
+    "to": "Au",
+    "fromDate": "Du {{date}}",
+    "toDate": "Au {{date}}"
   },
   "sites": {
     "management": "Gestion des Sites",
@@ -179,7 +181,8 @@
       "favorite": "Favori",
       "add": "Ajouter",
       "tip": "Astuce :",
-      "tipText": "Les sites favoris apparaîtront en priorité dans les sélecteurs"
+      "tipText": "Les sites favoris apparaîtront en priorité dans les sélecteurs",
+      "tipMessage": "<strong>Astuce :</strong> Les sites favoris apparaîtront en priorité dans les sélecteurs"
     },
     "weatherSources": {
       "title": "Gestion des Sources Météo",
@@ -210,6 +213,8 @@
       "calls": "Appels",
       "lastSuccess": "Dernier succès:",
       "lastError": "Dernière erreur:",
+      "lastSuccessMessage": "Dernier succès: {{date}}",
+      "lastErrorMessage": "Dernière erreur: {{date}}",
       "testing": "Test en cours...",
       "test": "Tester",
       "testSuccess": "Test réussi en {{time}}ms",
@@ -412,7 +417,8 @@
     "createDescription": "Uploadez un fichier GPX ou IGC pour créer automatiquement un nouveau vol. Les statistiques (durée, altitude, distance, vitesse) seront extraites du fichier.",
     "gpxFile": "Fichier GPX ou IGC",
     "autoDetection": "Détection automatique :",
-    "autoDetectionText": "Le site de décollage sera détecté automatiquement à partir des coordonnées GPS du fichier GPX.",
+    "autoDetectionText": "Le site de décollage sera détecté automatiquement à partir des coordonnées GPS du fichier GPX ou IGC.",
+    "autoDetectionMessage": "<strong>Détection automatique :</strong> Le site de décollage sera détecté automatiquement à partir des coordonnées GPS du fichier GPX ou IGC.",
     "createSuccess": "Vol créé avec succès",
     "name": "Nom :",
     "date": "Date :",
@@ -491,6 +497,7 @@
     "confirmDelete": "⚠️ Confirmer la suppression",
     "confirmDeleteSinglePrefix": "Vous êtes sur le point de supprimer définitivement le vol",
     "confirmDeleteSingleSuffix": "Cette action est irréversible.",
+    "confirmDeleteSingleMessage": "Vous êtes sur le point de supprimer définitivement le vol <title>{{title}}</title>. Cette action est irréversible.",
     "confirmDeleteMulti_one": "Vous êtes sur le point de supprimer définitivement {{count}} vol. Cette action est irréversible.",
     "confirmDeleteMulti_other": "Vous êtes sur le point de supprimer définitivement {{count}} vols. Cette action est irréversible.",
     "deleting": "⏳ Suppression...",
