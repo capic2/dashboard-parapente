@@ -33,6 +33,8 @@ _access_token = None
 _token_expires_at = None
 _refresh_token = None
 _refresh_lock = asyncio.Lock()
+_REFRESH_MAX_ATTEMPTS = 5
+_REFRESH_INITIAL_BACKOFF_SECONDS = 1.0
 
 
 def _get_persisted_refresh_token() -> str | None:
@@ -144,55 +146,94 @@ async def refresh_access_token(force: bool = False) -> str | None:
             _log_token_refresh(False, msg, refresh_mode=refresh_mode)
             return None
 
-        try:
-            logger.info("Refreshing Strava access token...")
-            logger.debug(f"Using CLIENT_ID: {STRAVA_CLIENT_ID}")
+        backoff_seconds = _REFRESH_INITIAL_BACKOFF_SECONDS
+        last_error_msg: str | None = None
 
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.post(
-                    TOKEN_URL,
-                    data={
-                        "client_id": STRAVA_CLIENT_ID,
-                        "client_secret": STRAVA_CLIENT_SECRET,
-                        "grant_type": "refresh_token",
-                        "refresh_token": current_refresh_token,
-                    },
+        for attempt in range(1, _REFRESH_MAX_ATTEMPTS + 1):
+            try:
+                logger.info(
+                    "Refreshing Strava access token "
+                    f"(attempt {attempt}/{_REFRESH_MAX_ATTEMPTS})..."
                 )
+                logger.debug(f"Using CLIENT_ID: {STRAVA_CLIENT_ID}")
 
-                logger.debug(f"Strava API response status: {response.status_code}")
-                response.raise_for_status()
-                data = response.json()
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    response = await client.post(
+                        TOKEN_URL,
+                        data={
+                            "client_id": STRAVA_CLIENT_ID,
+                            "client_secret": STRAVA_CLIENT_SECRET,
+                            "grant_type": "refresh_token",
+                            "refresh_token": current_refresh_token,
+                        },
+                    )
 
-            new_access_token = data["access_token"]
-            new_refresh_token = data["refresh_token"]
-            new_token_expires_at = datetime.fromtimestamp(data["expires_at"])
+                    logger.debug(f"Strava API response status: {response.status_code}")
+                    response.raise_for_status()
+                    data = response.json()
 
-            # Persist the new refresh token to DB
-            _persist_refresh_token(new_refresh_token)
+                new_access_token = data["access_token"]
+                new_refresh_token = data["refresh_token"]
+                new_token_expires_at = datetime.fromtimestamp(data["expires_at"])
 
-            _access_token = new_access_token
-            _refresh_token = new_refresh_token
-            _token_expires_at = new_token_expires_at
+                # Persist the new refresh token to DB
+                _persist_refresh_token(new_refresh_token)
 
-            msg = f"Access token refreshed (expires at {new_token_expires_at})"
-            logger.info(f"✅ {msg}")
-            _log_token_refresh(True, msg, new_token_expires_at, refresh_mode=refresh_mode)
+                _access_token = new_access_token
+                _refresh_token = new_refresh_token
+                _token_expires_at = new_token_expires_at
 
-            return _access_token
+                msg = (
+                    f"Access token refreshed (expires at {new_token_expires_at}) "
+                    f"after {attempt} attempt(s)"
+                )
+                logger.info(f"✅ {msg}")
+                _log_token_refresh(True, msg, new_token_expires_at, refresh_mode=refresh_mode)
 
-        except httpx.HTTPStatusError as e:
-            msg = f"Strava API error (HTTP {e.response.status_code}): {e.response.text}"
-            logger.error(msg)
-            _log_token_refresh(False, msg, refresh_mode=refresh_mode)
-            return None
-        except Exception as e:
-            msg = f"Failed to refresh token: {type(e).__name__}: {e}"
-            logger.error(msg)
-            import traceback
+                return _access_token
 
-            logger.error(traceback.format_exc())
-            _log_token_refresh(False, msg, refresh_mode=refresh_mode)
-            return None
+            except httpx.HTTPStatusError as e:
+                status_code = e.response.status_code
+                last_error_msg = f"Strava API error (HTTP {status_code}): {e.response.text}"
+                is_retryable = status_code == 429 or 500 <= status_code < 600
+                if is_retryable and attempt < _REFRESH_MAX_ATTEMPTS:
+                    logger.warning(
+                        f"{last_error_msg} - retrying in {backoff_seconds:.1f}s "
+                        f"(attempt {attempt}/{_REFRESH_MAX_ATTEMPTS})"
+                    )
+                    await asyncio.sleep(backoff_seconds)
+                    backoff_seconds *= 2
+                    continue
+
+                logger.error(last_error_msg)
+                break
+            except (httpx.RequestError, asyncio.TimeoutError) as e:
+                last_error_msg = f"Failed to refresh token: {type(e).__name__}: {e}"
+                if attempt < _REFRESH_MAX_ATTEMPTS:
+                    logger.warning(
+                        f"{last_error_msg} - retrying in {backoff_seconds:.1f}s "
+                        f"(attempt {attempt}/{_REFRESH_MAX_ATTEMPTS})"
+                    )
+                    await asyncio.sleep(backoff_seconds)
+                    backoff_seconds *= 2
+                    continue
+
+                logger.error(last_error_msg)
+                break
+            except Exception as e:
+                last_error_msg = f"Failed to refresh token: {type(e).__name__}: {e}"
+                logger.error(last_error_msg)
+                import traceback
+
+                logger.error(traceback.format_exc())
+                break
+
+        final_msg = (
+            f"Strava token refresh failed after {_REFRESH_MAX_ATTEMPTS} attempts: "
+            f"{last_error_msg or 'Unknown error'}"
+        )
+        _log_token_refresh(False, final_msg, refresh_mode=refresh_mode)
+        return None
 
 
 def get_token_status() -> dict:
