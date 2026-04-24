@@ -170,6 +170,119 @@ class TestEmagramEndpoints:
         marker_key = f"emagram:analysis:site-cache-marker:{today.isoformat()}:latest"
         marker = await fake_async_redis.get(marker_key)
         assert marker is not None
+        payload = json.loads(marker)
+        assert payload["analysis_id"] == "cache-marker-analysis"
+        assert payload["site_id"] == "site-cache-marker"
+        assert payload["hour"] == "latest"
+        assert payload["status"] == "completed"
+        assert await fake_async_redis.ttl(marker_key) > 0
+
+    @pytest.mark.anyio
+    async def test_get_latest_with_site_id_and_hour_writes_hour_marker(
+        self, client, db_session, fake_async_redis
+    ):
+        """Hourly latest request writes an hour-specific emagram cache marker."""
+        today = datetime.utcnow().date()
+
+        site = Site(
+            id="site-cache-hour",
+            code="SCH",
+            name="Cache Hour Site",
+            latitude=47.2,
+            longitude=6.0,
+            elevation_m=427,
+        )
+        db_session.add(site)
+
+        analysis = EmagramAnalysis(
+            id="cache-hour-analysis",
+            station_code="site-cache-hour",
+            station_name="Cache Hour Site",
+            station_latitude=47.2,
+            station_longitude=6.0,
+            analysis_date=today,
+            analysis_time=datetime.utcnow().time(),
+            analysis_datetime=datetime.utcnow(),
+            forecast_date=today,
+            forecast_hour=14,
+            distance_km=0.0,
+            data_source="test",
+            sounding_time="12Z",
+            analysis_method="llm_vision",
+            score_volabilite=71,
+            analysis_status="completed",
+        )
+        db_session.add(analysis)
+        db_session.commit()
+
+        async def mock_get_redis():
+            return fake_async_redis
+
+        with patch("cache.get_redis", side_effect=mock_get_redis):
+            response = client.get("/api/emagram/latest?site_id=site-cache-hour&hour=14")
+
+        assert response.status_code == 200
+        marker_key = f"emagram:analysis:site-cache-hour:{today.isoformat()}:14"
+        marker = await fake_async_redis.get(marker_key)
+        assert marker is not None
+        payload = json.loads(marker)
+        assert payload["analysis_id"] == "cache-hour-analysis"
+        assert payload["site_id"] == "site-cache-hour"
+        assert payload["hour"] == "14"
+        assert payload["status"] == "completed"
+
+    @pytest.mark.anyio
+    async def test_get_latest_with_site_id_failed_analysis_writes_failed_marker(
+        self, client, db_session, fake_async_redis
+    ):
+        """Failed fallback path also writes cache marker with failed status."""
+        today = datetime.utcnow().date()
+
+        site = Site(
+            id="site-cache-failed",
+            code="SCF",
+            name="Cache Failed Site",
+            latitude=47.2,
+            longitude=6.0,
+            elevation_m=427,
+        )
+        db_session.add(site)
+
+        failed_analysis = EmagramAnalysis(
+            id="cache-failed-analysis",
+            station_code="site-cache-failed",
+            station_name="Cache Failed Site",
+            station_latitude=47.2,
+            station_longitude=6.0,
+            analysis_date=today,
+            analysis_time=datetime.utcnow().time(),
+            analysis_datetime=datetime.utcnow(),
+            forecast_date=today,
+            distance_km=0.0,
+            data_source="test",
+            sounding_time="12Z",
+            analysis_method="llm_vision",
+            analysis_status="failed",
+            error_message="provider timeout",
+        )
+        db_session.add(failed_analysis)
+        db_session.commit()
+
+        async def mock_get_redis():
+            return fake_async_redis
+
+        with patch("cache.get_redis", side_effect=mock_get_redis):
+            response = client.get("/api/emagram/latest?site_id=site-cache-failed")
+
+        assert response.status_code == 200
+        marker_key = f"emagram:analysis:site-cache-failed:{today.isoformat()}:latest"
+        marker = await fake_async_redis.get(marker_key)
+        assert marker is not None
+        payload = json.loads(marker)
+        assert payload["analysis_id"] == "cache-failed-analysis"
+        assert payload["site_id"] == "site-cache-failed"
+        assert payload["hour"] == "latest"
+        assert payload["status"] == "failed"
 
     def test_get_latest_with_site_id_not_found(self, client, db_session):
         """Get latest emagram with non-existent site_id returns 404"""
