@@ -121,7 +121,7 @@ function HourSlider({
               ? `Analyse ${h.hour}h en attente`
               : `Analyse ${h.hour}h`;
 
-          if (!isFailed) {
+          if (!isFailed && !isPending) {
             return (
               <Button
                 key={h.hour}
@@ -157,7 +157,11 @@ function HourSlider({
                   />
                 )}
               </Button>
-              <Tooltip className="bg-red-700 text-white text-xs px-2 py-1 rounded shadow-lg max-w-56 break-words">
+              <Tooltip
+                className={`${
+                  isPending ? 'bg-amber-700' : 'bg-red-700'
+                } text-white text-xs px-2 py-1 rounded shadow-lg max-w-56 break-words`}
+              >
                 {label}
               </Tooltip>
             </TooltipTrigger>
