@@ -70,6 +70,35 @@ export interface DailyForecastItem {
   verdict: string;
 }
 
+export interface LiveWindStation {
+  id: string;
+  provider: string | null;
+  provider_id: string | null;
+  name: string;
+  latitude: number;
+  longitude: number;
+  altitude_m: number | null;
+  distance_km: number;
+  last_report_at: string | null;
+  age_minutes: number | null;
+  is_outdated: boolean;
+  wind_avg_kmh: number | null;
+  wind_min_kmh: number | null;
+  wind_max_kmh: number | null;
+  wind_direction_deg: number | null;
+  temperature_c: number | null;
+  cloud_ceiling_m: number | null;
+  source_url: string | null;
+}
+
+export interface LiveWindResponse {
+  site_id: string;
+  site_name: string;
+  source: 'spotair';
+  radius_km: number;
+  stations: LiveWindStation[];
+}
+
 // Form types
 export interface FlightFormData {
   name?: string;

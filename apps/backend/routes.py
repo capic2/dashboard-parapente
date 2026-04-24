@@ -2122,6 +2122,53 @@ async def get_weather_today(spot_id: str, db: Session = Depends(get_db)):
     return await get_weather(spot_id, day_index=0, db=db)
 
 
+@public_router.get("/sites/{site_id}/live-wind")
+async def get_site_live_wind(site_id: str, db: Session = Depends(get_db)):
+    """Get live wind stations from SpotAiR around a site."""
+    site = db.query(Site).filter(Site.id == site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    if site.latitude is None or site.longitude is None:
+        raise HTTPException(status_code=400, detail="Site has no coordinates")
+
+    from app_settings import get_setting_float, get_setting_int
+    from cache import generate_cache_key, get_cached, set_cached
+
+    radius_km = get_setting_float("spotair_live_wind_radius_km", db=db, default=10.0)
+    cache_ttl = get_setting_int("spotair_live_wind_cache_ttl_seconds", db=db, default=300)
+
+    cache_key = generate_cache_key(
+        "spotair_live_wind",
+        site_id=site_id,
+        radius_km=f"{radius_km:.2f}",
+    )
+    cached = await get_cached(cache_key)
+    if cached is not None:
+        return cached
+
+    from spotair_live_wind import fetch_live_wind_stations
+
+    try:
+        stations = await fetch_live_wind_stations(
+            site_lat=float(site.latitude),
+            site_lon=float(site.longitude),
+            radius_km=radius_km,
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch SpotAiR live wind for site {site_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail="Failed to fetch SpotAiR live wind") from e
+
+    result = {
+        "site_id": site.id,
+        "site_name": site.name,
+        "source": "spotair",
+        "radius_km": radius_km,
+        "stations": stations,
+    }
+    await set_cached(cache_key, result, cache_ttl)
+    return result
+
+
 @public_router.get("/weather/{spot_id}/summary")
 async def get_weather_summary(spot_id: str, day_index: int = 0, db: Session = Depends(get_db)):
     """
@@ -5280,8 +5327,13 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
     allowed_keys = set(DEFAULTS.keys())
     updated = {}
     rejected = []
-    positive_int_keys = {"scheduler_interval_minutes", "emagram_max_age_minutes"}
+    positive_int_keys = {
+        "scheduler_interval_minutes",
+        "emagram_max_age_minutes",
+        "spotair_live_wind_cache_ttl_seconds",
+    }
     float_range_keys: dict[str, tuple[float, float]] = {
+        "spotair_live_wind_radius_km": (1, 50),
         "para_wind_very_low_max": (0, 120),
         "para_wind_low_max": (0, 120),
         "para_wind_weak_max": (0, 120),

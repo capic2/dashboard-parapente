@@ -79,6 +79,8 @@ const mockWeatherStats = {
 const mockSettings = {
   cache_ttl_default: '3600',
   cache_ttl_summary: '3600',
+  spotair_live_wind_radius_km: '10',
+  spotair_live_wind_cache_ttl_seconds: '300',
   scheduler_interval_minutes: '30',
   redis_connect_timeout: '5',
   redis_socket_timeout: '5',
@@ -138,6 +140,8 @@ Default.test(
 
     // Should render server sub-section controls
     await canvas.findByText(/Durée du cache serveur/);
+    await canvas.findByText(/Rayon des balises vent live SpotAiR/);
+    await canvas.findByText(/Durée du cache vent live SpotAiR/);
     await canvas.findByText(/Fréquence de collecte automatique/);
   }
 );

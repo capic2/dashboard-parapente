@@ -314,6 +314,10 @@ function PerformanceSection() {
   };
 
   const currentCacheTtl = backendSettings?.cache_ttl_default ?? '3600';
+  const currentSpotairRadius =
+    backendSettings?.spotair_live_wind_radius_km ?? '10';
+  const currentSpotairCacheTtl =
+    backendSettings?.spotair_live_wind_cache_ttl_seconds ?? '300';
   const currentSchedulerInterval =
     backendSettings?.scheduler_interval_minutes ?? '30';
   const thresholdSections = [
@@ -324,7 +328,9 @@ function PerformanceSection() {
       fields: [
         {
           key: 'para_wind_very_low_max',
-          label: t('settings.thresholds.wind.fields.para_wind_very_low_max.label'),
+          label: t(
+            'settings.thresholds.wind.fields.para_wind_very_low_max.label'
+          ),
           defaultValue: '3',
           step: '1',
         },
@@ -342,7 +348,9 @@ function PerformanceSection() {
         },
         {
           key: 'para_wind_optimal_max',
-          label: t('settings.thresholds.wind.fields.para_wind_optimal_max.label'),
+          label: t(
+            'settings.thresholds.wind.fields.para_wind_optimal_max.label'
+          ),
           defaultValue: '15',
           step: '1',
         },
@@ -367,7 +375,9 @@ function PerformanceSection() {
         },
         {
           key: 'para_gust_moderate_max',
-          label: t('settings.thresholds.gust.fields.para_gust_moderate_max.label'),
+          label: t(
+            'settings.thresholds.gust.fields.para_gust_moderate_max.label'
+          ),
           defaultValue: '20',
           step: '1',
         },
@@ -386,25 +396,33 @@ function PerformanceSection() {
       fields: [
         {
           key: 'para_precip_none_max',
-          label: t('settings.thresholds.precipitation.fields.para_precip_none_max.label'),
+          label: t(
+            'settings.thresholds.precipitation.fields.para_precip_none_max.label'
+          ),
           defaultValue: '0',
           step: '0.1',
         },
         {
           key: 'para_precip_light_max',
-          label: t('settings.thresholds.precipitation.fields.para_precip_light_max.label'),
+          label: t(
+            'settings.thresholds.precipitation.fields.para_precip_light_max.label'
+          ),
           defaultValue: '1',
           step: '0.1',
         },
         {
           key: 'para_precip_heavy_min',
-          label: t('settings.thresholds.precipitation.fields.para_precip_heavy_min.label'),
+          label: t(
+            'settings.thresholds.precipitation.fields.para_precip_heavy_min.label'
+          ),
           defaultValue: '2',
           step: '0.1',
         },
         {
           key: 'para_slot_precipitation_max',
-          label: t('settings.thresholds.precipitation.fields.para_slot_precipitation_max.label'),
+          label: t(
+            'settings.thresholds.precipitation.fields.para_slot_precipitation_max.label'
+          ),
           defaultValue: '0.5',
           step: '0.1',
         },
@@ -417,19 +435,25 @@ function PerformanceSection() {
       fields: [
         {
           key: 'para_li_stable_min',
-          label: t('settings.thresholds.instability.fields.para_li_stable_min.label'),
+          label: t(
+            'settings.thresholds.instability.fields.para_li_stable_min.label'
+          ),
           defaultValue: '-1',
           step: '0.1',
         },
         {
           key: 'para_li_slightly_unstable_min',
-          label: t('settings.thresholds.instability.fields.para_li_slightly_unstable_min.label'),
+          label: t(
+            'settings.thresholds.instability.fields.para_li_slightly_unstable_min.label'
+          ),
           defaultValue: '-3',
           step: '0.1',
         },
         {
           key: 'para_li_very_unstable_max',
-          label: t('settings.thresholds.instability.fields.para_li_very_unstable_max.label'),
+          label: t(
+            'settings.thresholds.instability.fields.para_li_very_unstable_max.label'
+          ),
           defaultValue: '-5',
           step: '0.1',
         },
@@ -442,13 +466,17 @@ function PerformanceSection() {
       fields: [
         {
           key: 'para_temp_cool_min',
-          label: t('settings.thresholds.temperature.fields.para_temp_cool_min.label'),
+          label: t(
+            'settings.thresholds.temperature.fields.para_temp_cool_min.label'
+          ),
           defaultValue: '5',
           step: '1',
         },
         {
           key: 'para_temp_warm_min',
-          label: t('settings.thresholds.temperature.fields.para_temp_warm_min.label'),
+          label: t(
+            'settings.thresholds.temperature.fields.para_temp_warm_min.label'
+          ),
           defaultValue: '10',
           step: '1',
         },
@@ -461,19 +489,25 @@ function PerformanceSection() {
       fields: [
         {
           key: 'para_verdict_good_min',
-          label: t('settings.thresholds.verdict.fields.para_verdict_good_min.label'),
+          label: t(
+            'settings.thresholds.verdict.fields.para_verdict_good_min.label'
+          ),
           defaultValue: '65',
           step: '1',
         },
         {
           key: 'para_verdict_medium_min',
-          label: t('settings.thresholds.verdict.fields.para_verdict_medium_min.label'),
+          label: t(
+            'settings.thresholds.verdict.fields.para_verdict_medium_min.label'
+          ),
           defaultValue: '45',
           step: '1',
         },
         {
           key: 'para_verdict_limit_min',
-          label: t('settings.thresholds.verdict.fields.para_verdict_limit_min.label'),
+          label: t(
+            'settings.thresholds.verdict.fields.para_verdict_limit_min.label'
+          ),
           defaultValue: '30',
           step: '1',
         },
@@ -486,25 +520,33 @@ function PerformanceSection() {
       fields: [
         {
           key: 'ui_reason_wind_moderate_min',
-          label: t('settings.thresholds.ui.fields.ui_reason_wind_moderate_min.label'),
+          label: t(
+            'settings.thresholds.ui.fields.ui_reason_wind_moderate_min.label'
+          ),
           defaultValue: '25',
           step: '1',
         },
         {
           key: 'ui_reason_wind_very_strong_min',
-          label: t('settings.thresholds.ui.fields.ui_reason_wind_very_strong_min.label'),
+          label: t(
+            'settings.thresholds.ui.fields.ui_reason_wind_very_strong_min.label'
+          ),
           defaultValue: '35',
           step: '1',
         },
         {
           key: 'ui_reason_gust_high_min',
-          label: t('settings.thresholds.ui.fields.ui_reason_gust_high_min.label'),
+          label: t(
+            'settings.thresholds.ui.fields.ui_reason_gust_high_min.label'
+          ),
           defaultValue: '45',
           step: '1',
         },
         {
           key: 'ui_reason_cloud_very_cloudy_min',
-          label: t('settings.thresholds.ui.fields.ui_reason_cloud_very_cloudy_min.label'),
+          label: t(
+            'settings.thresholds.ui.fields.ui_reason_cloud_very_cloudy_min.label'
+          ),
           defaultValue: '80',
           step: '1',
         },
@@ -680,6 +722,103 @@ function PerformanceSection() {
         </div>
 
         {/* Scheduler Interval */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {t('settings.performance.spotairLiveWindRadius')}
+          </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            {t('settings.performance.spotairLiveWindRadiusHelp')}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            {(
+              [
+                {
+                  value: '5',
+                  label: '5 ' + t('settings.performance.kilometers'),
+                },
+                {
+                  value: '10',
+                  label:
+                    '10 ' +
+                    t('settings.performance.kilometers') +
+                    ' (' +
+                    t('settings.performance.default') +
+                    ')',
+                },
+                {
+                  value: '20',
+                  label: '20 ' + t('settings.performance.kilometers'),
+                },
+              ] as const
+            ).map((opt) => (
+              <Button
+                key={opt.value}
+                onClick={() =>
+                  handleBackendSetting('spotair_live_wind_radius_km', opt.value)
+                }
+                disabled={updateBackend.isPending}
+                className={`px-5 py-2 rounded-lg font-medium transition-all text-sm ${
+                  currentSpotairRadius === opt.value
+                    ? 'bg-sky-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                } disabled:opacity-50`}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {t('settings.performance.spotairLiveWindCache')}
+          </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            {t('settings.performance.spotairLiveWindCacheHelp')}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            {(
+              [
+                {
+                  value: '60',
+                  label: '1 ' + t('settings.performance.minutes'),
+                },
+                {
+                  value: '300',
+                  label:
+                    '5 ' +
+                    t('settings.performance.minutes') +
+                    ' (' +
+                    t('settings.performance.default') +
+                    ')',
+                },
+                {
+                  value: '900',
+                  label: '15 ' + t('settings.performance.minutes'),
+                },
+              ] as const
+            ).map((opt) => (
+              <Button
+                key={opt.value}
+                onClick={() =>
+                  handleBackendSetting(
+                    'spotair_live_wind_cache_ttl_seconds',
+                    opt.value
+                  )
+                }
+                disabled={updateBackend.isPending}
+                className={`px-5 py-2 rounded-lg font-medium transition-all text-sm ${
+                  currentSpotairCacheTtl === opt.value
+                    ? 'bg-sky-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                } disabled:opacity-50`}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             {t('settings.performance.schedulerInterval')}
