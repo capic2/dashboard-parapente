@@ -488,6 +488,33 @@ class TestEmagramEndpoints:
         assert [h["hour"] for h in hours] == list(range(7, 21))
         assert all(h["status"] == "pending" for h in hours)
 
+    def test_get_emagram_hours_returns_404_for_unknown_site(self, client):
+        """Hourly endpoint returns 404 for unknown site id."""
+        response = client.get("/api/emagram/hours?site_id=unknown-site&day_index=0")
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Site not found"
+
+    def test_get_emagram_hours_returns_400_without_coordinates(self, client, db_session):
+        """Hourly endpoint returns 400 when site has no coordinates."""
+        app_settings.invalidate_cache()
+
+        site = Site(
+            id="site-hours-no-coords",
+            code="SNC",
+            name="No Coordinates Site",
+            latitude=None,
+            longitude=None,
+            elevation_m=500,
+        )
+        db_session.add(site)
+        db_session.commit()
+
+        response = client.get("/api/emagram/hours?site_id=site-hours-no-coords&day_index=0")
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Site has no coordinates configured"
+
     def test_analyze_with_site_id(self, client, db_session):
         """Trigger analysis accepts site_id without lat/lon"""
         response = client.post(

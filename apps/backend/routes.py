@@ -4484,28 +4484,35 @@ async def get_emagram_hours(
             if analysis.forecast_hour not in latest_by_hour:
                 latest_by_hour[analysis.forecast_hour] = analysis
 
+        site = db.query(Site).filter(Site.id == site_id).first()
+        if not site:
+            raise HTTPException(status_code=404, detail="Site not found")
+        if site.latitude is None or site.longitude is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Site has no coordinates configured",
+            )
+
         # Build expected hour range (sunrise -> sunset), fallback to 07h-20h
         start_hour = 7
         end_hour = 20
         try:
-            site = db.query(Site).filter(Site.id == site_id).first()
-            if site and site.latitude is not None and site.longitude is not None:
-                from weather_pipeline import get_normalized_forecast
+            from weather_pipeline import get_normalized_forecast
 
-                forecast = await get_normalized_forecast(
-                    lat=site.latitude,
-                    lon=site.longitude,
-                    day_index=day_index,
-                    db=db,
-                )
+            forecast = await get_normalized_forecast(
+                lat=site.latitude,
+                lon=site.longitude,
+                day_index=day_index,
+                db=db,
+            )
 
-                sunrise = forecast.get("sunrise")
-                sunset = forecast.get("sunset")
+            sunrise = forecast.get("sunrise")
+            sunset = forecast.get("sunset")
 
-                if sunrise:
-                    start_hour = int(str(sunrise).split(":", maxsplit=1)[0])
-                if sunset:
-                    end_hour = int(str(sunset).split(":", maxsplit=1)[0])
+            if sunrise:
+                start_hour = int(str(sunrise).split(":", maxsplit=1)[0])
+            if sunset:
+                end_hour = int(str(sunset).split(":", maxsplit=1)[0])
         except Exception as e:
             logger.warning(
                 "Failed to compute emagram hour range from sunrise/sunset for site %s day_index=%s: %s",
@@ -4545,6 +4552,8 @@ async def get_emagram_hours(
                 for hour in all_hours
             ],
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get emagram hours: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e

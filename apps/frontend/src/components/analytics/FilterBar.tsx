@@ -17,6 +17,17 @@ interface FilterBarProps {
 export function FilterBar({ sites }: FilterBarProps) {
   const { t, i18n } = useTranslation();
   const dateLocale = i18n.language === 'en' ? 'en-US' : 'fr-FR';
+
+  const formatFilterDate = (value: string): string => {
+    const [year, month, day] = value.split('-').map(Number);
+
+    if (year && month && day) {
+      return new Date(year, month - 1, day).toLocaleDateString(dateLocale);
+    }
+
+    return new Date(value).toLocaleDateString(dateLocale);
+  };
+
   const { filters, setSiteId, setDateFrom, setDateTo, resetFilters } =
     useFiltersStore();
 
@@ -82,9 +93,7 @@ export function FilterBar({ sites }: FilterBarProps) {
                 <Trans
                   i18nKey="filters.fromDate"
                   values={{
-                    date: new Date(filters.dateFrom).toLocaleDateString(
-                      dateLocale
-                    ),
+                    date: formatFilterDate(filters.dateFrom),
                   }}
                 />
               </span>
@@ -94,9 +103,7 @@ export function FilterBar({ sites }: FilterBarProps) {
                 <Trans
                   i18nKey="filters.toDate"
                   values={{
-                    date: new Date(filters.dateTo).toLocaleDateString(
-                      dateLocale
-                    ),
+                    date: formatFilterDate(filters.dateTo),
                   }}
                 />
               </span>
