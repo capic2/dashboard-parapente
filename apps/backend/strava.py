@@ -207,7 +207,7 @@ async def refresh_access_token(force: bool = False) -> str | None:
 
                 logger.error(last_error_msg)
                 break
-            except (httpx.RequestError, asyncio.TimeoutError) as e:
+            except (httpx.RequestError, TimeoutError) as e:
                 last_error_msg = f"Failed to refresh token: {type(e).__name__}: {e}"
                 if attempt < _REFRESH_MAX_ATTEMPTS:
                     logger.warning(
