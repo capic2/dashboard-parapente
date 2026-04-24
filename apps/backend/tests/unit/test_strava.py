@@ -18,6 +18,7 @@ Strategy:
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from strava import (
@@ -248,6 +249,125 @@ async def test_refresh_access_token_http_error():
 
         token = await refresh_access_token()
         assert token is None
+
+
+@pytest.mark.asyncio
+async def test_refresh_access_token_retries_transient_http_errors_then_succeeds():
+    """Retries on transient HTTP errors and succeeds on a later attempt."""
+
+    import strava
+
+    strava._access_token = None
+    strava._token_expires_at = None
+    strava._refresh_token = None
+
+    first_response = MagicMock()
+    first_response.status_code = 429
+    first_response.text = "Too Many Requests"
+    first_response.raise_for_status = MagicMock(
+        side_effect=httpx.HTTPStatusError(
+            "429 Too Many Requests",
+            request=httpx.Request("POST", "https://www.strava.com/oauth/token"),
+            response=first_response,
+        )
+    )
+
+    second_payload = {
+        "access_token": "retried_access_token",
+        "refresh_token": "retried_refresh_token",
+        "expires_at": int((datetime.now() + timedelta(hours=6)).timestamp()),
+    }
+    second_response = MagicMock()
+    second_response.status_code = 200
+    second_response.raise_for_status = MagicMock()
+    second_response.json = MagicMock(return_value=second_payload)
+
+    with (
+        patch("strava.STRAVA_CLIENT_ID", "test_client_id"),
+        patch("strava.STRAVA_CLIENT_SECRET", "test_secret"),
+        patch("strava._get_persisted_refresh_token", return_value="test_refresh_token"),
+        patch("strava._persist_refresh_token") as mock_persist,
+        patch("strava.asyncio.sleep", new=AsyncMock()) as mock_sleep,
+        patch("strava.httpx.AsyncClient") as mock_client,
+    ):
+        mock_post = AsyncMock(side_effect=[first_response, second_response])
+        mock_client.return_value.__aenter__.return_value.post = mock_post
+
+        token = await refresh_access_token(force=True)
+
+    assert token == "retried_access_token"
+    assert mock_post.await_count == 2
+    mock_sleep.assert_awaited_once_with(1.0)
+    mock_persist.assert_called_once_with("retried_refresh_token")
+
+
+@pytest.mark.asyncio
+async def test_refresh_access_token_does_not_retry_non_retryable_http_error():
+    """Does not retry when Strava returns a non-retryable HTTP status."""
+
+    import strava
+
+    strava._access_token = None
+    strava._token_expires_at = None
+    strava._refresh_token = None
+
+    unauthorized_response = MagicMock()
+    unauthorized_response.status_code = 401
+    unauthorized_response.text = "Unauthorized"
+    unauthorized_response.raise_for_status = MagicMock(
+        side_effect=httpx.HTTPStatusError(
+            "401 Unauthorized",
+            request=httpx.Request("POST", "https://www.strava.com/oauth/token"),
+            response=unauthorized_response,
+        )
+    )
+
+    with (
+        patch("strava.STRAVA_CLIENT_ID", "test_client_id"),
+        patch("strava.STRAVA_CLIENT_SECRET", "test_secret"),
+        patch("strava._get_persisted_refresh_token", return_value="test_refresh_token"),
+        patch("strava.asyncio.sleep", new=AsyncMock()) as mock_sleep,
+        patch("strava.httpx.AsyncClient") as mock_client,
+    ):
+        mock_post = AsyncMock(return_value=unauthorized_response)
+        mock_client.return_value.__aenter__.return_value.post = mock_post
+
+        token = await refresh_access_token(force=True)
+
+    assert token is None
+    assert mock_post.await_count == 1
+    assert mock_sleep.await_count == 0
+
+
+@pytest.mark.asyncio
+async def test_refresh_access_token_retries_request_error_until_exhausted():
+    """Retries request errors up to the max attempts before failing."""
+
+    import strava
+
+    strava._access_token = None
+    strava._token_expires_at = None
+    strava._refresh_token = None
+
+    network_error = httpx.RequestError(
+        "Network down", request=httpx.Request("POST", "https://www.strava.com/oauth/token")
+    )
+
+    with (
+        patch("strava.STRAVA_CLIENT_ID", "test_client_id"),
+        patch("strava.STRAVA_CLIENT_SECRET", "test_secret"),
+        patch("strava._get_persisted_refresh_token", return_value="test_refresh_token"),
+        patch("strava.asyncio.sleep", new=AsyncMock()) as mock_sleep,
+        patch("strava.httpx.AsyncClient") as mock_client,
+    ):
+        mock_post = AsyncMock(side_effect=[network_error] * 5)
+        mock_client.return_value.__aenter__.return_value.post = mock_post
+
+        token = await refresh_access_token(force=True)
+
+    assert token is None
+    assert mock_post.await_count == 5
+    assert mock_sleep.await_count == 4
 
 
 @pytest.mark.asyncio
