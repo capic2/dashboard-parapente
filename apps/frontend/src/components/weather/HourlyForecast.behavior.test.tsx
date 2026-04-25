@@ -8,6 +8,9 @@ vi.mock('react-i18next', () => ({
       if (key === 'weather.paraIndex') return 'Para-Index';
       return key;
     },
+    i18n: {
+      language: 'fr',
+    },
   }),
 }));
 
