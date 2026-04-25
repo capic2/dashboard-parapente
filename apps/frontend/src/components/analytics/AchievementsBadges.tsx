@@ -30,9 +30,9 @@ export default function AchievementsBadges({ stats }: AchievementsBadgesProps) {
   const { t } = useTranslation();
 
   const badges = useMemo(() => {
-    const totalFlights = stats.total_flights || 0;
-    const totalHours = stats.total_hours || 0;
-    const maxAltitude = stats.max_altitude_m || 0;
+    const totalFlights = stats.total_flights ?? 0;
+    const totalHours = stats.total_hours ?? 0;
+    const maxAltitude = stats.max_altitude_m ?? 0;
 
     const allBadges: AchievementBadge[] = [
       // Badges de vols
@@ -137,7 +137,7 @@ export default function AchievementsBadges({ stats }: AchievementsBadgesProps) {
         progress: Math.min(100, (maxAltitude / 3000) * 100),
         threshold: 3000,
       },
-    ];
+    ] as const;
 
     return allBadges;
   }, [stats, t]);

@@ -1,0 +1,7 @@
+{
+  "packages": {},
+  "agents": [
+    "agents_md",
+    "opencode"
+  ]
+}
