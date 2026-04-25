@@ -1,5 +1,5 @@
 import { Suspense, useState, useEffect } from 'react';
-import { Trans, useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { Button } from '@dashboard-parapente/design-system';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
@@ -133,11 +133,8 @@ function SitesTab({
         </div>
       )}
       <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-800 dark:text-blue-200">
-        💡{' '}
-        <Trans
-          i18nKey="settings.favorites.tipMessage"
-          components={{ strong: <strong /> }}
-        />
+        💡 <strong>{t('settings.favorites.tip')}</strong>{' '}
+        {t('settings.favorites.tipText')}
       </div>
     </div>
   );
@@ -317,6 +314,10 @@ function PerformanceSection() {
   };
 
   const currentCacheTtl = backendSettings?.cache_ttl_default ?? '3600';
+  const currentSpotairRadius =
+    backendSettings?.spotair_live_wind_radius_km ?? '10';
+  const currentSpotairCacheTtl =
+    backendSettings?.spotair_live_wind_cache_ttl_seconds ?? '300';
   const currentSchedulerInterval =
     backendSettings?.scheduler_interval_minutes ?? '30';
   const thresholdSections = [
@@ -720,7 +721,105 @@ function PerformanceSection() {
           </div>
         </div>
 
-        {/* Scheduler Interval */}
+        {/* SpotAiR live wind station radius */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {t('settings.performance.spotairLiveWindRadius')}
+          </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            {t('settings.performance.spotairLiveWindRadiusHelp')}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            {(
+              [
+                {
+                  value: '5',
+                  label: '5 ' + t('settings.performance.kilometers'),
+                },
+                {
+                  value: '10',
+                  label:
+                    '10 ' +
+                    t('settings.performance.kilometers') +
+                    ' (' +
+                    t('settings.performance.default') +
+                    ')',
+                },
+                {
+                  value: '20',
+                  label: '20 ' + t('settings.performance.kilometers'),
+                },
+              ] as const
+            ).map((opt) => (
+              <Button
+                key={opt.value}
+                onClick={() =>
+                  handleBackendSetting('spotair_live_wind_radius_km', opt.value)
+                }
+                disabled={updateBackend.isPending}
+                className={`px-5 py-2 rounded-lg font-medium transition-all text-sm ${
+                  currentSpotairRadius === opt.value
+                    ? 'bg-sky-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                } disabled:opacity-50`}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* SpotAiR live wind cache TTL */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {t('settings.performance.spotairLiveWindCache')}
+          </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            {t('settings.performance.spotairLiveWindCacheHelp')}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            {(
+              [
+                {
+                  value: '60',
+                  label: '1 ' + t('settings.performance.minutes'),
+                },
+                {
+                  value: '300',
+                  label:
+                    '5 ' +
+                    t('settings.performance.minutes') +
+                    ' (' +
+                    t('settings.performance.default') +
+                    ')',
+                },
+                {
+                  value: '900',
+                  label: '15 ' + t('settings.performance.minutes'),
+                },
+              ] as const
+            ).map((opt) => (
+              <Button
+                key={opt.value}
+                onClick={() =>
+                  handleBackendSetting(
+                    'spotair_live_wind_cache_ttl_seconds',
+                    opt.value
+                  )
+                }
+                disabled={updateBackend.isPending}
+                className={`px-5 py-2 rounded-lg font-medium transition-all text-sm ${
+                  currentSpotairCacheTtl === opt.value
+                    ? 'bg-sky-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                } disabled:opacity-50`}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             {t('settings.performance.schedulerInterval')}

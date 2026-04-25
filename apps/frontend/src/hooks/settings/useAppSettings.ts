@@ -4,6 +4,8 @@ import { api } from '../../lib/api';
 export interface AppSettings {
   cache_ttl_default: string;
   cache_ttl_summary: string;
+  spotair_live_wind_radius_km: string;
+  spotair_live_wind_cache_ttl_seconds: string;
   scheduler_interval_minutes: string;
   redis_connect_timeout: string;
   redis_socket_timeout: string;

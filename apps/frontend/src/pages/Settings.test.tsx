@@ -20,6 +20,8 @@ vi.mock('../hooks/settings/useAppSettings', () => ({
   useAppSettings: () => ({
     data: {
       para_wind_very_low_max: '3',
+      spotair_live_wind_radius_km: '10',
+      spotair_live_wind_cache_ttl_seconds: '300',
     },
   }),
   useUpdateAppSettings: () => ({

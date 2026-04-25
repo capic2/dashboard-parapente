@@ -22,6 +22,8 @@ _cache_loaded = False
 DEFAULTS: dict[str, str] = {
     "cache_ttl_default": "3600",
     "cache_ttl_summary": "3600",
+    "spotair_live_wind_radius_km": "10",
+    "spotair_live_wind_cache_ttl_seconds": "300",
     "scheduler_interval_minutes": "30",
     "emagram_max_age_minutes": "180",
     "redis_connect_timeout": "5",
