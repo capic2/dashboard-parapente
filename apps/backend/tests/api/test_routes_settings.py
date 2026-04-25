@@ -106,6 +106,49 @@ class TestUpdateSettings:
         assert row is not None
         assert row.value == "120"
 
+    def test_update_spotair_live_wind_settings(self, client, db_session):
+        """Updates SpotAiR live wind settings and persists normalized values."""
+        response = client.put(
+            f"{API_PREFIX}/settings",
+            json={
+                "spotair_live_wind_radius_km": "12.0",
+                "spotair_live_wind_cache_ttl_seconds": "420",
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["updated"]["spotair_live_wind_radius_km"] == "12"
+        assert data["updated"]["spotair_live_wind_cache_ttl_seconds"] == "420"
+
+        radius_row = (
+            db_session.query(AppSetting)
+            .filter(AppSetting.key == "spotair_live_wind_radius_km")
+            .first()
+        )
+        ttl_row = (
+            db_session.query(AppSetting)
+            .filter(AppSetting.key == "spotair_live_wind_cache_ttl_seconds")
+            .first()
+        )
+        assert radius_row is not None and radius_row.value == "12"
+        assert ttl_row is not None and ttl_row.value == "420"
+
+    def test_rejects_invalid_spotair_live_wind_settings(self, client, db_session):
+        """Rejects out-of-range SpotAiR live wind radius and non-positive TTL."""
+        radius_response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"spotair_live_wind_radius_km": "0.5"},
+        )
+        assert radius_response.status_code == 400
+        assert "between 1 and 50" in radius_response.json()["detail"]
+
+        ttl_response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"spotair_live_wind_cache_ttl_seconds": "0"},
+        )
+        assert ttl_response.status_code == 400
+        assert ttl_response.json()["detail"] == "spotair_live_wind_cache_ttl_seconds must be > 0"
+
     def test_validates_and_normalizes_float_thresholds(self, client, db_session):
         """Float thresholds are normalized and reject non-finite / out-of-range values."""
         valid_response = client.put(

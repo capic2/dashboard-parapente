@@ -4,6 +4,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { useSearch } from '@tanstack/react-router';
 import SiteSelector from '../components/dashboard/SiteSelector';
 import CurrentConditions from '../components/weather/CurrentConditions';
+import LiveWindCard from '../components/weather/LiveWindCard';
 import Forecast7Day from '../components/weather/Forecast7Day';
 import HourlyForecast from '../components/weather/HourlyForecast';
 import EmagramWidget from '../components/dashboard/EmagramWidget';
@@ -94,6 +95,9 @@ export default function WeatherPage() {
 
         {/* Current Conditions */}
         <CurrentConditions spotId={selectedSiteId} />
+
+        {/* SpotAiR Live Wind */}
+        <LiveWindCard siteId={selectedSiteId} />
 
         {/* Landing Sites Weather */}
         <WeatherMultiLanding

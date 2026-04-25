@@ -64,6 +64,7 @@ API_DEBUG = os.getenv("BACKEND_API_DEBUG", "false").lower() == "true"
 # ============================================================================
 WEATHERAPI_KEY = os.getenv("BACKEND_WEATHERAPI_KEY")
 METEOBLUE_API_KEY = os.getenv("BACKEND_METEOBLUE_API_KEY")
+SPOTAIR_BALISES_API_KEY = os.getenv("BACKEND_SPOTAIR_BALISES_API_KEY")
 
 # ============================================================================
 # STRAVA OAUTH

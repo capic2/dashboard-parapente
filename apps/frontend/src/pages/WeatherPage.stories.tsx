@@ -375,6 +375,64 @@ const mockBestSpotByDay: Record<number, typeof mockBestSpot> = {
   },
 };
 
+const mockLiveWindArguel = {
+  site_id: 'site-arguel',
+  site_name: 'Arguel',
+  source: 'spotair' as const,
+  radius_km: 10,
+  stations: [
+    {
+      id: 'ffvl_5043',
+      provider: 'ffvl',
+      provider_id: '5043',
+      name: 'Arguel Nord',
+      latitude: 47.21,
+      longitude: 6.01,
+      altitude_m: 450,
+      distance_km: 1.2,
+      last_report_at: '2025-06-15T08:22:00Z',
+      age_minutes: 8,
+      is_outdated: false,
+      wind_avg_kmh: 14,
+      wind_min_kmh: 9,
+      wind_max_kmh: 22,
+      wind_direction_deg: 225,
+      temperature_c: 20,
+      cloud_ceiling_m: 1800,
+      source_url: 'https://balisemeteo.com/balise.php?idBalise=5043',
+    },
+  ],
+};
+
+const mockLiveWindChalais = {
+  site_id: 'site-chalais',
+  site_name: 'Chalais',
+  source: 'spotair' as const,
+  radius_km: 10,
+  stations: [
+    {
+      id: 'ffvl_9999',
+      provider: 'ffvl',
+      provider_id: '9999',
+      name: 'Chalais Ouest',
+      latitude: 47.18,
+      longitude: 6.21,
+      altitude_m: 870,
+      distance_km: 0.9,
+      last_report_at: '2025-06-15T07:10:00Z',
+      age_minutes: 80,
+      is_outdated: true,
+      wind_avg_kmh: 18,
+      wind_min_kmh: 12,
+      wind_max_kmh: 28,
+      wind_direction_deg: 270,
+      temperature_c: 16,
+      cloud_ceiling_m: 1500,
+      source_url: 'https://balisemeteo.com/balise.php?idBalise=9999',
+    },
+  ],
+};
+
 const defaultHandlers = [
   http.get('*/api/spots', () => HttpResponse.json(mockSites)),
   http.get('*/api/spots/best', ({ request }) => {
@@ -398,6 +456,12 @@ const defaultHandlers = [
   ),
   http.get('*/api/weather/:spotId/daily-summary', () =>
     HttpResponse.json(mockDailySummary)
+  ),
+  http.get('*/api/sites/site-arguel/live-wind', () =>
+    HttpResponse.json(mockLiveWindArguel)
+  ),
+  http.get('*/api/sites/site-chalais/live-wind', () =>
+    HttpResponse.json(mockLiveWindChalais)
   ),
   http.get('*/api/sites/:siteId/landings', () =>
     HttpResponse.json(mockLandingAssociations)
@@ -534,6 +598,15 @@ export const WeatherError = meta.story({
         http.get(
           '*/api/weather/:spotId/daily-summary',
           () => new HttpResponse(null, { status: 500 })
+        ),
+        http.get('*/api/sites/:siteId/live-wind', ({ params }) =>
+          HttpResponse.json({
+            site_id: String(params.siteId),
+            site_name: 'Unknown',
+            source: 'spotair',
+            radius_km: 10,
+            stations: [],
+          })
         ),
         http.get('*/api/sites/:siteId/landings', () => HttpResponse.json([])),
         http.get('*/api/sites/:siteId/landings/weather', () =>

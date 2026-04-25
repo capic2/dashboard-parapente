@@ -102,7 +102,20 @@
     "windUnavailable": "Données vent indisponibles",
     "flyableSlot": "Créneau",
     "thermalCeiling": "Plafond",
-    "score": "Score"
+    "score": "Score",
+    "liveWindTitle": "Vent live SpotAiR",
+    "liveWindSubtitle": "Balises autour de {{name}} (rayon {{radius}} km)",
+    "liveWindError": "Impossible de charger les balises vent live",
+    "liveWindEmpty": "Aucune balise live trouvée autour du site.",
+    "liveWindNearest": "Balise la plus proche",
+    "liveWindOthers": "Autres balises proches",
+    "liveWindLiveBadge": "Live",
+    "liveWindStaleBadge": "Ancien",
+    "liveWindAgeMinutes": "{{count}} min",
+    "liveWindNoRecent": "Sans relevé récent",
+    "liveWindDistance": "{{distance}} km",
+    "liveWindGust": "raf.",
+    "liveWindOpenSource": "Source"
   },
   "filters": {
     "title": "Filtres",
@@ -112,9 +125,7 @@
     "dateTo": "Date de fin",
     "activeFilters": "Filtres actifs :",
     "from": "Du",
-    "to": "Au",
-    "fromDate": "Du {{date}}",
-    "toDate": "Au {{date}}"
+    "to": "Au"
   },
   "sites": {
     "management": "Gestion des Sites",
@@ -181,8 +192,7 @@
       "favorite": "Favori",
       "add": "Ajouter",
       "tip": "Astuce :",
-      "tipText": "Les sites favoris apparaîtront en priorité dans les sélecteurs",
-      "tipMessage": "<strong>Astuce :</strong> Les sites favoris apparaîtront en priorité dans les sélecteurs"
+      "tipText": "Les sites favoris apparaîtront en priorité dans les sélecteurs"
     },
     "weatherSources": {
       "title": "Gestion des Sources Météo",
@@ -213,8 +223,6 @@
       "calls": "Appels",
       "lastSuccess": "Dernier succès:",
       "lastError": "Dernière erreur:",
-      "lastSuccessMessage": "Dernier succès: {{date}}",
-      "lastErrorMessage": "Dernière erreur: {{date}}",
       "testing": "Test en cours...",
       "test": "Tester",
       "testSuccess": "Test réussi en {{time}}ms",
@@ -264,8 +272,13 @@
       "httpTimeoutHelp": "Temps maximum d'attente pour les requêtes vers le serveur. Augmentez si votre connexion est lente.",
       "backendCache": "Durée du cache serveur",
       "backendCacheHelp": "Durée pendant laquelle le serveur conserve les données météo en cache (Redis). Après expiration, les données sont re-téléchargées depuis les sources externes (Open-Meteo, WeatherAPI, etc.).",
+      "spotairLiveWindRadius": "Rayon des balises vent live SpotAiR",
+      "spotairLiveWindRadiusHelp": "Distance autour du site utilisée pour récupérer les balises SpotAiR. Un rayon plus grand trouve plus de balises mais peut inclure des stations moins représentatives.",
+      "spotairLiveWindCache": "Durée du cache vent live SpotAiR",
+      "spotairLiveWindCacheHelp": "Durée pendant laquelle le serveur conserve les relevés de vent live SpotAiR avant de les recharger.",
       "schedulerInterval": "Fréquence de collecte automatique",
       "schedulerIntervalHelp": "Intervalle entre chaque collecte automatique des prévisions météo pour vos sites favoris (aujourd'hui et demain). Un intervalle plus court donne des prévisions plus fraîches mais sollicite davantage les API externes.",
+      "kilometers": "km",
       "minutes": "min",
       "seconds": "sec",
       "default": "défaut",
@@ -417,8 +430,7 @@
     "createDescription": "Uploadez un fichier GPX ou IGC pour créer automatiquement un nouveau vol. Les statistiques (durée, altitude, distance, vitesse) seront extraites du fichier.",
     "gpxFile": "Fichier GPX ou IGC",
     "autoDetection": "Détection automatique :",
-    "autoDetectionText": "Le site de décollage sera détecté automatiquement à partir des coordonnées GPS du fichier GPX ou IGC.",
-    "autoDetectionMessage": "<strong>Détection automatique :</strong> Le site de décollage sera détecté automatiquement à partir des coordonnées GPS du fichier GPX ou IGC.",
+    "autoDetectionText": "Le site de décollage sera détecté automatiquement à partir des coordonnées GPS du fichier GPX.",
     "createSuccess": "Vol créé avec succès",
     "name": "Nom :",
     "date": "Date :",
@@ -497,7 +509,6 @@
     "confirmDelete": "⚠️ Confirmer la suppression",
     "confirmDeleteSinglePrefix": "Vous êtes sur le point de supprimer définitivement le vol",
     "confirmDeleteSingleSuffix": "Cette action est irréversible.",
-    "confirmDeleteSingleMessage": "Vous êtes sur le point de supprimer définitivement le vol <title>{{title}}</title>. Cette action est irréversible.",
     "confirmDeleteMulti_one": "Vous êtes sur le point de supprimer définitivement {{count}} vol. Cette action est irréversible.",
     "confirmDeleteMulti_other": "Vous êtes sur le point de supprimer définitivement {{count}} vols. Cette action est irréversible.",
     "deleting": "⏳ Suppression...",
