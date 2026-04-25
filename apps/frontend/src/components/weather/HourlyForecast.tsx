@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Tooltip, TooltipTrigger } from 'react-aria-components';
 import {
   Clock,
   Gauge,
@@ -12,7 +13,6 @@ import {
   Flame,
   CircleCheck,
 } from 'lucide-react';
-import { Button } from '@dashboard-parapente/design-system';
 import { useAppSettings } from '../../hooks/settings/useAppSettings';
 import { useWeather } from '../../hooks/weather/useWeather';
 import type { HourlyForecastItem } from '../../types';
@@ -39,17 +39,8 @@ type CellType =
   | 'precipitation'
   | 'cloud-cover';
 
-interface TooltipPosition {
-  x: number;
-  y: number;
-}
-
 interface BaseTooltipProps {
-  position: TooltipPosition;
   hour: string;
-  onClose?: () => void;
-  isMobile?: boolean;
-  tooltipRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 interface SourceDataTooltipProps extends BaseTooltipProps {
@@ -259,7 +250,6 @@ const parseSettingNumber = (
 // ============================================================================
 
 const ParaIndexTooltip = ({
-  position,
   hour,
   label,
   paraIndex,
@@ -267,38 +257,9 @@ const ParaIndexTooltip = ({
   gust,
   precipitation,
   temperature,
-  onClose,
-  isMobile,
-  tooltipRef,
 }: ParaIndexTooltipProps) => {
   return (
-    <div
-      ref={tooltipRef}
-      className={`
-        ${isMobile ? 'fixed bottom-0 left-0 right-0 mx-4 mb-4' : 'fixed'}
-        bg-white dark:bg-gray-800 border-2 border-sky-500 rounded-lg shadow-xl p-4 z-50 text-sm
-      `}
-      style={
-        isMobile
-          ? {}
-          : {
-              left: `${position.x}px`,
-              top: `${position.y - 10}px`,
-              transform: 'translateX(-50%) translateY(-100%)',
-              maxWidth: '320px',
-            }
-      }
-    >
-      {onClose && (
-        <Button
-          onClick={onClose}
-          tone="ghost"
-          className="absolute top-2 right-2 text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-          aria-label="Fermer l'infobulle"
-        >
-          ✕
-        </Button>
-      )}
+    <div className="bg-white dark:bg-gray-800 border-2 border-sky-500 rounded-lg shadow-xl p-4 text-sm max-w-[320px]">
       <div className="font-bold mb-3 text-sky-700 dark:text-sky-400 flex items-center justify-between gap-2 pr-8">
         <span>
           📊 {label} - {hour}
@@ -337,7 +298,6 @@ const ParaIndexTooltip = ({
 };
 
 const VerdictTooltip = ({
-  position,
   hour,
   verdict,
   label,
@@ -346,9 +306,6 @@ const VerdictTooltip = ({
   gust,
   precipitation,
   thresholds,
-  onClose,
-  isMobile,
-  tooltipRef,
 }: VerdictTooltipProps) => {
   const criteria = [
     {
@@ -374,33 +331,7 @@ const VerdictTooltip = ({
   ];
 
   return (
-    <div
-      className={`
-        ${isMobile ? 'fixed bottom-0 left-0 right-0 mx-4 mb-4' : 'fixed'}
-        bg-white dark:bg-gray-800 border-2 border-emerald-500 rounded-lg shadow-xl p-4 z-50 text-sm
-      `}
-      ref={tooltipRef}
-      style={
-        isMobile
-          ? {}
-          : {
-              left: `${position.x}px`,
-              top: `${position.y - 10}px`,
-              transform: 'translateX(-50%) translateY(-100%)',
-              maxWidth: '320px',
-            }
-      }
-    >
-      {onClose && (
-        <Button
-          onClick={onClose}
-          tone="ghost"
-          className="absolute top-2 right-2 text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-          aria-label="Fermer le verdict"
-        >
-          ✕
-        </Button>
-      )}
+    <div className="bg-white dark:bg-gray-800 border-2 border-emerald-500 rounded-lg shadow-xl p-4 text-sm max-w-[320px]">
       <div className="font-bold mb-3 text-emerald-700 dark:text-emerald-400 flex items-center justify-between gap-2 pr-8">
         <span>✓ Verdict - {hour}</span>
         <ScopeBadge scope="backendFrontend" />
@@ -451,7 +382,6 @@ const VerdictTooltip = ({
 };
 
 const SourceDataTooltip = ({
-  position,
   hour,
   sources,
   consensus,
@@ -459,39 +389,12 @@ const SourceDataTooltip = ({
   fieldName,
   label,
   color,
-  onClose,
-  isMobile,
-  tooltipRef,
 }: SourceDataTooltipProps) => {
   return (
     <div
-      ref={tooltipRef}
-      className={`
-        ${isMobile ? 'fixed bottom-0 left-0 right-0 mx-4 mb-4' : 'fixed'}
-        bg-white dark:bg-gray-800 border-2 rounded-lg shadow-xl p-4 z-50 text-sm
-      `}
-      style={
-        isMobile
-          ? {}
-          : {
-              left: `${position.x}px`,
-              top: `${position.y - 10}px`,
-              transform: 'translateX(-50%) translateY(-100%)',
-              maxWidth: '320px',
-              borderColor: color,
-            }
-      }
+      className="bg-white dark:bg-gray-800 border-2 rounded-lg shadow-xl p-4 text-sm max-w-[320px]"
+      style={{ borderColor: color }}
     >
-      {onClose && (
-        <Button
-          onClick={onClose}
-          tone="ghost"
-          className="absolute top-2 right-2 text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-          aria-label="Fermer les données source"
-        >
-          ✕
-        </Button>
-      )}
       <div className="font-bold mb-3 text-gray-800 dark:text-gray-100 flex items-center gap-2">
         {label} - {hour}
       </div>
@@ -651,13 +554,6 @@ export default function HourlyForecast({
   const { t } = useTranslation();
   const { data: weather, isLoading, error } = useWeather(spotId, dayIndex);
   const { data: appSettings } = useAppSettings();
-  const [activeTooltip, setActiveTooltip] = useState<{
-    type: CellType;
-    data: HourlyForecastItem;
-    position: TooltipPosition;
-  } | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
-  const tooltipRef = useRef<HTMLDivElement>(null);
   const uiThresholds = useMemo<UiThresholds>(
     () => ({
       windLowMax: parseSettingNumber(
@@ -704,41 +600,6 @@ export default function HourlyForecast({
     [appSettings]
   );
 
-  // Close tooltip when clicking outside
-  useEffect(() => {
-    if (!activeTooltip) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        tooltipRef.current &&
-        !tooltipRef.current.contains(e.target as Node)
-      ) {
-        setActiveTooltip(null);
-      }
-    };
-    const handleViewportChange = () => {
-      setActiveTooltip(null);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('scroll', handleViewportChange, true);
-    window.addEventListener('resize', handleViewportChange);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('scroll', handleViewportChange, true);
-      window.removeEventListener('resize', handleViewportChange);
-    };
-  }, [activeTooltip]);
-
-  // Detect mobile on mount and window resize
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
   if (isLoading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
@@ -767,43 +628,12 @@ export default function HourlyForecast({
 
   const flyingHours = weather.hourly_forecast;
 
-  const handleCellInteraction = (
-    cellType: CellType,
-    hourData: HourlyForecastItem,
-    event: React.MouseEvent
-  ) => {
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const x = rect.left + rect.width / 2;
-    const y = rect.top;
-
-    setActiveTooltip({
-      type: cellType,
-      data: hourData,
-      position: { x, y },
-    });
-  };
-
-  const handleCloseTooltip = () => {
-    setActiveTooltip(null);
-  };
-
-  const renderTooltip = () => {
-    if (!activeTooltip) return null;
-
-    const { type, data, position } = activeTooltip;
-    const commonProps = {
-      position,
-      hour: data.hour,
-      onClose: handleCloseTooltip,
-      isMobile,
-      tooltipRef,
-    };
-
+  const renderTooltipContent = (type: CellType, data: HourlyForecastItem) => {
     switch (type) {
       case 'para-index':
         return (
           <ParaIndexTooltip
-            {...commonProps}
+            hour={data.hour}
             label={t('weather.paraIndex')}
             paraIndex={data.para_index}
             wind={data.wind_speed || 0}
@@ -820,7 +650,7 @@ export default function HourlyForecast({
       case 'verdict':
         return (
           <VerdictTooltip
-            {...commonProps}
+            hour={data.hour}
             label={t('weather.paraIndex')}
             verdict={data.verdict}
             paraIndex={data.para_index}
@@ -838,7 +668,7 @@ export default function HourlyForecast({
       case 'temperature':
         return (
           <SourceDataTooltip
-            {...commonProps}
+            hour={data.hour}
             sources={data.sources || {}}
             consensus={data.temperature}
             unit="°C"
@@ -851,7 +681,7 @@ export default function HourlyForecast({
       case 'wind':
         return (
           <SourceDataTooltip
-            {...commonProps}
+            hour={data.hour}
             sources={data.sources || {}}
             consensus={data.wind_speed}
             unit="km/h"
@@ -864,7 +694,7 @@ export default function HourlyForecast({
       case 'gust':
         return (
           <SourceDataTooltip
-            {...commonProps}
+            hour={data.hour}
             sources={data.sources || {}}
             consensus={data.wind_gust ?? null}
             unit="km/h"
@@ -877,7 +707,7 @@ export default function HourlyForecast({
       case 'direction':
         return (
           <SourceDataTooltip
-            {...commonProps}
+            hour={data.hour}
             sources={data.sources || {}}
             consensus={formatWindDirectionWithDegrees(
               data.sources?.['open-meteo']?.wind_direction ||
@@ -894,7 +724,7 @@ export default function HourlyForecast({
       case 'precipitation':
         return (
           <SourceDataTooltip
-            {...commonProps}
+            hour={data.hour}
             sources={data.sources || {}}
             consensus={data.precipitation}
             unit="mm"
@@ -907,7 +737,7 @@ export default function HourlyForecast({
       case 'cloud-cover':
         return (
           <SourceDataTooltip
-            {...commonProps}
+            hour={data.hour}
             sources={data.sources || {}}
             consensus={
               data.sources?.['open-meteo']?.cloud_cover ||
@@ -925,14 +755,6 @@ export default function HourlyForecast({
         return null;
     }
   };
-
-  const cellEventHandlers = (
-    cellType: CellType,
-    hourData: HourlyForecastItem
-  ) => ({
-    onClick: (e: React.MouseEvent) =>
-      handleCellInteraction(cellType, hourData, e),
-  });
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
@@ -1034,69 +856,125 @@ export default function HourlyForecast({
                       {hour.hour}
                     </td>
 
-                    <td
-                      className="py-2.5 px-2 text-center cursor-help hover:bg-sky-100 dark:hover:bg-sky-900/30 transition-colors"
-                      {...cellEventHandlers('para-index', hour)}
-                    >
-                      <strong className="text-sky-600 dark:text-sky-400">
-                        {hour.para_index}/100
-                      </strong>
+                    <td className="py-2.5 px-2 text-center">
+                      <TooltipTrigger delay={150} closeDelay={100}>
+                        <button
+                          type="button"
+                          aria-label={`${t('weather.paraIndex')} ${hour.hour}`}
+                          className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-sky-100 dark:hover:bg-sky-900/30 transition-colors"
+                        >
+                          <strong className="text-sky-600 dark:text-sky-400">
+                            {hour.para_index}/100
+                          </strong>
+                        </button>
+                        <Tooltip offset={8} className="z-50">
+                          {renderTooltipContent('para-index', hour)}
+                        </Tooltip>
+                      </TooltipTrigger>
                     </td>
 
-                    <td
-                      className="py-2.5 px-2 text-center cursor-help hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                      {...cellEventHandlers('wind', hour)}
-                    >
-                      {hour.wind}
+                    <td className="py-2.5 px-2 text-center">
+                      <TooltipTrigger delay={150} closeDelay={100}>
+                        <button
+                          type="button"
+                          aria-label={`Vent ${hour.hour}`}
+                          className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                        >
+                          {hour.wind}
+                        </button>
+                        <Tooltip offset={8} className="z-50">
+                          {renderTooltipContent('wind', hour)}
+                        </Tooltip>
+                      </TooltipTrigger>
                     </td>
 
-                    <td
-                      className="py-2.5 px-2 text-center cursor-help hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                      {...cellEventHandlers('gust', hour)}
-                    >
-                      {gustValue !== null && gustValue !== undefined
-                        ? gustValue.toFixed(1)
-                        : '—'}
+                    <td className="py-2.5 px-2 text-center">
+                      <TooltipTrigger delay={150} closeDelay={100}>
+                        <button
+                          type="button"
+                          aria-label={`Rafales ${hour.hour}`}
+                          className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        >
+                          {gustValue !== null && gustValue !== undefined
+                            ? gustValue.toFixed(1)
+                            : '—'}
+                        </button>
+                        <Tooltip offset={8} className="z-50">
+                          {renderTooltipContent('gust', hour)}
+                        </Tooltip>
+                      </TooltipTrigger>
                     </td>
 
-                    <td
-                      className="py-2.5 px-2 text-center cursor-help hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
-                      {...cellEventHandlers('direction', hour)}
-                    >
-                      {hour.wind_direction_deg != null ? (
-                        <WindArrow
-                          degrees={hour.wind_direction_deg}
-                          className="text-violet-600 dark:text-violet-400"
-                        />
-                      ) : (
-                        '—'
-                      )}
+                    <td className="py-2.5 px-2 text-center">
+                      <TooltipTrigger delay={150} closeDelay={100}>
+                        <button
+                          type="button"
+                          aria-label={`Direction ${hour.hour}`}
+                          className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors flex justify-center"
+                        >
+                          {hour.wind_direction_deg != null ? (
+                            <WindArrow
+                              degrees={hour.wind_direction_deg}
+                              className="text-violet-600 dark:text-violet-400"
+                            />
+                          ) : (
+                            '—'
+                          )}
+                        </button>
+                        <Tooltip offset={8} className="z-50">
+                          {renderTooltipContent('direction', hour)}
+                        </Tooltip>
+                      </TooltipTrigger>
                     </td>
 
-                    <td
-                      className="py-2.5 px-2 text-center cursor-help hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                      {...cellEventHandlers('temperature', hour)}
-                    >
-                      {hour.temp}
+                    <td className="py-2.5 px-2 text-center">
+                      <TooltipTrigger delay={150} closeDelay={100}>
+                        <button
+                          type="button"
+                          aria-label={`Temperature ${hour.hour}`}
+                          className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        >
+                          {hour.temp}
+                        </button>
+                        <Tooltip offset={8} className="z-50">
+                          {renderTooltipContent('temperature', hour)}
+                        </Tooltip>
+                      </TooltipTrigger>
                     </td>
 
-                    <td
-                      className="py-2.5 px-2 text-center cursor-help hover:bg-cyan-50 dark:hover:bg-cyan-900/20 transition-colors"
-                      {...cellEventHandlers('precipitation', hour)}
-                    >
-                      {hour.precipitation !== null &&
-                      hour.precipitation !== undefined
-                        ? hour.precipitation.toFixed(1)
-                        : '—'}
+                    <td className="py-2.5 px-2 text-center">
+                      <TooltipTrigger delay={150} closeDelay={100}>
+                        <button
+                          type="button"
+                          aria-label={`Precipitations ${hour.hour}`}
+                          className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-cyan-50 dark:hover:bg-cyan-900/20 transition-colors"
+                        >
+                          {hour.precipitation !== null &&
+                          hour.precipitation !== undefined
+                            ? hour.precipitation.toFixed(1)
+                            : '—'}
+                        </button>
+                        <Tooltip offset={8} className="z-50">
+                          {renderTooltipContent('precipitation', hour)}
+                        </Tooltip>
+                      </TooltipTrigger>
                     </td>
 
-                    <td
-                      className="py-2.5 px-2 text-center cursor-help hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors"
-                      {...cellEventHandlers('cloud-cover', hour)}
-                    >
-                      {cloudCover !== null && cloudCover !== undefined
-                        ? Math.round(cloudCover)
-                        : '—'}
+                    <td className="py-2.5 px-2 text-center">
+                      <TooltipTrigger delay={150} closeDelay={100}>
+                        <button
+                          type="button"
+                          aria-label={`Nuages ${hour.hour}`}
+                          className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors"
+                        >
+                          {cloudCover !== null && cloudCover !== undefined
+                            ? Math.round(cloudCover)
+                            : '—'}
+                        </button>
+                        <Tooltip offset={8} className="z-50">
+                          {renderTooltipContent('cloud-cover', hour)}
+                        </Tooltip>
+                      </TooltipTrigger>
                     </td>
 
                     <td className="py-2.5 px-2 text-center">
@@ -1116,9 +994,20 @@ export default function HourlyForecast({
                           uiThresholds
                         );
                         return (
-                          <span className={`font-medium ${display.color}`}>
-                            {display.emoji} {display.text}
-                          </span>
+                          <TooltipTrigger delay={150} closeDelay={100}>
+                            <button
+                              type="button"
+                              aria-label={`Verdict ${hour.hour}`}
+                              className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+                            >
+                              <span className={`font-medium ${display.color}`}>
+                                {display.emoji} {display.text}
+                              </span>
+                            </button>
+                            <Tooltip offset={8} className="z-50">
+                              {renderTooltipContent('verdict', hour)}
+                            </Tooltip>
+                          </TooltipTrigger>
                         );
                       })()}
                     </td>
@@ -1138,9 +1027,6 @@ export default function HourlyForecast({
           </tbody>
         </table>
       </div>
-
-      {/* Render active tooltip */}
-      {renderTooltip()}
     </div>
   );
 }
