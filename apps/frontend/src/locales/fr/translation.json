@@ -115,7 +115,9 @@
     "liveWindNoRecent": "Sans relevé récent",
     "liveWindDistance": "{{distance}} km",
     "liveWindGust": "raf.",
-    "liveWindOpenSource": "Source"
+    "liveWindOpenSource": "Source",
+    "liveWindExternalInfo": "Les balises live sont consultables directement sur SpotAiR.",
+    "liveWindOpenSpotair": "Ouvrir SpotAiR"
   },
   "filters": {
     "title": "Filtres",
