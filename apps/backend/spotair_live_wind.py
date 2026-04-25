@@ -182,5 +182,10 @@ async def fetch_live_wind_stations(
             }
         )
 
-    stations.sort(key=lambda s: (s["distance_km"], s["age_minutes"] or 10_000))
+    stations.sort(
+        key=lambda s: (
+            s["distance_km"],
+            s["age_minutes"] if s["age_minutes"] is not None else 10_000,
+        )
+    )
     return stations
