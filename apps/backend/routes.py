@@ -1646,7 +1646,9 @@ async def _cache_emagram_analysis_marker(
         from app_settings import get_setting_int
         from cache import get_redis
 
-        cache_ttl = get_setting_int("cache_ttl_default", db=db, default=3600)
+        emagram_max_age_minutes = get_setting_int("emagram_max_age_minutes", db=db, default=180)
+        cache_ttl = max(emagram_max_age_minutes * 60, 60)
+        # Keep hour=0 distinct from "latest" (avoid falsy coalescing like `hour or "latest"`).
         cache_hour = str(hour) if hour is not None else "latest"
         cache_key = f"emagram:analysis:{site.id}:{forecast_date.isoformat()}:{cache_hour}"
         cache_value = {
@@ -4287,14 +4289,36 @@ def _auto_emagram_analysis(site_id: str, day_index: int = 0, hour: int | None = 
     _pending_emagram_analyses.add(key)
     try:
         with get_db_context() as db:
-            asyncio.run(
-                generate_multi_source_emagram_for_spot(
+
+            async def _run_emagram_and_cache() -> None:
+                result = await generate_multi_source_emagram_for_spot(
                     site_id=site_id,
                     db=db,
                     day_index=day_index,
                     hour=hour,
                 )
-            )
+                if not (result.get("success") and result.get("analysis_id")):
+                    return
+
+                site = db.query(Site).filter(Site.id == site_id).first()
+                analysis = (
+                    db.query(EmagramAnalysis)
+                    .filter(EmagramAnalysis.id == result["analysis_id"])
+                    .first()
+                )
+                if not site or not analysis:
+                    return
+
+                forecast_date = (datetime.utcnow() + timedelta(days=day_index)).date()
+                await _cache_emagram_analysis_marker(
+                    site,
+                    analysis,
+                    forecast_date,
+                    hour,
+                    db=db,
+                )
+
+            asyncio.run(_run_emagram_and_cache())
     except Exception as e:
         logger.error(
             f"Auto emagram analysis failed for {site_id} day_index={day_index} hour={hour}: {e}"
@@ -4330,6 +4354,8 @@ async def get_latest_emagram(
         max_distance_km: Maximum acceptable station distance (default: 200km)
     """
     try:
+        site: Site | None = None
+
         # Determine target coordinates
         if site_id:
             site = db.query(Site).filter(Site.id == site_id).first()
@@ -4365,6 +4391,14 @@ async def get_latest_emagram(
                 .first()
             )
             if latest_attempt_for_hour:
+                if site is not None:
+                    await _cache_emagram_analysis_marker(
+                        site,
+                        latest_attempt_for_hour,
+                        target_date,
+                        hour,
+                        db=db,
+                    )
                 return latest_attempt_for_hour
 
         analysis_filters = [
@@ -4429,11 +4463,22 @@ async def get_latest_emagram(
                 .first()
             )
             if failed_analysis:
+                if site is not None:
+                    await _cache_emagram_analysis_marker(
+                        site,
+                        failed_analysis,
+                        target_date,
+                        hour,
+                        db=db,
+                    )
                 return failed_analysis
 
         # Auto-trigger analysis in background if no data found
         if result is None and auto_analyze and site_id:
             background_tasks.add_task(_auto_emagram_analysis, site_id, day_index, hour)
+
+        if result is not None and site is not None:
+            await _cache_emagram_analysis_marker(site, result, target_date, hour, db=db)
 
         return result
 
