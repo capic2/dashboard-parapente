@@ -4,8 +4,18 @@
 Frontend (`apps/frontend/**`).
 
 ## When
+- A route needs server data.
+- A page currently fetches data directly in a component.
 
-## Rules
+## Do
+- Fetch route-level data with TanStack Router loaders.
+- Use React Query for caching, synchronization, retries, and server state lifecycle.
+- Keep component bodies focused on rendering and interactions.
 
-* A route needs server data.
-* A page currently fetches data directly in a component.
+## Why
+- Improves consistency of loading and error handling.
+- Reduces duplicated data-fetching logic.
+
+## Examples
+- Good: loader prefetches query; component consumes query state.
+- Avoid: `useEffect` + manual fetch in page components when loader/query is suitable.

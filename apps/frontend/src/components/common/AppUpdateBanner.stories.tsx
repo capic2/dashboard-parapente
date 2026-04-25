@@ -22,25 +22,29 @@ export const WithReleaseNotes = meta.story({
   },
 });
 
-WithReleaseNotes.test('shows version details and release notes link', async ({
-  canvasElement,
-}) => {
-  const canvas = within(canvasElement);
+WithReleaseNotes.test(
+  'shows version details and release notes link',
+  async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
 
-  await expect(
-    canvas.getByText(/Une nouvelle version \(2026\.04\.22\.1\) est prete\./i)
-  ).toBeInTheDocument();
-  await expect(
-    canvas.getByRole('link', { name: /Voir les nouveautes/i })
-  ).toBeInTheDocument();
-});
+    await expect(
+      canvas.getByText(/Une nouvelle version \(2026\.04\.22\.1\) est prete\./i)
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByRole('link', { name: /Voir les nouveautes/i })
+    ).toBeInTheDocument();
+  }
+);
 
-WithReleaseNotes.test('calls refresh callback', async ({ canvasElement, args }) => {
-  const canvas = within(canvasElement);
+WithReleaseNotes.test(
+  'calls refresh callback',
+  async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
 
-  await userEvent.click(canvas.getByRole('button', { name: /Rafraichir/i }));
-  await expect(args.onRefresh).toHaveBeenCalledTimes(1);
-});
+    await userEvent.click(canvas.getByRole('button', { name: /Rafraichir/i }));
+    await expect(args.onRefresh).toHaveBeenCalledTimes(1);
+  }
+);
 
 export const WithoutReleaseNotes = meta.story({
   args: {
@@ -53,11 +57,14 @@ export const WithoutReleaseNotes = meta.story({
   },
 });
 
-WithoutReleaseNotes.test('hides release notes link when URL is missing', async ({
-  canvasElement,
-}) => {
-  const canvas = within(canvasElement);
+WithoutReleaseNotes.test(
+  'hides release notes link when URL is missing',
+  async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
 
-  await expect(canvas.queryByRole('link')).not.toBeInTheDocument();
-  await expect(canvas.getByRole('button', { name: /Refresh/i })).toBeInTheDocument();
-});
+    await expect(canvas.queryByRole('link')).not.toBeInTheDocument();
+    await expect(
+      canvas.getByRole('button', { name: /Refresh/i })
+    ).toBeInTheDocument();
+  }
+);

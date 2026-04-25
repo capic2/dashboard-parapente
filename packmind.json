@@ -1,5 +1,7 @@
 {
-  "packages": {
-    "@global/dashboard-parapente": "*"
-  }
+  "packages": {},
+  "agents": [
+    "agents_md",
+    "opencode"
+  ]
 }

@@ -28,8 +28,6 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-
-
 const mockEmagramData = {
   id: 'test-emagram-1',
   analysis_date: '2026-03-24',
@@ -75,10 +73,10 @@ const mockEmagramData = {
 
 // 1x1 blue PNG placeholder for screenshot preview testing
 const PLACEHOLDER_PNG = new Uint8Array([
-  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1,
-  0, 0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222, 0, 0, 0, 12, 73, 68, 65, 84,
-  8, 215, 99, 104, 104, 248, 15, 0, 1, 1, 0, 5, 24, 217, 38, 57, 0, 0, 0, 0,
-  73, 69, 78, 68, 174, 66, 96, 130,
+  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0,
+  0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222, 0, 0, 0, 12, 73, 68, 65, 84, 8,
+  215, 99, 104, 104, 248, 15, 0, 1, 1, 0, 5, 24, 217, 38, 57, 0, 0, 0, 0, 73,
+  69, 78, 68, 174, 66, 96, 130,
 ]);
 
 const screenshotHandler = http.get(
@@ -239,12 +237,15 @@ export const HoursWithoutAnalysis = meta.story({
   },
 });
 
-HoursWithoutAnalysis.test('shows hour chooser before analysis exists', async ({ canvas }) => {
-  await canvas.findByText(/9h/);
-  await expect(canvas.getByText(/12h/)).toBeInTheDocument();
-  await expect(canvas.getByText(/15h/)).toBeInTheDocument();
-  await canvas.findByText(/Analyse en cours/);
-});
+HoursWithoutAnalysis.test(
+  'shows hour chooser before analysis exists',
+  async ({ canvas }) => {
+    await canvas.findByText(/9h/);
+    await expect(canvas.getByText(/12h/)).toBeInTheDocument();
+    await expect(canvas.getByText(/15h/)).toBeInTheDocument();
+    await canvas.findByText(/Analyse en cours/);
+  }
+);
 
 export const WithScreenshotPreview = meta.story({
   name: 'With Screenshot Preview (hover)',
@@ -282,7 +283,9 @@ export const HourFailedTooltip = meta.story({
             error_message: 'Timeout fournisseur LLM',
           })
         ),
-        http.post('*/api/emagram/analyze', () => HttpResponse.json(mockEmagramData)),
+        http.post('*/api/emagram/analyze', () =>
+          HttpResponse.json(mockEmagramData)
+        ),
         screenshotHandler,
       ],
     },
