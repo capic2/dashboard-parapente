@@ -115,7 +115,9 @@
     "liveWindNoRecent": "No recent report",
     "liveWindDistance": "{{distance}} km",
     "liveWindGust": "gust",
-    "liveWindOpenSource": "Source"
+    "liveWindOpenSource": "Source",
+    "liveWindExternalInfo": "Live stations are available directly on SpotAiR.",
+    "liveWindOpenSpotair": "Open SpotAiR"
   },
   "filters": {
     "title": "Filters",

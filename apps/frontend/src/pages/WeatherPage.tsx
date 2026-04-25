@@ -4,7 +4,6 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { useSearch } from '@tanstack/react-router';
 import SiteSelector from '../components/dashboard/SiteSelector';
 import CurrentConditions from '../components/weather/CurrentConditions';
-import LiveWindCard from '../components/weather/LiveWindCard';
 import Forecast7Day from '../components/weather/Forecast7Day';
 import HourlyForecast from '../components/weather/HourlyForecast';
 import EmagramWidget from '../components/dashboard/EmagramWidget';
@@ -96,8 +95,27 @@ export default function WeatherPage() {
         {/* Current Conditions */}
         <CurrentConditions spotId={selectedSiteId} />
 
-        {/* SpotAiR Live Wind */}
-        <LiveWindCard siteId={selectedSiteId} />
+        {/* SpotAiR Live Wind (external link) */}
+        <section className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 sm:p-6 border border-gray-100 dark:border-gray-700">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {t('weather.liveWindTitle')}
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                {t('weather.liveWindExternalInfo')}
+              </p>
+            </div>
+            <a
+              href="https://www.spotair.mobi/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-700"
+            >
+              {t('weather.liveWindOpenSpotair')}
+            </a>
+          </div>
+        </section>
 
         {/* Landing Sites Weather */}
         <WeatherMultiLanding
