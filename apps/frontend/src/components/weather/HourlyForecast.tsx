@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Clock,
   Gauge,
@@ -12,9 +13,11 @@ import {
   CircleCheck,
 } from 'lucide-react';
 import { Button } from '@dashboard-parapente/design-system';
+import { useAppSettings } from '../../hooks/settings/useAppSettings';
 import { useWeather } from '../../hooks/weather/useWeather';
 import type { HourlyForecastItem } from '../../types';
 import CacheTimestamp from '../common/CacheTimestamp';
+import ScopeBadge from '../common/ScopeBadge';
 import WindArrow from './WindArrow';
 
 interface HourlyForecastProps {
@@ -59,6 +62,7 @@ interface SourceDataTooltipProps extends BaseTooltipProps {
 }
 
 interface ParaIndexTooltipProps extends BaseTooltipProps {
+  label: string;
   paraIndex: number;
   wind: number;
   gust: number;
@@ -67,11 +71,26 @@ interface ParaIndexTooltipProps extends BaseTooltipProps {
 }
 
 interface VerdictTooltipProps extends BaseTooltipProps {
+  label: string;
   verdict: string;
   paraIndex: number;
   wind: number;
   gust: number;
   precipitation: number;
+  thresholds: UiThresholds;
+}
+
+export interface UiThresholds {
+  windLowMax: number;
+  windWeakMax: number;
+  windOptimalMax: number;
+  windHighMax: number;
+  gustHighMax: number;
+  slotPrecipitationMax: number;
+  reasonWindVeryStrongMin: number;
+  reasonGustHighMin: number;
+  reasonCloudVeryCloudyMin: number;
+  reasonWindModerateMin: number;
 }
 
 // ============================================================================
@@ -103,26 +122,27 @@ const getSourceUrl = (sourceKey: string): string | null => {
  * Get flyability display with emoji, verdict and reason
  * Format: "🟢 BON" or "🟡 MOYEN — Vent faible" or "🔴 MAUVAIS — Vent insuffisant"
  */
-const getFlyabilityDisplay = (
-  hour: HourlyForecastItem
+export const getFlyabilityDisplay = (
+  hour: HourlyForecastItem,
+  thresholds: UiThresholds
 ): { emoji: string; text: string; color: string } => {
   const verdict = hour.verdict?.toLowerCase();
   const verdictUpper = verdict?.toUpperCase() || 'MOYEN';
 
   // Emoji and color based on verdict
   let emoji = '🟡';
-  let color = 'text-yellow-600 dark:text-yellow-400';
+  let color = 'text-yellow-700 dark:text-yellow-300';
 
   if (verdict === 'bon') {
     emoji = '🟢';
-    color = 'text-green-600 dark:text-green-400';
+    color = 'text-green-700 dark:text-green-300';
     return { emoji, text: 'BON', color };
   } else if (verdict === 'mauvais') {
     emoji = '🔴';
-    color = 'text-red-600 dark:text-red-400';
+    color = 'text-red-700 dark:text-red-300';
   } else if (verdict === 'limite') {
     emoji = '🟠';
-    color = 'text-orange-600 dark:text-orange-400';
+    color = 'text-orange-700 dark:text-orange-300';
   }
 
   // Determine the reason when not BON
@@ -141,19 +161,21 @@ const getFlyabilityDisplay = (
   let reason = '';
 
   // Priority order for reason
-  if (precipitation > 0.5) {
+  if (precipitation > thresholds.slotPrecipitationMax) {
     reason = 'Pluie';
-  } else if (wind > 35) {
+  } else if (wind > thresholds.reasonWindVeryStrongMin) {
     reason = 'Vent fort';
-  } else if (gust > 45) {
+  } else if (gust > thresholds.reasonGustHighMin) {
     reason = 'Rafales importantes';
-  } else if (wind < 8) {
+  } else if (wind < thresholds.windLowMax) {
     reason = 'Vent insuffisant';
-  } else if (wind < 15) {
+  } else if (wind < thresholds.windWeakMax) {
     reason = 'Vent faible';
-  } else if (cloudCover > 80) {
+  } else if (wind < thresholds.windOptimalMax) {
+    reason = 'Vent acceptable';
+  } else if (cloudCover > thresholds.reasonCloudVeryCloudyMin) {
     reason = 'Très nuageux';
-  } else if (wind > 25) {
+  } else if (wind > thresholds.reasonWindModerateMin) {
     reason = 'Vent modéré';
   } else {
     // Generic reason based on para-index
@@ -207,6 +229,31 @@ const SOURCE_ORDER = [
   'meteoblue',
 ];
 
+export const DEFAULT_UI_THRESHOLDS: UiThresholds = {
+  windLowMax: 5,
+  windWeakMax: 8,
+  windOptimalMax: 15,
+  windHighMax: 20,
+  gustHighMax: 25,
+  slotPrecipitationMax: 0.5,
+  reasonWindVeryStrongMin: 35,
+  reasonGustHighMin: 45,
+  reasonCloudVeryCloudyMin: 80,
+  reasonWindModerateMin: 25,
+};
+
+const parseSettingNumber = (
+  value: string | undefined,
+  fallback: number
+): number => {
+  if (value === undefined || value.trim() === '') {
+    return fallback;
+  }
+
+  const parsed = Number(value.trim());
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 // ============================================================================
 // TOOLTIP COMPONENTS
 // ============================================================================
@@ -214,6 +261,7 @@ const SOURCE_ORDER = [
 const ParaIndexTooltip = ({
   position,
   hour,
+  label,
   paraIndex,
   wind,
   gust,
@@ -245,17 +293,22 @@ const ParaIndexTooltip = ({
         <Button
           onClick={onClose}
           tone="ghost"
-          className="absolute top-2 right-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+          className="absolute top-2 right-2 text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           aria-label="Fermer l'infobulle"
         >
           ✕
         </Button>
       )}
-      <div className="font-bold mb-3 text-sky-700 dark:text-sky-400 flex items-center gap-2">
-        📊 Para-Index - {hour}
+      <div className="font-bold mb-3 text-sky-700 dark:text-sky-400 flex items-center justify-between gap-2 pr-8">
+        <span>
+          📊 {label} - {hour}
+        </span>
+        <ScopeBadge scope="backendFrontend" />
       </div>
       <div className="space-y-2 text-gray-700 dark:text-gray-300">
-        <div className="text-lg font-bold text-sky-600">{paraIndex}/100</div>
+        <div className="text-lg font-bold text-sky-600 dark:text-sky-400">
+          {paraIndex}/100
+        </div>
         <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
           <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
             Métriques utilisées :
@@ -287,34 +340,36 @@ const VerdictTooltip = ({
   position,
   hour,
   verdict,
+  label,
   paraIndex,
   wind,
   gust,
   precipitation,
+  thresholds,
   onClose,
   isMobile,
   tooltipRef,
 }: VerdictTooltipProps) => {
   const criteria = [
     {
-      label: 'Vent dans plage optimale (8-15 km/h)',
-      met: wind >= 8 && wind <= 15,
+      label: `Vent dans plage optimale (${thresholds.windWeakMax}-${thresholds.windOptimalMax} km/h)`,
+      met: wind >= thresholds.windWeakMax && wind <= thresholds.windOptimalMax,
     },
     {
-      label: 'Vent pas trop faible (> 5 km/h)',
-      met: wind > 5,
+      label: `Vent pas trop faible (> ${thresholds.windLowMax} km/h)`,
+      met: wind > thresholds.windLowMax,
     },
     {
-      label: 'Vent pas trop fort (< 20 km/h)',
-      met: wind < 20,
+      label: `Vent pas trop fort (< ${thresholds.windHighMax} km/h)`,
+      met: wind < thresholds.windHighMax,
     },
     {
-      label: 'Rafales acceptables (< 25 km/h)',
-      met: gust < 25,
+      label: `Rafales acceptables (< ${thresholds.gustHighMax} km/h)`,
+      met: gust < thresholds.gustHighMax,
     },
     {
       label: 'Pas de précipitations',
-      met: precipitation < 0.5,
+      met: precipitation < thresholds.slotPrecipitationMax,
     },
   ];
 
@@ -340,21 +395,22 @@ const VerdictTooltip = ({
         <Button
           onClick={onClose}
           tone="ghost"
-          className="absolute top-2 right-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+          className="absolute top-2 right-2 text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           aria-label="Fermer le verdict"
         >
           ✕
         </Button>
       )}
-      <div className="font-bold mb-3 text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-        ✓ Verdict - {hour}
+      <div className="font-bold mb-3 text-emerald-700 dark:text-emerald-400 flex items-center justify-between gap-2 pr-8">
+        <span>✓ Verdict - {hour}</span>
+        <ScopeBadge scope="backendFrontend" />
       </div>
       <div className="space-y-2 text-gray-700 dark:text-gray-300">
         <div className="text-lg font-bold capitalize text-emerald-600 dark:text-emerald-400">
           {verdict}
         </div>
         <div className="text-xs text-gray-500 dark:text-gray-400">
-          Para-Index : {paraIndex}/100
+          {label}: {paraIndex}/100
         </div>
         <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
           <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
@@ -364,7 +420,11 @@ const VerdictTooltip = ({
             {criteria.map((criterion, i) => (
               <div key={i} className="flex items-start gap-2">
                 <span
-                  className={criterion.met ? 'text-green-500' : 'text-red-500'}
+                  className={
+                    criterion.met
+                      ? 'text-green-500 dark:text-green-400'
+                      : 'text-red-500 dark:text-red-400'
+                  }
                 >
                   {criterion.met ? '✓' : '✗'}
                 </span>
@@ -380,6 +440,10 @@ const VerdictTooltip = ({
               </div>
             ))}
           </div>
+        </div>
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between gap-2">
+          <span>Raisons textuelles volabilité</span>
+          <ScopeBadge scope="frontendOnly" />
         </div>
       </div>
     </div>
@@ -422,7 +486,7 @@ const SourceDataTooltip = ({
         <Button
           onClick={onClose}
           tone="ghost"
-          className="absolute top-2 right-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+          className="absolute top-2 right-2 text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           aria-label="Fermer les données source"
         >
           ✕
@@ -440,7 +504,7 @@ const SourceDataTooltip = ({
             return (
               <div
                 key={sourceKey}
-                className="text-xs text-gray-400 dark:text-gray-500"
+                className="text-xs text-gray-400 dark:text-gray-400"
               >
                 <span className="font-semibold">{sourceName}:</span> (non
                 disponible)
@@ -479,7 +543,7 @@ const SourceDataTooltip = ({
                     href={sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-500 hover:text-blue-700 text-xs flex-shrink-0"
+                    className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-xs flex-shrink-0"
                     title={`Ouvrir ${sourceName}`}
                   >
                     ↗
@@ -510,7 +574,7 @@ const SourceDataTooltip = ({
                     href={sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-500 hover:text-blue-700 text-xs flex-shrink-0"
+                    className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-xs flex-shrink-0"
                     title={`Ouvrir ${sourceName}`}
                   >
                     ↗
@@ -525,7 +589,7 @@ const SourceDataTooltip = ({
             return (
               <div
                 key={sourceKey}
-                className="text-xs text-gray-400 dark:text-gray-500"
+                className="text-xs text-gray-400 dark:text-gray-400"
               >
                 <span className="font-semibold">{sourceName}:</span> (non
                 dispo.)
@@ -550,7 +614,7 @@ const SourceDataTooltip = ({
                   href={sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-500 hover:text-blue-700 text-xs"
+                  className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-xs"
                   title={`Ouvrir ${sourceName}`}
                 >
                   ↗
@@ -584,7 +648,9 @@ export default function HourlyForecast({
   spotId,
   dayIndex = 0,
 }: HourlyForecastProps) {
+  const { t } = useTranslation();
   const { data: weather, isLoading, error } = useWeather(spotId, dayIndex);
+  const { data: appSettings } = useAppSettings();
   const [activeTooltip, setActiveTooltip] = useState<{
     type: CellType;
     data: HourlyForecastItem;
@@ -592,6 +658,51 @@ export default function HourlyForecast({
   } | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const uiThresholds = useMemo<UiThresholds>(
+    () => ({
+      windLowMax: parseSettingNumber(
+        appSettings?.para_wind_low_max,
+        DEFAULT_UI_THRESHOLDS.windLowMax
+      ),
+      windWeakMax: parseSettingNumber(
+        appSettings?.para_wind_weak_max,
+        DEFAULT_UI_THRESHOLDS.windWeakMax
+      ),
+      windOptimalMax: parseSettingNumber(
+        appSettings?.para_wind_optimal_max,
+        DEFAULT_UI_THRESHOLDS.windOptimalMax
+      ),
+      windHighMax: parseSettingNumber(
+        appSettings?.para_wind_high_max,
+        DEFAULT_UI_THRESHOLDS.windHighMax
+      ),
+      gustHighMax: parseSettingNumber(
+        appSettings?.para_gust_high_max,
+        DEFAULT_UI_THRESHOLDS.gustHighMax
+      ),
+      slotPrecipitationMax: parseSettingNumber(
+        appSettings?.para_slot_precipitation_max,
+        DEFAULT_UI_THRESHOLDS.slotPrecipitationMax
+      ),
+      reasonWindVeryStrongMin: parseSettingNumber(
+        appSettings?.ui_reason_wind_very_strong_min,
+        DEFAULT_UI_THRESHOLDS.reasonWindVeryStrongMin
+      ),
+      reasonGustHighMin: parseSettingNumber(
+        appSettings?.ui_reason_gust_high_min,
+        DEFAULT_UI_THRESHOLDS.reasonGustHighMin
+      ),
+      reasonCloudVeryCloudyMin: parseSettingNumber(
+        appSettings?.ui_reason_cloud_very_cloudy_min,
+        DEFAULT_UI_THRESHOLDS.reasonCloudVeryCloudyMin
+      ),
+      reasonWindModerateMin: parseSettingNumber(
+        appSettings?.ui_reason_wind_moderate_min,
+        DEFAULT_UI_THRESHOLDS.reasonWindModerateMin
+      ),
+    }),
+    [appSettings]
+  );
 
   // Close tooltip when clicking outside
   useEffect(() => {
@@ -647,7 +758,7 @@ export default function HourlyForecast({
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
           Prévisions Horaires
         </h2>
-        <div className="py-5 text-center text-red-500 text-sm">
+        <div className="py-5 text-center text-red-500 dark:text-red-400 text-sm">
           Données non disponibles
         </div>
       </div>
@@ -693,6 +804,7 @@ export default function HourlyForecast({
         return (
           <ParaIndexTooltip
             {...commonProps}
+            label={t('weather.paraIndex')}
             paraIndex={data.para_index}
             wind={data.wind_speed || 0}
             gust={
@@ -709,6 +821,7 @@ export default function HourlyForecast({
         return (
           <VerdictTooltip
             {...commonProps}
+            label={t('weather.paraIndex')}
             verdict={data.verdict}
             paraIndex={data.para_index}
             wind={data.wind_speed || 0}
@@ -718,6 +831,7 @@ export default function HourlyForecast({
               0
             }
             precipitation={data.precipitation || 0}
+            thresholds={uiThresholds}
           />
         );
 
@@ -826,71 +940,75 @@ export default function HourlyForecast({
         <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
           Prévisions Horaires
         </h2>
-        <CacheTimestamp cachedAt={weather.cached_at} />
+        <div className="flex items-center gap-2">
+          <ScopeBadge scope="backendFrontend" />
+          <ScopeBadge scope="frontendOnly" />
+          <CacheTimestamp cachedAt={weather.cached_at} />
+        </div>
       </div>
 
       <div className="overflow-x-auto -mx-4 px-4">
         <table className="w-full min-w-[800px] text-sm">
           <thead>
             <tr className="border-b-2 border-gray-200 dark:border-gray-600">
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Clock size={14} /> Heure
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Gauge size={14} /> Para-Index
+                  <Gauge size={14} /> {t('weather.paraIndex')}
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Wind size={14} /> Vent (km/h)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Zap size={14} /> Rafales (km/h)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Compass size={14} /> Direction
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Thermometer size={14} /> Temp (°C)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <CloudRain size={14} /> Précip. (mm)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Cloud size={14} /> Nuages (%)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Zap size={14} /> CAPE (J/kg)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Flame size={14} /> Thermiques
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">
+              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <CircleCheck size={14} /> Volabilité
                 </span>
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="text-gray-800 dark:text-gray-100">
             {flyingHours.length > 0 ? (
               flyingHours.map((hour, index) => {
                 // Prefer top-level cloud_cover, fallback to sources for compatibility
@@ -920,7 +1038,7 @@ export default function HourlyForecast({
                       className="py-2.5 px-2 text-center cursor-help hover:bg-sky-100 dark:hover:bg-sky-900/30 transition-colors"
                       {...cellEventHandlers('para-index', hour)}
                     >
-                      <strong className="text-sky-600">
+                      <strong className="text-sky-600 dark:text-sky-400">
                         {hour.para_index}/100
                       </strong>
                     </td>
@@ -993,7 +1111,10 @@ export default function HourlyForecast({
 
                     <td className="py-2.5 px-2 text-center">
                       {(() => {
-                        const display = getFlyabilityDisplay(hour);
+                        const display = getFlyabilityDisplay(
+                          hour,
+                          uiThresholds
+                        );
                         return (
                           <span className={`font-medium ${display.color}`}>
                             {display.emoji} {display.text}

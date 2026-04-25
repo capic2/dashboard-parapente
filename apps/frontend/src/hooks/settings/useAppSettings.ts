@@ -1,12 +1,36 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 
-interface AppSettings {
+export interface AppSettings {
   cache_ttl_default: string;
   cache_ttl_summary: string;
   scheduler_interval_minutes: string;
   redis_connect_timeout: string;
   redis_socket_timeout: string;
+  para_wind_very_low_max: string;
+  para_wind_low_max: string;
+  para_wind_weak_max: string;
+  para_wind_optimal_max: string;
+  para_wind_high_max: string;
+  para_gust_low_max: string;
+  para_gust_moderate_max: string;
+  para_gust_high_max: string;
+  para_precip_none_max: string;
+  para_precip_light_max: string;
+  para_precip_heavy_min: string;
+  para_slot_precipitation_max: string;
+  para_li_stable_min: string;
+  para_li_slightly_unstable_min: string;
+  para_li_very_unstable_max: string;
+  para_temp_cool_min: string;
+  para_temp_warm_min: string;
+  para_verdict_good_min: string;
+  para_verdict_medium_min: string;
+  para_verdict_limit_min: string;
+  ui_reason_wind_very_strong_min: string;
+  ui_reason_gust_high_min: string;
+  ui_reason_cloud_very_cloudy_min: string;
+  ui_reason_wind_moderate_min: string;
 }
 
 export function useAppSettings() {
@@ -21,7 +45,7 @@ export function useUpdateAppSettings() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (settings: Partial<Record<string, string>>) =>
+    mutationFn: (settings: Partial<Record<keyof AppSettings, string>>) =>
       api.put('settings', { json: settings }).json(),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['app-settings'] });

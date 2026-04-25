@@ -6,12 +6,21 @@ import os
 import uuid
 import xml.etree.ElementTree as ET
 from typing import Any
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -19,6 +28,8 @@ from sqlalchemy.orm import Session
 import config
 from auth import authenticate_user, create_access_token, get_current_user
 from database import get_db
+from emagram_freshness import get_emagram_cutoff_utc
+from flight_backfill import calculate_and_persist_missing_max_speed
 from models import User
 from models import (
     EmagramAnalysis,
@@ -2364,6 +2375,29 @@ def get_flights(
 
     flights = query.order_by(Flight.flight_date.desc()).limit(limit).all()
 
+    updated_flights = False
+    for flight in flights:
+        updated_flights = (
+            calculate_and_persist_missing_max_speed(
+                db,
+                flight,
+                parse_coordinates=parse_gpx_file,
+                calculate_speed_kmh=calculate_max_speed,
+                base_dir=Path(__file__).parent,
+                logger=logger,
+            )
+            or updated_flights
+        )
+        if updated_flights:
+            break
+
+    if updated_flights:
+        try:
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.warning("Failed to persist calculated max speeds in /flights: %s", exc)
+
     # Convert to dict (user_id removed - not needed for single-user app)
     flights_data = []
     for flight in flights:
@@ -2533,6 +2567,22 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
+
+    if calculate_and_persist_missing_max_speed(
+        db,
+        flight,
+        parse_coordinates=parse_gpx_file,
+        calculate_speed_kmh=calculate_max_speed,
+        base_dir=Path(__file__).parent,
+        logger=logger,
+    ):
+        try:
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.warning(
+                "Failed to persist calculated max speed for flight %s: %s", flight_id, exc
+            )
 
     # Build response with flight data
     flight_dict = {
@@ -3258,6 +3308,35 @@ def health_check():
 @public_router.get("/version")
 def version_info():
     return get_version_payload()
+
+
+def serialize_sse_event(event_name: str, payload: dict[str, Any]) -> str:
+    return f"event: {event_name}\ndata: {json.dumps(payload)}\n\n"
+
+
+@public_router.get("/version/stream")
+async def version_stream(request: Request) -> StreamingResponse:
+    async def event_stream():
+        yield "retry: 5000\n\n"
+        yield serialize_sse_event("version", get_version_payload())
+
+        while True:
+            try:
+                await asyncio.wait_for(request.is_disconnected(), timeout=25)
+                break
+            except TimeoutError:
+                heartbeat = {"timestamp": datetime.now(timezone.utc).isoformat()}
+                yield serialize_sse_event("ping", heartbeat)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # ============================================================================
@@ -4268,10 +4347,30 @@ async def get_latest_emagram(
 
         # Filter by forecast target date
         target_date = (datetime.utcnow() + timedelta(days=day_index)).date()
+        cutoff_time = get_emagram_cutoff_utc(db=db)
+
+        # For explicit hourly queries on a specific site, return the most recent
+        # attempt regardless of status to stay consistent with /emagram/hours.
+        if site_id and hour is not None:
+            latest_attempt_for_hour = (
+                db.query(EmagramAnalysis)
+                .filter(
+                    EmagramAnalysis.forecast_date == target_date,
+                    EmagramAnalysis.station_code == site_id,
+                    EmagramAnalysis.analysis_method == "llm_vision",
+                    EmagramAnalysis.forecast_hour == hour,
+                    EmagramAnalysis.analysis_datetime >= cutoff_time,
+                )
+                .order_by(EmagramAnalysis.analysis_datetime.desc())
+                .first()
+            )
+            if latest_attempt_for_hour:
+                return latest_attempt_for_hour
 
         analysis_filters = [
             EmagramAnalysis.forecast_date == target_date,
             EmagramAnalysis.analysis_status == "completed",
+            EmagramAnalysis.analysis_datetime >= cutoff_time,
         ]
         if hour is not None:
             analysis_filters.append(EmagramAnalysis.forecast_hour == hour)
@@ -4318,6 +4417,7 @@ async def get_latest_emagram(
                 EmagramAnalysis.station_code == site_id,
                 EmagramAnalysis.analysis_method == "llm_vision",
                 EmagramAnalysis.analysis_status == "failed",
+                EmagramAnalysis.analysis_datetime >= cutoff_time,
             ]
             if hour is not None:
                 failed_filters.append(EmagramAnalysis.forecast_hour == hour)
@@ -4356,12 +4456,14 @@ async def get_emagram_hours(
     """
     try:
         target_date = (datetime.utcnow() + timedelta(days=day_index)).date()
+        cutoff_time = get_emagram_cutoff_utc(db=db)
 
         analyses = (
             db.query(
                 EmagramAnalysis.forecast_hour,
                 EmagramAnalysis.score_volabilite,
                 EmagramAnalysis.analysis_status,
+                EmagramAnalysis.error_message,
                 EmagramAnalysis.id,
                 EmagramAnalysis.analysis_datetime,
             )
@@ -4370,33 +4472,91 @@ async def get_emagram_hours(
                 EmagramAnalysis.forecast_date == target_date,
                 EmagramAnalysis.forecast_hour.isnot(None),
                 EmagramAnalysis.analysis_method == "llm_vision",
-                EmagramAnalysis.analysis_status == "completed",
+                EmagramAnalysis.analysis_datetime >= cutoff_time,
             )
             .order_by(EmagramAnalysis.forecast_hour, EmagramAnalysis.analysis_datetime.desc())
             .all()
         )
 
         # Deduplicate: keep only the most recent analysis per hour
-        seen_hours: set[int] = set()
-        unique_analyses = []
-        for a in analyses:
-            if a.forecast_hour not in seen_hours:
-                seen_hours.add(a.forecast_hour)
-                unique_analyses.append(a)
+        latest_by_hour: dict[int, Any] = {}
+        for analysis in analyses:
+            if analysis.forecast_hour not in latest_by_hour:
+                latest_by_hour[analysis.forecast_hour] = analysis
+
+        site = db.query(Site).filter(Site.id == site_id).first()
+        if not site:
+            raise HTTPException(status_code=404, detail="Site not found")
+        if site.latitude is None or site.longitude is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Site has no coordinates configured",
+            )
+
+        # Build expected hour range (sunrise -> sunset), fallback to 07h-20h
+        start_hour = 7
+        end_hour = 20
+        try:
+            import weather_pipeline
+
+            forecast = await asyncio.wait_for(
+                weather_pipeline.get_normalized_forecast(
+                    lat=site.latitude,
+                    lon=site.longitude,
+                    day_index=day_index,
+                    db=db,
+                ),
+                timeout=8,
+            )
+
+            sunrise = forecast.get("sunrise")
+            sunset = forecast.get("sunset")
+
+            if sunrise:
+                start_hour = int(str(sunrise).split(":", maxsplit=1)[0])
+            if sunset:
+                end_hour = int(str(sunset).split(":", maxsplit=1)[0])
+        except Exception as e:
+            logger.warning(
+                "Failed to compute emagram hour range from sunrise/sunset for site %s day_index=%s: %s",
+                site_id,
+                day_index,
+                e,
+            )
+
+        if end_hour < start_hour:
+            start_hour, end_hour = 7, 20
+
+        all_hours = sorted(set(range(start_hour, end_hour + 1)) | set(latest_by_hour.keys()))
 
         return {
             "site_id": site_id,
             "forecast_date": target_date.isoformat(),
             "hours": [
                 {
-                    "hour": a.forecast_hour,
-                    "score": a.score_volabilite,
-                    "status": a.analysis_status,
-                    "id": a.id,
+                    "hour": hour,
+                    "score": (
+                        latest_by_hour[hour].score_volabilite if hour in latest_by_hour else None
+                    ),
+                    "status": (
+                        latest_by_hour[hour].analysis_status
+                        if hour in latest_by_hour
+                        else "pending"
+                    ),
+                    "error_message": (
+                        latest_by_hour[hour].error_message if hour in latest_by_hour else None
+                    ),
+                    "id": (
+                        latest_by_hour[hour].id
+                        if hour in latest_by_hour
+                        else f"pending:{site_id}:{target_date.isoformat()}:{hour}"
+                    ),
                 }
-                for a in unique_analyses
+                for hour in all_hours
             ],
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get emagram hours: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -4652,11 +4812,11 @@ async def trigger_emagram_analysis(
 
         # Step 2: Check for recent analysis (unless force_refresh)
         forecast_date = (datetime.utcnow() + timedelta(days=request.day_index)).date()
+        cutoff_time = None if request.force_refresh else get_emagram_cutoff_utc(db=db)
 
         # Step 2a: If no specific hour, trigger hourly batch in background
         if request.hour is None and not request.force_refresh:
             # Check if any hourly analyses exist already
-            cutoff_time = datetime.utcnow() - timedelta(hours=3)
             existing_count = (
                 db.query(EmagramAnalysis)
                 .filter(
@@ -4690,7 +4850,6 @@ async def trigger_emagram_analysis(
 
         # Step 2b: Check cache for specific hour
         if request.hour is not None and not request.force_refresh:
-            cutoff_time = datetime.utcnow() - timedelta(hours=3)
             cache_filters = [
                 EmagramAnalysis.station_code == closest_site.id,
                 EmagramAnalysis.analysis_method == "llm_vision",
@@ -4765,7 +4924,7 @@ async def get_latest_emagram_for_spot(site_id: str, db: Session = Depends(get_db
     """
     Get latest multi-source emagram analysis for a specific spot
 
-    Returns analysis from last 3 hours if available
+    Returns analysis from configured freshness window if available
 
     Example:
         GET /api/emagram/spot/arguel/latest
@@ -4792,12 +4951,10 @@ async def get_latest_emagram_for_spot(site_id: str, db: Session = Depends(get_db
             "next_update": "2024-03-07T23:15:00"
         }
     """
-    from datetime import timedelta
-
     from emagram_multi_source import emagram_analysis_to_dict
 
-    # Find most recent analysis for this site (within 3 hours)
-    cutoff_time = datetime.utcnow() - timedelta(hours=3)
+    # Find most recent analysis for this site within freshness window
+    cutoff_time = get_emagram_cutoff_utc(db=db)
 
     emagram = (
         db.query(EmagramAnalysis)
@@ -4817,7 +4974,7 @@ async def get_latest_emagram_for_spot(site_id: str, db: Session = Depends(get_db
             detail=f"No recent emagram analysis found for spot {site_id}. Try refreshing.",
         )
 
-    return emagram_analysis_to_dict(emagram)
+    return emagram_analysis_to_dict(emagram, db=db)
 
 
 @router.post("/emagram/spot/{site_id}/refresh", tags=["Emagram"])
@@ -4884,9 +5041,7 @@ async def get_all_spots_latest_emagrammes(db: Session = Depends(get_db)):
             "updated_count": 5
         }
     """
-    from datetime import timedelta
-
-    cutoff_time = datetime.utcnow() - timedelta(hours=3)
+    cutoff_time = get_emagram_cutoff_utc(db=db)
 
     # Get all sites with recent emagram
     sites = db.query(Site).all()
@@ -5145,18 +5300,140 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
     Body: {"key": "value", ...}
     Only known keys are accepted.
     """
-    from app_settings import DEFAULTS, set_setting
+    from app_settings import DEFAULTS, get_all_settings, set_setting
 
     allowed_keys = set(DEFAULTS.keys())
     updated = {}
     rejected = []
+    positive_int_keys = {"scheduler_interval_minutes", "emagram_max_age_minutes"}
+    float_range_keys: dict[str, tuple[float, float]] = {
+        "para_wind_very_low_max": (0, 120),
+        "para_wind_low_max": (0, 120),
+        "para_wind_weak_max": (0, 120),
+        "para_wind_optimal_max": (0, 120),
+        "para_wind_high_max": (0, 120),
+        "para_gust_low_max": (0, 150),
+        "para_gust_moderate_max": (0, 150),
+        "para_gust_high_max": (0, 150),
+        "para_precip_none_max": (0, 100),
+        "para_precip_light_max": (0, 100),
+        "para_precip_heavy_min": (0, 100),
+        "para_slot_precipitation_max": (0, 100),
+        "para_li_stable_min": (-20, 20),
+        "para_li_slightly_unstable_min": (-20, 20),
+        "para_li_very_unstable_max": (-20, 20),
+        "para_temp_cool_min": (-50, 60),
+        "para_temp_warm_min": (-50, 60),
+        "para_verdict_good_min": (0, 100),
+        "para_verdict_medium_min": (0, 100),
+        "para_verdict_limit_min": (0, 100),
+        "ui_reason_wind_very_strong_min": (0, 150),
+        "ui_reason_gust_high_min": (0, 150),
+        "ui_reason_cloud_very_cloudy_min": (0, 100),
+        "ui_reason_wind_moderate_min": (0, 150),
+    }
+    validated_updates: dict[str, str] = {}
 
     for key, value in settings.items():
         if key not in allowed_keys:
             rejected.append(key)
             continue
-        set_setting(db, key, str(value))
-        updated[key] = value
+        normalized_value = str(value)
+        if key in positive_int_keys:
+            try:
+                parsed_value = int(normalized_value)
+            except (TypeError, ValueError) as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{key} must be a positive integer",
+                ) from e
+            if parsed_value <= 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{key} must be > 0",
+                )
+            normalized_value = str(parsed_value)
+        elif key in float_range_keys:
+            min_value, max_value = float_range_keys[key]
+            try:
+                parsed_value = float(normalized_value)
+            except (TypeError, ValueError) as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{key} must be a number",
+                ) from e
+            if not math.isfinite(parsed_value):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{key} must be a finite number",
+                )
+            if parsed_value < min_value or parsed_value > max_value:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{key} must be between {min_value:g} and {max_value:g}",
+                )
+            normalized_value = f"{parsed_value:g}"
+
+        validated_updates[key] = normalized_value
+
+    effective_settings = {**DEFAULTS, **get_all_settings(db), **validated_updates}
+    ordered_groups: list[tuple[str, tuple[str, ...], bool]] = [
+        (
+            "para_wind",
+            (
+                "para_wind_very_low_max",
+                "para_wind_low_max",
+                "para_wind_weak_max",
+                "para_wind_optimal_max",
+                "para_wind_high_max",
+            ),
+            True,
+        ),
+        (
+            "para_precipitation",
+            (
+                "para_precip_none_max",
+                "para_precip_light_max",
+                "para_precip_heavy_min",
+            ),
+            True,
+        ),
+        (
+            "para_li",
+            (
+                "para_li_stable_min",
+                "para_li_slightly_unstable_min",
+                "para_li_very_unstable_max",
+            ),
+            False,
+        ),
+        (
+            "para_verdict",
+            (
+                "para_verdict_good_min",
+                "para_verdict_medium_min",
+                "para_verdict_limit_min",
+            ),
+            False,
+        ),
+    ]
+
+    for group_name, keys, ascending in ordered_groups:
+        values = [float(effective_settings[key]) for key in keys]
+        is_invalid = any(
+            left >= right if ascending else left <= right
+            for left, right in zip(values, values[1:], strict=False)
+        )
+        if is_invalid:
+            direction = "increasing" if ascending else "decreasing"
+            raise HTTPException(
+                status_code=400,
+                detail=f"{group_name} thresholds must be strictly {direction}",
+            )
+
+    for key, normalized_value in validated_updates.items():
+        set_setting(db, key, normalized_value)
+        updated[key] = normalized_value
 
     # If scheduler interval changed, reschedule dynamically
     scheduler_error = None

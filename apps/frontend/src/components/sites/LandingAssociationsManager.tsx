@@ -84,7 +84,7 @@ export default function LandingAssociationsManager({
 
       {/* List of current associations */}
       {associations.length === 0 ? (
-        <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
+        <p className="text-xs text-gray-400 dark:text-gray-400 mb-2">
           {t('landings.none')}
         </p>
       ) : (
@@ -125,7 +125,7 @@ export default function LandingAssociationsManager({
                 type="button"
                 onClick={() => handleRemove(assoc.id)}
                 tone="ghost"
-                className="text-red-400 hover:text-red-600 flex-shrink-0 ml-2"
+                className="text-red-400 dark:text-red-300 hover:text-red-600 dark:hover:text-red-200 flex-shrink-0 ml-2"
                 title="Supprimer"
               >
                 &times;

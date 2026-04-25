@@ -5,6 +5,9 @@ FROM node:24-alpine AS frontend-builder
 
 WORKDIR /workspace
 
+ARG VITE_CESIUM_ION_TOKEN
+ENV VITE_CESIUM_ION_TOKEN=${VITE_CESIUM_ION_TOKEN}
+
 # Installer pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
@@ -72,8 +75,8 @@ COPY apps/backend/requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt
 
-# Installer Playwright et navigateur Chromium
-RUN playwright install --with-deps chromium
+# Installer Chromium pour Playwright
+RUN playwright install chromium
 
 # Copier code backend
 COPY apps/backend/ ./

@@ -9,6 +9,7 @@ import {
   ConstantPositionProperty,
   Entity,
   HeadingPitchRange,
+  Ion,
   JulianDate,
   Math as CesiumMath,
   sampleTerrainMostDetailed,
@@ -107,7 +108,7 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
           {title}
         </span>
         <span
-          className="text-gray-400 dark:text-gray-500 text-xs transition-transform"
+          className="text-gray-400 dark:text-gray-400 text-xs transition-transform"
           style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}
         >
           ▶
@@ -210,6 +211,17 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       }
 
       try {
+        const ionToken = import.meta.env.VITE_CESIUM_ION_TOKEN?.trim();
+
+        if (ionToken) {
+          Ion.defaultAccessToken = ionToken;
+        } else if (import.meta.env.PROD) {
+          setViewerError(
+            'VITE_CESIUM_ION_TOKEN is required to initialize Cesium World Terrain in production.'
+          );
+          return;
+        }
+
         const viewer = new CesiumViewer(container, {
           terrain: Terrain.fromWorldTerrain(),
           animation: false,
@@ -1186,7 +1198,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         </p>
         <div className="bg-white dark:bg-gray-800 p-4 rounded text-left text-xs font-mono">
           <p className="font-bold mb-2 dark:text-white">Erreur:</p>
-          <p className="text-red-600">{viewerError}</p>
+          <p className="text-red-600 dark:text-red-400">{viewerError}</p>
         </div>
         <p className="text-xs text-gray-600 dark:text-gray-300 mt-4">
           Vérifiez la console du navigateur (F12) pour plus de détails.
@@ -1218,7 +1230,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       {/* Controls - only show when data is loaded */}
       {gpxData?.coordinates && (
         <div
-          className={`absolute top-4 left-4 z-10 bg-white dark:bg-gray-800 rounded-lg shadow-lg transition-all ${panelClassName}`}
+          className={`absolute top-4 left-4 z-10 bg-white dark:bg-gray-800 rounded-lg shadow-lg transition-all ${panelClassName} max-h-[calc(100%-2rem)] overflow-hidden flex flex-col`}
         >
           <div className="flex items-center justify-between mb-2">
             {!isPanelCollapsed && (
@@ -1236,7 +1248,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           </div>
 
           {!isPanelCollapsed && (
-            <>
+            <div className="min-h-0 overflow-y-auto pr-1">
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
                 Points: {gpxData?.coordinates?.length || 0}
               </p>
@@ -1721,7 +1733,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   </div>
                 </AccordionSection>
               </div>
-            </>
+            </div>
           )}
         </div>
       )}

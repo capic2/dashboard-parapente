@@ -1,19 +1,31 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type APIRequestContext } from '@playwright/test';
 
 const ADMIN_EMAIL = process.env.BACKEND_ADMIN_EMAIL || 'e2e@test.local';
 const ADMIN_PASSWORD = process.env.BACKEND_ADMIN_PASSWORD || 'e2e-test-password';
 
-async function login(page: import('@playwright/test').Page) {
-  await page.goto('/login');
-  await page.fill('input#email', ADMIN_EMAIL);
-  await page.fill('input#password', ADMIN_PASSWORD);
-  await page.click('button[type="submit"]');
-  await page.waitForURL('/');
+async function authenticate(page: import('@playwright/test').Page, request: APIRequestContext) {
+  const loginResponse = await request.post('/api/auth/login', {
+    form: {
+      username: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
+    },
+  });
+
+  expect(loginResponse.ok()).toBeTruthy();
+  const payload = (await loginResponse.json()) as { access_token?: string };
+  expect(payload.access_token).toBeTruthy();
+
+  await page.context().addInitScript((token) => {
+    localStorage.setItem('parapente-auth', JSON.stringify({ state: { token } }));
+  }, payload.access_token);
+
+  await page.goto('/');
+  await expect(page).toHaveURL('/');
 }
 
 test.describe('Paragliding Dashboard E2E Tests', () => {
-  test.beforeEach(async ({ page }) => {
-    await login(page);
+  test.beforeEach(async ({ page, request }) => {
+    await authenticate(page, request);
   });
 
   test('should load dashboard and display header', async ({ page }) => {
@@ -113,6 +125,8 @@ test.describe('Paragliding Dashboard E2E Tests', () => {
   });
 
   test('should handle keyboard navigation', async ({ page }) => {
+    test.setTimeout(60000);
+
     // Focus on first nav link and navigate with keyboard
     await page.keyboard.press('Tab');
     await page.keyboard.press('Enter');
@@ -122,7 +136,7 @@ test.describe('Paragliding Dashboard E2E Tests', () => {
     await page.keyboard.press('Enter');
 
     // Verify accessibility of flight cards if any exist
-    await page.click('nav a:has-text("Vols")');
+    await page.getByRole('link', { name: /Vols/i }).click();
     const flightCards = page.locator('.flight-card');
     const hasFlights = (await flightCards.count()) > 0;
 

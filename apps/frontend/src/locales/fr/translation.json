@@ -57,6 +57,12 @@
     "siteFound_one": "{{count}} site trouvé",
     "siteFound_other": "{{count}} sites trouvés"
   },
+  "appUpdate": {
+    "title": "Nouvelle version disponible",
+    "message": "Une nouvelle version ({{version}}) est prête.",
+    "viewWhatsNew": "Voir les nouveautés",
+    "refresh": "Rafraîchir"
+  },
   "dashboard": {
     "loadingError": "Erreur de chargement",
     "loadingMessage": "Chargement du tableau de bord...",
@@ -86,7 +92,7 @@
     "forecast7Days": "Prévisions 7 Jours",
     "bestSpotFor": "Meilleur spot pour {{date}}",
     "calculating": "Calcul en cours...",
-    "paraIndex": "Para-Index:",
+    "paraIndex": "Conditions de vol",
     "viewForecast": "Voir les prévisions →",
     "recommended": "Recommandé",
     "landings": "Atterrissages",
@@ -106,7 +112,9 @@
     "dateTo": "Date de fin",
     "activeFilters": "Filtres actifs :",
     "from": "Du",
-    "to": "Au"
+    "to": "Au",
+    "fromDate": "Du {{date}}",
+    "toDate": "Au {{date}}"
   },
   "sites": {
     "management": "Gestion des Sites",
@@ -173,7 +181,8 @@
       "favorite": "Favori",
       "add": "Ajouter",
       "tip": "Astuce :",
-      "tipText": "Les sites favoris apparaîtront en priorité dans les sélecteurs"
+      "tipText": "Les sites favoris apparaîtront en priorité dans les sélecteurs",
+      "tipMessage": "<strong>Astuce :</strong> Les sites favoris apparaîtront en priorité dans les sélecteurs"
     },
     "weatherSources": {
       "title": "Gestion des Sources Météo",
@@ -204,6 +213,8 @@
       "calls": "Appels",
       "lastSuccess": "Dernier succès:",
       "lastError": "Dernière erreur:",
+      "lastSuccessMessage": "Dernier succès: {{date}}",
+      "lastErrorMessage": "Dernière erreur: {{date}}",
       "testing": "Test en cours...",
       "test": "Tester",
       "testSuccess": "Test réussi en {{time}}ms",
@@ -261,6 +272,82 @@
       "saving": "Enregistrement...",
       "serverSaved": "Paramètre serveur enregistré",
       "serverError": "Erreur lors de l'enregistrement"
+    },
+    "scope": {
+      "backendFrontend": "Backend + Frontend",
+      "frontendOnly": "Frontend uniquement",
+      "backendFrontendHint": "Affecte le calcul backend et l'affichage frontend.",
+      "frontendOnlyHint": "Affecte uniquement les libellés et raisons affichés dans l'interface."
+    },
+    "thresholds": {
+      "title": "Seuils météo paramétrables",
+      "description": "Ces seuils pilotent le score Para-Index backend et l'affichage frontend. Les valeurs sont enregistrées automatiquement quand vous quittez le champ.",
+      "wind": {
+        "title": "Vent (km/h)",
+        "help": "Agit principalement sur le score de base du Para-Index et la catégorisation vent faible / optimal / fort.",
+        "fields": {
+          "para_wind_very_low_max": { "label": "Vent très faible max" },
+          "para_wind_low_max": { "label": "Vent faible max" },
+          "para_wind_weak_max": { "label": "Début zone optimale" },
+          "para_wind_optimal_max": { "label": "Fin zone optimale" },
+          "para_wind_high_max": { "label": "Vent fort max" }
+        }
+      },
+      "gust": {
+        "title": "Rafales (km/h)",
+        "help": "Influence fortement les pénalités de sécurité et les alertes de volatilité.",
+        "fields": {
+          "para_gust_low_max": { "label": "Rafales faibles max" },
+          "para_gust_moderate_max": { "label": "Rafales modérées max" },
+          "para_gust_high_max": { "label": "Rafales fortes min" }
+        }
+      },
+      "precipitation": {
+        "title": "Pluie (mm)",
+        "help": "Ajuste les bonus / malus pluie et la limite de pluie pour qu'un créneau reste volable.",
+        "fields": {
+          "para_precip_none_max": { "label": "Sans pluie max" },
+          "para_precip_light_max": { "label": "Pluie légère max" },
+          "para_precip_heavy_min": { "label": "Pluie forte min" },
+          "para_slot_precipitation_max": { "label": "Pluie max pour voler" }
+        }
+      },
+      "instability": {
+        "title": "Instabilité (Lifted Index)",
+        "help": "Contrôle la sensibilité à l'instabilité atmosphérique dans le score et les créneaux.",
+        "fields": {
+          "para_li_stable_min": { "label": "Stable au-dessus de" },
+          "para_li_slightly_unstable_min": { "label": "Légèrement instable au-dessus de" },
+          "para_li_very_unstable_max": { "label": "Très instable en dessous de" }
+        }
+      },
+      "temperature": {
+        "title": "Température (°C)",
+        "help": "Définit les seuils de bonus température appliqués au score horaire.",
+        "fields": {
+          "para_temp_cool_min": { "label": "Petit bonus au-dessus de" },
+          "para_temp_warm_min": { "label": "Grand bonus au-dessus de" }
+        }
+      },
+      "verdict": {
+        "title": "Verdict Para-Index",
+        "help": "Définit les bornes de passage entre BON, MOYEN, LIMITE et MAUVAIS.",
+        "fields": {
+          "para_verdict_good_min": { "label": "BON min" },
+          "para_verdict_medium_min": { "label": "MOYEN min" },
+          "para_verdict_limit_min": { "label": "LIMITE min" }
+        }
+      },
+      "ui": {
+        "title": "Affichage UI",
+        "help": "Ajuste les raisons textuelles affichées dans la colonne Volabilité (frontend uniquement).",
+        "fields": {
+          "ui_reason_wind_moderate_min": { "label": "UI : vent modéré min" },
+          "ui_reason_wind_very_strong_min": { "label": "UI : vent très fort min" },
+          "ui_reason_gust_high_min": { "label": "UI : rafales importantes min" },
+          "ui_reason_cloud_very_cloudy_min": { "label": "UI : très nuageux min (%)" }
+        }
+      }
     },
     "saved": "Paramètres sauvegardés !",
     "saveButton": "Sauvegarder les modifications"
@@ -330,7 +417,8 @@
     "createDescription": "Uploadez un fichier GPX ou IGC pour créer automatiquement un nouveau vol. Les statistiques (durée, altitude, distance, vitesse) seront extraites du fichier.",
     "gpxFile": "Fichier GPX ou IGC",
     "autoDetection": "Détection automatique :",
-    "autoDetectionText": "Le site de décollage sera détecté automatiquement à partir des coordonnées GPS du fichier GPX.",
+    "autoDetectionText": "Le site de décollage sera détecté automatiquement à partir des coordonnées GPS du fichier GPX ou IGC.",
+    "autoDetectionMessage": "<strong>Détection automatique :</strong> Le site de décollage sera détecté automatiquement à partir des coordonnées GPS du fichier GPX ou IGC.",
     "createSuccess": "Vol créé avec succès",
     "name": "Nom :",
     "date": "Date :",
@@ -409,6 +497,7 @@
     "confirmDelete": "⚠️ Confirmer la suppression",
     "confirmDeleteSinglePrefix": "Vous êtes sur le point de supprimer définitivement le vol",
     "confirmDeleteSingleSuffix": "Cette action est irréversible.",
+    "confirmDeleteSingleMessage": "Vous êtes sur le point de supprimer définitivement le vol <title>{{title}}</title>. Cette action est irréversible.",
     "confirmDeleteMulti_one": "Vous êtes sur le point de supprimer définitivement {{count}} vol. Cette action est irréversible.",
     "confirmDeleteMulti_other": "Vous êtes sur le point de supprimer définitivement {{count}} vols. Cette action est irréversible.",
     "deleting": "⏳ Suppression...",

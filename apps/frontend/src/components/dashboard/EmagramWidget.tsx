@@ -15,7 +15,7 @@ import {
   getScoreColor,
   getScoreCategory,
 } from '../../types/emagram';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { parseApiUtcDate } from '../../lib/date';
 import { Lightbox } from '@dashboard-parapente/design-system';
 import {
@@ -24,6 +24,8 @@ import {
   SliderThumb,
   SliderOutput,
   Button,
+  Tooltip,
+  TooltipTrigger,
 } from 'react-aria-components';
 
 interface EmagramWidgetProps {
@@ -92,27 +94,77 @@ function HourSlider({
       </Slider>
       <div className="relative mt-1 h-7">
         {hours.map((h, idx) => {
+          const isActive = h.hour === effectiveHour;
+          const isFailed = h.status === 'failed';
+          const isPending = h.status === 'pending';
+          const errorText =
+            h.error_message?.trim() ||
+            'Analyse non disponible pour cette heure';
           const percent =
             hours.length > 1 ? (idx / (hours.length - 1)) * 100 : 50;
+
+          const buttonClassName = isActive
+            ? isFailed
+              ? 'font-bold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/30'
+              : isPending
+                ? 'font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30'
+                : 'font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30'
+            : isFailed
+              ? 'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300'
+              : isPending
+                ? 'text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300'
+                : 'text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300';
+
+          const label = isFailed
+            ? `Échec analyse ${h.hour}h : ${errorText}`
+            : isPending
+              ? `Analyse ${h.hour}h en attente`
+              : `Analyse ${h.hour}h`;
+
+          if (!isFailed && !isPending) {
+            return (
+              <Button
+                key={h.hour}
+                onPress={() => onHourChange(h.hour)}
+                className={`absolute -translate-x-1/2 text-[10px] px-1 py-0.5 rounded transition-colors ${buttonClassName}`}
+                style={{ left: `${percent}%` }}
+                aria-label={label}
+              >
+                {h.hour}h
+                {h.score != null && h.status === 'completed' && (
+                  <span
+                    className="block w-1.5 h-1.5 rounded-full mx-auto mt-0.5"
+                    style={{ backgroundColor: getScoreColor(h.score) }}
+                  />
+                )}
+              </Button>
+            );
+          }
+
           return (
-            <Button
-              key={h.hour}
-              onPress={() => onHourChange(h.hour)}
-              className={`absolute -translate-x-1/2 text-[10px] px-1 py-0.5 rounded transition-colors ${
-                h.hour === effectiveHour
-                  ? 'font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30'
-                  : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
-              }`}
-              style={{ left: `${percent}%` }}
-            >
-              {h.hour}h
-              {h.score != null && h.status === 'completed' && (
-                <span
-                  className="block w-1.5 h-1.5 rounded-full mx-auto mt-0.5"
-                  style={{ backgroundColor: getScoreColor(h.score) }}
-                />
-              )}
-            </Button>
+            <TooltipTrigger key={h.hour}>
+              <Button
+                onPress={() => onHourChange(h.hour)}
+                className={`absolute -translate-x-1/2 text-[10px] px-1 py-0.5 rounded transition-colors ${buttonClassName}`}
+                style={{ left: `${percent}%` }}
+                aria-label={label}
+              >
+                {h.hour}h
+                {h.score != null && h.status === 'completed' && (
+                  <span
+                    className="block w-1.5 h-1.5 rounded-full mx-auto mt-0.5"
+                    style={{ backgroundColor: getScoreColor(h.score) }}
+                  />
+                )}
+              </Button>
+              <Tooltip
+                className={`${
+                  isPending ? 'bg-amber-700' : 'bg-red-700'
+                } text-white text-xs px-2 py-1 rounded shadow-lg max-w-56 break-words`}
+              >
+                {label}
+              </Tooltip>
+            </TooltipTrigger>
           );
         })}
       </div>
@@ -128,39 +180,95 @@ export default function EmagramWidget({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
+  const [hasRequestedDisplay, setHasRequestedDisplay] = useState(
+    dayIndex === 0
+  );
 
-  const { data: hoursData } = useEmagramHours(siteId, dayIndex);
+  useEffect(() => {
+    setSelectedHour(null);
+    setHasRequestedDisplay(dayIndex === 0);
+  }, [dayIndex, siteId]);
+
+  const shouldFetchEmagram =
+    !!siteId && (dayIndex === 0 || hasRequestedDisplay);
+
+  const { data: hoursData } = useEmagramHours(siteId, dayIndex, {
+    enabled: shouldFetchEmagram,
+  });
+
+  const availableHours = useMemo(
+    () => [...(hoursData?.hours ?? [])].sort((a, b) => a.hour - b.hour),
+    [hoursData?.hours]
+  );
 
   // Determine which hour to display: selected, or current hour if in range, or null
   const activeHour = useMemo(() => {
     if (
       selectedHour !== null &&
-      hoursData?.hours?.some((h) => h.hour === selectedHour)
+      availableHours.some((h) => h.hour === selectedHour)
     ) {
       return selectedHour;
     }
-    if (!hoursData?.hours?.length) return null;
-    const now = new Date().getHours();
-    const available = hoursData.hours.map((h) => h.hour);
-    if (available.includes(now)) return now;
-    // Default to closest available hour
-    return available.reduce((prev, curr) =>
-      Math.abs(curr - now) < Math.abs(prev - now) ? curr : prev
-    );
-  }, [selectedHour, hoursData]);
+    if (!availableHours.length) return selectedHour;
+    const targetHour = dayIndex > 0 ? 14 : new Date().getHours();
+    const hours = availableHours.map((h) => h.hour);
 
-  const hasHourlyData = (hoursData?.hours?.length ?? 0) > 0;
+    if (hours.includes(targetHour)) return targetHour;
+    // Default to closest available hour
+    return hours.reduce((prev, curr) =>
+      Math.abs(curr - targetHour) < Math.abs(prev - targetHour) ? curr : prev
+    );
+  }, [selectedHour, availableHours, dayIndex]);
 
   const {
     data: emagram,
     isLoading,
     error,
     refetch,
-  } = useLatestEmagram(
-    siteId,
-    dayIndex,
-    hasHourlyData ? activeHour : undefined
-  );
+  } = useLatestEmagram(siteId, dayIndex, activeHour, {
+    enabled: shouldFetchEmagram,
+  });
+
+  const displayHours = useMemo(() => {
+    if (emagram?.forecast_hour == null) {
+      return availableHours;
+    }
+
+    if (availableHours.some((h) => h.hour === emagram.forecast_hour)) {
+      return availableHours;
+    }
+
+    return [
+      ...availableHours,
+      {
+        hour: emagram.forecast_hour,
+        score: emagram.score_volabilite,
+        status: emagram.analysis_status,
+        error_message: emagram.error_message,
+        id: emagram.id,
+      },
+    ].sort((a, b) => a.hour - b.hour);
+  }, [availableHours, emagram]);
+
+  useEffect(() => {
+    if (
+      selectedHour == null &&
+      !availableHours.length &&
+      emagram?.forecast_hour != null
+    ) {
+      setSelectedHour(emagram.forecast_hour);
+    }
+  }, [availableHours.length, emagram?.forecast_hour, selectedHour]);
+
+  const hasHourlyData = displayHours.length > 0;
+  const hourSlider = hasHourlyData ? (
+    <HourSlider
+      hours={displayHours}
+      selectedHour={activeHour}
+      onHourChange={setSelectedHour}
+    />
+  ) : null;
+
   const triggerMutation = useTriggerEmagram();
 
   const handleRefresh = async () => {
@@ -182,12 +290,37 @@ export default function EmagramWidget({
     }
   };
 
+  if (!shouldFetchEmagram) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-purple-600">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
+            🌡️ Analyse Thermique (Émagramme)
+          </h2>
+        </div>
+        <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
+          Cliquez pour afficher l&apos;émagramme de ce jour.
+        </div>
+        <div className="flex justify-center">
+          <Button
+            onPress={() => setHasRequestedDisplay(true)}
+            isDisabled={!siteId}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+          >
+            Afficher l&apos;émagramme
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-purple-600">
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3.5 font-semibold">
           🌡️ Analyse Thermique (Émagramme)
         </h2>
+        {hourSlider}
         <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
           Chargement...
         </div>
@@ -245,6 +378,7 @@ export default function EmagramWidget({
             </span>
           </Button>
         </div>
+        {hourSlider}
         <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
           {!siteId ? 'Aucun site selectionne' : 'Analyse en cours...'}
         </div>
@@ -281,13 +415,7 @@ export default function EmagramWidget({
             </span>
           </Button>
         </div>
-        {hasHourlyData && hoursData && (
-          <HourSlider
-            hours={hoursData.hours}
-            selectedHour={activeHour}
-            onHourChange={setSelectedHour}
-          />
-        )}
+        {hourSlider}
         <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg p-3">
           <div className="flex items-start gap-2">
             <span className="text-base flex-shrink-0">⚠️</span>
@@ -361,13 +489,7 @@ export default function EmagramWidget({
       </div>
 
       {/* Hour Slider */}
-      {hasHourlyData && hoursData && (
-        <HourSlider
-          hours={hoursData.hours}
-          selectedHour={activeHour}
-          onHourChange={setSelectedHour}
-        />
-      )}
+      {hourSlider}
 
       {/* Verdict + metadata */}
       <div className="flex items-center justify-between mb-3">
@@ -545,7 +667,9 @@ export default function EmagramWidget({
                       >
                         <span>📸</span>
                         <span>{image.alt}</span>
-                        <span className="text-blue-400">🔍</span>
+                        <span className="text-blue-500 dark:text-blue-300">
+                          🔍
+                        </span>
                       </Button>
                     ))}
                   </div>

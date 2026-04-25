@@ -5,8 +5,8 @@
 # ============================================
 # FastAPI Framework & Server
 # ============================================
-fastapi==0.136.0
-uvicorn[standard]==0.44.0
+fastapi==0.136.1
+uvicorn[standard]==0.46.0
 
 # ============================================
 # Database ORM
@@ -16,8 +16,8 @@ sqlalchemy==2.0.49
 # ============================================
 # Data Validation & Settings
 # ============================================
-pydantic==2.13.1
-pydantic-settings==2.13.1
+pydantic==2.13.3
+pydantic-settings==2.14.0
 
 # ============================================
 # Configuration Management
@@ -33,7 +33,7 @@ aiofiles==25.1.0
 # Web Scraping & Browser Automation
 # ============================================
 playwright==1.58.0
-scrapling==0.4.6
+scrapling==0.4.7
 beautifulsoup4==4.14.3
 
 # ============================================
@@ -63,7 +63,7 @@ fakeredis==2.35.1
 # ============================================
 # Code Quality & Linting
 # ============================================
-ruff==0.15.10
+ruff==0.15.12
 black==26.3.1
 isort==8.0.1
 
@@ -76,7 +76,7 @@ python-multipart==0.0.26
 # Meteorology & Scientific Computing
 # ============================================
 metpy==1.7.1
-matplotlib==3.10.8
+matplotlib==3.10.9
 numpy==2.4.4
 pillow==12.2.0
 
@@ -89,6 +89,5 @@ bcrypt>=4.0.0
 # ============================================
 # AI/LLM Integration
 # ============================================
-anthropic==0.95.0
 google-generativeai==0.8.6
-groq==1.1.2
+groq==1.2.0

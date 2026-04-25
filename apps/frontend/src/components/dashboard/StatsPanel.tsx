@@ -24,7 +24,7 @@ export default function StatsPanel() {
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
           📊 {t('stats.title')}
         </h2>
-        <div className="py-5 text-center text-red-500 text-sm">
+        <div className="py-5 text-center text-red-500 dark:text-red-400 text-sm">
           {t('common.dataUnavailable')}
         </div>
       </div>
@@ -145,10 +145,13 @@ export default function StatsPanel() {
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold text-gray-900 dark:text-white leading-tight truncate">
               {stats.last_flight_date
-                ? new Date(stats.last_flight_date).toLocaleDateString(i18n.language.startsWith('en') ? 'en-US' : 'fr-FR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                  })
+                ? new Date(stats.last_flight_date).toLocaleDateString(
+                    i18n.language.startsWith('en') ? 'en-US' : 'fr-FR',
+                    {
+                      day: '2-digit',
+                      month: '2-digit',
+                    }
+                  )
                 : 'N/A'}
             </div>
             <div className="text-[10px] text-gray-600 dark:text-gray-300 font-medium mt-0.5">

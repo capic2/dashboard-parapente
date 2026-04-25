@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Paragliding Dashboard - Weather, Flights, and Analytics - Nx Monorepo",
   "private": true,
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@10.33.2",
   "scripts": {
     "dev": "nx run-many -t serve -p frontend,backend --parallel",
     "build": "nx run-many -t build --all",
@@ -62,9 +62,9 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^6.0.0",
-    "@vitest/browser-playwright": "^4.0.18",
-    "@vitest/coverage-v8": "^4.0.18",
-    "@vitest/ui": "^4.0.18",
+    "@vitest/browser-playwright": "4.1.5",
+    "@vitest/coverage-v8": "4.1.5",
+    "@vitest/ui": "4.1.5",
     "chromatic": "^16.0.0",
     "happy-dom": "^20.8.4",
     "husky": "^9.1.7",
@@ -73,16 +73,16 @@
     "msw": "^2.12.10",
     "msw-storybook-addon": "^2.0.7",
     "nx": "^22.6.0",
-    "oxfmt": "^0.45.0",
+    "oxfmt": "^0.46.0",
     "oxlint": "^1.57.0",
     "playwright": "1.59.1",
     "storybook": "^10.3.3",
     "storybook-react-i18next": "^10.1.1",
     "tailwindcss": "^4.2.1",
     "typescript": "^6.0.2",
-    "vite": "8.0.5",
-    "vite-plugin-cesium": "^1.2.23",
-    "vitest": "^4.0.18"
+    "vite": "8.0.10",
+    "vite-plugin-cesium": "1.2.23",
+    "vitest": "4.1.5"
   },
   "lint-staged": {
     "apps/frontend/src/**/!(routeTree.gen).{ts,tsx}": [

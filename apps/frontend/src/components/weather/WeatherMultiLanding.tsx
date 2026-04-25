@@ -3,6 +3,7 @@ import {
   useLandingAssociations,
   useLandingWeather,
 } from '../../hooks/sites/useLandingAssociations';
+import ScopeBadge from '../common/ScopeBadge';
 
 interface WeatherMultiLandingProps {
   spotId: string;
@@ -40,16 +41,19 @@ export default function WeatherMultiLanding({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-indigo-500">
-      <h2 className="text-sm text-gray-600 dark:text-gray-400 mb-3 font-semibold">
-        {t('weather.landings')}
-      </h2>
+      <div className="flex items-center justify-between mb-3 gap-2">
+        <h2 className="text-sm text-gray-600 dark:text-gray-400 font-semibold">
+          {t('weather.landings')}
+        </h2>
+        <ScopeBadge scope="backendFrontend" />
+      </div>
 
       {isLoading ? (
         <div className="py-3 text-center text-gray-500 dark:text-gray-400 text-sm">
           {t('weather.loadingLandings')}
         </div>
       ) : !weatherData || weatherData.length === 0 ? (
-        <div className="py-3 text-center text-gray-400 dark:text-gray-500 text-sm">
+        <div className="py-3 text-center text-gray-400 dark:text-gray-400 text-sm">
           {t('weather.noWeatherData')}
         </div>
       ) : (
@@ -78,7 +82,9 @@ export default function WeatherMultiLanding({
                 </div>
 
                 {hasError ? (
-                  <p className="text-xs text-red-500">{weather.error}</p>
+                  <p className="text-xs text-red-500 dark:text-red-400">
+                    {weather.error}
+                  </p>
                 ) : (
                   <div className="flex items-center gap-3">
                     <span className="text-lg" title={verdict}>

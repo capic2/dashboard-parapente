@@ -43,7 +43,9 @@ export default function AltitudeChart({ flights }: AltitudeChartProps) {
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
           ⛰️ Progression d&apos;Altitude
         </h3>
-        <p className="text-red-600 text-sm">Pas de données disponibles</p>
+        <p className="text-red-600 dark:text-red-400 text-sm">
+          Pas de données disponibles
+        </p>
       </div>
     );
   }

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { flightsQueryOptions } from '../hooks/flights/useFlights';
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import type { Flight, Site } from '../types';
@@ -45,12 +45,15 @@ export default function FlightHistory() {
   const toast = useToast();
   const { toasts, removeToast } = useToastStore();
 
-  const handleSelectFlight = useCallback((flight: Flight) => {
-    setSelectedFlightId(flight.id);
-    if (isMobile) {
-      setShowMobileDetail(true);
-    }
-  }, [isMobile]);
+  const handleSelectFlight = useCallback(
+    (flight: Flight) => {
+      setSelectedFlightId(flight.id);
+      if (isMobile) {
+        setShowMobileDetail(true);
+      }
+    },
+    [isMobile]
+  );
 
   const handleCloseMobileDetail = useCallback(() => {
     setShowMobileDetail(false);
@@ -121,17 +124,17 @@ export default function FlightHistory() {
 
         setRowSelection({});
         setShowMultiDeleteConfirm(false);
-        } else if (flightToDelete) {
-          await api.delete(`flights/${flightToDelete.id}`);
-          queryClient.invalidateQueries({ queryKey: ['flights'] });
-          queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] });
-          toast.success(t('flights.deletedSuccess'));
-          if (selectedFlightId === flightToDelete.id) {
-            setSelectedFlightId(null);
-            setShowMobileDetail(false);
-          }
-          setFlightToDelete(null);
+      } else if (flightToDelete) {
+        await api.delete(`flights/${flightToDelete.id}`);
+        queryClient.invalidateQueries({ queryKey: ['flights'] });
+        queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] });
+        toast.success(t('flights.deletedSuccess'));
+        if (selectedFlightId === flightToDelete.id) {
+          setSelectedFlightId(null);
+          setShowMobileDetail(false);
         }
+        setFlightToDelete(null);
+      }
     } catch (err) {
       console.error('Failed to delete flight:', err);
       let errorMessage = t('flights.unknownError');
@@ -173,7 +176,7 @@ export default function FlightHistory() {
             </h1>
             <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
               {selectionMode && selectedCount > 0 ? (
-                <span className="text-sky-600 font-semibold">
+                <span className="text-sky-600 dark:text-sky-400 font-semibold">
                   {t('flights.selected', { count: selectedCount })}
                 </span>
               ) : (
@@ -333,11 +336,17 @@ export default function FlightHistory() {
         size="sm"
       >
         <p className="text-gray-700 dark:text-gray-300 mb-6">
-          {t('flights.confirmDeleteSinglePrefix')}{' '}
-          <span className="font-bold text-red-600">
-            {flightToDelete?.title || t('flights.untitledFlight')}
-          </span>
-          . {t('flights.confirmDeleteSingleSuffix')}
+          <Trans
+            i18nKey="flights.confirmDeleteSingleMessage"
+            values={{
+              title: flightToDelete?.title || t('flights.untitledFlight'),
+            }}
+            components={{
+              title: (
+                <span className="font-bold text-red-600 dark:text-red-400" />
+              ),
+            }}
+          />
         </p>
         <div className="flex gap-3 justify-end">
           <Button

@@ -1,4 +1,4 @@
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { useFiltersStore } from '../../stores/filtersStore';
 import { DatePicker, Select, Button } from '@dashboard-parapente/design-system';
 import type { Site } from '@dashboard-parapente/shared-types';
@@ -17,6 +17,17 @@ interface FilterBarProps {
 export function FilterBar({ sites }: FilterBarProps) {
   const { t, i18n } = useTranslation();
   const dateLocale = i18n.language === 'en' ? 'en-US' : 'fr-FR';
+
+  const formatFilterDate = (value: string): string => {
+    const [year, month, day] = value.split('-').map(Number);
+
+    if (year && month && day) {
+      return new Date(year, month - 1, day).toLocaleDateString(dateLocale);
+    }
+
+    return new Date(value).toLocaleDateString(dateLocale);
+  };
+
   const { filters, setSiteId, setDateFrom, setDateTo, resetFilters } =
     useFiltersStore();
 
@@ -36,7 +47,7 @@ export function FilterBar({ sites }: FilterBarProps) {
             onClick={resetFilters}
             tone="ghost"
             size="sm"
-            className="text-sm text-sky-600 hover:text-sky-700 font-medium"
+            className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 font-medium"
           >
             {t('filters.reset')}
           </Button>
@@ -79,14 +90,22 @@ export function FilterBar({ sites }: FilterBarProps) {
             )}
             {filters.dateFrom && (
               <span className="px-2 py-1 bg-sky-100 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 rounded">
-                {t('filters.from')}{' '}
-                {new Date(filters.dateFrom).toLocaleDateString(dateLocale)}
+                <Trans
+                  i18nKey="filters.fromDate"
+                  values={{
+                    date: formatFilterDate(filters.dateFrom),
+                  }}
+                />
               </span>
             )}
             {filters.dateTo && (
               <span className="px-2 py-1 bg-sky-100 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 rounded">
-                {t('filters.to')}{' '}
-                {new Date(filters.dateTo).toLocaleDateString(dateLocale)}
+                <Trans
+                  i18nKey="filters.toDate"
+                  values={{
+                    date: formatFilterDate(filters.dateTo),
+                  }}
+                />
               </span>
             )}
           </div>

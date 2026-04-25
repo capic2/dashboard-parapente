@@ -55,7 +55,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'nx serve backend',
+      command: './node_modules/.bin/nx serve backend',
       url: 'http://localhost:8001/health',
       reuseExistingServer: !process.env.CI,
       cwd: '../..',
@@ -77,11 +77,16 @@ export default defineConfig({
       },
     },
     {
-      command: 'nx build frontend && npx vite preview --config apps/frontend/vite.config.ts',
+      command:
+        'bash -lc "set -o pipefail; echo [e2e:web] Building frontend; ./node_modules/.bin/nx build frontend --output-style=stream; echo [e2e:web] Starting Vite preview; ./node_modules/.bin/vite preview --config apps/frontend/vite.config.ts --strictPort --host 127.0.0.1 --port 5173"',
       url: 'http://localhost:5173',
       reuseExistingServer: !process.env.CI,
       cwd: '../..',
       timeout: 120 * 1000, // 2 minutes for build + preview startup
+      env: {
+        VITE_CESIUM_ION_TOKEN:
+          process.env.VITE_CESIUM_ION_TOKEN || 'e2e-ci-placeholder-token',
+      },
     },
   ],
 });

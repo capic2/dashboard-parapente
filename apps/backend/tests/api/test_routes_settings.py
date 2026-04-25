@@ -89,6 +89,129 @@ class TestUpdateSettings:
         data = response.json()
         assert len(data["updated"]) == 2
 
+    def test_update_emagram_max_age_minutes(self, client, db_session):
+        """Updates emagram freshness window setting."""
+        response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"emagram_max_age_minutes": "120"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["updated"]["emagram_max_age_minutes"] == "120"
+
+        row = (
+            db_session.query(AppSetting).filter(AppSetting.key == "emagram_max_age_minutes").first()
+        )
+        assert row is not None
+        assert row.value == "120"
+
+    def test_validates_and_normalizes_float_thresholds(self, client, db_session):
+        """Float thresholds are normalized and reject non-finite / out-of-range values."""
+        valid_response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"para_gust_high_max": "25.0"},
+        )
+        assert valid_response.status_code == 200
+        assert valid_response.json()["updated"]["para_gust_high_max"] == "25"
+
+        row = db_session.query(AppSetting).filter(AppSetting.key == "para_gust_high_max").first()
+        assert row is not None
+        assert row.value == "25"
+
+        invalid_cases = [
+            ("NaN", "finite number"),
+            ("inf", "finite number"),
+            ("-inf", "finite number"),
+            ("151", "between 0 and 150"),
+        ]
+
+        for value, detail_fragment in invalid_cases:
+            response = client.put(
+                f"{API_PREFIX}/settings",
+                json={"para_gust_low_max": value},
+            )
+            assert response.status_code == 400
+            assert detail_fragment in response.json()["detail"]
+
+            row = db_session.query(AppSetting).filter(AppSetting.key == "para_gust_low_max").first()
+            assert row is None
+
+        verdict_response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"para_verdict_good_min": "101"},
+        )
+        assert verdict_response.status_code == 400
+        assert "between 0 and 100" in verdict_response.json()["detail"]
+
+    def test_rejects_non_monotonic_threshold_groups(self, client, db_session):
+        """Threshold families must keep their expected ordering."""
+        wind_response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"para_wind_low_max": "20"},
+        )
+        assert wind_response.status_code == 400
+        assert "para_wind thresholds" in wind_response.json()["detail"]
+
+        verdict_response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"para_verdict_good_min": "20"},
+        )
+        assert verdict_response.status_code == 400
+        assert "para_verdict thresholds" in verdict_response.json()["detail"]
+
+    def test_rejects_invalid_emagram_max_age_minutes(self, client, db_session):
+        """Invalid emagram freshness values are rejected with 400."""
+        response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"emagram_max_age_minutes": "abc"},
+        )
+        assert response.status_code == 400
+        assert "positive integer" in response.json()["detail"]
+
+        row = (
+            db_session.query(AppSetting).filter(AppSetting.key == "emagram_max_age_minutes").first()
+        )
+        assert row is None
+
+    def test_rejects_non_positive_emagram_max_age_minutes(self, client, db_session):
+        """Zero and negative emagram freshness values are rejected."""
+        for value in ("0", "-1"):
+            response = client.put(
+                f"{API_PREFIX}/settings",
+                json={"emagram_max_age_minutes": value},
+            )
+            assert response.status_code == 400
+            assert response.json()["detail"] == "emagram_max_age_minutes must be > 0"
+
+            row = (
+                db_session.query(AppSetting)
+                .filter(AppSetting.key == "emagram_max_age_minutes")
+                .first()
+            )
+            assert row is None
+
+    def test_rejects_invalid_setting_without_partial_persist(self, client, db_session):
+        """Mixed payloads must not persist valid keys when one value is invalid."""
+        response = client.put(
+            f"{API_PREFIX}/settings",
+            json={
+                "cache_ttl_default": "1800",
+                "emagram_max_age_minutes": "abc",
+            },
+        )
+        assert response.status_code == 400
+        assert "positive integer" in response.json()["detail"]
+
+        valid_row = (
+            db_session.query(AppSetting).filter(AppSetting.key == "cache_ttl_default").first()
+        )
+        invalid_row = (
+            db_session.query(AppSetting).filter(AppSetting.key == "emagram_max_age_minutes").first()
+        )
+        assert valid_row is None
+        assert invalid_row is None
+
     def test_update_creates_setting_if_missing(self, client, db_session):
         """Creates new row if setting key doesn't exist in DB yet."""
         response = client.put(

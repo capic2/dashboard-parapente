@@ -13,6 +13,7 @@ import { fr } from 'date-fns/locale';
 import CacheTimestamp from '../common/CacheTimestamp';
 import { enUS } from 'date-fns/locale';
 import { WindIndicator } from '../common/WindIndicator';
+import ScopeBadge from '../common/ScopeBadge';
 import { Button } from '@dashboard-parapente/design-system';
 import type { BestSpotResult } from '@dashboard-parapente/shared-types';
 
@@ -128,7 +129,7 @@ export function BestSpotSuggestion({
             <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
               {t('weather.bestSpotFor', { date: dateLabel })}
             </h3>
-            <div className="text-lg text-gray-500 dark:text-gray-500 mt-1">
+            <div className="text-lg text-gray-500 dark:text-gray-400 mt-1">
               {t('weather.calculating')}
             </div>
           </div>
@@ -153,6 +154,7 @@ export function BestSpotSuggestion({
     100,
     Math.max(0, score != null ? Math.round(score) : paraIndex)
   );
+  const localizedReason = reason.replace(/Para-Index/g, t('weather.paraIndex'));
   const scoreColor = getScoreColor(adjustedScore);
   const verdictInfo = getVerdict(adjustedScore, verdict ?? undefined);
 
@@ -165,12 +167,13 @@ export function BestSpotSuggestion({
 
       <div className="p-4">
         {/* Top row: title + verdict badge */}
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 gap-2">
           <div className="flex items-center gap-2">
             <span className="text-2xl">🎯</span>
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
               {t('weather.bestSpotFor', { date: dateLabel })}
             </h3>
+            <ScopeBadge scope="backendFrontend" />
           </div>
           <span
             className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${verdictInfo.className}`}
@@ -185,7 +188,7 @@ export function BestSpotSuggestion({
             {site.name}
           </span>
           {site.rating != null && site.rating > 0 && (
-            <span className="text-sm text-amber-500">
+            <span className="text-sm text-amber-500 dark:text-amber-400">
               {'★'.repeat(site.rating)}
               {'☆'.repeat(5 - site.rating)}
             </span>
@@ -205,7 +208,9 @@ export function BestSpotSuggestion({
             </span>
             <span className={`text-2xl font-bold ${scoreColor.text}`}>
               {adjustedScore}
-              <span className="text-sm font-normal text-gray-400">/100</span>
+              <span className="text-sm font-normal text-gray-400 dark:text-gray-400">
+                /100
+              </span>
             </span>
           </div>
           <div className="w-full h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -233,7 +238,7 @@ export function BestSpotSuggestion({
                 size="sm"
               />
             ) : (
-              <div className="flex items-center gap-2 text-sm text-gray-400">
+              <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-400">
                 <span>💨</span>
                 <span>—</span>
               </div>
@@ -310,7 +315,7 @@ export function BestSpotSuggestion({
 
         {/* Reason text */}
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 leading-relaxed">
-          {reason}
+          {localizedReason}
         </p>
 
         {/* Footer: button + cache */}

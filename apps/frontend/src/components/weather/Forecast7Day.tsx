@@ -6,6 +6,7 @@ import {
 } from '../../hooks/weather/useWeather';
 import { useQueryClient } from '@tanstack/react-query';
 import CacheTimestamp from '../common/CacheTimestamp';
+import ScopeBadge from '../common/ScopeBadge';
 import { Button } from '@dashboard-parapente/design-system';
 
 interface Forecast7DayProps {
@@ -96,7 +97,7 @@ export default function Forecast7Day({
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
           {t('weather.forecast7Days')}
         </h2>
-        <div className="py-5 text-center text-red-500 text-sm">
+        <div className="py-5 text-center text-red-500 dark:text-red-400 text-sm">
           {t('common.dataUnavailable')}
         </div>
       </div>
@@ -109,7 +110,10 @@ export default function Forecast7Day({
         <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
           {t('weather.forecast7Days')}
         </h2>
-        <CacheTimestamp cachedAt={dailySummary.cached_at} />
+        <div className="flex items-center gap-2">
+          <ScopeBadge scope="backendFrontend" />
+          <CacheTimestamp cachedAt={dailySummary.cached_at} />
+        </div>
       </div>
 
       <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:pb-0 sm:snap-none md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
@@ -135,7 +139,7 @@ export default function Forecast7Day({
                   {formatDate(day.date)}
                 </div>
                 <div className="flex items-center justify-center gap-2">
-                  <span className="text-2xl font-bold text-sky-600">
+                  <span className="text-2xl font-bold text-sky-600 dark:text-sky-400">
                     {day.score != null ? day.score : day.para_index}
                   </span>
                   <span

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { Modal, Button } from '@dashboard-parapente/design-system';
 import { useCreateFlightFromGPX } from '../../hooks/flights/useFlights';
 import { useToast } from '../../hooks/useToast';
@@ -58,7 +58,7 @@ export function CreateFlightModal({
         setTimeout(() => onClose(), 2000); // Fermer après 2s
       },
       onError: (error: Error) => {
-        console.log({error})
+        console.log({ error });
         const errorMessage = error.message || t('flights.createGenericError');
         setError(errorMessage);
         toast.error(t('flights.createFailure') + ` ${errorMessage}`);
@@ -125,8 +125,11 @@ export function CreateFlightModal({
 
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
           <p className="text-sm text-blue-800 dark:text-blue-200">
-            💡 <strong>{t('flights.autoDetection')}</strong>{' '}
-            {t('flights.autoDetectionText')}
+            💡{' '}
+            <Trans
+              i18nKey="flights.autoDetectionMessage"
+              components={{ strong: <strong /> }}
+            />
           </p>
         </div>
 

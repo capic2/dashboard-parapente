@@ -164,7 +164,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
             href="https://cloudconvert.com/webm-to-mp4"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-600 hover:underline ml-1"
+            className="text-blue-600 dark:text-blue-400 hover:underline dark:hover:text-blue-300 ml-1"
           >
             Convertir en MP4
           </a>

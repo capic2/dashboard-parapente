@@ -11,6 +11,8 @@ Tests the core logic for calculating flyability scores based on:
 
 import pytest
 
+import app_settings
+
 from para_index import (
     analyze_hourly_slots,
     calculate_hourly_para_index,
@@ -20,6 +22,13 @@ from para_index import (
     get_hourly_verdict,
     get_thermal_strength,
 )
+
+
+@pytest.fixture(autouse=True)
+def reset_app_settings_cache():
+    app_settings.invalidate_cache()
+    yield
+    app_settings.invalidate_cache()
 
 
 @pytest.mark.unit
@@ -229,6 +238,46 @@ class TestCalculateParaIndex:
         assert "total_rain_mm" in result["metrics"]
         assert "avg_temp_c" in result["metrics"]
         assert "avg_lifted_index" in result["metrics"]
+
+    def test_uses_custom_gust_thresholds(self):
+        """Configured gust corridors should impact score and explanation."""
+        app_settings._settings_cache.update(
+            {
+                "para_gust_low_max": "20",
+                "para_gust_moderate_max": "30",
+                "para_gust_high_max": "35",
+            }
+        )
+        app_settings._cache_loaded = True
+
+        consensus_hours = [
+            {
+                "hour": 12,
+                "temperature": 15.0,
+                "wind_speed": 10.0,
+                "wind_gust": 30.0,
+                "precipitation": 0.0,
+                "lifted_index": 0.0,
+            }
+        ]
+
+        result = calculate_para_index(consensus_hours)
+
+        assert result["para_index"] >= 80
+        assert "rafales dangereuses" not in result["explanation"].lower()
+
+    def test_uses_custom_verdict_thresholds(self):
+        """Verdict labels should follow configurable score thresholds."""
+        app_settings._settings_cache.update(
+            {
+                "para_verdict_good_min": "80",
+                "para_verdict_medium_min": "60",
+                "para_verdict_limit_min": "40",
+            }
+        )
+        app_settings._cache_loaded = True
+
+        assert get_hourly_verdict(65) == "MOYEN"
 
 
 @pytest.mark.unit

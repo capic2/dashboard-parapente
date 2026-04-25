@@ -1,0 +1,38 @@
+groups:
+  - name: infra
+    rules:
+      - alert: NodeExporterDown
+        expr: up{job="node-exporter"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Node exporter is down
+
+      - alert: CadvisorDown
+        expr: up{job="cadvisor"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: cAdvisor is down
+
+      - alert: BackendMetricsDown
+        expr: up{job="app-metrics"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: App metrics target is down
+
+      - alert: HighBackendLatency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, path) (rate(dashboard_http_request_duration_seconds_bucket[5m]))
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Backend latency is high

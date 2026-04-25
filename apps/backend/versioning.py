@@ -4,6 +4,7 @@ import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 import fcntl
 
@@ -16,7 +17,7 @@ VERSION_STATE_FILE = Path(
     )
 )
 
-_current_version_payload: dict[str, int | str] | None = None
+_current_version_payload: dict[str, int | str | None] | None = None
 
 
 def _today_string() -> str:
@@ -25,6 +26,19 @@ def _today_string() -> str:
 
 def _is_testing_mode() -> bool:
     return os.getenv("TESTING", "false").lower() == "true"
+
+
+def _release_notes_url() -> str | None:
+    value = os.getenv("BACKEND_RELEASE_NOTES_URL", "").strip()
+    if not value:
+        return None
+
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        logger.warning("Ignoring invalid BACKEND_RELEASE_NOTES_URL: %s", value)
+        return None
+
+    return value
 
 
 def _load_state() -> dict[str, int | str] | None:
@@ -63,16 +77,30 @@ def _write_state(date: str, number: int) -> None:
     temp_file.replace(VERSION_STATE_FILE)
 
 
-def initialize_deployment_version() -> dict[str, int | str]:
+def initialize_deployment_version() -> dict[str, int | str | None]:
     global _current_version_payload
 
     today = _today_string()
+    forced_version = os.getenv("BACKEND_DEPLOY_VERSION", "").strip()
+
+    if forced_version:
+        forced_parts = forced_version.split(".")
+        build_number = int(forced_parts[-1]) if forced_parts and forced_parts[-1].isdigit() else 0
+        _current_version_payload = {
+            "version": forced_version,
+            "build_date": ".".join(forced_parts[:3]) if len(forced_parts) >= 3 else today,
+            "build_number": build_number,
+            "release_notes_url": _release_notes_url(),
+        }
+        logger.info("Deployment version forced from BACKEND_DEPLOY_VERSION: %s", forced_version)
+        return _current_version_payload
 
     if _is_testing_mode() and "BACKEND_VERSION_STATE_FILE" not in os.environ:
         _current_version_payload = {
             "version": f"{today}.0",
             "build_date": today,
             "build_number": 0,
+            "release_notes_url": _release_notes_url(),
         }
         return _current_version_payload
 
@@ -95,13 +123,14 @@ def initialize_deployment_version() -> dict[str, int | str]:
         "version": f"{today}.{next_number}",
         "build_date": today,
         "build_number": next_number,
+        "release_notes_url": _release_notes_url(),
     }
 
     logger.info("Deployment version initialized: %s", _current_version_payload["version"])
     return _current_version_payload
 
 
-def get_version_payload() -> dict[str, int | str]:
+def get_version_payload() -> dict[str, int | str | None]:
     if _current_version_payload is not None:
         return _current_version_payload
 
