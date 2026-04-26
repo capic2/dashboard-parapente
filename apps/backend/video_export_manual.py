@@ -57,8 +57,6 @@ _WORKER_LOCK = threading.Lock()
 _JOB_UPDATE_DB_LOCK = threading.Lock()
 _EXPORT_JOBS_LOCK = threading.Lock()
 _JOB_UPDATE_DB: dict[str, bool] = {}
-_JOB_AUTH_TOKEN_LOCK = threading.Lock()
-_JOB_AUTH_TOKENS: dict[str, str] = {}
 
 _CANCEL_CHECK_INTERVAL = 10
 
@@ -196,21 +194,26 @@ def _get_job_update_db_flag(job_id: str, default: bool = True) -> bool:
 
 
 def _set_job_auth_token(job_id: str, token: str | None):
-    with _JOB_AUTH_TOKEN_LOCK:
-        if token:
-            _JOB_AUTH_TOKENS[job_id] = token
-        else:
-            _JOB_AUTH_TOKENS.pop(job_id, None)
+    with SessionLocal() as db:
+        job = db.query(VideoExportJob).filter(VideoExportJob.id == job_id).first()
+        if not job:
+            return
+
+        job.auth_token = token
+        job.updated_at = datetime.utcnow()
+        db.commit()
 
 
 def _get_job_auth_token(job_id: str) -> str | None:
-    with _JOB_AUTH_TOKEN_LOCK:
-        return _JOB_AUTH_TOKENS.get(job_id)
+    with SessionLocal() as db:
+        job = db.query(VideoExportJob).filter(VideoExportJob.id == job_id).first()
+        if not job:
+            return None
+        return job.auth_token
 
 
 def _clear_job_auth_token(job_id: str):
-    with _JOB_AUTH_TOKEN_LOCK:
-        _JOB_AUTH_TOKENS.pop(job_id, None)
+    _set_job_auth_token(job_id, None)
 
 
 def _build_playwright_init_script(auth_token: str | None) -> str:
@@ -276,6 +279,7 @@ def _update_job(
 
         popped_update_db: bool | None = None
         if job.status in _TERMINAL_STATUSES:
+            job.auth_token = None
             if job.status == _STATUS_COMPLETED:
                 if not job.completed_at:
                     job.completed_at = datetime.utcnow()
@@ -524,7 +528,7 @@ async def _export_video_manual_render(job_id: str):
             )
             page = await context.new_page()
 
-            auth_token = _get_job_auth_token(job_id)
+            auth_token = job.auth_token
             await page.add_init_script(_build_playwright_init_script(auth_token))
 
             page.on("console", lambda msg: print(f"🖥️  [{msg.type}]: {msg.text}"))

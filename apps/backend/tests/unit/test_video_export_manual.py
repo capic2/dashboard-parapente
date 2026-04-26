@@ -1,5 +1,9 @@
 """Unit tests for frontend URL resolution in manual video export."""
 
+from datetime import datetime
+
+from models import VideoExportJob
+
 import video_export_manual
 
 
@@ -52,8 +56,26 @@ def test_build_playwright_init_script_without_token_still_sets_export_mode():
     assert "const token = null" in script
 
 
-def test_job_auth_token_storage_roundtrip():
+def test_job_auth_token_storage_roundtrip(db_session):
     job_id = "job-token-test"
+
+    db_session.add(
+        VideoExportJob(
+            id=job_id,
+            flight_id="flight-test-001",
+            status="queued",
+            mode="manual",
+            quality="1080p",
+            fps=15,
+            speed=1,
+            progress=0,
+            message="test",
+            frontend_url="http://localhost:5173",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+    )
+    db_session.commit()
 
     video_export_manual._set_job_auth_token(job_id, "token-xyz")
     assert video_export_manual._get_job_auth_token(job_id) == "token-xyz"
@@ -62,8 +84,26 @@ def test_job_auth_token_storage_roundtrip():
     assert video_export_manual._get_job_auth_token(job_id) is None
 
 
-def test_set_job_auth_token_removes_value_when_none():
+def test_set_job_auth_token_removes_value_when_none(db_session):
     job_id = "job-token-none"
+
+    db_session.add(
+        VideoExportJob(
+            id=job_id,
+            flight_id="flight-test-001",
+            status="queued",
+            mode="manual",
+            quality="1080p",
+            fps=15,
+            speed=1,
+            progress=0,
+            message="test",
+            frontend_url="http://localhost:5173",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+    )
+    db_session.commit()
 
     video_export_manual._set_job_auth_token(job_id, "token-xyz")
     video_export_manual._set_job_auth_token(job_id, None)
