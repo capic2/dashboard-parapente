@@ -21,8 +21,11 @@ class TestVideoExportStartEndpoint:
         self, client: TestClient, sample_flight
     ):
         """Manual mode should be used when start_video_export_manual succeeds."""
-        with patch("routes.start_video_export_manual", return_value="job-manual"):
-            response = client.post(f"{API_PREFIX}/flights/flight-test-001/export-video?mode=manual")
+        with patch("routes.start_video_export_manual", return_value="job-manual") as mock_start:
+            response = client.post(
+                f"{API_PREFIX}/flights/flight-test-001/export-video?mode=manual",
+                headers={"Authorization": "Bearer test-token"},
+            )
 
         assert response.status_code == 200
         payload = response.json()
@@ -30,6 +33,7 @@ class TestVideoExportStartEndpoint:
         assert payload["mode"] == "manual"
         assert payload["message"] == "Video export started (manual render)"
         assert payload["status_url"] == "/api/exports/job-manual/status"
+        assert mock_start.call_args.kwargs["auth_token"] == "test-token"
 
     def test_start_video_export_falls_back_to_stream_on_manual_error(
         self,
@@ -73,13 +77,17 @@ class TestGenerateVideoEndpoint:
         sample_flight.gpx_file_path = "db/gpx/sample.gpx"
         db_session.commit()
 
-        with patch("routes.start_video_export_manual", return_value="job-manual"):
-            response = client.post(f"{API_PREFIX}/flights/flight-test-001/generate-video")
+        with patch("routes.start_video_export_manual", return_value="job-manual") as mock_start:
+            response = client.post(
+                f"{API_PREFIX}/flights/flight-test-001/generate-video",
+                headers={"Authorization": "Bearer token-generate"},
+            )
 
         assert response.status_code == 200
         payload = response.json()
         assert payload["job_id"] == "job-manual"
         assert payload["message"] == "Video generation started (Manual Render, ~60-90 min)"
+        assert mock_start.call_args.kwargs["auth_token"] == "token-generate"
 
     def test_generate_video_falls_back_to_stream_on_manual_error(
         self,

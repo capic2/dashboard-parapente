@@ -35,3 +35,37 @@ def test_resolve_frontend_url_strips_export_viewer_suffix(monkeypatch):
     )
 
     assert resolved == "http://frontend.example"
+
+
+def test_build_playwright_init_script_sets_export_mode_and_token():
+    script = video_export_manual._build_playwright_init_script("abc123")
+
+    assert "window._exportMode = 'manual_render'" in script
+    assert "parapente-auth" in script
+    assert '"abc123"' in script
+
+
+def test_build_playwright_init_script_without_token_still_sets_export_mode():
+    script = video_export_manual._build_playwright_init_script(None)
+
+    assert "window._exportMode = 'manual_render'" in script
+    assert "const token = null" in script
+
+
+def test_job_auth_token_storage_roundtrip():
+    job_id = "job-token-test"
+
+    video_export_manual._set_job_auth_token(job_id, "token-xyz")
+    assert video_export_manual._get_job_auth_token(job_id) == "token-xyz"
+
+    video_export_manual._clear_job_auth_token(job_id)
+    assert video_export_manual._get_job_auth_token(job_id) is None
+
+
+def test_set_job_auth_token_removes_value_when_none():
+    job_id = "job-token-none"
+
+    video_export_manual._set_job_auth_token(job_id, "token-xyz")
+    video_export_manual._set_job_auth_token(job_id, None)
+
+    assert video_export_manual._get_job_auth_token(job_id) is None

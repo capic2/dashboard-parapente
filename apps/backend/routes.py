@@ -3752,8 +3752,22 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 # ========================================
 
 
+def _extract_bearer_token(request: Request) -> str | None:
+    auth_header = request.headers.get("authorization")
+    if not auth_header:
+        return None
+
+    scheme, _, value = auth_header.partition(" ")
+    if scheme.lower() != "bearer":
+        return None
+
+    token = value.strip()
+    return token or None
+
+
 @router.post("/flights/{flight_id}/export-video")
 def start_flight_video_export(
+    request: Request,
     flight_id: str,
     quality: str = "1080p",
     fps: int = 15,
@@ -3802,6 +3816,7 @@ def start_flight_video_export(
                 fps=fps,
                 speed=speed,
                 frontend_url=frontend_url,
+                auth_token=_extract_bearer_token(request),
             )
         except Exception as e:
             logger.warning(
@@ -3840,7 +3855,11 @@ def start_flight_video_export(
 
 
 @router.post("/flights/{flight_id}/generate-video")
-def generate_flight_video(flight_id: str, db: Session = Depends(get_db)):
+def generate_flight_video(
+    request: Request,
+    flight_id: str,
+    db: Session = Depends(get_db),
+):
     """
     Generate video for a flight (simple endpoint with optimal defaults)
     Used for flights that don't have a video yet.
@@ -3875,6 +3894,7 @@ def generate_flight_video(flight_id: str, db: Session = Depends(get_db)):
             speed=1,
             frontend_url=frontend_url,
             update_db=True,
+            auth_token=_extract_bearer_token(request),
         )
         started_message = "Video generation started (Manual Render, ~60-90 min)"
     except Exception as e:

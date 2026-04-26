@@ -7,6 +7,7 @@ worker while keeping a small in-memory status snapshot for compatibility.
 """
 
 import asyncio
+import json
 import shutil
 import subprocess
 import threading
@@ -56,6 +57,8 @@ _WORKER_LOCK = threading.Lock()
 _JOB_UPDATE_DB_LOCK = threading.Lock()
 _EXPORT_JOBS_LOCK = threading.Lock()
 _JOB_UPDATE_DB: dict[str, bool] = {}
+_JOB_AUTH_TOKEN_LOCK = threading.Lock()
+_JOB_AUTH_TOKENS: dict[str, str] = {}
 
 _CANCEL_CHECK_INTERVAL = 10
 
@@ -190,6 +193,41 @@ def _pop_job_update_db_flag(job_id: str) -> bool | None:
 def _get_job_update_db_flag(job_id: str, default: bool = True) -> bool:
     with _JOB_UPDATE_DB_LOCK:
         return _JOB_UPDATE_DB.get(job_id, default)
+
+
+def _set_job_auth_token(job_id: str, token: str | None):
+    with _JOB_AUTH_TOKEN_LOCK:
+        if token:
+            _JOB_AUTH_TOKENS[job_id] = token
+        else:
+            _JOB_AUTH_TOKENS.pop(job_id, None)
+
+
+def _get_job_auth_token(job_id: str) -> str | None:
+    with _JOB_AUTH_TOKEN_LOCK:
+        return _JOB_AUTH_TOKENS.get(job_id)
+
+
+def _clear_job_auth_token(job_id: str):
+    with _JOB_AUTH_TOKEN_LOCK:
+        _JOB_AUTH_TOKENS.pop(job_id, None)
+
+
+def _build_playwright_init_script(auth_token: str | None) -> str:
+    token_literal = json.dumps(auth_token) if auth_token else "null"
+    return f"""
+        (() => {{
+            window._exportMode = 'manual_render';
+
+            const token = {token_literal};
+            if (token) {{
+                localStorage.setItem(
+                    'parapente-auth',
+                    JSON.stringify({{ state: {{ token }} }})
+                );
+            }}
+        }})();
+    """
 
 
 def _get_job(job_id: str, db: Session | None = None) -> VideoExportJob | None:
@@ -385,6 +423,7 @@ def start_video_export_manual(
     speed: int = 1,
     frontend_url: str = "http://localhost:5173",
     update_db: bool = True,
+    auth_token: str | None = None,
 ):
     """
     Create a new export job and enqueue it for the singleton worker.
@@ -427,6 +466,8 @@ def start_video_export_manual(
 
         db.commit()
         _set_memory_snapshot(job_id, _snapshot_from_job(job))
+
+    _set_job_auth_token(job_id, auth_token)
 
     start_video_export_worker()
     return job_id
@@ -483,6 +524,9 @@ async def _export_video_manual_render(job_id: str):
             )
             page = await context.new_page()
 
+            auth_token = _get_job_auth_token(job_id)
+            await page.add_init_script(_build_playwright_init_script(auth_token))
+
             page.on("console", lambda msg: print(f"🖥️  [{msg.type}]: {msg.text}"))
             page.on("pageerror", lambda err: print(f"❌ Browser error: {err}"))
 
@@ -495,7 +539,62 @@ async def _export_video_manual_render(job_id: str):
                 raise Exception(f"Page returned HTTP {response.status}")
 
             _update_job(job_id, message="Waiting for Cesium viewer")
-            await page.wait_for_selector("canvas", timeout=60000, state="attached")
+            await page.wait_for_load_state("domcontentloaded")
+            await page.wait_for_function(
+                """
+                () => {
+                    const hasCanvas = Boolean(document.querySelector('.cesium-viewer canvas, canvas'));
+                    const isLoginPage =
+                        window.location.pathname === '/login' ||
+                        Boolean(document.querySelector('input[type="password"]'));
+
+                    const errorText = document.body?.innerText || '';
+                    const hasViewerError =
+                        errorText.includes('Erreur d\'initialisation Cesium') ||
+                        errorText.includes('VITE_CESIUM_ION_TOKEN is required') ||
+                        errorText.includes('No flight ID provided');
+
+                    return hasCanvas || isLoginPage || hasViewerError;
+                }
+                """,
+                timeout=60000,
+            )
+
+            viewer_state = await page.evaluate("""
+                () => {
+                    const hasCanvas = Boolean(document.querySelector('.cesium-viewer canvas, canvas'));
+                    const isLoginPage =
+                        window.location.pathname === '/login' ||
+                        Boolean(document.querySelector('input[type="password"]'));
+                    const errorText = document.body?.innerText || '';
+
+                    return {
+                        hasCanvas,
+                        isLoginPage,
+                        path: window.location.pathname,
+                        hasViewerError: errorText.includes('Erreur d\'initialisation Cesium'),
+                        missingIonToken: errorText.includes('VITE_CESIUM_ION_TOKEN is required'),
+                        missingFlightId: errorText.includes('No flight ID provided'),
+                    };
+                }
+                """)
+
+            if viewer_state.get("isLoginPage"):
+                raise Exception(
+                    "Export viewer redirected to /login (missing auth token in Playwright context)"
+                )
+
+            if viewer_state.get("missingIonToken"):
+                raise Exception("Cesium token missing: VITE_CESIUM_ION_TOKEN is required")
+
+            if viewer_state.get("missingFlightId"):
+                raise Exception("Export viewer opened without flightId")
+
+            if not viewer_state.get("hasCanvas"):
+                raise Exception(
+                    f"Cesium canvas not available (path={viewer_state.get('path', 'unknown')})"
+                )
+
             await asyncio.sleep(3)
 
             print("✅ Cesium viewer found")
@@ -762,6 +861,8 @@ async def _export_video_manual_render(job_id: str):
             error=str(e),
             message=f"Error: {e}",
         )
+    finally:
+        _clear_job_auth_token(job_id)
 
 
 def get_export_status(job_id: str) -> dict[str, Any] | None:
@@ -790,6 +891,7 @@ def cancel_video_export(job_id: str, update_db: bool = True) -> bool:
         error=None,
         update_db=update_db,
     )
+    _clear_job_auth_token(job_id)
 
     print(f"🛑 Video export {job_id} cancelled")
     return True
