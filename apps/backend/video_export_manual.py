@@ -9,7 +9,6 @@ worker while keeping a small in-memory status snapshot for compatibility.
 import asyncio
 import json
 import shutil
-import subprocess
 import threading
 import uuid
 import traceback
@@ -56,7 +55,9 @@ _WORKER_STOP = threading.Event()
 _WORKER_LOCK = threading.Lock()
 _JOB_UPDATE_DB_LOCK = threading.Lock()
 _EXPORT_JOBS_LOCK = threading.Lock()
+_JOB_RUNTIME_LOCK = threading.Lock()
 _JOB_UPDATE_DB: dict[str, bool] = {}
+_JOB_RUNTIME: dict[str, dict[str, Any]] = {}
 
 _CANCEL_CHECK_INTERVAL = 10
 
@@ -146,7 +147,7 @@ def _normalize_frontend_url(frontend_url: str) -> str:
 
 
 def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
-    return {
+    snapshot = {
         "job_id": job.id,
         "flight_id": job.flight_id,
         "status": _to_public_status(job.status),
@@ -162,6 +163,30 @@ def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
         "quality": job.quality,
         "speed": job.speed,
     }
+
+    with _JOB_RUNTIME_LOCK:
+        runtime = _JOB_RUNTIME.get(job.id, {}).copy()
+    snapshot.update(runtime)
+    return snapshot
+
+
+def _set_job_runtime(job_id: str, **kwargs: Any) -> None:
+    with _JOB_RUNTIME_LOCK:
+        current = _JOB_RUNTIME.get(job_id, {}).copy()
+        for key, value in kwargs.items():
+            if value is None:
+                current.pop(key, None)
+            else:
+                current[key] = value
+        if current:
+            _JOB_RUNTIME[job_id] = current
+        else:
+            _JOB_RUNTIME.pop(job_id, None)
+
+
+def _clear_job_runtime(job_id: str) -> None:
+    with _JOB_RUNTIME_LOCK:
+        _JOB_RUNTIME.pop(job_id, None)
 
 
 def _set_memory_snapshot(job_id: str, data: dict[str, Any] | None):
@@ -286,6 +311,8 @@ def _update_job(
             if job.status == _STATUS_CANCELLED and not job.cancelled_at:
                 job.cancelled_at = datetime.utcnow()
 
+            _clear_job_runtime(job_id)
+
             popped_update_db = _pop_job_update_db_flag(job_id)
 
         if update_db is not None:
@@ -367,6 +394,50 @@ def _cleanup_frames(frames_dir: Path):
         frames_dir.rmdir()
     except OSError:
         pass
+
+
+def _capture_progress_percent(frame_count: int, total_frames: int) -> int:
+    if total_frames <= 0:
+        return 5
+    ratio = min(max(frame_count / total_frames, 0.0), 1.0)
+    return min(80, max(5, int(5 + ratio * 75)))
+
+
+def _parse_ffmpeg_out_time_seconds(line: str) -> float | None:
+    if "=" not in line:
+        return None
+
+    key, raw_value = line.split("=", 1)
+    value = raw_value.strip()
+
+    # FFmpeg uses a historical misnomer: out_time_ms is also reported in microseconds.
+    # Keep division by 1_000_000 for both keys (not 1_000).
+    if key == "out_time_ms" and value.isdigit():
+        return int(value) / 1_000_000
+
+    if key == "out_time_us" and value.isdigit():
+        return int(value) / 1_000_000
+
+    if key == "out_time":
+        parts = value.split(":")
+        if len(parts) != 3:
+            return None
+        try:
+            hours = float(parts[0])
+            minutes = float(parts[1])
+            seconds = float(parts[2])
+        except ValueError:
+            return None
+        return max(0.0, hours * 3600 + minutes * 60 + seconds)
+
+    return None
+
+
+def _encoding_progress_percent(encoded_seconds: float, total_duration_seconds: float) -> int:
+    if total_duration_seconds <= 0:
+        return 80
+    ratio = min(max(encoded_seconds / total_duration_seconds, 0.0), 1.0)
+    return min(99, max(80, int(80 + ratio * 19)))
 
 
 def _worker_loop():
@@ -470,6 +541,7 @@ def start_video_export_manual(
 
         db.commit()
         _set_memory_snapshot(job_id, _snapshot_from_job(job))
+        _set_job_runtime(job_id, phase=_STATUS_QUEUED)
 
     _set_job_auth_token(job_id, auth_token)
 
@@ -494,6 +566,7 @@ async def _export_video_manual_render(job_id: str):
         from playwright.async_api import async_playwright
 
         _update_job(job_id, status=_STATUS_INITIALIZING, message="Setting up manual render")
+        _set_job_runtime(job_id, phase=_STATUS_INITIALIZING)
 
         # Resolution mapping
         resolutions = {"720p": (1280, 720), "1080p": (1920, 1080), "4K": (3840, 2160)}
@@ -705,9 +778,11 @@ async def _export_video_manual_render(job_id: str):
             _update_job(
                 job_id,
                 status=_STATUS_INITIALIZING,
+                progress=5,
                 total_frames=total_frames,
                 message=f"Preparing to capture {total_frames} frames",
             )
+            _set_job_runtime(job_id, phase=_STATUS_INITIALIZING)
 
             frames_dir = EXPORTS_DIR / f"frames_{job_id}"
             frames_dir.mkdir(exist_ok=True)
@@ -715,6 +790,7 @@ async def _export_video_manual_render(job_id: str):
             print(f"📁 Frames directory: {frames_dir}")
 
             _update_job(job_id, status=_STATUS_CAPTURING, message="Starting frame capture")
+            _set_job_runtime(job_id, phase=_STATUS_CAPTURING)
 
             await page.evaluate("""
                 () => {
@@ -760,10 +836,18 @@ async def _export_video_manual_render(job_id: str):
 
                 frame_count += 1
                 if frame_count % 10 == 0:
-                    progress = int((frame_count / total_frames) * 50)
+                    progress = _capture_progress_percent(frame_count, total_frames)
                     elapsed = time.time() - start_time
                     fps_actual = frame_count / elapsed if elapsed > 0 else 0
                     eta_seconds = (total_frames - frame_count) / fps_actual if fps_actual > 0 else 0
+                    eta_seconds_int = max(0, int(eta_seconds)) if eta_seconds > 0 else None
+
+                    _set_job_runtime(
+                        job_id,
+                        phase=_STATUS_CAPTURING,
+                        eta_seconds=eta_seconds_int,
+                        frames_captured=frame_count,
+                    )
 
                     _update_job(
                         job_id,
@@ -796,8 +880,12 @@ async def _export_video_manual_render(job_id: str):
                 return
 
             _update_job(
-                job_id, status=_STATUS_ENCODING, progress=50, message="Encoding with FFmpeg"
+                job_id,
+                status=_STATUS_ENCODING,
+                progress=80,
+                message="Encoding with FFmpeg",
             )
+            _set_job_runtime(job_id, phase=_STATUS_ENCODING, eta_seconds=None)
 
             timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
             filename = f"flight-{flight_id}-{timestamp}.mp4"
@@ -817,25 +905,97 @@ async def _export_video_manual_render(job_id: str):
                 "18",
                 "-pix_fmt",
                 "yuv420p",
+                "-nostats",
+                "-progress",
+                "pipe:2",
                 "-y",
                 str(output_file),
             ]
 
             print(f"🎬 FFmpeg command: {' '.join(ffmpeg_cmd)}")
-            try:
-                result = subprocess.run(
-                    ffmpeg_cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=30 * 60,
-                )
-            except subprocess.TimeoutExpired as timeout_error:
-                raise Exception(
-                    f"FFmpeg timeout after 1800s: {' '.join(ffmpeg_cmd)}"
-                ) from timeout_error
+            process = await asyncio.create_subprocess_exec(
+                *ffmpeg_cmd,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
+            )
 
-            if result.returncode != 0:
-                raise Exception(f"FFmpeg encoding failed: {result.stderr}")
+            encoding_started_at = time.time()
+            ffmpeg_stderr: list[str] = []
+            ffmpeg_timeout_seconds = 30 * 60
+            total_duration_seconds = max(video_duration, 1e-6)
+
+            try:
+                assert process.stderr is not None
+                while True:
+                    if _is_cancelled(job_id):
+                        process.kill()
+                        await process.wait()
+                        _cleanup_frames(frames_dir)
+                        _update_job(
+                            job_id,
+                            status=_STATUS_CANCELLED,
+                            message="Export cancelled during encoding",
+                        )
+                        return
+
+                    if time.time() - encoding_started_at > ffmpeg_timeout_seconds:
+                        process.kill()
+                        await process.wait()
+                        raise Exception(
+                            f"FFmpeg timeout after {ffmpeg_timeout_seconds}s: {' '.join(ffmpeg_cmd)}"
+                        )
+
+                    try:
+                        line_bytes = await asyncio.wait_for(process.stderr.readline(), timeout=1.0)
+                    except TimeoutError:
+                        if process.returncode is not None:
+                            break
+                        continue
+
+                    if not line_bytes:
+                        if process.returncode is not None:
+                            break
+                        continue
+
+                    line = line_bytes.decode("utf-8", errors="replace").strip()
+                    ffmpeg_stderr.append(line)
+                    encoded_seconds = _parse_ffmpeg_out_time_seconds(line)
+
+                    if encoded_seconds is not None:
+                        progress = _encoding_progress_percent(
+                            encoded_seconds,
+                            total_duration_seconds,
+                        )
+                        elapsed_encoding = max(time.time() - encoding_started_at, 1e-6)
+                        encoding_speed = encoded_seconds / elapsed_encoding
+                        remaining = max(total_duration_seconds - encoded_seconds, 0.0)
+                        eta_seconds = (
+                            max(0, int(remaining / encoding_speed)) if encoding_speed > 0 else None
+                        )
+
+                        _set_job_runtime(
+                            job_id,
+                            phase=_STATUS_ENCODING,
+                            eta_seconds=eta_seconds,
+                            encoded_seconds=round(encoded_seconds, 2),
+                        )
+                        _update_job(
+                            job_id,
+                            status=_STATUS_ENCODING,
+                            progress=progress,
+                            message=(
+                                f"Encoding {int(min(max((encoded_seconds / total_duration_seconds) * 100, 0), 100))}%"
+                            ),
+                        )
+
+                return_code = await process.wait()
+                if return_code != 0:
+                    stderr_output = "\n".join(ffmpeg_stderr).strip()
+                    raise Exception(f"FFmpeg encoding failed: {stderr_output}")
+            finally:
+                if process.returncode is None:
+                    process.kill()
+                    await process.wait()
 
             print(f"✅ Video encoded: {output_file}")
 
@@ -849,6 +1009,7 @@ async def _export_video_manual_render(job_id: str):
                 message=f"Video ready! ({file_size_mb:.1f} MB)",
                 video_path=str(output_file),
             )
+            _set_job_runtime(job_id, phase=_STATUS_COMPLETED, eta_seconds=0)
 
             capture_time_min = int(total_capture_time / 60)
             print(f"✅ Export completed in {capture_time_min} minutes")

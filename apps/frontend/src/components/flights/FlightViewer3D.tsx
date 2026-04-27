@@ -20,6 +20,10 @@ import {
 import { useFlightGPX } from '../../hooks/flights/useFlightGPX';
 import { useFlight } from '../../hooks/flights/useFlight';
 import {
+  formatEta,
+  useVideoExportStatus,
+} from '../../hooks/flights/useVideoExportStatus';
+import {
   getHeadingFromOrientation,
   getOrientationLabel,
   getOrientationOptions,
@@ -179,11 +183,38 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     null
   );
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const exportPollingRef = useRef<NodeJS.Timeout | null>(null);
   const cameraHeadingRef = useRef<number>(0);
   const cameraDistanceRef = useRef<number>(500);
   const cameraTargetRef = useRef<Cartesian3 | null>(null);
   const containerDivRef = useRef<HTMLDivElement>(null);
+
+  const isExportActive = isVideoExportInProgress(flight?.video_export_status);
+  const { status: exportStatus } = useVideoExportStatus(
+    flight?.video_export_job_id,
+    Boolean(flight?.video_export_job_id && isExportActive)
+  );
+
+  const exportProgress = Math.min(
+    100,
+    Math.max(0, Math.round(exportStatus?.progress ?? 0))
+  );
+  const exportEta = formatEta(exportStatus?.eta_seconds);
+
+  useEffect(() => {
+    if (!flightId || !exportStatus?.internal_status) {
+      return;
+    }
+
+    if (
+      exportStatus.internal_status === 'completed' ||
+      exportStatus.internal_status === 'failed' ||
+      exportStatus.internal_status === 'cancelled'
+    ) {
+      queryClient.invalidateQueries({
+        queryKey: ['flights', flightId],
+      });
+    }
+  }, [exportStatus?.internal_status, flightId, queryClient]);
 
   // Initialize Cesium Viewer
   useEffect(() => {
@@ -741,16 +772,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const compactToggleButtonClassName = compact
     ? 'px-1.5 py-0.5 text-xs'
     : 'px-2 py-1 text-sm';
-
-  // Cleanup export polling on unmount
-  useEffect(() => {
-    return () => {
-      if (exportPollingRef.current) {
-        clearInterval(exportPollingRef.current);
-        exportPollingRef.current = null;
-      }
-    };
-  }, []);
 
   const toggleFullscreen = () => {
     if (!containerDivRef.current) return;
@@ -1441,6 +1462,33 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         {!flight.video_export_status &&
                           `🎥 ${t('flights.viewer.generateVideo')}`}
                       </Button>
+
+                      {isVideoExportInProgress(flight.video_export_status) &&
+                        flight.video_export_job_id && (
+                          <div className="mb-3 rounded border border-blue-200 bg-blue-50 p-2 dark:border-blue-700 dark:bg-blue-900/20">
+                            <div className="mb-1 flex items-center justify-between text-xs font-medium text-blue-900 dark:text-blue-100">
+                              <span>{t('flights.viewer.videoProgress')}</span>
+                              <span>{exportProgress}%</span>
+                            </div>
+                            <div className="h-2 w-full overflow-hidden rounded bg-blue-100 dark:bg-blue-950/40">
+                              <div
+                                className="h-full rounded bg-blue-600 transition-all duration-500"
+                                style={{ width: `${exportProgress}%` }}
+                              />
+                            </div>
+                            <p className="mt-2 text-xs text-blue-900 dark:text-blue-100">
+                              {exportStatus?.message ||
+                                t('flights.viewer.videoGenerating')}
+                            </p>
+                            {exportEta && (
+                              <p className="mt-1 text-xs text-blue-900 dark:text-blue-100">
+                                {t('flights.viewer.videoEta', {
+                                  time: exportEta,
+                                })}
+                              </p>
+                            )}
+                          </div>
+                        )}
 
                       {/* Cancel Button (only when export is active) */}
                       {isVideoExportInProgress(flight.video_export_status) &&

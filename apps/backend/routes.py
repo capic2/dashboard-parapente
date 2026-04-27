@@ -111,6 +111,14 @@ def _mark_flight_export_processing(db: Session, flight: Flight, job_id: str):
     db.refresh(flight)
 
 
+def _resolve_export_status(job_id: str) -> dict[str, Any] | None:
+    """Get export status from manual backend first, then stream fallback."""
+    status = get_export_status_manual(job_id)
+    if status:
+        return status
+    return get_export_status_stream(job_id)
+
+
 # Public routes: no authentication required (weather, spots read, auth)
 public_router = APIRouter(prefix="/api", tags=["api"])
 
@@ -3927,15 +3935,70 @@ def get_video_export_status(job_id: str):
     """
     Get status of video export job (works for both manual and stream modes)
     """
-    # Try manual render first, then stream
-    status = get_export_status_manual(job_id)
-    if not status:
-        status = get_export_status_stream(job_id)
+    status = _resolve_export_status(job_id)
 
     if not status:
         raise HTTPException(status_code=404, detail="Export job not found")
 
     return status
+
+
+@router.get("/exports/{job_id}/stream")
+async def stream_video_export_status(job_id: str, request: Request) -> StreamingResponse:
+    """Stream export status updates through Server-Sent Events."""
+
+    initial_status = await asyncio.to_thread(_resolve_export_status, job_id)
+    if not initial_status:
+        raise HTTPException(status_code=404, detail="Export job not found")
+
+    async def event_stream():
+        yield "retry: 3000\n\n"
+
+        heartbeat_tick = 0
+        last_serialized = ""
+        status = initial_status
+
+        while True:
+            serialized = json.dumps(status, sort_keys=True)
+            if serialized != last_serialized:
+                yield serialize_sse_event("status", status)
+                last_serialized = serialized
+
+            if status.get("internal_status") in {"completed", "failed", "cancelled"}:
+                break
+
+            try:
+                await asyncio.wait_for(request.is_disconnected(), timeout=2)
+                break
+            except TimeoutError:
+                heartbeat_tick += 1
+                if heartbeat_tick >= 10:
+                    yield serialize_sse_event(
+                        "ping",
+                        {"timestamp": datetime.now(timezone.utc).isoformat()},
+                    )
+                    heartbeat_tick = 0
+
+            status = await asyncio.to_thread(_resolve_export_status, job_id)
+            if not status:
+                yield serialize_sse_event(
+                    "error",
+                    {
+                        "job_id": job_id,
+                        "detail": "Export job no longer available",
+                    },
+                )
+                break
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.delete("/exports/{job_id}/cancel")
