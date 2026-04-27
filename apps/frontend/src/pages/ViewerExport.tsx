@@ -1,6 +1,11 @@
 import { useEffect, lazy, Suspense } from 'react';
 import { useSearch } from '@tanstack/react-router';
-const FlightViewer3D = lazy(() => import('../components/flights/FlightViewer3D').then(m => ({ default: m.FlightViewer3D })));
+import { useTranslation } from 'react-i18next';
+const FlightViewer3D = lazy(() =>
+  import('../components/flights/FlightViewer3D').then((m) => ({
+    default: m.FlightViewer3D,
+  }))
+);
 
 declare global {
   interface Window {
@@ -13,6 +18,7 @@ declare global {
  * Used by Playwright for capturing video frames
  */
 export function ViewerExport() {
+  const { t } = useTranslation();
   // Get flightId from URL search params (?flightId=xxx)
   const search = useSearch({ strict: false }) as { flightId?: string };
   const flightId =
@@ -37,7 +43,7 @@ export function ViewerExport() {
     return (
       <div className="flex items-center justify-center h-screen">
         <p className="text-gray-600 dark:text-gray-300">
-          No flight ID provided. Use ?flightId=xxx
+          {t('flights.viewerExportMissingFlightId')}
         </p>
       </div>
     );
@@ -45,7 +51,13 @@ export function ViewerExport() {
 
   return (
     <div className="w-full h-screen" style={{ backgroundColor: '#000' }}>
-      <Suspense fallback={<div className="h-screen flex items-center justify-center text-white">Chargement...</div>}>
+      <Suspense
+        fallback={
+          <div className="h-screen flex items-center justify-center text-white">
+            {t('viewerExport.loading')}
+          </div>
+        }
+      >
         <FlightViewer3D flightId={flightId} />
       </Suspense>
     </div>

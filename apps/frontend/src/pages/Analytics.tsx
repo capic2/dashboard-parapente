@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useSuspenseQuery } from '@tanstack/react-query';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { FilterBar } from '../components/analytics/FilterBar';
-import { useFiltersStore } from '../stores/filtersStore';
 import {
   useFlights,
   useFlightStats,
@@ -29,13 +29,19 @@ function ChartSkeleton() {
 
 export default function Analytics() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const search = useSearch({ from: '/analytics' });
   const { data: sites } = useSuspenseQuery(sitesQueryOptions());
-  const { filters } = useFiltersStore();
+  const filters = {
+    siteId: search.siteId ?? null,
+    dateFrom: search.dateFrom ?? null,
+    dateTo: search.dateTo ?? null,
+  };
   const { data: flights = [], isLoading: flightsLoading } = useFlights({
     limit: 500,
-    siteId: filters.siteId || undefined,
-    dateFrom: filters.dateFrom || undefined,
-    dateTo: filters.dateTo || undefined,
+    siteId: search.siteId,
+    dateFrom: search.dateFrom,
+    dateTo: search.dateTo,
   });
   const { data: stats, isLoading: statsLoading } = useFlightStats();
   const { data: records, isLoading: recordsLoading } = useFlightRecords();
@@ -54,7 +60,32 @@ export default function Analytics() {
       </div>
 
       {/* Filtres dynamiques */}
-      <FilterBar sites={sites} />
+      <FilterBar
+        sites={sites}
+        filters={filters}
+        onFiltersChange={(nextFilters) => {
+          const mergedFilters = { ...filters, ...nextFilters };
+
+          void navigate({
+            to: '/analytics',
+            search: {
+              siteId: mergedFilters.siteId || undefined,
+              dateFrom: mergedFilters.dateFrom || undefined,
+              dateTo: mergedFilters.dateTo || undefined,
+            },
+          });
+        }}
+        onResetFilters={() =>
+          void navigate({
+            to: '/analytics',
+            search: {
+              siteId: undefined,
+              dateFrom: undefined,
+              dateTo: undefined,
+            },
+          })
+        }
+      />
 
       {isLoading ? (
         <div className="space-y-4">

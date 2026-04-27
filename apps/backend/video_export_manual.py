@@ -626,7 +626,7 @@ async def _export_video_manual_render(job_id: str):
 
                     const errorText = document.body?.innerText || '';
                     const hasViewerError =
-                        errorText.includes('Erreur d\'initialisation Cesium') ||
+                        errorText.includes("Erreur d'initialisation Cesium") ||
                         errorText.includes('VITE_CESIUM_ION_TOKEN is required') ||
                         errorText.includes('No flight ID provided');
 
@@ -648,7 +648,7 @@ async def _export_video_manual_render(job_id: str):
                         hasCanvas,
                         isLoginPage,
                         path: window.location.pathname,
-                        hasViewerError: errorText.includes('Erreur d\'initialisation Cesium'),
+                        hasViewerError: errorText.includes("Erreur d'initialisation Cesium"),
                         missingIonToken: errorText.includes('VITE_CESIUM_ION_TOKEN is required'),
                         missingFlightId: errorText.includes('No flight ID provided'),
                     };

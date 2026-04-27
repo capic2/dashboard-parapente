@@ -217,7 +217,9 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
           ? 'border-sky-200 dark:border-sky-700'
           : 'border-gray-200 dark:border-gray-700'
       }`}
-      aria-label={`Configuration de la source météo ${source.display_name}`}
+      aria-label={t('settings.weatherSources.configAria', {
+        name: source.display_name,
+      })}
     >
       {/* Notification */}
       {notification && (
@@ -263,7 +265,15 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
           onChange={handleToggleEnabled}
           isDisabled={updateSource.isPending}
           className="group ml-3"
-          aria-label={`${source.is_enabled ? 'Désactiver' : 'Activer'} la source ${source.display_name}`}
+          aria-label={
+            source.is_enabled
+              ? t('settings.weatherSources.disableSource', {
+                  name: source.display_name,
+                })
+              : t('settings.weatherSources.enableSource', {
+                  name: source.display_name,
+                })
+          }
         >
           <div className="relative inline-flex items-center cursor-pointer">
             <div className="w-11 h-6 bg-gray-300 group-focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-sky-300 rounded-full group-selected:bg-sky-600 transition-colors">
@@ -281,7 +291,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
               className="text-sm font-medium text-gray-700 dark:text-gray-300"
               aria-hidden="true"
             >
-              🔑 Clé API
+              🔑 {t('settings.weatherSources.apiKey')}
             </span>
             {source.api_key_configured ? (
               <span
@@ -308,7 +318,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
                 value={apiKeyValue}
                 onChange={setApiKeyValue}
                 type={showApiKey ? 'text' : 'password'}
-                aria-label="Clé API"
+                aria-label={t('settings.weatherSources.apiKey')}
                 className="flex-1"
               >
                 <Input
@@ -320,7 +330,9 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
                 onPress={() => setShowApiKey(!showApiKey)}
                 className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-500 pressed:bg-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                 aria-label={
-                  showApiKey ? 'Masquer la clé API' : 'Afficher la clé API'
+                  showApiKey
+                    ? t('settings.weatherSources.hideApiKey')
+                    : t('settings.weatherSources.showApiKey')
                 }
               >
                 <span aria-hidden="true">{showApiKey ? '🙈' : '👁️'}</span>
@@ -329,7 +341,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
                 onPress={handleSaveApiKey}
                 isDisabled={updateSource.isPending}
                 className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 pressed:bg-green-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-                aria-label="Sauvegarder la clé API"
+                aria-label={t('common.save')}
               >
                 <span aria-hidden="true">✓</span>
               </Button>
@@ -339,7 +351,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
                   setApiKeyValue('');
                 }}
                 className="px-3 py-1 text-xs bg-gray-400 text-white rounded hover:bg-gray-500 pressed:bg-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-                aria-label="Annuler la modification"
+                aria-label={t('common.cancel')}
               >
                 <span aria-hidden="true">✗</span>
               </Button>
@@ -373,7 +385,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       <div
         className="grid grid-cols-3 gap-2 mb-3 text-center"
         role="group"
-        aria-label="Statistiques de performance"
+        aria-label={t('settings.weatherSources.performanceStatsAria')}
       >
         <div className="p-2 bg-gray-50 dark:bg-gray-900 rounded">
           <div
@@ -434,7 +446,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       <div
         className="text-xs text-gray-600 dark:text-gray-300 mb-3"
         role="region"
-        aria-label="Historique d'activité"
+        aria-label={t('settings.weatherSources.activityHistoryAria')}
       >
         {source.last_success_at && (
           <div role="status">
@@ -457,7 +469,9 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
                 className="text-xs mt-1 p-1 bg-red-50 dark:bg-red-900/20 rounded truncate"
                 title={source.last_error_message}
                 role="status"
-                aria-label={`Message d'erreur: ${source.last_error_message}`}
+                aria-label={t('settings.weatherSources.errorMessageAria', {
+                  message: source.last_error_message,
+                })}
               >
                 {source.last_error_message}
               </div>
@@ -486,13 +500,15 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       <div
         className="flex flex-col sm:flex-row gap-2"
         role="group"
-        aria-label="Actions sur la source météo"
+        aria-label={t('settings.weatherSources.actionsAria')}
       >
         <Button
           onPress={handleTest}
           isDisabled={isTesting || !source.is_enabled}
           className="flex-1 px-3 py-2 text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700 pressed:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-          aria-label={`Tester la source ${source.display_name}`}
+          aria-label={t('settings.weatherSources.testSourceAria', {
+            name: source.display_name,
+          })}
         >
           {isTesting ? (
             <>
@@ -518,10 +534,12 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
             <Button
               onPress={() => onDelete(source)}
               className="px-3 py-2 text-sm font-medium bg-red-600 text-white rounded hover:bg-red-700 pressed:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-              aria-label={`Supprimer la source ${source.display_name}`}
+              aria-label={t('settings.weatherSources.deleteSourceAria', {
+                name: source.display_name,
+              })}
             >
               <span aria-hidden="true">🗑️</span>
-              <span className="sr-only">Supprimer</span>
+              <span className="sr-only">{t('common.delete')}</span>
             </Button>
           )}
       </div>

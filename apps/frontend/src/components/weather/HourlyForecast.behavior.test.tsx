@@ -5,7 +5,13 @@ import HourlyForecast from './HourlyForecast';
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => {
-      if (key === 'weather.paraIndex') return 'Para-Index';
+      const labels: Record<string, string> = {
+        'weather.paraIndex': 'Para-Index',
+        'weather.metricsUsed': 'Metriques utilisees',
+        'weather.verdictLabel': 'Verdict',
+        'weather.criteriaEvaluated': 'Criteres evalues',
+      };
+      if (labels[key]) return labels[key];
       return key;
     },
     i18n: {
@@ -122,7 +128,7 @@ describe('HourlyForecast tooltip behavior', () => {
     );
 
     expect(screen.getByText('📊 Para-Index - 10:00')).toBeTruthy();
-    expect(screen.getByText(/Métriques utilisées/i)).toBeTruthy();
+    expect(screen.getByText(/Metriques utilisees/i)).toBeTruthy();
   });
 
   it('shows verdict tooltip content on hover', () => {
@@ -131,6 +137,6 @@ describe('HourlyForecast tooltip behavior', () => {
     fireEvent.mouseOver(screen.getByRole('button', { name: 'Verdict 10:00' }));
 
     expect(screen.getByText('✓ Verdict - 10:00')).toBeTruthy();
-    expect(screen.getByText(/Critères évalués/i)).toBeTruthy();
+    expect(screen.getByText(/Criteres evalues/i)).toBeTruthy();
   });
 });

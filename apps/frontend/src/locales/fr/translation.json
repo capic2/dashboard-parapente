@@ -67,7 +67,10 @@
     "loadingError": "Erreur de chargement",
     "loadingMessage": "Chargement du tableau de bord...",
     "sitesLoaded": "Sites chargés: {{count}}",
-    "allSitesConditions": "Conditions actuelles — tous les sites"
+    "allSitesConditions": "Conditions actuelles — tous les sites",
+    "noSites": "Aucun site configuré",
+    "noSitesDescription": "Ajoutez votre premier site de vol pour commencer.",
+    "addSite": "Ajouter un site"
   },
   "stats": {
     "title": "Statistiques",
@@ -117,7 +120,28 @@
     "liveWindGust": "raf.",
     "liveWindOpenSource": "Source",
     "liveWindExternalInfo": "Les balises live sont consultables directement sur SpotAiR.",
-    "liveWindOpenSpotair": "Ouvrir SpotAiR"
+    "liveWindOpenSpotair": "Ouvrir SpotAiR",
+    "reasonsTextualFlyability": "Raisons textuelles volabilité",
+    "notAvailable": "non disponible",
+    "windOrientation": "Vent / Orientation",
+    "favorabilityGood": "Favorable",
+    "favorabilityModerate": "Modéré",
+    "favorabilityPoor": "Défavorable",
+    "metricsUsed": "Métriques utilisées :",
+    "avgWind": "Vent moyen",
+    "maxGust": "Rafales max",
+    "precipitationLabel": "Précipitations",
+    "paraIndexHelp": "Score calculé selon les conditions optimales de vol",
+    "verdictLabel": "Verdict",
+    "criteriaEvaluated": "Critères évalués :",
+    "gustsShort": "rafales",
+    "criteria": {
+      "windOptimalRange": "Vent dans plage optimale ({{min}}-{{max}} km/h)",
+      "windNotTooLow": "Vent pas trop faible (> {{min}} km/h)",
+      "windNotTooHigh": "Vent pas trop fort (< {{max}} km/h)",
+      "gustAcceptable": "Rafales acceptables (< {{max}} km/h)",
+      "noPrecipitation": "Pas de précipitations"
+    }
   },
   "filters": {
     "title": "Filtres",
@@ -127,7 +151,9 @@
     "dateTo": "Date de fin",
     "activeFilters": "Filtres actifs :",
     "from": "Du",
-    "to": "Au"
+    "to": "Au",
+    "fromDate": "Du {{date}}",
+    "toDate": "Au {{date}}"
   },
   "sites": {
     "management": "Gestion des Sites",
@@ -210,6 +236,11 @@
       "meteoParapente": "Spécialisée parapente avec prévisions de thermiques",
       "meteociel": "Modèle AROME haute résolution pour la France",
       "meteoblue": "Prévisions professionnelles multi-modèles",
+      "openMeteoDesc": "API gratuite et fiable, recommandée comme source principale",
+      "weatherApiDesc": "Nécessite une clé API (plan gratuit disponible)",
+      "meteoParaglideDesc": "Spécialisée parapente avec prévisions de thermiques",
+      "meteocielDesc": "Modèle AROME haute résolution pour la France",
+      "meteoblueDesc": "Prévisions professionnelles multi-modèles",
       "deleteConfirm": "Supprimer la source \"{{name}}\" ?\n\nCette action est irréversible.",
       "deleteSuccess": "Source \"{{name}}\" supprimée avec succès",
       "deleteError": "Erreur lors de la suppression",
@@ -228,18 +259,33 @@
       "testing": "Test en cours...",
       "test": "Tester",
       "testSuccess": "Test réussi en {{time}}ms",
+      "testFailure": "Échec: {{error}}",
       "testFailed": "Échec: {{error}}",
       "testError": "Erreur: {{error}}",
+      "unknownError": "Erreur inconnue",
       "apiKey": "Clé API",
       "apiKeyConfigured": "Configurée",
       "apiKeyMissing": "Manquante",
+      "showApiKey": "Afficher la clé API",
+      "hideApiKey": "Masquer la clé API",
       "modifyApiKey": "Modifier la clé API",
       "configureApiKey": "Configurer la clé API",
       "enterApiKey": "Entrez votre clé API",
       "enterApiKeyWarning": "Veuillez entrer une clé API",
       "apiKeySaved": "Clé API sauvegardée avec succès",
       "apiKeySaveError": "Impossible de sauvegarder la clé API",
-      "documentation": "Documentation API"
+      "documentation": "Documentation API",
+      "lastSuccessMessage": "Dernier succès {{date}}",
+      "lastErrorMessage": "Dernière erreur {{date}}",
+      "configAria": "Configuration de la source météo {{name}}",
+      "enableSource": "Activer la source {{name}}",
+      "disableSource": "Désactiver la source {{name}}",
+      "performanceStatsAria": "Statistiques de performance",
+      "activityHistoryAria": "Historique d'activité",
+      "errorMessageAria": "Message d'erreur: {{message}}",
+      "actionsAria": "Actions sur la source météo",
+      "testSourceAria": "Tester la source {{name}}",
+      "deleteSourceAria": "Supprimer la source {{name}}"
     },
     "data": {
       "backupTitle": "Sauvegarde & Restauration",
@@ -433,6 +479,7 @@
     "gpxFile": "Fichier GPX ou IGC",
     "autoDetection": "Détection automatique :",
     "autoDetectionText": "Le site de décollage sera détecté automatiquement à partir des coordonnées GPS du fichier GPX.",
+    "autoDetectionMessage": "<strong>Détection automatique:</strong> Le site de décollage sera détecté automatiquement à partir des coordonnées GPS du fichier GPX.",
     "createSuccess": "Vol créé avec succès",
     "name": "Nom :",
     "date": "Date :",
@@ -509,6 +556,7 @@
     "flightOf": "Vol du {{date}}",
     "selectFlightHint": "📍 Sélectionnez un vol pour visualiser les détails et la trajectoire 3D",
     "confirmDelete": "⚠️ Confirmer la suppression",
+    "confirmDeleteSingleMessage": "Vous êtes sur le point de supprimer définitivement le vol <title>\"{{title}}\"</title>. Cette action est irréversible.",
     "confirmDeleteSinglePrefix": "Vous êtes sur le point de supprimer définitivement le vol",
     "confirmDeleteSingleSuffix": "Cette action est irréversible.",
     "confirmDeleteMulti_one": "Vous êtes sur le point de supprimer définitivement {{count}} vol. Cette action est irréversible.",
@@ -660,7 +708,27 @@
     "analyzing": "Analyse en cours...",
     "refresh": "Actualiser",
     "noRecentAnalysis": "Aucune analyse récente disponible",
-    "startAnalysis": "Lancer une analyse"
+    "startAnalysis": "Lancer une analyse",
+    "inProgress": "⏳ En cours...",
+    "history7Days": "📈 Historique 7 Jours",
+    "tableDate": "Date",
+    "tableScore": "Score",
+    "tableCeiling": "Plafond",
+    "tableStrength": "Force",
+    "tableMethod": "Méthode",
+    "methodAi": "🤖 IA",
+    "methodClassic": "📊 Classique",
+    "scoreCardTitle": "Score de Volabilité",
+    "ceilingMetric": "☁️ Plafond",
+    "strengthMetric": "📈 Force",
+    "hoursMetric": "⏰ Heures",
+    "skewtTitle": "Diagramme Skew-T",
+    "skewtAlt": "Diagramme Skew-T",
+    "skewtUnavailable": "Diagramme non disponible",
+    "imageUnavailable": "Image non disponible",
+    "summaryTitle": "📊 Résumé des Conditions",
+    "tipsTitle": "💡 Conseils de Vol",
+    "safetyAlertsTitle": "⚠️ Alertes de Sécurité"
   },
   "landings": {
     "loading": "Chargement des atterrissages...",
@@ -671,7 +739,11 @@
     "addLanding": "Ajouter un atterrissage",
     "chooseSite": "Choisir un site...",
     "notesOptional": "Notes (optionnel)",
-    "adding": "Ajout..."
+    "adding": "Ajout...",
+    "delete": "Supprimer"
+  },
+  "viewerExport": {
+    "loading": "Chargement..."
   },
   "datepicker": {
     "openCalendar": "Ouvrir le calendrier"

@@ -40,19 +40,16 @@ export default function WeatherPage() {
       <div className="py-8">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center max-w-md mx-auto">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-3">
-            {t('dashboard.noSites', 'Aucun site configuré')}
+            {t('dashboard.noSites')}
           </h2>
           <p className="text-gray-600 dark:text-gray-300 mb-4">
-            {t(
-              'dashboard.noSitesDescription',
-              'Ajoutez votre premier site de vol pour commencer.'
-            )}
+            {t('dashboard.noSitesDescription')}
           </p>
           <Button
             onClick={() => void navigate({ to: '/sites' })}
             className="px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-all"
           >
-            {t('dashboard.addSite', 'Ajouter un site')}
+            {t('dashboard.addSite')}
           </Button>
         </div>
       </div>

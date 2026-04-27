@@ -25,9 +25,7 @@ git status --short
 Confirm this branch runs in a dedicated worktree and follows naming rules.
 
 ```bash
-git worktree list
-CURRENT_WT="$(basename "$(git rev-parse --show-toplevel)")"
-echo "$CURRENT_WT" | grep -E '^wt-.+'
+./scripts/git/check-worktree-policy.sh
 ```
 
 ### 3. Validate worktree base against `origin/main`

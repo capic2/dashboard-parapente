@@ -258,6 +258,7 @@ const ParaIndexTooltip = ({
   precipitation,
   temperature,
 }: ParaIndexTooltipProps) => {
+  const { t } = useTranslation();
   return (
     <div className="bg-white dark:bg-gray-800 border-2 border-sky-500 rounded-lg shadow-xl p-4 text-sm max-w-[320px]">
       <div className="font-bold mb-3 text-sky-700 dark:text-sky-400 flex items-center justify-between gap-2 pr-8">
@@ -272,25 +273,27 @@ const ParaIndexTooltip = ({
         </div>
         <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
           <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
-            Métriques utilisées :
+            {t('weather.metricsUsed')}
           </div>
           <div className="space-y-1 text-xs">
             <div>
-              • Vent moyen : <strong>{wind.toFixed(1)} km/h</strong>
+              • {t('weather.avgWind')}: <strong>{wind.toFixed(1)} km/h</strong>
             </div>
             <div>
-              • Rafales max : <strong>{gust.toFixed(1)} km/h</strong>
+              • {t('weather.maxGust')}: <strong>{gust.toFixed(1)} km/h</strong>
             </div>
             <div>
-              • Précipitations : <strong>{precipitation.toFixed(1)} mm</strong>
+              • {t('weather.precipitationLabel')}:{' '}
+              <strong>{precipitation.toFixed(1)} mm</strong>
             </div>
             <div>
-              • Température : <strong>{temperature.toFixed(1)}°C</strong>
+              • {t('common.temperature')}:{' '}
+              <strong>{temperature.toFixed(1)}°C</strong>
             </div>
           </div>
         </div>
         <div className="text-xs text-gray-500 dark:text-gray-400 mt-3">
-          Score calculé selon les conditions optimales de vol
+          {t('weather.paraIndexHelp')}
         </div>
       </div>
     </div>
@@ -307,25 +310,35 @@ const VerdictTooltip = ({
   precipitation,
   thresholds,
 }: VerdictTooltipProps) => {
+  const { t } = useTranslation();
   const criteria = [
     {
-      label: `Vent dans plage optimale (${thresholds.windWeakMax}-${thresholds.windOptimalMax} km/h)`,
+      label: t('weather.criteria.windOptimalRange', {
+        min: thresholds.windWeakMax,
+        max: thresholds.windOptimalMax,
+      }),
       met: wind >= thresholds.windWeakMax && wind <= thresholds.windOptimalMax,
     },
     {
-      label: `Vent pas trop faible (> ${thresholds.windLowMax} km/h)`,
+      label: t('weather.criteria.windNotTooLow', {
+        min: thresholds.windLowMax,
+      }),
       met: wind > thresholds.windLowMax,
     },
     {
-      label: `Vent pas trop fort (< ${thresholds.windHighMax} km/h)`,
+      label: t('weather.criteria.windNotTooHigh', {
+        max: thresholds.windHighMax,
+      }),
       met: wind < thresholds.windHighMax,
     },
     {
-      label: `Rafales acceptables (< ${thresholds.gustHighMax} km/h)`,
+      label: t('weather.criteria.gustAcceptable', {
+        max: thresholds.gustHighMax,
+      }),
       met: gust < thresholds.gustHighMax,
     },
     {
-      label: 'Pas de précipitations',
+      label: t('weather.criteria.noPrecipitation'),
       met: precipitation < thresholds.slotPrecipitationMax,
     },
   ];
@@ -333,7 +346,9 @@ const VerdictTooltip = ({
   return (
     <div className="bg-white dark:bg-gray-800 border-2 border-emerald-500 rounded-lg shadow-xl p-4 text-sm max-w-[320px]">
       <div className="font-bold mb-3 text-emerald-700 dark:text-emerald-400 flex items-center justify-between gap-2 pr-8">
-        <span>✓ Verdict - {hour}</span>
+        <span>
+          ✓ {t('weather.verdictLabel')} - {hour}
+        </span>
         <ScopeBadge scope="backendFrontend" />
       </div>
       <div className="space-y-2 text-gray-700 dark:text-gray-300">
@@ -345,7 +360,7 @@ const VerdictTooltip = ({
         </div>
         <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
           <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
-            Critères évalués :
+            {t('weather.criteriaEvaluated')}
           </div>
           <div className="space-y-1 text-xs">
             {criteria.map((criterion, i) => (
@@ -373,7 +388,7 @@ const VerdictTooltip = ({
           </div>
         </div>
         <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between gap-2">
-          <span>Raisons textuelles volabilité</span>
+          <span>{t('weather.reasonsTextualFlyability')}</span>
           <ScopeBadge scope="frontendOnly" />
         </div>
       </div>
@@ -390,6 +405,7 @@ const SourceDataTooltip = ({
   label,
   color,
 }: SourceDataTooltipProps) => {
+  const { t } = useTranslation();
   return (
     <div
       className="bg-white dark:bg-gray-800 border-2 rounded-lg shadow-xl p-4 text-sm max-w-[320px]"
@@ -409,8 +425,8 @@ const SourceDataTooltip = ({
                 key={sourceKey}
                 className="text-xs text-gray-400 dark:text-gray-400"
               >
-                <span className="font-semibold">{sourceName}:</span> (non
-                disponible)
+                <span className="font-semibold">{sourceName}:</span> (
+                {t('weather.notAvailable')})
               </div>
             );
           }
@@ -429,7 +445,7 @@ const SourceDataTooltip = ({
             const displayValue = `${value.toFixed(1)} km/h`;
             const gustValue =
               gust !== null && gust !== undefined
-                ? ` (rafales: ${gust.toFixed(1)} km/h)`
+                ? ` (${t('weather.gustsShort')}: ${gust.toFixed(1)} km/h)`
                 : '';
             return (
               <div

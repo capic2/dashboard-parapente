@@ -67,7 +67,10 @@
     "loadingError": "Loading error",
     "loadingMessage": "Loading dashboard...",
     "sitesLoaded": "Sites loaded: {{count}}",
-    "allSitesConditions": "Current conditions — all sites"
+    "allSitesConditions": "Current conditions — all sites",
+    "noSites": "No site configured",
+    "noSitesDescription": "Add your first flying site to get started.",
+    "addSite": "Add a site"
   },
   "stats": {
     "title": "Statistics",
@@ -117,7 +120,28 @@
     "liveWindGust": "gust",
     "liveWindOpenSource": "Source",
     "liveWindExternalInfo": "Live stations are available directly on SpotAiR.",
-    "liveWindOpenSpotair": "Open SpotAiR"
+    "liveWindOpenSpotair": "Open SpotAiR",
+    "reasonsTextualFlyability": "Textual flyability reasons",
+    "notAvailable": "not available",
+    "windOrientation": "Wind / Orientation",
+    "favorabilityGood": "Favorable",
+    "favorabilityModerate": "Moderate",
+    "favorabilityPoor": "Unfavorable",
+    "metricsUsed": "Used metrics:",
+    "avgWind": "Average wind",
+    "maxGust": "Max gust",
+    "precipitationLabel": "Precipitation",
+    "paraIndexHelp": "Score computed from optimal flight conditions",
+    "verdictLabel": "Verdict",
+    "criteriaEvaluated": "Evaluated criteria:",
+    "gustsShort": "gusts",
+    "criteria": {
+      "windOptimalRange": "Wind in optimal range ({{min}}-{{max}} km/h)",
+      "windNotTooLow": "Wind not too low (> {{min}} km/h)",
+      "windNotTooHigh": "Wind not too high (< {{max}} km/h)",
+      "gustAcceptable": "Acceptable gusts (< {{max}} km/h)",
+      "noPrecipitation": "No precipitation"
+    }
   },
   "filters": {
     "title": "Filters",
@@ -127,7 +151,9 @@
     "dateTo": "End date",
     "activeFilters": "Active filters:",
     "from": "From",
-    "to": "To"
+    "to": "To",
+    "fromDate": "From {{date}}",
+    "toDate": "To {{date}}"
   },
   "sites": {
     "management": "Site Management",
@@ -210,6 +236,11 @@
       "meteoParapente": "Paragliding-specialized with thermal forecasts",
       "meteociel": "AROME high-resolution model for France",
       "meteoblue": "Professional multi-model forecasts",
+      "openMeteoDesc": "Free and reliable API, recommended as primary source",
+      "weatherApiDesc": "Requires an API key (free plan available)",
+      "meteoParaglideDesc": "Paragliding-specialized with thermal forecasts",
+      "meteocielDesc": "AROME high-resolution model for France",
+      "meteoblueDesc": "Professional multi-model forecasts",
       "deleteConfirm": "Delete source \"{{name}}\"?\n\nThis action is irreversible.",
       "deleteSuccess": "Source \"{{name}}\" deleted successfully",
       "deleteError": "Error deleting source",
@@ -228,18 +259,33 @@
       "testing": "Testing...",
       "test": "Test",
       "testSuccess": "Test passed in {{time}}ms",
+      "testFailure": "Failed: {{error}}",
       "testFailed": "Failed: {{error}}",
       "testError": "Error: {{error}}",
+      "unknownError": "Unknown error",
       "apiKey": "API Key",
       "apiKeyConfigured": "Configured",
       "apiKeyMissing": "Missing",
+      "showApiKey": "Show API key",
+      "hideApiKey": "Hide API key",
       "modifyApiKey": "Modify API key",
       "configureApiKey": "Configure API key",
       "enterApiKey": "Enter your API key",
       "enterApiKeyWarning": "Please enter an API key",
       "apiKeySaved": "API key saved successfully",
       "apiKeySaveError": "Unable to save API key",
-      "documentation": "API Documentation"
+      "documentation": "API Documentation",
+      "lastSuccessMessage": "Last success {{date}}",
+      "lastErrorMessage": "Last error {{date}}",
+      "configAria": "Weather source configuration {{name}}",
+      "enableSource": "Enable source {{name}}",
+      "disableSource": "Disable source {{name}}",
+      "performanceStatsAria": "Performance statistics",
+      "activityHistoryAria": "Activity history",
+      "errorMessageAria": "Error message: {{message}}",
+      "actionsAria": "Weather source actions",
+      "testSourceAria": "Test source {{name}}",
+      "deleteSourceAria": "Delete source {{name}}"
     },
     "data": {
       "backupTitle": "Backup & Restore",
@@ -433,6 +479,7 @@
     "gpxFile": "GPX or IGC file",
     "autoDetection": "Auto-detection:",
     "autoDetectionText": "The takeoff site will be automatically detected from the GPS coordinates in the GPX file.",
+    "autoDetectionMessage": "<strong>Auto-detection:</strong> The takeoff site will be automatically detected from the GPS coordinates in the GPX file.",
     "createSuccess": "Flight created successfully",
     "name": "Name:",
     "date": "Date:",
@@ -509,6 +556,7 @@
     "flightOf": "Flight on {{date}}",
     "selectFlightHint": "📍 Select a flight to view details and 3D trajectory",
     "confirmDelete": "⚠️ Confirm deletion",
+    "confirmDeleteSingleMessage": "You are about to permanently delete flight <title>\"{{title}}\"</title>. This action is irreversible.",
     "confirmDeleteSinglePrefix": "You are about to permanently delete flight",
     "confirmDeleteSingleSuffix": "This action is irreversible.",
     "confirmDeleteMulti_one": "You are about to permanently delete {{count}} flight. This action is irreversible.",
@@ -660,7 +708,27 @@
     "analyzing": "Analyzing...",
     "refresh": "Refresh",
     "noRecentAnalysis": "No recent analysis available",
-    "startAnalysis": "Start analysis"
+    "startAnalysis": "Start analysis",
+    "inProgress": "⏳ In progress...",
+    "history7Days": "📈 7-Day History",
+    "tableDate": "Date",
+    "tableScore": "Score",
+    "tableCeiling": "Ceiling",
+    "tableStrength": "Strength",
+    "tableMethod": "Method",
+    "methodAi": "🤖 AI",
+    "methodClassic": "📊 Classic",
+    "scoreCardTitle": "Flyability Score",
+    "ceilingMetric": "☁️ Ceiling",
+    "strengthMetric": "📈 Strength",
+    "hoursMetric": "⏰ Hours",
+    "skewtTitle": "Skew-T Diagram",
+    "skewtAlt": "Skew-T Diagram",
+    "skewtUnavailable": "Diagram unavailable",
+    "imageUnavailable": "Image unavailable",
+    "summaryTitle": "📊 Conditions Summary",
+    "tipsTitle": "💡 Flight Tips",
+    "safetyAlertsTitle": "⚠️ Safety Alerts"
   },
   "landings": {
     "loading": "Loading landings...",
@@ -671,7 +739,11 @@
     "addLanding": "Add a landing",
     "chooseSite": "Choose a site...",
     "notesOptional": "Notes (optional)",
-    "adding": "Adding..."
+    "adding": "Adding...",
+    "delete": "Delete"
+  },
+  "viewerExport": {
+    "loading": "Loading..."
   },
   "datepicker": {
     "openCalendar": "Open calendar"
