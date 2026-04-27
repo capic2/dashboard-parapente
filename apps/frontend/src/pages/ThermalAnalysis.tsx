@@ -2,7 +2,8 @@
  * Thermal Analysis Page - Detailed emagram analysis view
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useIsMobile } from '../hooks/useIsMobile';
 import {
   useReactTable,
@@ -24,73 +25,79 @@ import { parseApiUtcDate } from '../lib/date';
 
 const historyColumnHelper = createColumnHelper<EmagramListItem>();
 
-const historyColumns = [
-  historyColumnHelper.accessor('created_at', {
-    header: 'Date',
-    cell: (info) => parseApiUtcDate(info.getValue()).toLocaleDateString(),
-    sortingFn: 'alphanumeric',
-  }),
-  historyColumnHelper.accessor('score_volabilite', {
-    header: 'Score',
-    cell: (info) => {
-      const score = info.getValue();
-      return (
-        <span
-          className="px-2 py-1 rounded-full text-sm font-bold"
-          style={{
-            backgroundColor: `${getScoreColor(score)}20`,
-            color: getScoreColor(score),
-          }}
-        >
-          {score ?? '-'}
-        </span>
-      );
-    },
-    sortingFn: (rowA, rowB) => {
-      const a = rowA.original.score_volabilite ?? -Infinity;
-      const b = rowB.original.score_volabilite ?? -Infinity;
-      return a - b;
-    },
-  }),
-  historyColumnHelper.accessor('plafond_thermique_m', {
-    header: 'Plafond',
-    cell: (info) => {
-      const val = info.getValue();
-      return val == null ? '-' : `${val}m`;
-    },
-    sortingFn: (rowA, rowB) => {
-      const a = rowA.original.plafond_thermique_m ?? -Infinity;
-      const b = rowB.original.plafond_thermique_m ?? -Infinity;
-      return a - b;
-    },
-  }),
-  historyColumnHelper.accessor('force_thermique_ms', {
-    header: 'Force',
-    cell: (info) => {
-      const val = info.getValue();
-      return val == null ? '-' : `${val.toFixed(1)} m/s`;
-    },
-    sortingFn: (rowA, rowB) => {
-      const a = rowA.original.force_thermique_ms ?? -Infinity;
-      const b = rowB.original.force_thermique_ms ?? -Infinity;
-      return a - b;
-    },
-  }),
-  historyColumnHelper.accessor('analysis_method', {
-    header: 'Méthode',
-    cell: (info) => (
-      <span className="text-xs text-gray-500 dark:text-gray-400">
-        {info.getValue() === 'llm_vision' ? '🤖 IA' : '📊 Classique'}
-      </span>
-    ),
-  }),
-];
-
 function ThermalHistoryTable({ history }: { history: EmagramListItem[] }) {
+  const { t } = useTranslation();
   const isMobile = useIsMobile();
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'created_at', desc: true },
   ]);
+
+  const historyColumns = useMemo(
+    () => [
+      historyColumnHelper.accessor('created_at', {
+        header: t('thermal.tableDate'),
+        cell: (info) => parseApiUtcDate(info.getValue()).toLocaleDateString(),
+        sortingFn: 'alphanumeric',
+      }),
+      historyColumnHelper.accessor('score_volabilite', {
+        header: t('thermal.tableScore'),
+        cell: (info) => {
+          const score = info.getValue();
+          return (
+            <span
+              className="px-2 py-1 rounded-full text-sm font-bold"
+              style={{
+                backgroundColor: `${getScoreColor(score)}20`,
+                color: getScoreColor(score),
+              }}
+            >
+              {score ?? '-'}
+            </span>
+          );
+        },
+        sortingFn: (rowA, rowB) => {
+          const a = rowA.original.score_volabilite ?? -Infinity;
+          const b = rowB.original.score_volabilite ?? -Infinity;
+          return a - b;
+        },
+      }),
+      historyColumnHelper.accessor('plafond_thermique_m', {
+        header: t('thermal.tableCeiling'),
+        cell: (info) => {
+          const val = info.getValue();
+          return val == null ? '-' : `${val}m`;
+        },
+        sortingFn: (rowA, rowB) => {
+          const a = rowA.original.plafond_thermique_m ?? -Infinity;
+          const b = rowB.original.plafond_thermique_m ?? -Infinity;
+          return a - b;
+        },
+      }),
+      historyColumnHelper.accessor('force_thermique_ms', {
+        header: t('thermal.tableStrength'),
+        cell: (info) => {
+          const val = info.getValue();
+          return val == null ? '-' : `${val.toFixed(1)} m/s`;
+        },
+        sortingFn: (rowA, rowB) => {
+          const a = rowA.original.force_thermique_ms ?? -Infinity;
+          const b = rowB.original.force_thermique_ms ?? -Infinity;
+          return a - b;
+        },
+      }),
+      historyColumnHelper.accessor('analysis_method', {
+        header: t('thermal.tableMethod'),
+        cell: (info) => (
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            {info.getValue() === 'llm_vision'
+              ? t('thermal.methodAi')
+              : t('thermal.methodClassic')}
+          </span>
+        ),
+      }),
+    ],
+    [t]
+  );
 
   const columnVisibility: Record<string, boolean> = isMobile
     ? { force_thermique_ms: false, analysis_method: false }
@@ -108,13 +115,14 @@ function ThermalHistoryTable({ history }: { history: EmagramListItem[] }) {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-      <h2 className="text-lg font-bold mb-4">📈 Historique 7 Jours</h2>
+      <h2 className="text-lg font-bold mb-4">{t('thermal.history7Days')}</h2>
       <DataTable table={table} />
     </div>
   );
 }
 
 export default function ThermalAnalysis() {
+  const { t } = useTranslation();
   const [selectedSiteId] = useState<string>('site-mont-poupet-ouest');
   const { data: site } = useSite(selectedSiteId);
 
@@ -142,8 +150,8 @@ export default function ThermalAnalysis() {
   if (isLoading) {
     return (
       <div className="p-4">
-        <h1 className="text-2xl font-bold mb-4">🌡️ Analyse Thermique</h1>
-        <div className="text-center py-8">Chargement...</div>
+        <h1 className="text-2xl font-bold mb-4">🌡️ {t('thermal.pageTitle')}</h1>
+        <div className="text-center py-8">{t('common.loading')}</div>
       </div>
     );
   }
@@ -151,10 +159,10 @@ export default function ThermalAnalysis() {
   if (!latest) {
     return (
       <div className="p-4">
-        <h1 className="text-2xl font-bold mb-4">🌡️ Analyse Thermique</h1>
+        <h1 className="text-2xl font-bold mb-4">🌡️ {t('thermal.pageTitle')}</h1>
         <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center">
           <p className="text-gray-600 dark:text-gray-300 mb-4">
-            Aucune analyse récente disponible
+            {t('thermal.noRecentAnalysis')}
           </p>
           <Button
             onClick={handleRefresh}
@@ -162,8 +170,8 @@ export default function ThermalAnalysis() {
             className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
           >
             {triggerMutation.isPending
-              ? 'Analyse en cours...'
-              : 'Lancer une analyse'}
+              ? t('thermal.analyzing')
+              : t('thermal.startAnalysis')}
           </Button>
         </div>
       </div>
@@ -173,18 +181,23 @@ export default function ThermalAnalysis() {
   const score = latest.score_volabilite || 0;
   const scoreColor = getScoreColor(score);
   const alerts = parseAlerts(latest.alertes_securite);
+  const skewtUnavailableSvg = `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="#f3f4f6"/><text x="50%" y="50%" text-anchor="middle" fill="#9ca3af" font-size="16">${t('thermal.imageUnavailable')}</text></svg>`
+  )}`;
 
   return (
     <div className="p-4 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <h1 className="text-3xl font-bold">🌡️ Analyse Thermique</h1>
+        <h1 className="text-3xl font-bold">🌡️ {t('thermal.pageTitle')}</h1>
         <Button
           onClick={handleRefresh}
           disabled={triggerMutation.isPending}
           className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
         >
-          {triggerMutation.isPending ? '⏳ En cours...' : '🔄 Actualiser'}
+          {triggerMutation.isPending
+            ? t('thermal.inProgress')
+            : `🔄 ${t('thermal.refresh')}`}
         </Button>
       </div>
 
@@ -192,7 +205,9 @@ export default function ThermalAnalysis() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         {/* Left Column - Score & Metrics */}
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-          <h2 className="text-lg font-bold mb-4">Score de Volabilité</h2>
+          <h2 className="text-lg font-bold mb-4">
+            {t('thermal.scoreCardTitle')}
+          </h2>
 
           {/* Score Gauge */}
           <div className="flex justify-center mb-6">
@@ -236,7 +251,7 @@ export default function ThermalAnalysis() {
             {latest.plafond_thermique_m && (
               <div className="flex justify-between items-center border-b dark:border-gray-700 pb-2">
                 <span className="text-gray-600 dark:text-gray-300">
-                  ☁️ Plafond
+                  {t('thermal.ceilingMetric')}
                 </span>
                 <span className="font-bold">{latest.plafond_thermique_m}m</span>
               </div>
@@ -245,7 +260,7 @@ export default function ThermalAnalysis() {
             {latest.force_thermique_ms && (
               <div className="flex justify-between items-center border-b dark:border-gray-700 pb-2">
                 <span className="text-gray-600 dark:text-gray-300">
-                  📈 Force
+                  {t('thermal.strengthMetric')}
                 </span>
                 <span className="font-bold">
                   {latest.force_thermique_ms.toFixed(1)} m/s
@@ -267,7 +282,7 @@ export default function ThermalAnalysis() {
             {latest.flyable_hours_formatted && (
               <div className="flex justify-between items-center border-b dark:border-gray-700 pb-2">
                 <span className="text-gray-600 dark:text-gray-300">
-                  ⏰ Heures
+                  {t('thermal.hoursMetric')}
                 </span>
                 <span className="font-bold">
                   {latest.flyable_hours_formatted}
@@ -279,17 +294,16 @@ export default function ThermalAnalysis() {
 
         {/* Middle Column - Skew-T Diagram */}
         <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-          <h2 className="text-lg font-bold mb-4">Diagramme Skew-T</h2>
+          <h2 className="text-lg font-bold mb-4">{t('thermal.skewtTitle')}</h2>
 
           {latest.skewt_image_path ? (
             <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
               <img
                 src={`/api/files${latest.skewt_image_path}`}
-                alt="Skew-T Diagram"
+                alt={t('thermal.skewtAlt')}
                 className="w-full h-auto rounded"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src =
-                    'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="%23f3f4f6"/><text x="50%" y="50%" text-anchor="middle" fill="%239ca3af" font-size="16">Image non disponible</text></svg>';
+                  (e.target as HTMLImageElement).src = skewtUnavailableSvg;
                 }}
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
@@ -299,7 +313,7 @@ export default function ThermalAnalysis() {
             </div>
           ) : (
             <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-8 text-center text-gray-500 dark:text-gray-400">
-              Diagramme non disponible
+              {t('thermal.skewtUnavailable')}
             </div>
           )}
         </div>
@@ -310,7 +324,9 @@ export default function ThermalAnalysis() {
         {/* Conditions */}
         {latest.resume_conditions && (
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-            <h2 className="text-lg font-bold mb-3">📊 Résumé des Conditions</h2>
+            <h2 className="text-lg font-bold mb-3">
+              {t('thermal.summaryTitle')}
+            </h2>
             <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
               {latest.resume_conditions}
             </p>
@@ -321,7 +337,7 @@ export default function ThermalAnalysis() {
         {latest.conseils_vol && (
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6 shadow-md border border-blue-200 dark:border-blue-700">
             <h2 className="text-lg font-bold mb-3 text-blue-900 dark:text-blue-100">
-              💡 Conseils de Vol
+              {t('thermal.tipsTitle')}
             </h2>
             <p className="text-blue-800 dark:text-blue-200 leading-relaxed">
               {latest.conseils_vol}
@@ -334,7 +350,7 @@ export default function ThermalAnalysis() {
       {alerts.length > 0 && (
         <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-6 shadow-md border border-red-200 dark:border-red-700 mb-6">
           <h2 className="text-lg font-bold mb-3 text-red-900 dark:text-red-100">
-            ⚠️ Alertes de Sécurité
+            {t('thermal.safetyAlertsTitle')}
           </h2>
           <ul className="space-y-2">
             {alerts.map((alert, idx) => (
