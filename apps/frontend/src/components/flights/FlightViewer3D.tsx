@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArcType,
   BoundingSphere,
+  Cartesian2,
   CallbackProperty,
   Cartesian3,
   Cartographic,
@@ -9,12 +10,15 @@ import {
   ConstantPositionProperty,
   Entity,
   HeadingPitchRange,
+  HorizontalOrigin,
   Ion,
   JulianDate,
+  LabelStyle,
   Math as CesiumMath,
   sampleTerrainMostDetailed,
   ShadowMode,
   Terrain,
+  VerticalOrigin,
   Viewer as CesiumViewer,
 } from 'cesium';
 import { useFlightGPX } from '../../hooks/flights/useFlightGPX';
@@ -40,6 +44,12 @@ import {
   VIDEO_EXPORT_IN_PROGRESS_STATUSES,
   type Flight,
 } from '@dashboard-parapente/shared-types';
+import {
+  computeCursorTelemetryLabel,
+  DEFAULT_VIEWER_UNITS,
+  getViewerUnitsFromStorage,
+  type ViewerUnits,
+} from './flightViewerTelemetry';
 
 const isVideoExportInProgress = (status?: string | null) =>
   Boolean(status && VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(status));
@@ -152,6 +162,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(compact);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentElapsedTime, setCurrentElapsedTime] = useState(0);
+  const [viewerUnits, setViewerUnits] = useState<ViewerUnits>(() =>
+    typeof window === 'undefined'
+      ? DEFAULT_VIEWER_UNITS
+      : getViewerUnitsFromStorage(window.localStorage)
+  );
 
   // Terrain rendering states
   const [terrainShadows, setTerrainShadows] = useState(true);
@@ -187,6 +202,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const cameraDistanceRef = useRef<number>(500);
   const cameraTargetRef = useRef<Cartesian3 | null>(null);
   const containerDivRef = useRef<HTMLDivElement>(null);
+  const viewerUnitsRef = useRef<ViewerUnits>(viewerUnits);
 
   const isExportActive = isVideoExportInProgress(flight?.video_export_status);
   const { status: exportStatus } = useVideoExportStatus(
@@ -215,6 +231,39 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       });
     }
   }, [exportStatus?.internal_status, flightId, queryClient]);
+
+  useEffect(() => {
+    const refreshUnits = () => {
+      const nextUnits = getViewerUnitsFromStorage(window.localStorage);
+      setViewerUnits((previousUnits) => {
+        if (
+          previousUnits.altitude === nextUnits.altitude &&
+          previousUnits.speed === nextUnits.speed
+        ) {
+          return previousUnits;
+        }
+
+        return nextUnits;
+      });
+    };
+
+    refreshUnits();
+    window.addEventListener('storage', refreshUnits);
+    window.addEventListener('focus', refreshUnits);
+
+    return () => {
+      window.removeEventListener('storage', refreshUnits);
+      window.removeEventListener('focus', refreshUnits);
+    };
+  }, []);
+
+  useEffect(() => {
+    viewerUnitsRef.current = viewerUnits;
+
+    if (viewerRef.current && !viewerRef.current.isDestroyed()) {
+      viewerRef.current.scene.requestRender();
+    }
+  }, [viewerUnits]);
 
   // Initialize Cesium Viewer
   useEffect(() => {
@@ -458,6 +507,30 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           outlineWidth: 1,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
+        label: {
+          text: new CallbackProperty(
+            () =>
+              computeCursorTelemetryLabel(
+                currentIndexRef.current,
+                gpxData.coordinates,
+                elevationOffset,
+                viewerUnitsRef.current
+              ),
+            false
+          ),
+          font: '600 12px sans-serif',
+          fillColor: Color.WHITE,
+          outlineColor: Color.BLACK,
+          outlineWidth: 2,
+          style: LabelStyle.FILL_AND_OUTLINE,
+          showBackground: true,
+          backgroundColor: Color.BLACK.withAlpha(0.75),
+          backgroundPadding: new Cartesian2(8, 6),
+          pixelOffset: new Cartesian2(0, -28),
+          horizontalOrigin: HorizontalOrigin.CENTER,
+          verticalOrigin: VerticalOrigin.BOTTOM,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
       });
 
       // Create start marker
@@ -602,7 +675,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     };
     // Intentionally exclude site camera fields to avoid replay reset after save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gpxData, elevationOffset, viewerReady]);
+  }, [elevationOffset, gpxData, viewerReady]);
 
   // Initialize camera settings from flight data
   useEffect(() => {
@@ -948,6 +1021,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       if (cursorPositionPropertyRef.current) {
         cursorPositionPropertyRef.current.setValue(allPositionsRef.current[0]);
+      }
+
+      if (viewerRef.current && !viewerRef.current.isDestroyed()) {
+        viewerRef.current.scene.requestRender();
       }
     }
   }, [pause]);
