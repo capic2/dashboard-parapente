@@ -170,7 +170,7 @@ def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
     return snapshot
 
 
-def _set_job_runtime(job_id: str, **kwargs):
+def _set_job_runtime(job_id: str, **kwargs: Any) -> None:
     with _JOB_RUNTIME_LOCK:
         current = _JOB_RUNTIME.get(job_id, {}).copy()
         for key, value in kwargs.items():
@@ -184,7 +184,7 @@ def _set_job_runtime(job_id: str, **kwargs):
             _JOB_RUNTIME.pop(job_id, None)
 
 
-def _clear_job_runtime(job_id: str):
+def _clear_job_runtime(job_id: str) -> None:
     with _JOB_RUNTIME_LOCK:
         _JOB_RUNTIME.pop(job_id, None)
 
