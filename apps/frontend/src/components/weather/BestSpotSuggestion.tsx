@@ -290,7 +290,7 @@ export function BestSpotSuggestion({
                 </span>
                 <div className="flex flex-col">
                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                    Vent / Orientation
+                    {t('weather.windOrientation')}
                   </span>
                   <span
                     className={`text-sm font-bold ${
@@ -302,10 +302,10 @@ export function BestSpotSuggestion({
                     }`}
                   >
                     {windFavorability === 'good'
-                      ? 'Favorable'
+                      ? t('weather.favorabilityGood')
                       : windFavorability === 'moderate'
-                        ? 'Modéré'
-                        : 'Défavorable'}
+                        ? t('weather.favorabilityModerate')
+                        : t('weather.favorabilityPoor')}
                   </span>
                 </div>
               </div>
