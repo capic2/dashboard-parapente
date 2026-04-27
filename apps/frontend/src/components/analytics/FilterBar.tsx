@@ -1,10 +1,18 @@
 import { Trans, useTranslation } from 'react-i18next';
-import { useFiltersStore } from '../../stores/filtersStore';
 import { DatePicker, Select, Button } from '@dashboard-parapente/design-system';
 import type { Site } from '@dashboard-parapente/shared-types';
 
+export interface AnalyticsFilters {
+  siteId: string | null;
+  dateFrom: string | null;
+  dateTo: string | null;
+}
+
 interface FilterBarProps {
   sites: Site[];
+  filters: AnalyticsFilters;
+  onFiltersChange: (filters: Partial<AnalyticsFilters>) => void;
+  onResetFilters: () => void;
 }
 
 /**
@@ -14,7 +22,12 @@ interface FilterBarProps {
  * - Site de décollage
  * - Plage de dates (date de début et fin)
  */
-export function FilterBar({ sites }: FilterBarProps) {
+export function FilterBar({
+  sites,
+  filters,
+  onFiltersChange,
+  onResetFilters,
+}: FilterBarProps) {
   const { t, i18n } = useTranslation();
   const dateLocale = i18n.language === 'en' ? 'en-US' : 'fr-FR';
 
@@ -27,9 +40,6 @@ export function FilterBar({ sites }: FilterBarProps) {
 
     return new Date(value).toLocaleDateString(dateLocale);
   };
-
-  const { filters, setSiteId, setDateFrom, setDateTo, resetFilters } =
-    useFiltersStore();
 
   const siteOptions = sites.map((site) => ({
     id: site.id,
@@ -44,7 +54,7 @@ export function FilterBar({ sites }: FilterBarProps) {
             {t('filters.title')}
           </h3>
           <Button
-            onClick={resetFilters}
+            onClick={onResetFilters}
             tone="ghost"
             size="sm"
             className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 font-medium"
@@ -59,7 +69,9 @@ export function FilterBar({ sites }: FilterBarProps) {
             label={t('common.site')}
             options={siteOptions}
             value={filters.siteId}
-            onChange={setSiteId}
+            onChange={(value) =>
+              onFiltersChange({ siteId: value ? String(value) : null })
+            }
             placeholder={t('filters.allSites')}
           />
 
@@ -67,14 +79,14 @@ export function FilterBar({ sites }: FilterBarProps) {
           <DatePicker
             label={t('filters.dateFrom')}
             value={filters.dateFrom || ''}
-            onChange={(value) => setDateFrom(value || null)}
+            onChange={(value) => onFiltersChange({ dateFrom: value || null })}
           />
 
           {/* Date to filter */}
           <DatePicker
             label={t('filters.dateTo')}
             value={filters.dateTo || ''}
-            onChange={(value) => setDateTo(value || null)}
+            onChange={(value) => onFiltersChange({ dateTo: value || null })}
           />
         </div>
 

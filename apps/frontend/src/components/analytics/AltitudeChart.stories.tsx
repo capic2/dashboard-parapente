@@ -1,4 +1,5 @@
 import preview from '../../../.storybook/preview';
+import { userEvent, within } from 'storybook/test';
 import AltitudeChart from './AltitudeChart';
 
 const meta = preview.meta({
@@ -56,5 +57,16 @@ export const NoData = meta.story({
   name: 'No Data',
   args: {
     flights: noDataFlights,
+  },
+});
+
+export const WithTooltip = meta.story({
+  name: 'With Tooltip',
+  args: {
+    flights: defaultFlights,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.hover(await canvas.findByText(/15\s+janv\.?/i));
   },
 });
