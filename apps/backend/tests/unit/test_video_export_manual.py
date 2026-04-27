@@ -117,3 +117,22 @@ def test_set_job_auth_token_removes_value_when_none(test_db, monkeypatch):
     video_export_manual._set_job_auth_token(job_id, None)
 
     assert video_export_manual._get_job_auth_token(job_id) is None
+
+
+def test_capture_progress_percent_spans_capture_phase_range():
+    assert video_export_manual._capture_progress_percent(0, 100) == 5
+    assert video_export_manual._capture_progress_percent(50, 100) == 42
+    assert video_export_manual._capture_progress_percent(100, 100) == 80
+
+
+def test_parse_ffmpeg_out_time_seconds_parses_progress_lines():
+    assert video_export_manual._parse_ffmpeg_out_time_seconds("out_time_ms=3000000") == 3.0
+    assert video_export_manual._parse_ffmpeg_out_time_seconds("out_time_us=1500000") == 1.5
+    assert video_export_manual._parse_ffmpeg_out_time_seconds("out_time=00:00:05.50") == 5.5
+    assert video_export_manual._parse_ffmpeg_out_time_seconds("progress=continue") is None
+
+
+def test_encoding_progress_percent_spans_encoding_phase_range():
+    assert video_export_manual._encoding_progress_percent(0, 100) == 80
+    assert video_export_manual._encoding_progress_percent(50, 100) == 89
+    assert video_export_manual._encoding_progress_percent(100, 100) == 99
