@@ -56,8 +56,11 @@ def test_build_playwright_init_script_without_token_still_sets_export_mode():
     assert "const token = null" in script
 
 
-def test_job_auth_token_storage_roundtrip(db_session):
+def test_job_auth_token_storage_roundtrip(test_db, monkeypatch):
     job_id = "job-token-test"
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+
+    db_session = test_db()
 
     db_session.add(
         VideoExportJob(
@@ -76,6 +79,7 @@ def test_job_auth_token_storage_roundtrip(db_session):
         )
     )
     db_session.commit()
+    db_session.close()
 
     video_export_manual._set_job_auth_token(job_id, "token-xyz")
     assert video_export_manual._get_job_auth_token(job_id) == "token-xyz"
@@ -84,8 +88,11 @@ def test_job_auth_token_storage_roundtrip(db_session):
     assert video_export_manual._get_job_auth_token(job_id) is None
 
 
-def test_set_job_auth_token_removes_value_when_none(db_session):
+def test_set_job_auth_token_removes_value_when_none(test_db, monkeypatch):
     job_id = "job-token-none"
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+
+    db_session = test_db()
 
     db_session.add(
         VideoExportJob(
@@ -104,6 +111,7 @@ def test_set_job_auth_token_removes_value_when_none(db_session):
         )
     )
     db_session.commit()
+    db_session.close()
 
     video_export_manual._set_job_auth_token(job_id, "token-xyz")
     video_export_manual._set_job_auth_token(job_id, None)
