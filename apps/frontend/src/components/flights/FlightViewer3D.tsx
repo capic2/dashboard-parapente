@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArcType,
   BoundingSphere,
+  Cartesian2,
   CallbackProperty,
   Cartesian3,
   Cartographic,
@@ -9,12 +10,15 @@ import {
   ConstantPositionProperty,
   Entity,
   HeadingPitchRange,
+  HorizontalOrigin,
   Ion,
   JulianDate,
+  LabelStyle,
   Math as CesiumMath,
   sampleTerrainMostDetailed,
   ShadowMode,
   Terrain,
+  VerticalOrigin,
   Viewer as CesiumViewer,
 } from 'cesium';
 import { useFlightGPX } from '../../hooks/flights/useFlightGPX';
@@ -71,6 +75,29 @@ const getHttpErrorDetail = async (error: HTTPError): Promise<string | null> => {
   return null;
 };
 
+const EARTH_RADIUS_METERS = 6371000;
+
+const toRadians = (value: number): number => (value * Math.PI) / 180;
+
+const distanceMetersBetween = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number => {
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
+  const lat1Rad = toRadians(lat1);
+  const lat2Rad = toRadians(lat2);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1Rad) * Math.cos(lat2Rad);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return EARTH_RADIUS_METERS * c;
+};
+
 declare global {
   interface Window {
     _cesiumViewer?: CesiumViewer;
@@ -83,6 +110,48 @@ interface FlightViewer3DProps {
   flightTitle?: string;
   compact?: boolean;
 }
+
+interface ViewerUnits {
+  altitude: 'm' | 'ft';
+  speed: 'kmh' | 'mph';
+}
+
+const DEFAULT_VIEWER_UNITS: ViewerUnits = {
+  altitude: 'm',
+  speed: 'kmh',
+};
+
+const FEET_PER_METER = 3.28084;
+const MPH_PER_KMH = 0.621371;
+
+const getViewerUnits = (): ViewerUnits => {
+  if (typeof window === 'undefined') {
+    return DEFAULT_VIEWER_UNITS;
+  }
+
+  try {
+    const raw = window.localStorage.getItem('paragliding-settings');
+    if (!raw) {
+      return DEFAULT_VIEWER_UNITS;
+    }
+
+    const parsed = JSON.parse(raw) as {
+      units?: { altitude?: string; speed?: string };
+    };
+
+    const altitude = parsed.units?.altitude === 'ft' ? 'ft' : 'm';
+    const speed = parsed.units?.speed === 'mph' ? 'mph' : 'kmh';
+
+    return { altitude, speed };
+  } catch {
+    return DEFAULT_VIEWER_UNITS;
+  }
+};
+
+const formatTelemetryNumber = (value: number): string => {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+};
 
 /**
  * AccordionSection - Collapsible section component for control panel
@@ -152,6 +221,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(compact);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentElapsedTime, setCurrentElapsedTime] = useState(0);
+  const [viewerUnits, setViewerUnits] = useState<ViewerUnits>(() =>
+    getViewerUnits()
+  );
 
   // Terrain rendering states
   const [terrainShadows, setTerrainShadows] = useState(true);
@@ -215,6 +287,27 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       });
     }
   }, [exportStatus?.internal_status, flightId, queryClient]);
+
+  useEffect(() => {
+    const refreshUnits = () => {
+      setViewerUnits(getViewerUnits());
+    };
+
+    refreshUnits();
+    window.addEventListener('storage', refreshUnits);
+    window.addEventListener('focus', refreshUnits);
+
+    return () => {
+      window.removeEventListener('storage', refreshUnits);
+      window.removeEventListener('focus', refreshUnits);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (viewerRef.current && !viewerRef.current.isDestroyed()) {
+      viewerRef.current.scene.requestRender();
+    }
+  }, [viewerUnits]);
 
   // Initialize Cesium Viewer
   useEffect(() => {
@@ -372,6 +465,57 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
   }, [terrainShadows, ambientOcclusion, sunTime, lightIntensity, viewerReady]);
 
+  const getCursorTelemetryLabel = useCallback(
+    (index: number): string => {
+      if (!gpxData?.coordinates?.length || index < 0) {
+        const speedUnit = viewerUnits.speed === 'mph' ? 'mph' : 'km/h';
+        const altitudeUnit = viewerUnits.altitude;
+        return `0 ${altitudeUnit}\n0 ${speedUnit}`;
+      }
+
+      const safeIndex = Math.min(index, gpxData.coordinates.length - 1);
+      const current = gpxData.coordinates[safeIndex];
+      if (!current) {
+        const speedUnit = viewerUnits.speed === 'mph' ? 'mph' : 'km/h';
+        const altitudeUnit = viewerUnits.altitude;
+        return `0 ${altitudeUnit}\n0 ${speedUnit}`;
+      }
+
+      const altitudeMeters = current.elevation + elevationOffset;
+
+      let speedKmh = 0;
+      if (safeIndex > 0) {
+        const previous = gpxData.coordinates[safeIndex - 1];
+        const dtMilliseconds = current.timestamp - previous.timestamp;
+
+        if (dtMilliseconds > 0) {
+          const distanceMeters = distanceMetersBetween(
+            previous.lat,
+            previous.lon,
+            current.lat,
+            current.lon
+          );
+          speedKmh = (distanceMeters / dtMilliseconds) * 3600;
+        }
+      }
+
+      const altitudeValue =
+        viewerUnits.altitude === 'ft'
+          ? altitudeMeters * FEET_PER_METER
+          : altitudeMeters;
+      const speedValue =
+        viewerUnits.speed === 'mph' ? speedKmh * MPH_PER_KMH : speedKmh;
+
+      const altitudeUnit = viewerUnits.altitude;
+      const speedUnit = viewerUnits.speed === 'mph' ? 'mph' : 'km/h';
+      const altitudeText = `${formatTelemetryNumber(altitudeValue)} ${altitudeUnit}`;
+      const speedText = `${formatTelemetryNumber(speedValue)} ${speedUnit}`;
+
+      return `${altitudeText}\n${speedText}`;
+    },
+    [elevationOffset, gpxData, viewerUnits]
+  );
+
   // Load GPX data
   useEffect(() => {
     if (!gpxData?.coordinates || gpxData.coordinates.length === 0) {
@@ -456,6 +600,24 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           color: Color.YELLOW,
           outlineColor: Color.BLACK,
           outlineWidth: 1,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        label: {
+          text: new CallbackProperty(
+            () => getCursorTelemetryLabel(currentIndexRef.current),
+            false
+          ),
+          font: '600 12px sans-serif',
+          fillColor: Color.WHITE,
+          outlineColor: Color.BLACK,
+          outlineWidth: 2,
+          style: LabelStyle.FILL_AND_OUTLINE,
+          showBackground: true,
+          backgroundColor: Color.BLACK.withAlpha(0.75),
+          backgroundPadding: new Cartesian2(8, 6),
+          pixelOffset: new Cartesian2(0, -28),
+          horizontalOrigin: HorizontalOrigin.CENTER,
+          verticalOrigin: VerticalOrigin.BOTTOM,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
       });
@@ -602,7 +764,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     };
     // Intentionally exclude site camera fields to avoid replay reset after save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gpxData, elevationOffset, viewerReady]);
+  }, [elevationOffset, getCursorTelemetryLabel, gpxData, viewerReady]);
 
   // Initialize camera settings from flight data
   useEffect(() => {
@@ -948,6 +1110,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       if (cursorPositionPropertyRef.current) {
         cursorPositionPropertyRef.current.setValue(allPositionsRef.current[0]);
+      }
+
+      if (viewerRef.current && !viewerRef.current.isDestroyed()) {
+        viewerRef.current.scene.requestRender();
       }
     }
   }, [pause]);
