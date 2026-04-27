@@ -14,6 +14,7 @@
     "test:e2e:ui": "nx e2e:ui e2e",
     "test:e2e:debug": "nx e2e:debug e2e",
     "test:e2e:report": "nx e2e:report e2e",
+    "check:worktree": "./scripts/git/check-worktree-policy.sh",
     "lint": "nx run-many -t lint --all",
     "lint:affected": "nx affected -t lint",
     "format": "nx run-many -t format --all",
