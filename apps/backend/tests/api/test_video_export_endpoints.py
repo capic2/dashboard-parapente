@@ -215,3 +215,11 @@ class TestExportStatusAndCancel:
         assert "retry: 3000" in response.text
         assert "event: status" in response.text
         assert '"progress": 44' in response.text
+
+    def test_export_status_stream_returns_404_when_job_missing(self, client: TestClient):
+        """SSE endpoint should return HTTP 404 for missing jobs."""
+        with patch("routes._resolve_export_status", return_value=None):
+            response = client.get(f"{API_PREFIX}/exports/job-missing/stream")
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Export job not found"

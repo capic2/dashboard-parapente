@@ -77,8 +77,9 @@ export function formatEta(etaSeconds?: number): string | null {
     return '< 1 min';
   }
 
-  const hours = Math.floor(etaSeconds / 3600);
-  const minutes = Math.ceil((etaSeconds % 3600) / 60);
+  const totalMinutes = Math.ceil(etaSeconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
 
   if (hours <= 0) {
     return `${minutes} min`;

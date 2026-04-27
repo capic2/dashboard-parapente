@@ -3947,24 +3947,18 @@ def get_video_export_status(job_id: str):
 async def stream_video_export_status(job_id: str, request: Request) -> StreamingResponse:
     """Stream export status updates through Server-Sent Events."""
 
+    initial_status = await asyncio.to_thread(_resolve_export_status, job_id)
+    if not initial_status:
+        raise HTTPException(status_code=404, detail="Export job not found")
+
     async def event_stream():
         yield "retry: 3000\n\n"
 
         heartbeat_tick = 0
         last_serialized = ""
+        status = initial_status
 
         while True:
-            status = _resolve_export_status(job_id)
-            if not status:
-                yield serialize_sse_event(
-                    "error",
-                    {
-                        "job_id": job_id,
-                        "detail": "Export job not found",
-                    },
-                )
-                break
-
             serialized = json.dumps(status, sort_keys=True)
             if serialized != last_serialized:
                 yield serialize_sse_event("status", status)
@@ -3974,16 +3968,27 @@ async def stream_video_export_status(job_id: str, request: Request) -> Streaming
                 break
 
             try:
-                await asyncio.wait_for(request.is_disconnected(), timeout=1)
+                await asyncio.wait_for(request.is_disconnected(), timeout=2)
                 break
             except TimeoutError:
                 heartbeat_tick += 1
-                if heartbeat_tick >= 20:
+                if heartbeat_tick >= 10:
                     yield serialize_sse_event(
                         "ping",
                         {"timestamp": datetime.now(timezone.utc).isoformat()},
                     )
                     heartbeat_tick = 0
+
+            status = await asyncio.to_thread(_resolve_export_status, job_id)
+            if not status:
+                yield serialize_sse_event(
+                    "error",
+                    {
+                        "job_id": job_id,
+                        "detail": "Export job no longer available",
+                    },
+                )
+                break
 
     return StreamingResponse(
         event_stream(),

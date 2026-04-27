@@ -40,6 +40,8 @@ describe('formatEta', () => {
     expect(formatEta(-1)).toBeNull();
     expect(formatEta(30)).toBe('< 1 min');
     expect(formatEta(300)).toBe('5 min');
+    expect(formatEta(3599)).toBe('1 h 00 min');
     expect(formatEta(3900)).toBe('1 h 05 min');
+    expect(formatEta(7199)).toBe('2 h 00 min');
   });
 });

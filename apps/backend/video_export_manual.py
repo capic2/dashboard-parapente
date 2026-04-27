@@ -9,7 +9,6 @@ worker while keeping a small in-memory status snapshot for compatibility.
 import asyncio
 import json
 import shutil
-import subprocess
 import threading
 import uuid
 import traceback
@@ -411,6 +410,8 @@ def _parse_ffmpeg_out_time_seconds(line: str) -> float | None:
     key, raw_value = line.split("=", 1)
     value = raw_value.strip()
 
+    # FFmpeg uses a historical misnomer: out_time_ms is also reported in microseconds.
+    # Keep division by 1_000_000 for both keys (not 1_000).
     if key == "out_time_ms" and value.isdigit():
         return int(value) / 1_000_000
 
@@ -912,12 +913,10 @@ async def _export_video_manual_render(job_id: str):
             ]
 
             print(f"🎬 FFmpeg command: {' '.join(ffmpeg_cmd)}")
-            process = subprocess.Popen(
-                ffmpeg_cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1,
+            process = await asyncio.create_subprocess_exec(
+                *ffmpeg_cmd,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
             )
 
             encoding_started_at = time.time()
@@ -928,55 +927,75 @@ async def _export_video_manual_render(job_id: str):
             try:
                 assert process.stderr is not None
                 while True:
+                    if _is_cancelled(job_id):
+                        process.kill()
+                        await process.wait()
+                        _cleanup_frames(frames_dir)
+                        _update_job(
+                            job_id,
+                            status=_STATUS_CANCELLED,
+                            message="Export cancelled during encoding",
+                        )
+                        return
+
                     if time.time() - encoding_started_at > ffmpeg_timeout_seconds:
                         process.kill()
+                        await process.wait()
                         raise Exception(
                             f"FFmpeg timeout after {ffmpeg_timeout_seconds}s: {' '.join(ffmpeg_cmd)}"
                         )
 
-                    line = process.stderr.readline()
-                    if line:
-                        ffmpeg_stderr.append(line)
-                        encoded_seconds = _parse_ffmpeg_out_time_seconds(line.strip())
+                    try:
+                        line_bytes = await asyncio.wait_for(process.stderr.readline(), timeout=1.0)
+                    except TimeoutError:
+                        if process.returncode is not None:
+                            break
+                        continue
 
-                        if encoded_seconds is not None:
-                            progress = _encoding_progress_percent(
-                                encoded_seconds,
-                                total_duration_seconds,
-                            )
-                            elapsed_encoding = max(time.time() - encoding_started_at, 1e-6)
-                            encoding_speed = encoded_seconds / elapsed_encoding
-                            remaining = max(total_duration_seconds - encoded_seconds, 0.0)
-                            eta_seconds = (
-                                max(0, int(remaining / encoding_speed))
-                                if encoding_speed > 0
-                                else None
-                            )
+                    if not line_bytes:
+                        if process.returncode is not None:
+                            break
+                        continue
 
-                            _set_job_runtime(
-                                job_id,
-                                phase=_STATUS_ENCODING,
-                                eta_seconds=eta_seconds,
-                                encoded_seconds=round(encoded_seconds, 2),
-                            )
-                            _update_job(
-                                job_id,
-                                status=_STATUS_ENCODING,
-                                progress=progress,
-                                message=(
-                                    f"Encoding {int(min(max((encoded_seconds / total_duration_seconds) * 100, 0), 100))}%"
-                                ),
-                            )
+                    line = line_bytes.decode("utf-8", errors="replace").strip()
+                    ffmpeg_stderr.append(line)
+                    encoded_seconds = _parse_ffmpeg_out_time_seconds(line)
 
-                    if process.poll() is not None:
-                        break
+                    if encoded_seconds is not None:
+                        progress = _encoding_progress_percent(
+                            encoded_seconds,
+                            total_duration_seconds,
+                        )
+                        elapsed_encoding = max(time.time() - encoding_started_at, 1e-6)
+                        encoding_speed = encoded_seconds / elapsed_encoding
+                        remaining = max(total_duration_seconds - encoded_seconds, 0.0)
+                        eta_seconds = (
+                            max(0, int(remaining / encoding_speed)) if encoding_speed > 0 else None
+                        )
 
-                if process.returncode != 0:
-                    stderr_output = "".join(ffmpeg_stderr).strip()
+                        _set_job_runtime(
+                            job_id,
+                            phase=_STATUS_ENCODING,
+                            eta_seconds=eta_seconds,
+                            encoded_seconds=round(encoded_seconds, 2),
+                        )
+                        _update_job(
+                            job_id,
+                            status=_STATUS_ENCODING,
+                            progress=progress,
+                            message=(
+                                f"Encoding {int(min(max((encoded_seconds / total_duration_seconds) * 100, 0), 100))}%"
+                            ),
+                        )
+
+                return_code = await process.wait()
+                if return_code != 0:
+                    stderr_output = "\n".join(ffmpeg_stderr).strip()
                     raise Exception(f"FFmpeg encoding failed: {stderr_output}")
             finally:
-                if process.stderr:
-                    process.stderr.close()
+                if process.returncode is None:
+                    process.kill()
+                    await process.wait()
 
             print(f"✅ Video encoded: {output_file}")
 
