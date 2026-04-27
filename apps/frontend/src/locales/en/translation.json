@@ -607,6 +607,8 @@
       "videoRegenerateTitle": "Restart generation",
       "videoGenerateTitle": "Generate flight video",
       "videoGenerating": "Generation in progress...",
+      "videoProgress": "Progress",
+      "videoEta": "Estimated remaining: {{time}}",
       "downloadVideo": "Download video",
       "regenerateVideo": "Restart generation",
       "generateVideo": "Generate video",

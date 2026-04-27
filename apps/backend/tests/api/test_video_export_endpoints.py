@@ -187,3 +187,31 @@ class TestExportStatusAndCancel:
             assert response.content == b"dummy video bytes"
         finally:
             Path(video_path).unlink(missing_ok=True)
+
+    def test_export_status_stream_sends_sse_status_event(self, client: TestClient):
+        """SSE endpoint should emit status events for active jobs."""
+        active_status = {
+            "job_id": "job-stream-1",
+            "status": "processing",
+            "internal_status": "capturing",
+            "progress": 44,
+            "message": "Captured 44/100 frames",
+        }
+        completed_status = {
+            "job_id": "job-stream-1",
+            "status": "completed",
+            "internal_status": "completed",
+            "progress": 100,
+            "message": "Video ready",
+        }
+
+        with patch(
+            "routes._resolve_export_status",
+            side_effect=[active_status, completed_status],
+        ):
+            response = client.get(f"{API_PREFIX}/exports/job-stream-1/stream")
+
+        assert response.status_code == 200
+        assert "retry: 3000" in response.text
+        assert "event: status" in response.text
+        assert '"progress": 44' in response.text

@@ -607,6 +607,8 @@
       "videoRegenerateTitle": "Relancer la génération",
       "videoGenerateTitle": "Générer la vidéo du vol",
       "videoGenerating": "Génération en cours...",
+      "videoProgress": "Progression",
+      "videoEta": "Temps restant estimé : {{time}}",
       "downloadVideo": "Télécharger la vidéo",
       "regenerateVideo": "Relancer la génération",
       "generateVideo": "Générer la vidéo",
