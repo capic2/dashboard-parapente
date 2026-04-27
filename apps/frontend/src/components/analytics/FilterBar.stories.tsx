@@ -2,6 +2,7 @@ import preview from '../../../.storybook/preview';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FilterBar } from './FilterBar';
 import { Site } from '@dashboard-parapente/shared-types';
+import { expect, fn } from 'storybook/test';
 
 const meta = preview.meta({
   title: 'Components/Stats/FilterBar',
@@ -87,6 +88,13 @@ export const Default = meta.story({
   name: 'Default',
   args: {
     sites: defaultSites,
+    filters: {
+      siteId: null,
+      dateFrom: null,
+      dateTo: null,
+    },
+    onFiltersChange: fn(),
+    onResetFilters: fn(),
   },
 });
 
@@ -94,6 +102,13 @@ export const NoSites = meta.story({
   name: 'No Sites',
   args: {
     sites: noSites,
+    filters: {
+      siteId: null,
+      dateFrom: null,
+      dateTo: null,
+    },
+    onFiltersChange: fn(),
+    onResetFilters: fn(),
   },
 });
 
@@ -101,5 +116,22 @@ export const Loading = meta.story({
   name: 'Loading',
   args: {
     sites: [],
+    filters: {
+      siteId: null,
+      dateFrom: null,
+      dateTo: null,
+    },
+    onFiltersChange: fn(),
+    onResetFilters: fn(),
   },
 });
+
+Default.test(
+  'calls reset handler on reset button click',
+  async ({ canvas, userEvent, args }) => {
+    await userEvent.click(
+      canvas.getByRole('button', { name: /(réinitialiser|reset)/i })
+    );
+    await expect(args.onResetFilters).toHaveBeenCalledTimes(1);
+  }
+);

@@ -97,9 +97,28 @@ const defaultHandlers = [
   http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
 ];
 
+const analyticsRouteConfig = {
+  initialPath: '/analytics',
+  routes: [
+    {
+      path: '/analytics',
+      element: 'story' as const,
+      validateSearch: (search: Record<string, unknown>) => ({
+        siteId: typeof search.siteId === 'string' ? search.siteId : undefined,
+        dateFrom:
+          typeof search.dateFrom === 'string' ? search.dateFrom : undefined,
+        dateTo: typeof search.dateTo === 'string' ? search.dateTo : undefined,
+      }),
+    },
+  ],
+};
+
 export const Default = meta.story({
   name: 'Default',
-  parameters: { msw: { handlers: defaultHandlers } },
+  parameters: {
+    router: analyticsRouteConfig,
+    msw: { handlers: defaultHandlers },
+  },
 });
 
 Default.test('renders analytics page with title', async ({ canvas }) => {
@@ -109,6 +128,7 @@ Default.test('renders analytics page with title', async ({ canvas }) => {
 export const Loading = meta.story({
   name: 'Loading',
   parameters: {
+    router: analyticsRouteConfig,
     msw: {
       handlers: [
         http.get('*/api/flights/stats', async () => {
