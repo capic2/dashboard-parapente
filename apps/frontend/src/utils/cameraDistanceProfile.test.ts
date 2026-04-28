@@ -70,5 +70,23 @@ describe('getFlightCameraDistance', () => {
         transitionPercent: 100,
       })
     ).toBe(300);
+
+    expect(
+      getFlightCameraDistance({
+        progress: 0.2,
+        baseDistance: 1000,
+        closeZoomPercent: 75,
+        transitionPercent: 100,
+      })
+    ).toBe(875);
+
+    expect(
+      getFlightCameraDistance({
+        progress: 0.02,
+        baseDistance: 1000,
+        closeZoomPercent: 75,
+        transitionPercent: 0,
+      })
+    ).toBe(1000);
   });
 });

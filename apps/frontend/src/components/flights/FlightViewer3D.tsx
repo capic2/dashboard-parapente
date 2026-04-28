@@ -1854,11 +1854,15 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                       </div>
 
                       <div className="mb-2">
-                        <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">
+                        <label
+                          htmlFor="camera-close-zoom-slider"
+                          className="block text-xs text-gray-600 dark:text-gray-300 mb-1"
+                        >
                           {t('editSite.closeZoom')}:{' '}
                           {tempCameraCloseZoomPercent}%
                         </label>
                         <input
+                          id="camera-close-zoom-slider"
                           type="range"
                           min="30"
                           max="100"
@@ -1879,11 +1883,15 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                       </div>
 
                       <div className="mb-2">
-                        <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">
+                        <label
+                          htmlFor="camera-transition-slider"
+                          className="block text-xs text-gray-600 dark:text-gray-300 mb-1"
+                        >
                           {t('editSite.transition')}:{' '}
                           {tempCameraTransitionPercent}%
                         </label>
                         <input
+                          id="camera-transition-slider"
                           type="range"
                           min="1"
                           max="40"

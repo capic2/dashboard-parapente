@@ -285,6 +285,16 @@ class TestUpdateSiteEndpoint:
 
         assert response.status_code == 400
 
+        response = client.patch(
+            f"{API_PREFIX}/sites/site-arguel/camera?transition_percent=0"
+        )
+        assert response.status_code == 400
+
+        response = client.patch(
+            f"{API_PREFIX}/sites/site-arguel/camera?transition_percent=41"
+        )
+        assert response.status_code == 400
+
     def test_update_site_multiple_fields(self, client, db_session, arguel_site):
         """PATCH /sites/{site_id} updates multiple fields"""
         response = client.patch(
