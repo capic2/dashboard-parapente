@@ -686,6 +686,8 @@
     "camera3D": "Position Caméra 3D",
     "angle": "Angle",
     "distance": "Distance",
+    "closeZoom": "Zoom décollage/atterrissage",
+    "transition": "Transition zoom",
     "description": "Description",
     "additionalInfo": "Informations complémentaires sur le site...",
     "saving": "Enregistrement...",

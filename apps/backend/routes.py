@@ -783,6 +783,8 @@ def update_site_camera(
     site_id: str,
     angle: int | None = None,
     distance: int | None = None,
+    close_zoom_percent: int | None = None,
+    transition_percent: int | None = None,
     db: Session = Depends(get_db),
 ):
     """
@@ -792,6 +794,8 @@ def update_site_camera(
         site_id: Site ID
         angle: Camera angle in degrees (0-360) - where to position camera relative to takeoff
         distance: Camera distance from takeoff in meters (default: 500)
+        close_zoom_percent: Percentage of distance used near takeoff and landing (30-100)
+        transition_percent: Percentage of flight used to transition camera distance (1-40)
 
     Returns:
         Updated site camera settings
@@ -819,6 +823,20 @@ def update_site_camera(
             )
         site.camera_distance = distance
 
+    if close_zoom_percent is not None:
+        if close_zoom_percent < 30 or close_zoom_percent > 100:
+            raise HTTPException(
+                status_code=400, detail="Close zoom percent must be between 30 and 100"
+            )
+        site.camera_close_zoom_percent = close_zoom_percent
+
+    if transition_percent is not None:
+        if transition_percent < 1 or transition_percent > 40:
+            raise HTTPException(
+                status_code=400, detail="Transition percent must be between 1 and 40"
+            )
+        site.camera_transition_percent = transition_percent
+
     site.updated_at = datetime.utcnow()
 
     try:
@@ -834,6 +852,8 @@ def update_site_camera(
             "name": site.name,
             "camera_angle": site.camera_angle,
             "camera_distance": site.camera_distance,
+            "camera_close_zoom_percent": site.camera_close_zoom_percent,
+            "camera_transition_percent": site.camera_transition_percent,
             "message": "Camera settings updated successfully",
         }
     except Exception as e:
@@ -2686,6 +2706,8 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
                 "orientation": site.orientation,
                 "camera_angle": site.camera_angle,
                 "camera_distance": site.camera_distance,
+                "camera_close_zoom_percent": site.camera_close_zoom_percent,
+                "camera_transition_percent": site.camera_transition_percent,
                 "latitude": site.latitude,
                 "longitude": site.longitude,
                 "elevation_m": site.elevation_m,
