@@ -72,6 +72,7 @@ from video_export_manual import get_export_status as get_export_status_manual
 from video_export_manual import list_exports as list_exports_manual
 from video_export_manual import resolve_frontend_url
 from video_export_manual import start_video_export_manual
+from video_export_manual import start_video_export_manual_fast
 from versioning import get_version_payload
 from weather_pipeline import get_daily_aggregate, get_normalized_forecast
 
@@ -95,6 +96,14 @@ def _start_video_export_stream(
     return start_video_export_background(
         flight_id=flight_id, quality=quality, fps=fps, speed=speed, frontend_url=frontend_url
     )
+
+
+def _video_export_mode_label(mode: str) -> str:
+    if mode == "stream":
+        return "media stream"
+    if mode == "manual_fast":
+        return "manual fast render"
+    return "manual render"
 
 
 def _ensure_no_active_export(flight: Flight):
@@ -3780,7 +3789,7 @@ def start_flight_video_export(
     quality: str = "1080p",
     fps: int = 15,
     speed: int = 1,
-    mode: str = "manual",  # "manual" (Cesium manual render) or "stream" (MediaRecorder)
+    mode: str = "manual",  # "manual", "manual_fast", or "stream"
     db: Session = Depends(get_db),
 ):
     """
@@ -3788,6 +3797,7 @@ def start_flight_video_export(
 
     Modes:
     - manual: Cesium manual render (frame-by-frame, perfect quality, slow ~90min)
+    - manual_fast: deterministic frame screenshots without realtime playback waits
     - stream: MediaRecorder (realtime capture, fast ~8min, may stutter)
 
     Returns job_id to track progress
@@ -3795,8 +3805,11 @@ def start_flight_video_export(
     logger.info(f"🎥 Video export requested: flight_id={flight_id}, mode={mode}")
 
     selected_mode = mode.lower().strip()
-    if selected_mode not in ["manual", "stream"]:
-        raise HTTPException(status_code=400, detail="mode must be 'manual' or 'stream'")
+    if selected_mode not in ["manual", "manual_fast", "stream"]:
+        raise HTTPException(
+            status_code=400,
+            detail="mode must be 'manual', 'manual_fast' or 'stream'",
+        )
 
     # Verify flight exists
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
@@ -3815,10 +3828,18 @@ def start_flight_video_export(
     job_id: str
     effective_mode = selected_mode
 
-    if selected_mode == "manual":
-        logger.info("Using Cesium Manual Render (slow but perfect quality)")
+    if selected_mode in {"manual", "manual_fast"}:
+        logger.info(
+            "Using Cesium %s",
+            "Manual Fast Render" if selected_mode == "manual_fast" else "Manual Render",
+        )
         try:
-            job_id = start_video_export_manual(
+            start_manual_export = (
+                start_video_export_manual_fast
+                if selected_mode == "manual_fast"
+                else start_video_export_manual
+            )
+            job_id = start_manual_export(
                 flight_id=flight_id,
                 quality=quality,
                 fps=fps,
@@ -3828,19 +3849,32 @@ def start_flight_video_export(
             )
         except Exception as e:
             logger.warning(
-                "⚠️ Manual export failed, falling back to stream for flight %s: %s",
+                "⚠️ %s export failed, falling back to %s for flight %s: %s",
+                selected_mode,
+                "manual" if selected_mode == "manual_fast" else "stream",
                 flight_id,
                 e,
             )
-            job_id = _start_video_export_stream(
-                flight_id=flight_id,
-                quality=quality,
-                fps=fps,
-                speed=speed,
-                frontend_url=frontend_url,
-            )
-            effective_mode = "stream"
-            _mark_flight_export_processing(db=db, flight=flight, job_id=job_id)
+            if selected_mode == "manual_fast":
+                job_id = start_video_export_manual(
+                    flight_id=flight_id,
+                    quality=quality,
+                    fps=fps,
+                    speed=speed,
+                    frontend_url=frontend_url,
+                    auth_token=_extract_bearer_token(request),
+                )
+                effective_mode = "manual"
+            else:
+                job_id = _start_video_export_stream(
+                    flight_id=flight_id,
+                    quality=quality,
+                    fps=fps,
+                    speed=speed,
+                    frontend_url=frontend_url,
+                )
+                effective_mode = "stream"
+                _mark_flight_export_processing(db=db, flight=flight, job_id=job_id)
 
     else:  # stream mode
         logger.info("Using MediaRecorder stream (fast but may stutter)")
@@ -3856,7 +3890,7 @@ def start_flight_video_export(
 
     return {
         "job_id": job_id,
-        "message": f"Video export started ({'media stream' if effective_mode == 'stream' else 'manual render'})",
+        "message": f"Video export started ({_video_export_mode_label(effective_mode)})",
         "mode": effective_mode,
         "status_url": f"/api/exports/{job_id}/status",
     }
