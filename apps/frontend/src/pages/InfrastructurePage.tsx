@@ -751,19 +751,12 @@ function GroupSection({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
-      <div
-        className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-        onClick={onToggle}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onToggle();
-          }
-        }}
-      >
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+        <Button
+          onPress={onToggle}
+          tone="ghost"
+          className="flex-1 flex items-center gap-3 min-w-0 justify-start"
+        >
           <span
             className={`text-gray-400 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
           >
@@ -775,16 +768,14 @@ function GroupSection({
           <span className="text-xs bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 px-2 py-0.5 rounded-full">
             {group.count}
           </span>
-        </div>
-        <div onClick={(e) => e.stopPropagation()}>
-          <Button
-            onPress={onClearPattern}
-            isDisabled={isPending}
-            className="px-3 py-2 sm:px-2 sm:py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
-          >
-            {t('cache.clearPattern')}
-          </Button>
-        </div>
+        </Button>
+        <Button
+          onPress={onClearPattern}
+          isDisabled={isPending}
+          className="px-3 py-2 sm:px-2 sm:py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
+        >
+          {t('cache.clearPattern')}
+        </Button>
       </div>
 
       {isExpanded && (

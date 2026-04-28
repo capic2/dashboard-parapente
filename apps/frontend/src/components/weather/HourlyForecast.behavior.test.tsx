@@ -59,7 +59,19 @@ vi.mock('react-aria-components', async () => {
     </div>
   );
 
-  return { TooltipTrigger, Tooltip };
+  const Button = ({
+    children,
+    onPress,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    onPress?: () => void;
+  }) => (
+    <button type="button" onClick={onPress} {...props}>
+      {children}
+    </button>
+  );
+
+  return { Button, TooltipTrigger, Tooltip };
 });
 
 vi.mock('../../hooks/weather/useWeather', () => ({

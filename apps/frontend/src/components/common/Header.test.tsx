@@ -1,4 +1,4 @@
-import { render, within, fireEvent } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore } from '../../stores/themeStore';
@@ -51,23 +51,71 @@ vi.mock('@tanstack/react-router', () => ({
   useMatchRoute: () => false,
 }));
 
-vi.mock('react-aria-components', () => {
-  const MockCloseButton = ({
+vi.mock('react-aria-components', async () => {
+  const React = await import('react');
+
+  const MockButton = ({
     children,
+    onPress,
     ...props
-  }: React.ButtonHTMLAttributes<HTMLButtonElement>) => {
-    return <button {...props}>{children}</button>;
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    onPress?: () => void;
+  }) => {
+    return (
+      <button type="button" onClick={onPress} {...props}>
+        {children}
+      </button>
+    );
+  };
+
+  const MenuTrigger = ({ children }: { children: React.ReactNode }) => {
+    const [open, setOpen] = React.useState(false);
+    const childArray = React.Children.toArray(children);
+    const trigger = childArray[0];
+
+    return (
+      <div>
+        {React.isValidElement<React.ButtonHTMLAttributes<HTMLButtonElement>>(
+          trigger
+        )
+          ? React.cloneElement(trigger, {
+              onClick: () => setOpen((current) => !current),
+            })
+          : trigger}
+        {open ? childArray[1] : null}
+      </div>
+    );
+  };
+
+  const MenuItem = ({
+    children,
+    onAction,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    onAction?: () => void;
+  }) => {
+    return (
+      <button type="button" onClick={onAction} {...props}>
+        {children}
+      </button>
+    );
   };
 
   return {
-    Button: MockCloseButton,
+    Button: MockButton,
     DialogTrigger: ({ children }: { children: React.ReactNode }) => (
       <div>{children}</div>
     ),
+    Menu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    MenuItem,
+    MenuTrigger,
     Modal: ({ children }: { children: React.ReactNode }) => (
       <div>{children}</div>
     ),
     ModalOverlay: ({ children }: { children: React.ReactNode }) => (
+      <div>{children}</div>
+    ),
+    Popover: ({ children }: { children: React.ReactNode }) => (
       <div>{children}</div>
     ),
     Dialog: ({
@@ -97,15 +145,17 @@ describe('Header theme controls', () => {
   });
 
   it('opens the desktop theme selector and applies dark mode', () => {
-    const { container } = render(<Header />);
-    const desktopThemeSelector = container.querySelector(
-      '[data-theme-selector="desktop"]'
-    ) as HTMLElement;
-    const desktopButton = within(desktopThemeSelector).getByRole('button');
+    render(<Header />);
+    const themeButtons = screen.getAllByRole('button', {
+      name: /Theme : Light/,
+    });
+    expect(themeButtons).toHaveLength(2);
+    const desktopButton = themeButtons[0];
+    if (!desktopButton) throw new Error('Desktop theme button not found');
 
     fireEvent.click(desktopButton);
 
-    const darkOption = within(desktopThemeSelector).getByRole('button', {
+    const darkOption = screen.getByRole('button', {
       name: '🌙 Dark',
     });
     fireEvent.click(darkOption);
@@ -114,17 +164,17 @@ describe('Header theme controls', () => {
   });
 
   it('opens the mobile theme selector and applies auto mode', () => {
-    const { container } = render(<Header />);
-    const mobileThemeSelector = container.querySelector(
-      '[data-theme-selector="mobile"]'
-    ) as HTMLElement;
-    const mobileButton = within(mobileThemeSelector).getByRole('button', {
-      name: /Theme/,
+    render(<Header />);
+    const themeButtons = screen.getAllByRole('button', {
+      name: /Theme : Light/,
     });
+    expect(themeButtons).toHaveLength(2);
+    const mobileButton = themeButtons[1];
+    if (!mobileButton) throw new Error('Mobile theme button not found');
 
     fireEvent.click(mobileButton);
 
-    const autoOption = within(mobileThemeSelector).getByRole('button', {
+    const autoOption = screen.getByRole('button', {
       name: '🔄 Auto',
     });
     fireEvent.click(autoOption);
