@@ -8,7 +8,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { TextField, TextArea } from 'react-aria-components';
+import { Tab, TabList, TabPanel, Tabs, TextField, TextArea } from 'react-aria-components';
 import { Button } from '@dashboard-parapente/design-system';
 import {
   useUpdateFlight,
@@ -371,49 +371,47 @@ export function FlightDetails({
       <div className="space-y-4">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
           <div className="flex items-center gap-2 mb-4">
-            <button
-              type="button"
-              className="px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md"
-              onClick={onCloseMobile}
+            <Button
+              tone="secondary"
+              size="sm"
+              className="px-3 py-2 text-sm"
+              onPress={onCloseMobile}
             >
               {t('flights.backToList')}
-            </button>
+            </Button>
             <h2 className="text-base font-bold text-gray-900 dark:text-white truncate">
               {flightTitle}
             </h2>
           </div>
-
-          <div className="grid grid-cols-2 gap-2 mb-4" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'infos'}
-              className={`px-3 py-2 text-sm rounded-md transition-colors ${
-                activeTab === 'infos'
-                  ? 'bg-sky-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
-              }`}
-              onClick={() => setActiveTab('infos')}
-            >
-              {t('flights.infoTab')}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'replay'}
-              className={`px-3 py-2 text-sm rounded-md transition-colors ${
-                activeTab === 'replay'
-                  ? 'bg-sky-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
-              }`}
-              onClick={() => setActiveTab('replay')}
-            >
-              {t('flights.replayTab')}
-            </button>
-          </div>
         </div>
 
-        {activeTab === 'infos' ? infoCard : replayCard}
+        <Tabs
+          selectedKey={activeTab}
+          onSelectionChange={(key) => setActiveTab(key as FlightDetailsTab)}
+          className="space-y-4"
+        >
+          <TabList className="grid grid-cols-2 gap-2 mb-4 bg-white dark:bg-gray-800 rounded-xl p-2 shadow-md">
+            <Tab
+              id="infos"
+              className="px-3 py-2 text-sm rounded-md transition-colors cursor-pointer bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 selected:bg-sky-600 selected:text-white outline-none"
+            >
+              {t('flights.infoTab')}
+            </Tab>
+            <Tab
+              id="replay"
+              className="px-3 py-2 text-sm rounded-md transition-colors cursor-pointer bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 selected:bg-sky-600 selected:text-white outline-none"
+            >
+              {t('flights.replayTab')}
+            </Tab>
+          </TabList>
+
+          <TabPanel id="infos" className="outline-none">
+            {infoCard}
+          </TabPanel>
+          <TabPanel id="replay" className="outline-none">
+            {replayCard}
+          </TabPanel>
+        </Tabs>
       </div>
     );
   }

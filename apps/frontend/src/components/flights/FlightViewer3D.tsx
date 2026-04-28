@@ -36,6 +36,7 @@ import { api } from '../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '@dashboard-parapente/design-system';
+import { Disclosure, DisclosurePanel } from 'react-aria-components';
 import { HTTPError } from 'ky';
 import { useTranslation } from 'react-i18next';
 
@@ -110,27 +111,34 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
   defaultOpen = false,
   children,
 }) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-
   return (
-    <div className="border-b border-gray-200 dark:border-gray-700 last:border-0">
-      <Button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between py-2 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded"
-      >
-        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-          {emoji && <span className="mr-1.5">{emoji}</span>}
-          {title}
-        </span>
-        <span
-          className="text-gray-400 dark:text-gray-400 text-xs transition-transform"
-          style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}
-        >
-          ▶
-        </span>
-      </Button>
-      {isOpen && <div className="pb-3 pt-1 space-y-3">{children}</div>}
-    </div>
+    <Disclosure
+      defaultExpanded={defaultOpen}
+      className="border-b border-gray-200 dark:border-gray-700 last:border-0"
+    >
+      {({ isExpanded }) => (
+        <>
+          <Button
+            slot="trigger"
+            className="w-full flex items-center justify-between py-2 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded"
+          >
+            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              {emoji && <span className="mr-1.5">{emoji}</span>}
+              {title}
+            </span>
+            <span
+              className="text-gray-400 dark:text-gray-400 text-xs transition-transform"
+              style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
+            >
+              ▶
+            </span>
+          </Button>
+          <DisclosurePanel className="pb-3 pt-1 space-y-3">
+            {children}
+          </DisclosurePanel>
+        </>
+      )}
+    </Disclosure>
   );
 };
 
