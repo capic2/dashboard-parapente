@@ -283,6 +283,10 @@ class TestUpdateSiteEndpoint:
 
         assert response.status_code == 400
 
+        response = client.patch(f"{API_PREFIX}/sites/site-arguel/camera?close_zoom_percent=101")
+
+        assert response.status_code == 400
+
         response = client.patch(f"{API_PREFIX}/sites/site-arguel/camera?transition_percent=0")
         assert response.status_code == 400
 
