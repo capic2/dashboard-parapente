@@ -1464,11 +1464,32 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             flight.video_export_status === 'completed' &&
                             flight.video_file_path
                           ) {
-                            // Download video
-                            window.open(
-                              `/api/exports/${flight.video_export_job_id}/download`,
-                              '_blank'
-                            );
+                            // Download video with authenticated API client
+                            try {
+                              const blob = await api
+                                .get(
+                                  `exports/${flight.video_export_job_id}/download`
+                                )
+                                .blob();
+
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `flight-${flightId}.mp4`;
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            } catch (error) {
+                              if (error instanceof HTTPError) {
+                                const detail = await getHttpErrorDetail(error);
+                                toast.error(
+                                  detail || t('flights.viewer.videoDownloadError')
+                                );
+                                return;
+                              }
+
+                              console.error('Failed to download video:', error);
+                              toast.error(t('flights.viewer.videoDownloadError'));
+                            }
                           } else if (
                             !flight.video_export_status ||
                             flight.video_export_status === 'failed'
