@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAuthStore } from '../../stores/authStore';
 
 export type VideoExportPhase =
   | 'queued'
@@ -90,6 +91,7 @@ export function formatEta(etaSeconds?: number): string | null {
 
 export function useVideoExportStatus(jobId?: string | null, enabled = true) {
   const [state, setState] = useState<HookState>(initialState);
+  const token = useAuthStore((s) => s.token);
 
   useEffect(() => {
     setState(initialState);
@@ -98,7 +100,12 @@ export function useVideoExportStatus(jobId?: string | null, enabled = true) {
       return;
     }
 
-    const eventSource = new EventSource(`/api/exports/${jobId}/stream`);
+    const streamUrl = new URL(`/api/exports/${jobId}/stream`, window.location.origin);
+    if (token) {
+      streamUrl.searchParams.set('access_token', token);
+    }
+
+    const eventSource = new EventSource(streamUrl.toString());
 
     const handleStatusEvent = (event: MessageEvent<string>) => {
       let parsed: unknown;
@@ -136,7 +143,7 @@ export function useVideoExportStatus(jobId?: string | null, enabled = true) {
       eventSource.removeEventListener('error', handleError);
       eventSource.close();
     };
-  }, [enabled, jobId]);
+  }, [enabled, jobId, token]);
 
   return state;
 }

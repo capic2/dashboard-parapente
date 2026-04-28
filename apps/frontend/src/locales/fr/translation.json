@@ -602,6 +602,7 @@
       "videoSection": "Vidéo",
       "videoStartError": "Impossible de lancer la génération",
       "videoStartGenericError": "Erreur lors du lancement de la génération",
+      "videoDownloadError": "Impossible de télécharger la vidéo",
       "videoGeneratingTitle": "Génération vidéo en cours... (~60-90 min)",
       "videoDownloadTitle": "Télécharger la vidéo",
       "videoRegenerateTitle": "Relancer la génération",
