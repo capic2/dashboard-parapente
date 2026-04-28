@@ -1,4 +1,4 @@
-import { render, within, fireEvent } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore } from '../../stores/themeStore';
@@ -145,15 +145,14 @@ describe('Header theme controls', () => {
   });
 
   it('opens the desktop theme selector and applies dark mode', () => {
-    const { container } = render(<Header />);
-    const desktopThemeSelector = container.querySelector(
-      '[data-theme-selector="desktop"]'
-    ) as HTMLElement;
-    const desktopButton = within(desktopThemeSelector).getByRole('button');
+    render(<Header />);
+    const desktopButton = screen.getAllByRole('button', {
+      name: /Theme : Light/,
+    })[0]!;
 
     fireEvent.click(desktopButton);
 
-    const darkOption = within(desktopThemeSelector).getByRole('button', {
+    const darkOption = screen.getByRole('button', {
       name: '🌙 Dark',
     });
     fireEvent.click(darkOption);
@@ -162,17 +161,14 @@ describe('Header theme controls', () => {
   });
 
   it('opens the mobile theme selector and applies auto mode', () => {
-    const { container } = render(<Header />);
-    const mobileThemeSelector = container.querySelector(
-      '[data-theme-selector="mobile"]'
-    ) as HTMLElement;
-    const mobileButton = within(mobileThemeSelector).getByRole('button', {
-      name: /Theme/,
-    });
+    render(<Header />);
+    const mobileButton = screen.getAllByRole('button', {
+      name: /Theme : Light/,
+    })[1]!;
 
     fireEvent.click(mobileButton);
 
-    const autoOption = within(mobileThemeSelector).getByRole('button', {
+    const autoOption = screen.getByRole('button', {
       name: '🔄 Auto',
     });
     fireEvent.click(autoOption);
