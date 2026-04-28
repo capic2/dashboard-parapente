@@ -35,6 +35,8 @@ class SiteUpdate(BaseModel):
     orientation: str | None = None
     camera_angle: int | None = None
     camera_distance: int | None = None
+    camera_close_zoom_percent: int | None = None
+    camera_transition_percent: int | None = None
     usage_type: Literal["takeoff", "landing", "both"] | None = None
 
     @validator("latitude")
@@ -61,6 +63,18 @@ class SiteUpdate(BaseModel):
             raise ValueError("Camera distance must be between 50 and 5000 meters")
         return v
 
+    @validator("camera_close_zoom_percent")
+    def validate_camera_close_zoom_percent(cls, v):
+        if v is not None and not 30 <= v <= 100:
+            raise ValueError("Camera close zoom percent must be between 30 and 100")
+        return v
+
+    @validator("camera_transition_percent")
+    def validate_camera_transition_percent(cls, v):
+        if v is not None and not 1 <= v <= 40:
+            raise ValueError("Camera transition percent must be between 1 and 40")
+        return v
+
     @validator("orientation")
     def validate_orientation(cls, v):
         if v is not None and v not in ["N", "NE", "E", "SE", "S", "SW", "W", "NW", ""]:
@@ -74,6 +88,8 @@ class Site(SiteBase):
     orientation: str | None = None  # N, NW, W, S, etc.
     camera_angle: int | None = None  # Camera angle in degrees (0-360)
     camera_distance: int | None = 500  # Camera distance from takeoff in meters
+    camera_close_zoom_percent: int | None = 75
+    camera_transition_percent: int | None = 12
     linked_spot_id: str | None = None  # Link to paragliding_spots table
     flight_count: int | None = 0  # Number of flights at this site
     created_at: datetime | None = None

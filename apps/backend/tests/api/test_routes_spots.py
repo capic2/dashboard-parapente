@@ -261,6 +261,30 @@ class TestUpdateSiteEndpoint:
         )
         assert response.status_code in [200, 400, 404, 422]
 
+    def test_update_site_camera_zoom_settings(self, client, db_session, arguel_site):
+        """PATCH /sites/{site_id}/camera updates replay zoom settings"""
+        response = client.patch(
+            f"{API_PREFIX}/sites/site-arguel/camera"
+            "?angle=180&distance=800&close_zoom_percent=70&transition_percent=15"
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["camera_angle"] == 180
+        assert body["camera_distance"] == 800
+        assert body["camera_close_zoom_percent"] == 70
+        assert body["camera_transition_percent"] == 15
+
+    def test_update_site_camera_zoom_settings_validates_bounds(
+        self, client, db_session, arguel_site
+    ):
+        """PATCH /sites/{site_id}/camera rejects invalid replay zoom settings"""
+        response = client.patch(
+            f"{API_PREFIX}/sites/site-arguel/camera?close_zoom_percent=20"
+        )
+
+        assert response.status_code == 400
+
     def test_update_site_multiple_fields(self, client, db_session, arguel_site):
         """PATCH /sites/{site_id} updates multiple fields"""
         response = client.patch(
