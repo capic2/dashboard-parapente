@@ -146,9 +146,12 @@ describe('Header theme controls', () => {
 
   it('opens the desktop theme selector and applies dark mode', () => {
     render(<Header />);
-    const desktopButton = screen.getAllByRole('button', {
+    const themeButtons = screen.getAllByRole('button', {
       name: /Theme : Light/,
-    })[0]!;
+    });
+    expect(themeButtons).toHaveLength(2);
+    const desktopButton = themeButtons[0];
+    if (!desktopButton) throw new Error('Desktop theme button not found');
 
     fireEvent.click(desktopButton);
 
@@ -162,9 +165,12 @@ describe('Header theme controls', () => {
 
   it('opens the mobile theme selector and applies auto mode', () => {
     render(<Header />);
-    const mobileButton = screen.getAllByRole('button', {
+    const themeButtons = screen.getAllByRole('button', {
       name: /Theme : Light/,
-    })[1]!;
+    });
+    expect(themeButtons).toHaveLength(2);
+    const mobileButton = themeButtons[1];
+    if (!mobileButton) throw new Error('Mobile theme button not found');
 
     fireEvent.click(mobileButton);
 
