@@ -116,7 +116,6 @@ export default function Header() {
             aria-label={`${t('settings.languageTheme.theme')} : ${t(
               `settings.languageTheme.${themePreference}`
             )}`}
-            title={themeTooltip}
           >
             {themeLabel}
           </AriaButton>
@@ -167,13 +166,12 @@ export default function Header() {
       <div className="sm:hidden flex items-center gap-2 relative">
         <MenuTrigger>
           <AriaButton
-          className="min-h-11 min-w-11 flex items-center justify-center rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
-          aria-label={themeTooltip}
-          title={themeTooltip}
-        >
-          <span aria-hidden="true" className="text-lg leading-none inline-block">
-            {themeIcons[themePreference]}
-          </span>
+            className="min-h-11 min-w-11 flex items-center justify-center rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+            aria-label={themeTooltip}
+          >
+            <span aria-hidden="true" className="text-lg leading-none inline-block">
+              {themeIcons[themePreference]}
+            </span>
           </AriaButton>
           <Popover className="z-40 mt-2 w-44 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg p-1 theme-menu-popin">
             <Menu className="outline-none">
