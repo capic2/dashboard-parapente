@@ -51,23 +51,71 @@ vi.mock('@tanstack/react-router', () => ({
   useMatchRoute: () => false,
 }));
 
-vi.mock('react-aria-components', () => {
-  const MockCloseButton = ({
+vi.mock('react-aria-components', async () => {
+  const React = await import('react');
+
+  const MockButton = ({
     children,
+    onPress,
     ...props
-  }: React.ButtonHTMLAttributes<HTMLButtonElement>) => {
-    return <button {...props}>{children}</button>;
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    onPress?: () => void;
+  }) => {
+    return (
+      <button type="button" onClick={onPress} {...props}>
+        {children}
+      </button>
+    );
+  };
+
+  const MenuTrigger = ({ children }: { children: React.ReactNode }) => {
+    const [open, setOpen] = React.useState(false);
+    const childArray = React.Children.toArray(children);
+    const trigger = childArray[0];
+
+    return (
+      <div>
+        {React.isValidElement<React.ButtonHTMLAttributes<HTMLButtonElement>>(
+          trigger
+        )
+          ? React.cloneElement(trigger, {
+              onClick: () => setOpen((current) => !current),
+            })
+          : trigger}
+        {open ? childArray[1] : null}
+      </div>
+    );
+  };
+
+  const MenuItem = ({
+    children,
+    onAction,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    onAction?: () => void;
+  }) => {
+    return (
+      <button type="button" onClick={onAction} {...props}>
+        {children}
+      </button>
+    );
   };
 
   return {
-    Button: MockCloseButton,
+    Button: MockButton,
     DialogTrigger: ({ children }: { children: React.ReactNode }) => (
       <div>{children}</div>
     ),
+    Menu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    MenuItem,
+    MenuTrigger,
     Modal: ({ children }: { children: React.ReactNode }) => (
       <div>{children}</div>
     ),
     ModalOverlay: ({ children }: { children: React.ReactNode }) => (
+      <div>{children}</div>
+    ),
+    Popover: ({ children }: { children: React.ReactNode }) => (
       <div>{children}</div>
     ),
     Dialog: ({
