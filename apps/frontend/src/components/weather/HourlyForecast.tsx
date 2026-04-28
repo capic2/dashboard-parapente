@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Tooltip, TooltipTrigger } from 'react-aria-components';
+import { Button, Tooltip, TooltipTrigger } from 'react-aria-components';
 import {
   Clock,
   Gauge,
@@ -874,15 +874,14 @@ export default function HourlyForecast({
 
                     <td className="py-2.5 px-2 text-center">
                       <TooltipTrigger delay={150} closeDelay={100}>
-                        <button
-                          type="button"
+                        <Button
                           aria-label={`${t('weather.paraIndex')} ${hour.hour}`}
                           className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-sky-100 dark:hover:bg-sky-900/30 transition-colors"
                         >
                           <strong className="text-sky-600 dark:text-sky-400">
                             {hour.para_index}/100
                           </strong>
-                        </button>
+                        </Button>
                         <Tooltip offset={8} className="z-50">
                           {renderTooltipContent('para-index', hour)}
                         </Tooltip>
@@ -891,13 +890,12 @@ export default function HourlyForecast({
 
                     <td className="py-2.5 px-2 text-center">
                       <TooltipTrigger delay={150} closeDelay={100}>
-                        <button
-                          type="button"
+                        <Button
                           aria-label={`Vent ${hour.hour}`}
                           className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                         >
                           {hour.wind}
-                        </button>
+                        </Button>
                         <Tooltip offset={8} className="z-50">
                           {renderTooltipContent('wind', hour)}
                         </Tooltip>
@@ -906,15 +904,14 @@ export default function HourlyForecast({
 
                     <td className="py-2.5 px-2 text-center">
                       <TooltipTrigger delay={150} closeDelay={100}>
-                        <button
-                          type="button"
+                        <Button
                           aria-label={`Rafales ${hour.hour}`}
                           className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                         >
                           {gustValue !== null && gustValue !== undefined
                             ? gustValue.toFixed(1)
                             : '—'}
-                        </button>
+                        </Button>
                         <Tooltip offset={8} className="z-50">
                           {renderTooltipContent('gust', hour)}
                         </Tooltip>
@@ -923,8 +920,7 @@ export default function HourlyForecast({
 
                     <td className="py-2.5 px-2 text-center">
                       <TooltipTrigger delay={150} closeDelay={100}>
-                        <button
-                          type="button"
+                        <Button
                           aria-label={`Direction ${hour.hour}`}
                           className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors flex justify-center"
                         >
@@ -936,7 +932,7 @@ export default function HourlyForecast({
                           ) : (
                             '—'
                           )}
-                        </button>
+                        </Button>
                         <Tooltip offset={8} className="z-50">
                           {renderTooltipContent('direction', hour)}
                         </Tooltip>
@@ -945,13 +941,12 @@ export default function HourlyForecast({
 
                     <td className="py-2.5 px-2 text-center">
                       <TooltipTrigger delay={150} closeDelay={100}>
-                        <button
-                          type="button"
+                        <Button
                           aria-label={`Temperature ${hour.hour}`}
                           className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                         >
                           {hour.temp}
-                        </button>
+                        </Button>
                         <Tooltip offset={8} className="z-50">
                           {renderTooltipContent('temperature', hour)}
                         </Tooltip>
@@ -960,8 +955,7 @@ export default function HourlyForecast({
 
                     <td className="py-2.5 px-2 text-center">
                       <TooltipTrigger delay={150} closeDelay={100}>
-                        <button
-                          type="button"
+                        <Button
                           aria-label={`Precipitations ${hour.hour}`}
                           className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-cyan-50 dark:hover:bg-cyan-900/20 transition-colors"
                         >
@@ -969,7 +963,7 @@ export default function HourlyForecast({
                           hour.precipitation !== undefined
                             ? hour.precipitation.toFixed(1)
                             : '—'}
-                        </button>
+                        </Button>
                         <Tooltip offset={8} className="z-50">
                           {renderTooltipContent('precipitation', hour)}
                         </Tooltip>
@@ -978,15 +972,14 @@ export default function HourlyForecast({
 
                     <td className="py-2.5 px-2 text-center">
                       <TooltipTrigger delay={150} closeDelay={100}>
-                        <button
-                          type="button"
+                        <Button
                           aria-label={`Nuages ${hour.hour}`}
                           className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors"
                         >
                           {cloudCover !== null && cloudCover !== undefined
                             ? Math.round(cloudCover)
                             : '—'}
-                        </button>
+                        </Button>
                         <Tooltip offset={8} className="z-50">
                           {renderTooltipContent('cloud-cover', hour)}
                         </Tooltip>
@@ -1011,15 +1004,14 @@ export default function HourlyForecast({
                         );
                         return (
                           <TooltipTrigger delay={150} closeDelay={100}>
-                            <button
-                              type="button"
+                            <Button
                               aria-label={`Verdict ${hour.hour}`}
                               className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
                             >
                               <span className={`font-medium ${display.color}`}>
                                 {display.emoji} {display.text}
                               </span>
-                            </button>
+                            </Button>
                             <Tooltip offset={8} className="z-50">
                               {renderTooltipContent('verdict', hour)}
                             </Tooltip>

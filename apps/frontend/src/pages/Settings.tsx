@@ -1,6 +1,7 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSuspenseQuery } from '@tanstack/react-query';
+import { Switch, Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 import { Button } from '@dashboard-parapente/design-system';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import {
@@ -52,6 +53,8 @@ interface AppSettings {
   };
   favoriteSites: string[];
 }
+
+type SettingsTabKey = 'general' | 'sites' | 'weather' | 'data';
 
 const DEFAULT_SETTINGS: AppSettings = {
   units: {
@@ -941,9 +944,7 @@ export default function Settings() {
     return DEFAULT_SETTINGS;
   });
   const [saved, setSaved] = useState(false);
-  const [activeTab, setActiveTab] = useState<
-    'general' | 'sites' | 'weather' | 'data'
-  >('general');
+  const [activeTab, setActiveTab] = useState<SettingsTabKey>('general');
 
   useEffect(() => {
     void i18n.changeLanguage(settings.language);
@@ -1066,55 +1067,31 @@ export default function Settings() {
         </p>
       </div>
 
-      {/* Tabs Navigation */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md mb-4 p-2 grid grid-cols-2 gap-2 sm:flex">
-        <Button
-          onClick={() => setActiveTab('general')}
-          className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
-            activeTab === 'general'
-              ? 'bg-sky-600 text-white shadow-md'
-              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-          }`}
-        >
-          🎛️ {t('settings.tabs.general')}
-        </Button>
-        <Button
-          onClick={() => setActiveTab('sites')}
-          className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
-            activeTab === 'sites'
-              ? 'bg-sky-600 text-white shadow-md'
-              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-          }`}
-        >
-          📍 {t('settings.tabs.favoriteSites')}
-        </Button>
-        <Button
-          onClick={() => setActiveTab('weather')}
-          className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
-            activeTab === 'weather'
-              ? 'bg-sky-600 text-white shadow-md'
-              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-          }`}
-        >
-          🌦️ {t('settings.tabs.weatherSources')}
-        </Button>
-        <Button
-          onClick={() => setActiveTab('data')}
-          className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
-            activeTab === 'data'
-              ? 'bg-sky-600 text-white shadow-md'
-              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-          }`}
-        >
-          💾 {t('settings.tabs.data')}
-        </Button>
-      </div>
+      <Tabs
+        selectedKey={activeTab}
+        onSelectionChange={(key) => setActiveTab(key as SettingsTabKey)}
+        className="space-y-4"
+      >
+        {/* Tabs Navigation */}
+        <TabList className="bg-white dark:bg-gray-800 rounded-xl shadow-md mb-4 p-2 grid grid-cols-2 gap-2 sm:flex">
+          {(['general', 'sites', 'weather', 'data'] as const).map((tabKey) => (
+            <Tab
+              key={tabKey}
+              id={tabKey}
+              className="flex-1 px-4 py-2 rounded-lg font-medium transition-all cursor-pointer bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 selected:bg-sky-600 selected:text-white selected:shadow-md outline-none"
+            >
+              {tabKey === 'general' && `🎛️ ${t('settings.tabs.general')}`}
+              {tabKey === 'sites' && `📍 ${t('settings.tabs.favoriteSites')}`}
+              {tabKey === 'weather' && `🌦️ ${t('settings.tabs.weatherSources')}`}
+              {tabKey === 'data' && `💾 ${t('settings.tabs.data')}`}
+            </Tab>
+          ))}
+        </TabList>
 
-      {/* Content */}
-      <div className="space-y-4">
-        {/* GENERAL TAB */}
-        {activeTab === 'general' && (
-          <>
+        {/* Content */}
+        <div className="space-y-4">
+          {/* GENERAL TAB */}
+          <TabPanel id="general" className="space-y-4 outline-none">
             {/* Units Section */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
@@ -1314,69 +1291,83 @@ export default function Settings() {
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     {t('settings.notifications.weatherAlerts')}
                   </span>
-                  <input
-                    type="checkbox"
-                    checked={settings.notifications.weather}
-                    onChange={(e) =>
+                  <Switch
+                    isSelected={settings.notifications.weather}
+                    onChange={(isSelected) =>
                       setSettings((prev) => ({
                         ...prev,
                         notifications: {
                           ...prev.notifications,
-                          weather: e.target.checked,
+                          weather: isSelected,
                         },
                       }))
                     }
-                    className="w-5 h-5 text-sky-600 rounded focus:ring-2 focus:ring-sky-600"
-                  />
+                    className="group"
+                  >
+                    <div className="relative inline-flex items-center cursor-pointer">
+                      <div className="w-11 h-6 bg-gray-300 group-focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-sky-300 rounded-full group-selected:bg-sky-600 transition-colors">
+                        <div className="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform group-selected:translate-x-full"></div>
+                      </div>
+                    </div>
+                  </Switch>
                 </label>
                 <label className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all cursor-pointer">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     {t('settings.notifications.newFlights')}
                   </span>
-                  <input
-                    type="checkbox"
-                    checked={settings.notifications.flights}
-                    onChange={(e) =>
+                  <Switch
+                    isSelected={settings.notifications.flights}
+                    onChange={(isSelected) =>
                       setSettings((prev) => ({
                         ...prev,
                         notifications: {
                           ...prev.notifications,
-                          flights: e.target.checked,
+                          flights: isSelected,
                         },
                       }))
                     }
-                    className="w-5 h-5 text-sky-600 rounded focus:ring-2 focus:ring-sky-600"
-                  />
+                    className="group"
+                  >
+                    <div className="relative inline-flex items-center cursor-pointer">
+                      <div className="w-11 h-6 bg-gray-300 group-focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-sky-300 rounded-full group-selected:bg-sky-600 transition-colors">
+                        <div className="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform group-selected:translate-x-full"></div>
+                      </div>
+                    </div>
+                  </Switch>
                 </label>
                 <label className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all cursor-pointer">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     {t('settings.notifications.customAlerts')}
                   </span>
-                  <input
-                    type="checkbox"
-                    checked={settings.notifications.alerts}
-                    onChange={(e) =>
+                  <Switch
+                    isSelected={settings.notifications.alerts}
+                    onChange={(isSelected) =>
                       setSettings((prev) => ({
                         ...prev,
                         notifications: {
                           ...prev.notifications,
-                          alerts: e.target.checked,
+                          alerts: isSelected,
                         },
                       }))
                     }
-                    className="w-5 h-5 text-sky-600 rounded focus:ring-2 focus:ring-sky-600"
-                  />
+                    className="group"
+                  >
+                    <div className="relative inline-flex items-center cursor-pointer">
+                      <div className="w-11 h-6 bg-gray-300 group-focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-sky-300 rounded-full group-selected:bg-sky-600 transition-colors">
+                        <div className="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform group-selected:translate-x-full"></div>
+                      </div>
+                    </div>
+                  </Switch>
                 </label>
               </div>
             </div>
 
             {/* Performance Section */}
             <PerformanceSection />
-          </>
-        )}
+          </TabPanel>
 
-        {/* SITES TAB */}
-        {activeTab === 'sites' && (
+          {/* SITES TAB */}
+          <TabPanel id="sites" className="outline-none">
           <Suspense
             fallback={
               <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md animate-pulse space-y-3">
@@ -1391,13 +1382,15 @@ export default function Settings() {
           >
             <SitesTab settings={settings} toggleFavorite={toggleFavorite} />
           </Suspense>
-        )}
+          </TabPanel>
 
-        {/* WEATHER SOURCES TAB */}
-        {activeTab === 'weather' && <WeatherSourcesTab />}
+          {/* WEATHER SOURCES TAB */}
+          <TabPanel id="weather" className="outline-none">
+            <WeatherSourcesTab />
+          </TabPanel>
 
-        {/* DATA TAB */}
-        {activeTab === 'data' && (
+          {/* DATA TAB */}
+          <TabPanel id="data" className="outline-none">
           <div className="space-y-4">
             {/* Export/Import Section */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
@@ -1459,8 +1452,9 @@ export default function Settings() {
               </div>
             </div>
           </div>
-        )}
-      </div>
+          </TabPanel>
+        </div>
+      </Tabs>
 
       {/* Save Button */}
       <div className="mt-6 sticky bottom-4 z-10">
