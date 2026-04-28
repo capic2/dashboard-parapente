@@ -102,6 +102,12 @@ class Site(Base):
     camera_distance = Column(
         Integer, default=500
     )  # Distance in meters from takeoff point (default: 500m)
+    camera_close_zoom_percent = Column(
+        Integer, default=75
+    )  # Percentage of camera_distance used near takeoff and landing
+    camera_transition_percent = Column(
+        Integer, default=12
+    )  # Percentage of flight used to transition between close and normal distance
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

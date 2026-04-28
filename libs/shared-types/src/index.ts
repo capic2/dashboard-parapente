@@ -35,6 +35,8 @@ export const SiteSchema = z.object({
   orientation: z.string().nullish(),
   camera_angle: z.number().nullish(),
   camera_distance: z.number().nullish().default(500),
+  camera_close_zoom_percent: z.number().nullish().optional(),
+  camera_transition_percent: z.number().nullish().optional(),
   linked_spot_id: z.string().nullish(),
   flight_count: z.number().optional().default(0),
   created_at: z.string().nullish(),
@@ -385,6 +387,8 @@ export const SiteUpdateSchema = z
     orientation: z.string(),
     camera_angle: z.number().nullable(),
     camera_distance: z.number().nullable(),
+    camera_close_zoom_percent: z.number().nullable(),
+    camera_transition_percent: z.number().nullable(),
     usage_type: z.enum(['takeoff', 'landing', 'both']),
     description: z.string(),
   })
@@ -394,6 +398,8 @@ export const CreateSiteSchema = SiteUpdateSchema.omit({
   orientation: true,
   camera_angle: true,
   camera_distance: true,
+  camera_close_zoom_percent: true,
+  camera_transition_percent: true,
 }).required({
   name: true,
   latitude: true,
