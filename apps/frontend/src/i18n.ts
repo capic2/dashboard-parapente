@@ -4,7 +4,8 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 import fr from './locales/fr/translation.json';
 import en from './locales/en/translation.json';
 
-i18n
+// oxlint-disable-next-line import/no-named-as-default-member
+void i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({

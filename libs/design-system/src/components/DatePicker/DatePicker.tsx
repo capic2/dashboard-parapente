@@ -15,7 +15,8 @@ import {
   Dialog,
   Popover,
 } from 'react-aria-components';
-import { parseDate, CalendarDate } from '@internationalized/date';
+import type { CalendarDate } from '@internationalized/date';
+import { parseDate } from '@internationalized/date';
 import { useTranslation } from 'react-i18next';
 import { getToday } from '../../utils/dateUtils';
 

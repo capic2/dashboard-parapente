@@ -1,5 +1,7 @@
-import React, { Component, ReactNode, ErrorInfo } from 'react';
-import { withTranslation, WithTranslation } from 'react-i18next';
+import type { ReactNode, ErrorInfo } from 'react';
+import React, { Component } from 'react';
+import type { WithTranslation } from 'react-i18next';
+import { withTranslation } from 'react-i18next';
 
 interface ErrorBoundaryProps extends WithTranslation {
   children: ReactNode;
@@ -59,26 +61,30 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             <h2 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-4">
               ❌ {t('errors.errorOccurred')}
             </h2>
-            <p className="text-gray-700 dark:text-gray-300 mb-6">{t('errors.errorMessage')}</p>
+            <p className="text-gray-700 dark:text-gray-300 mb-6">
+              {t('errors.errorMessage')}
+            </p>
 
-            {this.state.error && typeof window !== 'undefined' && window.location.hostname === 'localhost' && (
-              <details className="mb-6 bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                <summary className="cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-sky-600">
-                  {t('errors.technicalDetails')}
-                </summary>
-                <pre className="mt-3 text-xs text-gray-800 dark:text-gray-200 overflow-auto max-h-64 bg-white dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
-                  <strong>{t('errors.errorLabel')}</strong>{' '}
-                  {this.state.error.toString()}
-                  {this.state.errorInfo && (
-                    <>
-                      {'\n\n'}
-                      <strong>{t('errors.stackTrace')}</strong>
-                      {this.state.errorInfo.componentStack}
-                    </>
-                  )}
-                </pre>
-              </details>
-            )}
+            {this.state.error &&
+              typeof window !== 'undefined' &&
+              window.location.hostname === 'localhost' && (
+                <details className="mb-6 bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                  <summary className="cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-sky-600">
+                    {t('errors.technicalDetails')}
+                  </summary>
+                  <pre className="mt-3 text-xs text-gray-800 dark:text-gray-200 overflow-auto max-h-64 bg-white dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                    <strong>{t('errors.errorLabel')}</strong>{' '}
+                    {this.state.error.toString()}
+                    {this.state.errorInfo && (
+                      <>
+                        {'\n\n'}
+                        <strong>{t('errors.stackTrace')}</strong>
+                        {this.state.errorInfo.componentStack}
+                      </>
+                    )}
+                  </pre>
+                </details>
+              )}
 
             <div className="flex gap-3 flex-wrap">
               <button

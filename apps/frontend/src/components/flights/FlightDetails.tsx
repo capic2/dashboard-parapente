@@ -1,14 +1,15 @@
-import {
-  useState,
-  useRef,
-  lazy,
-  Suspense,
-  ChangeEvent,
-  useEffect,
-} from 'react';
+import type { ChangeEvent } from 'react';
+import { useState, useRef, lazy, Suspense, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { Tab, TabList, TabPanel, Tabs, TextField, TextArea } from 'react-aria-components';
+import {
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
+  TextField,
+  TextArea,
+} from 'react-aria-components';
 import { Button } from '@dashboard-parapente/design-system';
 import {
   useUpdateFlight,

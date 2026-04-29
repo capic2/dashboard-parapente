@@ -1,6 +1,6 @@
 import preview from '../../../.storybook/preview';
 import MonthlyStats from './MonthlyStats';
-import { Flight } from '@dashboard-parapente/shared-types';
+import type { Flight } from '@dashboard-parapente/shared-types';
 
 const meta = preview.meta({
   title: 'Components/Stats/MonthlyStats',

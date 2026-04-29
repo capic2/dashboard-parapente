@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { getStaleTime } from '../../lib/cacheConfig';
-import { GeoPoint } from '../../types/flight';
+import type { GeoPoint } from '../../types/flight';
 
 interface GPXData {
   coordinates: GeoPoint[];

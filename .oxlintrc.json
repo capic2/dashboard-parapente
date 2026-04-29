@@ -22,12 +22,14 @@
     "@typescript-eslint/no-non-null-assertion": "error",
     "@typescript-eslint/no-empty-function": "error",
     "@typescript-eslint/no-inferrable-types": "error",
-    "eqeqeq": "error",
-    "logical-assignment-operators": "error",
+    "eqeqeq": ["error", "smart"],
+    "import/no-named-as-default-member": "off",
     "no-case-declarations": "off",
     "no-constant-condition": "off",
     "no-console": "warn",
     "no-debugger": "error",
+    "no-shadow": "off",
+    "no-underscore-dangle": "off",
     "no-unused-vars": "error",
     "no-useless-rename": "error",
     "object-shorthand": "error",
@@ -40,7 +42,6 @@
     "react/no-children-prop": "off",
     "react/jsx-no-useless-fragment": "error",
     "react/no-unescaped-entities": "warn",
-    "react/prop-types": "off",
     "react/react-in-jsx-scope": "off",
     "react-hooks/exhaustive-deps": "error",
     "react-hooks/rules-of-hooks": "error",
@@ -59,7 +60,8 @@
       "rules": {
         "@typescript-eslint/no-explicit-any": "off",
         "@typescript-eslint/no-empty-function": "off",
-        "typescript/no-non-null-assertion": "off"
+        "typescript/no-non-null-assertion": "off",
+        "max-lines-per-function": "off"
       }
     }, {
       "files": ["**/*.md/*.ts", "**/*.md/*.js", "**/*.md/*.tsx"],

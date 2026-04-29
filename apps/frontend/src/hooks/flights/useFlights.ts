@@ -204,7 +204,7 @@ export function useCreateFlightFromGPX() {
           } catch {
             // Response is not JSON, use default message
           }
-          throw new Error(errorMessage);
+          throw new Error(errorMessage, { cause: error });
         }
         // Re-throw other errors
         throw error;
