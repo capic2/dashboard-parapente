@@ -49,7 +49,7 @@
     "typescript/consistent-type-imports": "error",
     "typescript/no-explicit-any": "error",
     "typescript/no-non-null-assertion": "error",
-    "typescript/no-unused-vars": "error"
+    "typescript/no-unused-vars": "error",
     "typescript/prefer-nullish-coalescing": "error",
     "typescript/prefer-optional-chain": "error"
   },
