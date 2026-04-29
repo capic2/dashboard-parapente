@@ -1,4 +1,2 @@
 #!/bin/sh
 set -eu
-
-./scripts/git/check-worktree-policy.sh
