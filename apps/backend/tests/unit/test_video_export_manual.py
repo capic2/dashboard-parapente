@@ -141,6 +141,11 @@ def test_ffmpeg_timeout_is_not_limited_to_thirty_minutes():
     assert video_export_manual._ffmpeg_timeout_seconds(60) == 6 * 60 * 60
 
 
+def test_ffmpeg_timeout_scales_for_long_videos():
+    duration_seconds = 7 * 60 * 60
+    assert video_export_manual._ffmpeg_timeout_seconds(duration_seconds) == duration_seconds * 20
+
+
 def test_encoding_progress_percent_spans_encoding_phase_range():
     assert video_export_manual._encoding_progress_percent(0, 100) == 80
     assert video_export_manual._encoding_progress_percent(50, 100) == 89

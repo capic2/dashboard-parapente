@@ -1010,7 +1010,7 @@ async def _export_video_manual_render(job_id: str):
                 stderr=asyncio.subprocess.PIPE,
             )
 
-            encoding_started_at = time.time()
+            encoding_started_at = time.monotonic()
             last_ffmpeg_output_at = encoding_started_at
             ffmpeg_stderr: list[str] = []
             total_duration_seconds = max(video_duration, 1e-6)
@@ -1030,7 +1030,7 @@ async def _export_video_manual_render(job_id: str):
                         )
                         return
 
-                    now = time.time()
+                    now = time.monotonic()
                     if now - last_ffmpeg_output_at > _FFMPEG_STALL_TIMEOUT_SECONDS:
                         process.kill()
                         await process.wait()
@@ -1059,7 +1059,7 @@ async def _export_video_manual_render(job_id: str):
                         continue
 
                     line = line_bytes.decode("utf-8", errors="replace").strip()
-                    last_ffmpeg_output_at = time.time()
+                    last_ffmpeg_output_at = time.monotonic()
                     ffmpeg_stderr.append(line)
                     encoded_seconds = _parse_ffmpeg_out_time_seconds(line)
 
@@ -1068,7 +1068,7 @@ async def _export_video_manual_render(job_id: str):
                             encoded_seconds,
                             total_duration_seconds,
                         )
-                        elapsed_encoding = max(time.time() - encoding_started_at, 1e-6)
+                        elapsed_encoding = max(time.monotonic() - encoding_started_at, 1e-6)
                         encoding_speed = encoded_seconds / elapsed_encoding
                         remaining = max(total_duration_seconds - encoded_seconds, 0.0)
                         eta_seconds = (
