@@ -32,10 +32,16 @@ import {
   getOrientationLabel,
   getOrientationOptions,
 } from '../../utils/cameraOrientation';
+import {
+  DEFAULT_CAMERA_CLOSE_ZOOM_PERCENT,
+  DEFAULT_CAMERA_TRANSITION_PERCENT,
+  getFlightCameraDistance,
+} from '../../utils/cameraDistanceProfile';
 import { api } from '../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '@dashboard-parapente/design-system';
+import { Disclosure, DisclosurePanel } from 'react-aria-components';
 import { HTTPError } from 'ky';
 import { useTranslation } from 'react-i18next';
 
@@ -110,27 +116,36 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
   defaultOpen = false,
   children,
 }) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-
   return (
-    <div className="border-b border-gray-200 dark:border-gray-700 last:border-0">
-      <Button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between py-2 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded"
-      >
-        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-          {emoji && <span className="mr-1.5">{emoji}</span>}
-          {title}
-        </span>
-        <span
-          className="text-gray-400 dark:text-gray-400 text-xs transition-transform"
-          style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}
-        >
-          ▶
-        </span>
-      </Button>
-      {isOpen && <div className="pb-3 pt-1 space-y-3">{children}</div>}
-    </div>
+    <Disclosure
+      defaultExpanded={defaultOpen}
+      className="border-b border-gray-200 dark:border-gray-700 last:border-0"
+    >
+      {({ isExpanded }) => (
+        <>
+          <Button
+            slot="trigger"
+            className="w-full flex items-center justify-between py-2 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded"
+          >
+            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              {emoji && <span className="mr-1.5">{emoji}</span>}
+              {title}
+            </span>
+            <span
+              className="text-gray-400 dark:text-gray-400 text-xs transition-transform"
+              style={{
+                transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+              }}
+            >
+              ▶
+            </span>
+          </Button>
+          <DisclosurePanel className="pb-3 pt-1 space-y-3">
+            {children}
+          </DisclosurePanel>
+        </>
+      )}
+    </Disclosure>
   );
 };
 
@@ -181,6 +196,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [isUpdatingCamera, setIsUpdatingCamera] = useState(false);
   const [tempCameraAngle, setTempCameraAngle] = useState<number>(0);
   const [tempCameraDistance, setTempCameraDistance] = useState<number>(500);
+  const [tempCameraCloseZoomPercent, setTempCameraCloseZoomPercent] =
+    useState<number>(DEFAULT_CAMERA_CLOSE_ZOOM_PERCENT);
+  const [tempCameraTransitionPercent, setTempCameraTransitionPercent] =
+    useState<number>(DEFAULT_CAMERA_TRANSITION_PERCENT);
 
   const allPositionsRef = useRef<Cartesian3[]>([]);
   const timestampsRef = useRef<number[]>([]);
@@ -200,6 +219,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const cameraHeadingRef = useRef<number>(0);
   const cameraDistanceRef = useRef<number>(500);
+  const cameraCloseZoomPercentRef = useRef<number>(
+    DEFAULT_CAMERA_CLOSE_ZOOM_PERCENT
+  );
+  const cameraTransitionPercentRef = useRef<number>(
+    DEFAULT_CAMERA_TRANSITION_PERCENT
+  );
   const cameraTargetRef = useRef<Cartesian3 | null>(null);
   const containerDivRef = useRef<HTMLDivElement>(null);
   const viewerUnitsRef = useRef<ViewerUnits>(viewerUnits);
@@ -687,6 +712,20 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       }
       setTempCameraAngle(initialAngle);
       setTempCameraDistance(flight.site.camera_distance || 500);
+      setTempCameraCloseZoomPercent(
+        flight.site.camera_close_zoom_percent ||
+          DEFAULT_CAMERA_CLOSE_ZOOM_PERCENT
+      );
+      setTempCameraTransitionPercent(
+        flight.site.camera_transition_percent ||
+          DEFAULT_CAMERA_TRANSITION_PERCENT
+      );
+      cameraCloseZoomPercentRef.current =
+        flight.site.camera_close_zoom_percent ||
+        DEFAULT_CAMERA_CLOSE_ZOOM_PERCENT;
+      cameraTransitionPercentRef.current =
+        flight.site.camera_transition_percent ||
+        DEFAULT_CAMERA_TRANSITION_PERCENT;
     }
   }, [flight?.site]);
 
@@ -714,6 +753,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       cameraAngle = getHeadingFromOrientation(orientation);
     }
     const cameraDistance = flight?.site?.camera_distance || 500;
+    const cameraCloseZoomPercent =
+      flight?.site?.camera_close_zoom_percent ||
+      DEFAULT_CAMERA_CLOSE_ZOOM_PERCENT;
+    const cameraTransitionPercent =
+      flight?.site?.camera_transition_percent ||
+      DEFAULT_CAMERA_TRANSITION_PERCENT;
 
     if (cameraAngle !== null && cameraAngle !== undefined) {
       // Camera is positioned at the specified angle, looking back at takeoff
@@ -723,6 +768,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       // Save camera settings for replay mode
       cameraHeadingRef.current = CesiumMath.toRadians(cameraAngle);
       cameraDistanceRef.current = cameraDistance;
+      cameraCloseZoomPercentRef.current = cameraCloseZoomPercent;
+      cameraTransitionPercentRef.current = cameraTransitionPercent;
 
       // First, position camera at takeoff looking in the OPPOSITE direction
       viewer.camera.setView({
@@ -743,6 +790,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     gpxData,
     flight?.site?.camera_angle,
     flight?.site?.camera_distance,
+    flight?.site?.camera_close_zoom_percent,
+    flight?.site?.camera_transition_percent,
     flight?.site?.orientation,
   ]);
 
@@ -927,7 +976,16 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           const currentPosition =
             allPositionsRef.current[currentIndexRef.current];
           const heading = cameraHeadingRef.current;
-          const distance = cameraDistanceRef.current;
+          const progress =
+            allPositionsRef.current.length > 1
+              ? currentIndexRef.current / (allPositionsRef.current.length - 1)
+              : 0;
+          const distance = getFlightCameraDistance({
+            progress,
+            baseDistance: cameraDistanceRef.current,
+            closeZoomPercent: cameraCloseZoomPercentRef.current,
+            transitionPercent: cameraTransitionPercentRef.current,
+          });
           const pitch = -0.05;
 
           // Smooth lerp vers la position actuelle
@@ -1108,7 +1166,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
   const updateCameraSettings = async (
     angle: number,
-    distance: number
+    distance: number,
+    closeZoomPercent: number,
+    transitionPercent: number
   ): Promise<boolean> => {
     if (!flight?.site?.id) {
       console.error('No site ID available');
@@ -1120,6 +1180,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       const params = new URLSearchParams();
       params.append('angle', angle.toString());
       params.append('distance', distance.toString());
+      params.append('close_zoom_percent', closeZoomPercent.toString());
+      params.append('transition_percent', transitionPercent.toString());
 
       await api.patch(`sites/${flight.site.id}/camera?${params.toString()}`);
 
@@ -1141,6 +1203,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
               ...previousSite,
               camera_angle: angle,
               camera_distance: distance,
+              camera_close_zoom_percent: closeZoomPercent,
+              camera_transition_percent: transitionPercent,
             },
           };
         }
@@ -1203,6 +1267,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       return;
     }
 
+    cameraCloseZoomPercentRef.current = tempCameraCloseZoomPercent;
+    cameraTransitionPercentRef.current = tempCameraTransitionPercent;
     repositionCamera(tempCameraAngle, tempCameraDistance);
     if (showToast) {
       toast.success(t('flights.viewer.cameraAppliedToPlayback'));
@@ -1212,7 +1278,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const saveCameraSettings = async () => {
     const saved = await updateCameraSettings(
       tempCameraAngle,
-      tempCameraDistance
+      tempCameraDistance,
+      tempCameraCloseZoomPercent,
+      tempCameraTransitionPercent
     );
     if (!saved) {
       return;
@@ -1464,11 +1532,35 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             flight.video_export_status === 'completed' &&
                             flight.video_file_path
                           ) {
-                            // Download video
-                            window.open(
-                              `/api/exports/${flight.video_export_job_id}/download`,
-                              '_blank'
-                            );
+                            // Download video with authenticated API client
+                            try {
+                              const blob = await api
+                                .get(
+                                  `exports/${flight.video_export_job_id}/download`
+                                )
+                                .blob();
+
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `flight-${flightId}.mp4`;
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            } catch (error) {
+                              if (error instanceof HTTPError) {
+                                const detail = await getHttpErrorDetail(error);
+                                toast.error(
+                                  detail ||
+                                    t('flights.viewer.videoDownloadError')
+                                );
+                                return;
+                              }
+
+                              console.error('Failed to download video:', error);
+                              toast.error(
+                                t('flights.viewer.videoDownloadError')
+                              );
+                            }
                           } else if (
                             !flight.video_export_status ||
                             flight.video_export_status === 'failed'
@@ -1758,6 +1850,64 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                           <span>100m</span>
                           <span>2000m</span>
+                        </div>
+                      </div>
+
+                      <div className="mb-2">
+                        <label
+                          htmlFor="camera-close-zoom-slider"
+                          className="block text-xs text-gray-600 dark:text-gray-300 mb-1"
+                        >
+                          {t('editSite.closeZoom')}:{' '}
+                          {tempCameraCloseZoomPercent}%
+                        </label>
+                        <input
+                          id="camera-close-zoom-slider"
+                          type="range"
+                          min="30"
+                          max="100"
+                          step="5"
+                          value={tempCameraCloseZoomPercent}
+                          onChange={(e) =>
+                            setTempCameraCloseZoomPercent(
+                              Number(e.target.value)
+                            )
+                          }
+                          className="w-full"
+                          data-testid="camera-close-zoom-slider"
+                        />
+                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          <span>30%</span>
+                          <span>100%</span>
+                        </div>
+                      </div>
+
+                      <div className="mb-2">
+                        <label
+                          htmlFor="camera-transition-slider"
+                          className="block text-xs text-gray-600 dark:text-gray-300 mb-1"
+                        >
+                          {t('editSite.transition')}:{' '}
+                          {tempCameraTransitionPercent}%
+                        </label>
+                        <input
+                          id="camera-transition-slider"
+                          type="range"
+                          min="1"
+                          max="40"
+                          step="1"
+                          value={tempCameraTransitionPercent}
+                          onChange={(e) =>
+                            setTempCameraTransitionPercent(
+                              Number(e.target.value)
+                            )
+                          }
+                          className="w-full"
+                          data-testid="camera-transition-slider"
+                        />
+                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          <span>1%</span>
+                          <span>40%</span>
                         </div>
                       </div>
 

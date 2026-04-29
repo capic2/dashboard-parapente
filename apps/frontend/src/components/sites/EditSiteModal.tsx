@@ -43,6 +43,8 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
     orientation: '',
     camera_angle: 180,
     camera_distance: 500,
+    camera_close_zoom_percent: 75,
+    camera_transition_percent: 12,
     usage_type: 'both',
     description: '',
   });
@@ -72,6 +74,8 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         orientation: site.orientation || '',
         camera_angle: site.camera_angle || 180,
         camera_distance: site.camera_distance || 500,
+        camera_close_zoom_percent: site.camera_close_zoom_percent || 75,
+        camera_transition_percent: site.camera_transition_percent || 12,
         usage_type: site.usage_type || 'both',
         description: site.description || '',
       };
@@ -93,6 +97,8 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         orientation: '',
         camera_angle: 180,
         camera_distance: 500,
+        camera_close_zoom_percent: 75,
+        camera_transition_percent: 12,
         usage_type: 'both',
         description: '',
       });
@@ -423,6 +429,54 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
             <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
               <span>100m</span>
               <span>2000m</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm mb-1">
+              {t('editSite.closeZoom')}: {formData.camera_close_zoom_percent}%
+            </label>
+            <input
+              type="range"
+              min="30"
+              max="100"
+              step="5"
+              value={formData.camera_close_zoom_percent ?? 75}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  camera_close_zoom_percent: parseInt(e.target.value),
+                })
+              }
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <span>30%</span>
+              <span>100%</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm mb-1">
+              {t('editSite.transition')}: {formData.camera_transition_percent}%
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="40"
+              step="1"
+              value={formData.camera_transition_percent ?? 12}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  camera_transition_percent: parseInt(e.target.value),
+                })
+              }
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <span>1%</span>
+              <span>40%</span>
             </div>
           </div>
         </div>

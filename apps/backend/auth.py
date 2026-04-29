@@ -8,8 +8,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, Request, status
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
@@ -19,9 +18,25 @@ from models import User
 
 logger = logging.getLogger(__name__)
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
-
 ALGORITHM = "HS256"
+
+
+def _extract_access_token(request: Request) -> str | None:
+    """Read bearer token from Authorization header or access_token query param."""
+    auth_header = request.headers.get("authorization", "")
+    scheme, _, value = auth_header.partition(" ")
+    if scheme.lower() == "bearer":
+        token = value.strip()
+        if token:
+            return token
+
+    query_token = request.query_params.get("access_token")
+    if query_token:
+        token = query_token.strip()
+        if token:
+            return token
+
+    return None
 
 
 def hash_password(password: str) -> str:
@@ -38,7 +53,7 @@ def create_access_token(email: str) -> str:
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    request: Request,
     db: Session = Depends(get_db),
 ) -> User:
     """FastAPI dependency: decode JWT and return the authenticated User."""
@@ -47,6 +62,10 @@ def get_current_user(
         detail="Invalid or expired token",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    token = _extract_access_token(request)
+    if not token:
+        raise credentials_exception
+
     try:
         payload = jwt.decode(token, config.JWT_SECRET, algorithms=[ALGORITHM])
         email: str | None = payload.get("sub")
