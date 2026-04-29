@@ -76,6 +76,30 @@ class TestVideoExportStartEndpoint:
         assert payload["mode"] == "manual"
         assert payload["message"] == "Video export started (manual render)"
 
+    def test_start_video_export_returns_error_when_manual_fast_and_fallback_fail(
+        self, client: TestClient, sample_flight
+    ):
+        """Fallback startup failures should return an actionable API error."""
+        with (
+            patch(
+                "routes.start_video_export_manual_fast",
+                side_effect=RuntimeError("fast unavailable"),
+            ),
+            patch(
+                "routes.start_video_export_manual",
+                side_effect=RuntimeError("manual unavailable"),
+            ),
+        ):
+            response = client.post(
+                f"{API_PREFIX}/flights/flight-test-001/export-video?mode=manual_fast"
+            )
+
+        assert response.status_code == 500
+        assert (
+            response.json()["detail"]
+            == "Unable to start video export: manual_fast failed and fallback manual also failed"
+        )
+
     def test_start_video_export_falls_back_to_stream_on_manual_error(
         self,
         client: TestClient,

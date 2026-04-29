@@ -3870,33 +3870,51 @@ def start_flight_video_export(
                 auth_token=_extract_bearer_token(request),
             )
         except Exception as e:
+            fallback_mode = "manual" if selected_mode == "manual_fast" else "stream"
             logger.warning(
                 "⚠️ %s export failed, falling back to %s for flight %s: %s",
                 selected_mode,
-                "manual" if selected_mode == "manual_fast" else "stream",
+                fallback_mode,
                 flight_id,
                 e,
             )
-            if selected_mode == "manual_fast":
-                job_id = start_video_export_manual(
-                    flight_id=flight_id,
-                    quality=quality,
-                    fps=fps,
-                    speed=speed,
-                    frontend_url=frontend_url,
-                    auth_token=_extract_bearer_token(request),
+            try:
+                if selected_mode == "manual_fast":
+                    job_id = start_video_export_manual(
+                        flight_id=flight_id,
+                        quality=quality,
+                        fps=fps,
+                        speed=speed,
+                        frontend_url=frontend_url,
+                        auth_token=_extract_bearer_token(request),
+                    )
+                    effective_mode = "manual"
+                else:
+                    job_id = _start_video_export_stream(
+                        flight_id=flight_id,
+                        quality=quality,
+                        fps=fps,
+                        speed=speed,
+                        frontend_url=frontend_url,
+                    )
+                    effective_mode = "stream"
+                    _mark_flight_export_processing(db=db, flight=flight, job_id=job_id)
+            except Exception as fallback_error:
+                logger.error(
+                    "Failed to start export for flight %s using %s and fallback %s: %s",
+                    flight_id,
+                    selected_mode,
+                    fallback_mode,
+                    fallback_error,
+                    exc_info=True,
                 )
-                effective_mode = "manual"
-            else:
-                job_id = _start_video_export_stream(
-                    flight_id=flight_id,
-                    quality=quality,
-                    fps=fps,
-                    speed=speed,
-                    frontend_url=frontend_url,
-                )
-                effective_mode = "stream"
-                _mark_flight_export_processing(db=db, flight=flight, job_id=job_id)
+                raise HTTPException(
+                    status_code=500,
+                    detail=(
+                        f"Unable to start video export: {selected_mode} failed and "
+                        f"fallback {fallback_mode} also failed"
+                    ),
+                ) from fallback_error
 
     else:  # stream mode
         logger.info("Using MediaRecorder stream (fast but may stutter)")

@@ -195,6 +195,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [currentElapsedTime, setCurrentElapsedTime] = useState(0);
   const [videoExportMode, setVideoExportMode] =
     useState<VideoExportMode>('manual_fast');
+  const [isStartingVideoExport, setIsStartingVideoExport] = useState(false);
   const [viewerUnits, setViewerUnits] = useState<ViewerUnits>(() =>
     typeof window === 'undefined'
       ? DEFAULT_VIEWER_UNITS
@@ -1283,16 +1284,25 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   };
 
   const startVideoExport = useCallback(async () => {
-    await api.post(`flights/${flightId}/export-video`, {
-      searchParams: {
-        mode: videoExportMode,
-      },
-    });
+    if (isStartingVideoExport) {
+      return;
+    }
 
-    queryClient.invalidateQueries({
-      queryKey: ['flights', flightId],
-    });
-  }, [flightId, queryClient, videoExportMode]);
+    setIsStartingVideoExport(true);
+    try {
+      await api.post(`flights/${flightId}/export-video`, {
+        searchParams: {
+          mode: videoExportMode,
+        },
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ['flights', flightId],
+      });
+    } finally {
+      setIsStartingVideoExport(false);
+    }
+  }, [flightId, isStartingVideoExport, queryClient, videoExportMode]);
 
   /**
    * Update site orientation
@@ -1679,10 +1689,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                     <>
                       {!isVideoExportInProgress(flight.video_export_status) && (
                         <div className="mb-3 rounded border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900/30">
-                          <label className="mb-1 block text-xs font-semibold text-gray-700 dark:text-gray-200">
+                          <label
+                            htmlFor="video-export-mode"
+                            className="mb-1 block text-xs font-semibold text-gray-700 dark:text-gray-200"
+                          >
                             {t('flights.viewer.videoExportMode')}
                           </label>
                           <select
+                            id="video-export-mode"
                             value={videoExportMode}
                             onChange={(event) =>
                               setVideoExportMode(
@@ -1768,9 +1782,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             }
                           }
                         }}
-                        disabled={isVideoExportInProgress(
-                          flight.video_export_status
-                        )}
+                        disabled={
+                          isStartingVideoExport ||
+                          isVideoExportInProgress(flight.video_export_status)
+                        }
                         className={`w-full ${compactControlButtonClassName} text-white rounded ${
                           flight.video_export_status === 'completed'
                             ? 'mb-2'
@@ -1778,7 +1793,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         } ${
                           flight.video_export_status === 'completed'
                             ? 'bg-green-600 hover:bg-green-700'
-                            : isVideoExportInProgress(
+                            : isStartingVideoExport ||
+                                isVideoExportInProgress(
                                   flight.video_export_status
                                 )
                               ? 'bg-gray-400 cursor-not-allowed'
@@ -1911,7 +1927,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                               toast.error(t('flights.viewer.regenerateError'));
                             }
                           }}
-                          className="w-full px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 mb-3"
+                          disabled={isStartingVideoExport}
+                          className="w-full px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed mb-3"
                           title={t('flights.viewer.regenerateTitle')}
                         >
                           🔄 {t('flights.viewer.regenerateVideo')}
