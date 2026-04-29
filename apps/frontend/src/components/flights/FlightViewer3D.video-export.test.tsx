@@ -77,7 +77,9 @@ vi.mock('cesium', () => {
       return false;
     }
 
-    destroy() {}
+    destroy() {
+      return undefined;
+    }
   }
 
   return {

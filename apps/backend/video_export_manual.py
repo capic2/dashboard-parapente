@@ -895,9 +895,7 @@ async def _export_video_manual_render(job_id: str):
                         """,
                         {"frameIndex": i, "totalFrames": total_frames},
                     )
-                    tiles_loaded = bool(
-                        frame_state and frame_state.get("tilesLoaded")
-                    )
+                    tiles_loaded = bool(frame_state and frame_state.get("tilesLoaded"))
                 else:
                     tiles_loaded = await page.evaluate("""
                         () => {

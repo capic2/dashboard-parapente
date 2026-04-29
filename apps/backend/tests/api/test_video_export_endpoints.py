@@ -35,9 +35,7 @@ class TestVideoExportStartEndpoint:
         assert payload["status_url"] == "/api/exports/job-manual/status"
         assert mock_start.call_args.kwargs["auth_token"] == "test-token"
 
-    def test_start_video_export_accepts_manual_fast_mode(
-        self, client: TestClient, sample_flight
-    ):
+    def test_start_video_export_accepts_manual_fast_mode(self, client: TestClient, sample_flight):
         """Fast manual mode should use the deterministic screenshot exporter."""
         with patch(
             "routes.start_video_export_manual_fast",
