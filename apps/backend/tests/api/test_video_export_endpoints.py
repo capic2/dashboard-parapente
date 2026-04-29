@@ -35,6 +35,69 @@ class TestVideoExportStartEndpoint:
         assert payload["status_url"] == "/api/exports/job-manual/status"
         assert mock_start.call_args.kwargs["auth_token"] == "test-token"
 
+    def test_start_video_export_accepts_manual_fast_mode(self, client: TestClient, sample_flight):
+        """Fast manual mode should use the deterministic screenshot exporter."""
+        with patch(
+            "routes.start_video_export_manual_fast",
+            return_value="job-manual-fast",
+        ) as mock_start:
+            response = client.post(
+                f"{API_PREFIX}/flights/flight-test-001/export-video?mode=manual_fast",
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["job_id"] == "job-manual-fast"
+        assert payload["mode"] == "manual_fast"
+        assert payload["message"] == "Video export started (manual fast render)"
+        assert mock_start.call_args.kwargs["auth_token"] == "test-token"
+
+    def test_start_video_export_manual_fast_falls_back_to_manual(
+        self, client: TestClient, sample_flight
+    ):
+        """Fast manual errors should fall back to the existing manual renderer."""
+        with (
+            patch(
+                "routes.start_video_export_manual_fast",
+                side_effect=RuntimeError("fast unavailable"),
+            ),
+            patch("routes.start_video_export_manual", return_value="job-manual"),
+        ):
+            response = client.post(
+                f"{API_PREFIX}/flights/flight-test-001/export-video?mode=manual_fast"
+            )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["job_id"] == "job-manual"
+        assert payload["mode"] == "manual"
+        assert payload["message"] == "Video export started (manual render)"
+
+    def test_start_video_export_returns_error_when_manual_fast_and_fallback_fail(
+        self, client: TestClient, sample_flight
+    ):
+        """Fallback startup failures should return an actionable API error."""
+        with (
+            patch(
+                "routes.start_video_export_manual_fast",
+                side_effect=RuntimeError("fast unavailable"),
+            ),
+            patch(
+                "routes.start_video_export_manual",
+                side_effect=RuntimeError("manual unavailable"),
+            ),
+        ):
+            response = client.post(
+                f"{API_PREFIX}/flights/flight-test-001/export-video?mode=manual_fast"
+            )
+
+        assert response.status_code == 500
+        assert (
+            response.json()["detail"]
+            == "Unable to start video export: manual_fast failed and fallback manual also failed"
+        )
+
     def test_start_video_export_falls_back_to_stream_on_manual_error(
         self,
         client: TestClient,
@@ -64,7 +127,7 @@ class TestVideoExportStartEndpoint:
         """Unsupported export mode should return HTTP 400."""
         response = client.post(f"{API_PREFIX}/flights/flight-test-001/export-video?mode=invalid")
         assert response.status_code == 400
-        assert "mode must be 'manual' or 'stream'" in response.json()["detail"]
+        assert "mode must be 'manual', 'manual_fast' or 'stream'" in response.json()["detail"]
 
 
 class TestGenerateVideoEndpoint:
