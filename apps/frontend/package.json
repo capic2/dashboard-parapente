@@ -6,7 +6,7 @@
   "dependencies": {
     "@dashboard-parapente/design-system": "workspace:*",
     "@dashboard-parapente/shared-types": "workspace:*",
-    "lucide-react": "^1.7.0"
+    "lucide-react": "catalog:"
   },
   "scripts": {
     "dev": "vite",
