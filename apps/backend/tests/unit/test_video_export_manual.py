@@ -132,6 +132,15 @@ def test_parse_ffmpeg_out_time_seconds_parses_progress_lines():
     assert video_export_manual._parse_ffmpeg_out_time_seconds("progress=continue") is None
 
 
+def test_ffmpeg_encoding_settings_use_fast_preset_for_manual_fast():
+    assert video_export_manual._ffmpeg_encoding_settings(True) == ("veryfast", "23")
+    assert video_export_manual._ffmpeg_encoding_settings(False) == ("medium", "18")
+
+
+def test_ffmpeg_timeout_is_not_limited_to_thirty_minutes():
+    assert video_export_manual._ffmpeg_timeout_seconds(60) == 6 * 60 * 60
+
+
 def test_encoding_progress_percent_spans_encoding_phase_range():
     assert video_export_manual._encoding_progress_percent(0, 100) == 80
     assert video_export_manual._encoding_progress_percent(50, 100) == 89

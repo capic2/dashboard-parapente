@@ -60,6 +60,7 @@ _JOB_UPDATE_DB: dict[str, bool] = {}
 _JOB_RUNTIME: dict[str, dict[str, Any]] = {}
 
 _CANCEL_CHECK_INTERVAL = 10
+_FFMPEG_STALL_TIMEOUT_SECONDS = 10 * 60
 
 
 def check_dependencies():
@@ -433,6 +434,17 @@ def _parse_ffmpeg_out_time_seconds(line: str) -> float | None:
     return None
 
 
+def _ffmpeg_encoding_settings(is_fast_mode: bool) -> tuple[str, str]:
+    if is_fast_mode:
+        return "veryfast", "23"
+    return "medium", "18"
+
+
+def _ffmpeg_timeout_seconds(video_duration_seconds: float) -> int:
+    dynamic_timeout = int(max(video_duration_seconds, 1.0) * 20)
+    return max(6 * 60 * 60, dynamic_timeout)
+
+
 def _encoding_progress_percent(encoded_seconds: float, total_duration_seconds: float) -> int:
     if total_duration_seconds <= 0:
         return 80
@@ -558,6 +570,7 @@ async def _export_video_manual_render(job_id: str):
     quality = job.quality or "1080p"
     fps = job.fps or 15
     speed = job.speed or 1
+    is_fast_mode = job.mode == "manual_fast"
     flight_id = job.flight_id
     frontend_url = resolve_frontend_url(job.frontend_url)
     frames_dir: Path | None = None
@@ -890,6 +903,7 @@ async def _export_video_manual_render(job_id: str):
             timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
             filename = f"flight-{flight_id}-{timestamp}.mp4"
             output_file = EXPORTS_DIR / filename
+            ffmpeg_preset, ffmpeg_crf = _ffmpeg_encoding_settings(is_fast_mode)
 
             ffmpeg_cmd = [
                 "ffmpeg",
@@ -900,9 +914,9 @@ async def _export_video_manual_render(job_id: str):
                 "-c:v",
                 "libx264",
                 "-preset",
-                "medium",
+                ffmpeg_preset,
                 "-crf",
-                "18",
+                ffmpeg_crf,
                 "-pix_fmt",
                 "yuv420p",
                 "-nostats",
@@ -920,9 +934,10 @@ async def _export_video_manual_render(job_id: str):
             )
 
             encoding_started_at = time.time()
+            last_ffmpeg_output_at = encoding_started_at
             ffmpeg_stderr: list[str] = []
-            ffmpeg_timeout_seconds = 30 * 60
             total_duration_seconds = max(video_duration, 1e-6)
+            ffmpeg_timeout_seconds = _ffmpeg_timeout_seconds(total_duration_seconds)
 
             try:
                 assert process.stderr is not None
@@ -938,7 +953,16 @@ async def _export_video_manual_render(job_id: str):
                         )
                         return
 
-                    if time.time() - encoding_started_at > ffmpeg_timeout_seconds:
+                    now = time.time()
+                    if now - last_ffmpeg_output_at > _FFMPEG_STALL_TIMEOUT_SECONDS:
+                        process.kill()
+                        await process.wait()
+                        raise Exception(
+                            "FFmpeg stalled for "
+                            f"{_FFMPEG_STALL_TIMEOUT_SECONDS}s: {' '.join(ffmpeg_cmd)}"
+                        )
+
+                    if now - encoding_started_at > ffmpeg_timeout_seconds:
                         process.kill()
                         await process.wait()
                         raise Exception(
@@ -958,6 +982,7 @@ async def _export_video_manual_render(job_id: str):
                         continue
 
                     line = line_bytes.decode("utf-8", errors="replace").strip()
+                    last_ffmpeg_output_at = time.time()
                     ffmpeg_stderr.append(line)
                     encoded_seconds = _parse_ffmpeg_out_time_seconds(line)
 
