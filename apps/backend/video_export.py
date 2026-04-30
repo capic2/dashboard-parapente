@@ -10,11 +10,15 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+import config
+
 # Storage for export jobs
 export_jobs: dict[str, dict] = {}
 
-EXPORTS_DIR = Path(__file__).parent / "exports" / "videos"
-EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+VIDEO_EXPORT_DIR = Path(config.VIDEO_EXPORT_DIR)
+VIDEO_TEMP_IMAGES_DIR = Path(config.VIDEO_TEMP_IMAGES_DIR)
+VIDEO_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+VIDEO_TEMP_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def check_dependencies():
@@ -96,6 +100,11 @@ async def _export_video_playwright(
     """
     Export video using Playwright to capture frames
     """
+    temp_dir = VIDEO_TEMP_IMAGES_DIR / job_id
+    debug_dir = temp_dir / "debug"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    debug_dir.mkdir(parents=True, exist_ok=True)
+
     try:
         # Lazy import to avoid blocking server startup
         from playwright.async_api import async_playwright
@@ -160,8 +169,9 @@ async def _export_video_playwright(
 
             # Take a screenshot for debugging (with longer timeout for headless)
             try:
-                await page.screenshot(path=f"/tmp/playwright-debug-{job_id}.png", timeout=60000)
-                print(f"📸 Debug screenshot saved to /tmp/playwright-debug-{job_id}.png")
+                debug_screenshot = debug_dir / f"playwright-debug-{job_id}.png"
+                await page.screenshot(path=str(debug_screenshot), timeout=60000)
+                print(f"📸 Debug screenshot saved to {debug_screenshot}")
             except Exception as e:
                 print(f"⚠️  Debug screenshot failed: {e} (continuing anyway)")
 
@@ -183,8 +193,9 @@ async def _export_video_playwright(
 
             except Exception as e:
                 # Take another screenshot to see what went wrong
-                await page.screenshot(path=f"/tmp/playwright-error-{job_id}.png")
-                print(f"❌ Canvas not found. Error screenshot: /tmp/playwright-error-{job_id}.png")
+                error_screenshot = debug_dir / f"playwright-error-{job_id}.png"
+                await page.screenshot(path=str(error_screenshot))
+                print(f"❌ Canvas not found. Error screenshot: {error_screenshot}")
 
                 # Get page content for debugging
                 content = await page.content()
@@ -436,7 +447,7 @@ async def _export_video_playwright(
 
             # Save WebM file
             webm_file = (
-                EXPORTS_DIR / f"flight-{flight_id}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.webm"
+                temp_dir / f"flight-{flight_id}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.webm"
             )
             import base64
 
@@ -452,7 +463,8 @@ async def _export_video_playwright(
             export_jobs[job_id]["message"] = "Converting WebM to MP4..."
 
             output_file = (
-                EXPORTS_DIR / f"flight-{flight_id}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.mp4"
+                VIDEO_EXPORT_DIR
+                / f"flight-{flight_id}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.mp4"
             )
 
             # Convert WebM to MP4
@@ -500,6 +512,8 @@ async def _export_video_playwright(
         export_jobs[job_id]["status"] = "failed"
         export_jobs[job_id]["error"] = str(e)
         export_jobs[job_id]["message"] = f"Error: {str(e)}"
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def get_export_status(job_id: str) -> dict | None:

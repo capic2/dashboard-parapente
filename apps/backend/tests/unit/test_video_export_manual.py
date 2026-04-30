@@ -136,3 +136,33 @@ def test_encoding_progress_percent_spans_encoding_phase_range():
     assert video_export_manual._encoding_progress_percent(0, 100) == 80
     assert video_export_manual._encoding_progress_percent(50, 100) == 89
     assert video_export_manual._encoding_progress_percent(100, 100) == 99
+
+
+def test_video_output_path_uses_configured_export_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(video_export_manual, "VIDEO_EXPORT_DIR", tmp_path / "videos")
+
+    output_path = video_export_manual._video_output_path("flight-123", "20260430-120000")
+
+    assert output_path == tmp_path / "videos" / "flight-flight-123-20260430-120000.mp4"
+
+
+def test_job_frames_dir_uses_configured_temp_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(video_export_manual, "VIDEO_TEMP_IMAGES_DIR", tmp_path / "temp-images")
+
+    frames_dir = video_export_manual._job_frames_dir("job-123")
+
+    assert frames_dir == tmp_path / "temp-images" / "job-123" / "frames"
+
+
+def test_cleanup_temp_dir_removes_nested_files(tmp_path):
+    temp_dir = tmp_path / "temp-images" / "job-123"
+    frames_dir = temp_dir / "frames"
+    debug_dir = temp_dir / "debug"
+    frames_dir.mkdir(parents=True)
+    debug_dir.mkdir()
+    (frames_dir / "frame00001.png").write_bytes(b"frame")
+    (debug_dir / "playwright-debug.png").write_bytes(b"debug")
+
+    video_export_manual._cleanup_temp_dir(temp_dir)
+
+    assert not temp_dir.exists()

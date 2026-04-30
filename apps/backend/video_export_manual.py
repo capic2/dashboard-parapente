@@ -27,8 +27,10 @@ from models import Flight, VideoExportJob
 # Storage for export jobs (compatibility snapshot)
 export_jobs: dict[str, dict[str, Any]] = {}
 
-EXPORTS_DIR = Path(__file__).parent / "exports" / "videos"
-EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+VIDEO_EXPORT_DIR = Path(config.VIDEO_EXPORT_DIR)
+VIDEO_TEMP_IMAGES_DIR = Path(config.VIDEO_TEMP_IMAGES_DIR)
+VIDEO_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+VIDEO_TEMP_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 _STATUS_QUEUED = "queued"
@@ -384,16 +386,21 @@ def _acquire_next_job() -> str | None:
         return job.id
 
 
-def _cleanup_frames(frames_dir: Path):
-    if not frames_dir.exists():
-        return
+def _cleanup_temp_dir(temp_dir: Path | None):
+    if temp_dir is not None:
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
-    for frame_file in frames_dir.glob("*.png"):
-        frame_file.unlink()
-    try:
-        frames_dir.rmdir()
-    except OSError:
-        pass
+
+def _job_temp_dir(job_id: str) -> Path:
+    return VIDEO_TEMP_IMAGES_DIR / job_id
+
+
+def _job_frames_dir(job_id: str) -> Path:
+    return _job_temp_dir(job_id) / "frames"
+
+
+def _video_output_path(flight_id: str, timestamp: str) -> Path:
+    return VIDEO_EXPORT_DIR / f"flight-{flight_id}-{timestamp}.mp4"
 
 
 def _capture_progress_percent(frame_count: int, total_frames: int) -> int:
@@ -560,6 +567,7 @@ async def _export_video_manual_render(job_id: str):
     speed = job.speed or 1
     flight_id = job.flight_id
     frontend_url = resolve_frontend_url(job.frontend_url)
+    temp_dir: Path | None = None
     frames_dir: Path | None = None
 
     try:
@@ -784,8 +792,9 @@ async def _export_video_manual_render(job_id: str):
             )
             _set_job_runtime(job_id, phase=_STATUS_INITIALIZING)
 
-            frames_dir = EXPORTS_DIR / f"frames_{job_id}"
-            frames_dir.mkdir(exist_ok=True)
+            temp_dir = _job_temp_dir(job_id)
+            frames_dir = _job_frames_dir(job_id)
+            frames_dir.mkdir(parents=True, exist_ok=True)
 
             print(f"📁 Frames directory: {frames_dir}")
 
@@ -812,7 +821,7 @@ async def _export_video_manual_render(job_id: str):
                 if i % _CANCEL_CHECK_INTERVAL == 0 and _is_cancelled(job_id):
                     print("🛑 Export cancelled by user")
                     await browser.close()
-                    _cleanup_frames(frames_dir)
+                    _cleanup_temp_dir(temp_dir)
                     _update_job(
                         job_id,
                         status=_STATUS_CANCELLED,
@@ -871,7 +880,7 @@ async def _export_video_manual_render(job_id: str):
 
             if _is_cancelled(job_id):
                 print("🛑 Export cancelled by user before encoding")
-                _cleanup_frames(frames_dir)
+                _cleanup_temp_dir(temp_dir)
                 _update_job(
                     job_id,
                     status=_STATUS_CANCELLED,
@@ -888,8 +897,7 @@ async def _export_video_manual_render(job_id: str):
             _set_job_runtime(job_id, phase=_STATUS_ENCODING, eta_seconds=None)
 
             timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-            filename = f"flight-{flight_id}-{timestamp}.mp4"
-            output_file = EXPORTS_DIR / filename
+            output_file = _video_output_path(flight_id, timestamp)
 
             ffmpeg_cmd = [
                 "ffmpeg",
@@ -930,7 +938,7 @@ async def _export_video_manual_render(job_id: str):
                     if _is_cancelled(job_id):
                         process.kill()
                         await process.wait()
-                        _cleanup_frames(frames_dir)
+                        _cleanup_temp_dir(temp_dir)
                         _update_job(
                             job_id,
                             status=_STATUS_CANCELLED,
@@ -999,7 +1007,7 @@ async def _export_video_manual_render(job_id: str):
 
             print(f"✅ Video encoded: {output_file}")
 
-            _cleanup_frames(frames_dir)
+            _cleanup_temp_dir(temp_dir)
 
             file_size_mb = output_file.stat().st_size / (1024 * 1024)
             _update_job(
@@ -1016,8 +1024,7 @@ async def _export_video_manual_render(job_id: str):
             print(f"📹 Video: {output_file} ({file_size_mb:.1f} MB)")
 
     except Exception as e:
-        if frames_dir is not None:
-            _cleanup_frames(frames_dir)
+        _cleanup_temp_dir(temp_dir)
         print(f"❌ Export failed: {e}")
         traceback.print_exc()
         _update_job(
