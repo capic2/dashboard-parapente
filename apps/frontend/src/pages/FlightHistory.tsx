@@ -9,7 +9,6 @@ import { CreateFlightModal } from '../components/flights/CreateFlightModal';
 import { CreateSiteModal } from '../components/flights/CreateSiteModal';
 import { FlightsTable } from '../components/flights/FlightsTable';
 import { FlightDetails } from '../components/flights/FlightDetails';
-import { VideoExportJobsPanel } from '../components/flights/VideoExportJobsPanel';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import {
   ToastContainer,
@@ -168,8 +167,6 @@ export default function FlightHistory() {
     <div>
       {/* Toast notifications */}
       <ToastContainer toasts={toasts} onClose={removeToast} />
-
-      <VideoExportJobsPanel />
 
       <div className="mb-4 bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
