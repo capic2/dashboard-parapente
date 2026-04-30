@@ -10,6 +10,9 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from database import SessionLocal
+from models import Flight
+
 # Storage for export jobs
 export_jobs: dict[str, dict] = {}
 
@@ -51,6 +54,27 @@ def _is_cancelled(job_id: str) -> bool:
 def _raise_if_cancelled(job_id: str):
     if _is_cancelled(job_id):
         raise RuntimeError("Export cancelled by user")
+
+
+def _cleanup_export_files(*paths: Path | None):
+    for path in paths:
+        if path:
+            path.unlink(missing_ok=True)
+
+
+def _mark_flight_export_cancelled(job: dict):
+    flight_id = job.get("flight_id")
+    if not flight_id:
+        return
+
+    with SessionLocal() as db:
+        flight = db.query(Flight).filter(Flight.id == flight_id).first()
+        if not flight:
+            return
+
+        flight.video_export_status = "cancelled"
+        flight.updated_at = datetime.utcnow()
+        db.commit()
 
 
 def start_video_export_background(
@@ -108,6 +132,9 @@ async def _export_video_playwright(
     """
     Export video using Playwright to capture frames
     """
+    webm_file: Path | None = None
+    output_file: Path | None = None
+
     try:
         # Lazy import to avoid blocking server startup
         from playwright.async_api import async_playwright
@@ -506,12 +533,16 @@ async def _export_video_playwright(
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            while process.poll() is None:
+            try:
+                while process.poll() is None:
+                    if _is_cancelled(job_id):
+                        process.kill()
+                        process.wait()
+                        raise RuntimeError("Export cancelled by user")
+                    await asyncio.sleep(1)
+            finally:
                 if _is_cancelled(job_id):
-                    process.kill()
-                    process.wait()
-                    raise RuntimeError("Export cancelled by user")
-                await asyncio.sleep(1)
+                    _cleanup_export_files(webm_file, output_file)
 
             if process.returncode != 0:
                 raise Exception(f"FFmpeg conversion failed with code {process.returncode}")
@@ -534,6 +565,7 @@ async def _export_video_playwright(
     except Exception as e:
         print(f"❌ Export failed: {str(e)}")
         if _is_cancelled(job_id):
+            _cleanup_export_files(webm_file, output_file)
             export_jobs[job_id]["message"] = "Export cancelled by user"
             export_jobs[job_id]["error"] = None
             export_jobs[job_id]["cancelled_at"] = datetime.now().isoformat()
@@ -563,6 +595,7 @@ def cancel_video_export(job_id: str) -> bool:
     job["message"] = "Export cancelled by user"
     job["error"] = None
     job["cancelled_at"] = datetime.now().isoformat()
+    _mark_flight_export_cancelled(job)
     return True
 
 

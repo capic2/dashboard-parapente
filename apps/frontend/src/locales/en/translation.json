@@ -65,8 +65,9 @@
   },
   "videoJobs": {
     "title": "Video generations",
-    "activeCount": "{{count}} generation running",
-    "noActive": "No generation running",
+    "activeCount_one": "{{count}} generation running",
+    "activeCount_other": "{{count}} generations running",
+    "noActive": "No generations running",
     "confirmStop": "Stop this video generation?",
     "stop": "Stop",
     "stopping": "Stopping...",
