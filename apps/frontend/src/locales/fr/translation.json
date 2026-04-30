@@ -65,7 +65,8 @@
   },
   "videoJobs": {
     "title": "Générations vidéo",
-    "activeCount": "{{count}} génération en cours",
+    "activeCount_one": "{{count}} génération en cours",
+    "activeCount_other": "{{count}} générations en cours",
     "noActive": "Aucune génération en cours",
     "confirmStop": "Stopper cette génération vidéo ?",
     "stop": "Stopper",
