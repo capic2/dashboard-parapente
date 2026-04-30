@@ -1,4 +1,7 @@
+// @vitest-environment happy-dom
+
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoExportJobsPanel } from './VideoExportJobsPanel';
 
@@ -16,6 +19,7 @@ vi.mock('react-i18next', () => ({
         ? fallback.replace('{{count}}', String(values.count))
         : fallback,
   }),
+  withTranslation: () => (Component: React.ComponentType) => Component,
 }));
 
 vi.mock('../../hooks/useToast', () => ({
@@ -60,7 +64,7 @@ vi.mock('../../hooks/flights/useVideoExportJobs', () => ({
 describe('VideoExportJobsPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    window.confirm = vi.fn(() => true);
   });
 
   it('shows active jobs with a stop action only when cancellable', () => {
