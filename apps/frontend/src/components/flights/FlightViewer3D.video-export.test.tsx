@@ -103,7 +103,9 @@ vi.mock('cesium', () => {
     ConstantPositionProperty: class ConstantPositionProperty {
       setValue = vi.fn();
     },
-    Entity: class Entity {},
+    Entity: class Entity {
+      id = 'entity';
+    },
     HeadingPitchRange: class HeadingPitchRange {
       constructor(
         public heading: number,
@@ -125,7 +127,10 @@ vi.mock('cesium', () => {
 });
 
 vi.mock('@dashboard-parapente/design-system', () => ({
-  Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
+  Button: ({
+    children,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
     <button type="button" {...props}>
       {children}
     </button>
@@ -133,9 +138,11 @@ vi.mock('@dashboard-parapente/design-system', () => ({
 }));
 
 vi.mock('react-aria-components', () => ({
-  Disclosure: ({ children }: { children: (state: { isExpanded: boolean }) => React.ReactNode }) => (
-    <div>{children({ isExpanded: true })}</div>
-  ),
+  Disclosure: ({
+    children,
+  }: {
+    children: (state: { isExpanded: boolean }) => React.ReactNode;
+  }) => <div>{children({ isExpanded: true })}</div>,
   DisclosurePanel: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),

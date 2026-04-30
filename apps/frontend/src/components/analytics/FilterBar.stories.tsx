@@ -1,7 +1,7 @@
 import preview from '../../../.storybook/preview';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FilterBar } from './FilterBar';
-import { Site } from '@dashboard-parapente/shared-types';
+import type { Site } from '@dashboard-parapente/shared-types';
 import { expect, fn } from 'storybook/test';
 
 const meta = preview.meta({

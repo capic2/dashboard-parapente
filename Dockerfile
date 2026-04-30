@@ -38,6 +38,7 @@ WORKDIR /app
 LABEL maintainer="Dashboard Parapente"
 LABEL version="2.0.0-nx"
 LABEL description="Paragliding weather dashboard - Nx Monorepo"
+LABEL com.centurylinklabs.watchtower.enable="false"
 
 # Installer dépendances système pour Playwright et FFmpeg
 RUN apt-get update && apt-get install -y --no-install-recommends \

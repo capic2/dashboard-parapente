@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import type { Entity } from 'cesium';
 import {
   ArcType,
   BoundingSphere,
@@ -8,7 +9,6 @@ import {
   Cartographic,
   Color,
   ConstantPositionProperty,
-  Entity,
   HeadingPitchRange,
   HorizontalOrigin,
   Ion,
@@ -46,8 +46,8 @@ import { Disclosure, DisclosurePanel } from 'react-aria-components';
 import { HTTPError } from 'ky';
 import { useTranslation } from 'react-i18next';
 
+import type { GPXData } from '@dashboard-parapente/shared-types';
 import {
-  GPXData,
   VIDEO_EXPORT_IN_PROGRESS_STATUSES,
   type Flight,
 } from '@dashboard-parapente/shared-types';
@@ -498,8 +498,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       if (typeof window !== 'undefined' && window._exportMode) {
         window._gpxData = {
           ...gpxData,
-          positions: positions,
-          timestamps: timestamps,
+          positions,
+          timestamps,
         };
         window._cesiumViewer = viewer;
       }
@@ -1036,7 +1036,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     window._getExportMetadata = () => ({
       totalPoints: allPositionsRef.current.length,
       duration:
-        gpxData?.flight_duration_seconds || allPositionsRef.current.length || 300,
+        gpxData?.flight_duration_seconds ||
+        allPositionsRef.current.length ||
+        300,
     });
 
     return () => {
@@ -1148,8 +1150,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           viewer.camera.setView({
             destination: cameraTargetRef.current,
             orientation: {
-              heading: heading,
-              pitch: pitch,
+              heading,
+              pitch,
               roll: 0,
             },
           });
