@@ -163,6 +163,10 @@ def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
         "fps": job.fps,
         "quality": job.quality,
         "speed": job.speed,
+        "mode": job.mode,
+        "created_at": _to_iso(job.created_at),
+        "updated_at": _to_iso(job.updated_at),
+        "cancelled_at": _to_iso(job.cancelled_at),
     }
 
     with _JOB_RUNTIME_LOCK:
@@ -1164,15 +1168,13 @@ def cancel_video_export(job_id: str, update_db: bool = True) -> bool:
     return True
 
 
-def list_exports(flight_id: str) -> list[dict[str, Any]]:
-    """List all exports for a flight from DB and in-memory snapshots."""
+def list_exports(flight_id: str | None = None) -> list[dict[str, Any]]:
+    """List exports from DB and in-memory snapshots."""
     with SessionLocal() as db:
-        jobs = (
-            db.query(VideoExportJob)
-            .filter(VideoExportJob.flight_id == flight_id)
-            .order_by(VideoExportJob.created_at.desc())
-            .all()
-        )
+        query = db.query(VideoExportJob)
+        if flight_id:
+            query = query.filter(VideoExportJob.flight_id == flight_id)
+        jobs = query.order_by(VideoExportJob.created_at.desc()).all()
 
     results = [_snapshot_from_job(job) for job in jobs]
 
@@ -1180,7 +1182,7 @@ def list_exports(flight_id: str) -> list[dict[str, Any]]:
         memory_items = list(export_jobs.items())
 
     for job_id, snapshot in memory_items:
-        if snapshot.get("flight_id") != flight_id:
+        if flight_id and snapshot.get("flight_id") != flight_id:
             continue
         if not any(item.get("job_id") == job_id for item in results):
             results.append(snapshot)

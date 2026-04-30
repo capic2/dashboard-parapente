@@ -13,6 +13,8 @@ from pathlib import Path
 # Storage for export jobs
 export_jobs: dict[str, dict] = {}
 
+_TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
+
 EXPORTS_DIR = Path(__file__).parent / "exports" / "videos"
 EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -42,6 +44,15 @@ def check_dependencies():
 _dependencies_ok = check_dependencies()
 
 
+def _is_cancelled(job_id: str) -> bool:
+    return export_jobs.get(job_id, {}).get("status") == "cancelled"
+
+
+def _raise_if_cancelled(job_id: str):
+    if _is_cancelled(job_id):
+        raise RuntimeError("Export cancelled by user")
+
+
 def start_video_export_background(
     flight_id: str,
     quality: str = "1080p",
@@ -55,6 +66,7 @@ def start_video_export_background(
     job_id = f"{flight_id}-{int(time.time())}"
 
     export_jobs[job_id] = {
+        "job_id": job_id,
         "flight_id": flight_id,
         "status": "started",
         "progress": 0,
@@ -101,6 +113,7 @@ async def _export_video_playwright(
         from playwright.async_api import async_playwright
 
         # Update status
+        _raise_if_cancelled(job_id)
         export_jobs[job_id]["status"] = "capturing"
         export_jobs[job_id]["message"] = "Loading page..."
 
@@ -155,6 +168,7 @@ async def _export_video_playwright(
 
             # Navigate and check for errors
             response = await page.goto(url, wait_until="networkidle", timeout=60000)
+            _raise_if_cancelled(job_id)
             if response.status >= 400:
                 raise Exception(f"Page returned HTTP {response.status}")
 
@@ -172,14 +186,17 @@ async def _export_video_playwright(
             # Wait for React to load first
             await page.wait_for_load_state("domcontentloaded")
             await asyncio.sleep(2)  # Give React time to hydrate
+            _raise_if_cancelled(job_id)
 
             try:
                 # Try to wait for canvas with a longer timeout
                 await page.wait_for_selector("canvas", timeout=60000, state="attached")
+                _raise_if_cancelled(job_id)
                 print("✅ Cesium canvas found")
 
                 # Wait a bit more for Cesium to initialize
                 await asyncio.sleep(3)
+                _raise_if_cancelled(job_id)
 
             except Exception as e:
                 # Take another screenshot to see what went wrong
@@ -199,6 +216,7 @@ async def _export_video_playwright(
 
             # Give it a bit more time for initialization
             await asyncio.sleep(3)
+            _raise_if_cancelled(job_id)
 
             # Wait for terrain textures to load by checking terrainReady state
             export_jobs[job_id]["message"] = "Waiting for terrain textures..."
@@ -254,15 +272,18 @@ async def _export_video_playwright(
                     print("⚠️ Terrain check timed out after 60s, proceeding anyway...")
 
                 await asyncio.sleep(2)  # Extra buffer for complete rendering
+                _raise_if_cancelled(job_id)
 
             except TimeoutError:
                 print(
                     "⚠️ Python-level timeout after 65s - terrain still loading. Proceeding anyway..."
                 )
                 await asyncio.sleep(2)
+                _raise_if_cancelled(job_id)
             except Exception as e:
                 print(f"⚠️ Error waiting for terrain: {e}. Proceeding anyway...")
                 await asyncio.sleep(2)
+                _raise_if_cancelled(job_id)
 
             # Get flight data to calculate duration
             export_jobs[job_id]["message"] = "Calculating frames..."
@@ -285,6 +306,7 @@ async def _export_video_playwright(
                     return { duration: 1800 }; // Default 30 min
                 }
             """)
+            _raise_if_cancelled(job_id)
 
             duration_seconds = flight_info.get("duration", 1800)
             video_duration = duration_seconds / speed
@@ -372,6 +394,7 @@ async def _export_video_playwright(
                     return true;
                 }}
             """)
+            _raise_if_cancelled(job_id)
 
             if not recording_started:
                 raise Exception("Failed to start canvas recording")
@@ -385,6 +408,7 @@ async def _export_video_playwright(
             elapsed = 0
             check_interval = 5
             while elapsed < video_duration + 5:  # Add 5s buffer
+                _raise_if_cancelled(job_id)
                 await asyncio.sleep(check_interval)
                 elapsed += check_interval
 
@@ -394,6 +418,7 @@ async def _export_video_playwright(
                 print(f"🎥 Recording progress: {elapsed}s / {int(video_duration)}s")
 
             print("⏹️  Stopping recording...")
+            _raise_if_cancelled(job_id)
 
             # Stop recording and get the video data
             export_jobs[job_id]["message"] = "Finalizing recording..."
@@ -447,6 +472,7 @@ async def _export_video_playwright(
             await browser.close()
 
             # Convert WebM to MP4 with FFmpeg
+            _raise_if_cancelled(job_id)
             export_jobs[job_id]["status"] = "encoding"
             export_jobs[job_id]["progress"] = 50
             export_jobs[job_id]["message"] = "Converting WebM to MP4..."
@@ -475,10 +501,20 @@ async def _export_video_playwright(
             ]
 
             print(f"🎬 Converting WebM to MP4: {' '.join(ffmpeg_cmd)}")
-            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+            process = subprocess.Popen(
+                ffmpeg_cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            while process.poll() is None:
+                if _is_cancelled(job_id):
+                    process.kill()
+                    process.wait()
+                    raise RuntimeError("Export cancelled by user")
+                await asyncio.sleep(1)
 
-            if result.returncode != 0:
-                raise Exception(f"FFmpeg conversion failed: {result.stderr}")
+            if process.returncode != 0:
+                raise Exception(f"FFmpeg conversion failed with code {process.returncode}")
 
             # Cleanup temporary WebM file
             if webm_file.exists():
@@ -497,6 +533,12 @@ async def _export_video_playwright(
 
     except Exception as e:
         print(f"❌ Export failed: {str(e)}")
+        if _is_cancelled(job_id):
+            export_jobs[job_id]["message"] = "Export cancelled by user"
+            export_jobs[job_id]["error"] = None
+            export_jobs[job_id]["cancelled_at"] = datetime.now().isoformat()
+            return
+
         export_jobs[job_id]["status"] = "failed"
         export_jobs[job_id]["error"] = str(e)
         export_jobs[job_id]["message"] = f"Error: {str(e)}"
@@ -509,11 +551,26 @@ def get_export_status(job_id: str) -> dict | None:
     return export_jobs.get(job_id)
 
 
+def cancel_video_export(job_id: str) -> bool:
+    """
+    Cancel an ongoing stream export job.
+    """
+    job = export_jobs.get(job_id)
+    if not job or job.get("status") in _TERMINAL_STATUSES:
+        return False
+
+    job["status"] = "cancelled"
+    job["message"] = "Export cancelled by user"
+    job["error"] = None
+    job["cancelled_at"] = datetime.now().isoformat()
+    return True
+
+
 def list_exports(flight_id: str | None = None) -> list:
     """
     List all export jobs, optionally filtered by flight_id
     """
-    jobs = list(export_jobs.values())
+    jobs = [dict(job, job_id=job_id) for job_id, job in export_jobs.items()]
     if flight_id:
         jobs = [j for j in jobs if j.get("flight_id") == flight_id]
     return jobs

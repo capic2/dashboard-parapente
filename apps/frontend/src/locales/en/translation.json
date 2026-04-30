@@ -63,6 +63,28 @@
     "viewWhatsNew": "See what's new",
     "refresh": "Refresh"
   },
+  "videoJobs": {
+    "title": "Video generations",
+    "activeCount": "{{count}} generation running",
+    "noActive": "No generation running",
+    "confirmStop": "Stop this video generation?",
+    "stop": "Stop",
+    "stopping": "Stopping...",
+    "stopSuccess": "Generation stopped",
+    "stopError": "Unable to stop generation",
+    "loadError": "Unable to load video generations",
+    "status": {
+      "queued": "Queued",
+      "running": "Starting",
+      "initializing": "Initializing",
+      "capturing": "Capturing",
+      "encoding": "Encoding",
+      "processing": "In progress",
+      "completed": "Completed",
+      "failed": "Error",
+      "cancelled": "Cancelled"
+    }
+  },
   "dashboard": {
     "loadingError": "Loading error",
     "loadingMessage": "Loading dashboard...",
