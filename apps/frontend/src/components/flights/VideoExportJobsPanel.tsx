@@ -49,7 +49,12 @@ function getProgress(job: VideoExportJob) {
 }
 
 function getDateLabel(job: VideoExportJob) {
-  const rawDate = job.updated_at || job.started_at || job.created_at;
+  const rawDate =
+    job.updated_at ||
+    job.completed_at ||
+    job.cancelled_at ||
+    job.started_at ||
+    job.created_at;
   if (!rawDate) {
     return null;
   }
@@ -65,6 +70,7 @@ function getDateLabel(job: VideoExportJob) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
+}
 }
 
 export function VideoExportJobsPanel() {
