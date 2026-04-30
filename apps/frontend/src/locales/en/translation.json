@@ -3,6 +3,7 @@
     "title": "Paragliding Dashboard",
     "dashboard": "Dashboard",
     "flights": "Flights",
+    "exports": "Exports",
     "analytics": "Analytics",
     "sites": "Sites",
     "settings": "Settings",
@@ -65,6 +66,8 @@
   },
   "videoJobs": {
     "title": "Video generations",
+    "pageTitle": "Video exports",
+    "pageSubtitle": "Track running video generations and recent exports.",
     "activeCount_one": "{{count}} generation running",
     "activeCount_other": "{{count}} generations running",
     "noActive": "No generations running",
@@ -74,6 +77,7 @@
     "stopSuccess": "Generation stopped",
     "stopError": "Unable to stop generation",
     "loadError": "Unable to load video generations",
+    "empty": "No video generation yet.",
     "status": {
       "queued": "Queued",
       "running": "Starting",

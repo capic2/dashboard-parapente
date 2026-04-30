@@ -59,6 +59,9 @@ export default function Header() {
           <Link to="/flights" className={linkClassName} onClick={onNavigate}>
             {t('header.flights')}
           </Link>
+          <Link to="/exports" className={linkClassName} onClick={onNavigate}>
+            {t('header.exports')}
+          </Link>
           <Link to="/analytics" className={linkClassName} onClick={onNavigate}>
             {t('header.analytics')}
           </Link>
@@ -169,7 +172,10 @@ export default function Header() {
             className="min-h-11 min-w-11 flex items-center justify-center rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
             aria-label={themeTooltip}
           >
-            <span aria-hidden="true" className="text-lg leading-none inline-block">
+            <span
+              aria-hidden="true"
+              className="text-lg leading-none inline-block"
+            >
               {themeIcons[themePreference]}
             </span>
           </AriaButton>

@@ -100,10 +100,6 @@ export function VideoExportJobsPanel() {
     }
   }
 
-  if (!isLoading && !isError && visibleJobs.length === 0) {
-    return null;
-  }
-
   return (
     <section className="mb-4 overflow-hidden rounded-xl border border-sky-100 bg-white shadow-md dark:border-sky-900/60 dark:bg-gray-800">
       <div className="flex flex-col gap-3 border-b border-gray-100 p-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
@@ -142,7 +138,13 @@ export function VideoExportJobsPanel() {
         </div>
       )}
 
-      {!isLoading && !isError && (
+      {!isLoading && !isError && visibleJobs.length === 0 && (
+        <div className="p-4 text-sm text-gray-600 dark:text-gray-300">
+          {t('videoJobs.empty', 'Aucune génération vidéo pour le moment.')}
+        </div>
+      )}
+
+      {!isLoading && !isError && visibleJobs.length > 0 && (
         <div className="divide-y divide-gray-100 dark:divide-gray-700">
           {visibleJobs.map((job) => {
             const progress = getProgress(job);

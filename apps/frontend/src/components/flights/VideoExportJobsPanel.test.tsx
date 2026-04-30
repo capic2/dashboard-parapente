@@ -5,12 +5,34 @@ import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoExportJobsPanel } from './VideoExportJobsPanel';
 
-const { cancelJob, toastError, toastSuccess, refetch } = vi.hoisted(() => ({
-  cancelJob: vi.fn(),
-  toastError: vi.fn(),
-  toastSuccess: vi.fn(),
-  refetch: vi.fn(),
-}));
+const { cancelJob, toastError, toastSuccess, refetch, jobs } = vi.hoisted(
+  () => ({
+    cancelJob: vi.fn(),
+    toastError: vi.fn(),
+    toastSuccess: vi.fn(),
+    refetch: vi.fn(),
+    jobs: [
+      {
+        job_id: 'job-active',
+        flight_title: 'Vol test',
+        status: 'processing',
+        internal_status: 'capturing',
+        progress: 42,
+        message: 'Capturing frames',
+        mode: 'manual_fast',
+        can_cancel: true,
+      },
+      {
+        job_id: 'job-done',
+        flight_title: 'Vol terminé',
+        status: 'completed',
+        internal_status: 'completed',
+        progress: 100,
+        can_cancel: false,
+      },
+    ],
+  })
+);
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -31,7 +53,23 @@ vi.mock('../../hooks/useToast', () => ({
 
 vi.mock('../../hooks/flights/useVideoExportJobs', () => ({
   useVideoExportJobs: () => ({
-    data: [
+    data: jobs,
+    isLoading: false,
+    isError: false,
+    refetch,
+  }),
+  useCancelVideoExportJob: () => ({
+    mutateAsync: cancelJob,
+    isPending: false,
+  }),
+}));
+
+describe('VideoExportJobsPanel', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    jobs.splice(
+      0,
+      jobs.length,
       {
         job_id: 'job-active',
         flight_title: 'Vol test',
@@ -49,21 +87,8 @@ vi.mock('../../hooks/flights/useVideoExportJobs', () => ({
         internal_status: 'completed',
         progress: 100,
         can_cancel: false,
-      },
-    ],
-    isLoading: false,
-    isError: false,
-    refetch,
-  }),
-  useCancelVideoExportJob: () => ({
-    mutateAsync: cancelJob,
-    isPending: false,
-  }),
-}));
-
-describe('VideoExportJobsPanel', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+      }
+    );
     window.confirm = vi.fn(() => true);
   });
 
@@ -85,5 +110,15 @@ describe('VideoExportJobsPanel', () => {
 
     await waitFor(() => expect(cancelJob).toHaveBeenCalledWith('job-active'));
     expect(toastSuccess).toHaveBeenCalledWith('Génération stoppée');
+  });
+
+  it('shows an empty state when there are no jobs', () => {
+    jobs.splice(0, jobs.length);
+
+    render(<VideoExportJobsPanel />);
+
+    expect(
+      screen.getByText('Aucune génération vidéo pour le moment.')
+    ).toBeInTheDocument();
   });
 });
