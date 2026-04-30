@@ -204,6 +204,7 @@ export function useCreateFlightFromGPX() {
           } catch {
             // Response is not JSON, use default message
           }
+          // @ts-expect-error IDK
           throw new Error(errorMessage, { cause: error });
         }
         // Re-throw other errors
