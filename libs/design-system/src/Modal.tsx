@@ -7,7 +7,7 @@ import {
 } from 'react-aria-components';
 import { useTranslation } from 'react-i18next';
 import { tv } from 'tailwind-variants';
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 const modal = tv({
   base: 'bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-h-[90vh] overflow-y-auto',
