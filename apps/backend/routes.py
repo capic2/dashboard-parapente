@@ -66,6 +66,7 @@ from schemas import (
 )
 from video_export import get_export_status as get_export_status_stream
 from video_export import list_exports as list_exports_stream
+from video_export import cancel_video_export as cancel_video_export_stream
 from video_export import start_video_export_background
 from video_export_manual import cancel_video_export as cancel_video_export_manual
 from video_export_manual import get_export_status as get_export_status_manual
@@ -81,6 +82,14 @@ logger = logging.getLogger(__name__)
 
 _VIDEO_EXPORT_IN_PROGRESS_STATUSES = {
     "processing",
+    "queued",
+    "running",
+    "initializing",
+    "capturing",
+    "encoding",
+}
+
+_VIDEO_EXPORT_CANCELLABLE_STATUSES = {
     "queued",
     "running",
     "initializing",
@@ -126,6 +135,72 @@ def _resolve_export_status(job_id: str) -> dict[str, Any] | None:
     if status:
         return status
     return get_export_status_stream(job_id)
+
+
+def _video_export_sort_value(export: dict[str, Any]) -> str:
+    return str(
+        export.get("updated_at")
+        or export.get("started_at")
+        or export.get("completed_at")
+        or export.get("created_at")
+        or ""
+    )
+
+
+def _video_export_public_status(export: dict[str, Any]) -> str:
+    internal_status = export.get("internal_status")
+    if internal_status in {"completed", "failed", "cancelled"}:
+        return str(internal_status)
+
+    status = export.get("status")
+    if status == "started":
+        return "processing"
+    if isinstance(status, str):
+        return status
+    return "unknown"
+
+
+def _video_export_can_cancel(export: dict[str, Any]) -> bool:
+    internal_status = export.get("internal_status")
+    if isinstance(internal_status, str):
+        return internal_status in _VIDEO_EXPORT_CANCELLABLE_STATUSES
+
+    return export.get("status") in {
+        "started",
+        "processing",
+        *_VIDEO_EXPORT_CANCELLABLE_STATUSES,
+    } and bool(export.get("job_id"))
+
+
+def _build_video_export_jobs_payload(
+    exports: list[dict[str, Any]], db: Session
+) -> list[dict[str, Any]]:
+    flight_ids = {export.get("flight_id") for export in exports if export.get("flight_id")}
+    flights_by_id = {}
+    if flight_ids:
+        flights_by_id = {
+            flight.id: flight for flight in db.query(Flight).filter(Flight.id.in_(flight_ids)).all()
+        }
+
+    jobs: list[dict[str, Any]] = []
+    seen_job_ids: set[str] = set()
+    for export in exports:
+        job_id = export.get("job_id")
+        if job_id and job_id in seen_job_ids:
+            continue
+        if job_id:
+            seen_job_ids.add(job_id)
+
+        flight = flights_by_id.get(export.get("flight_id"))
+        job = dict(export)
+        job["status"] = _video_export_public_status(job)
+        job["can_cancel"] = _video_export_can_cancel(job)
+        if flight:
+            job["flight_name"] = flight.name or flight.title
+            job["flight_title"] = flight.title or flight.name
+        jobs.append(job)
+
+    return sorted(jobs, key=_video_export_sort_value, reverse=True)
 
 
 # Public routes: no authentication required (weather, spots read, auth)
@@ -4017,6 +4092,22 @@ def get_video_export_status(job_id: str):
     return status
 
 
+@router.get("/video-export-jobs")
+def list_video_export_jobs(
+    active_only: bool = False,
+    db: Session = Depends(get_db),
+):
+    """List video export jobs across all flights."""
+    jobs = _build_video_export_jobs_payload(
+        list_exports_manual() + list_exports_stream(),
+        db,
+    )
+    if active_only:
+        jobs = [job for job in jobs if job.get("can_cancel")]
+
+    return {"jobs": jobs}
+
+
 @router.get("/exports/{job_id}/stream")
 async def stream_video_export_status(job_id: str, request: Request) -> StreamingResponse:
     """Stream export status updates through Server-Sent Events."""
@@ -4080,8 +4171,9 @@ def cancel_video_export(job_id: str):
     """
     Cancel an ongoing video export job
     """
-    # Try to cancel manual render job
     success = cancel_video_export_manual(job_id)
+    if not success:
+        success = cancel_video_export_stream(job_id)
 
     if not success:
         raise HTTPException(

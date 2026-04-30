@@ -63,6 +63,29 @@
     "viewWhatsNew": "Voir les nouveautés",
     "refresh": "Rafraîchir"
   },
+  "videoJobs": {
+    "title": "Générations vidéo",
+    "activeCount_one": "{{count}} génération en cours",
+    "activeCount_other": "{{count}} générations en cours",
+    "noActive": "Aucune génération en cours",
+    "confirmStop": "Stopper cette génération vidéo ?",
+    "stop": "Stopper",
+    "stopping": "Arrêt...",
+    "stopSuccess": "Génération stoppée",
+    "stopError": "Impossible de stopper la génération",
+    "loadError": "Impossible de charger les générations vidéo",
+    "status": {
+      "queued": "En attente",
+      "running": "Démarrage",
+      "initializing": "Initialisation",
+      "capturing": "Capture",
+      "encoding": "Encodage",
+      "processing": "En cours",
+      "completed": "Terminé",
+      "failed": "Erreur",
+      "cancelled": "Annulé"
+    }
+  },
   "dashboard": {
     "loadingError": "Erreur de chargement",
     "loadingMessage": "Chargement du tableau de bord...",
