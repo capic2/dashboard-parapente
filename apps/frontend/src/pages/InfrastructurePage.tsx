@@ -1,8 +1,15 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useTranslation } from 'react-i18next';
-import { Checkbox, Input, TextField } from 'react-aria-components';
-import { Button } from '@dashboard-parapente/design-system';
+import {
+  Checkbox,
+  Input,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
+  TextField,
+} from 'react-aria-components';
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -10,7 +17,12 @@ import {
   useReactTable,
   type SortingState,
 } from '@tanstack/react-table';
-import { DataTable, Modal } from '@dashboard-parapente/design-system';
+import {
+  Button,
+  DataTable,
+  Modal,
+  ToastContainer,
+} from '@dashboard-parapente/design-system';
 import {
   useCacheOverview,
   useCacheKeyDetail,
@@ -22,6 +34,8 @@ import {
   useStravaTokenLogs,
   useStravaRefreshToken,
 } from '../hooks/admin/useStravaToken';
+import { VideoExportJobsPanel } from '../components/flights/VideoExportJobsPanel';
+import { useToastStore } from '../hooks/useToast';
 
 // --- Helpers ---
 
@@ -635,15 +649,48 @@ function CacheSection() {
 
 export default function InfrastructurePage() {
   const { t } = useTranslation();
+  const { toasts, removeToast } = useToastStore();
 
   return (
     <div className="py-4 space-y-8">
+      <ToastContainer toasts={toasts} onClose={removeToast} />
+
       <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
         {t('infrastructure.title')}
       </h2>
 
-      <StravaTokenSection />
-      <CacheSection />
+      <Tabs className="space-y-4">
+        <TabList className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <Tab
+            id="strava"
+            className="flex-1 px-4 py-2 rounded-lg font-medium transition-all cursor-pointer bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 selected:bg-sky-600 selected:text-white selected:shadow-md outline-none"
+          >
+            {t('infrastructure.tabs.strava')}
+          </Tab>
+          <Tab
+            id="videoExports"
+            className="flex-1 px-4 py-2 rounded-lg font-medium transition-all cursor-pointer bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 selected:bg-sky-600 selected:text-white selected:shadow-md outline-none"
+          >
+            {t('infrastructure.tabs.videoExports')}
+          </Tab>
+          <Tab
+            id="cache"
+            className="flex-1 px-4 py-2 rounded-lg font-medium transition-all cursor-pointer bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 selected:bg-sky-600 selected:text-white selected:shadow-md outline-none"
+          >
+            {t('infrastructure.tabs.cache')}
+          </Tab>
+        </TabList>
+
+        <TabPanel id="strava" className="outline-none">
+          <StravaTokenSection />
+        </TabPanel>
+        <TabPanel id="videoExports" className="outline-none">
+          <VideoExportJobsPanel limit={null} />
+        </TabPanel>
+        <TabPanel id="cache" className="outline-none">
+          <CacheSection />
+        </TabPanel>
+      </Tabs>
     </div>
   );
 }

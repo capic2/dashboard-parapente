@@ -472,4 +472,47 @@ export const cacheHandlers = [
   }),
 ];
 
-export const defaultHandlers = [...stravaHandlers, ...cacheHandlers];
+export const videoExportHandlers = [
+  http.get('*/api/video-export-jobs', () =>
+    HttpResponse.json({
+      jobs: [
+        {
+          job_id: 'job-arguel-running',
+          flight_id: 'flight-arguel',
+          flight_title: 'Arguel - soaring du soir',
+          status: 'processing',
+          internal_status: 'encoding',
+          progress: 68,
+          message: 'Encoding 68%',
+          mode: 'manual_fast',
+          started_at: '2026-01-15T09:15:00Z',
+          updated_at: '2026-01-15T10:05:00Z',
+          can_cancel: true,
+        },
+        {
+          job_id: 'job-chalais-completed',
+          flight_id: 'flight-chalais',
+          flight_title: 'Chalais - thermique bleu',
+          status: 'completed',
+          internal_status: 'completed',
+          progress: 100,
+          message: 'Video ready',
+          mode: 'manual',
+          started_at: '2026-01-14T12:20:00Z',
+          completed_at: '2026-01-14T13:35:00Z',
+          can_cancel: false,
+        },
+      ],
+    })
+  ),
+
+  http.delete('*/api/exports/:jobId/cancel', () =>
+    HttpResponse.json({ success: true })
+  ),
+];
+
+export const defaultHandlers = [
+  ...stravaHandlers,
+  ...cacheHandlers,
+  ...videoExportHandlers,
+];
