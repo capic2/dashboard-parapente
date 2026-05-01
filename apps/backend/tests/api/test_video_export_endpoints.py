@@ -384,3 +384,28 @@ class TestVideoExportJobsEndpoint:
         jobs = response.json()["jobs"]
         assert {job["job_id"] for job in jobs} == {"job-queued", "job-stream-encoding"}
         assert all(job["can_cancel"] is True for job in jobs)
+
+    def test_video_export_jobs_temp_files_endpoint_cleans_known_exports(self, client: TestClient):
+        manual_jobs = [{"job_id": "job-failed", "internal_status": "failed"}]
+        stream_jobs = [{"job_id": "job-stream", "status": "completed"}]
+        cleanup_payload = {
+            "files_deleted": 2,
+            "dirs_deleted": 2,
+            "bytes_deleted": 10,
+            "paths_deleted": ["/tmp/job-failed", "/tmp/job-stream"],
+            "errors": [],
+        }
+
+        with (
+            patch("routes.list_exports_manual", return_value=manual_jobs),
+            patch("routes.list_exports_stream", return_value=stream_jobs),
+            patch(
+                "routes.cleanup_video_export_temp_files",
+                return_value=cleanup_payload,
+            ) as cleanup,
+        ):
+            response = client.delete(f"{API_PREFIX}/video-export-jobs/temp-files")
+
+        assert response.status_code == 200
+        assert response.json() == cleanup_payload
+        cleanup.assert_called_once_with(manual_jobs + stream_jobs)

@@ -76,6 +76,12 @@
     "stopping": "Stopping...",
     "stopSuccess": "Generation stopped",
     "stopError": "Unable to stop generation",
+    "cleanupTempFiles": "Clean temp files",
+    "cleaningTempFiles": "Cleaning...",
+    "confirmCleanupTempFiles": "Delete temporary files for completed, failed, or cancelled generations?",
+    "cleanupSuccess": "{{count}} temporary item(s) deleted",
+    "cleanupPartialError": "{{count}} item(s) deleted, but some files could not be removed",
+    "cleanupError": "Unable to delete temporary files",
     "loadError": "Unable to load video generations",
     "empty": "No video generation yet.",
     "status": {

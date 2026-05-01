@@ -76,6 +76,12 @@
     "stopping": "Arrêt...",
     "stopSuccess": "Génération stoppée",
     "stopError": "Impossible de stopper la génération",
+    "cleanupTempFiles": "Nettoyer les temporaires",
+    "cleaningTempFiles": "Nettoyage...",
+    "confirmCleanupTempFiles": "Supprimer les fichiers temporaires des générations terminées, échouées ou annulées ?",
+    "cleanupSuccess": "{{count}} élément(s) temporaire(s) supprimé(s)",
+    "cleanupPartialError": "{{count}} élément(s) supprimé(s), mais certains fichiers n’ont pas pu être supprimés",
+    "cleanupError": "Impossible de supprimer les fichiers temporaires",
     "loadError": "Impossible de charger les générations vidéo",
     "empty": "Aucune génération vidéo pour le moment.",
     "status": {

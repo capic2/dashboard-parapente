@@ -3,6 +3,7 @@ import { Button } from '@dashboard-parapente/design-system';
 import {
   type VideoExportJob,
   useCancelVideoExportJob,
+  useCleanupVideoExportTempFiles,
   useVideoExportJobs,
 } from '../../hooks/flights/useVideoExportJobs';
 import { useToast } from '../../hooks/useToast';
@@ -77,6 +78,7 @@ export function VideoExportJobsPanel() {
   const toast = useToast();
   const { data: jobs = [], isLoading, isError, refetch } = useVideoExportJobs();
   const cancelJob = useCancelVideoExportJob();
+  const cleanupTempFiles = useCleanupVideoExportTempFiles();
   const visibleJobs = jobs.slice(0, 6);
   const activeCount = jobs.filter((job) => job.can_cancel).length;
 
@@ -92,10 +94,52 @@ export function VideoExportJobsPanel() {
     try {
       await cancelJob.mutateAsync(job.job_id);
       toast.success(t('videoJobs.stopSuccess', 'Génération stoppée'));
-    } catch (error) {
-      console.error('Failed to cancel video export job:', error);
+    } catch {
       toast.error(
         t('videoJobs.stopError', 'Impossible de stopper la génération')
+      );
+    }
+  }
+
+  async function handleCleanupTempFiles() {
+    if (
+      !window.confirm(
+        t(
+          'videoJobs.confirmCleanupTempFiles',
+          'Supprimer les fichiers temporaires des générations terminées, échouées ou annulées ?'
+        )
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const result = await cleanupTempFiles.mutateAsync();
+      const deletedCount = result.files_deleted + result.dirs_deleted;
+      if (result.errors.length > 0) {
+        toast.error(
+          t(
+            'videoJobs.cleanupPartialError',
+            '{{count}} élément(s) supprimé(s), mais certains fichiers n’ont pas pu être supprimés',
+            { count: deletedCount }
+          )
+        );
+        return;
+      }
+
+      toast.success(
+        t(
+          'videoJobs.cleanupSuccess',
+          '{{count}} élément(s) temporaire(s) supprimé(s)',
+          { count: deletedCount }
+        )
+      );
+    } catch {
+      toast.error(
+        t(
+          'videoJobs.cleanupError',
+          'Impossible de supprimer les fichiers temporaires'
+        )
       );
     }
   }
@@ -115,12 +159,23 @@ export function VideoExportJobsPanel() {
               : t('videoJobs.noActive', 'Aucune génération en cours')}
           </p>
         </div>
-        <Button
-          onClick={() => refetch()}
-          className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
-        >
-          {t('common.retry', 'Rafraîchir')}
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Button
+            onClick={handleCleanupTempFiles}
+            disabled={cleanupTempFiles.isPending}
+            className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 dark:bg-amber-900/40 dark:text-amber-200 dark:hover:bg-amber-900/60 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
+          >
+            {cleanupTempFiles.isPending
+              ? t('videoJobs.cleaningTempFiles', 'Nettoyage...')
+              : t('videoJobs.cleanupTempFiles', 'Nettoyer les temporaires')}
+          </Button>
+          <Button
+            onClick={() => refetch()}
+            className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+          >
+            {t('common.retry', 'Rafraîchir')}
+          </Button>
+        </div>
       </div>
 
       {isError && (
