@@ -5,9 +5,10 @@ import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoExportJobsPanel } from './VideoExportJobsPanel';
 
-const { cancelJob, toastError, toastSuccess, refetch, jobs } = vi.hoisted(
-  () => ({
+const { cancelJob, cleanupTempFiles, toastError, toastSuccess, refetch, jobs } =
+  vi.hoisted(() => ({
     cancelJob: vi.fn(),
+    cleanupTempFiles: vi.fn(),
     toastError: vi.fn(),
     toastSuccess: vi.fn(),
     refetch: vi.fn(),
@@ -31,8 +32,7 @@ const { cancelJob, toastError, toastSuccess, refetch, jobs } = vi.hoisted(
         can_cancel: false,
       },
     ],
-  })
-);
+  }));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -60,6 +60,10 @@ vi.mock('../../hooks/flights/useVideoExportJobs', () => ({
   }),
   useCancelVideoExportJob: () => ({
     mutateAsync: cancelJob,
+    isPending: false,
+  }),
+  useCleanupVideoExportTempFiles: () => ({
+    mutateAsync: cleanupTempFiles,
     isPending: false,
   }),
 }));
@@ -110,6 +114,26 @@ describe('VideoExportJobsPanel', () => {
 
     await waitFor(() => expect(cancelJob).toHaveBeenCalledWith('job-active'));
     expect(toastSuccess).toHaveBeenCalledWith('Génération stoppée');
+  });
+
+  it('cleans temporary files after confirmation', async () => {
+    cleanupTempFiles.mockResolvedValue({
+      files_deleted: 2,
+      dirs_deleted: 1,
+      bytes_deleted: 123,
+      paths_deleted: ['/tmp/export-temp'],
+      errors: [],
+    });
+
+    render(<VideoExportJobsPanel />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Nettoyer les temporaires' })
+    );
+
+    await waitFor(() => expect(cleanupTempFiles).toHaveBeenCalled());
+    expect(toastSuccess).toHaveBeenCalledWith(
+      '3 élément(s) temporaire(s) supprimé(s)'
+    );
   });
 
   it('shows an empty state when there are no jobs', () => {

@@ -61,6 +61,7 @@ _JOB_RUNTIME: dict[str, dict[str, Any]] = {}
 
 _CANCEL_CHECK_INTERVAL = 10
 _FFMPEG_STALL_TIMEOUT_SECONDS = 10 * 60
+_ORPHAN_TEMP_CLEANUP_GRACE_SECONDS = 30
 
 
 def check_dependencies():
@@ -392,6 +393,160 @@ def _acquire_next_job() -> str | None:
 def _cleanup_temp_dir(temp_dir: Path | None) -> None:
     if temp_dir is not None:
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def _is_path_inside(path: Path, directory: Path) -> bool:
+    try:
+        path.resolve(strict=False).relative_to(directory.resolve(strict=False))
+    except ValueError:
+        return False
+    return True
+
+
+def _path_usage(path: Path) -> tuple[int, int, int]:
+    if not path.exists():
+        return 0, 0, 0
+
+    if path.is_file() or path.is_symlink():
+        try:
+            return 1, 0, path.stat().st_size
+        except OSError:
+            return 1, 0, 0
+
+    files_count = 0
+    dirs_count = 1
+    bytes_count = 0
+    for item in path.rglob("*"):
+        if item.is_dir() and not item.is_symlink():
+            dirs_count += 1
+            continue
+        files_count += 1
+        try:
+            bytes_count += item.stat().st_size
+        except OSError:
+            pass
+    return files_count, dirs_count, bytes_count
+
+
+def _delete_temp_path(path: Path, allowed_root: Path) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "path": str(path),
+        "deleted": False,
+        "files_deleted": 0,
+        "dirs_deleted": 0,
+        "bytes_deleted": 0,
+        "error": None,
+    }
+
+    if not path.exists():
+        return result
+
+    if not _is_path_inside(path, allowed_root):
+        result["error"] = "Refusing to delete outside configured temp directory"
+        return result
+
+    files_count, dirs_count, bytes_count = _path_usage(path)
+    try:
+        if path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+    except OSError as exc:
+        result["error"] = str(exc)
+        return result
+
+    result.update(
+        {
+            "deleted": True,
+            "files_deleted": files_count,
+            "dirs_deleted": dirs_count,
+            "bytes_deleted": bytes_count,
+        }
+    )
+    return result
+
+
+def _is_export_active(export: dict[str, Any]) -> bool:
+    internal_status = export.get("internal_status")
+    if isinstance(internal_status, str):
+        return internal_status in _ACTIVE_STATUSES
+    return export.get("status") in {"started", "processing", *_ACTIVE_STATUSES}
+
+
+def _is_path_older_than(path: Path, age_seconds: int) -> bool:
+    try:
+        return time.time() - path.stat().st_mtime >= age_seconds
+    except OSError:
+        return False
+
+
+def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, Any]:
+    """Delete non-active video export temporary files from configured storage."""
+    active_job_ids = {
+        str(export["job_id"])
+        for export in exports
+        if export.get("job_id") and _is_export_active(export)
+    }
+    known_inactive_job_ids = {
+        str(export["job_id"])
+        for export in exports
+        if export.get("job_id") and not _is_export_active(export)
+    }
+
+    candidates: list[tuple[Path, Path]] = []
+    temp_root = VIDEO_TEMP_IMAGES_DIR
+    export_root = VIDEO_EXPORT_DIR
+
+    for job_id in known_inactive_job_ids:
+        candidates.append((_job_temp_dir(job_id), temp_root))
+        candidates.append((export_root / f"frames_{job_id}", export_root))
+        candidates.append((Path("/tmp") / f"playwright-debug-{job_id}.png", Path("/tmp")))
+        candidates.append((Path("/tmp") / f"playwright-error-{job_id}.png", Path("/tmp")))
+
+    if temp_root.exists():
+        for child in temp_root.iterdir():
+            if child.name not in active_job_ids and _is_path_older_than(
+                child, _ORPHAN_TEMP_CLEANUP_GRACE_SECONDS
+            ):
+                candidates.append((child, temp_root))
+
+    if export_root.exists():
+        for child in export_root.glob("frames_*"):
+            job_id = child.name.removeprefix("frames_")
+            if job_id not in active_job_ids and _is_path_older_than(
+                child, _ORPHAN_TEMP_CLEANUP_GRACE_SECONDS
+            ):
+                candidates.append((child, export_root))
+
+    seen: set[str] = set()
+    deleted_paths: list[str] = []
+    errors: list[dict[str, str]] = []
+    files_deleted = 0
+    dirs_deleted = 0
+    bytes_deleted = 0
+
+    for path, allowed_root in candidates:
+        resolved_key = str(path.resolve(strict=False))
+        if resolved_key in seen:
+            continue
+        seen.add(resolved_key)
+
+        deletion = _delete_temp_path(path, allowed_root)
+        if deletion["deleted"]:
+            deleted_paths.append(str(deletion["path"]))
+            files_deleted += int(deletion["files_deleted"])
+            dirs_deleted += int(deletion["dirs_deleted"])
+            bytes_deleted += int(deletion["bytes_deleted"])
+        elif deletion["error"]:
+            errors.append({"path": str(deletion["path"]), "error": str(deletion["error"])})
+
+    return {
+        "files_deleted": files_deleted,
+        "dirs_deleted": dirs_deleted,
+        "bytes_deleted": bytes_deleted,
+        "paths_deleted": deleted_paths,
+        "errors": errors,
+    }
 
 
 def _prepare_export_dirs(temp_dir: Path, frames_dir: Path) -> None:
