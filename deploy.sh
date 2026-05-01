@@ -35,6 +35,9 @@ docker compose build --no-cache backend
 echo "Démarrage des conteneurs..."
 docker compose up -d
 
+echo "Nettoyage des images Docker inutilisées..."
+docker image prune -f
+
 echo "✅ Docker redémarré"
 echo ""
 
