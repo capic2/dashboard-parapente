@@ -287,6 +287,7 @@ jobs:
           BACKEND_METEOBLUE_API_KEY: test_key
           BACKEND_STRAVA_VERIFY_TOKEN: PARAPENTE_E2E_TEST
           BACKEND_JWT_SECRET: ci-test-secret-not-for-production
+          VITE_CESIUM_ION_TOKEN: e2e-ci-placeholder-token
 
       - name: 🔄 Retry E2E with local cache (if NX Cloud exhausted)
         if: steps.e2e.outcome == 'failure'
@@ -309,6 +310,7 @@ jobs:
           BACKEND_METEOBLUE_API_KEY: test_key
           BACKEND_STRAVA_VERIFY_TOKEN: PARAPENTE_E2E_TEST
           BACKEND_JWT_SECRET: ci-test-secret-not-for-production
+          VITE_CESIUM_ION_TOKEN: e2e-ci-placeholder-token
 
       - name: 📤 Upload E2E artifacts
         if: failure()
