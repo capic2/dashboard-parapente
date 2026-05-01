@@ -10,15 +10,15 @@ type LoginFormProps = {
   errorMessage?: string;
 };
 
-type LoginFormViewProps = {
-  form: ReturnType<typeof useForm>;
-  isPending: boolean;
-  errorMessage?: string;
-  emailLabel: string;
-  passwordLabel: string;
-  title: string;
-  loadingLabel: string;
-  submitLabel: string;
+type LoginFieldViewProps = {
+  id: 'email' | 'password';
+  type: 'email' | 'password';
+  autoComplete: 'username' | 'current-password';
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  inputClassName: string;
+  labelClassName: string;
 };
 
 const styles = tv({
@@ -38,104 +38,26 @@ const styles = tv({
   },
 });
 
-type LoginFieldProps = {
-  form: ReturnType<typeof useForm>;
-  label: string;
-  name: 'email' | 'password';
-  type: 'email' | 'password';
-  autoComplete: 'username' | 'current-password';
-  inputClassName: string;
-  labelClassName: string;
-};
-
-function LoginField({
-  form,
-  label,
-  name,
+function LoginFieldView({
+  id,
   type,
   autoComplete,
+  label,
+  value,
+  onChange,
   inputClassName,
   labelClassName,
-}: LoginFieldProps) {
+}: LoginFieldViewProps) {
   return (
-    <form.Field name={name}>
-      {(field) => (
-        <TextField
-          isRequired
-          value={field.state.value}
-          onChange={field.handleChange}
-        >
-          <Label className={labelClassName}>{label}</Label>
-          <Input
-            id={name}
-            type={type}
-            autoComplete={autoComplete}
-            className={inputClassName}
-          />
-        </TextField>
-      )}
-    </form.Field>
-  );
-}
-
-function LoginFormView({
-  form,
-  isPending,
-  errorMessage,
-  emailLabel,
-  passwordLabel,
-  title,
-  loadingLabel,
-  submitLabel,
-}: LoginFormViewProps) {
-  const s = styles();
-
-  return (
-    <div className={s.page()}>
-      <div className={s.container()}>
-        <div className={s.card()}>
-          <h1 className={s.title()}>{title}</h1>
-
-          <Form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void form.handleSubmit();
-            }}
-            className={s.form()}
-          >
-            <LoginField
-              form={form}
-              label={emailLabel}
-              name="email"
-              type="email"
-              autoComplete="username"
-              inputClassName={s.input()}
-              labelClassName={s.label()}
-            />
-
-            <LoginField
-              form={form}
-              label={passwordLabel}
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              inputClassName={s.input()}
-              labelClassName={s.label()}
-            />
-
-            {errorMessage ? <p className={s.error()}>{errorMessage}</p> : null}
-
-            <Button
-              type="submit"
-              isDisabled={isPending}
-              className={s.submitButton()}
-            >
-              {isPending ? loadingLabel : submitLabel}
-            </Button>
-          </Form>
-        </div>
-      </div>
-    </div>
+    <TextField isRequired value={value} onChange={onChange}>
+      <Label className={labelClassName}>{label}</Label>
+      <Input
+        id={id}
+        type={type}
+        autoComplete={autoComplete}
+        className={inputClassName}
+      />
+    </TextField>
   );
 }
 
@@ -145,6 +67,7 @@ export function LoginForm({
   errorMessage,
 }: LoginFormProps) {
   const { t } = useTranslation();
+  const s = styles();
 
   const form = useForm({
     defaultValues: { email: '', password: '' },
@@ -154,15 +77,60 @@ export function LoginForm({
   });
 
   return (
-    <LoginFormView
-      form={form}
-      isPending={isPending}
-      errorMessage={errorMessage}
-      emailLabel={t('login.email')}
-      passwordLabel={t('login.password')}
-      title={t('login.title')}
-      loadingLabel={t('login.loading')}
-      submitLabel={t('login.submit')}
-    />
+    <div className={s.page()}>
+      <div className={s.container()}>
+        <div className={s.card()}>
+          <h1 className={s.title()}>{t('login.title')}</h1>
+
+          <Form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void form.handleSubmit();
+            }}
+            className={s.form()}
+          >
+            <form.Field name="email">
+              {(field) => (
+                <LoginFieldView
+                  id="email"
+                  type="email"
+                  autoComplete="username"
+                  label={t('login.email')}
+                  value={String(field.state.value ?? '')}
+                  onChange={(value) => field.handleChange(value)}
+                  inputClassName={s.input()}
+                  labelClassName={s.label()}
+                />
+              )}
+            </form.Field>
+
+            <form.Field name="password">
+              {(field) => (
+                <LoginFieldView
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  label={t('login.password')}
+                  value={String(field.state.value ?? '')}
+                  onChange={(value) => field.handleChange(value)}
+                  inputClassName={s.input()}
+                  labelClassName={s.label()}
+                />
+              )}
+            </form.Field>
+
+            {errorMessage ? <p className={s.error()}>{errorMessage}</p> : null}
+
+            <Button
+              type="submit"
+              isDisabled={isPending}
+              className={s.submitButton()}
+            >
+              {isPending ? t('login.loading') : t('login.submit')}
+            </Button>
+          </Form>
+        </div>
+      </div>
+    </div>
   );
 }
