@@ -29,6 +29,14 @@ type VideoExportJobsResponse = {
   jobs: VideoExportJob[];
 };
 
+export type VideoExportTempCleanupResult = {
+  files_deleted: number;
+  dirs_deleted: number;
+  bytes_deleted: number;
+  paths_deleted: string[];
+  errors: { path: string; error: string }[];
+};
+
 const hasActiveJob = (jobs: VideoExportJob[] | undefined) =>
   Boolean(jobs?.some((job) => job.can_cancel));
 
@@ -58,6 +66,21 @@ export function useCancelVideoExportJob() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
       queryClient.invalidateQueries({ queryKey: ['flights'] });
+    },
+  });
+}
+
+export function useCleanupVideoExportTempFiles() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      return await api
+        .delete('video-export-jobs/temp-files')
+        .json<VideoExportTempCleanupResult>();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
     },
   });
 }

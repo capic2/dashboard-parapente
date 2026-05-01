@@ -558,3 +558,16 @@ class EmagramTriggerRequest(BaseModel):
         if v is not None and not -180 <= v <= 180:
             raise ValueError("Longitude must be between -180 and 180")
         return v
+
+
+class VideoExportTempCleanupError(BaseModel):
+    path: str
+    error: str
+
+
+class VideoExportTempCleanupResponse(BaseModel):
+    files_deleted: int
+    dirs_deleted: int
+    bytes_deleted: int
+    paths_deleted: list[str]
+    errors: list[VideoExportTempCleanupError]

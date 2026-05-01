@@ -1,5 +1,7 @@
 """Unit tests for video export helpers."""
 
+import os
+import time
 from datetime import datetime
 
 from models import VideoExportJob
@@ -223,3 +225,82 @@ def test_stream_export_cleanup_removes_temp_dir_on_error(tmp_path):
         video_export._cleanup_temp_dir(temp_dir)
 
     assert not temp_dir.exists()
+
+
+def test_cleanup_video_export_temp_files_uses_configured_temp_dir(tmp_path, monkeypatch):
+    temp_root = tmp_path / "configured-temp-images"
+    export_root = tmp_path / "configured-video-exports"
+    monkeypatch.setattr(video_export_manual, "VIDEO_TEMP_IMAGES_DIR", temp_root)
+    monkeypatch.setattr(video_export_manual, "VIDEO_EXPORT_DIR", export_root)
+
+    inactive_temp_dir = temp_root / "job-failed"
+    active_temp_dir = temp_root / "job-active"
+    inactive_temp_dir.mkdir(parents=True)
+    active_temp_dir.mkdir(parents=True)
+    (inactive_temp_dir / "frame00001.png").write_bytes(b"frame")
+    (active_temp_dir / "frame00001.png").write_bytes(b"frame")
+
+    result = video_export_manual.cleanup_video_export_temp_files(
+        [
+            {"job_id": "job-failed", "internal_status": "failed"},
+            {"job_id": "job-active", "internal_status": "capturing"},
+        ]
+    )
+
+    assert result["files_deleted"] == 1
+    assert not inactive_temp_dir.exists()
+    assert active_temp_dir.exists()
+
+
+def test_cleanup_video_export_temp_files_removes_configured_orphan_temp_dirs(tmp_path, monkeypatch):
+    temp_root = tmp_path / "configured-temp-images"
+    export_root = tmp_path / "configured-video-exports"
+    monkeypatch.setattr(video_export_manual, "VIDEO_TEMP_IMAGES_DIR", temp_root)
+    monkeypatch.setattr(video_export_manual, "VIDEO_EXPORT_DIR", export_root)
+
+    orphan_temp_dir = temp_root / "orphan-job"
+    orphan_temp_dir.mkdir(parents=True)
+    (orphan_temp_dir / "frame00001.png").write_bytes(b"frame")
+    old_timestamp = time.time() - video_export_manual._ORPHAN_TEMP_CLEANUP_GRACE_SECONDS - 1
+    os.utime(orphan_temp_dir, (old_timestamp, old_timestamp))
+
+    result = video_export_manual.cleanup_video_export_temp_files([])
+
+    assert result["files_deleted"] == 1
+    assert not orphan_temp_dir.exists()
+
+
+def test_cleanup_video_export_temp_files_keeps_fresh_orphan_temp_dirs(tmp_path, monkeypatch):
+    temp_root = tmp_path / "configured-temp-images"
+    export_root = tmp_path / "configured-video-exports"
+    monkeypatch.setattr(video_export_manual, "VIDEO_TEMP_IMAGES_DIR", temp_root)
+    monkeypatch.setattr(video_export_manual, "VIDEO_EXPORT_DIR", export_root)
+
+    fresh_temp_dir = temp_root / "fresh-job"
+    fresh_temp_dir.mkdir(parents=True)
+    (fresh_temp_dir / "frame00001.png").write_bytes(b"frame")
+
+    result = video_export_manual.cleanup_video_export_temp_files([])
+
+    assert result["files_deleted"] == 0
+    assert fresh_temp_dir.exists()
+
+
+def test_cleanup_video_export_temp_files_removes_legacy_frames_for_inactive_job(
+    tmp_path, monkeypatch
+):
+    temp_root = tmp_path / "configured-temp-images"
+    export_root = tmp_path / "configured-video-exports"
+    monkeypatch.setattr(video_export_manual, "VIDEO_TEMP_IMAGES_DIR", temp_root)
+    monkeypatch.setattr(video_export_manual, "VIDEO_EXPORT_DIR", export_root)
+
+    legacy_frames_dir = export_root / "frames_job-cancelled"
+    legacy_frames_dir.mkdir(parents=True)
+    (legacy_frames_dir / "frame00001.png").write_bytes(b"frame")
+
+    result = video_export_manual.cleanup_video_export_temp_files(
+        [{"job_id": "job-cancelled", "internal_status": "cancelled"}]
+    )
+
+    assert result["files_deleted"] == 1
+    assert not legacy_frames_dir.exists()
