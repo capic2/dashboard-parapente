@@ -44,6 +44,9 @@ interface PendingConfirm {
   onConfirm: () => void;
 }
 
+const infrastructureTabClassName =
+  'flex-1 px-4 py-2 rounded-lg font-medium transition-all cursor-pointer bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 selected:bg-sky-600 selected:text-white selected:shadow-md outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-800';
+
 function formatTtl(ttl: number): string {
   if (ttl < 0) return '—';
   if (ttl === 0) return '0s';
@@ -661,22 +664,13 @@ export default function InfrastructurePage() {
 
       <Tabs className="space-y-4">
         <TabList className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <Tab
-            id="strava"
-            className="flex-1 px-4 py-2 rounded-lg font-medium transition-all cursor-pointer bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 selected:bg-sky-600 selected:text-white selected:shadow-md outline-none"
-          >
+          <Tab id="strava" className={infrastructureTabClassName}>
             {t('infrastructure.tabs.strava')}
           </Tab>
-          <Tab
-            id="videoExports"
-            className="flex-1 px-4 py-2 rounded-lg font-medium transition-all cursor-pointer bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 selected:bg-sky-600 selected:text-white selected:shadow-md outline-none"
-          >
+          <Tab id="videoExports" className={infrastructureTabClassName}>
             {t('infrastructure.tabs.videoExports')}
           </Tab>
-          <Tab
-            id="cache"
-            className="flex-1 px-4 py-2 rounded-lg font-medium transition-all cursor-pointer bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 selected:bg-sky-600 selected:text-white selected:shadow-md outline-none"
-          >
+          <Tab id="cache" className={infrastructureTabClassName}>
             {t('infrastructure.tabs.cache')}
           </Tab>
         </TabList>

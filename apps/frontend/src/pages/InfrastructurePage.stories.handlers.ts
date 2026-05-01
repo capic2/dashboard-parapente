@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import type { CacheKeyDetail } from '../hooks/admin/useCache';
 import type { TokenLog } from '../hooks/admin/useStravaToken';
+import type { VideoExportJob } from '../hooks/flights/useVideoExportJobs';
 
 // --- In-memory cache database ---
 
@@ -196,6 +197,44 @@ const buildStravaExpiredTokenLogs = (
 let currentStravaTokenState = buildStravaTokenState();
 let currentStravaTokenLogs: TokenLog[] = buildStravaTokenLogs();
 
+const initialMockVideoJobs: VideoExportJob[] = [
+  {
+    job_id: 'job-arguel-running',
+    flight_id: 'flight-arguel',
+    flight_title: 'Arguel - soaring du soir',
+    status: 'processing',
+    internal_status: 'encoding',
+    progress: 68,
+    message: 'Encoding 68%',
+    mode: 'manual_fast',
+    started_at: '2026-01-15T09:15:00Z',
+    updated_at: '2026-01-15T10:05:00Z',
+    can_cancel: true,
+  },
+  {
+    job_id: 'job-chalais-completed',
+    flight_id: 'flight-chalais',
+    flight_title: 'Chalais - thermique bleu',
+    status: 'completed',
+    internal_status: 'completed',
+    progress: 100,
+    message: 'Video ready',
+    mode: 'manual',
+    started_at: '2026-01-14T12:20:00Z',
+    completed_at: '2026-01-14T13:35:00Z',
+    can_cancel: false,
+  },
+];
+
+const mockVideoJobs: VideoExportJob[] = initialMockVideoJobs.map((job) => ({
+  ...job,
+}));
+
+const resetMockVideoJobs = () => {
+  mockVideoJobs.length = 0;
+  mockVideoJobs.push(...initialMockVideoJobs.map((job) => ({ ...job })));
+};
+
 const refreshStravaToken = () => {
   currentRefreshClock += STRAVA_REFRESH_STEP_MS;
   const newExpiry = getExpiresAt(6, currentRefreshClock);
@@ -234,6 +273,7 @@ export const resetCacheDb = () => {
   cacheDb.push(...initialEntries);
   // Reset Strava state
   getInitialStravaState();
+  resetMockVideoJobs();
 };
 
 // --- Helper: build overview response from cacheDb ---
@@ -475,40 +515,24 @@ export const cacheHandlers = [
 export const videoExportHandlers = [
   http.get('*/api/video-export-jobs', () =>
     HttpResponse.json({
-      jobs: [
-        {
-          job_id: 'job-arguel-running',
-          flight_id: 'flight-arguel',
-          flight_title: 'Arguel - soaring du soir',
-          status: 'processing',
-          internal_status: 'encoding',
-          progress: 68,
-          message: 'Encoding 68%',
-          mode: 'manual_fast',
-          started_at: '2026-01-15T09:15:00Z',
-          updated_at: '2026-01-15T10:05:00Z',
-          can_cancel: true,
-        },
-        {
-          job_id: 'job-chalais-completed',
-          flight_id: 'flight-chalais',
-          flight_title: 'Chalais - thermique bleu',
-          status: 'completed',
-          internal_status: 'completed',
-          progress: 100,
-          message: 'Video ready',
-          mode: 'manual',
-          started_at: '2026-01-14T12:20:00Z',
-          completed_at: '2026-01-14T13:35:00Z',
-          can_cancel: false,
-        },
-      ],
+      jobs: mockVideoJobs,
     })
   ),
 
-  http.delete('*/api/exports/:jobId/cancel', () =>
-    HttpResponse.json({ success: true })
-  ),
+  http.delete('*/api/exports/:jobId/cancel', ({ params }) => {
+    const job = mockVideoJobs.find((item) => item.job_id === params.jobId);
+    if (job) {
+      const now = new Date().toISOString();
+      job.status = 'cancelled';
+      job.internal_status = 'cancelled';
+      job.can_cancel = false;
+      job.cancelled_at = now;
+      job.updated_at = now;
+      job.message = 'Cancelled';
+    }
+
+    return HttpResponse.json({ success: true });
+  }),
 ];
 
 export const defaultHandlers = [
