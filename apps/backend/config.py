@@ -84,6 +84,14 @@ STRAVA_TOKEN_LOG_HISTORY_LIMIT = max(
 GOOGLE_API_KEY = os.getenv("BACKEND_GOOGLE_API_KEY")
 GEMINI_MODEL = os.getenv("BACKEND_GEMINI_MODEL", "gemini-2.5-flash")
 GROQ_API_KEY = os.getenv("BACKEND_GROQ_API_KEY")
+GROQ_MODEL = os.getenv("BACKEND_GROQ_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
+OPENROUTER_API_KEY = os.getenv("BACKEND_OPENROUTER_API_KEY")
+OPENROUTER_MODEL = os.getenv("BACKEND_OPENROUTER_MODEL", "qwen/qwen2.5-vl-72b-instruct:free")
+LLM_FALLBACK_ORDER = [
+    provider.strip().lower()
+    for provider in os.getenv("BACKEND_LLM_FALLBACK_ORDER", "groq,openrouter,google").split(",")
+    if provider.strip()
+]
 
 # ============================================================================
 # SCHEDULER
