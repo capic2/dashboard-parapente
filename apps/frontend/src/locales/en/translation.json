@@ -818,6 +818,11 @@
   },
   "infrastructure": {
     "title": "Infrastructure",
+    "tabs": {
+      "strava": "Strava Token",
+      "videoExports": "Video exports",
+      "cache": "Redis Cache"
+    },
     "strava": {
       "title": "Strava Token",
       "status": "Status",
