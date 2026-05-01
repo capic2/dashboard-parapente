@@ -63,12 +63,14 @@ from schemas import (
     WeatherSourceConfigUpdate,
     WeatherSourceStats,
     WeatherSourceTestResult,
+    VideoExportTempCleanupResponse,
 )
 from video_export import get_export_status as get_export_status_stream
 from video_export import list_exports as list_exports_stream
 from video_export import cancel_video_export as cancel_video_export_stream
 from video_export import start_video_export_background
 from video_export_manual import cancel_video_export as cancel_video_export_manual
+from video_export_manual import cleanup_video_export_temp_files
 from video_export_manual import get_export_status as get_export_status_manual
 from video_export_manual import list_exports as list_exports_manual
 from video_export_manual import resolve_frontend_url
@@ -4106,6 +4108,17 @@ def list_video_export_jobs(
         jobs = [job for job in jobs if job.get("can_cancel")]
 
     return {"jobs": jobs}
+
+
+@router.delete(
+    "/video-export-jobs/temp-files",
+    response_model=VideoExportTempCleanupResponse,
+)
+def delete_video_export_temp_files() -> VideoExportTempCleanupResponse:
+    """Delete temporary files left by completed, failed, or cancelled video exports."""
+    return VideoExportTempCleanupResponse.model_validate(
+        cleanup_video_export_temp_files(list_exports_manual() + list_exports_stream())
+    )
 
 
 @router.get("/exports/{job_id}/stream")
