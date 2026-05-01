@@ -126,6 +126,27 @@ TELEGRAM_CHAT_ID = os.getenv("BACKEND_TELEGRAM_CHAT_ID")
 FRONTEND_URL = os.getenv("BACKEND_FRONTEND_URL")
 
 # ============================================================================
+# VIDEO EXPORT
+# ============================================================================
+_USE_CONTAINER_VIDEO_PATHS = ENVIRONMENT == "production"
+VIDEO_EXPORT_DIR = os.getenv(
+    "BACKEND_VIDEO_EXPORT_DIR",
+    (
+        "/app/video-exports"
+        if _USE_CONTAINER_VIDEO_PATHS
+        else str(BACKEND_ROOT / "exports" / "videos")
+    ),
+)
+VIDEO_TEMP_IMAGES_DIR = os.getenv(
+    "BACKEND_VIDEO_TEMP_IMAGES_DIR",
+    (
+        "/app/video-temp-images"
+        if _USE_CONTAINER_VIDEO_PATHS
+        else str(BACKEND_ROOT / "exports" / "video-temp-images")
+    ),
+)
+
+# ============================================================================
 # VALIDATION
 # ============================================================================
 
