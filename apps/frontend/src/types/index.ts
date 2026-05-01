@@ -1,6 +1,6 @@
 // Core domain types
 // Re-export types from Zod schemas to ensure consistency between validation and types
-import { Key } from 'react-aria-components';
+import type { Key } from 'react-aria-components';
 
 export type {
   Site,

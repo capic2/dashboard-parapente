@@ -63,9 +63,17 @@ export function FlightsTable({
     (row: Row<Flight>, { isSelected }: { isSelected: boolean }) => {
       const flight = row.original;
       const isActive = selectedFlightId === flight.id;
+      const selectFlight = () => {
+        if (!selectionMode) {
+          onSelectFlight(flight);
+        }
+      };
 
       return (
         <div
+          role="option"
+          aria-selected={isActive || isSelected}
+          tabIndex={0}
           data-testid={`flight-row-${flight.id}`}
           className={`group relative bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border-2 transition-all cursor-pointer ${
             isSelected
@@ -74,9 +82,11 @@ export function FlightsTable({
                 ? 'border-sky-600 shadow-md'
                 : 'border-gray-200 dark:border-gray-700 hover:border-sky-400'
           }`}
-          onClick={() => {
-            if (!selectionMode) {
-              onSelectFlight(flight);
+          onClick={selectFlight}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              selectFlight();
             }
           }}
         >

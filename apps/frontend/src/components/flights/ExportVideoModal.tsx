@@ -42,10 +42,10 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
         </h2>
 
         {/* Quality Selection */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+        <fieldset className="mb-4">
+          <legend className="block text-sm font-medium mb-2 dark:text-gray-200">
             Qualité
-          </label>
+          </legend>
           <div className="grid grid-cols-3 gap-2">
             {(['720p', '1080p', '4K'] as const).map((q) => (
               <Button
@@ -61,13 +61,13 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
               </Button>
             ))}
           </div>
-        </div>
+        </fieldset>
 
         {/* FPS Selection */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+        <fieldset className="mb-4">
+          <legend className="block text-sm font-medium mb-2 dark:text-gray-200">
             Images/seconde
-          </label>
+          </legend>
           <div className="grid grid-cols-2 gap-2">
             {([30, 60] as const).map((f) => (
               <Button
@@ -83,16 +83,16 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
               </Button>
             ))}
           </div>
-        </div>
+        </fieldset>
 
         {/* Speed Selection */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+        <fieldset className="mb-4">
+          <legend className="block text-sm font-medium mb-2 dark:text-gray-200">
             Vitesse de replay
             <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
               (1x = temps réel pour sync caméra)
             </span>
-          </label>
+          </legend>
           <div className="grid grid-cols-4 gap-2">
             {([1, 2, 4, 8] as const).map((s) => (
               <Button
@@ -108,7 +108,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
               </Button>
             ))}
           </div>
-        </div>
+        </fieldset>
 
         {/* Estimates */}
         <div className="bg-gray-100 dark:bg-gray-700 rounded p-3 mb-4">

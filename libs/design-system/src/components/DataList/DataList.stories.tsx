@@ -12,7 +12,7 @@ import { useState } from 'react';
 import type { Selection } from 'react-aria-components';
 import { DataList } from './DataList';
 import { expect, fn } from 'storybook/test';
-import { StoryContext } from '@storybook/react';
+import type { StoryContext } from '@storybook/react';
 
 interface DataListContext extends StoryContext {
   parameters: {
@@ -124,7 +124,7 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-// @ts-ignore
+// @ts-expect-error
 export const Default = meta.story({
   name: 'Default',
   args: {

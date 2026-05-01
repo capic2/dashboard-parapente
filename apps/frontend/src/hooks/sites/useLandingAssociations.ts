@@ -105,7 +105,7 @@ interface LandingWeatherEntry {
   distance_km: number | null;
   is_primary: boolean;
   weather: {
-    consensus?: Array<Record<string, unknown>>;
+    consensus?: Record<string, unknown>[];
     para_index?: number;
     verdict?: string;
     emoji?: string;

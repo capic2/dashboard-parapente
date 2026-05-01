@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import type { Entity } from 'cesium';
 import {
   ArcType,
   BoundingSphere,
@@ -8,7 +9,6 @@ import {
   Cartographic,
   Color,
   ConstantPositionProperty,
-  Entity,
   HeadingPitchRange,
   HorizontalOrigin,
   Ion,
@@ -37,6 +37,7 @@ import {
   DEFAULT_CAMERA_TRANSITION_PERCENT,
   getFlightCameraDistance,
 } from '../../utils/cameraDistanceProfile';
+import { getExportFrameTargetIndex } from '../../utils/videoExportFrame';
 import { api } from '../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../hooks/useToast';
@@ -45,8 +46,8 @@ import { Disclosure, DisclosurePanel } from 'react-aria-components';
 import { HTTPError } from 'ky';
 import { useTranslation } from 'react-i18next';
 
+import type { GPXData } from '@dashboard-parapente/shared-types';
 import {
-  GPXData,
   VIDEO_EXPORT_IN_PROGRESS_STATUSES,
   type Flight,
 } from '@dashboard-parapente/shared-types';
@@ -59,6 +60,8 @@ import {
 
 const isVideoExportInProgress = (status?: string | null) =>
   Boolean(status && VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(status));
+
+type VideoExportMode = 'manual_fast' | 'manual';
 
 const getHttpErrorDetail = async (error: HTTPError): Promise<string | null> => {
   try {
@@ -89,8 +92,21 @@ const getHttpErrorDetail = async (error: HTTPError): Promise<string | null> => {
 
 declare global {
   interface Window {
+    _exportMode?: string;
     _cesiumViewer?: CesiumViewer;
     _gpxData?: GPXData & { positions: Cartesian3[]; timestamps: number[] };
+    _setExportFrame?: (
+      frameIndex: number,
+      totalFrames: number
+    ) => {
+      index: number;
+      progress: number;
+      tilesLoaded: boolean;
+    };
+    _getExportMetadata?: () => {
+      totalPoints: number;
+      duration: number;
+    };
   }
 }
 
@@ -177,6 +193,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(compact);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentElapsedTime, setCurrentElapsedTime] = useState(0);
+  const [videoExportMode, setVideoExportMode] =
+    useState<VideoExportMode>('manual_fast');
+  const [isStartingVideoExport, setIsStartingVideoExport] = useState(false);
   const [viewerUnits, setViewerUnits] = useState<ViewerUnits>(() =>
     typeof window === 'undefined'
       ? DEFAULT_VIEWER_UNITS
@@ -479,8 +498,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       if (typeof window !== 'undefined' && window._exportMode) {
         window._gpxData = {
           ...gpxData,
-          positions: positions,
-          timestamps: timestamps,
+          positions,
+          timestamps,
         };
         window._cesiumViewer = viewer;
       }
@@ -909,6 +928,130 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
   };
 
+  const setSceneToIndex = useCallback((targetIndex: number) => {
+    const lastIndex = allPositionsRef.current.length - 1;
+    if (lastIndex < 0) {
+      return { index: 0, progress: 0, tilesLoaded: false };
+    }
+
+    const safeIndex = Math.min(Math.max(targetIndex, 0), lastIndex);
+    currentIndexRef.current = safeIndex;
+    visiblePositionsRef.current = allPositionsRef.current.slice(
+      0,
+      safeIndex + 1
+    );
+
+    if (timestampsRef.current.length > 0) {
+      const currentTimestamp = timestampsRef.current[safeIndex];
+      const startTimestamp = timestampsRef.current[0];
+      setCurrentElapsedTime((currentTimestamp - startTimestamp) / 1000);
+    }
+
+    if (
+      cursorPositionPropertyRef.current &&
+      allPositionsRef.current[safeIndex]
+    ) {
+      cursorPositionPropertyRef.current.setValue(
+        allPositionsRef.current[safeIndex]
+      );
+    }
+
+    const viewer = viewerRef.current;
+    if (viewer && !viewer.isDestroyed()) {
+      const currentPosition = allPositionsRef.current[safeIndex];
+      const heading = cameraHeadingRef.current;
+      const progress = lastIndex > 0 ? safeIndex / lastIndex : 0;
+      const distance = getFlightCameraDistance({
+        progress,
+        baseDistance: cameraDistanceRef.current,
+        closeZoomPercent: cameraCloseZoomPercentRef.current,
+        transitionPercent: cameraTransitionPercentRef.current,
+      });
+      const pitch = -0.05;
+
+      cameraTargetRef.current = currentPosition;
+      viewer.camera.setView({
+        destination: currentPosition,
+        orientation: {
+          heading,
+          pitch,
+          roll: 0,
+        },
+      });
+      viewer.camera.moveBackward(distance);
+
+      const cameraCartographic = Cartographic.fromCartesian(
+        viewer.camera.position
+      );
+      const globe = viewer.scene.globe;
+      const terrainHeight = globe.getHeight(cameraCartographic);
+
+      if (
+        terrainHeight !== undefined &&
+        cameraCartographic.height < terrainHeight + 50
+      ) {
+        cameraCartographic.height = terrainHeight + 50;
+        viewer.camera.position = Cartesian3.fromRadians(
+          cameraCartographic.longitude,
+          cameraCartographic.latitude,
+          cameraCartographic.height
+        );
+      }
+
+      viewer.scene.requestRender();
+      viewer.scene.render(viewer.clock.currentTime);
+    }
+
+    const progress = lastIndex > 0 ? (safeIndex / lastIndex) * 100 : 0;
+    setCurrentProgress(progress);
+
+    return {
+      index: safeIndex,
+      progress,
+      tilesLoaded: Boolean(viewer?.scene.globe.tilesLoaded),
+    };
+  }, []);
+
+  useEffect(() => {
+    if (
+      typeof window === 'undefined' ||
+      !window._exportMode ||
+      !viewerReady ||
+      !gpxData?.coordinates?.length ||
+      allPositionsRef.current.length === 0
+    ) {
+      return;
+    }
+
+    window._setExportFrame = (frameIndex: number, totalFrames: number) => {
+      const targetIndex = getExportFrameTargetIndex(
+        frameIndex,
+        totalFrames,
+        allPositionsRef.current.length
+      );
+
+      return setSceneToIndex(targetIndex);
+    };
+
+    window._getExportMetadata = () => ({
+      totalPoints: allPositionsRef.current.length,
+      duration:
+        gpxData?.flight_duration_seconds ||
+        allPositionsRef.current.length ||
+        300,
+    });
+
+    return () => {
+      window._setExportFrame = undefined;
+      window._getExportMetadata = undefined;
+    };
+  }, [
+    gpxData?.coordinates?.length,
+    gpxData?.flight_duration_seconds,
+    setSceneToIndex,
+    viewerReady,
+  ]);
+
   const play = useCallback(() => {
     if (intervalRef.current || allPositionsRef.current.length === 0) return;
 
@@ -1007,8 +1150,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           viewer.camera.setView({
             destination: cameraTargetRef.current,
             orientation: {
-              heading: heading,
-              pitch: pitch,
+              heading,
+              pitch,
               roll: 0,
             },
           });
@@ -1141,6 +1284,27 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       setTimeout(() => play(), 50);
     }
   };
+
+  const startVideoExport = useCallback(async () => {
+    if (isStartingVideoExport) {
+      return;
+    }
+
+    setIsStartingVideoExport(true);
+    try {
+      await api.post(`flights/${flightId}/export-video`, {
+        searchParams: {
+          mode: videoExportMode,
+        },
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ['flights', flightId],
+      });
+    } finally {
+      setIsStartingVideoExport(false);
+    }
+  }, [flightId, isStartingVideoExport, queryClient, videoExportMode]);
 
   /**
    * Update site orientation
@@ -1525,6 +1689,39 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                     defaultOpen={false}
                   >
                     <>
+                      {!isVideoExportInProgress(flight.video_export_status) && (
+                        <div className="mb-3 rounded border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900/30">
+                          <label
+                            htmlFor="video-export-mode"
+                            className="mb-1 block text-xs font-semibold text-gray-700 dark:text-gray-200"
+                          >
+                            {t('flights.viewer.videoExportMode')}
+                          </label>
+                          <select
+                            id="video-export-mode"
+                            value={videoExportMode}
+                            onChange={(event) =>
+                              setVideoExportMode(
+                                event.target.value as VideoExportMode
+                              )
+                            }
+                            className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                          >
+                            <option value="manual_fast">
+                              {t('flights.viewer.videoModeManualFast')}
+                            </option>
+                            <option value="manual">
+                              {t('flights.viewer.videoModeManual')}
+                            </option>
+                          </select>
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            {videoExportMode === 'manual_fast'
+                              ? t('flights.viewer.videoModeManualFastHint')
+                              : t('flights.viewer.videoModeManualHint')}
+                          </p>
+                        </div>
+                      )}
+
                       {/* Download/Generate Button */}
                       <Button
                         onClick={async () => {
@@ -1567,14 +1764,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           ) {
                             // Generate video
                             try {
-                              await api.post(
-                                `flights/${flightId}/generate-video`
-                              );
-
-                              // Refresh flight data to get updated status
-                              queryClient.invalidateQueries({
-                                queryKey: ['flights', flightId],
-                              });
+                              await startVideoExport();
                             } catch (error) {
                               if (error instanceof HTTPError) {
                                 const detail = await getHttpErrorDetail(error);
@@ -1594,9 +1784,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             }
                           }
                         }}
-                        disabled={isVideoExportInProgress(
-                          flight.video_export_status
-                        )}
+                        disabled={
+                          isStartingVideoExport ||
+                          isVideoExportInProgress(flight.video_export_status)
+                        }
                         className={`w-full ${compactControlButtonClassName} text-white rounded ${
                           flight.video_export_status === 'completed'
                             ? 'mb-2'
@@ -1604,7 +1795,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         } ${
                           flight.video_export_status === 'completed'
                             ? 'bg-green-600 hover:bg-green-700'
-                            : isVideoExportInProgress(
+                            : isStartingVideoExport ||
+                                isVideoExportInProgress(
                                   flight.video_export_status
                                 )
                               ? 'bg-gray-400 cursor-not-allowed'
@@ -1719,14 +1911,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             }
 
                             try {
-                              await api.post(
-                                `flights/${flightId}/generate-video`
-                              );
-
-                              // Refresh flight data to get updated status
-                              queryClient.invalidateQueries({
-                                queryKey: ['flights', flightId],
-                              });
+                              await startVideoExport();
                             } catch (error) {
                               if (error instanceof HTTPError) {
                                 const detail = await getHttpErrorDetail(error);
@@ -1744,7 +1929,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                               toast.error(t('flights.viewer.regenerateError'));
                             }
                           }}
-                          className="w-full px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 mb-3"
+                          disabled={isStartingVideoExport}
+                          className="w-full px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed mb-3"
                           title={t('flights.viewer.regenerateTitle')}
                         >
                           🔄 {t('flights.viewer.regenerateVideo')}

@@ -1,9 +1,10 @@
-"""Unit tests for frontend URL resolution in manual video export."""
+"""Unit tests for video export helpers."""
 
 from datetime import datetime
 
 from models import VideoExportJob
 
+import video_export
 import video_export_manual
 
 
@@ -132,6 +133,20 @@ def test_parse_ffmpeg_out_time_seconds_parses_progress_lines():
     assert video_export_manual._parse_ffmpeg_out_time_seconds("progress=continue") is None
 
 
+def test_ffmpeg_encoding_settings_use_fast_preset_for_manual_fast():
+    assert video_export_manual._ffmpeg_encoding_settings(True) == ("veryfast", "23")
+    assert video_export_manual._ffmpeg_encoding_settings(False) == ("medium", "18")
+
+
+def test_ffmpeg_timeout_is_not_limited_to_thirty_minutes():
+    assert video_export_manual._ffmpeg_timeout_seconds(60) == 6 * 60 * 60
+
+
+def test_ffmpeg_timeout_scales_for_long_videos():
+    duration_seconds = 7 * 60 * 60
+    assert video_export_manual._ffmpeg_timeout_seconds(duration_seconds) == duration_seconds * 20
+
+
 def test_encoding_progress_percent_spans_encoding_phase_range():
     assert video_export_manual._encoding_progress_percent(0, 100) == 80
     assert video_export_manual._encoding_progress_percent(50, 100) == 89
@@ -164,5 +179,47 @@ def test_cleanup_temp_dir_removes_nested_files(tmp_path):
     (debug_dir / "playwright-debug.png").write_bytes(b"debug")
 
     video_export_manual._cleanup_temp_dir(temp_dir)
+
+    assert not temp_dir.exists()
+
+
+def test_stream_export_paths_use_configured_storage_dirs(tmp_path, monkeypatch):
+    monkeypatch.setattr(video_export, "VIDEO_EXPORT_DIR", tmp_path / "videos")
+    monkeypatch.setattr(video_export, "VIDEO_TEMP_IMAGES_DIR", tmp_path / "temp-images")
+
+    temp_dir = video_export._job_temp_dir("job-123")
+    debug_dir = video_export._job_debug_dir("job-123")
+    output_path = video_export._video_output_path("flight-123", "20260430-120000")
+
+    video_export._prepare_export_dirs(temp_dir, debug_dir)
+
+    assert temp_dir == tmp_path / "temp-images" / "job-123"
+    assert debug_dir == tmp_path / "temp-images" / "job-123" / "debug"
+    assert output_path == tmp_path / "videos" / "flight-flight-123-20260430-120000.mp4"
+    assert debug_dir.exists()
+    assert (tmp_path / "videos").exists()
+
+
+def test_stream_export_cleanup_removes_temp_dir_on_success(tmp_path):
+    temp_dir = tmp_path / "temp-images" / "job-123"
+    debug_dir = temp_dir / "debug"
+    debug_dir.mkdir(parents=True)
+    (debug_dir / "playwright-debug.png").write_bytes(b"debug")
+
+    video_export._cleanup_temp_dir(temp_dir)
+
+    assert not temp_dir.exists()
+
+
+def test_stream_export_cleanup_removes_temp_dir_on_error(tmp_path):
+    temp_dir = tmp_path / "temp-images" / "job-123"
+    debug_dir = temp_dir / "debug"
+    debug_dir.mkdir(parents=True)
+    (debug_dir / "playwright-error.png").write_bytes(b"debug")
+
+    try:
+        raise RuntimeError("export failed")
+    except RuntimeError:
+        video_export._cleanup_temp_dir(temp_dir)
 
     assert not temp_dir.exists()
