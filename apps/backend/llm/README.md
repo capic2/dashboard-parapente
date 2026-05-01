@@ -66,14 +66,14 @@ result = analyze_emagram_with_gemini(
     screenshot_paths=[...],
     spot_name="Arguel",
     coordinates=(47.2167, 6.0833),
-    api_key=os.getenv("GOOGLE_API_KEY")
+    api_key=os.getenv("BACKEND_GOOGLE_API_KEY")
 )
 ```
 
 **Obtenir une clé API:**
 1. Aller sur https://aistudio.google.com/app/apikey
 2. Créer une clé API (compte Google requis)
-3. Ajouter dans `.env`: `GOOGLE_API_KEY=...`
+3. Ajouter dans `.env`: `BACKEND_GOOGLE_API_KEY=...`
 
 **Limites gratuites:**
 - 1500 requêtes/jour
@@ -138,11 +138,11 @@ python backend/test_gemini_integration.py
 cd backend/llm
 
 # Test Gemini
-export GOOGLE_API_KEY=your_key
+export BACKEND_GOOGLE_API_KEY=your_key
 python gemini_analyzer.py
 
 # Test Groq
-export GROQ_API_KEY=your_key
+export BACKEND_GROQ_API_KEY=your_key
 python groq_analyzer.py
 ```
 

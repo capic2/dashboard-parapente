@@ -186,7 +186,8 @@ def _is_usable_llm_analysis(analysis: dict[str, Any]) -> bool:
 
     details = str(analysis.get("details_analyse", "")).lower()
     advice = str(analysis.get("conseils_vol", "")).lower()
-    return "erreur de parsing" not in details and "analyse impossible" not in advice
+    failure_phrases = ["erreur de parsing", "analyse impossible"]
+    return not any(phrase in details or phrase in advice for phrase in failure_phrases)
 
 
 async def generate_multi_source_emagram_for_spot(

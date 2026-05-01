@@ -45,7 +45,7 @@ def analyze_emagram_with_openrouter(
     """Analyze emagram screenshots using OpenRouter vision models."""
     api_key = config.OPENROUTER_API_KEY
     if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY not configured")
+        raise RuntimeError("BACKEND_OPENROUTER_API_KEY not configured")
 
     logger.info(f"Analyzing emagram for {spot_name} using OpenRouter {model_name}")
 
