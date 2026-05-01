@@ -409,6 +409,23 @@ jobs:
               }
             }
 
+      - name: Cleanup unused Docker images
+        if: steps.trigger_deploy.conclusion == 'success' && steps.verify_deploy.outcome == 'success'
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          fingerprint: ${{ secrets.SSH_FINGERPRINT }}
+          port: ${{ secrets.SSH_PORT }}
+          command_timeout: 5m
+          script: |
+            set -u
+            if ! docker image prune -f; then
+              echo "Docker image cleanup failed; deployment remains successful"
+            fi
+
       - name: Label merged PRs with deployed version
         if: steps.trigger_deploy.conclusion == 'success' && steps.verify_deploy.outcome == 'success'
         uses: actions/github-script@v9

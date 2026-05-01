@@ -35,6 +35,11 @@ docker compose build --no-cache backend
 echo "Démarrage des conteneurs..."
 docker compose up -d
 
+echo "Nettoyage des images Docker inutilisées..."
+if ! docker image prune -f; then
+  echo "⚠️  Nettoyage des images ignoré (échec non bloquant)"
+fi
+
 echo "✅ Docker redémarré"
 echo ""
 
