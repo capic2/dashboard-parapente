@@ -1,10 +1,18 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { apiPost, invalidateQueries } = vi.hoisted(() => ({
+const { apiGet, apiPost, invalidateQueries, mockFlight } = vi.hoisted(() => ({
+  apiGet: vi.fn(),
   apiPost: vi.fn(),
   invalidateQueries: vi.fn(),
+  mockFlight: {
+    gpx_file_path: 'sample.gpx',
+    video_export_status: null as string | null,
+    video_export_job_id: null as string | null,
+    video_file_path: null as string | null,
+    site: null,
+  },
 }));
 
 vi.mock('cesium', () => {
@@ -159,6 +167,7 @@ vi.mock('react-i18next', () => ({
         'flights.viewer.videoModeManualFastHint': 'Fast hint',
         'flights.viewer.videoModeManualHint': 'Manual hint',
         'flights.viewer.generateVideo': 'Generate video',
+        'flights.viewer.downloadVideo': 'Download video',
         'flights.viewer.videoSection': 'Video',
       })[key] ?? key,
   }),
@@ -181,13 +190,7 @@ vi.mock('../../hooks/flights/useFlightGPX', () => ({
 
 vi.mock('../../hooks/flights/useFlight', () => ({
   useFlight: () => ({
-    data: {
-      gpx_file_path: 'sample.gpx',
-      video_export_status: null,
-      video_export_job_id: null,
-      video_file_path: null,
-      site: null,
-    },
+    data: mockFlight,
   }),
 }));
 
@@ -198,6 +201,7 @@ vi.mock('../../hooks/flights/useVideoExportStatus', () => ({
 
 vi.mock('../../lib/api', () => ({
   api: {
+    get: apiGet,
     post: apiPost,
   },
 }));
@@ -213,10 +217,28 @@ vi.mock('../../hooks/useToast', () => ({
 import { FlightViewer3D } from './FlightViewer3D';
 
 describe('FlightViewer3D video export mode', () => {
+  const originalCreateObjectURL = URL.createObjectURL;
+  const originalRevokeObjectURL = URL.revokeObjectURL;
+
   beforeEach(() => {
     apiPost.mockResolvedValue(undefined);
+    apiGet.mockReset();
     apiPost.mockClear();
     invalidateQueries.mockClear();
+    mockFlight.video_export_status = null;
+    mockFlight.video_export_job_id = null;
+    mockFlight.video_file_path = null;
+  });
+
+  afterEach(() => {
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: originalCreateObjectURL,
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: originalRevokeObjectURL,
+    });
   });
 
   it('starts fast smooth export by default and shows its hint', async () => {
@@ -248,6 +270,33 @@ describe('FlightViewer3D video export mode', () => {
       expect(apiPost).toHaveBeenCalledWith('flights/flight-1/export-video', {
         searchParams: { mode: 'manual' },
       });
+    });
+  });
+
+  it('downloads generated videos without applying the API request timeout', async () => {
+    mockFlight.video_export_status = 'completed';
+    mockFlight.video_export_job_id = 'job-video';
+    mockFlight.video_file_path = '/exports/job-video.mp4';
+    const blob = vi.fn().mockResolvedValue(new Blob(['video']));
+    apiGet.mockReturnValue({ blob });
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => 'blob:video'),
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: vi.fn(),
+    });
+
+    render(<FlightViewer3D flightId="flight-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Download video/ }));
+
+    await waitFor(() => {
+      expect(apiGet).toHaveBeenCalledWith('exports/job-video/download', {
+        timeout: false,
+      });
+      expect(blob).toHaveBeenCalled();
     });
   });
 });

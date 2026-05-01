@@ -1733,7 +1733,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             try {
                               const blob = await api
                                 .get(
-                                  `exports/${flight.video_export_job_id}/download`
+                                  `exports/${flight.video_export_job_id}/download`,
+                                  { timeout: false }
                                 )
                                 .blob();
 
