@@ -11,7 +11,7 @@ type LoginFormProps = {
 };
 
 type LoginFormViewProps = {
-  form: ReturnType<typeof useForm<{ email: string; password: string }>>;
+  form: ReturnType<typeof useForm>;
   isPending: boolean;
   errorMessage?: string;
   emailLabel: string;
@@ -39,7 +39,7 @@ const styles = tv({
 });
 
 type LoginFieldProps = {
-  form: ReturnType<typeof useForm<{ email: string; password: string }>>;
+  form: ReturnType<typeof useForm>;
   label: string;
   name: 'email' | 'password';
   type: 'email' | 'password';
