@@ -10,7 +10,7 @@ description: Enforces the Git start-of-work strategy for repository code changes
 Before any implementation task:
 
 1. Check the current Git branch.
-2. If on `main`, update `main` and create a worktree from `main`.
+2. If on `main`, update `main` with `gh pull` and create a worktree from `main`.
 3. If on another branch, ask whether to create a worktree.
 4. If yes, update `main` and create the worktree from `main`.
 5. If no, stay on the current branch.
