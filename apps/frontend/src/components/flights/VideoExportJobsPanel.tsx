@@ -73,13 +73,14 @@ function getDateLabel(job: VideoExportJob) {
   }).format(date);
 }
 
-export function VideoExportJobsPanel() {
+export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
   const { t } = useTranslation();
   const toast = useToast();
   const { data: jobs = [], isLoading, isError, refetch } = useVideoExportJobs();
   const cancelJob = useCancelVideoExportJob();
   const cleanupTempFiles = useCleanupVideoExportTempFiles();
-  const visibleJobs = jobs.slice(0, 6);
+  const visibleJobs = typeof limit === 'number' ? jobs.slice(0, limit) : jobs;
+
   const activeCount = jobs.filter((job) => job.can_cancel).length;
 
   async function handleCancel(job: VideoExportJob) {
