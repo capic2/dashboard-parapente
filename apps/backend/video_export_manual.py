@@ -61,6 +61,7 @@ _JOB_RUNTIME: dict[str, dict[str, Any]] = {}
 
 _CANCEL_CHECK_INTERVAL = 10
 _FFMPEG_STALL_TIMEOUT_SECONDS = 10 * 60
+_ORPHAN_TEMP_CLEANUP_GRACE_SECONDS = 30
 
 
 def check_dependencies():
@@ -472,6 +473,13 @@ def _is_export_active(export: dict[str, Any]) -> bool:
     return export.get("status") in {"started", "processing", *_ACTIVE_STATUSES}
 
 
+def _is_path_older_than(path: Path, age_seconds: int) -> bool:
+    try:
+        return time.time() - path.stat().st_mtime >= age_seconds
+    except OSError:
+        return False
+
+
 def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, Any]:
     """Delete non-active video export temporary files from configured storage."""
     active_job_ids = {
@@ -497,13 +505,17 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
 
     if temp_root.exists():
         for child in temp_root.iterdir():
-            if child.name not in active_job_ids:
+            if child.name not in active_job_ids and _is_path_older_than(
+                child, _ORPHAN_TEMP_CLEANUP_GRACE_SECONDS
+            ):
                 candidates.append((child, temp_root))
 
     if export_root.exists():
         for child in export_root.glob("frames_*"):
             job_id = child.name.removeprefix("frames_")
-            if job_id not in active_job_ids:
+            if job_id not in active_job_ids and _is_path_older_than(
+                child, _ORPHAN_TEMP_CLEANUP_GRACE_SECONDS
+            ):
                 candidates.append((child, export_root))
 
     seen: set[str] = set()
