@@ -66,12 +66,14 @@ from schemas import (
 )
 from video_export import get_export_status as get_export_status_stream
 from video_export import list_exports as list_exports_stream
+from video_export import cancel_video_export as cancel_video_export_stream
 from video_export import start_video_export_background
 from video_export_manual import cancel_video_export as cancel_video_export_manual
 from video_export_manual import get_export_status as get_export_status_manual
 from video_export_manual import list_exports as list_exports_manual
 from video_export_manual import resolve_frontend_url
 from video_export_manual import start_video_export_manual
+from video_export_manual import start_video_export_manual_fast
 from versioning import get_version_payload
 from weather_pipeline import get_daily_aggregate, get_normalized_forecast
 
@@ -87,6 +89,14 @@ _VIDEO_EXPORT_IN_PROGRESS_STATUSES = {
     "encoding",
 }
 
+_VIDEO_EXPORT_CANCELLABLE_STATUSES = {
+    "queued",
+    "running",
+    "initializing",
+    "capturing",
+    "encoding",
+}
+
 
 def _start_video_export_stream(
     flight_id: str, quality: str, fps: int, speed: int, frontend_url: str
@@ -95,6 +105,14 @@ def _start_video_export_stream(
     return start_video_export_background(
         flight_id=flight_id, quality=quality, fps=fps, speed=speed, frontend_url=frontend_url
     )
+
+
+def _video_export_mode_label(mode: str) -> str:
+    if mode == "stream":
+        return "media stream"
+    if mode == "manual_fast":
+        return "manual fast render"
+    return "manual render"
 
 
 def _ensure_no_active_export(flight: Flight):
@@ -117,6 +135,72 @@ def _resolve_export_status(job_id: str) -> dict[str, Any] | None:
     if status:
         return status
     return get_export_status_stream(job_id)
+
+
+def _video_export_sort_value(export: dict[str, Any]) -> str:
+    return str(
+        export.get("updated_at")
+        or export.get("started_at")
+        or export.get("completed_at")
+        or export.get("created_at")
+        or ""
+    )
+
+
+def _video_export_public_status(export: dict[str, Any]) -> str:
+    internal_status = export.get("internal_status")
+    if internal_status in {"completed", "failed", "cancelled"}:
+        return str(internal_status)
+
+    status = export.get("status")
+    if status == "started":
+        return "processing"
+    if isinstance(status, str):
+        return status
+    return "unknown"
+
+
+def _video_export_can_cancel(export: dict[str, Any]) -> bool:
+    internal_status = export.get("internal_status")
+    if isinstance(internal_status, str):
+        return internal_status in _VIDEO_EXPORT_CANCELLABLE_STATUSES
+
+    return export.get("status") in {
+        "started",
+        "processing",
+        *_VIDEO_EXPORT_CANCELLABLE_STATUSES,
+    } and bool(export.get("job_id"))
+
+
+def _build_video_export_jobs_payload(
+    exports: list[dict[str, Any]], db: Session
+) -> list[dict[str, Any]]:
+    flight_ids = {export.get("flight_id") for export in exports if export.get("flight_id")}
+    flights_by_id = {}
+    if flight_ids:
+        flights_by_id = {
+            flight.id: flight for flight in db.query(Flight).filter(Flight.id.in_(flight_ids)).all()
+        }
+
+    jobs: list[dict[str, Any]] = []
+    seen_job_ids: set[str] = set()
+    for export in exports:
+        job_id = export.get("job_id")
+        if job_id and job_id in seen_job_ids:
+            continue
+        if job_id:
+            seen_job_ids.add(job_id)
+
+        flight = flights_by_id.get(export.get("flight_id"))
+        job = dict(export)
+        job["status"] = _video_export_public_status(job)
+        job["can_cancel"] = _video_export_can_cancel(job)
+        if flight:
+            job["flight_name"] = flight.name or flight.title
+            job["flight_title"] = flight.title or flight.name
+        jobs.append(job)
+
+    return sorted(jobs, key=_video_export_sort_value, reverse=True)
 
 
 # Public routes: no authentication required (weather, spots read, auth)
@@ -3802,7 +3886,7 @@ def start_flight_video_export(
     quality: str = "1080p",
     fps: int = 15,
     speed: int = 1,
-    mode: str = "manual",  # "manual" (Cesium manual render) or "stream" (MediaRecorder)
+    mode: str = "manual",  # "manual", "manual_fast", or "stream"
     db: Session = Depends(get_db),
 ):
     """
@@ -3810,6 +3894,7 @@ def start_flight_video_export(
 
     Modes:
     - manual: Cesium manual render (frame-by-frame, perfect quality, slow ~90min)
+    - manual_fast: deterministic frame screenshots without realtime playback waits
     - stream: MediaRecorder (realtime capture, fast ~8min, may stutter)
 
     Returns job_id to track progress
@@ -3817,8 +3902,11 @@ def start_flight_video_export(
     logger.info(f"🎥 Video export requested: flight_id={flight_id}, mode={mode}")
 
     selected_mode = mode.lower().strip()
-    if selected_mode not in ["manual", "stream"]:
-        raise HTTPException(status_code=400, detail="mode must be 'manual' or 'stream'")
+    if selected_mode not in ["manual", "manual_fast", "stream"]:
+        raise HTTPException(
+            status_code=400,
+            detail="mode must be 'manual', 'manual_fast' or 'stream'",
+        )
 
     # Verify flight exists
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
@@ -3837,10 +3925,18 @@ def start_flight_video_export(
     job_id: str
     effective_mode = selected_mode
 
-    if selected_mode == "manual":
-        logger.info("Using Cesium Manual Render (slow but perfect quality)")
+    if selected_mode in {"manual", "manual_fast"}:
+        logger.info(
+            "Using Cesium %s",
+            "Manual Fast Render" if selected_mode == "manual_fast" else "Manual Render",
+        )
         try:
-            job_id = start_video_export_manual(
+            start_manual_export = (
+                start_video_export_manual_fast
+                if selected_mode == "manual_fast"
+                else start_video_export_manual
+            )
+            job_id = start_manual_export(
                 flight_id=flight_id,
                 quality=quality,
                 fps=fps,
@@ -3849,20 +3945,51 @@ def start_flight_video_export(
                 auth_token=_extract_bearer_token(request),
             )
         except Exception as e:
+            fallback_mode = "manual" if selected_mode == "manual_fast" else "stream"
             logger.warning(
-                "⚠️ Manual export failed, falling back to stream for flight %s: %s",
+                "⚠️ %s export failed, falling back to %s for flight %s: %s",
+                selected_mode,
+                fallback_mode,
                 flight_id,
                 e,
             )
-            job_id = _start_video_export_stream(
-                flight_id=flight_id,
-                quality=quality,
-                fps=fps,
-                speed=speed,
-                frontend_url=frontend_url,
-            )
-            effective_mode = "stream"
-            _mark_flight_export_processing(db=db, flight=flight, job_id=job_id)
+            try:
+                if selected_mode == "manual_fast":
+                    job_id = start_video_export_manual(
+                        flight_id=flight_id,
+                        quality=quality,
+                        fps=fps,
+                        speed=speed,
+                        frontend_url=frontend_url,
+                        auth_token=_extract_bearer_token(request),
+                    )
+                    effective_mode = "manual"
+                else:
+                    job_id = _start_video_export_stream(
+                        flight_id=flight_id,
+                        quality=quality,
+                        fps=fps,
+                        speed=speed,
+                        frontend_url=frontend_url,
+                    )
+                    effective_mode = "stream"
+                    _mark_flight_export_processing(db=db, flight=flight, job_id=job_id)
+            except Exception as fallback_error:
+                logger.error(
+                    "Failed to start export for flight %s using %s and fallback %s: %s",
+                    flight_id,
+                    selected_mode,
+                    fallback_mode,
+                    fallback_error,
+                    exc_info=True,
+                )
+                raise HTTPException(
+                    status_code=500,
+                    detail=(
+                        f"Unable to start video export: {selected_mode} failed and "
+                        f"fallback {fallback_mode} also failed"
+                    ),
+                ) from fallback_error
 
     else:  # stream mode
         logger.info("Using MediaRecorder stream (fast but may stutter)")
@@ -3878,7 +4005,7 @@ def start_flight_video_export(
 
     return {
         "job_id": job_id,
-        "message": f"Video export started ({'media stream' if effective_mode == 'stream' else 'manual render'})",
+        "message": f"Video export started ({_video_export_mode_label(effective_mode)})",
         "mode": effective_mode,
         "status_url": f"/api/exports/{job_id}/status",
     }
@@ -3965,6 +4092,22 @@ def get_video_export_status(job_id: str):
     return status
 
 
+@router.get("/video-export-jobs")
+def list_video_export_jobs(
+    active_only: bool = False,
+    db: Session = Depends(get_db),
+):
+    """List video export jobs across all flights."""
+    jobs = _build_video_export_jobs_payload(
+        list_exports_manual() + list_exports_stream(),
+        db,
+    )
+    if active_only:
+        jobs = [job for job in jobs if job.get("can_cancel")]
+
+    return {"jobs": jobs}
+
+
 @router.get("/exports/{job_id}/stream")
 async def stream_video_export_status(job_id: str, request: Request) -> StreamingResponse:
     """Stream export status updates through Server-Sent Events."""
@@ -4028,8 +4171,9 @@ def cancel_video_export(job_id: str):
     """
     Cancel an ongoing video export job
     """
-    # Try to cancel manual render job
     success = cancel_video_export_manual(job_id)
+    if not success:
+        success = cancel_video_export_stream(job_id)
 
     if not success:
         raise HTTPException(

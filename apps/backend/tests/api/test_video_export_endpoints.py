@@ -35,6 +35,69 @@ class TestVideoExportStartEndpoint:
         assert payload["status_url"] == "/api/exports/job-manual/status"
         assert mock_start.call_args.kwargs["auth_token"] == "test-token"
 
+    def test_start_video_export_accepts_manual_fast_mode(self, client: TestClient, sample_flight):
+        """Fast manual mode should use the deterministic screenshot exporter."""
+        with patch(
+            "routes.start_video_export_manual_fast",
+            return_value="job-manual-fast",
+        ) as mock_start:
+            response = client.post(
+                f"{API_PREFIX}/flights/flight-test-001/export-video?mode=manual_fast",
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["job_id"] == "job-manual-fast"
+        assert payload["mode"] == "manual_fast"
+        assert payload["message"] == "Video export started (manual fast render)"
+        assert mock_start.call_args.kwargs["auth_token"] == "test-token"
+
+    def test_start_video_export_manual_fast_falls_back_to_manual(
+        self, client: TestClient, sample_flight
+    ):
+        """Fast manual errors should fall back to the existing manual renderer."""
+        with (
+            patch(
+                "routes.start_video_export_manual_fast",
+                side_effect=RuntimeError("fast unavailable"),
+            ),
+            patch("routes.start_video_export_manual", return_value="job-manual"),
+        ):
+            response = client.post(
+                f"{API_PREFIX}/flights/flight-test-001/export-video?mode=manual_fast"
+            )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["job_id"] == "job-manual"
+        assert payload["mode"] == "manual"
+        assert payload["message"] == "Video export started (manual render)"
+
+    def test_start_video_export_returns_error_when_manual_fast_and_fallback_fail(
+        self, client: TestClient, sample_flight
+    ):
+        """Fallback startup failures should return an actionable API error."""
+        with (
+            patch(
+                "routes.start_video_export_manual_fast",
+                side_effect=RuntimeError("fast unavailable"),
+            ),
+            patch(
+                "routes.start_video_export_manual",
+                side_effect=RuntimeError("manual unavailable"),
+            ),
+        ):
+            response = client.post(
+                f"{API_PREFIX}/flights/flight-test-001/export-video?mode=manual_fast"
+            )
+
+        assert response.status_code == 500
+        assert (
+            response.json()["detail"]
+            == "Unable to start video export: manual_fast failed and fallback manual also failed"
+        )
+
     def test_start_video_export_falls_back_to_stream_on_manual_error(
         self,
         client: TestClient,
@@ -64,7 +127,7 @@ class TestVideoExportStartEndpoint:
         """Unsupported export mode should return HTTP 400."""
         response = client.post(f"{API_PREFIX}/flights/flight-test-001/export-video?mode=invalid")
         assert response.status_code == 400
-        assert "mode must be 'manual' or 'stream'" in response.json()["detail"]
+        assert "mode must be 'manual', 'manual_fast' or 'stream'" in response.json()["detail"]
 
 
 class TestGenerateVideoEndpoint:
@@ -151,11 +214,26 @@ class TestExportStatusAndCancel:
 
     def test_export_cancel_propagates_manual_cancel_result(self, client: TestClient):
         """Cancel endpoint returns a 400 when manual cancellation fails."""
-        with patch("routes.cancel_video_export_manual", return_value=False):
+        with (
+            patch("routes.cancel_video_export_manual", return_value=False),
+            patch("routes.cancel_video_export_stream", return_value=False),
+        ):
             response = client.delete(f"{API_PREFIX}/exports/job-abc/cancel")
 
         assert response.status_code == 400
         assert "Export job not found or cannot be cancelled" in response.json()["detail"]
+
+    def test_export_cancel_falls_back_to_stream_cancel(self, client: TestClient):
+        """Cancel endpoint should stop stream jobs when no manual job matches."""
+        with (
+            patch("routes.cancel_video_export_manual", return_value=False),
+            patch("routes.cancel_video_export_stream", return_value=True) as mock_stream,
+        ):
+            response = client.delete(f"{API_PREFIX}/exports/job-stream/cancel")
+
+        assert response.status_code == 200
+        assert response.json()["job_id"] == "job-stream"
+        mock_stream.assert_called_once_with("job-stream")
 
     def test_export_download_missing_file_returns_not_found(self, client: TestClient):
         """Completed status without existing file should return 404."""
@@ -223,3 +301,86 @@ class TestExportStatusAndCancel:
 
         assert response.status_code == 404
         assert response.json()["detail"] == "Export job not found"
+
+
+class TestVideoExportJobsEndpoint:
+    """Tests for GET /video-export-jobs."""
+
+    def test_video_export_jobs_lists_jobs_with_cancel_state(
+        self, client: TestClient, sample_flight
+    ):
+        manual_jobs = [
+            {
+                "job_id": "job-running",
+                "flight_id": sample_flight.id,
+                "status": "processing",
+                "internal_status": "capturing",
+                "progress": 42,
+                "message": "Capturing frames",
+                "mode": "manual_fast",
+                "updated_at": "2026-04-30T10:00:00",
+            },
+            {
+                "job_id": "job-cancelled",
+                "flight_id": sample_flight.id,
+                "status": "failed",
+                "internal_status": "cancelled",
+                "progress": 10,
+                "message": "Export cancelled by user",
+                "mode": "manual",
+                "updated_at": "2026-04-30T09:00:00",
+            },
+        ]
+
+        with (
+            patch("routes.list_exports_manual", return_value=manual_jobs),
+            patch("routes.list_exports_stream", return_value=[]),
+        ):
+            response = client.get(f"{API_PREFIX}/video-export-jobs")
+
+        assert response.status_code == 200
+        jobs = response.json()["jobs"]
+        assert jobs[0]["job_id"] == "job-running"
+        assert jobs[0]["status"] == "processing"
+        assert jobs[0]["can_cancel"] is True
+        assert jobs[0]["flight_name"] == sample_flight.name
+        assert jobs[1]["job_id"] == "job-cancelled"
+        assert jobs[1]["status"] == "cancelled"
+        assert jobs[1]["can_cancel"] is False
+
+    def test_video_export_jobs_can_filter_active_jobs(self, client: TestClient):
+        with (
+            patch(
+                "routes.list_exports_manual",
+                return_value=[
+                    {
+                        "job_id": "job-queued",
+                        "flight_id": "flight-1",
+                        "status": "processing",
+                        "internal_status": "queued",
+                    },
+                    {
+                        "job_id": "job-done",
+                        "flight_id": "flight-1",
+                        "status": "completed",
+                        "internal_status": "completed",
+                    },
+                ],
+            ),
+            patch(
+                "routes.list_exports_stream",
+                return_value=[
+                    {
+                        "job_id": "job-stream-encoding",
+                        "flight_id": "flight-1",
+                        "status": "encoding",
+                    }
+                ],
+            ),
+        ):
+            response = client.get(f"{API_PREFIX}/video-export-jobs?active_only=true")
+
+        assert response.status_code == 200
+        jobs = response.json()["jobs"]
+        assert {job["job_id"] for job in jobs} == {"job-queued", "job-stream-encoding"}
+        assert all(job["can_cancel"] is True for job in jobs)

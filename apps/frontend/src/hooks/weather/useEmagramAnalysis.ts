@@ -4,7 +4,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getStaleTime, getWeatherRefetchInterval } from '../../lib/cacheConfig';
-import { EmagramAnalysis, EmagramListItem } from '../../types/emagram';
+import type { EmagramAnalysis, EmagramListItem } from '../../types/emagram';
 import { api } from '../../lib/api';
 
 const emagramKeys = {

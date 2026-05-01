@@ -1,9 +1,16 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "react", "react-hooks", "import"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "pedantic": "warn",
+    "perf": "warn",
+    "style": "off",
+    "restriction": "off",
+    "nursery": "off"
+  },
+  "plugins": ["typescript", "react", "react-hooks", "jsx-a11y", "import", "oxc"],
   "rules": {
-    "react/react-in-jsx-scope": "off",
-    "react/no-unescaped-entities": "warn",
     "@typescript-eslint/no-unused-vars": [
       "error",
       {
@@ -15,32 +22,77 @@
     "@typescript-eslint/no-non-null-assertion": "error",
     "@typescript-eslint/no-empty-function": "error",
     "@typescript-eslint/no-inferrable-types": "error",
+    "eqeqeq": ["error", "smart"],
+    "import/no-named-as-default-member": "off",
+    "no-case-declarations": "off",
+    "no-constant-condition": "off",
+    "no-console": "warn",
+    "no-debugger": "error",
+    "no-shadow": "off",
+    "no-underscore-dangle": "off",
+    "no-unused-vars": "error",
+    "no-useless-rename": "error",
+    "object-shorthand": "error",
+    "operator-assignment": "error",
+    "prefer-const": "error",
+    "react/display-name": "off",
+    "react/jsx-no-undef": "error",
+    "react/jsx-props-no-spreading": "off",
+    "react/no-array-index-key": "off",
+    "react/no-children-prop": "off",
+    "react/jsx-no-useless-fragment": "error",
+    "react/no-unescaped-entities": "warn",
+    "react/react-in-jsx-scope": "off",
     "react-hooks/exhaustive-deps": "error",
     "react-hooks/rules-of-hooks": "error",
-    "react/jsx-no-useless-fragment": "error",
+    "typescript/array-type": "error",
+    "typescript/consistent-type-exports": "error",
+    "typescript/consistent-type-imports": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/no-unused-vars": "error",
     "typescript/prefer-nullish-coalescing": "error",
     "typescript/prefer-optional-chain": "error"
   },
   "overrides": [
     {
-      "files": ["**/*.stories.tsx", "**/mocks/**/*.ts", "**/mocks/**/*.tsx"],
+      "files": ["**/*.test.{js,jsx,ts,tsx}", "**/*.spec.{js,jsx,ts,tsx}", "**/*.stories.{ts,tsx,js,jsx,mjs,cjs}", "**/*.story.{ts,tsx,js,jsx,mjs,cjs}"],
       "rules": {
         "@typescript-eslint/no-explicit-any": "off",
-        "@typescript-eslint/no-empty-function": "off"
+        "@typescript-eslint/no-empty-function": "off",
+        "typescript/no-non-null-assertion": "off",
+        "max-lines-per-function": "off"
+      }
+    }, {
+      "files": ["**/*.md/*.ts", "**/*.md/*.js", "**/*.md/*.tsx"],
+      "rules": {
+        "no-unused-vars": "off",
+        "typescript/no-explicit-any": "off",
+        "typescript/no-non-null-assertion": "off",
+        "typescript/no-unused-vars": "off"
       }
     }
   ],
   "ignorePatterns": [
-    "node_modules",
-    "dist",
-    "coverage",
-    "apps/backend",
-    "apps/e2e",
     "**/*.config.js",
     "**/*.config.ts",
-    "public/mockServiceWorker.js",
+    "**/*.d.ts",
+    "**/*.snap",
+    "**/dist/**",
     "**/routeTree.gen.ts",
     ".storybook",
-    "storybook-static"
+    ".vitest-coverage/**",
+    ".vitest-reports/**",
+    "apps/backend",
+    "apps/e2e",
+    "code-pushup.config.bundled_*",
+    "coverage*",
+    "dist/**",
+    "node_modules",
+    "public/mockServiceWorker.js",
+    "mockServiceWorker.js",
+    "storybook-static",
+    "tmp",
+    "vite.config.{ts,js}.timestamp*"
   ]
 }

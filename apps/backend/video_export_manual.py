@@ -60,6 +60,7 @@ _JOB_UPDATE_DB: dict[str, bool] = {}
 _JOB_RUNTIME: dict[str, dict[str, Any]] = {}
 
 _CANCEL_CHECK_INTERVAL = 10
+_FFMPEG_STALL_TIMEOUT_SECONDS = 10 * 60
 
 
 def check_dependencies():
@@ -162,6 +163,10 @@ def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
         "fps": job.fps,
         "quality": job.quality,
         "speed": job.speed,
+        "mode": job.mode,
+        "created_at": _to_iso(job.created_at),
+        "updated_at": _to_iso(job.updated_at),
+        "cancelled_at": _to_iso(job.cancelled_at),
     }
 
     with _JOB_RUNTIME_LOCK:
@@ -433,6 +438,17 @@ def _parse_ffmpeg_out_time_seconds(line: str) -> float | None:
     return None
 
 
+def _ffmpeg_encoding_settings(is_fast_mode: bool) -> tuple[str, str]:
+    if is_fast_mode:
+        return "veryfast", "23"
+    return "medium", "18"
+
+
+def _ffmpeg_timeout_seconds(video_duration_seconds: float) -> int:
+    dynamic_timeout = int(max(video_duration_seconds, 1.0) * 20)
+    return max(6 * 60 * 60, dynamic_timeout)
+
+
 def _encoding_progress_percent(encoded_seconds: float, total_duration_seconds: float) -> int:
     if total_duration_seconds <= 0:
         return 80
@@ -491,8 +507,9 @@ def stop_video_export_worker():
         _WORKER_THREAD.join(timeout=5)
 
 
-def start_video_export_manual(
+def _enqueue_video_export_job(
     flight_id: str,
+    mode: str,
     quality: str = "1080p",
     fps: int = 15,
     speed: int = 1,
@@ -500,9 +517,7 @@ def start_video_export_manual(
     update_db: bool = True,
     auth_token: str | None = None,
 ):
-    """
-    Create a new export job and enqueue it for the singleton worker.
-    """
+    """Create a new export job and enqueue it for the singleton worker."""
     if not _dependencies_ok:
         raise RuntimeError("Missing dependencies for video export")
 
@@ -514,7 +529,7 @@ def start_video_export_manual(
             id=job_id,
             flight_id=flight_id,
             status=_STATUS_QUEUED,
-            mode="manual",
+            mode=mode,
             quality=quality,
             fps=fps,
             speed=speed,
@@ -549,6 +564,50 @@ def start_video_export_manual(
     return job_id
 
 
+def start_video_export_manual(
+    flight_id: str,
+    quality: str = "1080p",
+    fps: int = 15,
+    speed: int = 1,
+    frontend_url: str = "http://localhost:5173",
+    update_db: bool = True,
+    auth_token: str | None = None,
+):
+    """Create a classic manual render export job."""
+    return _enqueue_video_export_job(
+        flight_id=flight_id,
+        mode="manual",
+        quality=quality,
+        fps=fps,
+        speed=speed,
+        frontend_url=frontend_url,
+        update_db=update_db,
+        auth_token=auth_token,
+    )
+
+
+def start_video_export_manual_fast(
+    flight_id: str,
+    quality: str = "1080p",
+    fps: int = 15,
+    speed: int = 1,
+    frontend_url: str = "http://localhost:5173",
+    update_db: bool = True,
+    auth_token: str | None = None,
+):
+    """Create a deterministic screenshot export job without realtime playback waits."""
+    return _enqueue_video_export_job(
+        flight_id=flight_id,
+        mode="manual_fast",
+        quality=quality,
+        fps=fps,
+        speed=speed,
+        frontend_url=frontend_url,
+        update_db=update_db,
+        auth_token=auth_token,
+    )
+
+
 async def _export_video_manual_render(job_id: str):
     """Export video using Cesium manual render - frame by frame."""
     job = _get_job(job_id)
@@ -558,6 +617,7 @@ async def _export_video_manual_render(job_id: str):
     quality = job.quality or "1080p"
     fps = job.fps or 15
     speed = job.speed or 1
+    is_fast_mode = job.mode == "manual_fast"
     flight_id = job.flight_id
     frontend_url = resolve_frontend_url(job.frontend_url)
     frames_dir: Path | None = None
@@ -746,6 +806,10 @@ async def _export_video_manual_render(job_id: str):
 
             flight_data = await page.evaluate("""
                 () => {
+                    if (typeof window._getExportMetadata === 'function') {
+                        return window._getExportMetadata();
+                    }
+
                     const gpxData = window._gpxData || {};
                     const coordinates = gpxData.coordinates || [];
 
@@ -789,19 +853,37 @@ async def _export_video_manual_render(job_id: str):
 
             print(f"📁 Frames directory: {frames_dir}")
 
-            _update_job(job_id, status=_STATUS_CAPTURING, message="Starting frame capture")
+            capture_mode_message = (
+                "Starting fast deterministic frame capture"
+                if is_fast_mode
+                else "Starting frame capture"
+            )
+            _update_job(
+                job_id,
+                status=_STATUS_CAPTURING,
+                message=capture_mode_message,
+            )
             _set_job_runtime(job_id, phase=_STATUS_CAPTURING)
 
-            await page.evaluate("""
-                () => {
-                    const playButton = Array.from(document.querySelectorAll('button'))
-                        .find(btn => btn.textContent.includes('Play') || btn.textContent.includes('▶'));
-                    if (playButton) {
-                        playButton.click();
-                        console.log('▶️  Play button clicked');
+            if is_fast_mode:
+                await page.wait_for_function(
+                    "() => typeof window._setExportFrame === 'function'",
+                    timeout=30000,
+                )
+            else:
+                await page.evaluate("""
+                    () => {
+                        const playButton = Array.from(document.querySelectorAll('button'))
+                            .find(btn =>
+                                btn.textContent.includes('Play') ||
+                                btn.textContent.includes('▶')
+                            );
+                        if (playButton) {
+                            playButton.click();
+                            console.log('▶️  Play button clicked');
+                        }
                     }
-                }
-            """)
+                """)
 
             frame_count = 0
             ms_per_frame = (duration_seconds * 1000) / max(total_frames, 1)
@@ -820,13 +902,24 @@ async def _export_video_manual_render(job_id: str):
                     )
                     return
 
-                tiles_loaded = await page.evaluate("""
-                    () => {
-                        const viewer = window._cesiumViewer;
-                        viewer.scene.render(viewer.clock.currentTime);
-                        return viewer.scene.globe.tilesLoaded;
-                    }
-                """)
+                if is_fast_mode:
+                    frame_state = await page.evaluate(
+                        """
+                        ({ frameIndex, totalFrames }) => {
+                            return window._setExportFrame(frameIndex, totalFrames);
+                        }
+                        """,
+                        {"frameIndex": i, "totalFrames": total_frames},
+                    )
+                    tiles_loaded = bool(frame_state and frame_state.get("tilesLoaded"))
+                else:
+                    tiles_loaded = await page.evaluate("""
+                        () => {
+                            const viewer = window._cesiumViewer;
+                            viewer.scene.render(viewer.clock.currentTime);
+                            return viewer.scene.globe.tilesLoaded;
+                        }
+                    """)
 
                 if not tiles_loaded:
                     await asyncio.sleep(0.1)
@@ -860,7 +953,8 @@ async def _export_video_manual_render(job_id: str):
                         f"📸 {frame_count}/{total_frames} frames ({fps_actual:.1f} fps, ETA: {int(eta_seconds/60)}min)"
                     )
 
-                await asyncio.sleep(ms_per_frame / 1000)
+                if not is_fast_mode:
+                    await asyncio.sleep(ms_per_frame / 1000)
 
             total_capture_time = time.time() - start_time
             print(
@@ -890,6 +984,7 @@ async def _export_video_manual_render(job_id: str):
             timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
             filename = f"flight-{flight_id}-{timestamp}.mp4"
             output_file = EXPORTS_DIR / filename
+            ffmpeg_preset, ffmpeg_crf = _ffmpeg_encoding_settings(is_fast_mode)
 
             ffmpeg_cmd = [
                 "ffmpeg",
@@ -900,9 +995,9 @@ async def _export_video_manual_render(job_id: str):
                 "-c:v",
                 "libx264",
                 "-preset",
-                "medium",
+                ffmpeg_preset,
                 "-crf",
-                "18",
+                ffmpeg_crf,
                 "-pix_fmt",
                 "yuv420p",
                 "-nostats",
@@ -919,10 +1014,11 @@ async def _export_video_manual_render(job_id: str):
                 stderr=asyncio.subprocess.PIPE,
             )
 
-            encoding_started_at = time.time()
+            encoding_started_at = time.monotonic()
+            last_ffmpeg_output_at = encoding_started_at
             ffmpeg_stderr: list[str] = []
-            ffmpeg_timeout_seconds = 30 * 60
             total_duration_seconds = max(video_duration, 1e-6)
+            ffmpeg_timeout_seconds = _ffmpeg_timeout_seconds(total_duration_seconds)
 
             try:
                 assert process.stderr is not None
@@ -938,7 +1034,16 @@ async def _export_video_manual_render(job_id: str):
                         )
                         return
 
-                    if time.time() - encoding_started_at > ffmpeg_timeout_seconds:
+                    now = time.monotonic()
+                    if now - last_ffmpeg_output_at > _FFMPEG_STALL_TIMEOUT_SECONDS:
+                        process.kill()
+                        await process.wait()
+                        raise Exception(
+                            "FFmpeg stalled for "
+                            f"{_FFMPEG_STALL_TIMEOUT_SECONDS}s: {' '.join(ffmpeg_cmd)}"
+                        )
+
+                    if now - encoding_started_at > ffmpeg_timeout_seconds:
                         process.kill()
                         await process.wait()
                         raise Exception(
@@ -958,6 +1063,7 @@ async def _export_video_manual_render(job_id: str):
                         continue
 
                     line = line_bytes.decode("utf-8", errors="replace").strip()
+                    last_ffmpeg_output_at = time.monotonic()
                     ffmpeg_stderr.append(line)
                     encoded_seconds = _parse_ffmpeg_out_time_seconds(line)
 
@@ -966,7 +1072,7 @@ async def _export_video_manual_render(job_id: str):
                             encoded_seconds,
                             total_duration_seconds,
                         )
-                        elapsed_encoding = max(time.time() - encoding_started_at, 1e-6)
+                        elapsed_encoding = max(time.monotonic() - encoding_started_at, 1e-6)
                         encoding_speed = encoded_seconds / elapsed_encoding
                         remaining = max(total_duration_seconds - encoded_seconds, 0.0)
                         eta_seconds = (
@@ -1062,15 +1168,13 @@ def cancel_video_export(job_id: str, update_db: bool = True) -> bool:
     return True
 
 
-def list_exports(flight_id: str) -> list[dict[str, Any]]:
-    """List all exports for a flight from DB and in-memory snapshots."""
+def list_exports(flight_id: str | None = None) -> list[dict[str, Any]]:
+    """List exports from DB and in-memory snapshots."""
     with SessionLocal() as db:
-        jobs = (
-            db.query(VideoExportJob)
-            .filter(VideoExportJob.flight_id == flight_id)
-            .order_by(VideoExportJob.created_at.desc())
-            .all()
-        )
+        query = db.query(VideoExportJob)
+        if flight_id:
+            query = query.filter(VideoExportJob.flight_id == flight_id)
+        jobs = query.order_by(VideoExportJob.created_at.desc()).all()
 
     results = [_snapshot_from_job(job) for job in jobs]
 
@@ -1078,7 +1182,7 @@ def list_exports(flight_id: str) -> list[dict[str, Any]]:
         memory_items = list(export_jobs.items())
 
     for job_id, snapshot in memory_items:
-        if snapshot.get("flight_id") != flight_id:
+        if flight_id and snapshot.get("flight_id") != flight_id:
             continue
         if not any(item.get("job_id") == job_id for item in results):
             results.append(snapshot)

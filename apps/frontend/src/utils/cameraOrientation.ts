@@ -84,10 +84,10 @@ export function getOrientationLabel(orientation: string): string {
  * Get all valid orientations with labels
  * Useful for dropdowns/selectors
  */
-export function getOrientationOptions(): Array<{
+export function getOrientationOptions(): {
   value: string;
   label: string;
-}> {
+}[] {
   const orientations = [
     'N',
     'NNE',

@@ -1,7 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+// oxlint-disable-next-line import/no-unassigned-import
 import './i18n';
 import App from './App';
+// oxlint-disable-next-line import/no-unassigned-import
 import './App.css';
 import { initTheme } from './stores/themeStore';
 

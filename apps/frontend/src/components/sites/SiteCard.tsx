@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Site } from '@dashboard-parapente/shared-types';
+import type { Site } from '@dashboard-parapente/shared-types';
 import { Button } from '@dashboard-parapente/design-system';
 
 interface SiteCardProps {
