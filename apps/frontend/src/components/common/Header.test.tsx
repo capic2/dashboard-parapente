@@ -12,7 +12,6 @@ vi.mock('react-i18next', () => ({
         'header.weather': 'Weather',
         'header.dashboard': 'Dashboard',
         'header.flights': 'Flights',
-        'header.exports': 'Exports',
         'header.analytics': 'Analytics',
         'header.sites': 'Sites',
         'header.settings': 'Settings',
@@ -185,14 +184,13 @@ describe('Header theme controls', () => {
     expect(useThemeStore.getState().preference).toBe('auto');
   });
 
-  it('shows the exports navigation link when authenticated', () => {
+  it('does not show a dedicated exports navigation link when authenticated', () => {
     useAuthStore.setState({ isAuthenticated: true, token: 'token' });
 
     render(<Header />);
 
-    expect(screen.getAllByRole('link', { name: 'Exports' })[0]).toHaveAttribute(
-      'href',
-      '/exports'
-    );
+    expect(
+      screen.queryByRole('link', { name: 'Exports' })
+    ).not.toBeInTheDocument();
   });
 });

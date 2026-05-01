@@ -3,7 +3,6 @@
     "title": "Tableau de Bord Parapente",
     "dashboard": "Dashboard",
     "flights": "Vols",
-    "exports": "Exportations",
     "analytics": "Analyses",
     "sites": "Sites",
     "settings": "Paramètres",
@@ -66,8 +65,6 @@
   },
   "videoJobs": {
     "title": "Générations vidéo",
-    "pageTitle": "Exportations vidéo",
-    "pageSubtitle": "Suivez les générations vidéo en cours et les derniers exports.",
     "activeCount_one": "{{count}} génération en cours",
     "activeCount_other": "{{count}} générations en cours",
     "noActive": "Aucune génération en cours",
