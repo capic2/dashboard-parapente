@@ -1,4 +1,5 @@
 // Mock GPX data pour chaque vol
+// oxlint-disable-next-line typescript/no-explicit-any
 export const gpxData: Record<string, any> = {
   '72672aab-7213-43fb-8ad8-ed9fbc0f3246': {
     coordinates: [

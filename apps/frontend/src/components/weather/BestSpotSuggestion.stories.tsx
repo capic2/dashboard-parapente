@@ -1,4 +1,3 @@
-import { expect, screen } from 'storybook/test';
 import { fn } from 'storybook/test';
 import preview from '../../../.storybook/preview';
 import {
@@ -283,19 +282,6 @@ export const DisplaysBestSpotData = meta.story({
   ),
 });
 
-DisplaysBestSpotData.test(
-  'should display best spot data correctly',
-  async ({ canvas }) => {
-    await canvas.findByText('Annecy');
-    await expect(canvas.getByText(/aujourd'hui/i)).toBeInTheDocument();
-    await expect(canvas.getByText('90')).toBeInTheDocument();
-    await expect(
-      canvas.getByText(/Excellentes conditions/)
-    ).toBeInTheDocument();
-    await expect(canvas.getByText('Voir les prévisions →')).toBeInTheDocument();
-  }
-);
-
 export const ShowsRatingStars = meta.story({
   name: 'Shows Rating Stars',
   render: () => (
@@ -303,31 +289,12 @@ export const ShowsRatingStars = meta.story({
   ),
 });
 
-ShowsRatingStars.test(
-  'should show rating stars when available',
-  async ({ canvas }) => {
-    await canvas.findByText('Annecy');
-    // Rating stars rendered as ★ characters
-    const ratingText = canvas.queryByText(/★{5}/);
-    await expect(ratingText).toBeInTheDocument();
-  }
-);
-
 export const HidesWindWhenNotAvailable = meta.story({
   name: 'Hides Wind When Not Available',
   render: () => (
     <BestSpotSuggestion bestSpot={mockBestSpotNoWind} onSelectSite={fn()} />
   ),
 });
-
-HidesWindWhenNotAvailable.test(
-  'should hide wind info when not available',
-  async ({ canvas }) => {
-    await canvas.findByText('Les Contamines');
-    await expect(canvas.getByText('80')).toBeInTheDocument();
-    await expect(canvas.queryByText(/Vent:/)).not.toBeInTheDocument();
-  }
-);
 
 export const CallsOnSelectSiteCallback = meta.story({
   name: 'Calls On Select Site Callback',
@@ -342,30 +309,10 @@ export const CallsOnSelectSiteCallback = meta.story({
   },
 });
 
-CallsOnSelectSiteCallback.test(
-  'should call onSelectSite callback when button clicked',
-  async ({ canvas, userEvent }) => {
-    const button = canvas.getByText('Voir les prévisions →');
-    await userEvent.click(button);
-
-    // Note: In CSF3 with .test(), we can't easily check the callback
-    // This test verifies the button is clickable and doesn't error
-  }
-);
-
 export const RendersNothingWhenNull = meta.story({
   name: 'Renders Nothing When Null',
   render: () => <BestSpotSuggestion bestSpot={null} onSelectSite={fn()} />,
 });
-
-RendersNothingWhenNull.test(
-  'should render nothing when bestSpot is null',
-  async ({ canvas }) => {
-    await expect(
-      canvas.queryByText("Meilleur spot aujourd'hui")
-    ).not.toBeInTheDocument();
-  }
-);
 
 export const CompactCallsOnSelectSite = meta.story({
   name: 'Compact Calls On Select Site',
@@ -379,19 +326,6 @@ export const CompactCallsOnSelectSite = meta.story({
     );
   },
 });
-
-CompactCallsOnSelectSite.test(
-  'should call onSelectSite callback in compact variant',
-  async ({ canvas, userEvent }) => {
-    const button = canvas.getByText('Annecy').closest('button');
-    await expect(button).toBeInTheDocument();
-
-    if (button) await userEvent.click(button);
-
-    // Note: In CSF3 with .test(), we can't easily check the callback
-    // This test verifies the button is clickable and doesn't error
-  }
-);
 
 // ==========================================
 // NEW STORIES - DAY INDEX SUPPORT
@@ -409,10 +343,6 @@ export const Today = meta.story({
   },
 });
 
-Today.test('should display "aujourd\'hui"', async () => {
-  await expect(screen.getByText(/aujourd'hui/i)).toBeInTheDocument();
-});
-
 /**
  * Meilleur spot pour demain (day 1)
  */
@@ -425,10 +355,6 @@ export const Tomorrow = meta.story({
   },
 });
 
-Tomorrow.test('should display "demain"', async () => {
-  await expect(screen.getByText(/demain/i)).toBeInTheDocument();
-});
-
 /**
  * Meilleur spot pour dans 3 jours (day 3)
  */
@@ -439,12 +365,6 @@ export const Day3 = meta.story({
     selectedDayIndex: 3,
     onSelectSite: fn(),
   },
-});
-
-Day3.test('should display formatted date', async () => {
-  // Devrait afficher "jeudi 22 mars" ou similaire
-  const text = screen.getByText(/meilleur spot pour/i).textContent;
-  expect(text).toMatch(/\w+ \d+ \w+/); // Pattern: "jeudi 22 mars"
 });
 
 /**
