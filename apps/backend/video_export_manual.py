@@ -21,14 +21,25 @@ from urllib.parse import urlparse
 from sqlalchemy.orm import Session
 
 import config
+from app_settings import get_setting
 from database import SessionLocal
 from models import Flight, VideoExportJob
 
 # Storage for export jobs (compatibility snapshot)
 export_jobs: dict[str, dict[str, Any]] = {}
 
-VIDEO_EXPORT_DIR = Path(config.VIDEO_EXPORT_DIR)
-VIDEO_TEMP_IMAGES_DIR = Path(config.VIDEO_TEMP_IMAGES_DIR)
+def _video_export_dir() -> Path:
+    with SessionLocal() as db:
+        path_value = get_setting("video_export_dir", db=db, default=config.VIDEO_EXPORT_DIR)
+    return Path(path_value)
+
+
+def _video_temp_images_dir() -> Path:
+    with SessionLocal() as db:
+        path_value = get_setting(
+            "video_temp_images_dir", db=db, default=config.VIDEO_TEMP_IMAGES_DIR
+        )
+    return Path(path_value)
 
 
 _STATUS_QUEUED = "queued"
@@ -494,8 +505,8 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
     }
 
     candidates: list[tuple[Path, Path]] = []
-    temp_root = VIDEO_TEMP_IMAGES_DIR
-    export_root = VIDEO_EXPORT_DIR
+    temp_root = _video_temp_images_dir()
+    export_root = _video_export_dir()
 
     for job_id in known_inactive_job_ids:
         candidates.append((_job_temp_dir(job_id), temp_root))
@@ -551,7 +562,7 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
 
 def _prepare_export_dirs(temp_dir: Path, frames_dir: Path) -> None:
     try:
-        VIDEO_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        _video_export_dir().mkdir(parents=True, exist_ok=True)
         temp_dir.mkdir(parents=True, exist_ok=True)
         frames_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
@@ -559,7 +570,7 @@ def _prepare_export_dirs(temp_dir: Path, frames_dir: Path) -> None:
 
 
 def _job_temp_dir(job_id: str) -> Path:
-    return VIDEO_TEMP_IMAGES_DIR / job_id
+    return _video_temp_images_dir() / job_id
 
 
 def _job_frames_dir(job_id: str) -> Path:
@@ -567,7 +578,7 @@ def _job_frames_dir(job_id: str) -> Path:
 
 
 def _video_output_path(flight_id: str, timestamp: str) -> Path:
-    return VIDEO_EXPORT_DIR / f"flight-{flight_id}-{timestamp}.mp4"
+    return _video_export_dir() / f"flight-{flight_id}-{timestamp}.mp4"
 
 
 def _capture_progress_percent(frame_count: int, total_frames: int) -> int:

@@ -133,6 +133,43 @@ class TestUpdateSettings:
         assert radius_row is not None and radius_row.value == "12"
         assert ttl_row is not None and ttl_row.value == "420"
 
+    def test_update_video_storage_settings(self, client, db_session):
+        """Updates video storage folders and persists normalized absolute paths."""
+        response = client.put(
+            f"{API_PREFIX}/settings",
+            json={
+                "video_export_dir": "  /mnt/videos/exports  ",
+                "video_temp_images_dir": "/mnt/videos/temp-images",
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["updated"]["video_export_dir"] == "/mnt/videos/exports"
+        assert data["updated"]["video_temp_images_dir"] == "/mnt/videos/temp-images"
+
+        export_row = db_session.query(AppSetting).filter(AppSetting.key == "video_export_dir").first()
+        temp_row = (
+            db_session.query(AppSetting).filter(AppSetting.key == "video_temp_images_dir").first()
+        )
+        assert export_row is not None and export_row.value == "/mnt/videos/exports"
+        assert temp_row is not None and temp_row.value == "/mnt/videos/temp-images"
+
+    def test_rejects_invalid_video_storage_paths(self, client, db_session):
+        """Rejects empty and relative paths for video storage settings."""
+        empty_response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"video_export_dir": "   "},
+        )
+        assert empty_response.status_code == 400
+        assert empty_response.json()["detail"] == "video_export_dir must not be empty"
+
+        relative_response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"video_temp_images_dir": "exports/temp"},
+        )
+        assert relative_response.status_code == 400
+        assert relative_response.json()["detail"] == "video_temp_images_dir must be an absolute path"
+
     def test_rejects_invalid_spotair_live_wind_settings(self, client, db_session):
         """Rejects out-of-range SpotAiR live wind radius and non-positive TTL."""
         radius_response = client.put(

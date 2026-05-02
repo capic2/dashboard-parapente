@@ -5646,6 +5646,7 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
         "ui_reason_cloud_very_cloudy_min": (0, 100),
         "ui_reason_wind_moderate_min": (0, 150),
     }
+    path_keys = {"video_export_dir", "video_temp_images_dir"}
     validated_updates: dict[str, str] = {}
 
     for key, value in settings.items():
@@ -5687,6 +5688,14 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
                     detail=f"{key} must be between {min_value:g} and {max_value:g}",
                 )
             normalized_value = f"{parsed_value:g}"
+        elif key in path_keys:
+            candidate = normalized_value.strip()
+            if not candidate:
+                raise HTTPException(status_code=400, detail=f"{key} must not be empty")
+            path_value = Path(candidate)
+            if not path_value.is_absolute():
+                raise HTTPException(status_code=400, detail=f"{key} must be an absolute path")
+            normalized_value = str(path_value)
 
         validated_updates[key] = normalized_value
 

@@ -11,15 +11,28 @@ from datetime import datetime
 from pathlib import Path
 
 import config
+from app_settings import get_setting
 from database import SessionLocal
 from models import Flight
 
 # Storage for export jobs
 export_jobs: dict[str, dict] = {}
 
-VIDEO_EXPORT_DIR = Path(config.VIDEO_EXPORT_DIR)
-VIDEO_TEMP_IMAGES_DIR = Path(config.VIDEO_TEMP_IMAGES_DIR)
 _TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
+
+
+def _video_export_dir() -> Path:
+    with SessionLocal() as db:
+        path_value = get_setting("video_export_dir", db=db, default=config.VIDEO_EXPORT_DIR)
+    return Path(path_value)
+
+
+def _video_temp_images_dir() -> Path:
+    with SessionLocal() as db:
+        path_value = get_setting(
+            "video_temp_images_dir", db=db, default=config.VIDEO_TEMP_IMAGES_DIR
+        )
+    return Path(path_value)
 
 
 def check_dependencies():
@@ -68,7 +81,7 @@ def _cleanup_temp_dir(temp_dir: Path | None) -> None:
 
 
 def _job_temp_dir(job_id: str) -> Path:
-    return VIDEO_TEMP_IMAGES_DIR / job_id
+    return _video_temp_images_dir() / job_id
 
 
 def _job_debug_dir(job_id: str) -> Path:
@@ -76,12 +89,12 @@ def _job_debug_dir(job_id: str) -> Path:
 
 
 def _video_output_path(flight_id: str, timestamp: str) -> Path:
-    return VIDEO_EXPORT_DIR / f"flight-{flight_id}-{timestamp}.mp4"
+    return _video_export_dir() / f"flight-{flight_id}-{timestamp}.mp4"
 
 
 def _prepare_export_dirs(temp_dir: Path, debug_dir: Path) -> None:
     try:
-        VIDEO_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        _video_export_dir().mkdir(parents=True, exist_ok=True)
         temp_dir.mkdir(parents=True, exist_ok=True)
         debug_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
