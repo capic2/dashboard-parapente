@@ -887,6 +887,7 @@ function PerformanceSection() {
               {t('settings.performance.videoExportDir')}
             </span>
             <input
+              key={`video_export_dir-${currentVideoExportDir}`}
               type="text"
               defaultValue={currentVideoExportDir}
               placeholder="/app/video-exports"
@@ -902,6 +903,7 @@ function PerformanceSection() {
               {t('settings.performance.videoTempImagesDir')}
             </span>
             <input
+              key={`video_temp_images_dir-${currentVideoTempImagesDir}`}
               type="text"
               defaultValue={currentVideoTempImagesDir}
               placeholder="/app/video-temp-images"

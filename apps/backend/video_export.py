@@ -80,21 +80,21 @@ def _cleanup_temp_dir(temp_dir: Path | None) -> None:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-def _job_temp_dir(job_id: str) -> Path:
-    return _video_temp_images_dir() / job_id
+def _job_temp_dir(temp_root: Path, job_id: str) -> Path:
+    return temp_root / job_id
 
 
-def _job_debug_dir(job_id: str) -> Path:
-    return _job_temp_dir(job_id) / "debug"
+def _job_debug_dir(temp_root: Path, job_id: str) -> Path:
+    return _job_temp_dir(temp_root, job_id) / "debug"
 
 
-def _video_output_path(flight_id: str, timestamp: str) -> Path:
-    return _video_export_dir() / f"flight-{flight_id}-{timestamp}.mp4"
+def _video_output_path(export_root: Path, flight_id: str, timestamp: str) -> Path:
+    return export_root / f"flight-{flight_id}-{timestamp}.mp4"
 
 
-def _prepare_export_dirs(temp_dir: Path, debug_dir: Path) -> None:
+def _prepare_export_dirs(export_root: Path, temp_dir: Path, debug_dir: Path) -> None:
     try:
-        _video_export_dir().mkdir(parents=True, exist_ok=True)
+        export_root.mkdir(parents=True, exist_ok=True)
         temp_dir.mkdir(parents=True, exist_ok=True)
         debug_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
@@ -171,13 +171,15 @@ async def _export_video_playwright(
     """
     Export video using Playwright to capture frames
     """
-    temp_dir = _job_temp_dir(job_id)
-    debug_dir = _job_debug_dir(job_id)
+    export_root = _video_export_dir()
+    temp_root = _video_temp_images_dir()
+    temp_dir = _job_temp_dir(temp_root, job_id)
+    debug_dir = _job_debug_dir(temp_root, job_id)
     webm_file: Path | None = None
     output_file: Path | None = None
 
     try:
-        _prepare_export_dirs(temp_dir, debug_dir)
+        _prepare_export_dirs(export_root, temp_dir, debug_dir)
 
         # Lazy import to avoid blocking server startup
         from playwright.async_api import async_playwright
@@ -548,7 +550,7 @@ async def _export_video_playwright(
             export_jobs[job_id]["progress"] = 50
             export_jobs[job_id]["message"] = "Converting WebM to MP4..."
 
-            output_file = _video_output_path(flight_id, timestamp)
+            output_file = _video_output_path(export_root, flight_id, timestamp)
 
             # Convert WebM to MP4
             ffmpeg_cmd = [

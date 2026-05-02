@@ -19,10 +19,12 @@ class TestGetSettings:
         app_settings.invalidate_cache()
 
     def test_get_settings_empty_table(self, client, db_session):
-        """Returns empty dict when no settings exist."""
+        """Returns default settings when no settings exist."""
         response = client.get(f"{API_PREFIX}/settings")
         assert response.status_code == 200
-        assert response.json() == {}
+        data = response.json()
+        assert data["video_export_dir"] == app_settings.DEFAULTS["video_export_dir"]
+        assert data["video_temp_images_dir"] == app_settings.DEFAULTS["video_temp_images_dir"]
 
     def test_get_settings_returns_all(self, client, db_session):
         """Returns all settings as key-value pairs."""
@@ -35,6 +37,7 @@ class TestGetSettings:
         data = response.json()
         assert data["cache_ttl_default"] == "1800"
         assert data["scheduler_interval_minutes"] == "15"
+        assert data["video_export_dir"] == app_settings.DEFAULTS["video_export_dir"]
 
 
 class TestUpdateSettings:

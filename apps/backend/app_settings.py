@@ -134,7 +134,10 @@ def get_all_settings(db: Session) -> dict[str, str]:
     """Read all settings as a dict (sensitive keys excluded)."""
     if not _cache_loaded:
         reload_cache(db)
-    return {k: v for k, v in _settings_cache.items() if k not in _SENSITIVE_KEYS}
+    return {
+        **DEFAULTS,
+        **{k: v for k, v in _settings_cache.items() if k not in _SENSITIVE_KEYS},
+    }
 
 
 def invalidate_cache() -> None:
