@@ -158,6 +158,30 @@ const mockHourlyBestSpots = [
     score: 88,
     flyableSlot: '13h',
   },
+  {
+    ...mockBestSpotExcellent,
+    hour: 14,
+    score: 82,
+    flyableSlot: '14h',
+  },
+  {
+    ...mockBestSpotGood,
+    hour: 15,
+    score: 68,
+    flyableSlot: '15h',
+  },
+  {
+    ...mockBestSpotModerate,
+    hour: 16,
+    score: 48,
+    flyableSlot: '16h',
+  },
+  {
+    ...mockBestSpotPoor,
+    hour: 17,
+    score: 24,
+    flyableSlot: '17h',
+  },
 ];
 
 // Default story - Excellent conditions

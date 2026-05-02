@@ -127,7 +127,7 @@
     "forecast7Days": "7-Day Forecast",
     "bestSpotFor": "Best spot for {{date}}",
     "bestSpotTimeline": "Best spot hour by hour",
-    "byHour": "h, h+1...",
+    "byHour": "H -> end of day",
     "calculating": "Calculating...",
     "paraIndex": "Flight Conditions",
     "viewForecast": "View forecast →",
