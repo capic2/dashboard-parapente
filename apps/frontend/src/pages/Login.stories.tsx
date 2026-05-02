@@ -1,5 +1,5 @@
 import { delay, http, HttpResponse } from 'msw';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 import preview from '../../.storybook/preview';
 import Login from './Login';
 import { useAuthStore } from '../stores/authStore';
@@ -134,6 +134,8 @@ SubmitSuccess.test('logs user in after submit', async ({ canvasElement }) => {
     await canvas.findByRole('button', { name: /se connecter|sign in/i })
   );
 
-  await expect(useAuthStore.getState().token).toBe('storybook-jwt-token');
-  await expect(useAuthStore.getState().isAuthenticated).toBe(true);
+  await waitFor(() => {
+    expect(useAuthStore.getState().token).toBe('storybook-jwt-token');
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+  });
 });
