@@ -806,6 +806,78 @@ async def test_cache_key_per_day():
 
 
 @pytest.mark.asyncio
+async def test_get_hourly_best_spots_cached_cache_miss_sets_ttl():
+    """Test hourly best spots cache key and TTL on cache miss."""
+    from best_spot import get_hourly_best_spots_cached
+
+    mock_db = MagicMock()
+    mock_get_cached = AsyncMock(return_value=None)
+    mock_set_cached = AsyncMock()
+    mock_hourly_best_spots = {
+        "dayIndex": 3,
+        "startHour": 0,
+        "hours": [{"hour": 9, "site": {"name": "Arguel"}, "score": 75}],
+    }
+
+    def cache_ttl():
+        return {"summary": 1800}
+
+    with (
+        patch(
+            "best_spot._get_cache_functions",
+            return_value=(mock_get_cached, mock_set_cached, cache_ttl),
+        ),
+        patch(
+            "best_spot.calculate_hourly_best_spots_from_cache",
+            new=AsyncMock(return_value=mock_hourly_best_spots),
+        ),
+    ):
+        result = await get_hourly_best_spots_cached(mock_db, day_index=3, hours=4)
+
+    assert result == mock_hourly_best_spots
+    mock_get_cached.assert_awaited_once_with("best_spot_hourly:day_3:start_0:hours_4")
+    mock_set_cached.assert_awaited_once_with(
+        "best_spot_hourly:day_3:start_0:hours_4", mock_hourly_best_spots, 1800
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_hourly_best_spots_cached_cache_hit_uses_current_hour():
+    """Test hourly best spots cache hit returns cached payload without writing cache."""
+    from best_spot import get_hourly_best_spots_cached
+
+    mock_db = MagicMock()
+    cached_payload = {
+        "dayIndex": 0,
+        "startHour": 14,
+        "hours": [{"hour": 14, "site": {"name": "Chalais"}, "score": 68}],
+    }
+    mock_get_cached = AsyncMock(return_value=cached_payload)
+    mock_set_cached = AsyncMock()
+
+    def cache_ttl():
+        return {"summary": 1800}
+
+    with (
+        patch("best_spot.datetime") as mock_datetime,
+        patch(
+            "best_spot._get_cache_functions",
+            return_value=(mock_get_cached, mock_set_cached, cache_ttl),
+        ),
+        patch(
+            "best_spot.calculate_hourly_best_spots_from_cache", new=AsyncMock()
+        ) as calculate_mock,
+    ):
+        mock_datetime.now.return_value.hour = 14
+        result = await get_hourly_best_spots_cached(mock_db, day_index=0, hours=8)
+
+    assert result == cached_payload
+    mock_get_cached.assert_awaited_once_with("best_spot_hourly:day_0:start_14:hours_8")
+    mock_set_cached.assert_not_called()
+    calculate_mock.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_refresh_cache_all_days():
     """Test that scheduler refreshes all 7 days (0-6)"""
     from best_spot import refresh_best_spot_cache

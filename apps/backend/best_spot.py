@@ -110,6 +110,26 @@ def get_wind_score_multiplier(favorability: str) -> float:
     return multipliers.get(favorability, 0.7)
 
 
+def _filter_flyable_hours(
+    consensus_hours: list[dict[str, Any]], forecast: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Return daylight hours, falling back to all consensus hours on invalid sun times."""
+    sunrise_time = forecast.get("sunrise")
+    sunset_time = forecast.get("sunset")
+    if sunrise_time and sunset_time:
+        try:
+            sunrise_hour = int(sunrise_time.split(":")[0])
+            sunset_hour = int(sunset_time.split(":")[0])
+            return [
+                hour_data
+                for hour_data in consensus_hours
+                if sunrise_hour <= hour_data.get("hour", 0) <= sunset_hour
+            ]
+        except (ValueError, IndexError, AttributeError):
+            pass
+    return consensus_hours
+
+
 async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dict[str, Any] | None:
     """
     Calculate the best spot based on cached weather data (from Redis)
@@ -170,20 +190,7 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
                     continue
 
                 # Filter to flyable hours (sunrise/sunset) for consistent para_index
-                sunrise_time = forecast.get("sunrise")
-                sunset_time = forecast.get("sunset")
-                flyable_hours = consensus_hours
-                if sunrise_time and sunset_time:
-                    try:
-                        sunrise_hour = int(sunrise_time.split(":")[0])
-                        sunset_hour = int(sunset_time.split(":")[0])
-                        flyable_hours = [
-                            h
-                            for h in consensus_hours
-                            if sunrise_hour <= h.get("hour", 0) <= sunset_hour
-                        ]
-                    except (ValueError, IndexError, AttributeError):
-                        pass
+                flyable_hours = _filter_flyable_hours(consensus_hours, forecast)
                 if not flyable_hours:
                     continue
 
@@ -558,20 +565,7 @@ async def calculate_hourly_best_spots_from_cache(
                 if not consensus_hours:
                     continue
 
-                sunrise_time = forecast.get("sunrise")
-                sunset_time = forecast.get("sunset")
-                flyable_hours = consensus_hours
-                if sunrise_time and sunset_time:
-                    try:
-                        sunrise_hour = int(sunrise_time.split(":")[0])
-                        sunset_hour = int(sunset_time.split(":")[0])
-                        flyable_hours = [
-                            h
-                            for h in consensus_hours
-                            if sunrise_hour <= h.get("hour", 0) <= sunset_hour
-                        ]
-                    except (ValueError, IndexError, AttributeError):
-                        pass
+                flyable_hours = _filter_flyable_hours(consensus_hours, forecast)
 
                 for hour_data in flyable_hours:
                     hour = hour_data.get("hour")
