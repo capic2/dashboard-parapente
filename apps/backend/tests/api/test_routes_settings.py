@@ -147,7 +147,9 @@ class TestUpdateSettings:
         assert data["updated"]["video_export_dir"] == "/mnt/videos/exports"
         assert data["updated"]["video_temp_images_dir"] == "/mnt/videos/temp-images"
 
-        export_row = db_session.query(AppSetting).filter(AppSetting.key == "video_export_dir").first()
+        export_row = (
+            db_session.query(AppSetting).filter(AppSetting.key == "video_export_dir").first()
+        )
         temp_row = (
             db_session.query(AppSetting).filter(AppSetting.key == "video_temp_images_dir").first()
         )
@@ -168,7 +170,9 @@ class TestUpdateSettings:
             json={"video_temp_images_dir": "exports/temp"},
         )
         assert relative_response.status_code == 400
-        assert relative_response.json()["detail"] == "video_temp_images_dir must be an absolute path"
+        assert (
+            relative_response.json()["detail"] == "video_temp_images_dir must be an absolute path"
+        )
 
     def test_rejects_invalid_spotair_live_wind_settings(self, client, db_session):
         """Rejects out-of-range SpotAiR live wind radius and non-positive TTL."""

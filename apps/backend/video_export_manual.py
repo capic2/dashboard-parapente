@@ -28,6 +28,7 @@ from models import Flight, VideoExportJob
 # Storage for export jobs (compatibility snapshot)
 export_jobs: dict[str, dict[str, Any]] = {}
 
+
 def _video_export_dir() -> Path:
     with SessionLocal() as db:
         path_value = get_setting("video_export_dir", db=db, default=config.VIDEO_EXPORT_DIR)
