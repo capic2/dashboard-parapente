@@ -1359,6 +1359,40 @@ async def get_best_spot(
         ) from e
 
 
+@public_router.get("/spots/best/hourly")
+async def get_hourly_best_spots(
+    day_index: int = Query(
+        default=0,
+        ge=0,
+        le=6,
+        description="Day index (0=today, 1=tomorrow, ..., 6=in 6 days)",
+    ),
+    hours: int = Query(default=8, ge=1, le=24, description="Maximum number of hourly winners"),
+    db: Session = Depends(get_db),
+):
+    """Get the best flying spot for each upcoming flyable hour."""
+    from best_spot import get_hourly_best_spots_cached
+
+    try:
+        hourly_best_spots = await get_hourly_best_spots_cached(db, day_index, hours)
+
+        if not hourly_best_spots:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No hourly forecast data available for day {day_index}.",
+            )
+
+        return hourly_best_spots
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting hourly best spots: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Failed to calculate hourly best spots: {str(e)}"
+        ) from e
+
+
 @public_router.get("/spots/{spot_id}", response_model=SiteSchema)
 def get_spot(spot_id: str, db: Session = Depends(get_db)):
     """Get a specific user-managed spot"""

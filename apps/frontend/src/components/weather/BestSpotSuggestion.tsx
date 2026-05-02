@@ -17,8 +17,11 @@ import ScopeBadge from '../common/ScopeBadge';
 import { Button } from '@dashboard-parapente/design-system';
 import type { BestSpotResult } from '@dashboard-parapente/shared-types';
 
+type HourlyBestSpot = BestSpotResult & { hour: number };
+
 interface BestSpotSuggestionProps {
   bestSpot: BestSpotResult | null;
+  hourlyBestSpots?: HourlyBestSpot[];
   onSelectSite: (siteId: string) => void;
   selectedDayIndex?: number;
   className?: string;
@@ -103,6 +106,7 @@ function getVerdict(paraIndex: number, verdict?: string) {
 
 export const BestSpotSuggestion = ({
   bestSpot,
+  hourlyBestSpots = [],
   onSelectSite,
   selectedDayIndex = 0,
   className = '',
@@ -157,6 +161,7 @@ export const BestSpotSuggestion = ({
   const localizedReason = reason.replace(/Para-Index/g, t('weather.paraIndex'));
   const scoreColor = getScoreColor(adjustedScore);
   const verdictInfo = getVerdict(adjustedScore, verdict ?? undefined);
+  const nowHour = new Date().getHours();
 
   return (
     <div
@@ -317,6 +322,72 @@ export const BestSpotSuggestion = ({
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 leading-relaxed">
           {localizedReason}
         </p>
+
+        {hourlyBestSpots.length > 0 && (
+          <div className="mb-4 border-t border-gray-100 dark:border-gray-700 pt-3">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                {t('weather.bestSpotTimeline')}
+              </span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                {t('weather.byHour')}
+              </span>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {hourlyBestSpots.map((hourlySpot) => {
+                const hourlyScore = Math.min(
+                  100,
+                  Math.max(
+                    0,
+                    hourlySpot.score != null
+                      ? Math.round(hourlySpot.score)
+                      : hourlySpot.paraIndex
+                  )
+                );
+                const hourlyScoreColor = getScoreColor(hourlyScore);
+                const hourLabel =
+                  selectedDayIndex === 0 && hourlySpot.hour === nowHour
+                    ? t('common.now')
+                    : `${hourlySpot.hour}h`;
+                const windLabel =
+                  hourlySpot.windDirection && hourlySpot.windSpeed != null
+                    ? `${hourlySpot.windDirection} ${Math.round(
+                        hourlySpot.windSpeed
+                      )}km/h`
+                    : '—';
+
+                return (
+                  <Button
+                    key={`${hourlySpot.hour}-${hourlySpot.site?.id ?? 'none'}`}
+                    onClick={() => {
+                      if (hourlySpot.site) {
+                        onSelectSite(hourlySpot.site.id);
+                      }
+                    }}
+                    className="min-w-[132px] rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900/30 dark:hover:bg-gray-900/60"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-gray-900 dark:text-white">
+                        {hourLabel}
+                      </span>
+                      <span
+                        className={`text-xs font-bold ${hourlyScoreColor.text}`}
+                      >
+                        {hourlyScore}
+                      </span>
+                    </div>
+                    <div className="mt-1 truncate text-sm font-semibold text-gray-800 dark:text-gray-100">
+                      {hourlySpot.site?.name ?? '—'}
+                    </div>
+                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {windLabel}
+                    </div>
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Footer: button + cache */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

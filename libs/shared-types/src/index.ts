@@ -330,6 +330,12 @@ export const BestSpotResultSchema = z.object({
   cached_at: z.string().nullish(),
 });
 
+export const HourlyBestSpotsResultSchema = z.object({
+  dayIndex: z.number(),
+  startHour: z.number(),
+  hours: z.array(BestSpotResultSchema.extend({ hour: z.number() })),
+});
+
 // ============================================================================
 // FLIGHT RECORDS SCHEMAS
 // ============================================================================
@@ -432,3 +438,4 @@ export type GeoPoint = z.infer<typeof GeoPointSchema>;
 export type GPXData = z.infer<typeof GPXDataSchema>;
 export type BestSpotSite = z.infer<typeof BestSpotSiteSchema>;
 export type BestSpotResult = z.infer<typeof BestSpotResultSchema>;
+export type HourlyBestSpotsResult = z.infer<typeof HourlyBestSpotsResultSchema>;

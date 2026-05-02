@@ -133,6 +133,33 @@ const mockBestSpotNoRating: BestSpotResult = {
   verdict: 'BON',
 };
 
+const mockHourlyBestSpots = [
+  {
+    ...mockBestSpotExcellent,
+    hour: 10,
+    score: 90,
+    flyableSlot: '10h',
+  },
+  {
+    ...mockBestSpotGood,
+    hour: 11,
+    score: 75,
+    flyableSlot: '11h',
+  },
+  {
+    ...mockBestSpotModerate,
+    hour: 12,
+    score: 55,
+    flyableSlot: '12h',
+  },
+  {
+    ...mockBestSpotNoRating,
+    hour: 13,
+    score: 88,
+    flyableSlot: '13h',
+  },
+];
+
 // Default story - Excellent conditions
 export const ExcellentConditions = meta.story({
   name: 'Excellent Conditions',
@@ -178,6 +205,17 @@ export const NoRating = meta.story({
   name: 'No Rating',
   render: () => (
     <BestSpotSuggestion bestSpot={mockBestSpotNoRating} onSelectSite={fn()} />
+  ),
+});
+
+export const HourlyTimeline = meta.story({
+  name: 'Hourly Timeline',
+  render: () => (
+    <BestSpotSuggestion
+      bestSpot={mockBestSpotExcellent}
+      hourlyBestSpots={mockHourlyBestSpots}
+      onSelectSite={fn()}
+    />
   ),
 });
 
