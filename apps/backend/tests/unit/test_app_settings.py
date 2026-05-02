@@ -153,7 +153,9 @@ class TestGetAllSettings:
         db_session.commit()
 
         result = app_settings.get_all_settings(db_session)
-        assert result == {"a": "1", "b": "2"}
+        assert result["a"] == "1"
+        assert result["b"] == "2"
+        assert result["video_export_dir"] == app_settings.DEFAULTS["video_export_dir"]
 
 
 class TestInvalidateCache:
