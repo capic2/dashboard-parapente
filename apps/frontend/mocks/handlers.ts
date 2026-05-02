@@ -1,4 +1,10 @@
-import { http, HttpResponse, HttpHandler } from 'msw';
+import type {
+  DefaultBodyType,
+  HttpHandler,
+  HttpResponseResolver,
+  PathParams,
+} from 'msw';
+import { http, HttpResponse } from 'msw';
 import { sites } from './data/sites';
 import { flights } from './data/flights';
 import { gpxData } from './data/gpx';
@@ -6,13 +12,26 @@ import { weatherData } from './data/weather';
 import { flightStats } from './data/stats';
 import { weatherSources } from './data/weatherSources';
 import { getBestSpotForDay } from './data/bestSpot';
+import type { EmagramAnalysis } from '../src/types/emagram.ts';
+import type {
+  Alert,
+  Flight,
+  LandingAssociation,
+  Site,
+} from '@dashboard-parapente/shared-types';
+// oxlint-disable-next-line import/max-dependencies
+import type { WeatherSource } from '../src/types/weatherSources.ts';
 
 // Helper to create handlers that work in both dev, Storybook, and Vitest
 // Use wildcard pattern */api/... to match any origin
-const createHandler = (
+const createHandler = <
+  Params extends PathParams<keyof Params> = PathParams,
+  RequestBodyType extends DefaultBodyType = DefaultBodyType,
+  ResponseBodyType extends DefaultBodyType = undefined,
+>(
   method: 'get' | 'post' | 'put' | 'patch' | 'delete',
   path: string,
-  handler: Parameters<typeof http.get>[1]
+  handler: HttpResponseResolver<Params, RequestBodyType, ResponseBodyType>
 ): HttpHandler[] => {
   return [
     // Wildcard pattern - works in all environments (dev, Storybook, Vitest)
@@ -28,7 +47,7 @@ export const handlers = [
   // GET /api/spots - Retourne tous les sites
   ...createHandler('get', '/spots', () => {
     return HttpResponse.json({
-      sites: sites,
+      sites,
     });
   }),
 
@@ -79,27 +98,35 @@ export const handlers = [
   }),
 
   // POST /api/spots - Créer un nouveau site
-  ...createHandler('post', '/spots', async ({ request }) => {
-    const body = (await request.json()) as any;
-    return HttpResponse.json({
-      id: `site-${Date.now()}`,
-      ...body,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-  }),
+  ...createHandler<PathParams, Omit<Site, 'id'>>(
+    'post',
+    '/spots',
+    async ({ request }) => {
+      const body = await request.json();
+      return HttpResponse.json({
+        id: `site-${Date.now()}`,
+        ...body,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+    }
+  ),
 
   // PATCH /api/sites/:siteId - Mettre à jour un site
-  ...createHandler('patch', '/sites/:siteId', async ({ params, request }) => {
-    const body = (await request.json()) as any;
-    const site = sites.find((s) => s.id === params.siteId);
-    return HttpResponse.json({
-      ...site,
-      ...body,
-      id: params.siteId,
-      updated_at: new Date().toISOString(),
-    });
-  }),
+  ...createHandler<PathParams, Site>(
+    'patch',
+    '/sites/:siteId',
+    async ({ params, request }) => {
+      const body = await request.json();
+      const site = sites.find((s) => s.id === params.siteId);
+      return HttpResponse.json({
+        ...site,
+        ...body,
+        id: params.siteId,
+        updated_at: new Date().toISOString(),
+      });
+    }
+  ),
 
   // DELETE /api/sites/:siteId - Supprimer un site
   ...createHandler('delete', '/sites/:siteId', () => {
@@ -188,12 +215,19 @@ export const handlers = [
 
     // Transform data to match GPXData interface
     const data = {
-      coordinates: rawData.coordinates.map((coord: any) => ({
-        lat: coord.lat,
-        lon: coord.lon,
-        elevation: coord.elevation,
-        timestamp: new Date(coord.time).getTime(),
-      })),
+      coordinates: rawData.coordinates.map(
+        (coord: {
+          lat: number;
+          lon: number;
+          elevation: number;
+          time: string;
+        }) => ({
+          lat: coord.lat,
+          lon: coord.lon,
+          elevation: coord.elevation,
+          timestamp: new Date(coord.time).getTime(),
+        })
+      ),
       max_altitude_m: rawData.stats.max_altitude_m,
       min_altitude_m: rawData.stats.min_altitude_m,
       elevation_gain_m: rawData.stats.elevation_gain_m,
@@ -222,20 +256,24 @@ export const handlers = [
   }),
 
   // POST /api/flights - Créer un nouveau vol
-  ...createHandler('post', '/flights', async ({ request }) => {
-    const body = (await request.json()) as any;
-    return HttpResponse.json({
-      id: `flight-${Date.now()}`,
-      ...body,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      duration: 45,
-      distance: 12.5,
-      max_altitude: 1850,
-      site_id: body.site_id || '1',
-      site_name: 'Annecy',
-    });
-  }),
+  ...createHandler<PathParams, Omit<Flight, 'id'>>(
+    'post',
+    '/flights',
+    async ({ request }) => {
+      const body = await request.json();
+      return HttpResponse.json({
+        id: `flight-${Date.now()}`,
+        ...body,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        duration: 45,
+        distance: 12.5,
+        max_altitude: 1850,
+        site_id: body.site_id || '1',
+        site_name: 'Annecy',
+      });
+    }
+  ),
 
   // POST /api/flights/create-from-gpx - Créer un vol depuis un fichier GPX
   ...createHandler('post', '/flights/create-from-gpx', async ({ request }) => {
@@ -263,11 +301,11 @@ export const handlers = [
   }),
 
   // PATCH /api/flights/:flightId - Mettre à jour un vol
-  ...createHandler(
+  ...createHandler<{ flightId: string }, Omit<Flight, 'id'>, Flight>(
     'patch',
     '/flights/:flightId',
     async ({ params, request }) => {
-      const body = (await request.json()) as any;
+      const body = await request.json();
       return HttpResponse.json({
         id: params.flightId,
         ...body,
@@ -450,6 +488,7 @@ export const handlers = [
   ...createHandler(
     'get',
     '/weather/:spotId/daily-summary',
+    // oxlint-disable-next-line max-lines-per-function
     ({ params, request }) => {
       const { spotId } = params;
       const url = new URL(request.url);
@@ -477,14 +516,22 @@ export const handlers = [
           const baseParaIndex = 70 + (index % 3) * 10;
           const variance = Math.floor(Math.random() * 10);
           const paraIndex = Math.min(100, baseParaIndex + variance);
+          let verdict = 'MAUVAIS';
+          let emoji = '❌';
+          if (paraIndex >= 75) {
+            verdict = 'BON';
+            emoji = '✅';
+          } else if (paraIndex >= 60) {
+            verdict = 'MOYEN';
+            emoji = '⚠️';
+          }
 
           return {
             day_index: index,
             date: date.toISOString().split('T')[0],
             para_index: paraIndex,
-            verdict:
-              paraIndex >= 75 ? 'BON' : paraIndex >= 60 ? 'MOYEN' : 'MAUVAIS',
-            emoji: paraIndex >= 75 ? '✅' : paraIndex >= 60 ? '⚠️' : '❌',
+            verdict,
+            emoji,
             temp_min: 10 + index,
             temp_max: 18 + index,
             wind_avg: 8 + index * 2,
@@ -526,25 +573,29 @@ export const handlers = [
   }),
 
   // POST /api/weather-sources - Créer une nouvelle source météo
-  ...createHandler('post', '/weather-sources', async ({ request }) => {
-    const body = (await request.json()) as any;
-    return HttpResponse.json(
-      {
-        id: `source-${Date.now()}`,
-        ...body,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      { status: 201 }
-    );
-  }),
+  ...createHandler<PathParams, Omit<WeatherSource, 'id'>, WeatherSource>(
+    'post',
+    '/weather-sources',
+    async ({ request }) => {
+      const body = await request.json();
+      return HttpResponse.json(
+        {
+          id: `source-${Date.now()}`,
+          ...body,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        { status: 201 }
+      );
+    }
+  ),
 
   // PATCH /api/weather-sources/:sourceName - Mettre à jour une source météo
-  ...createHandler(
+  ...createHandler<PathParams, WeatherSource>(
     'patch',
     '/weather-sources/:sourceName',
     async ({ params, request }) => {
-      const body = (await request.json()) as any;
+      const body = await request.json();
       const source = weatherSources.find(
         (s) => s.source_name === params.sourceName
       );
@@ -576,36 +627,40 @@ export const handlers = [
 
   // GET /api/sites/:siteId/landings - Retourne les associations d'atterrissage
   // IMPORTANT: Must be BEFORE /sites/:siteId to match the more specific path first
-  ...createHandler('get', '/sites/:siteId/landings/weather', ({ params, request }) => {
-    const { siteId } = params;
-    const url = new URL(request.url);
-    const dayIndex = parseInt(url.searchParams.get('day_index') || '0', 10);
+  ...createHandler(
+    'get',
+    '/sites/:siteId/landings/weather',
+    ({ params, request }) => {
+      const { siteId } = params;
+      const url = new URL(request.url);
+      const dayIndex = parseInt(url.searchParams.get('day_index') || '0', 10);
 
-    // Find landing sites associated with this takeoff site
-    const landingSite = sites.find((s) => s.id !== siteId);
+      // Find landing sites associated with this takeoff site
+      const landingSite = sites.find((s) => s.id !== siteId);
 
-    if (!landingSite) {
-      return HttpResponse.json([]);
-    }
+      if (!landingSite) {
+        return HttpResponse.json([]);
+      }
 
-    return HttpResponse.json([
-      {
-        landing_site_id: landingSite.id,
-        landing_site_name: landingSite.name,
-        distance_km: 2.5,
-        is_primary: true,
-        weather: {
-          consensus: weatherData[landingSite.id]?.consensus || [],
-          para_index: 75,
-          verdict: 'BON',
-          emoji: '✅',
-          sunrise: '06:30',
-          sunset: '20:45',
-          day_index: dayIndex,
+      return HttpResponse.json([
+        {
+          landing_site_id: landingSite.id,
+          landing_site_name: landingSite.name,
+          distance_km: 2.5,
+          is_primary: true,
+          weather: {
+            consensus: weatherData[landingSite.id]?.consensus || [],
+            para_index: 75,
+            verdict: 'BON',
+            emoji: '✅',
+            sunrise: '06:30',
+            sunset: '20:45',
+            day_index: dayIndex,
+          },
         },
-      },
-    ]);
-  }),
+      ]);
+    }
+  ),
 
   // GET /api/sites/:siteId/landings - Retourne les associations d'atterrissage
   ...createHandler('get', '/sites/:siteId/landings', ({ params }) => {
@@ -633,36 +688,44 @@ export const handlers = [
   }),
 
   // POST /api/sites/:siteId/landings - Créer une association d'atterrissage
-  ...createHandler('post', '/sites/:siteId/landings', async ({ params, request }) => {
-    const body = (await request.json()) as any;
-    const landingSite = sites.find((s) => s.id === body.landing_site_id);
+  ...createHandler<PathParams, LandingAssociation>(
+    'post',
+    '/sites/:siteId/landings',
+    async ({ params, request }) => {
+      const body = await request.json();
+      const landingSite = sites.find((s) => s.id === body.landing_site_id);
 
-    return HttpResponse.json({
-      id: `assoc-${Date.now()}`,
-      takeoff_site_id: params.siteId,
-      landing_site_id: body.landing_site_id,
-      is_primary: body.is_primary ?? false,
-      distance_km: null,
-      notes: body.notes ?? null,
-      landing_site: landingSite || null,
-      created_at: new Date().toISOString(),
-    });
-  }),
+      return HttpResponse.json({
+        id: `assoc-${Date.now()}`,
+        takeoff_site_id: params.siteId,
+        landing_site_id: body.landing_site_id,
+        is_primary: body.is_primary ?? false,
+        distance_km: null,
+        notes: body.notes ?? null,
+        landing_site: landingSite || null,
+        created_at: new Date().toISOString(),
+      });
+    }
+  ),
 
   // PATCH /api/sites/:siteId/landings/:assocId - Mettre à jour une association
-  ...createHandler('patch', '/sites/:siteId/landings/:assocId', async ({ params, request }) => {
-    const body = (await request.json()) as any;
+  ...createHandler<PathParams, LandingAssociation>(
+    'patch',
+    '/sites/:siteId/landings/:assocId',
+    async ({ params, request }) => {
+      const body = await request.json();
 
-    return HttpResponse.json({
-      id: params.assocId,
-      takeoff_site_id: params.siteId,
-      landing_site_id: 'landing-1',
-      is_primary: body.is_primary ?? false,
-      distance_km: 2.5,
-      notes: body.notes ?? null,
-      created_at: '2025-01-15T10:00:00Z',
-    });
-  }),
+      return HttpResponse.json({
+        id: params.assocId,
+        takeoff_site_id: params.siteId,
+        landing_site_id: 'landing-1',
+        is_primary: body.is_primary ?? false,
+        distance_km: 2.5,
+        notes: body.notes ?? null,
+        created_at: '2025-01-15T10:00:00Z',
+      });
+    }
+  ),
 
   // DELETE /api/sites/:siteId/landings/:assocId - Supprimer une association
   ...createHandler('delete', '/sites/:siteId/landings/:assocId', () => {
@@ -745,14 +808,18 @@ export const handlers = [
   }),
 
   // POST /api/alerts - Créer une nouvelle alerte
-  ...createHandler('post', '/alerts', async ({ request }) => {
-    const body = (await request.json()) as any;
-    return HttpResponse.json({
-      id: `alert-${Date.now()}`,
-      ...body,
-      created_at: new Date().toISOString(),
-    });
-  }),
+  ...createHandler<PathParams, Alert[]>(
+    'post',
+    '/alerts',
+    async ({ request }) => {
+      const body = await request.json();
+      return HttpResponse.json({
+        id: `alert-${Date.now()}`,
+        ...body,
+        created_at: new Date().toISOString(),
+      });
+    }
+  ),
 
   // ============================================
   // EMAGRAM / SOUNDING ANALYSIS
@@ -815,7 +882,7 @@ export const handlers = [
       resume_conditions:
         'Bonnes conditions thermiques prévues. Plafond à 2200m, thermiques modérés à forts.',
       conseils_vol:
-        'Décoller entre 11h et 14h pour profiter des meilleures conditions. Plafond exploitable jusqu\'à 2200m.',
+        "Décoller entre 11h et 14h pour profiter des meilleures conditions. Plafond exploitable jusqu'à 2200m.",
       alertes_securite: '["Brise de vallée modérée après 15h"]',
       lcl_m: 1200,
       lfc_m: 1500,
@@ -883,69 +950,76 @@ export const handlers = [
   }),
 
   // POST /api/emagram/analyze - Trigger manual emagram analysis
-  ...createHandler('post', '/emagram/analyze', async ({ request }) => {
-    const body = (await request.json()) as any;
+  ...createHandler<
+    PathParams,
+    { site_id: string; hour: number },
+    EmagramAnalysis
+  >(
+    'post',
+    '/emagram/analyze',
+    // oxlint-disable-next-line max-lines-per-function
+    async ({ request }) => {
+      const body = await request.json();
 
-    return HttpResponse.json({
-      id: `emagram-${Date.now()}`,
-      analysis_date: '2026-04-06',
-      analysis_time: '12:00',
-      analysis_datetime: '2026-04-06T12:00:00Z',
-      station_code: body.site_id || 'LSMP',
-      station_name: 'Station Mock',
-      station_latitude: 47.24,
-      station_longitude: 6.02,
-      distance_km: 15.3,
-      data_source: 'open_meteo',
-      sounding_time: '12Z',
-      llm_provider: 'gemini',
-      llm_model: 'gemini-2.0-flash',
-      llm_tokens_used: 1500,
-      llm_cost_usd: 0.003,
-      analysis_method: 'llm_vision',
-      plafond_thermique_m: 2200,
-      force_thermique_ms: 2.5,
-      cape_jkg: 450,
-      stabilite_atmospherique: 'Instable modéré',
-      cisaillement_vent: 'Faible',
-      heure_debut_thermiques: '11:00',
-      heure_fin_thermiques: '17:00',
-      heures_volables_total: 6,
-      risque_orage: 'Faible',
-      score_volabilite: 82,
-      resume_conditions:
-        'Bonnes conditions thermiques. Plafond à 2200m.',
-      conseils_vol:
-        'Décoller entre 11h et 14h.',
-      alertes_securite: '[]',
-      lcl_m: 1200,
-      lfc_m: 1500,
-      el_m: 5000,
-      lifted_index: -2.5,
-      k_index: 28,
-      total_totals: 48,
-      showalter_index: -1.2,
-      wind_shear_0_3km_ms: 3.5,
-      wind_shear_0_6km_ms: 6.2,
-      skewt_image_path: null,
-      raw_sounding_data: null,
-      ai_raw_response: null,
-      analysis_status: 'completed',
-      error_message: null,
-      is_from_llm: true,
-      has_thermal_data: true,
-      flyable_hours_formatted: '11:00 - 17:00',
-      forecast_date: '2026-04-06',
-      forecast_hour: body.hour ?? null,
-      external_source_urls: null,
-      screenshot_paths: null,
-      sources_count: 1,
-      sources_agreement: null,
-      sources_errors: null,
-      created_at: '2026-04-06T12:00:00Z',
-      updated_at: '2026-04-06T12:00:00Z',
-    });
-  }),
+      return HttpResponse.json({
+        id: `emagram-${Date.now()}`,
+        analysis_date: '2026-04-06',
+        analysis_time: '12:00',
+        analysis_datetime: '2026-04-06T12:00:00Z',
+        station_code: body.site_id || 'LSMP',
+        station_name: 'Station Mock',
+        station_latitude: 47.24,
+        station_longitude: 6.02,
+        distance_km: 15.3,
+        data_source: 'open_meteo',
+        sounding_time: '12Z',
+        llm_provider: 'gemini',
+        llm_model: 'gemini-2.0-flash',
+        llm_tokens_used: 1500,
+        llm_cost_usd: 0.003,
+        analysis_method: 'llm_vision',
+        plafond_thermique_m: 2200,
+        force_thermique_ms: 2.5,
+        cape_jkg: 450,
+        stabilite_atmospherique: 'Instable modéré',
+        cisaillement_vent: 'Faible',
+        heure_debut_thermiques: '11:00',
+        heure_fin_thermiques: '17:00',
+        heures_volables_total: 6,
+        risque_orage: 'Faible',
+        score_volabilite: 82,
+        resume_conditions: 'Bonnes conditions thermiques. Plafond à 2200m.',
+        conseils_vol: 'Décoller entre 11h et 14h.',
+        alertes_securite: '[]',
+        lcl_m: 1200,
+        lfc_m: 1500,
+        el_m: 5000,
+        lifted_index: -2.5,
+        k_index: 28,
+        total_totals: 48,
+        showalter_index: -1.2,
+        wind_shear_0_3km_ms: 3.5,
+        wind_shear_0_6km_ms: 6.2,
+        skewt_image_path: null,
+        raw_sounding_data: null,
+        ai_raw_response: null,
+        analysis_status: 'completed',
+        error_message: null,
+        is_from_llm: true,
+        has_thermal_data: true,
+        flyable_hours_formatted: '11:00 - 17:00',
+        forecast_date: '2026-04-06',
+        forecast_hour: body.hour ?? null,
+        external_source_urls: null,
+        screenshot_paths: null,
+        sources_count: 1,
+        sources_agreement: null,
+        sources_errors: null,
+        created_at: '2026-04-06T12:00:00Z',
+        updated_at: '2026-04-06T12:00:00Z',
+      });
+    }
+  ),
 
   // ============================================
   // APP SETTINGS

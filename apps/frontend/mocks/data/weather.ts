@@ -1,4 +1,5 @@
 // Mock weather data matching BackendWeatherResponseSchema
+// oxlint-disable-next-line typescript/no-explicit-any
 export const weatherData: Record<string, any> = {
   'site-arguel': {
     site_id: 'site-arguel',

@@ -101,12 +101,12 @@ function getVerdict(paraIndex: number, verdict?: string) {
   };
 }
 
-export function BestSpotSuggestion({
+export const BestSpotSuggestion = ({
   bestSpot,
   onSelectSite,
   selectedDayIndex = 0,
   className = '',
-}: BestSpotSuggestionProps) {
+}: BestSpotSuggestionProps) => {
   const { t, i18n } = useTranslation();
 
   // Calculate the date label based on selectedDayIndex
@@ -331,7 +331,7 @@ export function BestSpotSuggestion({
       </div>
     </div>
   );
-}
+};
 
 /**
  * Compact version for sidebar or small spaces

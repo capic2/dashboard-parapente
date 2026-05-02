@@ -16,6 +16,7 @@ interface FlightsTableProps {
   onRowSelectionChange: OnChangeFn<RowSelectionState>;
 }
 
+// oxlint-disable-next-line max-lines-per-function
 export function FlightsTable({
   flights,
   selectedFlightId,
@@ -60,6 +61,7 @@ export function FlightsTable({
   );
 
   const renderFlightCard = useCallback(
+    // oxlint-disable-next-line max-lines-per-function
     (row: Row<Flight>, { isSelected }: { isSelected: boolean }) => {
       const flight = row.original;
       const isActive = selectedFlightId === flight.id;
@@ -69,6 +71,14 @@ export function FlightsTable({
         }
       };
 
+      let color = 'border-gray-200 dark:border-gray-700 hover:border-sky-400';
+
+      if (isSelected) {
+        color = 'border-sky-600 shadow-md bg-sky-50 dark:bg-sky-900/20';
+      } else if (isActive) {
+        color = 'border-sky-600 shadow-md';
+      }
+
       return (
         <div
           role="option"
@@ -76,11 +86,7 @@ export function FlightsTable({
           tabIndex={0}
           data-testid={`flight-row-${flight.id}`}
           className={`group relative bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border-2 transition-all cursor-pointer ${
-            isSelected
-              ? 'border-sky-600 shadow-md bg-sky-50 dark:bg-sky-900/20'
-              : isActive
-                ? 'border-sky-600 shadow-md'
-                : 'border-gray-200 dark:border-gray-700 hover:border-sky-400'
+            color
           }`}
           onClick={selectFlight}
           onKeyDown={(event) => {
