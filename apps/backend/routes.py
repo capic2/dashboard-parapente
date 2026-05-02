@@ -1367,9 +1367,7 @@ async def get_hourly_best_spots(
         le=6,
         description="Day index (0=today, 1=tomorrow, ..., 6=in 6 days)",
     ),
-    hours: int = Query(
-        default=8, ge=1, le=24, description="Maximum number of hourly winners"
-    ),
+    hours: int = Query(default=8, ge=1, le=24, description="Maximum number of hourly winners"),
     db: Session = Depends(get_db),
 ):
     """Get the best flying spot for each upcoming flyable hour."""

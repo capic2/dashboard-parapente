@@ -533,9 +533,7 @@ async def calculate_hourly_best_spots_from_cache(
     from para_index import calculate_hourly_para_index, get_hourly_verdict
     from weather_pipeline import get_normalized_forecast
 
-    logger.info(
-        f"Calculating hourly best spots from cached weather data for day {day_index}..."
-    )
+    logger.info(f"Calculating hourly best spots from cached weather data for day {day_index}...")
 
     try:
         sites = db.query(Site).all()
@@ -576,27 +574,19 @@ async def calculate_hourly_best_spots_from_cache(
                     wind_speed = hour_data.get("wind_speed")
                     wind_direction = hour_data.get("wind_direction")
                     wind_dir_str = (
-                        degrees_to_cardinal(wind_direction)
-                        if wind_direction is not None
-                        else None
+                        degrees_to_cardinal(wind_direction) if wind_direction is not None else None
                     )
                     wind_favorability = get_wind_favorability(
                         wind_dir_str, site.orientation, wind_speed
                     )
-                    final_score = para_index * get_wind_score_multiplier(
-                        wind_favorability
-                    )
+                    final_score = para_index * get_wind_score_multiplier(wind_favorability)
 
                     parts = [f"Para-Index {para_index}"]
                     if wind_dir_str and wind_speed is not None:
                         if wind_favorability == "good":
-                            parts.append(
-                                f"vent favorable {wind_dir_str} {int(wind_speed)}km/h"
-                            )
+                            parts.append(f"vent favorable {wind_dir_str} {int(wind_speed)}km/h")
                         elif wind_favorability == "bad":
-                            parts.append(
-                                f"vent défavorable {wind_dir_str} {int(wind_speed)}km/h"
-                            )
+                            parts.append(f"vent défavorable {wind_dir_str} {int(wind_speed)}km/h")
                         else:
                             parts.append(f"vent {wind_dir_str} {int(wind_speed)}km/h")
 
@@ -630,9 +620,7 @@ async def calculate_hourly_best_spots_from_cache(
                 logger.warning(f"Error processing hourly site {site.name}: {e}")
                 continue
 
-        hourly_best_spots = [
-            best_by_hour[hour] for hour in sorted(best_by_hour.keys())[:hours]
-        ]
+        hourly_best_spots = [best_by_hour[hour] for hour in sorted(best_by_hour.keys())[:hours]]
         if not hourly_best_spots:
             logger.warning("No valid hourly forecasts found for any site")
             return None
@@ -718,9 +706,7 @@ async def get_hourly_best_spots_cached(
             return cached_data
 
         logger.info(f"Cache miss, calculating hourly best spots for day {day_index}...")
-        hourly_best_spots = await calculate_hourly_best_spots_from_cache(
-            db, day_index, hours
-        )
+        hourly_best_spots = await calculate_hourly_best_spots_from_cache(db, day_index, hours)
 
         if hourly_best_spots and get_cache_ttl_func:
             ttl = get_cache_ttl_func().get("summary", 3600)
@@ -765,9 +751,7 @@ async def refresh_best_spot_cache(db: Session):
                         f"✅ Best spot calculated for day {day_index} (no cache): {best_spot['site']['name']}"
                     )
             else:
-                logger.warning(
-                    f"⚠️ No best spot calculated for day {day_index} (no forecast data?)"
-                )
+                logger.warning(f"⚠️ No best spot calculated for day {day_index} (no forecast data?)")
 
     except Exception as e:
         logger.error(f"Error refreshing best spot cache: {e}", exc_info=True)

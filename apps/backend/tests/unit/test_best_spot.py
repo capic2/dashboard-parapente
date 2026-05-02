@@ -204,9 +204,7 @@ async def test_calculate_best_spot_from_cache_success(db_session, arguel_site, c
     mock_arguel_para = {"para_index": 75, "verdict": "Excellent"}
     mock_chalais_para = {"para_index": 60, "verdict": "Bon"}
 
-    async def mock_get_forecast(
-        lat, lon, day_index, site_name=None, elevation_m=None, db=None
-    ):
+    async def mock_get_forecast(lat, lon, day_index, site_name=None, elevation_m=None, db=None):
         if site_name == "Arguel":
             return mock_arguel_forecast
         elif site_name == "Chalais":
@@ -316,9 +314,7 @@ async def test_calculate_hourly_best_spots_from_cache_can_change_by_hour(
         ],
     }
 
-    async def mock_get_forecast(
-        lat, lon, day_index, site_name=None, elevation_m=None, db=None
-    ):
+    async def mock_get_forecast(lat, lon, day_index, site_name=None, elevation_m=None, db=None):
         if site_name == "Arguel":
             return mock_arguel_forecast
         if site_name == "Chalais":
@@ -326,9 +322,7 @@ async def test_calculate_hourly_best_spots_from_cache_can_change_by_hour(
         return {"success": False}
 
     with patch("weather_pipeline.get_normalized_forecast", new=mock_get_forecast):
-        result = await calculate_hourly_best_spots_from_cache(
-            db_session, day_index=1, hours=2
-        )
+        result = await calculate_hourly_best_spots_from_cache(db_session, day_index=1, hours=2)
 
     assert result is not None
     assert result["dayIndex"] == 1
