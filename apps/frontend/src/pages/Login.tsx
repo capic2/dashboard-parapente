@@ -21,7 +21,9 @@ export default function Login() {
       await navigate({ to: '/' });
     } catch (error) {
       const key =
-        error instanceof Error ? error.message : 'login.unexpectedError';
+        error instanceof Error && error.message.startsWith('login.')
+          ? error.message
+          : 'login.unexpectedError';
       setErrorMessage(t(key));
     }
   };

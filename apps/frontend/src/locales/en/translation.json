@@ -21,6 +21,7 @@
     "submit": "Sign in",
     "loading": "Signing in...",
     "invalidCredentials": "Invalid email or password",
+    "validationError": "Invalid sign-in information",
     "connectionError": "Connection error",
     "unexpectedError": "Unexpected server response"
   },

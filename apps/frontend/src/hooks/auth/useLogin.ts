@@ -48,7 +48,7 @@ export function useLogin() {
         }
 
         if (error instanceof z.ZodError) {
-          throw withCause('login.unexpectedError', error);
+          throw withCause('login.validationError', error);
         }
 
         if (isHTTPError(error) && error.response.status === 401) {

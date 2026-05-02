@@ -119,7 +119,11 @@ export function LoginForm({
               )}
             </form.Field>
 
-            {errorMessage ? <p className={s.error()}>{errorMessage}</p> : null}
+            {errorMessage ? (
+              <p className={s.error()} role="alert" aria-live="polite">
+                {errorMessage}
+              </p>
+            ) : null}
 
             <Button
               type="submit"
