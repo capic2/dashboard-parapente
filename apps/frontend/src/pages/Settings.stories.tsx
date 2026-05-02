@@ -84,6 +84,8 @@ const mockSettings = {
   scheduler_interval_minutes: '30',
   redis_connect_timeout: '5',
   redis_socket_timeout: '5',
+  video_export_dir: '/app/video-exports',
+  video_temp_images_dir: '/app/video-temp-images',
 };
 
 export const defaultHandlers = [
@@ -143,6 +145,9 @@ Default.test(
     await canvas.findByText(/Rayon des balises vent live SpotAiR/);
     await canvas.findByText(/Durée du cache vent live SpotAiR/);
     await canvas.findByText(/Fréquence de collecte automatique/);
+    await canvas.findByText(/Stockage des exports vidéo/);
+    await canvas.findByDisplayValue('/app/video-exports');
+    await canvas.findByDisplayValue('/app/video-temp-images');
   }
 );
 
