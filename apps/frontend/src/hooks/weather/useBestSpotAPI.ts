@@ -34,7 +34,7 @@ export const bestSpotQueryOptions = (dayIndex = 0) =>
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
-export const hourlyBestSpotsQueryOptions = (dayIndex = 0, hours = 8) =>
+export const hourlyBestSpotsQueryOptions = (dayIndex = 0, hours = 24) =>
   queryOptions<HourlyBestSpotsResult>({
     queryKey: ['bestSpot', 'hourly', dayIndex, hours],
     queryFn: async () => {
@@ -60,7 +60,7 @@ export function useBestSpotAPI(dayIndex = 0) {
   return useQuery(bestSpotQueryOptions(dayIndex));
 }
 
-export function useHourlyBestSpotsAPI(dayIndex = 0, hours = 8) {
+export function useHourlyBestSpotsAPI(dayIndex = 0, hours = 24) {
   return useQuery(hourlyBestSpotsQueryOptions(dayIndex, hours));
 }
 
