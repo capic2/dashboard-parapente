@@ -751,7 +751,9 @@ async def refresh_best_spot_cache(db: Session):
                         f"✅ Best spot calculated for day {day_index} (no cache): {best_spot['site']['name']}"
                     )
             else:
-                logger.warning(f"⚠️ No best spot calculated for day {day_index} (no forecast data?)")
+                logger.warning(
+                    f"⚠️ No best spot calculated for day {day_index} (no forecast data?)"
+                )
 
     except Exception as e:
         logger.error(f"Error refreshing best spot cache: {e}", exc_info=True)
