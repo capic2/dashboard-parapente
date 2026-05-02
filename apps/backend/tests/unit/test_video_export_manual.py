@@ -152,9 +152,7 @@ def test_ffmpeg_timeout_scales_for_long_videos():
 def test_ffmpeg_output_file_activity_tracks_size_and_mtime(tmp_path):
     output_file = tmp_path / "export.mp4"
 
-    activity, size, mtime_ns = video_export_manual._ffmpeg_output_file_activity(
-        output_file, -1, -1
-    )
+    activity, size, mtime_ns = video_export_manual._ffmpeg_output_file_activity(output_file, -1, -1)
     assert activity is False
     assert size == -1
     assert mtime_ns == -1
@@ -165,6 +163,20 @@ def test_ffmpeg_output_file_activity_tracks_size_and_mtime(tmp_path):
     )
     assert activity is True
     assert size == 5
+
+    activity, size, mtime_ns = video_export_manual._ffmpeg_output_file_activity(
+        output_file, size, mtime_ns
+    )
+    assert activity is False
+
+    same_size_mtime_ns = mtime_ns + 1_000_000_000
+    os.utime(output_file, ns=(same_size_mtime_ns, same_size_mtime_ns))
+    activity, size, mtime_ns = video_export_manual._ffmpeg_output_file_activity(
+        output_file, size, mtime_ns
+    )
+    assert activity is True
+    assert size == 5
+    assert mtime_ns == same_size_mtime_ns
 
     activity, size, mtime_ns = video_export_manual._ffmpeg_output_file_activity(
         output_file, size, mtime_ns
