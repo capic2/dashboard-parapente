@@ -149,6 +149,48 @@ def test_ffmpeg_timeout_scales_for_long_videos():
     assert video_export_manual._ffmpeg_timeout_seconds(duration_seconds) == duration_seconds * 20
 
 
+def test_ffmpeg_output_file_activity_tracks_size_and_mtime(tmp_path):
+    output_file = tmp_path / "export.mp4"
+
+    activity, size, mtime_ns = video_export_manual._ffmpeg_output_file_activity(output_file, -1, -1)
+    assert activity is False
+    assert size == -1
+    assert mtime_ns == -1
+
+    output_file.write_bytes(b"first")
+    activity, size, mtime_ns = video_export_manual._ffmpeg_output_file_activity(
+        output_file, size, mtime_ns
+    )
+    assert activity is True
+    assert size == 5
+
+    activity, size, mtime_ns = video_export_manual._ffmpeg_output_file_activity(
+        output_file, size, mtime_ns
+    )
+    assert activity is False
+
+    same_size_mtime_ns = mtime_ns + 1_000_000_000
+    os.utime(output_file, ns=(same_size_mtime_ns, same_size_mtime_ns))
+    activity, size, mtime_ns = video_export_manual._ffmpeg_output_file_activity(
+        output_file, size, mtime_ns
+    )
+    assert activity is True
+    assert size == 5
+    assert mtime_ns == same_size_mtime_ns
+
+    activity, size, mtime_ns = video_export_manual._ffmpeg_output_file_activity(
+        output_file, size, mtime_ns
+    )
+    assert activity is False
+
+    output_file.write_bytes(b"second-pass")
+    activity, size, mtime_ns = video_export_manual._ffmpeg_output_file_activity(
+        output_file, size, mtime_ns
+    )
+    assert activity is True
+    assert size == 11
+
+
 def test_encoding_progress_percent_spans_encoding_phase_range():
     assert video_export_manual._encoding_progress_percent(0, 100) == 80
     assert video_export_manual._encoding_progress_percent(50, 100) == 89
