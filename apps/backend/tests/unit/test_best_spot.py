@@ -26,6 +26,7 @@ from best_spot import (
     calculate_angle_difference,
     calculate_best_spot_from_cache,
     calculate_best_spot_from_db,
+    calculate_hourly_best_spots_from_cache,
     degrees_to_cardinal,
     get_wind_favorability,
     get_wind_score_multiplier,
@@ -203,7 +204,9 @@ async def test_calculate_best_spot_from_cache_success(db_session, arguel_site, c
     mock_arguel_para = {"para_index": 75, "verdict": "Excellent"}
     mock_chalais_para = {"para_index": 60, "verdict": "Bon"}
 
-    async def mock_get_forecast(lat, lon, day_index, site_name=None, elevation_m=None, db=None):
+    async def mock_get_forecast(
+        lat, lon, day_index, site_name=None, elevation_m=None, db=None
+    ):
         if site_name == "Arguel":
             return mock_arguel_forecast
         elif site_name == "Chalais":
@@ -255,6 +258,85 @@ async def test_calculate_best_spot_from_cache_no_forecasts(db_session, arguel_si
         result = await calculate_best_spot_from_cache(db_session)
 
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test_calculate_hourly_best_spots_from_cache_can_change_by_hour(
+    db_session, arguel_site, chalais_site
+):
+    """Test hourly winners are calculated independently for each hour."""
+    mock_arguel_forecast = {
+        "success": True,
+        "sunrise": "07:00",
+        "sunset": "19:00",
+        "consensus": [
+            {
+                "hour": 10,
+                "wind_speed": 12,
+                "wind_gust": 10,
+                "wind_direction": 225,
+                "precipitation": 0,
+                "temperature": 20,
+                "lifted_index": 0,
+            },
+            {
+                "hour": 11,
+                "wind_speed": 12,
+                "wind_gust": 10,
+                "wind_direction": 45,
+                "precipitation": 0,
+                "temperature": 20,
+                "lifted_index": 0,
+            },
+        ],
+    }
+    mock_chalais_forecast = {
+        "success": True,
+        "sunrise": "07:00",
+        "sunset": "19:00",
+        "consensus": [
+            {
+                "hour": 10,
+                "wind_speed": 12,
+                "wind_gust": 10,
+                "wind_direction": 90,
+                "precipitation": 0,
+                "temperature": 20,
+                "lifted_index": 0,
+            },
+            {
+                "hour": 11,
+                "wind_speed": 12,
+                "wind_gust": 10,
+                "wind_direction": 270,
+                "precipitation": 0,
+                "temperature": 20,
+                "lifted_index": 0,
+            },
+        ],
+    }
+
+    async def mock_get_forecast(
+        lat, lon, day_index, site_name=None, elevation_m=None, db=None
+    ):
+        if site_name == "Arguel":
+            return mock_arguel_forecast
+        if site_name == "Chalais":
+            return mock_chalais_forecast
+        return {"success": False}
+
+    with patch("weather_pipeline.get_normalized_forecast", new=mock_get_forecast):
+        result = await calculate_hourly_best_spots_from_cache(
+            db_session, day_index=1, hours=2
+        )
+
+    assert result is not None
+    assert result["dayIndex"] == 1
+    assert [spot["hour"] for spot in result["hours"]] == [10, 11]
+    assert result["hours"][0]["site"]["name"] == "Arguel"
+    assert result["hours"][1]["site"]["name"] == "Chalais"
+    assert result["hours"][0]["windFavorability"] == "good"
+    assert result["hours"][1]["windFavorability"] == "good"
 
 
 @pytest.mark.asyncio
