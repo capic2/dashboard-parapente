@@ -21,6 +21,7 @@
     "submit": "Se connecter",
     "loading": "Connexion...",
     "invalidCredentials": "Email ou mot de passe incorrect",
+    "validationError": "Informations de connexion invalides",
     "connectionError": "Erreur de connexion",
     "unexpectedError": "Réponse inattendue du serveur"
   },
