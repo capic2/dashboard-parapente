@@ -630,6 +630,19 @@ def _ffmpeg_timeout_seconds(video_duration_seconds: float) -> int:
     return max(6 * 60 * 60, dynamic_timeout)
 
 
+def _ffmpeg_output_file_activity(
+    output_file: Path, last_size: int, last_mtime_ns: int
+) -> tuple[bool, int, int]:
+    try:
+        stat = output_file.stat()
+    except FileNotFoundError:
+        return False, last_size, last_mtime_ns
+
+    size = stat.st_size
+    mtime_ns = stat.st_mtime_ns
+    return size != last_size or mtime_ns != last_mtime_ns, size, mtime_ns
+
+
 def _encoding_progress_percent(encoded_seconds: float, total_duration_seconds: float) -> int:
     if total_duration_seconds <= 0:
         return 80
@@ -1203,6 +1216,8 @@ async def _export_video_manual_render(job_id: str):
             ffmpeg_stderr: list[str] = []
             total_duration_seconds = max(video_duration, 1e-6)
             ffmpeg_timeout_seconds = _ffmpeg_timeout_seconds(total_duration_seconds)
+            last_output_file_size = -1
+            last_output_file_mtime_ns = -1
 
             try:
                 assert process.stderr is not None
@@ -1219,6 +1234,18 @@ async def _export_video_manual_render(job_id: str):
                         return
 
                     now = time.monotonic()
+                    (
+                        has_output_file_activity,
+                        last_output_file_size,
+                        last_output_file_mtime_ns,
+                    ) = _ffmpeg_output_file_activity(
+                        output_file,
+                        last_output_file_size,
+                        last_output_file_mtime_ns,
+                    )
+                    if has_output_file_activity:
+                        last_ffmpeg_output_at = now
+
                     if now - last_ffmpeg_output_at > _FFMPEG_STALL_TIMEOUT_SECONDS:
                         process.kill()
                         await process.wait()
