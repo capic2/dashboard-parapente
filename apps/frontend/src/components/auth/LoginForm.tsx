@@ -6,7 +6,6 @@ import { Button } from '@dashboard-parapente/design-system';
 
 type LoginFormProps = {
   onSubmit: (value: { email: string; password: string }) => Promise<void>;
-  isPending: boolean;
   errorMessage?: string;
 };
 
@@ -63,7 +62,6 @@ function LoginFieldView({
 
 export function LoginForm({
   onSubmit,
-  isPending,
   errorMessage,
 }: LoginFormProps) {
   const { t } = useTranslation();
@@ -125,13 +123,17 @@ export function LoginForm({
               </p>
             ) : null}
 
-            <Button
-              type="submit"
-              isDisabled={isPending}
-              className={s.submitButton()}
-            >
-              {isPending ? t('login.loading') : t('login.submit')}
-            </Button>
+            <form.Subscribe selector={(state) => state.isSubmitting}>
+              {(isSubmitting) => (
+                <Button
+                  type="submit"
+                  isDisabled={isSubmitting}
+                  className={s.submitButton()}
+                >
+                  {isSubmitting ? t('login.loading') : t('login.submit')}
+                </Button>
+              )}
+            </form.Subscribe>
           </Form>
         </div>
       </div>
