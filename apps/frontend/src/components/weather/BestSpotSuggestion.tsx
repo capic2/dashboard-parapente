@@ -373,7 +373,7 @@ export const BestSpotSuggestion = ({
                         onSelectSite(hourlySpot.site.id);
                       }
                     }}
-                    className="min-w-[176px] rounded-xl border border-gray-200 bg-white px-3.5 py-3 text-left shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50 dark:hover:bg-gray-900"
+                    className="min-w-[176px] flex-col items-stretch justify-start gap-0 whitespace-normal rounded-xl border border-gray-200 bg-white px-3.5 py-3 text-left shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50 dark:hover:bg-gray-900"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-sm font-extrabold text-gray-900 dark:text-white">
