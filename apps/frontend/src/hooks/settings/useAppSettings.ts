@@ -9,6 +9,8 @@ export interface AppSettings {
   scheduler_interval_minutes: string;
   redis_connect_timeout: string;
   redis_socket_timeout: string;
+  video_export_dir: string;
+  video_temp_images_dir: string;
   para_wind_very_low_max: string;
   para_wind_low_max: string;
   para_wind_weak_max: string;

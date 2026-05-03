@@ -6,7 +6,6 @@ Coordinates screenshot capture, LLM analysis, and database storage
 import asyncio
 import json
 import logging
-import os
 import uuid
 from datetime import datetime
 from datetime import time as dt_time
@@ -19,6 +18,7 @@ from emagram_freshness import get_emagram_cutoff_utc, get_emagram_next_update_ut
 from llm.exceptions import QuotaExhaustedError
 from llm.gemini_analyzer import analyze_emagram_with_gemini
 from llm.groq_analyzer import analyze_emagram_with_groq
+from llm.openrouter_analyzer import analyze_emagram_with_openrouter
 from models import EmagramAnalysis, Site
 from scrapers.emagram_screenshots import fetch_all_emagram_screenshots
 
@@ -26,6 +26,168 @@ logger = logging.getLogger(__name__)
 
 GOOGLE_API_ENV_VAR = "BACKEND_GOOGLE_API_KEY"
 GROQ_API_ENV_VAR = "BACKEND_GROQ_API_KEY"
+OPENROUTER_API_ENV_VAR = "BACKEND_OPENROUTER_API_KEY"
+
+PROVIDER_ENV_VARS = {
+    "google": GOOGLE_API_ENV_VAR,
+    "groq": GROQ_API_ENV_VAR,
+    "openrouter": OPENROUTER_API_ENV_VAR,
+}
+
+
+def _configured_llm_providers() -> list[dict[str, Any]]:
+    providers = {
+        "groq": {
+            "key": config.GROQ_API_KEY,
+            "provider": "groq",
+            "analyzer": "groq",
+            "model": config.GROQ_MODEL,
+            "label": "Groq Llama Vision",
+            "free": True,
+            "call": lambda image_paths, site: analyze_emagram_with_groq(
+                screenshot_paths=image_paths,
+                spot_name=site.name,
+                coordinates=(site.latitude, site.longitude),
+                model_name=config.GROQ_MODEL,
+            ),
+        },
+        "openrouter": {
+            "key": config.OPENROUTER_API_KEY,
+            "provider": "openrouter",
+            "analyzer": "openrouter",
+            "model": config.OPENROUTER_MODEL,
+            "label": "OpenRouter Vision",
+            "free": True,
+            "call": lambda image_paths, site: analyze_emagram_with_openrouter(
+                screenshot_paths=image_paths,
+                spot_name=site.name,
+                coordinates=(site.latitude, site.longitude),
+                model_name=config.OPENROUTER_MODEL,
+            ),
+        },
+        "google": {
+            "key": config.GOOGLE_API_KEY,
+            "provider": "google",
+            "analyzer": "gemini",
+            "model": config.GEMINI_MODEL,
+            "label": "Gemini Vision",
+            "free": False,
+            "call": lambda image_paths, site: analyze_emagram_with_gemini(
+                screenshot_paths=image_paths,
+                spot_name=site.name,
+                coordinates=(site.latitude, site.longitude),
+                api_key=config.GOOGLE_API_KEY,
+                model_name=config.GEMINI_MODEL,
+                max_retries=3,
+            ),
+        },
+    }
+
+    configured = []
+    seen = set()
+    for provider_name in config.LLM_FALLBACK_ORDER:
+        if provider_name in seen:
+            continue
+        seen.add(provider_name)
+
+        provider = providers.get(provider_name)
+        if not provider:
+            logger.warning(f"Unknown LLM provider in fallback order: {provider_name}")
+            continue
+
+        logger.info(
+            "🔍 Checking %s availability: API Key = %s",
+            provider["label"],
+            "SET" if provider["key"] else "NOT SET",
+        )
+        if provider["key"]:
+            configured.append(provider)
+
+    return configured
+
+
+def _analyze_emagram_with_fallbacks(image_paths: list[str], site: Site) -> dict[str, Any]:
+    analysis_errors = []
+    quota_errors = 0
+    providers_tried = 0
+    configured_providers = _configured_llm_providers()
+
+    if not configured_providers:
+        env_vars = ", ".join(PROVIDER_ENV_VARS.values())
+        return {"success": False, "error": f"No LLM provider configured (set one of {env_vars})"}
+
+    for provider in configured_providers:
+        providers_tried += 1
+        free_label = " (free)" if provider["free"] else ""
+        logger.info(f"🤖 Trying {provider['label']} analysis{free_label}...")
+        logger.info(f"   Model: {provider['model']}")
+
+        try:
+            raw_analysis = provider["call"](image_paths, site)
+            analysis_result = _normalize_llm_analysis(raw_analysis, provider)
+            if not _is_usable_llm_analysis(analysis_result):
+                raise RuntimeError("LLM response is incomplete or unusable")
+
+            logger.info(f"🤖 {provider['label']} analysis successful!")
+            return analysis_result
+
+        except QuotaExhaustedError as e:
+            quota_errors += 1
+            analysis_errors.append(f"{provider['provider']}: quota exhausted ({e})")
+            logger.warning(f"⚠️ {provider['label']} quota exhausted, trying next provider")
+        except Exception as e:
+            analysis_errors.append(f"{provider['provider']}: {e}")
+            logger.warning(f"{provider['label']} analysis failed: {e}")
+
+    if quota_errors > 0 and quota_errors >= providers_tried:
+        raise QuotaExhaustedError(
+            f"All {providers_tried} configured LLM providers exhausted their quota"
+        )
+
+    return {
+        "success": False,
+        "error": "All configured LLM providers failed",
+        "provider_errors": analysis_errors,
+    }
+
+
+def _normalize_llm_analysis(
+    raw_analysis: dict[str, Any], provider: dict[str, Any]
+) -> dict[str, Any]:
+    return {
+        "success": True,
+        "plafond_thermique_m": raw_analysis.get("plafond_thermique_m"),
+        "force_thermique_ms": raw_analysis.get("force_thermique_ms"),
+        "heures_volables": raw_analysis.get("heures_volables"),
+        "score_volabilite": raw_analysis.get("score_volabilite"),
+        "conseils_vol": raw_analysis.get("conseils_vol"),
+        "alertes_securite": raw_analysis.get("alertes_securite", []),
+        "details_analyse": raw_analysis.get("details_analyse"),
+        "llm_provider": provider["provider"],
+        "llm_model": raw_analysis.get("llm_model", provider["model"]),
+        "llm_tokens_used": raw_analysis.get("llm_tokens_used"),
+        "llm_cost_usd": raw_analysis.get("llm_cost_usd"),
+        "analyzer": provider["analyzer"],
+    }
+
+
+def _is_usable_llm_analysis(analysis: dict[str, Any]) -> bool:
+    required_fields = [
+        "plafond_thermique_m",
+        "force_thermique_ms",
+        "heures_volables",
+        "score_volabilite",
+        "conseils_vol",
+        "alertes_securite",
+        "details_analyse",
+    ]
+    if any(analysis.get(field) is None for field in required_fields):
+        return False
+
+    details = str(analysis.get("details_analyse", "")).lower()
+    advice = str(analysis.get("conseils_vol", "")).lower()
+    failure_phrases = ["erreur de parsing", "analyse impossible"]
+    return not any(phrase in details or phrase in advice for phrase in failure_phrases)
 
 
 async def generate_multi_source_emagram_for_spot(
@@ -137,119 +299,9 @@ async def generate_multi_source_emagram_for_spot(
 
         logger.info(f"📸 {len(successful_screenshots)}/3 screenshots successful")
 
-        # Step 4: Analyze with AI (priority: Gemini > Groq)
+        # Step 4: Analyze with AI using the configured fallback chain.
         image_paths = [s["image_path"] for s in successful_screenshots]
-
-        analysis_result = None
-        quota_errors = 0
-        providers_tried = 0
-
-        # Priority 1: Try Gemini if API key is available
-        google_api_key = config.GOOGLE_API_KEY
-        logger.info(
-            f"🔍 Checking Gemini availability: API Key = {'SET' if google_api_key else 'NOT SET'}"
-        )
-
-        if google_api_key:
-            providers_tried += 1
-            logger.info("🔷 Trying Gemini Vision analysis...")
-            logger.info("   API key found (configured)")
-            logger.info(f"   Model: {os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')}")
-            try:
-                gemini_analysis = analyze_emagram_with_gemini(
-                    screenshot_paths=image_paths,
-                    spot_name=site.name,
-                    coordinates=(site.latitude, site.longitude),
-                    api_key=google_api_key,
-                    model_name=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-                    max_retries=3,
-                )
-
-                # Convert to expected format
-                analysis_result = {
-                    "success": True,
-                    "plafond_thermique_m": gemini_analysis["plafond_thermique_m"],
-                    "force_thermique_ms": gemini_analysis["force_thermique_ms"],
-                    "heures_volables": gemini_analysis["heures_volables"],
-                    "score_volabilite": gemini_analysis["score_volabilite"],
-                    "conseils_vol": gemini_analysis["conseils_vol"],
-                    "alertes_securite": gemini_analysis["alertes_securite"],
-                    "details_analyse": gemini_analysis["details_analyse"],
-                    "llm_provider": "google",
-                    "llm_model": gemini_analysis.get(
-                        "llm_model", os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-                    ),
-                    "llm_tokens_used": gemini_analysis.get("llm_tokens_used"),
-                    "llm_cost_usd": gemini_analysis.get("llm_cost_usd"),
-                    "analyzer": "gemini",
-                }
-                logger.info("🔷 Gemini analysis successful!")
-
-            except QuotaExhaustedError:
-                logger.warning("⚠️ Gemini quota exhausted, trying next provider")
-                quota_errors += 1
-                analysis_result = None
-            except Exception as e:
-                logger.warning(f"Gemini analysis failed: {e}")
-                analysis_result = None
-
-        # Priority 2: Try Groq (free, Llama Vision)
-        if not analysis_result and config.GROQ_API_KEY:
-            providers_tried += 1
-            try:
-                logger.info("🟢 Trying Groq Llama Vision analysis (free)...")
-                groq_analysis = analyze_emagram_with_groq(
-                    screenshot_paths=image_paths,
-                    spot_name=site.name,
-                    coordinates=(site.latitude, site.longitude),
-                )
-
-                analysis_result = {
-                    "success": True,
-                    "plafond_thermique_m": groq_analysis["plafond_thermique_m"],
-                    "force_thermique_ms": groq_analysis["force_thermique_ms"],
-                    "heures_volables": groq_analysis["heures_volables"],
-                    "score_volabilite": groq_analysis["score_volabilite"],
-                    "conseils_vol": groq_analysis["conseils_vol"],
-                    "alertes_securite": groq_analysis["alertes_securite"],
-                    "details_analyse": groq_analysis["details_analyse"],
-                    "llm_provider": "groq",
-                    "llm_model": groq_analysis.get(
-                        "llm_model", "meta-llama/llama-4-scout-17b-16e-instruct"
-                    ),
-                    "llm_tokens_used": groq_analysis.get("llm_tokens_used"),
-                    "llm_cost_usd": groq_analysis.get("llm_cost_usd"),
-                    "analyzer": "groq",
-                }
-                logger.info("🟢 Groq analysis successful!")
-
-            except QuotaExhaustedError:
-                logger.warning("⚠️ Groq quota exhausted, trying next provider")
-                quota_errors += 1
-                analysis_result = None
-            except Exception as e:
-                logger.warning(f"Groq analysis failed: {e}")
-                analysis_result = None
-
-        if not analysis_result:
-            if providers_tried == 0:
-                return {
-                    "success": False,
-                    "error": (
-                        "No LLM provider configured "
-                        f"(set {GOOGLE_API_ENV_VAR} and/or {GROQ_API_ENV_VAR})"
-                    ),
-                }
-
-            if quota_errors > 0 and quota_errors >= providers_tried:
-                raise QuotaExhaustedError(
-                    f"All {providers_tried} configured LLM providers exhausted their quota"
-                )
-
-            return {
-                "success": False,
-                "error": "All configured LLM providers failed",
-            }
+        analysis_result = _analyze_emagram_with_fallbacks(image_paths, site)
 
         if not analysis_result.get("success"):
             logger.error(f"LLM analysis failed: {analysis_result.get('error')}")

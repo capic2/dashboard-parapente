@@ -110,6 +110,26 @@ def get_wind_score_multiplier(favorability: str) -> float:
     return multipliers.get(favorability, 0.7)
 
 
+def _filter_flyable_hours(
+    consensus_hours: list[dict[str, Any]], forecast: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Return daylight hours, falling back to all consensus hours on invalid sun times."""
+    sunrise_time = forecast.get("sunrise")
+    sunset_time = forecast.get("sunset")
+    if sunrise_time and sunset_time:
+        try:
+            sunrise_hour = int(sunrise_time.split(":")[0])
+            sunset_hour = int(sunset_time.split(":")[0])
+            return [
+                hour_data
+                for hour_data in consensus_hours
+                if sunrise_hour <= hour_data.get("hour", 0) <= sunset_hour
+            ]
+        except (ValueError, IndexError, AttributeError):
+            pass
+    return consensus_hours
+
+
 async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dict[str, Any] | None:
     """
     Calculate the best spot based on cached weather data (from Redis)
@@ -170,20 +190,7 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
                     continue
 
                 # Filter to flyable hours (sunrise/sunset) for consistent para_index
-                sunrise_time = forecast.get("sunrise")
-                sunset_time = forecast.get("sunset")
-                flyable_hours = consensus_hours
-                if sunrise_time and sunset_time:
-                    try:
-                        sunrise_hour = int(sunrise_time.split(":")[0])
-                        sunset_hour = int(sunset_time.split(":")[0])
-                        flyable_hours = [
-                            h
-                            for h in consensus_hours
-                            if sunrise_hour <= h.get("hour", 0) <= sunset_hour
-                        ]
-                    except (ValueError, IndexError, AttributeError):
-                        pass
+                flyable_hours = _filter_flyable_hours(consensus_hours, forecast)
                 if not flyable_hours:
                     continue
 
@@ -519,6 +526,116 @@ async def calculate_best_spot_from_db(db: Session, day_index: int = 0) -> dict[s
         return None
 
 
+async def calculate_hourly_best_spots_from_cache(
+    db: Session, day_index: int = 0, hours: int = 8
+) -> dict[str, Any] | None:
+    """Calculate the best flying spot for each upcoming flyable hour."""
+    from para_index import calculate_hourly_para_index, get_hourly_verdict
+    from weather_pipeline import get_normalized_forecast
+
+    logger.info(f"Calculating hourly best spots from cached weather data for day {day_index}...")
+
+    try:
+        sites = db.query(Site).all()
+        if not sites:
+            logger.warning("No sites found in database")
+            return None
+
+        start_hour = datetime.now().hour if day_index == 0 else 0
+        best_by_hour: dict[int, dict[str, Any]] = {}
+
+        for site in sites:
+            try:
+                forecast = await get_normalized_forecast(
+                    lat=site.latitude,
+                    lon=site.longitude,
+                    day_index=day_index,
+                    site_name=site.name,
+                    elevation_m=site.elevation_m,
+                    db=db,
+                )
+
+                if not forecast.get("success"):
+                    logger.warning(f"No cached forecast for {site.name}")
+                    continue
+
+                consensus_hours = forecast.get("consensus", [])
+                if not consensus_hours:
+                    continue
+
+                flyable_hours = _filter_flyable_hours(consensus_hours, forecast)
+
+                for hour_data in flyable_hours:
+                    hour = hour_data.get("hour")
+                    if hour is None or hour < start_hour:
+                        continue
+
+                    para_index = calculate_hourly_para_index(hour_data)
+                    wind_speed = hour_data.get("wind_speed")
+                    wind_direction = hour_data.get("wind_direction")
+                    wind_dir_str = (
+                        degrees_to_cardinal(wind_direction) if wind_direction is not None else None
+                    )
+                    wind_favorability = get_wind_favorability(
+                        wind_dir_str, site.orientation, wind_speed
+                    )
+                    final_score = para_index * get_wind_score_multiplier(wind_favorability)
+
+                    parts = [f"Para-Index {para_index}"]
+                    if wind_dir_str and wind_speed is not None:
+                        if wind_favorability == "good":
+                            parts.append(f"vent favorable {wind_dir_str} {int(wind_speed)}km/h")
+                        elif wind_favorability == "bad":
+                            parts.append(f"vent défavorable {wind_dir_str} {int(wind_speed)}km/h")
+                        else:
+                            parts.append(f"vent {wind_dir_str} {int(wind_speed)}km/h")
+
+                    candidate = {
+                        "hour": hour,
+                        "site": {
+                            "id": site.id,
+                            "code": site.code,
+                            "name": site.name,
+                            "latitude": site.latitude,
+                            "longitude": site.longitude,
+                            "orientation": site.orientation,
+                            "rating": site.rating,
+                        },
+                        "paraIndex": para_index,
+                        "windDirection": wind_dir_str,
+                        "windSpeed": wind_speed,
+                        "windFavorability": wind_favorability,
+                        "score": final_score,
+                        "flyableSlot": f"{hour}h",
+                        "thermalCeiling": None,
+                        "reason": ", ".join(parts),
+                        "verdict": get_hourly_verdict(para_index),
+                    }
+
+                    current_best = best_by_hour.get(hour)
+                    if current_best is None or candidate["score"] > current_best["score"]:
+                        best_by_hour[hour] = candidate
+
+            except Exception as e:
+                logger.warning(f"Error processing hourly site {site.name}: {e}")
+                continue
+
+        hourly_best_spots = [best_by_hour[hour] for hour in sorted(best_by_hour.keys())[:hours]]
+        if not hourly_best_spots:
+            logger.warning("No valid hourly forecasts found for any site")
+            return None
+
+        return {
+            "dayIndex": day_index,
+            "startHour": start_hour,
+            "hours": hourly_best_spots,
+        }
+
+    except Exception as e:
+        logger.error(f"Error calculating hourly best spots: {e}", exc_info=True)
+        return None
+
+
 async def get_best_spot_cached(db: Session, day_index: int = 0) -> dict[str, Any] | None:
     """
     Get best spot from cache or calculate if not cached
@@ -566,6 +683,43 @@ async def get_best_spot_cached(db: Session, day_index: int = 0) -> dict[str, Any
         logger.error(f"Error in get_best_spot_cached for day {day_index}: {e}", exc_info=True)
         # Fallback: try to calculate without caching
         return await calculate_best_spot_from_cache(db, day_index)
+
+
+async def get_hourly_best_spots_cached(
+    db: Session, day_index: int = 0, hours: int = 8
+) -> dict[str, Any] | None:
+    """Get hourly best spots from cache or calculate if not cached."""
+    start_hour = datetime.now().hour if day_index == 0 else 0
+    cache_key = f"best_spot_hourly:day_{day_index}:start_{start_hour}:hours_{hours}"
+    get_cached_func, set_cached_func, get_cache_ttl_func = _get_cache_functions()
+
+    if get_cached_func is None:
+        logger.info(
+            f"Redis not available, calculating hourly best spots for day {day_index} directly..."
+        )
+        return await calculate_hourly_best_spots_from_cache(db, day_index, hours)
+
+    try:
+        cached_data = await get_cached_func(cache_key)
+        if cached_data is not None:
+            logger.info(f"✅ Hourly best spots for day {day_index} retrieved from cache")
+            return cached_data
+
+        logger.info(f"Cache miss, calculating hourly best spots for day {day_index}...")
+        hourly_best_spots = await calculate_hourly_best_spots_from_cache(db, day_index, hours)
+
+        if hourly_best_spots and get_cache_ttl_func:
+            ttl = get_cache_ttl_func().get("summary", 3600)
+            await set_cached_func(cache_key, hourly_best_spots, ttl)
+            logger.info(f"✅ Hourly best spots for day {day_index} cached for {ttl}s")
+
+        return hourly_best_spots
+
+    except Exception as e:
+        logger.error(
+            f"Error in get_hourly_best_spots_cached for day {day_index}: {e}", exc_info=True
+        )
+        return await calculate_hourly_best_spots_from_cache(db, day_index, hours)
 
 
 async def refresh_best_spot_cache(db: Session):

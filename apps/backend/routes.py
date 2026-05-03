@@ -1359,6 +1359,40 @@ async def get_best_spot(
         ) from e
 
 
+@public_router.get("/spots/best/hourly")
+async def get_hourly_best_spots(
+    day_index: int = Query(
+        default=0,
+        ge=0,
+        le=6,
+        description="Day index (0=today, 1=tomorrow, ..., 6=in 6 days)",
+    ),
+    hours: int = Query(default=8, ge=1, le=24, description="Maximum number of hourly winners"),
+    db: Session = Depends(get_db),
+):
+    """Get the best flying spot for each upcoming flyable hour."""
+    from best_spot import get_hourly_best_spots_cached
+
+    try:
+        hourly_best_spots = await get_hourly_best_spots_cached(db, day_index, hours)
+
+        if not hourly_best_spots:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No hourly forecast data available for day {day_index}.",
+            )
+
+        return hourly_best_spots
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting hourly best spots: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Failed to calculate hourly best spots: {str(e)}"
+        ) from e
+
+
 @public_router.get("/spots/{spot_id}", response_model=SiteSchema)
 def get_spot(spot_id: str, db: Session = Depends(get_db)):
     """Get a specific user-managed spot"""
@@ -5646,6 +5680,7 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
         "ui_reason_cloud_very_cloudy_min": (0, 100),
         "ui_reason_wind_moderate_min": (0, 150),
     }
+    path_keys = {"video_export_dir", "video_temp_images_dir"}
     validated_updates: dict[str, str] = {}
 
     for key, value in settings.items():
@@ -5687,6 +5722,14 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
                     detail=f"{key} must be between {min_value:g} and {max_value:g}",
                 )
             normalized_value = f"{parsed_value:g}"
+        elif key in path_keys:
+            candidate = normalized_value.strip()
+            if not candidate:
+                raise HTTPException(status_code=400, detail=f"{key} must not be empty")
+            path_value = Path(candidate)
+            if not path_value.is_absolute():
+                raise HTTPException(status_code=400, detail=f"{key} must be an absolute path")
+            normalized_value = str(path_value)
 
         validated_updates[key] = normalized_value
 

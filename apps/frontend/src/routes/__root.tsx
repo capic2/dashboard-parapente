@@ -8,7 +8,16 @@ import { appVersionQueryOptions } from '../hooks/common/useAppVersion';
 import { useVersionUpdates } from '../hooks/common/useVersionUpdates';
 
 export const Route = createRootRoute({
-  loader: () => queryClient.ensureQueryData(appVersionQueryOptions()),
+  loader: ({ location }) => {
+    if (
+      location.pathname === '/login' ||
+      location.pathname === '/export-viewer'
+    ) {
+      return null;
+    }
+
+    return queryClient.ensureQueryData(appVersionQueryOptions());
+  },
   component: RootComponent,
   pendingComponent: PendingComponent,
 });
@@ -35,13 +44,14 @@ function RootComponent() {
   const { t } = useTranslation();
   const matchRoute = useMatchRoute();
   const isLoginPage = matchRoute({ to: '/login' });
+  const isExportViewerPage = matchRoute({ to: '/export-viewer' });
   const appVersion = Route.useLoaderData();
   const version = appVersion?.version ?? null;
   const { latestVersion, releaseNotesUrl } = useVersionUpdates(
-    isLoginPage ? null : version
+    isLoginPage || isExportViewerPage ? null : version
   );
 
-  if (isLoginPage) {
+  if (isLoginPage || isExportViewerPage) {
     return <Outlet />;
   }
 

@@ -6,7 +6,10 @@ import AllSitesConditions from '../components/dashboard/AllSitesConditions';
 import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
 import { Button } from '@dashboard-parapente/design-system';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
-import { useBestSpotAPI } from '../hooks/weather/useBestSpotAPI';
+import {
+  useBestSpotAPI,
+  useHourlyBestSpotsAPI,
+} from '../hooks/weather/useBestSpotAPI';
 import { createWeatherQueryFn } from '../hooks/weather/useWeather';
 import { getStaleTime, getWeatherRefetchInterval } from '../lib/cacheConfig';
 import type { WeatherData } from '../types';
@@ -17,6 +20,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { data: sites } = useSuspenseQuery(sitesQueryOptions());
   const { data: bestSpot } = useBestSpotAPI(0);
+  const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(0);
 
   // Fetch current weather for all sites (day 0), auto-refresh every hour
   const weatherQueries = useQueries({
@@ -67,6 +71,7 @@ export default function Dashboard() {
         {/* 2. Best Spot (Today) */}
         <BestSpotSuggestion
           bestSpot={bestSpot ?? null}
+          hourlyBestSpots={hourlyBestSpots?.hours ?? []}
           onSelectSite={(siteId) =>
             void navigate({ to: '/weather', search: { siteId } })
           }

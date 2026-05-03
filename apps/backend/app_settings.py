@@ -7,10 +7,12 @@ Settings are cached in memory to avoid DB queries on every call (e.g., cache TTL
 
 import logging
 from datetime import datetime
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
 from models import AppSetting
+import config
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,8 @@ DEFAULTS: dict[str, str] = {
     "emagram_max_age_minutes": "180",
     "redis_connect_timeout": "5",
     "redis_socket_timeout": "5",
+    "video_export_dir": str(Path(config.VIDEO_EXPORT_DIR)),
+    "video_temp_images_dir": str(Path(config.VIDEO_TEMP_IMAGES_DIR)),
     "para_wind_very_low_max": "3",
     "para_wind_low_max": "5",
     "para_wind_weak_max": "8",
@@ -130,7 +134,10 @@ def get_all_settings(db: Session) -> dict[str, str]:
     """Read all settings as a dict (sensitive keys excluded)."""
     if not _cache_loaded:
         reload_cache(db)
-    return {k: v for k, v in _settings_cache.items() if k not in _SENSITIVE_KEYS}
+    return {
+        **DEFAULTS,
+        **{k: v for k, v in _settings_cache.items() if k not in _SENSITIVE_KEYS},
+    }
 
 
 def invalidate_cache() -> None:

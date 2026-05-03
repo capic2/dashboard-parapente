@@ -15,7 +15,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "coverage": "vitest --coverage",
-    "lint": "eslint src --fix",
+    "lint": "oxlint -c ../../.oxlintrc.json src",
     "type-check": "tsc --noEmit",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"

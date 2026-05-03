@@ -323,6 +323,10 @@ function PerformanceSection() {
     backendSettings?.spotair_live_wind_cache_ttl_seconds ?? '300';
   const currentSchedulerInterval =
     backendSettings?.scheduler_interval_minutes ?? '30';
+  const currentVideoExportDir =
+    backendSettings?.video_export_dir ?? '/app/video-exports';
+  const currentVideoTempImagesDir =
+    backendSettings?.video_temp_images_dir ?? '/app/video-temp-images';
   const thresholdSections = [
     {
       title: t('settings.thresholds.wind.title'),
@@ -871,6 +875,50 @@ function PerformanceSection() {
         </div>
 
         <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
+          <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+            {t('settings.performance.videoStorageTitle')}
+          </h4>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {t('settings.performance.videoStorageHelp')}
+          </p>
+
+          <label className="block">
+            <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('settings.performance.videoExportDir')}
+            </span>
+            <input
+              key={`video_export_dir-${currentVideoExportDir}`}
+              type="text"
+              defaultValue={currentVideoExportDir}
+              placeholder="/app/video-exports"
+              onBlur={(event) =>
+                handleBackendSetting('video_export_dir', event.target.value)
+              }
+              className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+            />
+          </label>
+
+          <label className="block">
+            <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('settings.performance.videoTempImagesDir')}
+            </span>
+            <input
+              key={`video_temp_images_dir-${currentVideoTempImagesDir}`}
+              type="text"
+              defaultValue={currentVideoTempImagesDir}
+              placeholder="/app/video-temp-images"
+              onBlur={(event) =>
+                handleBackendSetting(
+                  'video_temp_images_dir',
+                  event.target.value
+                )
+              }
+              className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+            />
+          </label>
+        </div>
+
+        <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             {t('settings.thresholds.title')}
           </label>
@@ -909,7 +957,7 @@ function PerformanceSection() {
                       onBlur={(event) =>
                         handleBackendSetting(item.key, event.target.value)
                       }
-                      className="px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                      className="px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100"
                     />
                   </label>
                 ))}
@@ -1082,7 +1130,8 @@ export default function Settings() {
             >
               {tabKey === 'general' && `🎛️ ${t('settings.tabs.general')}`}
               {tabKey === 'sites' && `📍 ${t('settings.tabs.favoriteSites')}`}
-              {tabKey === 'weather' && `🌦️ ${t('settings.tabs.weatherSources')}`}
+              {tabKey === 'weather' &&
+                `🌦️ ${t('settings.tabs.weatherSources')}`}
               {tabKey === 'data' && `💾 ${t('settings.tabs.data')}`}
             </Tab>
           ))}
@@ -1368,20 +1417,20 @@ export default function Settings() {
 
           {/* SITES TAB */}
           <TabPanel id="sites" className="outline-none">
-          <Suspense
-            fallback={
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md animate-pulse space-y-3">
-                {[...Array(4)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-16 bg-gray-200 dark:bg-gray-600 rounded-lg"
-                  ></div>
-                ))}
-              </div>
-            }
-          >
-            <SitesTab settings={settings} toggleFavorite={toggleFavorite} />
-          </Suspense>
+            <Suspense
+              fallback={
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md animate-pulse space-y-3">
+                  {[...Array(4)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-16 bg-gray-200 dark:bg-gray-600 rounded-lg"
+                    ></div>
+                  ))}
+                </div>
+              }
+            >
+              <SitesTab settings={settings} toggleFavorite={toggleFavorite} />
+            </Suspense>
           </TabPanel>
 
           {/* WEATHER SOURCES TAB */}
@@ -1391,67 +1440,67 @@ export default function Settings() {
 
           {/* DATA TAB */}
           <TabPanel id="data" className="outline-none">
-          <div className="space-y-4">
-            {/* Export/Import Section */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-                💾 {t('settings.data.backupTitle')}
-              </h2>
-              <div className="space-y-3">
+            <div className="space-y-4">
+              {/* Export/Import Section */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+                  💾 {t('settings.data.backupTitle')}
+                </h2>
+                <div className="space-y-3">
+                  <Button
+                    onClick={exportData}
+                    className="w-full px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all flex items-center justify-center gap-2"
+                  >
+                    <span>📥</span>
+                    {t('settings.data.export')}
+                  </Button>
+                  <label className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all flex items-center justify-center gap-2 cursor-pointer">
+                    <span>📤</span>
+                    {t('settings.data.import')}
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={importData}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
+                  ⚠️ {t('settings.data.importWarning')}
+                </div>
+              </div>
+
+              {/* Clear Data Section */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+                  🗑️ {t('settings.data.resetTitle')}
+                </h2>
                 <Button
-                  onClick={exportData}
-                  className="w-full px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all flex items-center justify-center gap-2"
+                  onClick={clearData}
+                  className="w-full px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"
                 >
-                  <span>📥</span>
-                  {t('settings.data.export')}
+                  {t('settings.data.resetAll')}
                 </Button>
-                <label className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all flex items-center justify-center gap-2 cursor-pointer">
-                  <span>📤</span>
-                  {t('settings.data.import')}
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={importData}
-                    className="hidden"
-                  />
-                </label>
+                <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-sm text-red-800 dark:text-red-200">
+                  ⚠️ {t('settings.data.resetWarning')}
+                </div>
               </div>
-              <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
-                ⚠️ {t('settings.data.importWarning')}
-              </div>
-            </div>
 
-            {/* Clear Data Section */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-                🗑️ {t('settings.data.resetTitle')}
-              </h2>
-              <Button
-                onClick={clearData}
-                className="w-full px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"
-              >
-                {t('settings.data.resetAll')}
-              </Button>
-              <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-sm text-red-800 dark:text-red-200">
-                ⚠️ {t('settings.data.resetWarning')}
+              {/* User Profile Placeholder */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+                  👤 {t('settings.profile.title')}
+                </h2>
+                <div className="p-8 bg-gray-50 dark:bg-gray-900 rounded-lg text-center">
+                  <p className="text-gray-600 dark:text-gray-300 mb-2">
+                    🚧 {t('settings.profile.wip')}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {t('settings.profile.wipDetails')}
+                  </p>
+                </div>
               </div>
             </div>
-
-            {/* User Profile Placeholder */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-                👤 {t('settings.profile.title')}
-              </h2>
-              <div className="p-8 bg-gray-50 dark:bg-gray-900 rounded-lg text-center">
-                <p className="text-gray-600 dark:text-gray-300 mb-2">
-                  🚧 {t('settings.profile.wip')}
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {t('settings.profile.wipDetails')}
-                </p>
-              </div>
-            </div>
-          </div>
           </TabPanel>
         </div>
       </Tabs>

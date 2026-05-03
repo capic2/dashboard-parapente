@@ -16,7 +16,6 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as InfrastructureRouteImport } from './routes/infrastructure'
 import { Route as FlightsRouteImport } from './routes/flights'
-import { Route as ExportsRouteImport } from './routes/exports'
 import { Route as ExportViewerRouteImport } from './routes/export-viewer'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as IndexRouteImport } from './routes/index'
@@ -59,11 +58,6 @@ const FlightsRoute = FlightsRouteImport.update({
   path: '/flights',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/flights.lazy').then((d) => d.Route))
-const ExportsRoute = ExportsRouteImport.update({
-  id: '/exports',
-  path: '/exports',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/exports.lazy').then((d) => d.Route))
 const ExportViewerRoute = ExportViewerRouteImport.update({
   id: '/export-viewer',
   path: '/export-viewer',
@@ -91,7 +85,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/export-viewer': typeof ExportViewerRoute
-  '/exports': typeof ExportsRoute
   '/flights': typeof FlightsRoute
   '/infrastructure': typeof InfrastructureRoute
   '/login': typeof LoginRoute
@@ -105,7 +98,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/export-viewer': typeof ExportViewerRoute
-  '/exports': typeof ExportsRoute
   '/flights': typeof FlightsRoute
   '/infrastructure': typeof InfrastructureRoute
   '/login': typeof LoginRoute
@@ -120,7 +112,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/export-viewer': typeof ExportViewerRoute
-  '/exports': typeof ExportsRoute
   '/flights': typeof FlightsRoute
   '/infrastructure': typeof InfrastructureRoute
   '/login': typeof LoginRoute
@@ -136,7 +127,6 @@ export interface FileRouteTypes {
     | '/'
     | '/analytics'
     | '/export-viewer'
-    | '/exports'
     | '/flights'
     | '/infrastructure'
     | '/login'
@@ -150,7 +140,6 @@ export interface FileRouteTypes {
     | '/'
     | '/analytics'
     | '/export-viewer'
-    | '/exports'
     | '/flights'
     | '/infrastructure'
     | '/login'
@@ -164,7 +153,6 @@ export interface FileRouteTypes {
     | '/'
     | '/analytics'
     | '/export-viewer'
-    | '/exports'
     | '/flights'
     | '/infrastructure'
     | '/login'
@@ -179,7 +167,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AnalyticsRoute: typeof AnalyticsRoute
   ExportViewerRoute: typeof ExportViewerRoute
-  ExportsRoute: typeof ExportsRoute
   FlightsRoute: typeof FlightsRoute
   InfrastructureRoute: typeof InfrastructureRoute
   LoginRoute: typeof LoginRoute
@@ -241,13 +228,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FlightsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/exports': {
-      id: '/exports'
-      path: '/exports'
-      fullPath: '/exports'
-      preLoaderRoute: typeof ExportsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/export-viewer': {
       id: '/export-viewer'
       path: '/export-viewer'
@@ -283,7 +263,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnalyticsRoute: AnalyticsRoute,
   ExportViewerRoute: ExportViewerRoute,
-  ExportsRoute: ExportsRoute,
   FlightsRoute: FlightsRoute,
   InfrastructureRoute: InfrastructureRoute,
   LoginRoute: LoginRoute,

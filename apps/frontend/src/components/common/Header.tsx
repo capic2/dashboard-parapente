@@ -59,9 +59,6 @@ export default function Header() {
           <Link to="/flights" className={linkClassName} onClick={onNavigate}>
             {t('header.flights')}
           </Link>
-          <Link to="/exports" className={linkClassName} onClick={onNavigate}>
-            {t('header.exports')}
-          </Link>
           <Link to="/analytics" className={linkClassName} onClick={onNavigate}>
             {t('header.analytics')}
           </Link>

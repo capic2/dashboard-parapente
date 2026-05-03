@@ -13,7 +13,10 @@ import { Button } from '@dashboard-parapente/design-system';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from '@tanstack/react-router';
-import { useBestSpotAPI } from '../hooks/weather/useBestSpotAPI';
+import {
+  useBestSpotAPI,
+  useHourlyBestSpotsAPI,
+} from '../hooks/weather/useBestSpotAPI';
 
 export default function WeatherPage() {
   const { t } = useTranslation();
@@ -23,6 +26,7 @@ export default function WeatherPage() {
   const routeSiteId = search ? search.siteId : '';
   const selectedDayIndex = search.day ?? 0;
   const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
+  const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(selectedDayIndex);
   const selectedSiteId =
     sites.find((site) => site.id === routeSiteId)?.id ?? sites[0]?.id ?? '';
 
@@ -77,6 +81,7 @@ export default function WeatherPage() {
         {/* Best Spot for selected day */}
         <BestSpotSuggestion
           bestSpot={bestSpot ?? null}
+          hourlyBestSpots={hourlyBestSpots?.hours ?? []}
           onSelectSite={(siteId) =>
             void navigate({
               to: '/weather',

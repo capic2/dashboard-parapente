@@ -40,14 +40,14 @@ _REFRESH_INITIAL_BACKOFF_SECONDS = 1.0
 def _get_persisted_refresh_token() -> str | None:
     """Read the refresh token from DB (app_settings), fallback to env."""
     try:
-        from app_settings import get_setting
         from database import get_db_context
+        from models import AppSetting
 
         with get_db_context() as db:
-            persisted = get_setting("strava_refresh_token", db=db)
-            if persisted:
+            row = db.query(AppSetting).filter(AppSetting.key == "strava_refresh_token").first()
+            if row and row.value:
                 logger.info("Using persisted refresh token from DB")
-                return persisted
+                return row.value
     except Exception as e:
         logger.warning(f"Could not read persisted refresh token: {e}")
     return STRAVA_REFRESH_TOKEN
@@ -108,7 +108,7 @@ async def refresh_access_token(force: bool = False) -> str | None:
     """
     Refresh Strava access token.
 
-    Token priority: in-memory → DB (app_settings) → env (.env).
+    Token priority: DB (app_settings) → env (.env) → in-memory fallback.
     After refresh, persists new refresh_token to DB and logs the attempt.
 
     Args:
@@ -131,8 +131,9 @@ async def refresh_access_token(force: bool = False) -> str | None:
         if force:
             logger.info("Forcing token refresh (ignoring in-memory validity cache)")
 
-        # Resolve the refresh token: in-memory → DB → env
-        current_refresh_token = _refresh_token or _get_persisted_refresh_token()
+        # Prefer persisted state: Strava rotates refresh tokens on every exchange,
+        # so an in-memory token can become stale if another process refreshed it.
+        current_refresh_token = _get_persisted_refresh_token() or _refresh_token
 
         if not current_refresh_token:
             msg = "No refresh token available (not in memory, DB, or env)"

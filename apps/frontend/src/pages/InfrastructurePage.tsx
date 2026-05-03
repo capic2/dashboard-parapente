@@ -82,6 +82,7 @@ function getRefreshModeLabel(
   return t('infrastructure.strava.modeUnknown');
 }
 
+// oxlint-disable-next-line max-lines-per-function
 export function getResolvedLabel(
   resolved: CacheKeyInfo['resolved'],
   t: (key: string, options?: Record<string, unknown>) => string
@@ -151,6 +152,7 @@ export function getResolvedLabel(
 // STRAVA TOKEN SECTION
 // =============================================================================
 
+// oxlint-disable-next-line max-lines-per-function
 function StravaTokenSection() {
   const { t } = useTranslation();
   const {
@@ -166,10 +168,10 @@ function StravaTokenSection() {
   const refreshMutation = useStravaRefreshToken();
 
   const refreshSucceeded =
-    refreshMutation.isSuccess && refreshMutation.data?.refreshed === true;
+    refreshMutation.isSuccess && refreshMutation.data?.refreshed;
   const refreshFailed =
     refreshMutation.isError ||
-    (refreshMutation.isSuccess && refreshMutation.data?.refreshed === false);
+    (refreshMutation.isSuccess && !refreshMutation.data?.refreshed);
 
   const statusBadge = (() => {
     if (statusLoading) return null;
@@ -193,6 +195,109 @@ function StravaTokenSection() {
         };
   })();
 
+  const renderStatus = () => {
+    if (statusLoading) {
+      return (
+        <span className="text-sm text-gray-400 dark:text-gray-400">...</span>
+      );
+    }
+    if (statusBadge) {
+      return (
+        <span
+          className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge.className}`}
+        >
+          {statusBadge.label}
+        </span>
+      );
+    }
+
+    return null;
+  };
+
+  // oxlint-disable-next-line max-lines-per-function
+  const renderLogs = () => {
+    if (logsLoading) {
+      return (
+        <div className="p-4 text-sm text-gray-400 dark:text-gray-400">...</div>
+      );
+    }
+
+    if (logsError) {
+      return (
+        <div className="p-4 text-sm text-red-500 dark:text-red-400 text-center">
+          {t('infrastructure.strava.unknown')}
+        </div>
+      );
+    }
+    if (!logs || logs.length === 0) {
+      return (
+        <div className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+          {t('infrastructure.strava.noLogs')}
+        </div>
+      );
+    }
+
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 dark:bg-gray-900/50 text-left">
+              <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
+                {t('infrastructure.strava.date')}
+              </th>
+              <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
+                {t('infrastructure.strava.status')}
+              </th>
+              <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
+                {t('infrastructure.strava.mode')}
+              </th>
+              <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
+                {t('infrastructure.strava.message')}
+              </th>
+              <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
+                {t('infrastructure.strava.expiresAt')}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {logs.map((log) => (
+              <tr
+                key={log.id}
+                className="border-t border-gray-100 dark:border-gray-700/50"
+              >
+                <td className="px-4 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                  {formatDate(log.timestamp)}
+                </td>
+                <td className="px-4 py-2">
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      log.success
+                        ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                        : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
+                    }`}
+                  >
+                    {log.success
+                      ? t('infrastructure.strava.ok')
+                      : t('infrastructure.strava.fail')}
+                  </span>
+                </td>
+                <td className="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                  {getRefreshModeLabel(log.refresh_mode, t)}
+                </td>
+                <td className="px-4 py-2 text-gray-600 dark:text-gray-400 text-xs max-w-md truncate">
+                  {log.message}
+                </td>
+                <td className="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                  {log.expires_at ? formatDate(log.expires_at) : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
@@ -205,17 +310,7 @@ function StravaTokenSection() {
           <span className="text-sm text-gray-500 dark:text-gray-400">
             {t('infrastructure.strava.status')}:
           </span>
-          {statusLoading ? (
-            <span className="text-sm text-gray-400 dark:text-gray-400">
-              ...
-            </span>
-          ) : statusBadge ? (
-            <span
-              className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge.className}`}
-            >
-              {statusBadge.label}
-            </span>
-          ) : null}
+          {renderStatus()}
         </div>
 
         {status?.expires_at && (
@@ -259,77 +354,7 @@ function StravaTokenSection() {
             {t('infrastructure.strava.logs')}
           </h4>
         </div>
-        {logsLoading ? (
-          <div className="p-4 text-sm text-gray-400 dark:text-gray-400">
-            ...
-          </div>
-        ) : logsError ? (
-          <div className="p-4 text-sm text-red-500 dark:text-red-400 text-center">
-            {t('infrastructure.strava.unknown')}
-          </div>
-        ) : !logs || logs.length === 0 ? (
-          <div className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">
-            {t('infrastructure.strava.noLogs')}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-gray-900/50 text-left">
-                  <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
-                    {t('infrastructure.strava.date')}
-                  </th>
-                  <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
-                    {t('infrastructure.strava.status')}
-                  </th>
-                  <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
-                    {t('infrastructure.strava.mode')}
-                  </th>
-                  <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
-                    {t('infrastructure.strava.message')}
-                  </th>
-                  <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
-                    {t('infrastructure.strava.expiresAt')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((log) => (
-                  <tr
-                    key={log.id}
-                    className="border-t border-gray-100 dark:border-gray-700/50"
-                  >
-                    <td className="px-4 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                      {formatDate(log.timestamp)}
-                    </td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          log.success
-                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                            : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                        }`}
-                      >
-                        {log.success
-                          ? t('infrastructure.strava.ok')
-                          : t('infrastructure.strava.fail')}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                      {getRefreshModeLabel(log.refresh_mode, t)}
-                    </td>
-                    <td className="px-4 py-2 text-gray-600 dark:text-gray-400 text-xs max-w-md truncate">
-                      {log.message}
-                    </td>
-                    <td className="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                      {log.expires_at ? formatDate(log.expires_at) : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {renderLogs()}
       </div>
     </div>
   );
@@ -339,6 +364,7 @@ function StravaTokenSection() {
 // CACHE SECTION
 // =============================================================================
 
+// oxlint-disable-next-line max-lines-per-function
 function CacheSection() {
   const { t } = useTranslation();
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -826,4 +852,6 @@ function GroupSection({
       )}
     </div>
   );
+  // oxlint-disable-next-line max-lines
+  // oxlint-disable-next-line max-lines
 }

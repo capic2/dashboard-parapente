@@ -17,8 +17,11 @@ import ScopeBadge from '../common/ScopeBadge';
 import { Button } from '@dashboard-parapente/design-system';
 import type { BestSpotResult } from '@dashboard-parapente/shared-types';
 
+type HourlyBestSpot = BestSpotResult & { hour: number };
+
 interface BestSpotSuggestionProps {
   bestSpot: BestSpotResult | null;
+  hourlyBestSpots?: HourlyBestSpot[];
   onSelectSite: (siteId: string) => void;
   selectedDayIndex?: number;
   className?: string;
@@ -101,12 +104,13 @@ function getVerdict(paraIndex: number, verdict?: string) {
   };
 }
 
-export function BestSpotSuggestion({
+export const BestSpotSuggestion = ({
   bestSpot,
+  hourlyBestSpots = [],
   onSelectSite,
   selectedDayIndex = 0,
   className = '',
-}: BestSpotSuggestionProps) {
+}: BestSpotSuggestionProps) => {
   const { t, i18n } = useTranslation();
 
   // Calculate the date label based on selectedDayIndex
@@ -157,6 +161,7 @@ export function BestSpotSuggestion({
   const localizedReason = reason.replace(/Para-Index/g, t('weather.paraIndex'));
   const scoreColor = getScoreColor(adjustedScore);
   const verdictInfo = getVerdict(adjustedScore, verdict ?? undefined);
+  const nowHour = new Date().getHours();
 
   return (
     <div
@@ -318,6 +323,104 @@ export function BestSpotSuggestion({
           {localizedReason}
         </p>
 
+        {hourlyBestSpots.length > 0 && (
+          <div className="mb-4 border-t border-gray-100 dark:border-gray-700 pt-3">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                {t('weather.bestSpotTimeline')}
+              </span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                {t('weather.byHour')}
+              </span>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {hourlyBestSpots.map((hourlySpot) => {
+                const hourlyScore = Math.min(
+                  100,
+                  Math.max(
+                    0,
+                    hourlySpot.score != null
+                      ? Math.round(hourlySpot.score)
+                      : hourlySpot.paraIndex
+                  )
+                );
+                const hourlyScoreColor = getScoreColor(hourlyScore);
+                const hourlyVerdict = getVerdict(
+                  hourlyScore,
+                  hourlySpot.verdict ?? undefined
+                );
+                const hourLabel =
+                  selectedDayIndex === 0 && hourlySpot.hour === nowHour
+                    ? t('common.now')
+                    : `${hourlySpot.hour}h`;
+                const roundedWindSpeed =
+                  hourlySpot.windSpeed != null
+                    ? Math.round(hourlySpot.windSpeed)
+                    : null;
+                const windLabel =
+                  hourlySpot.windDirection && roundedWindSpeed != null
+                    ? `${t('common.wind')} ${hourlySpot.windDirection} ${roundedWindSpeed} km/h`
+                    : '—';
+                const orientationLabel = hourlySpot.site?.orientation
+                  ? `${t('sites.orientation')} ${hourlySpot.site.orientation}`
+                  : null;
+
+                return (
+                  <Button
+                    key={`${hourlySpot.hour}-${hourlySpot.site?.id ?? 'none'}`}
+                    onClick={() => {
+                      if (hourlySpot.site) {
+                        onSelectSite(hourlySpot.site.id);
+                      }
+                    }}
+                    className="min-w-[176px] rounded-xl border border-gray-200 bg-white px-3.5 py-3 text-left shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50 dark:hover:bg-gray-900"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-sm font-extrabold text-gray-900 dark:text-white">
+                        {hourLabel}
+                      </span>
+                      <div className="text-right">
+                        <span
+                          className={`block text-xl font-black leading-none ${hourlyScoreColor.text}`}
+                        >
+                          {hourlyScore}
+                        </span>
+                        <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500">
+                          /100
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-2 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700">
+                      <div
+                        className={`h-full rounded-full ${hourlyScoreColor.bg}`}
+                        style={{ width: `${hourlyScore}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 truncate text-base font-bold text-gray-900 dark:text-gray-50">
+                      {hourlySpot.site?.name ?? '—'}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${hourlyVerdict.className}`}
+                      >
+                        {hourlyVerdict.label}
+                      </span>
+                      {orientationLabel && (
+                        <span className="truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
+                          {orientationLabel}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-2 text-xs font-medium text-gray-600 dark:text-gray-300">
+                      {windLabel}
+                    </div>
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Footer: button + cache */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <Button
@@ -331,7 +434,7 @@ export function BestSpotSuggestion({
       </div>
     </div>
   );
-}
+};
 
 /**
  * Compact version for sidebar or small spaces

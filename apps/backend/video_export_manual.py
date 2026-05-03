@@ -21,14 +21,26 @@ from urllib.parse import urlparse
 from sqlalchemy.orm import Session
 
 import config
+from app_settings import get_setting
 from database import SessionLocal
 from models import Flight, VideoExportJob
 
 # Storage for export jobs (compatibility snapshot)
 export_jobs: dict[str, dict[str, Any]] = {}
 
-VIDEO_EXPORT_DIR = Path(config.VIDEO_EXPORT_DIR)
-VIDEO_TEMP_IMAGES_DIR = Path(config.VIDEO_TEMP_IMAGES_DIR)
+
+def _video_export_dir() -> Path:
+    with SessionLocal() as db:
+        path_value = get_setting("video_export_dir", db=db, default=config.VIDEO_EXPORT_DIR)
+    return Path(path_value)
+
+
+def _video_temp_images_dir() -> Path:
+    with SessionLocal() as db:
+        path_value = get_setting(
+            "video_temp_images_dir", db=db, default=config.VIDEO_TEMP_IMAGES_DIR
+        )
+    return Path(path_value)
 
 
 _STATUS_QUEUED = "queued"
@@ -494,11 +506,11 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
     }
 
     candidates: list[tuple[Path, Path]] = []
-    temp_root = VIDEO_TEMP_IMAGES_DIR
-    export_root = VIDEO_EXPORT_DIR
+    temp_root = _video_temp_images_dir()
+    export_root = _video_export_dir()
 
     for job_id in known_inactive_job_ids:
-        candidates.append((_job_temp_dir(job_id), temp_root))
+        candidates.append((_job_temp_dir(temp_root, job_id), temp_root))
         candidates.append((export_root / f"frames_{job_id}", export_root))
         candidates.append((Path("/tmp") / f"playwright-debug-{job_id}.png", Path("/tmp")))
         candidates.append((Path("/tmp") / f"playwright-error-{job_id}.png", Path("/tmp")))
@@ -549,25 +561,25 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
     }
 
 
-def _prepare_export_dirs(temp_dir: Path, frames_dir: Path) -> None:
+def _prepare_export_dirs(export_root: Path, temp_dir: Path, frames_dir: Path) -> None:
     try:
-        VIDEO_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        export_root.mkdir(parents=True, exist_ok=True)
         temp_dir.mkdir(parents=True, exist_ok=True)
         frames_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
         raise RuntimeError(f"Video export storage is not writable: {exc}") from exc
 
 
-def _job_temp_dir(job_id: str) -> Path:
-    return VIDEO_TEMP_IMAGES_DIR / job_id
+def _job_temp_dir(temp_root: Path, job_id: str) -> Path:
+    return temp_root / job_id
 
 
-def _job_frames_dir(job_id: str) -> Path:
-    return _job_temp_dir(job_id) / "frames"
+def _job_frames_dir(temp_root: Path, job_id: str) -> Path:
+    return _job_temp_dir(temp_root, job_id) / "frames"
 
 
-def _video_output_path(flight_id: str, timestamp: str) -> Path:
-    return VIDEO_EXPORT_DIR / f"flight-{flight_id}-{timestamp}.mp4"
+def _video_output_path(export_root: Path, flight_id: str, timestamp: str) -> Path:
+    return export_root / f"flight-{flight_id}-{timestamp}.mp4"
 
 
 def _capture_progress_percent(frame_count: int, total_frames: int) -> int:
@@ -616,6 +628,19 @@ def _ffmpeg_encoding_settings(is_fast_mode: bool) -> tuple[str, str]:
 def _ffmpeg_timeout_seconds(video_duration_seconds: float) -> int:
     dynamic_timeout = int(max(video_duration_seconds, 1.0) * 20)
     return max(6 * 60 * 60, dynamic_timeout)
+
+
+def _ffmpeg_output_file_activity(
+    output_file: Path, last_size: int, last_mtime_ns: int
+) -> tuple[bool, int, int]:
+    try:
+        stat = output_file.stat()
+    except FileNotFoundError:
+        return False, last_size, last_mtime_ns
+
+    size = stat.st_size
+    mtime_ns = stat.st_mtime_ns
+    return size != last_size or mtime_ns != last_mtime_ns, size, mtime_ns
 
 
 def _encoding_progress_percent(encoded_seconds: float, total_duration_seconds: float) -> int:
@@ -789,6 +814,8 @@ async def _export_video_manual_render(job_id: str):
     is_fast_mode = job.mode == "manual_fast"
     flight_id = job.flight_id
     frontend_url = resolve_frontend_url(job.frontend_url)
+    export_root = _video_export_dir()
+    temp_root = _video_temp_images_dir()
     temp_dir: Path | None = None
     frames_dir: Path | None = None
 
@@ -1018,9 +1045,9 @@ async def _export_video_manual_render(job_id: str):
             )
             _set_job_runtime(job_id, phase=_STATUS_INITIALIZING)
 
-            temp_dir = _job_temp_dir(job_id)
-            frames_dir = _job_frames_dir(job_id)
-            _prepare_export_dirs(temp_dir, frames_dir)
+            temp_dir = _job_temp_dir(temp_root, job_id)
+            frames_dir = _job_frames_dir(temp_root, job_id)
+            _prepare_export_dirs(export_root, temp_dir, frames_dir)
 
             print(f"📁 Frames directory: {frames_dir}")
 
@@ -1153,7 +1180,7 @@ async def _export_video_manual_render(job_id: str):
             _set_job_runtime(job_id, phase=_STATUS_ENCODING, eta_seconds=None)
 
             timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-            output_file = _video_output_path(flight_id, timestamp)
+            output_file = _video_output_path(export_root, flight_id, timestamp)
             ffmpeg_preset, ffmpeg_crf = _ffmpeg_encoding_settings(is_fast_mode)
 
             ffmpeg_cmd = [
@@ -1189,6 +1216,8 @@ async def _export_video_manual_render(job_id: str):
             ffmpeg_stderr: list[str] = []
             total_duration_seconds = max(video_duration, 1e-6)
             ffmpeg_timeout_seconds = _ffmpeg_timeout_seconds(total_duration_seconds)
+            last_output_file_size = -1
+            last_output_file_mtime_ns = -1
 
             try:
                 assert process.stderr is not None
@@ -1205,6 +1234,18 @@ async def _export_video_manual_render(job_id: str):
                         return
 
                     now = time.monotonic()
+                    (
+                        has_output_file_activity,
+                        last_output_file_size,
+                        last_output_file_mtime_ns,
+                    ) = _ffmpeg_output_file_activity(
+                        output_file,
+                        last_output_file_size,
+                        last_output_file_mtime_ns,
+                    )
+                    if has_output_file_activity:
+                        last_ffmpeg_output_at = now
+
                     if now - last_ffmpeg_output_at > _FFMPEG_STALL_TIMEOUT_SECONDS:
                         process.kill()
                         await process.wait()

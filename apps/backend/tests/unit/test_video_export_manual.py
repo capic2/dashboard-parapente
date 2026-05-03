@@ -149,6 +149,48 @@ def test_ffmpeg_timeout_scales_for_long_videos():
     assert video_export_manual._ffmpeg_timeout_seconds(duration_seconds) == duration_seconds * 20
 
 
+def test_ffmpeg_output_file_activity_tracks_size_and_mtime(tmp_path):
+    output_file = tmp_path / "export.mp4"
+
+    activity, size, mtime_ns = video_export_manual._ffmpeg_output_file_activity(output_file, -1, -1)
+    assert activity is False
+    assert size == -1
+    assert mtime_ns == -1
+
+    output_file.write_bytes(b"first")
+    activity, size, mtime_ns = video_export_manual._ffmpeg_output_file_activity(
+        output_file, size, mtime_ns
+    )
+    assert activity is True
+    assert size == 5
+
+    activity, size, mtime_ns = video_export_manual._ffmpeg_output_file_activity(
+        output_file, size, mtime_ns
+    )
+    assert activity is False
+
+    same_size_mtime_ns = mtime_ns + 1_000_000_000
+    os.utime(output_file, ns=(same_size_mtime_ns, same_size_mtime_ns))
+    activity, size, mtime_ns = video_export_manual._ffmpeg_output_file_activity(
+        output_file, size, mtime_ns
+    )
+    assert activity is True
+    assert size == 5
+    assert mtime_ns == same_size_mtime_ns
+
+    activity, size, mtime_ns = video_export_manual._ffmpeg_output_file_activity(
+        output_file, size, mtime_ns
+    )
+    assert activity is False
+
+    output_file.write_bytes(b"second-pass")
+    activity, size, mtime_ns = video_export_manual._ffmpeg_output_file_activity(
+        output_file, size, mtime_ns
+    )
+    assert activity is True
+    assert size == 11
+
+
 def test_encoding_progress_percent_spans_encoding_phase_range():
     assert video_export_manual._encoding_progress_percent(0, 100) == 80
     assert video_export_manual._encoding_progress_percent(50, 100) == 89
@@ -156,17 +198,23 @@ def test_encoding_progress_percent_spans_encoding_phase_range():
 
 
 def test_video_output_path_uses_configured_export_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(video_export_manual, "VIDEO_EXPORT_DIR", tmp_path / "videos")
+    monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: tmp_path / "videos")
 
-    output_path = video_export_manual._video_output_path("flight-123", "20260430-120000")
+    output_path = video_export_manual._video_output_path(
+        video_export_manual._video_export_dir(), "flight-123", "20260430-120000"
+    )
 
     assert output_path == tmp_path / "videos" / "flight-flight-123-20260430-120000.mp4"
 
 
 def test_job_frames_dir_uses_configured_temp_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(video_export_manual, "VIDEO_TEMP_IMAGES_DIR", tmp_path / "temp-images")
+    monkeypatch.setattr(
+        video_export_manual, "_video_temp_images_dir", lambda: tmp_path / "temp-images"
+    )
 
-    frames_dir = video_export_manual._job_frames_dir("job-123")
+    frames_dir = video_export_manual._job_frames_dir(
+        video_export_manual._video_temp_images_dir(), "job-123"
+    )
 
     assert frames_dir == tmp_path / "temp-images" / "job-123" / "frames"
 
@@ -186,14 +234,16 @@ def test_cleanup_temp_dir_removes_nested_files(tmp_path):
 
 
 def test_stream_export_paths_use_configured_storage_dirs(tmp_path, monkeypatch):
-    monkeypatch.setattr(video_export, "VIDEO_EXPORT_DIR", tmp_path / "videos")
-    monkeypatch.setattr(video_export, "VIDEO_TEMP_IMAGES_DIR", tmp_path / "temp-images")
+    monkeypatch.setattr(video_export, "_video_export_dir", lambda: tmp_path / "videos")
+    monkeypatch.setattr(video_export, "_video_temp_images_dir", lambda: tmp_path / "temp-images")
 
-    temp_dir = video_export._job_temp_dir("job-123")
-    debug_dir = video_export._job_debug_dir("job-123")
-    output_path = video_export._video_output_path("flight-123", "20260430-120000")
+    export_root = video_export._video_export_dir()
+    temp_root = video_export._video_temp_images_dir()
+    temp_dir = video_export._job_temp_dir(temp_root, "job-123")
+    debug_dir = video_export._job_debug_dir(temp_root, "job-123")
+    output_path = video_export._video_output_path(export_root, "flight-123", "20260430-120000")
 
-    video_export._prepare_export_dirs(temp_dir, debug_dir)
+    video_export._prepare_export_dirs(export_root, temp_dir, debug_dir)
 
     assert temp_dir == tmp_path / "temp-images" / "job-123"
     assert debug_dir == tmp_path / "temp-images" / "job-123" / "debug"
@@ -230,8 +280,8 @@ def test_stream_export_cleanup_removes_temp_dir_on_error(tmp_path):
 def test_cleanup_video_export_temp_files_uses_configured_temp_dir(tmp_path, monkeypatch):
     temp_root = tmp_path / "configured-temp-images"
     export_root = tmp_path / "configured-video-exports"
-    monkeypatch.setattr(video_export_manual, "VIDEO_TEMP_IMAGES_DIR", temp_root)
-    monkeypatch.setattr(video_export_manual, "VIDEO_EXPORT_DIR", export_root)
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: export_root)
 
     inactive_temp_dir = temp_root / "job-failed"
     active_temp_dir = temp_root / "job-active"
@@ -255,8 +305,8 @@ def test_cleanup_video_export_temp_files_uses_configured_temp_dir(tmp_path, monk
 def test_cleanup_video_export_temp_files_removes_configured_orphan_temp_dirs(tmp_path, monkeypatch):
     temp_root = tmp_path / "configured-temp-images"
     export_root = tmp_path / "configured-video-exports"
-    monkeypatch.setattr(video_export_manual, "VIDEO_TEMP_IMAGES_DIR", temp_root)
-    monkeypatch.setattr(video_export_manual, "VIDEO_EXPORT_DIR", export_root)
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: export_root)
 
     orphan_temp_dir = temp_root / "orphan-job"
     orphan_temp_dir.mkdir(parents=True)
@@ -273,8 +323,8 @@ def test_cleanup_video_export_temp_files_removes_configured_orphan_temp_dirs(tmp
 def test_cleanup_video_export_temp_files_keeps_fresh_orphan_temp_dirs(tmp_path, monkeypatch):
     temp_root = tmp_path / "configured-temp-images"
     export_root = tmp_path / "configured-video-exports"
-    monkeypatch.setattr(video_export_manual, "VIDEO_TEMP_IMAGES_DIR", temp_root)
-    monkeypatch.setattr(video_export_manual, "VIDEO_EXPORT_DIR", export_root)
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: export_root)
 
     fresh_temp_dir = temp_root / "fresh-job"
     fresh_temp_dir.mkdir(parents=True)
@@ -291,8 +341,8 @@ def test_cleanup_video_export_temp_files_removes_legacy_frames_for_inactive_job(
 ):
     temp_root = tmp_path / "configured-temp-images"
     export_root = tmp_path / "configured-video-exports"
-    monkeypatch.setattr(video_export_manual, "VIDEO_TEMP_IMAGES_DIR", temp_root)
-    monkeypatch.setattr(video_export_manual, "VIDEO_EXPORT_DIR", export_root)
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: export_root)
 
     legacy_frames_dir = export_root / "frames_job-cancelled"
     legacy_frames_dir.mkdir(parents=True)
