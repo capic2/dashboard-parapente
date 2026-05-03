@@ -10,7 +10,8 @@ export function getExportFrameTargetIndex(
   totalFrames: number,
   totalPositions: number
 ): number {
-  return getExportFrameTarget(frameIndex, totalFrames, totalPositions).nextIndex;
+  const target = getExportFrameTarget(frameIndex, totalFrames, totalPositions);
+  return target.ratio >= 0.5 ? target.nextIndex : target.previousIndex;
 }
 
 export function getExportFrameTarget(

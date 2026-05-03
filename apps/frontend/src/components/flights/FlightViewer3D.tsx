@@ -267,6 +267,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     DEFAULT_CAMERA_TRANSITION_PERCENT
   );
   const cameraTargetRef = useRef<Cartesian3 | null>(null);
+  const currentTimestampRef = useRef<number | null>(null);
   const containerDivRef = useRef<HTMLDivElement>(null);
   const viewerUnitsRef = useRef<ViewerUnits>(viewerUnits);
 
@@ -1105,10 +1106,17 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         scenePosition.ratio >= 0.5
           ? scenePosition.nextIndex
           : scenePosition.previousIndex;
+      currentTimestampRef.current = scenePosition.timestamp;
       visiblePositionsRef.current = allPositionsRef.current.slice(
         0,
-        scenePosition.nextIndex + 1
+        scenePosition.previousIndex + 1
       );
+      if (scenePosition.ratio > 0) {
+        visiblePositionsRef.current = [
+          ...visiblePositionsRef.current,
+          scenePosition.position,
+        ];
+      }
 
       if (timestampsRef.current.length > 0) {
         const startTimestamp = timestampsRef.current[0];
@@ -1261,6 +1269,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
     realTimeStartRef.current = performance.now();
     gpxStartTimeRef.current =
+      currentTimestampRef.current ??
       timestampsRef.current[currentIndexRef.current] ??
       timestampsRef.current[0] ??
       0;
@@ -1653,11 +1662,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           .flight-viewer-export-only .cesium-viewer-timelineContainer,
           .flight-viewer-export-only .cesium-viewer-fullscreenContainer,
           .flight-viewer-export-only .cesium-infoBox,
-          .flight-viewer-export-only .cesium-selection-wrapper,
-          .flight-viewer-export-only .cesium-credit-logoContainer,
-          .flight-viewer-export-only .cesium-credit-textContainer,
-          .flight-viewer-export-only .cesium-credit-expand-link,
-          .flight-viewer-export-only .cesium-credit-lightbox-overlay {
+          .flight-viewer-export-only .cesium-selection-wrapper {
             display: none !important;
           }
         `}</style>

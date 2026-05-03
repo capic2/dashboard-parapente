@@ -312,7 +312,7 @@ describe('FlightViewer3D video export mode', () => {
     render(<FlightViewer3D flightId="flight-1" exportOnly />);
 
     await waitFor(() => {
-      expect(viewerOptions.at(-1)).toMatchObject({
+      expect(viewerOptions[viewerOptions.length - 1]).toMatchObject({
         animation: false,
         timeline: false,
         baseLayerPicker: false,

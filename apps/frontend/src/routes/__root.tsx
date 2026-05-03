@@ -8,7 +8,16 @@ import { appVersionQueryOptions } from '../hooks/common/useAppVersion';
 import { useVersionUpdates } from '../hooks/common/useVersionUpdates';
 
 export const Route = createRootRoute({
-  loader: () => queryClient.ensureQueryData(appVersionQueryOptions()),
+  loader: ({ location }) => {
+    if (
+      location.pathname === '/login' ||
+      location.pathname === '/export-viewer'
+    ) {
+      return null;
+    }
+
+    return queryClient.ensureQueryData(appVersionQueryOptions());
+  },
   component: RootComponent,
   pendingComponent: PendingComponent,
 });
