@@ -2,11 +2,24 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { apiGet, apiPost, invalidateQueries, mockFlight, viewerOptions } =
-  vi.hoisted(() => ({
+const {
+  apiGet,
+  apiPost,
+  invalidateQueries,
+  mockFlight,
+  viewerInstances,
+  viewerOptions,
+} = vi.hoisted(() => ({
     apiGet: vi.fn(),
     apiPost: vi.fn(),
     invalidateQueries: vi.fn(),
+    viewerInstances: [] as {
+      render: ReturnType<typeof vi.fn>;
+      scene: {
+        requestRender: ReturnType<typeof vi.fn>;
+        render: ReturnType<typeof vi.fn>;
+      };
+    }[],
     viewerOptions: [] as unknown[],
     mockFlight: {
       gpx_file_path: 'sample.gpx',
@@ -82,9 +95,11 @@ vi.mock('cesium', () => {
     };
     shadows = false;
     terrainShadows = 0;
+    render = vi.fn();
 
     constructor(_container: Element, options: unknown) {
       viewerOptions.push(options);
+      viewerInstances.push(this);
     }
 
     isDestroyed() {
@@ -247,10 +262,13 @@ describe('FlightViewer3D video export mode', () => {
     apiGet.mockReset();
     apiPost.mockClear();
     invalidateQueries.mockClear();
+    viewerInstances.length = 0;
     viewerOptions.length = 0;
     mockFlight.video_export_status = null;
     mockFlight.video_export_job_id = null;
     mockFlight.video_file_path = null;
+    window._exportMode = undefined;
+    window._setExportFrame = undefined;
   });
 
   afterEach(() => {
@@ -276,6 +294,8 @@ describe('FlightViewer3D video export mode', () => {
         originalClientWidth
       );
     }
+    window._exportMode = undefined;
+    window._setExportFrame = undefined;
   });
 
   it('starts fast smooth export by default and shows its hint', async () => {
@@ -326,6 +346,23 @@ describe('FlightViewer3D video export mode', () => {
         selectionIndicator: false,
       });
     });
+  });
+
+  it('renders the full Cesium viewer after setting an export frame', async () => {
+    window._exportMode = 'manual_render';
+
+    render(<FlightViewer3D flightId="flight-1" exportOnly />);
+
+    await waitFor(() => {
+      expect(window._setExportFrame).toBeTypeOf('function');
+    });
+
+    const viewer = viewerInstances[viewerInstances.length - 1];
+    const frameState = window._setExportFrame?.(1, 2);
+
+    expect(frameState).toMatchObject({ progress: 100, tilesLoaded: true });
+    expect(viewer.scene.requestRender).toHaveBeenCalled();
+    expect(viewer.render).toHaveBeenCalled();
   });
 
   it('starts max quality export after switching mode', async () => {

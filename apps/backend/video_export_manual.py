@@ -1114,7 +1114,8 @@ async def _export_video_manual_render(job_id: str):
                     tiles_loaded = await page.evaluate("""
                         () => {
                             const viewer = window._cesiumViewer;
-                            viewer.scene.render(viewer.clock.currentTime);
+                            viewer.scene.requestRender();
+                            viewer.render();
                             return viewer.scene.globe.tilesLoaded;
                         }
                     """)
