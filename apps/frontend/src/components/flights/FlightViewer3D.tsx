@@ -37,7 +37,7 @@ import {
   DEFAULT_CAMERA_TRANSITION_PERCENT,
   getFlightCameraDistance,
 } from '../../utils/cameraDistanceProfile';
-import { getExportFrameTargetIndex } from '../../utils/videoExportFrame';
+import { getExportFrameTarget } from '../../utils/videoExportFrame';
 import { api } from '../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../hooks/useToast';
@@ -101,6 +101,7 @@ declare global {
     ) => {
       index: number;
       progress: number;
+      ratio: number;
       tilesLoaded: boolean;
     };
     _getExportMetadata?: () => {
@@ -114,7 +115,27 @@ interface FlightViewer3DProps {
   flightId: string;
   flightTitle?: string;
   compact?: boolean;
+  exportOnly?: boolean;
 }
+
+interface ScenePositionState {
+  position: Cartesian3;
+  previousIndex: number;
+  nextIndex: number;
+  ratio: number;
+  timestamp: number;
+}
+
+const interpolatePosition = (
+  start: Cartesian3,
+  end: Cartesian3,
+  ratio: number
+) =>
+  new Cartesian3(
+    start.x + (end.x - start.x) * ratio,
+    start.y + (end.y - start.y) * ratio,
+    start.z + (end.z - start.z) * ratio
+  );
 
 /**
  * AccordionSection - Collapsible section component for control panel
@@ -172,6 +193,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   flightId,
   flightTitle,
   compact = false,
+  exportOnly = false,
 }) => {
   const { t } = useTranslation();
   const resolvedFlightTitle = flightTitle || t('flights.viewer.defaultTitle');
@@ -235,7 +257,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const cursorPositionPropertyRef = useRef<ConstantPositionProperty | null>(
     null
   );
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const cameraHeadingRef = useRef<number>(0);
   const cameraDistanceRef = useRef<number>(500);
   const cameraCloseZoomPercentRef = useRef<number>(
@@ -245,6 +267,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     DEFAULT_CAMERA_TRANSITION_PERCENT
   );
   const cameraTargetRef = useRef<Cartesian3 | null>(null);
+  const currentTimestampRef = useRef<number | null>(null);
   const containerDivRef = useRef<HTMLDivElement>(null);
   const viewerUnitsRef = useRef<ViewerUnits>(viewerUnits);
 
@@ -354,9 +377,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           animation: false,
           timeline: false,
           baseLayerPicker: false,
+          geocoder: false,
+          homeButton: false,
           fullscreenButton: false,
           navigationHelpButton: false,
           sceneModePicker: false,
+          vrButton: false,
           infoBox: false,
           selectionIndicator: false,
         });
@@ -675,9 +701,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
     return () => {
       // Reset play state when changing flights
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
       isPlayingRef.current = false;
       setIsPlaying(false);
@@ -913,6 +939,15 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const compactToggleButtonClassName = compact
     ? 'px-1.5 py-0.5 text-xs'
     : 'px-2 py-1 text-sm';
+  let viewerHeight = '600px';
+  if (exportOnly || isFullscreen) {
+    viewerHeight = '100%';
+  } else if (compact) {
+    viewerHeight = '420px';
+  }
+  const rootClassName = exportOnly
+    ? 'flight-viewer-export-only absolute inset-0 h-full w-full overflow-hidden bg-black'
+    : 'relative w-full overflow-hidden bg-gray-900';
 
   const toggleFullscreen = () => {
     if (!containerDivRef.current) return;
@@ -928,89 +963,255 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
   };
 
-  const setSceneToIndex = useCallback((targetIndex: number) => {
-    const lastIndex = allPositionsRef.current.length - 1;
-    if (lastIndex < 0) {
-      return { index: 0, progress: 0, tilesLoaded: false };
-    }
-
-    const safeIndex = Math.min(Math.max(targetIndex, 0), lastIndex);
-    currentIndexRef.current = safeIndex;
-    visiblePositionsRef.current = allPositionsRef.current.slice(
-      0,
-      safeIndex + 1
-    );
-
-    if (timestampsRef.current.length > 0) {
-      const currentTimestamp = timestampsRef.current[safeIndex];
-      const startTimestamp = timestampsRef.current[0];
-      setCurrentElapsedTime((currentTimestamp - startTimestamp) / 1000);
-    }
-
-    if (
-      cursorPositionPropertyRef.current &&
-      allPositionsRef.current[safeIndex]
-    ) {
-      cursorPositionPropertyRef.current.setValue(
-        allPositionsRef.current[safeIndex]
-      );
-    }
-
-    const viewer = viewerRef.current;
-    if (viewer && !viewer.isDestroyed()) {
-      const currentPosition = allPositionsRef.current[safeIndex];
-      const heading = cameraHeadingRef.current;
-      const progress = lastIndex > 0 ? safeIndex / lastIndex : 0;
-      const distance = getFlightCameraDistance({
-        progress,
-        baseDistance: cameraDistanceRef.current,
-        closeZoomPercent: cameraCloseZoomPercentRef.current,
-        transitionPercent: cameraTransitionPercentRef.current,
-      });
-      const pitch = -0.05;
-
-      cameraTargetRef.current = currentPosition;
-      viewer.camera.setView({
-        destination: currentPosition,
-        orientation: {
-          heading,
-          pitch,
-          roll: 0,
-        },
-      });
-      viewer.camera.moveBackward(distance);
-
-      const cameraCartographic = Cartographic.fromCartesian(
-        viewer.camera.position
-      );
-      const globe = viewer.scene.globe;
-      const terrainHeight = globe.getHeight(cameraCartographic);
-
-      if (
-        terrainHeight !== undefined &&
-        cameraCartographic.height < terrainHeight + 50
-      ) {
-        cameraCartographic.height = terrainHeight + 50;
-        viewer.camera.position = Cartesian3.fromRadians(
-          cameraCartographic.longitude,
-          cameraCartographic.latitude,
-          cameraCartographic.height
-        );
+  const getScenePositionFromTimestamp = useCallback(
+    (targetTimestamp: number): ScenePositionState | null => {
+      const positions = allPositionsRef.current;
+      const timestamps = timestampsRef.current;
+      const lastIndex = positions.length - 1;
+      if (lastIndex < 0) {
+        return null;
       }
 
-      viewer.scene.requestRender();
-      viewer.scene.render(viewer.clock.currentTime);
-    }
+      if (timestamps.length !== positions.length || timestamps.length < 2) {
+        const safeIndex = Math.min(
+          Math.max(currentIndexRef.current, 0),
+          lastIndex
+        );
+        return {
+          position: positions[safeIndex],
+          previousIndex: safeIndex,
+          nextIndex: safeIndex,
+          ratio: 0,
+          timestamp: timestamps[safeIndex] ?? 0,
+        };
+      }
 
-    const progress = lastIndex > 0 ? (safeIndex / lastIndex) * 100 : 0;
-    setCurrentProgress(progress);
+      if (targetTimestamp <= timestamps[0]) {
+        return {
+          position: positions[0],
+          previousIndex: 0,
+          nextIndex: 0,
+          ratio: 0,
+          timestamp: timestamps[0],
+        };
+      }
 
-    return {
-      index: safeIndex,
-      progress,
-      tilesLoaded: Boolean(viewer?.scene.globe.tilesLoaded),
-    };
-  }, []);
+      if (targetTimestamp >= timestamps[lastIndex]) {
+        return {
+          position: positions[lastIndex],
+          previousIndex: lastIndex,
+          nextIndex: lastIndex,
+          ratio: 0,
+          timestamp: timestamps[lastIndex],
+        };
+      }
+
+      let nextIndex = Math.max(currentIndexRef.current + 1, 1);
+      if (timestamps[nextIndex] < targetTimestamp) {
+        while (
+          nextIndex < timestamps.length - 1 &&
+          timestamps[nextIndex] < targetTimestamp
+        ) {
+          nextIndex += 1;
+        }
+      } else {
+        while (
+          nextIndex > 1 &&
+          timestamps[nextIndex - 1] > targetTimestamp
+        ) {
+          nextIndex -= 1;
+        }
+      }
+
+      const previousIndex = nextIndex - 1;
+      const previousTimestamp = timestamps[previousIndex];
+      const nextTimestamp = timestamps[nextIndex];
+      const segmentDuration = nextTimestamp - previousTimestamp;
+      const ratio =
+        segmentDuration > 0
+          ? Math.min(
+              Math.max(
+                (targetTimestamp - previousTimestamp) / segmentDuration,
+                0
+              ),
+              1
+            )
+          : 0;
+
+      return {
+        position: interpolatePosition(
+          positions[previousIndex],
+          positions[nextIndex],
+          ratio
+        ),
+        previousIndex,
+        nextIndex,
+        ratio,
+        timestamp: targetTimestamp,
+      };
+    },
+    []
+  );
+
+  const getScenePositionFromProgress = useCallback(
+    (targetProgress: number): ScenePositionState | null => {
+      const positions = allPositionsRef.current;
+      const lastIndex = positions.length - 1;
+      if (lastIndex < 0) {
+        return null;
+      }
+
+      const progress = Math.min(Math.max(targetProgress, 0), 1);
+      const timestamps = timestampsRef.current;
+      if (timestamps.length === positions.length && timestamps.length > 1) {
+        const startTimestamp = timestamps[0];
+        const endTimestamp = timestamps[timestamps.length - 1];
+        const durationMs = endTimestamp - startTimestamp;
+
+        if (durationMs > 0) {
+          return getScenePositionFromTimestamp(
+            startTimestamp + durationMs * progress
+          );
+        }
+      }
+
+      const exactIndex = progress * lastIndex;
+      const previousIndex = Math.floor(exactIndex);
+      const nextIndex = Math.ceil(exactIndex);
+      const ratio = exactIndex - previousIndex;
+
+      return {
+        position: interpolatePosition(
+          positions[previousIndex],
+          positions[nextIndex],
+          ratio
+        ),
+        previousIndex,
+        nextIndex,
+        ratio,
+        timestamp: timestamps[previousIndex] ?? 0,
+      };
+    },
+    [getScenePositionFromTimestamp]
+  );
+
+  const applyScenePosition = useCallback(
+    (scenePosition: ScenePositionState, smoothCamera: boolean) => {
+      const lastIndex = allPositionsRef.current.length - 1;
+      if (lastIndex < 0) {
+        return { index: 0, progress: 0, ratio: 0, tilesLoaded: false };
+      }
+
+      currentIndexRef.current =
+        scenePosition.ratio >= 0.5
+          ? scenePosition.nextIndex
+          : scenePosition.previousIndex;
+      currentTimestampRef.current = scenePosition.timestamp;
+      visiblePositionsRef.current = allPositionsRef.current.slice(
+        0,
+        scenePosition.previousIndex + 1
+      );
+      if (scenePosition.ratio > 0) {
+        visiblePositionsRef.current = [
+          ...visiblePositionsRef.current,
+          scenePosition.position,
+        ];
+      }
+
+      if (timestampsRef.current.length > 0) {
+        const startTimestamp = timestampsRef.current[0];
+        setCurrentElapsedTime((scenePosition.timestamp - startTimestamp) / 1000);
+      }
+
+      if (cursorPositionPropertyRef.current) {
+        cursorPositionPropertyRef.current.setValue(scenePosition.position);
+      }
+
+      const viewer = viewerRef.current;
+      if (viewer && !viewer.isDestroyed()) {
+        const heading = cameraHeadingRef.current;
+        const progress =
+          lastIndex > 0
+            ? (scenePosition.previousIndex + scenePosition.ratio) / lastIndex
+            : 0;
+        const distance = getFlightCameraDistance({
+          progress,
+          baseDistance: cameraDistanceRef.current,
+          closeZoomPercent: cameraCloseZoomPercentRef.current,
+          transitionPercent: cameraTransitionPercentRef.current,
+        });
+        const pitch = -0.05;
+
+        if (!smoothCamera || !cameraTargetRef.current) {
+          cameraTargetRef.current = scenePosition.position;
+        } else {
+          const lerpFactor = 0.08;
+          cameraTargetRef.current = interpolatePosition(
+            cameraTargetRef.current,
+            scenePosition.position,
+            lerpFactor
+          );
+        }
+
+        viewer.camera.setView({
+          destination: cameraTargetRef.current,
+          orientation: {
+            heading,
+            pitch,
+            roll: 0,
+          },
+        });
+        viewer.camera.moveBackward(distance);
+
+        const cameraCartographic = Cartographic.fromCartesian(
+          viewer.camera.position
+        );
+        const globe = viewer.scene.globe;
+        const terrainHeight = globe.getHeight(cameraCartographic);
+
+        if (
+          terrainHeight !== undefined &&
+          cameraCartographic.height < terrainHeight + 50
+        ) {
+          cameraCartographic.height = terrainHeight + 50;
+          viewer.camera.position = Cartesian3.fromRadians(
+            cameraCartographic.longitude,
+            cameraCartographic.latitude,
+            cameraCartographic.height
+          );
+        }
+
+        viewer.scene.requestRender();
+        viewer.scene.render(viewer.clock.currentTime);
+      }
+
+      let progress = 0;
+      if (timestampsRef.current.length > 1) {
+        progress =
+          ((scenePosition.timestamp - timestampsRef.current[0]) /
+            Math.max(
+              timestampsRef.current[timestampsRef.current.length - 1] -
+                timestampsRef.current[0],
+              1
+            )) *
+          100;
+      } else if (lastIndex > 0) {
+        progress =
+          ((scenePosition.previousIndex + scenePosition.ratio) / lastIndex) *
+          100;
+      }
+      const safeProgress = Math.min(Math.max(progress, 0), 100);
+      setCurrentProgress(safeProgress);
+
+      return {
+        index: currentIndexRef.current,
+        progress: safeProgress,
+        ratio: scenePosition.ratio,
+        tilesLoaded: Boolean(viewer?.scene.globe.tilesLoaded),
+      };
+    },
+    []
+  );
 
   useEffect(() => {
     if (
@@ -1024,13 +1225,18 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
 
     window._setExportFrame = (frameIndex: number, totalFrames: number) => {
-      const targetIndex = getExportFrameTargetIndex(
+      const target = getExportFrameTarget(
         frameIndex,
         totalFrames,
         allPositionsRef.current.length
       );
+      const scenePosition = getScenePositionFromProgress(target.progress);
 
-      return setSceneToIndex(targetIndex);
+      if (!scenePosition) {
+        return { index: 0, progress: 0, ratio: 0, tilesLoaded: false };
+      }
+
+      return applyScenePosition(scenePosition, false);
     };
 
     window._getExportMetadata = () => ({
@@ -1048,156 +1254,68 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   }, [
     gpxData?.coordinates?.length,
     gpxData?.flight_duration_seconds,
-    setSceneToIndex,
+    applyScenePosition,
+    getScenePositionFromProgress,
     viewerReady,
   ]);
 
   const play = useCallback(() => {
-    if (intervalRef.current || allPositionsRef.current.length === 0) return;
+    if (animationFrameRef.current || allPositionsRef.current.length === 0) {
+      return;
+    }
 
     isPlayingRef.current = true;
     setIsPlaying(true);
 
-    realTimeStartRef.current = Date.now();
-    gpxStartTimeRef.current = timestampsRef.current[currentIndexRef.current];
+    realTimeStartRef.current = performance.now();
+    gpxStartTimeRef.current =
+      currentTimestampRef.current ??
+      timestampsRef.current[currentIndexRef.current] ??
+      timestampsRef.current[0] ??
+      0;
 
-    intervalRef.current = setInterval(() => {
-      if (currentIndexRef.current >= allPositionsRef.current.length - 1) {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
+    const step = (now: number) => {
+      const lastTimestamp =
+        timestampsRef.current[timestampsRef.current.length - 1];
+      if (!isPlayingRef.current || gpxStartTimeRef.current >= lastTimestamp) {
+        animationFrameRef.current = null;
         isPlayingRef.current = false;
         setIsPlaying(false);
         return;
       }
 
-      // Utiliser la vitesse directement (x1 = temps réel, x10 par défaut)
       const speed = speedRef.current;
-      const elapsedRealTime = Date.now() - realTimeStartRef.current;
+      const elapsedRealTime = now - realTimeStartRef.current;
       const elapsedGpxTime = elapsedRealTime * speed;
       const targetGpxTime = gpxStartTimeRef.current + elapsedGpxTime;
+      const scenePosition = getScenePositionFromTimestamp(targetGpxTime);
 
-      let targetIndex = currentIndexRef.current;
-      for (
-        let i = currentIndexRef.current;
-        i < timestampsRef.current.length;
-        i++
-      ) {
-        if (timestampsRef.current[i] <= targetGpxTime) {
-          targetIndex = i;
-        } else {
-          break;
+      if (!scenePosition || scenePosition.timestamp >= lastTimestamp) {
+        const endPosition = getScenePositionFromProgress(1);
+        if (endPosition) {
+          applyScenePosition(endPosition, true);
         }
+        animationFrameRef.current = null;
+        isPlayingRef.current = false;
+        setIsPlaying(false);
+        return;
       }
 
-      if (targetIndex > currentIndexRef.current) {
-        currentIndexRef.current = targetIndex;
-        visiblePositionsRef.current = allPositionsRef.current.slice(
-          0,
-          currentIndexRef.current + 1
-        );
+      applyScenePosition(scenePosition, true);
+      animationFrameRef.current = requestAnimationFrame(step);
+    };
 
-        // Calculate elapsed time
-        if (timestampsRef.current.length > 0) {
-          const currentTimestamp =
-            timestampsRef.current[currentIndexRef.current];
-          const startTimestamp = timestampsRef.current[0];
-          const elapsedMs = currentTimestamp - startTimestamp;
-          setCurrentElapsedTime(elapsedMs / 1000); // Convert to seconds
-        }
-
-        if (cursorPositionPropertyRef.current) {
-          cursorPositionPropertyRef.current.setValue(
-            allPositionsRef.current[currentIndexRef.current]
-          );
-        }
-
-        // Suivre le curseur avec la caméra
-        const viewer = viewerRef.current;
-        if (viewer && !viewer.isDestroyed()) {
-          const currentPosition =
-            allPositionsRef.current[currentIndexRef.current];
-          const heading = cameraHeadingRef.current;
-          const progress =
-            allPositionsRef.current.length > 1
-              ? currentIndexRef.current / (allPositionsRef.current.length - 1)
-              : 0;
-          const distance = getFlightCameraDistance({
-            progress,
-            baseDistance: cameraDistanceRef.current,
-            closeZoomPercent: cameraCloseZoomPercentRef.current,
-            transitionPercent: cameraTransitionPercentRef.current,
-          });
-          const pitch = -0.05;
-
-          // Smooth lerp vers la position actuelle
-          if (!cameraTargetRef.current) {
-            cameraTargetRef.current = currentPosition;
-          } else {
-            const lerpFactor = 0.08;
-            cameraTargetRef.current = new Cartesian3(
-              cameraTargetRef.current.x +
-                (currentPosition.x - cameraTargetRef.current.x) * lerpFactor,
-              cameraTargetRef.current.y +
-                (currentPosition.y - cameraTargetRef.current.y) * lerpFactor,
-              cameraTargetRef.current.z +
-                (currentPosition.z - cameraTargetRef.current.z) * lerpFactor
-            );
-          }
-
-          // Use setView instead of lookAt for better control
-          viewer.camera.setView({
-            destination: cameraTargetRef.current,
-            orientation: {
-              heading,
-              pitch,
-              roll: 0,
-            },
-          });
-
-          // Move camera back by distance
-          viewer.camera.moveBackward(distance);
-
-          // Check terrain collision and adjust camera height if needed
-          const cameraCartographic = Cartographic.fromCartesian(
-            viewer.camera.position
-          );
-          const globe = viewer.scene.globe;
-          const terrainHeight = globe.getHeight(cameraCartographic);
-
-          if (
-            terrainHeight !== undefined &&
-            cameraCartographic.height < terrainHeight + 50
-          ) {
-            // Camera is too low, lift it above terrain (minimum 50m above ground)
-            cameraCartographic.height = terrainHeight + 50;
-            viewer.camera.position = Cartesian3.fromRadians(
-              cameraCartographic.longitude,
-              cameraCartographic.latitude,
-              cameraCartographic.height
-            );
-          }
-        }
-
-        // Mettre à jour le slider de progression
-        const progress =
-          (currentIndexRef.current / (allPositionsRef.current.length - 1)) *
-          100;
-        setCurrentProgress(progress);
-
-        // Forcer le rendu Cesium pour mettre à jour la polyline progressive
-        if (viewerRef.current && !viewerRef.current.isDestroyed()) {
-          viewerRef.current.scene.requestRender();
-        }
-      }
-    }, 16);
-  }, []);
+    animationFrameRef.current = requestAnimationFrame(step);
+  }, [
+    applyScenePosition,
+    getScenePositionFromProgress,
+    getScenePositionFromTimestamp,
+  ]);
 
   const pause = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
     }
     isPlayingRef.current = false;
     setIsPlaying(false);
@@ -1239,32 +1357,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         pause();
       }
 
-      // Calculer le nouvel index
-      const newIndex = Math.floor(
-        (value / 100) * (allPositionsRef.current.length - 1)
-      );
-      currentIndexRef.current = newIndex;
-      setCurrentProgress(value);
-
-      // Mettre à jour la trace visible
-      visiblePositionsRef.current = allPositionsRef.current.slice(
-        0,
-        newIndex + 1
-      );
-
-      // Mettre à jour le curseur
-      if (
-        cursorPositionPropertyRef.current &&
-        allPositionsRef.current[newIndex]
-      ) {
-        cursorPositionPropertyRef.current.setValue(
-          allPositionsRef.current[newIndex]
-        );
-      }
-
-      // Forcer le rendu
-      if (viewerRef.current && !viewerRef.current.isDestroyed()) {
-        viewerRef.current.scene.requestRender();
+      const scenePosition = getScenePositionFromProgress(value / 100);
+      if (scenePosition) {
+        applyScenePosition(scenePosition, false);
       }
 
       // Reprendre la lecture si elle était active
@@ -1272,7 +1367,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         setTimeout(() => play(), 50);
       }
     },
-    [pause, play]
+    [applyScenePosition, getScenePositionFromProgress, pause, play]
   );
 
   const handleSpeedChange = (value: number) => {
@@ -1549,14 +1644,34 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   return (
     <div
       ref={containerDivRef}
-      className="relative w-full bg-gray-900"
-      style={{ height: isFullscreen ? '100vh' : compact ? '420px' : '600px' }}
+      className={rootClassName}
+      style={{ height: viewerHeight }}
+      data-testid="flight-viewer-root"
     >
+      {exportOnly && (
+        <style>{`
+          .flight-viewer-export-only .cesium-viewer,
+          .flight-viewer-export-only .cesium-widget,
+          .flight-viewer-export-only .cesium-widget canvas {
+            width: 100% !important;
+            height: 100% !important;
+          }
+
+          .flight-viewer-export-only .cesium-viewer-toolbar,
+          .flight-viewer-export-only .cesium-viewer-animationContainer,
+          .flight-viewer-export-only .cesium-viewer-timelineContainer,
+          .flight-viewer-export-only .cesium-viewer-fullscreenContainer,
+          .flight-viewer-export-only .cesium-infoBox,
+          .flight-viewer-export-only .cesium-selection-wrapper {
+            display: none !important;
+          }
+        `}</style>
+      )}
       {/* Overlay for loading/error states */}
       {renderOverlay()}
 
       {/* Bouton plein écran */}
-      {gpxData?.coordinates && (
+      {gpxData?.coordinates && !exportOnly && (
         <Button
           onClick={toggleFullscreen}
           className={`absolute top-4 right-4 z-10 bg-gray-800 text-white rounded-lg shadow-lg hover:bg-gray-700 ${fullscreenButtonClassName}`}
@@ -1573,7 +1688,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       )}
 
       {/* Controls - only show when data is loaded */}
-      {gpxData?.coordinates && (
+      {gpxData?.coordinates && !exportOnly && (
         <div
           className={`absolute top-4 left-4 z-10 bg-white dark:bg-gray-800 rounded-lg shadow-lg transition-all ${panelClassName} max-h-[calc(100%-2rem)] overflow-hidden flex flex-col`}
         >
@@ -2233,7 +2348,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       )}
 
       {/* Cesium Container */}
-      <div ref={containerRef} className="w-full h-full" />
+      <div
+        ref={containerRef}
+        className={exportOnly ? 'absolute inset-0 h-full w-full' : 'h-full w-full'}
+      />
     </div>
   );
 };

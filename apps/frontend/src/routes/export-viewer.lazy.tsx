@@ -17,7 +17,7 @@ function ExportViewer() {
 
   if (!flightId) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="fixed inset-0 flex items-center justify-center bg-black">
         <p className="text-gray-600 dark:text-gray-300">
           No flight ID provided. Use ?flightId=xxx
         </p>
@@ -26,15 +26,15 @@ function ExportViewer() {
   }
 
   return (
-    <div className="w-full h-screen">
+    <div className="fixed inset-0 overflow-hidden bg-black">
       <Suspense
         fallback={
-          <div className="h-screen flex items-center justify-center text-gray-500 dark:text-gray-400">
+          <div className="flex h-screen items-center justify-center text-gray-500 dark:text-gray-400">
             Chargement...
           </div>
         }
       >
-        <FlightViewer3D flightId={flightId} />
+        <FlightViewer3D flightId={flightId} exportOnly />
       </Suspense>
     </div>
   );

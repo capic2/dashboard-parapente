@@ -2,18 +2,20 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { apiGet, apiPost, invalidateQueries, mockFlight } = vi.hoisted(() => ({
-  apiGet: vi.fn(),
-  apiPost: vi.fn(),
-  invalidateQueries: vi.fn(),
-  mockFlight: {
-    gpx_file_path: 'sample.gpx',
-    video_export_status: null as string | null,
-    video_export_job_id: null as string | null,
-    video_file_path: null as string | null,
-    site: null,
-  },
-}));
+const { apiGet, apiPost, invalidateQueries, mockFlight, viewerOptions } =
+  vi.hoisted(() => ({
+    apiGet: vi.fn(),
+    apiPost: vi.fn(),
+    invalidateQueries: vi.fn(),
+    viewerOptions: [] as unknown[],
+    mockFlight: {
+      gpx_file_path: 'sample.gpx',
+      video_export_status: null as string | null,
+      video_export_job_id: null as string | null,
+      video_file_path: null as string | null,
+      site: null,
+    },
+  }));
 
 vi.mock('cesium', () => {
   class Cartesian3 {
@@ -80,6 +82,10 @@ vi.mock('cesium', () => {
     };
     shadows = false;
     terrainShadows = 0;
+
+    constructor(_container: Element, options: unknown) {
+      viewerOptions.push(options);
+    }
 
     isDestroyed() {
       return false;
@@ -219,12 +225,29 @@ import { FlightViewer3D } from './FlightViewer3D';
 describe('FlightViewer3D video export mode', () => {
   const originalCreateObjectURL = URL.createObjectURL;
   const originalRevokeObjectURL = URL.revokeObjectURL;
+  const originalClientHeight = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    'clientHeight'
+  );
+  const originalClientWidth = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    'clientWidth'
+  );
 
   beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      value: 768,
+    });
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      value: 1024,
+    });
     apiPost.mockResolvedValue(undefined);
     apiGet.mockReset();
     apiPost.mockClear();
     invalidateQueries.mockClear();
+    viewerOptions.length = 0;
     mockFlight.video_export_status = null;
     mockFlight.video_export_job_id = null;
     mockFlight.video_file_path = null;
@@ -239,6 +262,20 @@ describe('FlightViewer3D video export mode', () => {
       configurable: true,
       value: originalRevokeObjectURL,
     });
+    if (originalClientHeight) {
+      Object.defineProperty(
+        HTMLElement.prototype,
+        'clientHeight',
+        originalClientHeight
+      );
+    }
+    if (originalClientWidth) {
+      Object.defineProperty(
+        HTMLElement.prototype,
+        'clientWidth',
+        originalClientWidth
+      );
+    }
   });
 
   it('starts fast smooth export by default and shows its hint', async () => {
@@ -251,6 +288,42 @@ describe('FlightViewer3D video export mode', () => {
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith('flights/flight-1/export-video', {
         searchParams: { mode: 'manual_fast' },
+      });
+    });
+  });
+
+  it('hides viewer controls in export-only mode', () => {
+    render(<FlightViewer3D flightId="flight-1" exportOnly />);
+
+    expect(screen.getByTestId('flight-viewer-root')).toHaveAttribute(
+      'style',
+      'height: 100%;'
+    );
+    expect(screen.getByTestId('flight-viewer-root')).toHaveClass(
+      'flight-viewer-export-only'
+    );
+    expect(screen.queryByText('Fast hint')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Generate video/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('disables Cesium interface widgets', async () => {
+    render(<FlightViewer3D flightId="flight-1" exportOnly />);
+
+    await waitFor(() => {
+      expect(viewerOptions[viewerOptions.length - 1]).toMatchObject({
+        animation: false,
+        timeline: false,
+        baseLayerPicker: false,
+        geocoder: false,
+        homeButton: false,
+        fullscreenButton: false,
+        navigationHelpButton: false,
+        sceneModePicker: false,
+        vrButton: false,
+        infoBox: false,
+        selectionIndicator: false,
       });
     });
   });
