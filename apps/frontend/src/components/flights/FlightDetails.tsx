@@ -2,15 +2,14 @@ import type { ChangeEvent } from 'react';
 import { useState, useRef, lazy, Suspense, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
+import { TextField, TextArea } from 'react-aria-components';
 import {
+  Button,
   Tab,
   TabList,
   TabPanel,
   Tabs,
-  TextField,
-  TextArea,
-} from 'react-aria-components';
-import { Button } from '@dashboard-parapente/design-system';
+} from '@dashboard-parapente/design-system';
 import {
   useUpdateFlight,
   useUploadGPXToFlight,
@@ -391,17 +390,11 @@ export function FlightDetails({
           onSelectionChange={(key) => setActiveTab(key as FlightDetailsTab)}
           className="space-y-4"
         >
-          <TabList className="grid grid-cols-2 gap-2 mb-4 bg-white dark:bg-gray-800 rounded-xl p-2 shadow-md">
-            <Tab
-              id="infos"
-              className="px-3 py-2 text-sm rounded-md transition-colors cursor-pointer bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 selected:bg-sky-600 selected:text-white outline-none"
-            >
+          <TabList className="mb-4 grid-cols-2">
+            <Tab id="infos" className="rounded-md px-3 py-2 text-sm">
               {t('flights.infoTab')}
             </Tab>
-            <Tab
-              id="replay"
-              className="px-3 py-2 text-sm rounded-md transition-colors cursor-pointer bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 selected:bg-sky-600 selected:text-white outline-none"
-            >
+            <Tab id="replay" className="rounded-md px-3 py-2 text-sm">
               {t('flights.replayTab')}
             </Tab>
           </TabList>

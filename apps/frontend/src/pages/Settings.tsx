@@ -1,8 +1,14 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { Switch, Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
-import { Button } from '@dashboard-parapente/design-system';
+import { Switch } from 'react-aria-components';
+import {
+  Button,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
+} from '@dashboard-parapente/design-system';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import {
   useWeatherSources,
@@ -1121,13 +1127,9 @@ export default function Settings() {
         className="space-y-4"
       >
         {/* Tabs Navigation */}
-        <TabList className="bg-white dark:bg-gray-800 rounded-xl shadow-md mb-4 p-2 grid grid-cols-2 gap-2 sm:flex">
+        <TabList className="mb-4 grid-cols-2 sm:flex">
           {(['general', 'sites', 'weather', 'data'] as const).map((tabKey) => (
-            <Tab
-              key={tabKey}
-              id={tabKey}
-              className="flex-1 px-4 py-2 rounded-lg font-medium transition-all cursor-pointer bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 selected:bg-sky-600 selected:text-white selected:shadow-md outline-none"
-            >
+            <Tab key={tabKey} id={tabKey} className="flex-1">
               {tabKey === 'general' && `🎛️ ${t('settings.tabs.general')}`}
               {tabKey === 'sites' && `📍 ${t('settings.tabs.favoriteSites')}`}
               {tabKey === 'weather' &&
