@@ -34,9 +34,11 @@ export const bestSpotQueryOptions = (dayIndex = 0) =>
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
-export const hourlyBestSpotsQueryOptions = (dayIndex = 0, hours = 24) =>
-  queryOptions<HourlyBestSpotsResult>({
-    queryKey: ['bestSpot', 'hourly', dayIndex, hours],
+export const hourlyBestSpotsQueryOptions = (dayIndex = 0, hours = 24) => {
+  const currentHour = dayIndex === 0 ? new Date().getHours() : null;
+
+  return queryOptions<HourlyBestSpotsResult>({
+    queryKey: ['bestSpot', 'hourly', dayIndex, hours, currentHour],
     queryFn: async () => {
       const params = new URLSearchParams({
         day_index: dayIndex.toString(),
@@ -46,10 +48,13 @@ export const hourlyBestSpotsQueryOptions = (dayIndex = 0, hours = 24) =>
       return HourlyBestSpotsResultSchema.parse(response);
     },
     staleTime: getStaleTime(1000 * 60 * 30),
+    refetchInterval: dayIndex === 0 ? 60_000 : false,
+    refetchOnWindowFocus: dayIndex === 0 ? 'always' : false,
     gcTime: 1000 * 60 * 60 * 2,
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
+};
 
 /**
  * Hook to fetch the best spot for a specific day

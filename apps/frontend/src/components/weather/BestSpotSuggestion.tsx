@@ -22,6 +22,7 @@ type HourlyBestSpot = BestSpotResult & { hour: number };
 interface BestSpotSuggestionProps {
   bestSpot: BestSpotResult | null;
   hourlyBestSpots?: HourlyBestSpot[];
+  hourlyStartHour?: number;
   onSelectSite: (siteId: string) => void;
   selectedDayIndex?: number;
   className?: string;
@@ -107,6 +108,7 @@ function getVerdict(paraIndex: number, verdict?: string) {
 export const BestSpotSuggestion = ({
   bestSpot,
   hourlyBestSpots = [],
+  hourlyStartHour,
   onSelectSite,
   selectedDayIndex = 0,
   className = '',
@@ -161,7 +163,6 @@ export const BestSpotSuggestion = ({
   const localizedReason = reason.replace(/Para-Index/g, t('weather.paraIndex'));
   const scoreColor = getScoreColor(adjustedScore);
   const verdictInfo = getVerdict(adjustedScore, verdict ?? undefined);
-  const nowHour = new Date().getHours();
 
   return (
     <div
@@ -350,7 +351,7 @@ export const BestSpotSuggestion = ({
                   hourlySpot.verdict ?? undefined
                 );
                 const hourLabel =
-                  selectedDayIndex === 0 && hourlySpot.hour === nowHour
+                  selectedDayIndex === 0 && hourlySpot.hour === hourlyStartHour
                     ? t('common.now')
                     : `${hourlySpot.hour}h`;
                 const roundedWindSpeed =
