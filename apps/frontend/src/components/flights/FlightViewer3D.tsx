@@ -137,6 +137,11 @@ const interpolatePosition = (
     start.z + (end.z - start.z) * ratio
   );
 
+const renderViewerFrame = (viewer: CesiumViewer) => {
+  viewer.scene.requestRender();
+  viewer.render();
+};
+
 /**
  * AccordionSection - Collapsible section component for control panel
  */
@@ -1180,8 +1185,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           );
         }
 
-        viewer.scene.requestRender();
-        viewer.scene.render(viewer.clock.currentTime);
+        renderViewerFrame(viewer);
       }
 
       let progress = 0;
