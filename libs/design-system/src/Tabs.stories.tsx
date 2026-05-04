@@ -41,8 +41,13 @@ export const Default = meta.story({
 });
 
 Default.test('shows selected tab state', async ({ canvas }) => {
-  await expect(canvas.getByRole('tab', { name: 'Weather' })).toHaveAttribute(
-    'data-selected'
+  const selectedTab = canvas.getByRole('tab', { name: 'Weather' });
+  const unselectedTab = canvas.getByRole('tab', { name: 'General' });
+
+  await expect(selectedTab).toHaveAttribute('data-selected');
+  await expect(unselectedTab).not.toHaveAttribute('data-selected');
+  expect(getComputedStyle(selectedTab).backgroundColor).not.toBe(
+    getComputedStyle(unselectedTab).backgroundColor
   );
 });
 
