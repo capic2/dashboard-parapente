@@ -82,6 +82,7 @@ export default function WeatherPage() {
         <BestSpotSuggestion
           bestSpot={bestSpot ?? null}
           hourlyBestSpots={hourlyBestSpots?.hours ?? []}
+          hourlyStartHour={hourlyBestSpots?.startHour}
           onSelectSite={(siteId) =>
             void navigate({
               to: '/weather',
