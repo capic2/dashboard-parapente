@@ -68,6 +68,3 @@ export function TabPanel({ className, ...props }: TabPanelProps) {
     />
   );
 }
-    />
-  );
-}
