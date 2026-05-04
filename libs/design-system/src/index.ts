@@ -6,6 +6,7 @@ export { Modal } from './Modal';
 export { Toast, ToastContainer } from './Toast';
 export { Button } from './Button';
 export type { ButtonProps } from './Button';
+export { Tab, TabList, TabPanel, Tabs } from './Tabs';
 export { DatePicker } from './components/DatePicker/DatePicker';
 export { Select } from './Select';
 export type { SelectOption } from './Select';
