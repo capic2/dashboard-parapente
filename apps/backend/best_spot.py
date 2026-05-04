@@ -527,7 +527,7 @@ async def calculate_best_spot_from_db(db: Session, day_index: int = 0) -> dict[s
 
 
 async def calculate_hourly_best_spots_from_cache(
-    db: Session, day_index: int = 0, hours: int = 8
+    db: Session, day_index: int = 0, hours: int = 24
 ) -> dict[str, Any] | None:
     """Calculate the best flying spot for each upcoming flyable hour."""
     from para_index import calculate_hourly_para_index, get_hourly_verdict
@@ -686,7 +686,7 @@ async def get_best_spot_cached(db: Session, day_index: int = 0) -> dict[str, Any
 
 
 async def get_hourly_best_spots_cached(
-    db: Session, day_index: int = 0, hours: int = 8
+    db: Session, day_index: int = 0, hours: int = 24
 ) -> dict[str, Any] | None:
     """Get hourly best spots from cache or calculate if not cached."""
     start_hour = datetime.now().hour if day_index == 0 else 0
