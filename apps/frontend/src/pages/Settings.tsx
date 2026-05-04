@@ -908,7 +908,10 @@ function PerformanceSection() {
               defaultValue={currentVideoTempImagesDir}
               placeholder="/app/video-temp-images"
               onBlur={(event) =>
-                handleBackendSetting('video_temp_images_dir', event.target.value)
+                handleBackendSetting(
+                  'video_temp_images_dir',
+                  event.target.value
+                )
               }
               className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
             />

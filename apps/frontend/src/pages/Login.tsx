@@ -28,10 +28,5 @@ export default function Login() {
     }
   };
 
-  return (
-    <LoginForm
-      onSubmit={handleSubmit}
-      errorMessage={errorMessage}
-    />
-  );
+  return <LoginForm onSubmit={handleSubmit} errorMessage={errorMessage} />;
 }

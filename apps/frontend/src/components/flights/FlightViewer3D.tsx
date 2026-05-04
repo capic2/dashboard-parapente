@@ -1020,10 +1020,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           nextIndex += 1;
         }
       } else {
-        while (
-          nextIndex > 1 &&
-          timestamps[nextIndex - 1] > targetTimestamp
-        ) {
+        while (nextIndex > 1 && timestamps[nextIndex - 1] > targetTimestamp) {
           nextIndex -= 1;
         }
       }
@@ -1125,7 +1122,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       if (timestampsRef.current.length > 0) {
         const startTimestamp = timestampsRef.current[0];
-        setCurrentElapsedTime((scenePosition.timestamp - startTimestamp) / 1000);
+        setCurrentElapsedTime(
+          (scenePosition.timestamp - startTimestamp) / 1000
+        );
       }
 
       if (cursorPositionPropertyRef.current) {
@@ -2354,7 +2353,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       {/* Cesium Container */}
       <div
         ref={containerRef}
-        className={exportOnly ? 'absolute inset-0 h-full w-full' : 'h-full w-full'}
+        className={
+          exportOnly ? 'absolute inset-0 h-full w-full' : 'h-full w-full'
+        }
       />
     </div>
   );

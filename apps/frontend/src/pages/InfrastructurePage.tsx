@@ -852,6 +852,6 @@ function GroupSection({
       )}
     </div>
   );
-// oxlint-disable-next-line max-lines
-// oxlint-disable-next-line max-lines
+  // oxlint-disable-next-line max-lines
+  // oxlint-disable-next-line max-lines
 }
