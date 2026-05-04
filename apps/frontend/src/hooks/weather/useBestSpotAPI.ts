@@ -20,6 +20,15 @@ import {
   type HourlyBestSpotsResult,
 } from '@dashboard-parapente/shared-types';
 
+const forecastHourFormatter = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: 'Europe/Paris',
+  hour: 'numeric',
+  hourCycle: 'h23',
+});
+
+const getCurrentForecastHour = () =>
+  Number.parseInt(forecastHourFormatter.format(new Date()), 10);
+
 export const bestSpotQueryOptions = (dayIndex = 0) =>
   queryOptions<BestSpotResult>({
     queryKey: ['bestSpot', dayIndex],
@@ -35,7 +44,7 @@ export const bestSpotQueryOptions = (dayIndex = 0) =>
   });
 
 export const hourlyBestSpotsQueryOptions = (dayIndex = 0, hours = 24) => {
-  const currentHour = dayIndex === 0 ? new Date().getHours() : null;
+  const currentHour = dayIndex === 0 ? getCurrentForecastHour() : null;
 
   return queryOptions<HourlyBestSpotsResult>({
     queryKey: ['bestSpot', 'hourly', dayIndex, hours, currentHour],
