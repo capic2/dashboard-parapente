@@ -10,6 +10,7 @@ This module provides functions to:
 import logging
 from datetime import date, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
@@ -17,6 +18,11 @@ from models import EmagramAnalysis as EmagramAnalysisModel
 from models import Site, WeatherForecast
 
 logger = logging.getLogger(__name__)
+FORECAST_TIME_ZONE = ZoneInfo("Europe/Paris")
+
+
+def _get_current_forecast_hour() -> int:
+    return datetime.now(FORECAST_TIME_ZONE).hour
 
 
 def _get_cache_functions():
@@ -541,7 +547,7 @@ async def calculate_hourly_best_spots_from_cache(
             logger.warning("No sites found in database")
             return None
 
-        start_hour = datetime.now().hour if day_index == 0 else 0
+        start_hour = _get_current_forecast_hour() if day_index == 0 else 0
         best_by_hour: dict[int, dict[str, Any]] = {}
 
         for site in sites:
@@ -689,7 +695,7 @@ async def get_hourly_best_spots_cached(
     db: Session, day_index: int = 0, hours: int = 24
 ) -> dict[str, Any] | None:
     """Get hourly best spots from cache or calculate if not cached."""
-    start_hour = datetime.now().hour if day_index == 0 else 0
+    start_hour = _get_current_forecast_hour() if day_index == 0 else 0
     cache_key = f"best_spot_hourly:day_{day_index}:start_{start_hour}:hours_{hours}"
     get_cached_func, set_cached_func, get_cache_ttl_func = _get_cache_functions()
 
