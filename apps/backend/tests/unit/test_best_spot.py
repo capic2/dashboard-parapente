@@ -334,6 +334,45 @@ async def test_calculate_hourly_best_spots_from_cache_can_change_by_hour(
 
 
 @pytest.mark.asyncio
+async def test_calculate_hourly_best_spots_from_cache_today_runs_until_sunset(
+    db_session, arguel_site
+):
+    """Test today's hourly winners cover current hour through sunset by default."""
+    mock_forecast = {
+        "success": True,
+        "sunrise": "07:00",
+        "sunset": "19:00",
+        "consensus": [
+            {
+                "hour": hour,
+                "wind_speed": 12,
+                "wind_gust": 10,
+                "wind_direction": 270,
+                "precipitation": 0,
+                "temperature": 20,
+                "lifted_index": 0,
+            }
+            for hour in range(12, 21)
+        ],
+    }
+
+    with (
+        patch("best_spot.datetime") as mock_datetime,
+        patch(
+            "weather_pipeline.get_normalized_forecast",
+            new=AsyncMock(return_value=mock_forecast),
+        ),
+    ):
+        mock_datetime.now.return_value.hour = 14
+        result = await calculate_hourly_best_spots_from_cache(db_session, day_index=0)
+
+    assert result is not None
+    assert result["dayIndex"] == 0
+    assert result["startHour"] == 14
+    assert [spot["hour"] for spot in result["hours"]] == [14, 15, 16, 17, 18, 19]
+
+
+@pytest.mark.asyncio
 async def test_calculate_best_spot_from_cache_low_scores(db_session, arguel_site):
     """Test best spot with low scores adds warning"""
 
