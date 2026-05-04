@@ -23,6 +23,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from best_spot import (
+    FORECAST_TIME_ZONE,
+    _get_current_forecast_hour,
     calculate_angle_difference,
     calculate_best_spot_from_cache,
     calculate_best_spot_from_db,
@@ -48,6 +50,16 @@ def test_parse_wind_direction_valid():
     assert parse_wind_direction("W") == 270
     assert parse_wind_direction("NE") == 45
     assert parse_wind_direction("SW") == 225
+
+
+def test_get_current_forecast_hour_uses_forecast_timezone():
+    """Test current forecast hour follows the weather forecast timezone."""
+    with patch("best_spot.datetime") as mock_datetime:
+        mock_datetime.now.return_value.hour = 16
+
+        assert _get_current_forecast_hour() == 16
+
+    mock_datetime.now.assert_called_once_with(FORECAST_TIME_ZONE)
 
 
 def test_parse_wind_direction_case_insensitive():
