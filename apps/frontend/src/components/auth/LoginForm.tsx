@@ -60,10 +60,7 @@ function LoginFieldView({
   );
 }
 
-export function LoginForm({
-  onSubmit,
-  errorMessage,
-}: LoginFormProps) {
+export function LoginForm({ onSubmit, errorMessage }: LoginFormProps) {
   const { t } = useTranslation();
   const s = styles();
 
