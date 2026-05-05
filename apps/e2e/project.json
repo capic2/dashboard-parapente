@@ -14,7 +14,7 @@
       "configurations": {
         "ci": {
           "headed": false,
-          "workers": 3
+          "workers": 1
         }
       }
     },
