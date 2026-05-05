@@ -17,7 +17,6 @@ import { useAppSettings } from '../../hooks/settings/useAppSettings';
 import { useWeather } from '../../hooks/weather/useWeather';
 import type { HourlyForecastItem } from '../../types';
 import CacheTimestamp from '../common/CacheTimestamp';
-import ScopeBadge from '../common/ScopeBadge';
 import WindArrow from './WindArrow';
 
 interface HourlyForecastProps {
@@ -261,11 +260,10 @@ const ParaIndexTooltip = ({
   const { t } = useTranslation();
   return (
     <div className="bg-white dark:bg-gray-800 border-2 border-sky-500 rounded-lg shadow-xl p-4 text-sm max-w-[320px]">
-      <div className="font-bold mb-3 text-sky-700 dark:text-sky-400 flex items-center justify-between gap-2 pr-8">
+      <div className="font-bold mb-3 text-sky-700 dark:text-sky-400 pr-8">
         <span>
           📊 {label} - {hour}
         </span>
-        <ScopeBadge scope="backendFrontend" />
       </div>
       <div className="space-y-2 text-gray-700 dark:text-gray-300">
         <div className="text-lg font-bold text-sky-600 dark:text-sky-400">
@@ -345,11 +343,10 @@ const VerdictTooltip = ({
 
   return (
     <div className="bg-white dark:bg-gray-800 border-2 border-emerald-500 rounded-lg shadow-xl p-4 text-sm max-w-[320px]">
-      <div className="font-bold mb-3 text-emerald-700 dark:text-emerald-400 flex items-center justify-between gap-2 pr-8">
+      <div className="font-bold mb-3 text-emerald-700 dark:text-emerald-400 pr-8">
         <span>
           ✓ {t('weather.verdictLabel')} - {hour}
         </span>
-        <ScopeBadge scope="backendFrontend" />
       </div>
       <div className="space-y-2 text-gray-700 dark:text-gray-300">
         <div className="text-lg font-bold capitalize text-emerald-600 dark:text-emerald-400">
@@ -387,9 +384,8 @@ const VerdictTooltip = ({
             ))}
           </div>
         </div>
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between gap-2">
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2 text-xs text-gray-500 dark:text-gray-400">
           <span>{t('weather.reasonsTextualFlyability')}</span>
-          <ScopeBadge scope="frontendOnly" />
         </div>
       </div>
     </div>
@@ -778,11 +774,7 @@ export default function HourlyForecast({
         <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
           Prévisions Horaires
         </h2>
-        <div className="flex items-center gap-2">
-          <ScopeBadge scope="backendFrontend" />
-          <ScopeBadge scope="frontendOnly" />
-          <CacheTimestamp cachedAt={weather.cached_at} />
-        </div>
+        <CacheTimestamp cachedAt={weather.cached_at} />
       </div>
 
       <div className="overflow-x-auto -mx-4 px-4">

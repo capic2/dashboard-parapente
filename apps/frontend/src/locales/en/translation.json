@@ -372,12 +372,6 @@
       "serverSaved": "Server setting saved",
       "serverError": "Error saving setting"
     },
-    "scope": {
-      "backendFrontend": "Backend + Frontend",
-      "frontendOnly": "Frontend only",
-      "backendFrontendHint": "Affects backend calculations and frontend display.",
-      "frontendOnlyHint": "Affects only labels and reasons displayed in the interface."
-    },
     "thresholds": {
       "title": "Weather thresholds",
       "description": "These thresholds drive backend Para-Index scoring and frontend display. Values save automatically when you leave the field.",
