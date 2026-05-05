@@ -11,7 +11,6 @@ from datetime import datetime
 from pathlib import Path
 
 import config
-from app_settings import get_setting
 from database import SessionLocal
 from models import Flight
 
@@ -22,17 +21,11 @@ _TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
 
 
 def _video_export_dir() -> Path:
-    with SessionLocal() as db:
-        path_value = get_setting("video_export_dir", db=db, default=config.VIDEO_EXPORT_DIR)
-    return Path(path_value)
+    return Path(config.VIDEO_EXPORT_DIR)
 
 
 def _video_temp_images_dir() -> Path:
-    with SessionLocal() as db:
-        path_value = get_setting(
-            "video_temp_images_dir", db=db, default=config.VIDEO_TEMP_IMAGES_DIR
-        )
-    return Path(path_value)
+    return Path(config.VIDEO_TEMP_IMAGES_DIR)
 
 
 def check_dependencies():

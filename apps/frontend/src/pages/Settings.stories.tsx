@@ -84,8 +84,6 @@ const mockSettings = {
   scheduler_interval_minutes: '30',
   redis_connect_timeout: '5',
   redis_socket_timeout: '5',
-  video_export_dir: '/app/video-exports',
-  video_temp_images_dir: '/app/video-temp-images',
 };
 
 export const defaultHandlers = [
