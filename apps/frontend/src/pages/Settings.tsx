@@ -16,7 +16,6 @@ import {
   useDeleteWeatherSource,
 } from '../hooks/weather/useWeatherSources';
 import { WeatherSourceCard } from '../components/settings/WeatherSourceCard';
-import ScopeBadge from '../components/common/ScopeBadge';
 import type { WeatherSource } from '../types/weatherSources';
 import { useThemeStore } from '../stores/themeStore';
 import type { ThemePreference } from '../stores/themeStore';
@@ -336,7 +335,6 @@ function PerformanceSection() {
   const thresholdSections = [
     {
       title: t('settings.thresholds.wind.title'),
-      scope: 'backendFrontend',
       help: t('settings.thresholds.wind.help'),
       fields: [
         {
@@ -377,7 +375,6 @@ function PerformanceSection() {
     },
     {
       title: t('settings.thresholds.gust.title'),
-      scope: 'backendFrontend',
       help: t('settings.thresholds.gust.help'),
       fields: [
         {
@@ -404,7 +401,6 @@ function PerformanceSection() {
     },
     {
       title: t('settings.thresholds.precipitation.title'),
-      scope: 'backendFrontend',
       help: t('settings.thresholds.precipitation.help'),
       fields: [
         {
@@ -443,7 +439,6 @@ function PerformanceSection() {
     },
     {
       title: t('settings.thresholds.instability.title'),
-      scope: 'backendFrontend',
       help: t('settings.thresholds.instability.help'),
       fields: [
         {
@@ -474,7 +469,6 @@ function PerformanceSection() {
     },
     {
       title: t('settings.thresholds.temperature.title'),
-      scope: 'backendFrontend',
       help: t('settings.thresholds.temperature.help'),
       fields: [
         {
@@ -497,7 +491,6 @@ function PerformanceSection() {
     },
     {
       title: t('settings.thresholds.verdict.title'),
-      scope: 'backendFrontend',
       help: t('settings.thresholds.verdict.help'),
       fields: [
         {
@@ -528,7 +521,6 @@ function PerformanceSection() {
     },
     {
       title: t('settings.thresholds.ui.title'),
-      scope: 'frontendOnly',
       help: t('settings.thresholds.ui.help'),
       fields: [
         {
@@ -936,11 +928,10 @@ function PerformanceSection() {
               key={section.title}
               className="rounded-lg border border-gray-200 dark:border-gray-700 p-3"
             >
-              <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="mb-2">
                 <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">
                   {section.title}
                 </h4>
-                <ScopeBadge scope={section.scope} />
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                 {section.help}

@@ -13,7 +13,6 @@ import { fr } from 'date-fns/locale';
 import CacheTimestamp from '../common/CacheTimestamp';
 import { enUS } from 'date-fns/locale';
 import { WindIndicator } from '../common/WindIndicator';
-import ScopeBadge from '../common/ScopeBadge';
 import { Button } from '@dashboard-parapente/design-system';
 import type { BestSpotResult } from '@dashboard-parapente/shared-types';
 
@@ -179,7 +178,6 @@ export const BestSpotSuggestion = ({
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
               {t('weather.bestSpotFor', { date: dateLabel })}
             </h3>
-            <ScopeBadge scope="backendFrontend" />
           </div>
           <span
             className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${verdictInfo.className}`}

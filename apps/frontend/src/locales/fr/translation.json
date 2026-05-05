@@ -372,12 +372,6 @@
       "serverSaved": "Paramètre serveur enregistré",
       "serverError": "Erreur lors de l'enregistrement"
     },
-    "scope": {
-      "backendFrontend": "Backend + Frontend",
-      "frontendOnly": "Frontend uniquement",
-      "backendFrontendHint": "Affecte le calcul backend et l'affichage frontend.",
-      "frontendOnlyHint": "Affecte uniquement les libellés et raisons affichés dans l'interface."
-    },
     "thresholds": {
       "title": "Seuils météo paramétrables",
       "description": "Ces seuils pilotent le score Para-Index backend et l'affichage frontend. Les valeurs sont enregistrées automatiquement quand vous quittez le champ.",

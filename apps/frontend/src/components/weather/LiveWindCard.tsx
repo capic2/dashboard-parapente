@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import ScopeBadge from '../common/ScopeBadge';
 import { useLiveWind } from '../../hooks/weather/useLiveWind';
 import type { LiveWindStation } from '../../types';
 
@@ -141,7 +140,7 @@ export default function LiveWindCard({ siteId }: LiveWindCardProps) {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-sky-600 flex-1 flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
+      <div>
         <div>
           <h2 className="text-sm text-gray-700 dark:text-gray-300 font-semibold">
             {t('weather.liveWindTitle')}
@@ -155,7 +154,6 @@ export default function LiveWindCard({ siteId }: LiveWindCardProps) {
             </p>
           )}
         </div>
-        <ScopeBadge scope="backendFrontend" />
       </div>
 
       {!primaryStation ? (
