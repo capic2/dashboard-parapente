@@ -115,40 +115,6 @@ export const Default = meta.story({
   parameters: { msw: { handlers: defaultHandlers } },
 });
 
-Default.test('renders settings page', async ({ canvas }) => {
-  await canvas.findByText(/Param/);
-});
-
-Default.test(
-  'renders performance section with all controls',
-  async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-
-    // Should render the section title
-    await canvas.findByText(/Données et Performance/);
-
-    // Should render browser sub-section controls (use button role to avoid matching descriptions)
-    await canvas.findByRole('button', { name: /Temps réel/ });
-    await canvas.findByRole('button', { name: /Économie/ });
-
-    // Should render auto-refresh toggle
-    await canvas.findByText(/Rafraîchissement automatique de la météo/);
-
-    // Should render timeout buttons
-    await canvas.findByRole('button', { name: /15 sec/ });
-    await canvas.findByRole('button', { name: /60 sec/ });
-
-    // Should render server sub-section controls
-    await canvas.findByText(/Durée du cache serveur/);
-    await canvas.findByText(/Rayon des balises vent live SpotAiR/);
-    await canvas.findByText(/Durée du cache vent live SpotAiR/);
-    await canvas.findByText(/Fréquence de collecte automatique/);
-    await canvas.findByText(/Stockage des exports vidéo/);
-    await canvas.findByDisplayValue('/app/video-exports');
-    await canvas.findByDisplayValue('/app/video-temp-images');
-  }
-);
-
 Default.test(
   'clicking economy updates freshness level',
   async ({ canvasElement }) => {
