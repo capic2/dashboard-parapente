@@ -44,7 +44,7 @@ catalog:
   msw: ^2.13.6
   msw-storybook-addon: ^2.0.7
   nx: ^22.6.0
-  oxfmt: ^0.47.0
+  oxfmt: ^0.48.0
   oxlint: ^1.57.0
   playwright: 1.59.1
   react: ^19.0.0
