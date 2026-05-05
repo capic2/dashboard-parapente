@@ -108,8 +108,8 @@ services:
         condition: service_healthy
     volumes:
       - /home/capic/docker-data/dashboard-parapente/db:/app/db
-      - /home/capic/docker-data/dashboard-parapente/videos:/app/video-exports
-      - /home/capic/docker-data/dashboard-parapente/video-temp-images:/app/video-temp-images
+      - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:/app/video-exports
+      - ${VIDEO_TEMP_IMAGES_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/video-temp-images}:/app/video-temp-images
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8001/']
       interval: 30s

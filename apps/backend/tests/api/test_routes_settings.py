@@ -23,8 +23,8 @@ class TestGetSettings:
         response = client.get(f"{API_PREFIX}/settings")
         assert response.status_code == 200
         data = response.json()
-        assert data["video_export_dir"] == app_settings.DEFAULTS["video_export_dir"]
-        assert data["video_temp_images_dir"] == app_settings.DEFAULTS["video_temp_images_dir"]
+        assert "video_export_dir" not in data
+        assert "video_temp_images_dir" not in data
 
     def test_get_settings_returns_all(self, client, db_session):
         """Returns all settings as key-value pairs."""
@@ -37,7 +37,19 @@ class TestGetSettings:
         data = response.json()
         assert data["cache_ttl_default"] == "1800"
         assert data["scheduler_interval_minutes"] == "15"
-        assert data["video_export_dir"] == app_settings.DEFAULTS["video_export_dir"]
+        assert "video_export_dir" not in data
+
+    def test_get_settings_ignores_retired_video_storage_keys(self, client, db_session):
+        """Retired video storage keys are not exposed even if old rows exist."""
+        db_session.add(AppSetting(key="video_export_dir", value="/mnt/old-exports"))
+        db_session.add(AppSetting(key="video_temp_images_dir", value="/mnt/old-temp"))
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/settings")
+        assert response.status_code == 200
+        data = response.json()
+        assert "video_export_dir" not in data
+        assert "video_temp_images_dir" not in data
 
 
 class TestUpdateSettings:
@@ -136,8 +148,8 @@ class TestUpdateSettings:
         assert radius_row is not None and radius_row.value == "12"
         assert ttl_row is not None and ttl_row.value == "420"
 
-    def test_update_video_storage_settings(self, client, db_session):
-        """Updates video storage folders and persists normalized absolute paths."""
+    def test_rejects_retired_video_storage_settings(self, client, db_session):
+        """Video storage folders are managed by Docker volume mapping only."""
         response = client.put(
             f"{API_PREFIX}/settings",
             json={
@@ -147,8 +159,8 @@ class TestUpdateSettings:
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["updated"]["video_export_dir"] == "/mnt/videos/exports"
-        assert data["updated"]["video_temp_images_dir"] == "/mnt/videos/temp-images"
+        assert data["updated"] == {}
+        assert data["rejected_keys"] == ["video_export_dir", "video_temp_images_dir"]
 
         export_row = (
             db_session.query(AppSetting).filter(AppSetting.key == "video_export_dir").first()
@@ -156,26 +168,8 @@ class TestUpdateSettings:
         temp_row = (
             db_session.query(AppSetting).filter(AppSetting.key == "video_temp_images_dir").first()
         )
-        assert export_row is not None and export_row.value == "/mnt/videos/exports"
-        assert temp_row is not None and temp_row.value == "/mnt/videos/temp-images"
-
-    def test_rejects_invalid_video_storage_paths(self, client, db_session):
-        """Rejects empty and relative paths for video storage settings."""
-        empty_response = client.put(
-            f"{API_PREFIX}/settings",
-            json={"video_export_dir": "   "},
-        )
-        assert empty_response.status_code == 400
-        assert empty_response.json()["detail"] == "video_export_dir must not be empty"
-
-        relative_response = client.put(
-            f"{API_PREFIX}/settings",
-            json={"video_temp_images_dir": "exports/temp"},
-        )
-        assert relative_response.status_code == 400
-        assert (
-            relative_response.json()["detail"] == "video_temp_images_dir must be an absolute path"
-        )
+        assert export_row is None
+        assert temp_row is None
 
     def test_rejects_invalid_spotair_live_wind_settings(self, client, db_session):
         """Rejects out-of-range SpotAiR live wind radius and non-positive TTL."""

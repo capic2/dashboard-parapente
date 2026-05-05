@@ -1,18 +1,17 @@
-import { FullConfig } from '@playwright/test';
 import { execSync } from 'child_process';
 import * as path from 'path';
 
-function globalSetup(config: FullConfig): void {
+function globalSetup(): void {
   console.log('🔧 E2E Global Setup: Initializing test database...');
-  
+
   const backendPath = path.resolve(__dirname, '..', 'backend');
   const scriptPath = path.join(backendPath, 'init_e2e_db.py');
   const dbPath = path.join(backendPath, 'test.db');
   const absoluteDbUrl = `sqlite:///${dbPath}`;
-  
+
   // Use python3 on Unix systems, python on Windows
   const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-  
+
   try {
     // Quote scriptPath to handle spaces in paths
     execSync(`${pythonCmd} "${scriptPath}"`, {
@@ -20,6 +19,7 @@ function globalSetup(config: FullConfig): void {
       stdio: 'inherit',
       env: {
         ...process.env,
+        ENVIRONMENT: 'test',
         TESTING: 'false',
         BACKEND_DATABASE_URL: absoluteDbUrl,
         BACKEND_JWT_SECRET: process.env.BACKEND_JWT_SECRET || 'e2e-test-secret',

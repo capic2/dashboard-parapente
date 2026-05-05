@@ -328,10 +328,6 @@ function PerformanceSection() {
     backendSettings?.spotair_live_wind_cache_ttl_seconds ?? '300';
   const currentSchedulerInterval =
     backendSettings?.scheduler_interval_minutes ?? '30';
-  const currentVideoExportDir =
-    backendSettings?.video_export_dir ?? '/app/video-exports';
-  const currentVideoTempImagesDir =
-    backendSettings?.video_temp_images_dir ?? '/app/video-temp-images';
   const thresholdSections = [
     {
       title: t('settings.thresholds.wind.title'),
@@ -870,50 +866,6 @@ function PerformanceSection() {
               </Button>
             ))}
           </div>
-        </div>
-
-        <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
-          <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-            {t('settings.performance.videoStorageTitle')}
-          </h4>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {t('settings.performance.videoStorageHelp')}
-          </p>
-
-          <label className="block">
-            <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {t('settings.performance.videoExportDir')}
-            </span>
-            <input
-              key={`video_export_dir-${currentVideoExportDir}`}
-              type="text"
-              defaultValue={currentVideoExportDir}
-              placeholder="/app/video-exports"
-              onBlur={(event) =>
-                handleBackendSetting('video_export_dir', event.target.value)
-              }
-              className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
-            />
-          </label>
-
-          <label className="block">
-            <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {t('settings.performance.videoTempImagesDir')}
-            </span>
-            <input
-              key={`video_temp_images_dir-${currentVideoTempImagesDir}`}
-              type="text"
-              defaultValue={currentVideoTempImagesDir}
-              placeholder="/app/video-temp-images"
-              onBlur={(event) =>
-                handleBackendSetting(
-                  'video_temp_images_dir',
-                  event.target.value
-                )
-              }
-              className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
-            />
-          </label>
         </div>
 
         <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">

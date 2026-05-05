@@ -11,6 +11,7 @@ const ciOnly = !!process.env.CI;
 
 export default defineConfig({
   testDir: './',
+  globalSetup: './global-setup.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -61,6 +62,7 @@ export default defineConfig({
       cwd: '../..',
       timeout: 120 * 1000, // 2 minutes for backend startup
       env: {
+        ENVIRONMENT: 'test',
         TESTING: 'false',
         BACKEND_DATABASE_URL: process.env.BACKEND_DATABASE_URL || absoluteDbUrl,
         BACKEND_WEATHERAPI_KEY: process.env.BACKEND_WEATHERAPI_KEY || 'test_key',

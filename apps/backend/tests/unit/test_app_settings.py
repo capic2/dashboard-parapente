@@ -155,7 +155,26 @@ class TestGetAllSettings:
         result = app_settings.get_all_settings(db_session)
         assert result["a"] == "1"
         assert result["b"] == "2"
-        assert result["video_export_dir"] == app_settings.DEFAULTS["video_export_dir"]
+
+    def test_omits_retired_video_storage_settings(self, db_session):
+        db_session.add(AppSetting(key="video_export_dir", value="/mnt/old-exports"))
+        db_session.add(AppSetting(key="video_temp_images_dir", value="/mnt/old-temp"))
+        db_session.commit()
+
+        result = app_settings.get_all_settings(db_session)
+        assert "video_export_dir" not in result
+        assert "video_temp_images_dir" not in result
+
+    def test_get_setting_ignores_retired_video_storage_settings(self, db_session):
+        db_session.add(AppSetting(key="video_export_dir", value="/mnt/old-exports"))
+        db_session.commit()
+
+        result = app_settings.get_setting(
+            "video_export_dir",
+            db=db_session,
+            default="/app/video-exports",
+        )
+        assert result == "/app/video-exports"
 
 
 class TestInvalidateCache:

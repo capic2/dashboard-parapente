@@ -7,12 +7,10 @@ Settings are cached in memory to avoid DB queries on every call (e.g., cache TTL
 
 import logging
 from datetime import datetime
-from pathlib import Path
 
 from sqlalchemy.orm import Session
 
 from models import AppSetting
-import config
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +28,6 @@ DEFAULTS: dict[str, str] = {
     "emagram_max_age_minutes": "180",
     "redis_connect_timeout": "5",
     "redis_socket_timeout": "5",
-    "video_export_dir": str(Path(config.VIDEO_EXPORT_DIR)),
-    "video_temp_images_dir": str(Path(config.VIDEO_TEMP_IMAGES_DIR)),
     "para_wind_very_low_max": "3",
     "para_wind_low_max": "5",
     "para_wind_weak_max": "8",
@@ -60,6 +56,7 @@ DEFAULTS: dict[str, str] = {
 
 # Keys that must never be exposed via the public settings API
 _SENSITIVE_KEYS = {"strava_refresh_token"}
+_RETIRED_KEYS = {"video_export_dir", "video_temp_images_dir"}
 
 
 def _mask_value_for_logs(setting_key: str, setting_value: str) -> str:
@@ -81,6 +78,9 @@ def get_setting(key: str, db: Session | None = None, default: str | None = None)
 
     Priority: memory cache → DB (if db provided) → DEFAULTS → default param.
     """
+    if key in _RETIRED_KEYS:
+        return default if default is not None else ""
+
     # Try memory cache first
     if key in _settings_cache:
         return _settings_cache[key]
@@ -136,7 +136,11 @@ def get_all_settings(db: Session) -> dict[str, str]:
         reload_cache(db)
     return {
         **DEFAULTS,
-        **{k: v for k, v in _settings_cache.items() if k not in _SENSITIVE_KEYS},
+        **{
+            k: v
+            for k, v in _settings_cache.items()
+            if k not in _SENSITIVE_KEYS and k not in _RETIRED_KEYS
+        },
     }
 
 

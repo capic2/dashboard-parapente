@@ -6,7 +6,8 @@ import sys
 
 # Force production-like initialization (with real tables)
 os.environ["TESTING"] = "false"
-os.environ["BACKEND_DATABASE_URL"] = "sqlite:///./test.db"
+os.environ.setdefault("ENVIRONMENT", "test")
+os.environ.setdefault("BACKEND_DATABASE_URL", "sqlite:///./test.db")
 
 # Set minimal required env vars for config validation
 os.environ.setdefault("BACKEND_WEATHERAPI_KEY", "test_key")

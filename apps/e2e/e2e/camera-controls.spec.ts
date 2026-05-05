@@ -318,6 +318,33 @@ const getSiteCameraState = async (
   };
 };
 
+const waitForFlightInList = async (
+  request: APIRequestContext,
+  token: string,
+  flightId: string
+) => {
+  await expect.poll(
+    async () => {
+      const response = await request.get('/api/flights?limit=50', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok()) {
+        return false;
+      }
+
+      const data = (await response.json()) as { flights?: Array<{ id?: string }> };
+      return data.flights?.some((flight) => flight.id === flightId) ?? false;
+    },
+    {
+      timeout: 30000,
+      message: `le vol ${flightId} est disponible dans la liste`,
+    }
+  ).toBeTruthy();
+};
+
 const restoreSiteCameraState = async (
   request: APIRequestContext,
   token: string,
@@ -364,6 +391,7 @@ test.describe('Contrôles caméra du viewer 3D', () => {
       const flight = await createFlightFromGPX(request, token);
       flightId = flight.id;
       initialCameraState = await getSiteCameraState(request, token, flight.id);
+      await waitForFlightInList(request, token, flight.id);
 
       await page.goto('/flights');
       await expect(page).toHaveURL(/\/flights/, { timeout: 15000 });
@@ -416,6 +444,7 @@ test.describe('Contrôles caméra du viewer 3D', () => {
       const flight = await createFlightFromGPX(request, token);
       flightId = flight.id;
       initialCameraState = await getSiteCameraState(request, token, flight.id);
+      await waitForFlightInList(request, token, flight.id);
 
       await page.goto('/flights');
       await expect(page).toHaveURL(/\/flights/, { timeout: 15000 });
