@@ -90,9 +90,6 @@ catalogs:
     cesium:
       specifier: ^1.139.1
       version: 1.141.0
-    chromatic:
-      specifier: ^16.0.0
-      version: 16.8.0
     date-fns:
       specifier: ^4.0.0
       version: 4.1.0
@@ -108,6 +105,9 @@ catalogs:
     i18next-browser-languagedetector:
       specifier: ^8.2.1
       version: 8.2.1
+    knip:
+      specifier: ^6.1.0
+      version: 6.12.0
     ky:
       specifier: ^2.0.0
       version: 2.0.2
@@ -317,7 +317,7 @@ importers:
         version: 4.1.5(vitest@4.1.5)
       chromatic:
         specifier: 'catalog:'
-        version: 16.8.0
+        version: 16.9.0
       happy-dom:
         specifier: 'catalog:'
         version: 20.9.0
@@ -3065,8 +3065,8 @@ packages:
       '@chromatic-com/playwright':
         optional: true
 
-  chromatic@16.8.0:
-    resolution: {integrity: sha512-61Ma2LBOB8x2uyVnVn0RkPxtPNlg6crXmOn9X3gEcKuRDbJQUfNSKTjRCX18YSOW0lxGrzmkQO5Qj+P0l4GEkQ==}
+  chromatic@16.9.0:
+    resolution: {integrity: sha512-KJ1qvHMMP3jYZksxA229dREL81TeS+XxerRgd83klJIgtuQdY8kYg5TClNaF+K9HAzHmF19VIDHF6d0XwsRqzQ==}
     hasBin: true
     peerDependencies:
       '@chromatic-com/cypress': ^0.*.* || ^1.0.0
@@ -7907,7 +7907,7 @@ snapshots:
 
   chromatic@13.3.5: {}
 
-  chromatic@16.8.0:
+  chromatic@16.9.0:
     dependencies:
       semver: 7.7.4
 
