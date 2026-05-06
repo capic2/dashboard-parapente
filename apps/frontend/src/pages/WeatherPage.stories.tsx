@@ -728,6 +728,7 @@ export const WeatherError = meta.story({
     router: weatherRouteConfig,
     msw: {
       handlers: [
+        hourlyBestSpotsHandler,
         http.get('*/api/spots/best', () => HttpResponse.json(mockBestSpot)),
         http.get('*/api/spots', () => HttpResponse.json(mockSites)),
         http.get('*/api/spots/:id', ({ params }) => {

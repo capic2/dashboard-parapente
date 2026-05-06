@@ -1,12 +1,5 @@
-import { useEffect, useState } from 'react';
-import {
-  ComboBox,
-  Input,
-  Label,
-  ListBox,
-  ListBoxItem,
-  Popover,
-} from 'react-aria-components';
+import { useEffect, useId, useState } from 'react';
+import { Input, Label, TextField } from 'react-aria-components';
 import { Button } from '@dashboard-parapente/design-system';
 import type {
   BackendWeatherResponse,
@@ -122,6 +115,7 @@ function OptionButton({
     <button
       type="button"
       onClick={onSelect}
+      aria-pressed={isSelected}
       className={`rounded-xl border p-3 text-left transition-all ${
         isSelected
           ? 'border-sky-500 bg-sky-50 ring-2 ring-sky-200 dark:border-sky-400 dark:bg-sky-950/40 dark:ring-sky-900'
@@ -144,12 +138,14 @@ function spotDescription(spot: ParaglidingSpotSearchResult) {
 }
 
 export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) {
+  const listboxId = useId();
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedLocation, setSelectedLocation] =
     useState<LocationSuggestion | null>(null);
   const [radiusKm, setRadiusKm] = useState(30);
   const [limit, setLimit] = useState(5);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<SelectedOption | null>(
     null
   );
@@ -176,21 +172,35 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
     selectedOption?.type === 'city'
       ? selectedOption.location.name
       : selectedOption?.spot.name;
+  const suggestions = locationSearch.data?.locations ?? [];
+  const isSuggestionsOpen = debouncedQuery.length >= 3 && !selectedLocation;
+  const activeSuggestion = suggestions[activeSuggestionIndex];
+  const activeSuggestionId = activeSuggestion
+    ? `${listboxId}-${activeSuggestion.id}`
+    : undefined;
   let selectedWeather: BackendWeatherResponse | SpotWeatherResponse | undefined;
   let isWeatherLoading = false;
+  let isWeatherError = false;
   if (selectedOption?.type === 'city') {
     selectedWeather = coordinateWeather.data;
     isWeatherLoading = coordinateWeather.isLoading;
+    isWeatherError = coordinateWeather.isError;
   } else if (selectedOption) {
     selectedWeather = spotWeather.data;
     isWeatherLoading = spotWeather.isLoading;
+    isWeatherError = spotWeather.isError;
   }
 
   const handleSelectLocation = (location: LocationSuggestion) => {
     setSelectedLocation(location);
     setSelectedOption({ type: 'city', location });
     setQuery(location.name);
+    setActiveSuggestionIndex(0);
   };
+
+  useEffect(() => {
+    setActiveSuggestionIndex(0);
+  }, [debouncedQuery]);
 
   return (
     <section className="rounded-2xl border border-sky-100 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800 sm:p-6">
@@ -204,48 +214,66 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
       </div>
 
       <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-end">
-        <ComboBox<LocationSuggestion>
-          items={locationSearch.data?.locations ?? []}
-          inputValue={query}
-          selectedKey={selectedLocation?.id ?? null}
-          allowsCustomValue
-          menuTrigger="input"
-          onInputChange={(value) => {
-            setQuery(value);
-            setSelectedLocation(null);
-            setSelectedOption(null);
-          }}
-          onSelectionChange={(key) => {
-            if (key == null) return;
-            const location = locationSearch.data?.locations.find(
-              (item) => item.id === String(key)
-            );
-            if (location) handleSelectLocation(location);
-          }}
-          className="relative flex flex-col gap-1"
-        >
+        <TextField className="relative flex flex-col gap-1">
           <Label className="text-sm font-medium text-gray-700 dark:text-gray-200">
             Ville
           </Label>
           <Input
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setSelectedLocation(null);
+              setSelectedOption(null);
+            }}
+            onKeyDown={(event) => {
+              if (!isSuggestionsOpen || !suggestions.length) return;
+              if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                setActiveSuggestionIndex((index) =>
+                  Math.min(index + 1, suggestions.length - 1)
+                );
+              } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                setActiveSuggestionIndex((index) => Math.max(index - 1, 0));
+              } else if (event.key === 'Enter') {
+                event.preventDefault();
+                handleSelectLocation(suggestions[activeSuggestionIndex]);
+              }
+            }}
+            role="combobox"
+            aria-expanded={isSuggestionsOpen}
+            aria-haspopup="listbox"
+            aria-autocomplete="list"
+            aria-controls={listboxId}
+            aria-activedescendant={activeSuggestionId}
             placeholder="Ex: Besançon, Annecy, Grenoble..."
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
-          <Popover className="z-20 w-(--trigger-width) overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
-            {locationSearch.isLoading && debouncedQuery.length >= 3 ? (
-              <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
-                Recherche des villes...
-              </div>
-            ) : (
-              <ListBox
-                aria-label="Suggestions de villes"
-                className="max-h-72 overflow-auto outline-none"
-              >
-                {(location) => (
-                  <ListBoxItem
-                    id={location.id}
-                    textValue={location.name}
-                    className="cursor-pointer border-b border-gray-100 px-3 py-2 outline-none last:border-b-0 hover:bg-sky-50 focus:bg-sky-50 dark:border-gray-800 dark:hover:bg-sky-950/40 dark:focus:bg-sky-950/40"
+          {isSuggestionsOpen && (
+            <div
+              id={listboxId}
+              role="listbox"
+              className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900"
+            >
+              {locationSearch.isLoading ? (
+                <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
+                  Recherche des villes...
+                </div>
+              ) : suggestions.length ? (
+                suggestions.map((location, index) => (
+                  <button
+                    id={`${listboxId}-${location.id}`}
+                    key={location.id}
+                    type="button"
+                    role="option"
+                    aria-selected={index === activeSuggestionIndex}
+                    onMouseEnter={() => setActiveSuggestionIndex(index)}
+                    onClick={() => handleSelectLocation(location)}
+                    className={`block w-full border-b border-gray-100 px-3 py-2 text-left last:border-b-0 dark:border-gray-800 ${
+                      index === activeSuggestionIndex
+                        ? 'bg-sky-100 dark:bg-sky-950/60'
+                        : 'hover:bg-sky-50 dark:hover:bg-sky-950/40'
+                    }`}
                   >
                     <span className="block font-medium text-gray-950 dark:text-white">
                       {location.name}
@@ -253,12 +281,16 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
                     <span className="block text-xs text-gray-500 dark:text-gray-400">
                       {location.display_name}
                     </span>
-                  </ListBoxItem>
-                )}
-              </ListBox>
-            )}
-          </Popover>
-        </ComboBox>
+                  </button>
+                ))
+              ) : (
+                <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
+                  Aucune ville trouvée.
+                </div>
+              )}
+            </div>
+          )}
+        </TextField>
 
         <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
           Rayon
@@ -310,7 +342,11 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
             </Button>
           </div>
 
-          {nearbyOptions.isLoading ? (
+          {nearbyOptions.isError ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+              Impossible de charger les décollages et atterrissages proches.
+            </div>
+          ) : nearbyOptions.isLoading ? (
             <div className="rounded-xl border border-gray-200 p-4 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">
               Recherche des décollages et atterrissages proches...
             </div>
@@ -364,13 +400,17 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
             </div>
           )}
 
-          {weatherTitle && (
+          {weatherTitle && isWeatherError ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+              Impossible de charger la météo pour {weatherTitle}.
+            </div>
+          ) : weatherTitle ? (
             <WeatherSummaryCard
               title={weatherTitle}
               weather={selectedWeather}
               isLoading={isWeatherLoading}
             />
-          )}
+          ) : null}
         </div>
       )}
     </section>
