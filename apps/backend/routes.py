@@ -74,6 +74,7 @@ from video_export_manual import cleanup_video_export_temp_files
 from video_export_manual import get_export_status as get_export_status_manual
 from video_export_manual import list_exports as list_exports_manual
 from video_export_manual import resolve_frontend_url
+from video_export_manual import resume_video_export
 from video_export_manual import start_video_export_manual
 from video_export_manual import start_video_export_manual_fast
 from versioning import get_version_payload
@@ -4229,6 +4230,19 @@ def cancel_video_export(job_id: str):
         )
 
     return {"message": "Export cancelled successfully", "job_id": job_id}
+
+
+@router.post("/exports/{job_id}/resume")
+def resume_cancelled_video_export(request: Request, job_id: str):
+    """Resume a cancelled or failed manual video export from preserved frames."""
+    success = resume_video_export(job_id, auth_token=_extract_bearer_token(request))
+    if not success:
+        raise HTTPException(
+            status_code=400,
+            detail="Export job not found or cannot be resumed",
+        )
+
+    return {"message": "Export resume enqueued", "job_id": job_id}
 
 
 @router.get("/exports/{job_id}/download")
