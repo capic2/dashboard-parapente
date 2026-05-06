@@ -219,6 +219,120 @@ def test_job_frames_dir_uses_configured_temp_dir(tmp_path, monkeypatch):
     assert frames_dir == tmp_path / "temp-images" / "job-123" / "frames"
 
 
+def test_first_missing_frame_index_returns_resume_point(tmp_path):
+    frames_dir = tmp_path / "frames"
+    frames_dir.mkdir()
+    (frames_dir / "frame00000.png").write_bytes(b"frame")
+    (frames_dir / "frame00001.png").write_bytes(b"frame")
+    (frames_dir / "frame00003.png").write_bytes(b"frame")
+
+    assert video_export_manual._first_missing_frame_index(frames_dir, 5) == 2
+
+
+def test_job_resume_info_requires_terminal_status_and_frames(tmp_path, monkeypatch):
+    temp_root = tmp_path / "temp-images"
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    frames_dir = temp_root / "job-cancelled" / "frames"
+    frames_dir.mkdir(parents=True)
+    (frames_dir / "frame00000.png").write_bytes(b"frame")
+    job = VideoExportJob(
+        id="job-cancelled",
+        flight_id="flight-test-001",
+        status="cancelled",
+        total_frames=10,
+    )
+
+    resume_info = video_export_manual._job_resume_info(job)
+
+    assert resume_info == {
+        "can_resume": True,
+        "frames_captured": 1,
+        "resume_from_frame": 1,
+    }
+
+
+def test_resume_video_export_requeues_cancelled_job_with_frames(test_db, tmp_path, monkeypatch):
+    job_id = "job-resume"
+    temp_root = tmp_path / "temp-images"
+    frames_dir = temp_root / job_id / "frames"
+    frames_dir.mkdir(parents=True)
+    (frames_dir / "frame00000.png").write_bytes(b"frame")
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "start_video_export_worker", lambda: None)
+
+    db_session = test_db()
+    db_session.add(
+        VideoExportJob(
+            id=job_id,
+            flight_id="flight-test-001",
+            status="cancelled",
+            mode="manual",
+            quality="1080p",
+            fps=15,
+            speed=1,
+            progress=10,
+            total_frames=10,
+            message="cancelled",
+            frontend_url="http://localhost:5173",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+            cancelled_at=datetime.utcnow(),
+        )
+    )
+    db_session.commit()
+    db_session.close()
+
+    assert video_export_manual.resume_video_export(job_id, auth_token="resume-token") is True
+
+    db_session = test_db()
+    job = db_session.query(VideoExportJob).filter(VideoExportJob.id == job_id).one()
+    assert job.status == "queued"
+    assert job.auth_token == "resume-token"
+    assert job.cancelled_at is None
+    assert job.error is None
+    assert job.video_path is None
+    db_session.close()
+
+
+def test_resume_video_export_waits_for_running_cancel_to_finish(test_db, tmp_path, monkeypatch):
+    job_id = "job-cancel-pending"
+    temp_root = tmp_path / "temp-images"
+    frames_dir = temp_root / job_id / "frames"
+    frames_dir.mkdir(parents=True)
+    (frames_dir / "frame00000.png").write_bytes(b"frame")
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+
+    db_session = test_db()
+    db_session.add(
+        VideoExportJob(
+            id=job_id,
+            flight_id="flight-test-001",
+            status="cancelled",
+            mode="manual",
+            quality="1080p",
+            fps=15,
+            speed=1,
+            progress=10,
+            total_frames=10,
+            message="cancelled",
+            frontend_url="http://localhost:5173",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+            cancelled_at=datetime.utcnow(),
+        )
+    )
+    db_session.commit()
+    db_session.close()
+
+    video_export_manual._set_job_cancel_requested(job_id)
+    try:
+        assert video_export_manual.resume_video_export(job_id, auth_token="resume-token") is False
+    finally:
+        video_export_manual._clear_job_cancel_requested(job_id)
+
+
 def test_cleanup_temp_dir_removes_nested_files(tmp_path):
     temp_dir = tmp_path / "temp-images" / "job-123"
     frames_dir = temp_dir / "frames"
