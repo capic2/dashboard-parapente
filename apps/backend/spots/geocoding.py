@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 # In-memory cache for geocoded cities
 # Format: {city_name: (lat, lon, timestamp)}
 _geocoding_cache: dict[str, tuple[float, float, float]] = {}
+_location_search_cache: dict[str, tuple[list[dict[str, str | float]], float]] = {}
 
 # Cache TTL: 7 days (cities don't move!)
 CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
@@ -122,13 +123,88 @@ def geocode_city(city_name: str, country: str = "FR") -> tuple[float, float] | N
         return None
 
 
+def search_locations(
+    query: str, country: str = "FR", limit: int = 5
+) -> list[dict[str, str | float]]:
+    """Search location suggestions from Nominatim for autocomplete."""
+    global _last_request_time
+
+    normalized_query = query.strip()
+    if len(normalized_query) < 3:
+        return []
+
+    safe_limit = max(1, min(10, limit))
+    cache_key = f"{normalized_query.lower()}_{country.upper()}_{safe_limit}"
+    if cache_key in _location_search_cache:
+        locations, timestamp = _location_search_cache[cache_key]
+        if time.time() - timestamp < CACHE_TTL_SECONDS:
+            logger.debug(f"Location search cache hit for {normalized_query}, {country}")
+            return locations
+        del _location_search_cache[cache_key]
+
+    time_since_last = time.time() - _last_request_time
+    if time_since_last < RATE_LIMIT_SECONDS:
+        sleep_time = RATE_LIMIT_SECONDS - time_since_last
+        logger.debug(f"Rate limiting: sleeping {sleep_time:.2f}s")
+        time.sleep(sleep_time)
+
+    try:
+        url = "https://nominatim.openstreetmap.org/search"
+        params = {
+            "q": normalized_query,
+            "countrycodes": country.lower(),
+            "format": "json",
+            "limit": safe_limit,
+            "addressdetails": 1,
+        }
+        headers = {"User-Agent": "DashboardParapente/0.2.0 (paragliding weather dashboard)"}
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        _last_request_time = time.time()
+        response.raise_for_status()
+        data = response.json()
+
+        locations: list[dict[str, str | float]] = []
+        for item in data:
+            lat = float(item["lat"])
+            lon = float(item["lon"])
+            address = item.get("address") or {}
+            name = (
+                address.get("city")
+                or address.get("town")
+                or address.get("village")
+                or address.get("municipality")
+                or item.get("name")
+                or normalized_query
+            )
+            locations.append(
+                {
+                    "id": str(item.get("place_id") or f"{lat:.6f},{lon:.6f}"),
+                    "name": str(name),
+                    "display_name": str(item.get("display_name") or name),
+                    "latitude": lat,
+                    "longitude": lon,
+                    "country": country.upper(),
+                }
+            )
+
+        _location_search_cache[cache_key] = (locations, time.time())
+        return locations
+    except requests.RequestException as e:
+        logger.error(f"Location search API error for {normalized_query}: {e}")
+        return []
+    except (KeyError, TypeError, ValueError) as e:
+        logger.error(f"Failed to parse location search response for {normalized_query}: {e}")
+        return []
+
+
 def clear_geocoding_cache():
     """
     Clear the geocoding cache.
     Useful for testing or if you want to force fresh lookups.
     """
-    global _geocoding_cache
+    global _geocoding_cache, _location_search_cache
     _geocoding_cache = {}
+    _location_search_cache = {}
     logger.info("Geocoding cache cleared")
 
 

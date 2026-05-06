@@ -8,6 +8,7 @@ import Forecast7Day from '../components/weather/Forecast7Day';
 import HourlyForecast from '../components/weather/HourlyForecast';
 import EmagramWidget from '../components/dashboard/EmagramWidget';
 import WeatherMultiLanding from '../components/weather/WeatherMultiLanding';
+import CityWeatherSearch from '../components/weather/CityWeatherSearch';
 import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
 import { Button } from '@dashboard-parapente/design-system';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
@@ -63,6 +64,8 @@ export default function WeatherPage() {
   return (
     <div>
       <div className="space-y-4">
+        <CityWeatherSearch dayIndex={selectedDayIndex} />
+
         {/* Site Selector */}
         <SiteSelector
           selectedSiteId={selectedSiteId}

@@ -50,6 +50,8 @@ from schemas import LandingAssociation as LandingAssociationSchema
 from schemas import (
     LandingAssociationCreate,
     LandingAssociationUpdate,
+    LocationSearchResponse,
+    NearbyFlightOptionsResponse,
 )
 from schemas import Site as SiteSchema
 from schemas import (
@@ -345,6 +347,68 @@ async def geocode_location(query: str, country: str = "FR"):
         display_name = query
 
     return {"name": query, "latitude": lat, "longitude": lon, "display_name": display_name}
+
+
+@public_router.get("/locations/search", response_model=LocationSearchResponse)
+async def search_location_suggestions(
+    query: str = Query(..., min_length=3),
+    country: str = Query(default="FR", min_length=2, max_length=2),
+    limit: int = Query(default=5, ge=1, le=10),
+):
+    """Search city/location suggestions for autocomplete."""
+    from spots import search_locations
+
+    try:
+        locations = await asyncio.to_thread(search_locations, query, country, limit)
+    except Exception as exc:
+        logger.exception("Location search failed for query %s", query)
+        raise HTTPException(
+            status_code=502,
+            detail="Location search service is currently unavailable. Please retry later.",
+        ) from exc
+
+    return {"query": query, "locations": locations}
+
+
+@public_router.get("/locations/nearby-flight-options", response_model=NearbyFlightOptionsResponse)
+async def get_nearby_flight_options(
+    lat: float = Query(..., ge=-90, le=90),
+    lon: float = Query(..., ge=-180, le=180),
+    name: str = Query(default="Ville"),
+    display_name: str | None = None,
+    country: str = Query(default="FR", min_length=2, max_length=2),
+    radius_km: int = Query(default=30, ge=1, le=150),
+    limit: int = Query(default=5, ge=1, le=10),
+    db: Session = Depends(get_db),
+):
+    """Return the selected city plus nearby takeoff and landing options."""
+    from spots import search_by_coordinates
+
+    takeoff_result = search_by_coordinates(db, lat, lon, radius_km, "takeoff")
+    if "error" in takeoff_result:
+        raise HTTPException(status_code=404, detail=takeoff_result["error"])
+
+    landing_result = search_by_coordinates(db, lat, lon, radius_km, "landing")
+    if "error" in landing_result:
+        raise HTTPException(status_code=404, detail=landing_result["error"])
+
+    takeoffs = takeoff_result["spots"][:limit]
+    landings = landing_result["spots"][:limit]
+
+    return {
+        "city_option": {
+            "id": f"city-{lat:.6f}-{lon:.6f}",
+            "name": name,
+            "display_name": display_name or name,
+            "latitude": lat,
+            "longitude": lon,
+            "country": country.upper(),
+        },
+        "radius_km": radius_km,
+        "limit": limit,
+        "takeoffs": takeoffs,
+        "landings": landings,
+    }
 
 
 @public_router.get("/spots/search")
@@ -2111,6 +2175,109 @@ async def link_user_sites_to_spots(db: Session = Depends(get_db)):
 # ============================================================================
 # Weather endpoints (UPDATED with pipeline + para_index)
 # ============================================================================
+async def _build_coordinate_weather_payload(
+    latitude: float,
+    longitude: float,
+    name: str,
+    day_index: int,
+    days: int = 1,
+    elevation_m: int | None = None,
+) -> dict[str, Any]:
+    """Build the standard weather payload for free coordinates."""
+    day_index = max(0, min(6, day_index))
+    days = max(1, min(7, days))
+
+    tasks = [
+        get_normalized_forecast(
+            latitude,
+            longitude,
+            day_index + d,
+            site_name=name,
+            elevation_m=elevation_m,
+        )
+        for d in range(days)
+    ]
+    results = await asyncio.gather(*tasks)
+
+    all_consensus = []
+    total_sources = 0
+    sunrise_time = None
+    sunset_time = None
+    cached_at = None
+
+    for day_result in results:
+        if not day_result.get("success"):
+            return {
+                "site_id": "coordinates",
+                "site_name": name,
+                "error": day_result.get("error", "Failed to fetch weather data"),
+                "day_index": day_index,
+                "days": days,
+            }
+
+        all_consensus.extend(day_result.get("consensus", []))
+        total_sources = max(total_sources, day_result.get("total_sources", 0))
+        if not sunrise_time and day_result.get("sunrise"):
+            sunrise_time = day_result.get("sunrise")
+            sunset_time = day_result.get("sunset")
+        if not cached_at and day_result.get("cached_at"):
+            cached_at = day_result["cached_at"]
+
+    from para_index import calculate_hourly_para_index, get_hourly_verdict, get_thermal_strength
+
+    for hour in all_consensus:
+        hour["para_index"] = calculate_hourly_para_index(hour)
+        hour["verdict"] = get_hourly_verdict(hour["para_index"])
+        hour["thermal_strength"] = get_thermal_strength(hour.get("cape"), hour.get("lifted_index"))
+
+    flyable_consensus = all_consensus
+    if sunrise_time and sunset_time:
+        try:
+            sunrise_hour = int(sunrise_time.split(":")[0])
+            sunset_hour = int(sunset_time.split(":")[0])
+            flyable_consensus = [
+                h for h in all_consensus if sunrise_hour <= h.get("hour", 0) <= sunset_hour
+            ]
+        except (ValueError, IndexError):
+            pass
+
+    para_result = calculate_para_index(flyable_consensus)
+    slots = analyze_hourly_slots(flyable_consensus)
+
+    return {
+        "site_id": "coordinates",
+        "site_name": name,
+        "day_index": day_index,
+        "days": days,
+        "sunrise": sunrise_time,
+        "sunset": sunset_time,
+        "cached_at": cached_at,
+        "consensus": all_consensus,
+        "para_index": para_result["para_index"],
+        "score": para_result["para_index"],
+        "verdict": para_result["verdict"],
+        "emoji": para_result["emoji"],
+        "explanation": para_result["explanation"],
+        "metrics": para_result["metrics"],
+        "slots": slots,
+        "slots_summary": format_slots_summary(slots),
+        "total_sources": total_sources,
+        "coordinates": {"latitude": latitude, "longitude": longitude},
+    }
+
+
+@public_router.get("/weather/coordinates")
+async def get_weather_by_coordinates(
+    lat: float = Query(..., ge=-90, le=90),
+    lon: float = Query(..., ge=-180, le=180),
+    name: str = Query(default="Ville"),
+    day_index: int = Query(default=0, ge=0, le=6),
+    days: int = Query(default=1, ge=1, le=7),
+):
+    """Get weather forecast for arbitrary coordinates such as a selected city."""
+    return await _build_coordinate_weather_payload(lat, lon, name, day_index, days)
+
+
 @public_router.get("/weather/{spot_id}")
 async def get_weather(
     spot_id: str, day_index: int = 0, days: int = 1, db: Session = Depends(get_db)

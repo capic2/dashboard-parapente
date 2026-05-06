@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import preview from '../../.storybook/preview';
-import { expect } from 'storybook/test';
+import { expect, screen } from 'storybook/test';
 import WeatherPage from './WeatherPage';
 
 const meta = preview.meta({
@@ -340,6 +340,56 @@ const mockLandingWeather = [
   },
 ];
 
+const mockLocationSearch = {
+  query: 'Besan',
+  locations: [
+    {
+      id: 'osm-besancon',
+      name: 'Besançon',
+      display_name: 'Besançon, Doubs, Bourgogne-Franche-Comté, France',
+      latitude: 47.238,
+      longitude: 6.024,
+      country: 'FR',
+    },
+  ],
+};
+
+const mockNearbyFlightOptions = {
+  city_option: mockLocationSearch.locations[0],
+  radius_km: 30,
+  limit: 5,
+  takeoffs: [
+    {
+      id: 'merged-takeoff-arguel',
+      name: 'Arguel déco',
+      type: 'takeoff' as const,
+      latitude: 47.2,
+      longitude: 6.0,
+      elevation_m: 427,
+      orientation: 'SW',
+      rating: 4,
+      country: 'FR',
+      source: 'merged',
+      distance_km: 4.9,
+    },
+  ],
+  landings: [
+    {
+      id: 'merged-landing-arguel',
+      name: "Plaine d'Arguel",
+      type: 'landing' as const,
+      latitude: 47.19,
+      longitude: 5.99,
+      elevation_m: 250,
+      orientation: null,
+      rating: 3,
+      country: 'FR',
+      source: 'merged',
+      distance_km: 5.8,
+    },
+  ],
+};
+
 const mockBestSpot = {
   site: {
     id: 'site-arguel',
@@ -433,46 +483,120 @@ const mockLiveWindChalais = {
   ],
 };
 
-const defaultHandlers = [
-  http.get('*/api/spots', () => HttpResponse.json(mockSites)),
-  http.get('*/api/spots/best', ({ request }) => {
-    const dayIndex = Number(
-      new URL(request.url).searchParams.get('day_index') || '0'
-    );
+const spotsHandler = http.get('*/api/spots', () => HttpResponse.json(mockSites));
+const locationsSearchHandler = http.get('*/api/locations/search', () =>
+  HttpResponse.json(mockLocationSearch)
+);
+const nearbyFlightOptionsHandler = http.get(
+  '*/api/locations/nearby-flight-options',
+  () => HttpResponse.json(mockNearbyFlightOptions)
+);
+const coordinatesWeatherHandler = http.get('*/api/weather/coordinates', () =>
+  HttpResponse.json({
+    ...mockWeatherArguel,
+    site_id: 'coordinates',
+    site_name: 'Besançon',
+  })
+);
+const spotWeatherHandler = http.get('*/api/spots/weather/:spotId', () =>
+  HttpResponse.json({
+    ...mockWeatherArguel,
+    spot_id: 'merged-takeoff-arguel',
+    spot_name: 'Arguel déco',
+  })
+);
+const bestSpotsHandler = http.get('*/api/spots/best', ({ request }) => {
+  const dayIndex = Number(
+    new URL(request.url).searchParams.get('day_index') || '0'
+  );
 
-    return HttpResponse.json(mockBestSpotByDay[dayIndex] ?? mockBestSpot);
-  }),
-  http.get('*/api/spots/:id', ({ params }) => {
-    const site = mockSites.sites.find((s) => s.id === params.id);
-    return site
-      ? HttpResponse.json(site)
-      : new HttpResponse(null, { status: 404 });
-  }),
-  http.get('*/api/weather/site-arguel', () =>
-    HttpResponse.json(mockWeatherArguel)
-  ),
-  http.get('*/api/weather/site-chalais', () =>
-    HttpResponse.json(mockWeatherChalais)
-  ),
-  http.get('*/api/weather/:spotId/daily-summary', () =>
-    HttpResponse.json(mockDailySummary)
-  ),
-  http.get('*/api/sites/site-arguel/live-wind', () =>
-    HttpResponse.json(mockLiveWindArguel)
-  ),
-  http.get('*/api/sites/site-chalais/live-wind', () =>
-    HttpResponse.json(mockLiveWindChalais)
-  ),
-  http.get('*/api/sites/:siteId/landings', () =>
-    HttpResponse.json(mockLandingAssociations)
-  ),
-  http.get('*/api/sites/:siteId/landings/weather', () =>
-    HttpResponse.json(mockLandingWeather)
-  ),
-  http.get('*/api/emagram/hours', () => HttpResponse.json(mockEmagramHours)),
-  http.get('*/api/emagram/latest', () => HttpResponse.json(null)),
-  http.get('*/api/emagram/history', () => HttpResponse.json([])),
+  return HttpResponse.json(mockBestSpotByDay[dayIndex] ?? mockBestSpot);
+});
+const hourlyBestSpotsHandler = http.get(
+  '*/api/spots/best/hourly',
+  ({ request }) => {
+    const url = new URL(request.url);
+    const dayIndex = Number(url.searchParams.get('day_index') || '0');
+    const hours = Number(url.searchParams.get('hours') || '24');
+    const bestSpot = mockBestSpotByDay[dayIndex] ?? mockBestSpot;
+
+    return HttpResponse.json({
+      dayIndex,
+      startHour: 9,
+      hours: Array.from({ length: Math.min(hours, 3) }, (_, index) => ({
+        ...bestSpot,
+        hour: 9 + index,
+      })),
+    });
+  }
+);
+const spotDetailsHandler = http.get('*/api/spots/:id', ({ params }) => {
+  const site = mockSites.sites.find((s) => s.id === params.id);
+  return site
+    ? HttpResponse.json(site)
+    : new HttpResponse(null, { status: 404 });
+});
+const weatherArguelHandler = http.get('*/api/weather/site-arguel', () =>
+  HttpResponse.json(mockWeatherArguel)
+);
+const weatherChalaisHandler = http.get('*/api/weather/site-chalais', () =>
+  HttpResponse.json(mockWeatherChalais)
+);
+const dailySummaryHandler = http.get('*/api/weather/:spotId/daily-summary', () =>
+  HttpResponse.json(mockDailySummary)
+);
+const liveWindArguelHandler = http.get('*/api/sites/site-arguel/live-wind', () =>
+  HttpResponse.json(mockLiveWindArguel)
+);
+const liveWindChalaisHandler = http.get(
+  '*/api/sites/site-chalais/live-wind',
+  () => HttpResponse.json(mockLiveWindChalais)
+);
+const landingsHandler = http.get('*/api/sites/:siteId/landings', () =>
+  HttpResponse.json(mockLandingAssociations)
+);
+const landingWeatherHandler = http.get(
+  '*/api/sites/:siteId/landings/weather',
+  () => HttpResponse.json(mockLandingWeather)
+);
+const emagramHoursHandler = http.get('*/api/emagram/hours', () =>
+  HttpResponse.json(mockEmagramHours)
+);
+const emagramLatestHandler = http.get('*/api/emagram/latest', () =>
+  HttpResponse.json(null)
+);
+const emagramHistoryHandler = http.get('*/api/emagram/history', () =>
+  HttpResponse.json([])
+);
+
+const defaultHandlers = [
+  spotsHandler,
+  locationsSearchHandler,
+  nearbyFlightOptionsHandler,
+  coordinatesWeatherHandler,
+  spotWeatherHandler,
+  hourlyBestSpotsHandler,
+  bestSpotsHandler,
+  spotDetailsHandler,
+  weatherArguelHandler,
+  weatherChalaisHandler,
+  dailySummaryHandler,
+  liveWindArguelHandler,
+  liveWindChalaisHandler,
+  landingsHandler,
+  landingWeatherHandler,
+  emagramHoursHandler,
+  emagramLatestHandler,
+  emagramHistoryHandler,
 ];
+
+const defaultHandlersWithoutSpots = defaultHandlers.filter(
+  (handler) => handler !== spotsHandler
+);
+
+const defaultHandlersWithoutSpotsAndDetails = defaultHandlers.filter(
+  (handler) => handler !== spotsHandler && handler !== spotDetailsHandler
+);
 
 const weatherRouteConfig = {
   initialPath: '/weather',
@@ -545,6 +669,27 @@ WithSelectedSite.test(
   }
 );
 
+export const WithCitySearch = meta.story({
+  name: 'With City Search',
+  parameters: {
+    router: weatherRouteConfig,
+    msw: { handlers: defaultHandlers },
+  },
+});
+
+WithCitySearch.test(
+  'suggests city and displays nearby flight options',
+  async ({ canvas, userEvent }) => {
+    const input = await canvas.findByPlaceholderText(/Besançon/);
+    await userEvent.type(input, 'Besan');
+    const suggestion = await screen.findByRole('option', { name: /Besançon/ });
+    await userEvent.click(suggestion);
+    await canvas.findByRole('button', { name: /Arguel déco/ });
+    await canvas.findByRole('button', { name: /Plaine d'Arguel/ });
+    await canvas.findByText('Météo sélectionnée');
+  }
+);
+
 export const NoSites = meta.story({
   name: 'No Sites',
   parameters: {
@@ -552,7 +697,7 @@ export const NoSites = meta.story({
     msw: {
       handlers: [
         http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
-        ...defaultHandlers.slice(1),
+        ...defaultHandlersWithoutSpots,
       ],
     },
   },
@@ -571,7 +716,7 @@ export const Loading = meta.story({
         http.get('*/api/spots', async () => {
           await new Promise(() => {});
         }),
-        ...defaultHandlers.slice(1),
+        ...defaultHandlersWithoutSpots,
       ],
     },
   },
@@ -583,6 +728,7 @@ export const WeatherError = meta.story({
     router: weatherRouteConfig,
     msw: {
       handlers: [
+        hourlyBestSpotsHandler,
         http.get('*/api/spots/best', () => HttpResponse.json(mockBestSpot)),
         http.get('*/api/spots', () => HttpResponse.json(mockSites)),
         http.get('*/api/spots/:id', ({ params }) => {
@@ -643,7 +789,7 @@ export const SingleSite = meta.story({
         http.get('*/api/spots/:id', () =>
           HttpResponse.json(mockSites.sites[0])
         ),
-        ...defaultHandlers.slice(2),
+        ...defaultHandlersWithoutSpotsAndDetails,
       ],
     },
   },
