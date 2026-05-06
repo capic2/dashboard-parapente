@@ -24,7 +24,7 @@ description: Workflow expert for the dashboard-parapente Nx monorepo. Use when i
 - Use `gh` for all GitHub interactions.
 - Use `gh` for issues, pull requests, checks, releases, comments, and GitHub API calls.
 - If the user provides a GitHub URL, inspect it with `gh`.
-- When fixing CodeRabbit CI review comments, reply to each resolved conversation and close it.
+- When fixing CodeRabbit CI review comments, REPLY to each resolved conversation and CLOSE it.
 
 ## Worktrees
 - For branch/worktree start-of-work decisions, use the `implementation-worktree-strategy` skill.
