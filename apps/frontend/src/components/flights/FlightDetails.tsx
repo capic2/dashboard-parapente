@@ -58,6 +58,7 @@ export function FlightDetails({
   const [activeTab, setActiveTab] = useState<FlightDetailsTab>('infos');
 
   const hasGpx = Boolean(flight.gpx_file_path);
+  const hasVideo = Boolean(flight.video_file_path);
   const normalizedTitle = flight.title?.trim();
   const flightTitle =
     normalizedTitle ||
@@ -171,6 +172,21 @@ export function FlightDetails({
               className="hidden"
             />
           </div>
+
+          {(hasGpx || hasVideo) && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {hasGpx && (
+                <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800 dark:bg-green-900/30 dark:text-green-200">
+                  {t('flights.gpxBadge')}
+                </span>
+              )}
+              {hasVideo && (
+                <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-200">
+                  {t('flights.videoBadge')}
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
             <div>
@@ -314,29 +330,6 @@ export function FlightDetails({
             )}
           </div>
 
-          <div className="mt-4 pt-4 border-t dark:border-gray-700">
-            {flight.gpx_file_path ? (
-              <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
-                <span className="text-xl">✅</span>
-                <div>
-                  <p className="font-medium">{t('flights.gpxAvailable')}</p>
-                  <p className="text-xs text-green-600 dark:text-green-400">
-                    {t('flights.viewer3dActive')}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-sm text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg">
-                <span className="text-xl">⚠️</span>
-                <div>
-                  <p className="font-medium">{t('flights.gpxMissingDetail')}</p>
-                  <p className="text-xs text-orange-600 dark:text-orange-400">
-                    {t('flights.gpxMissingHint')}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
         </>
       )}
     </div>
