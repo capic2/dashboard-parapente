@@ -232,21 +232,16 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
           />
           {debouncedQuery.length >= 3 && !selectedLocation && (
             <Popover className="z-20 w-(--trigger-width) overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
-              <ListBox
-                aria-label="Suggestions de villes"
-                className="max-h-72 overflow-auto outline-none"
-              >
-                {locationSearch.isLoading ? (
-                  <ListBoxItem
-                    id="city-search-loading"
-                    isDisabled
-                    textValue="Recherche des villes"
-                    className="p-3 text-sm text-gray-600 dark:text-gray-300"
-                  >
-                    Recherche des villes...
-                  </ListBoxItem>
-                ) : locationSearch.data?.locations.length ? (
-                  locationSearch.data.locations.map((location) => (
+              {locationSearch.isLoading ? (
+                <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
+                  Recherche des villes...
+                </div>
+              ) : locationSearch.data?.locations.length ? (
+                <ListBox
+                  aria-label="Suggestions de villes"
+                  className="max-h-72 overflow-auto outline-none"
+                >
+                  {locationSearch.data.locations.map((location) => (
                     <ListBoxItem
                       key={location.id}
                       id={location.id}
@@ -260,18 +255,13 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
                         {location.display_name}
                       </span>
                     </ListBoxItem>
-                  ))
-                ) : (
-                  <ListBoxItem
-                    id="city-search-empty"
-                    isDisabled
-                    textValue="Aucune ville trouvée"
-                    className="p-3 text-sm text-gray-600 dark:text-gray-300"
-                  >
-                    Aucune ville trouvée.
-                  </ListBoxItem>
-                )}
-              </ListBox>
+                  ))}
+                </ListBox>
+              ) : (
+                <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
+                  Aucune ville trouvée.
+                </div>
+              )}
             </Popover>
           )}
         </ComboBox>

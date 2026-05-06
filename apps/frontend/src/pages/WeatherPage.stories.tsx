@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import preview from '../../.storybook/preview';
-import { expect } from 'storybook/test';
+import { expect, screen } from 'storybook/test';
 import WeatherPage from './WeatherPage';
 
 const meta = preview.meta({
@@ -512,9 +512,29 @@ const bestSpotsHandler = http.get('*/api/spots/best', ({ request }) => {
 
   return HttpResponse.json(mockBestSpotByDay[dayIndex] ?? mockBestSpot);
 });
+const hourlyBestSpotsHandler = http.get(
+  '*/api/spots/best/hourly',
+  ({ request }) => {
+    const url = new URL(request.url);
+    const dayIndex = Number(url.searchParams.get('day_index') || '0');
+    const hours = Number(url.searchParams.get('hours') || '24');
+    const bestSpot = mockBestSpotByDay[dayIndex] ?? mockBestSpot;
+
+    return HttpResponse.json({
+      dayIndex,
+      startHour: 9,
+      hours: Array.from({ length: Math.min(hours, 3) }, (_, index) => ({
+        ...bestSpot,
+        hour: 9 + index,
+      })),
+    });
+  }
+);
 const spotDetailsHandler = http.get('*/api/spots/:id', ({ params }) => {
   const site = mockSites.sites.find((s) => s.id === params.id);
-  return site ? HttpResponse.json(site) : new HttpResponse(null, { status: 404 });
+  return site
+    ? HttpResponse.json(site)
+    : new HttpResponse(null, { status: 404 });
 });
 const weatherArguelHandler = http.get('*/api/weather/site-arguel', () =>
   HttpResponse.json(mockWeatherArguel)
@@ -556,6 +576,7 @@ const defaultHandlers = [
   coordinatesWeatherHandler,
   spotWeatherHandler,
   bestSpotsHandler,
+  hourlyBestSpotsHandler,
   spotDetailsHandler,
   weatherArguelHandler,
   weatherChalaisHandler,
@@ -661,8 +682,8 @@ WithCitySearch.test(
   async ({ canvas, userEvent }) => {
     const input = await canvas.findByPlaceholderText(/Besançon/);
     await userEvent.type(input, 'Besan');
-    await canvas.findByText('Besançon');
-    await userEvent.click(canvas.getByText('Besançon'));
+    const suggestion = await screen.findByRole('option', { name: /Besançon/ });
+    await userEvent.click(suggestion);
     await canvas.findByText('Arguel déco');
     await canvas.findByText("Plaine d'Arguel");
     await canvas.findByText('Météo sélectionnée');
