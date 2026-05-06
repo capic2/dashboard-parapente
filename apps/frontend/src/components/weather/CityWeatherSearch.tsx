@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Input, Label, TextField } from 'react-aria-components';
+import {
+  ComboBox,
+  Input,
+  Label,
+  ListBox,
+  ListBoxItem,
+  Popover,
+} from 'react-aria-components';
 import { Button } from '@dashboard-parapente/design-system';
 import type {
   BackendWeatherResponse,
@@ -136,48 +143,6 @@ function spotDescription(spot: ParaglidingSpotSearchResult) {
   return parts.join(' · ');
 }
 
-function LocationSuggestions({
-  isLoading,
-  locations,
-  onSelectLocation,
-}: {
-  isLoading: boolean;
-  locations: LocationSuggestion[] | undefined;
-  onSelectLocation: (location: LocationSuggestion) => void;
-}) {
-  if (isLoading) {
-    return (
-      <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
-        Recherche des villes...
-      </div>
-    );
-  }
-
-  if (!locations?.length) {
-    return (
-      <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
-        Aucune ville trouvée.
-      </div>
-    );
-  }
-
-  return locations.map((location) => (
-    <button
-      key={location.id}
-      type="button"
-      onClick={() => onSelectLocation(location)}
-      className="block w-full border-b border-gray-100 px-3 py-2 text-left last:border-b-0 hover:bg-sky-50 dark:border-gray-800 dark:hover:bg-sky-950/40"
-    >
-      <span className="block font-medium text-gray-950 dark:text-white">
-        {location.name}
-      </span>
-      <span className="block text-xs text-gray-500 dark:text-gray-400">
-        {location.display_name}
-      </span>
-    </button>
-  ));
-}
-
 export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -239,30 +204,77 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
       </div>
 
       <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-end">
-        <TextField className="relative flex flex-col gap-1">
+        <ComboBox
+          inputValue={query}
+          selectedKey={selectedLocation?.id ?? null}
+          allowsCustomValue
+          menuTrigger="input"
+          onInputChange={(value) => {
+            setQuery(value);
+            setSelectedLocation(null);
+            setSelectedOption(null);
+          }}
+          onSelectionChange={(key) => {
+            if (key == null) return;
+            const location = locationSearch.data?.locations.find(
+              (item) => item.id === String(key)
+            );
+            if (location) handleSelectLocation(location);
+          }}
+          className="relative flex flex-col gap-1"
+        >
           <Label className="text-sm font-medium text-gray-700 dark:text-gray-200">
             Ville
           </Label>
           <Input
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setSelectedLocation(null);
-              setSelectedOption(null);
-            }}
             placeholder="Ex: Besançon, Annecy, Grenoble..."
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
           {debouncedQuery.length >= 3 && !selectedLocation && (
-            <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
-              <LocationSuggestions
-                isLoading={locationSearch.isLoading}
-                locations={locationSearch.data?.locations}
-                onSelectLocation={handleSelectLocation}
-              />
-            </div>
+            <Popover className="z-20 w-(--trigger-width) overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+              <ListBox
+                aria-label="Suggestions de villes"
+                className="max-h-72 overflow-auto outline-none"
+              >
+                {locationSearch.isLoading ? (
+                  <ListBoxItem
+                    id="city-search-loading"
+                    isDisabled
+                    textValue="Recherche des villes"
+                    className="p-3 text-sm text-gray-600 dark:text-gray-300"
+                  >
+                    Recherche des villes...
+                  </ListBoxItem>
+                ) : locationSearch.data?.locations.length ? (
+                  locationSearch.data.locations.map((location) => (
+                    <ListBoxItem
+                      key={location.id}
+                      id={location.id}
+                      textValue={location.name}
+                      className="cursor-pointer border-b border-gray-100 px-3 py-2 outline-none last:border-b-0 hover:bg-sky-50 focus:bg-sky-50 dark:border-gray-800 dark:hover:bg-sky-950/40 dark:focus:bg-sky-950/40"
+                    >
+                      <span className="block font-medium text-gray-950 dark:text-white">
+                        {location.name}
+                      </span>
+                      <span className="block text-xs text-gray-500 dark:text-gray-400">
+                        {location.display_name}
+                      </span>
+                    </ListBoxItem>
+                  ))
+                ) : (
+                  <ListBoxItem
+                    id="city-search-empty"
+                    isDisabled
+                    textValue="Aucune ville trouvée"
+                    className="p-3 text-sm text-gray-600 dark:text-gray-300"
+                  >
+                    Aucune ville trouvée.
+                  </ListBoxItem>
+                )}
+              </ListBox>
+            </Popover>
           )}
-        </TextField>
+        </ComboBox>
 
         <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
           Rayon

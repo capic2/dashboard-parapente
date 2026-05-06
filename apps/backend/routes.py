@@ -358,7 +358,15 @@ async def search_location_suggestions(
     """Search city/location suggestions for autocomplete."""
     from spots import search_locations
 
-    locations = search_locations(query, country, limit)
+    try:
+        locations = await asyncio.to_thread(search_locations, query, country, limit)
+    except Exception as exc:
+        logger.exception("Location search failed for query %s", query)
+        raise HTTPException(
+            status_code=502,
+            detail="Location search service is currently unavailable. Please retry later.",
+        ) from exc
+
     return {"query": query, "locations": locations}
 
 
@@ -376,8 +384,16 @@ async def get_nearby_flight_options(
     """Return the selected city plus nearby takeoff and landing options."""
     from spots import search_by_coordinates
 
-    takeoffs = search_by_coordinates(db, lat, lon, radius_km, "takeoff")["spots"][:limit]
-    landings = search_by_coordinates(db, lat, lon, radius_km, "landing")["spots"][:limit]
+    takeoff_result = search_by_coordinates(db, lat, lon, radius_km, "takeoff")
+    if "error" in takeoff_result:
+        raise HTTPException(status_code=404, detail=takeoff_result["error"])
+
+    landing_result = search_by_coordinates(db, lat, lon, radius_km, "landing")
+    if "error" in landing_result:
+        raise HTTPException(status_code=404, detail=landing_result["error"])
+
+    takeoffs = takeoff_result["spots"][:limit]
+    landings = landing_result["spots"][:limit]
 
     return {
         "city_option": {
