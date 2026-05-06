@@ -302,6 +302,44 @@ export const GeocodeResponseSchema = z.object({
   display_name: z.string(),
 });
 
+export const LocationSuggestionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  display_name: z.string(),
+  latitude: z.number(),
+  longitude: z.number(),
+  country: z.string().default('FR'),
+});
+
+export const LocationSearchResponseSchema = z.object({
+  query: z.string(),
+  locations: z.array(LocationSuggestionSchema),
+});
+
+export const NearbyFlightOptionsResponseSchema = z.object({
+  city_option: LocationSuggestionSchema,
+  radius_km: z.number(),
+  limit: z.number(),
+  takeoffs: z.array(ParaglidingSpotSearchResultSchema),
+  landings: z.array(ParaglidingSpotSearchResultSchema),
+});
+
+export const SpotWeatherResponseSchema = BackendWeatherResponseSchema.extend({
+  spot_id: z.string().optional(),
+  spot_name: z.string().optional(),
+  spot_type: z.string().optional(),
+  spot_orientation: z.string().nullish(),
+  spot_elevation_m: z.number().nullish(),
+  spot_rating: z.number().nullish(),
+  coordinates: z
+    .object({ latitude: z.number(), longitude: z.number() })
+    .optional(),
+}).transform((data) => ({
+  ...data,
+  site_id: data.site_id || data.spot_id || '',
+  site_name: data.site_name || data.spot_name || '',
+}));
+
 // ============================================================================
 // BEST SPOT SCHEMAS
 // ============================================================================
@@ -432,6 +470,14 @@ export type ParaglidingSpotSearchResult = z.infer<
 >;
 export type SpotSearchResponse = z.infer<typeof SpotSearchResponseSchema>;
 export type GeocodeResponse = z.infer<typeof GeocodeResponseSchema>;
+export type LocationSuggestion = z.infer<typeof LocationSuggestionSchema>;
+export type LocationSearchResponse = z.infer<
+  typeof LocationSearchResponseSchema
+>;
+export type NearbyFlightOptionsResponse = z.infer<
+  typeof NearbyFlightOptionsResponseSchema
+>;
+export type SpotWeatherResponse = z.infer<typeof SpotWeatherResponseSchema>;
 export type FlightRecord = z.infer<typeof FlightRecordSchema>;
 export type FlightRecords = z.infer<typeof FlightRecordsSchema>;
 export type GeoPoint = z.infer<typeof GeoPointSchema>;

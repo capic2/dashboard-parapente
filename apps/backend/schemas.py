@@ -255,6 +255,20 @@ class WeatherResponse(BaseModel):
     forecast: WeatherForecast
 
 
+class LocationSuggestion(BaseModel):
+    id: str
+    name: str
+    display_name: str
+    latitude: float
+    longitude: float
+    country: str = "FR"
+
+
+class LocationSearchResponse(BaseModel):
+    query: str
+    locations: list[LocationSuggestion]
+
+
 class HealthResponse(BaseModel):
     status: str
     message: str
@@ -300,6 +314,14 @@ class SpotSearchResponse(BaseModel):
     query: dict[str, Any]
     total: int
     spots: list[ParaglidingSpotSearchResult]
+
+
+class NearbyFlightOptionsResponse(BaseModel):
+    city_option: LocationSuggestion
+    radius_km: int
+    limit: int
+    takeoffs: list[ParaglidingSpotSearchResult]
+    landings: list[ParaglidingSpotSearchResult]
 
 
 class SyncSpotsResponse(BaseModel):

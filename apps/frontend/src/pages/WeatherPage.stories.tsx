@@ -340,6 +340,56 @@ const mockLandingWeather = [
   },
 ];
 
+const mockLocationSearch = {
+  query: 'Besan',
+  locations: [
+    {
+      id: 'osm-besancon',
+      name: 'Besançon',
+      display_name: 'Besançon, Doubs, Bourgogne-Franche-Comté, France',
+      latitude: 47.238,
+      longitude: 6.024,
+      country: 'FR',
+    },
+  ],
+};
+
+const mockNearbyFlightOptions = {
+  city_option: mockLocationSearch.locations[0],
+  radius_km: 30,
+  limit: 5,
+  takeoffs: [
+    {
+      id: 'merged-takeoff-arguel',
+      name: 'Arguel déco',
+      type: 'takeoff' as const,
+      latitude: 47.2,
+      longitude: 6.0,
+      elevation_m: 427,
+      orientation: 'SW',
+      rating: 4,
+      country: 'FR',
+      source: 'merged',
+      distance_km: 4.9,
+    },
+  ],
+  landings: [
+    {
+      id: 'merged-landing-arguel',
+      name: "Plaine d'Arguel",
+      type: 'landing' as const,
+      latitude: 47.19,
+      longitude: 5.99,
+      elevation_m: 250,
+      orientation: null,
+      rating: 3,
+      country: 'FR',
+      source: 'merged',
+      distance_km: 5.8,
+    },
+  ],
+};
+
 const mockBestSpot = {
   site: {
     id: 'site-arguel',
@@ -435,6 +485,24 @@ const mockLiveWindChalais = {
 
 const defaultHandlers = [
   http.get('*/api/spots', () => HttpResponse.json(mockSites)),
+  http.get('*/api/locations/search', () => HttpResponse.json(mockLocationSearch)),
+  http.get('*/api/locations/nearby-flight-options', () =>
+    HttpResponse.json(mockNearbyFlightOptions)
+  ),
+  http.get('*/api/weather/coordinates', () =>
+    HttpResponse.json({
+      ...mockWeatherArguel,
+      site_id: 'coordinates',
+      site_name: 'Besançon',
+    })
+  ),
+  http.get('*/api/spots/weather/:spotId', () =>
+    HttpResponse.json({
+      ...mockWeatherArguel,
+      spot_id: 'merged-takeoff-arguel',
+      spot_name: 'Arguel déco',
+    })
+  ),
   http.get('*/api/spots/best', ({ request }) => {
     const dayIndex = Number(
       new URL(request.url).searchParams.get('day_index') || '0'
@@ -542,6 +610,27 @@ WithSelectedSite.test(
     await canvas.findByText('Chalais');
     await expect(canvas.getByText('Arguel')).toBeInTheDocument();
     await canvas.findByText(/Best spot for|Meilleur spot pour/);
+  }
+);
+
+export const WithCitySearch = meta.story({
+  name: 'With City Search',
+  parameters: {
+    router: weatherRouteConfig,
+    msw: { handlers: defaultHandlers },
+  },
+});
+
+WithCitySearch.test(
+  'suggests city and displays nearby flight options',
+  async ({ canvas, userEvent }) => {
+    const input = await canvas.findByPlaceholderText(/Besançon/);
+    await userEvent.type(input, 'Besan');
+    await canvas.findByText('Besançon');
+    await userEvent.click(canvas.getByText('Besançon'));
+    await canvas.findByText('Arguel déco');
+    await canvas.findByText("Plaine d'Arguel");
+    await canvas.findByText('Météo sélectionnée');
   }
 );
 
