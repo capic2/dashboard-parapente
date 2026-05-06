@@ -10,6 +10,9 @@ describe('toStatusPayload', () => {
       progress: 62,
       eta_seconds: 540,
       message: 'Encoding 32%',
+      can_resume: true,
+      frames_captured: 120,
+      resume_from_frame: 120,
       phase: 'encoding',
     });
 
@@ -20,6 +23,9 @@ describe('toStatusPayload', () => {
       progress: 62,
       eta_seconds: 540,
       message: 'Encoding 32%',
+      can_resume: true,
+      frames_captured: 120,
+      resume_from_frame: 120,
       phase: 'encoding',
     });
   });

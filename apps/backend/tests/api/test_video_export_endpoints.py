@@ -235,6 +235,28 @@ class TestExportStatusAndCancel:
         assert response.json()["job_id"] == "job-stream"
         mock_stream.assert_called_once_with("job-stream")
 
+    def test_export_resume_requeues_resumable_manual_job(self, client: TestClient):
+        """Resume endpoint should pass auth token through to manual exporter."""
+        with patch("routes.resume_video_export", return_value=True) as resume:
+            response = client.post(
+                f"{API_PREFIX}/exports/job-cancelled/resume",
+                headers={"Authorization": "Bearer resume-token"},
+            )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "message": "Export resume enqueued",
+            "job_id": "job-cancelled",
+        }
+        resume.assert_called_once_with("job-cancelled", auth_token="resume-token")
+
+    def test_export_resume_returns_400_when_job_cannot_resume(self, client: TestClient):
+        with patch("routes.resume_video_export", return_value=False):
+            response = client.post(f"{API_PREFIX}/exports/job-completed/resume")
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Export job not found or cannot be resumed"
+
     def test_export_download_missing_file_returns_not_found(self, client: TestClient):
         """Completed status without existing file should return 404."""
         with patch(

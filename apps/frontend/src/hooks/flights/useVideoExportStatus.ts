@@ -18,6 +18,9 @@ export type VideoExportStatusPayload = {
   progress?: number;
   message?: string | null;
   eta_seconds?: number;
+  can_resume?: boolean;
+  frames_captured?: number;
+  resume_from_frame?: number | null;
   phase?: VideoExportPhase;
 };
 
@@ -58,6 +61,16 @@ export const toStatusPayload = (
       typeof value.eta_seconds === 'number'
         ? Math.max(0, value.eta_seconds)
         : undefined,
+    can_resume:
+      typeof value.can_resume === 'boolean' ? value.can_resume : undefined,
+    frames_captured:
+      typeof value.frames_captured === 'number'
+        ? Math.max(0, value.frames_captured)
+        : undefined,
+    resume_from_frame:
+      typeof value.resume_from_frame === 'number'
+        ? Math.max(0, value.resume_from_frame)
+        : null,
     phase:
       typeof value.phase === 'string'
         ? (value.phase as VideoExportPhase)

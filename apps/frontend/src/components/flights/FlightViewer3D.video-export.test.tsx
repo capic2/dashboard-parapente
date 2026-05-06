@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   apiGet,
   apiPost,
+  exportStatusMock,
   invalidateQueries,
   mockFlight,
   viewerInstances,
@@ -12,6 +13,7 @@ const {
 } = vi.hoisted(() => ({
     apiGet: vi.fn(),
     apiPost: vi.fn(),
+    exportStatusMock: { current: null as unknown },
     invalidateQueries: vi.fn(),
     viewerInstances: [] as {
       render: ReturnType<typeof vi.fn>;
@@ -189,6 +191,8 @@ vi.mock('react-i18next', () => ({
         'flights.viewer.videoModeManualHint': 'Manual hint',
         'flights.viewer.generateVideo': 'Generate video',
         'flights.viewer.downloadVideo': 'Download video',
+        'flights.viewer.resumeVideo': 'Resume generation',
+        'flights.viewer.videoResumeHint': 'frames preserved',
         'flights.viewer.videoSection': 'Video',
       })[key] ?? key,
   }),
@@ -217,7 +221,7 @@ vi.mock('../../hooks/flights/useFlight', () => ({
 
 vi.mock('../../hooks/flights/useVideoExportStatus', () => ({
   formatEta: () => null,
-  useVideoExportStatus: () => ({ status: null }),
+  useVideoExportStatus: () => ({ status: exportStatusMock.current }),
 }));
 
 vi.mock('../../lib/api', () => ({
@@ -267,6 +271,7 @@ describe('FlightViewer3D video export mode', () => {
     mockFlight.video_export_status = null;
     mockFlight.video_export_job_id = null;
     mockFlight.video_file_path = null;
+    exportStatusMock.current = null;
     window._exportMode = undefined;
     window._setExportFrame = undefined;
   });
@@ -380,6 +385,29 @@ describe('FlightViewer3D video export mode', () => {
       expect(apiPost).toHaveBeenCalledWith('flights/flight-1/export-video', {
         searchParams: { mode: 'manual' },
       });
+    });
+  });
+
+  it('resumes a cancelled export when preserved frames are available', async () => {
+    mockFlight.video_export_status = 'cancelled';
+    mockFlight.video_export_job_id = 'job-cancelled';
+    exportStatusMock.current = {
+      job_id: 'job-cancelled',
+      status: 'failed',
+      internal_status: 'cancelled',
+      can_resume: true,
+      frames_captured: 25,
+      resume_from_frame: 25,
+    };
+
+    render(<FlightViewer3D flightId="flight-1" />);
+
+    expect(screen.getByText('frames preserved')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Resume generation/ }));
+
+    await waitFor(() => {
+      expect(apiPost).toHaveBeenCalledWith('exports/job-cancelled/resume');
     });
   });
 
