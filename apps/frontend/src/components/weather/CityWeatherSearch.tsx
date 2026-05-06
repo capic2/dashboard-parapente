@@ -204,7 +204,8 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
       </div>
 
       <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-end">
-        <ComboBox
+        <ComboBox<LocationSuggestion>
+          items={locationSearch.data?.locations ?? []}
           inputValue={query}
           selectedKey={selectedLocation?.id ?? null}
           allowsCustomValue
@@ -230,40 +231,33 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
             placeholder="Ex: Besançon, Annecy, Grenoble..."
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
-          {debouncedQuery.length >= 3 && !selectedLocation && (
-            <Popover className="z-20 w-(--trigger-width) overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
-              {locationSearch.isLoading ? (
-                <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
-                  Recherche des villes...
-                </div>
-              ) : locationSearch.data?.locations.length ? (
-                <ListBox
-                  aria-label="Suggestions de villes"
-                  className="max-h-72 overflow-auto outline-none"
-                >
-                  {locationSearch.data.locations.map((location) => (
-                    <ListBoxItem
-                      key={location.id}
-                      id={location.id}
-                      textValue={location.name}
-                      className="cursor-pointer border-b border-gray-100 px-3 py-2 outline-none last:border-b-0 hover:bg-sky-50 focus:bg-sky-50 dark:border-gray-800 dark:hover:bg-sky-950/40 dark:focus:bg-sky-950/40"
-                    >
-                      <span className="block font-medium text-gray-950 dark:text-white">
-                        {location.name}
-                      </span>
-                      <span className="block text-xs text-gray-500 dark:text-gray-400">
-                        {location.display_name}
-                      </span>
-                    </ListBoxItem>
-                  ))}
-                </ListBox>
-              ) : (
-                <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
-                  Aucune ville trouvée.
-                </div>
-              )}
-            </Popover>
-          )}
+          <Popover className="z-20 w-(--trigger-width) overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+            {locationSearch.isLoading && debouncedQuery.length >= 3 ? (
+              <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
+                Recherche des villes...
+              </div>
+            ) : (
+              <ListBox
+                aria-label="Suggestions de villes"
+                className="max-h-72 overflow-auto outline-none"
+              >
+                {(location) => (
+                  <ListBoxItem
+                    id={location.id}
+                    textValue={location.name}
+                    className="cursor-pointer border-b border-gray-100 px-3 py-2 outline-none last:border-b-0 hover:bg-sky-50 focus:bg-sky-50 dark:border-gray-800 dark:hover:bg-sky-950/40 dark:focus:bg-sky-950/40"
+                  >
+                    <span className="block font-medium text-gray-950 dark:text-white">
+                      {location.name}
+                    </span>
+                    <span className="block text-xs text-gray-500 dark:text-gray-400">
+                      {location.display_name}
+                    </span>
+                  </ListBoxItem>
+                )}
+              </ListBox>
+            )}
+          </Popover>
         </ComboBox>
 
         <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
