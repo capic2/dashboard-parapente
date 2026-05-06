@@ -684,8 +684,8 @@ WithCitySearch.test(
     await userEvent.type(input, 'Besan');
     const suggestion = await screen.findByRole('option', { name: /Besançon/ });
     await userEvent.click(suggestion);
-    await canvas.findByText('Arguel déco');
-    await canvas.findByText("Plaine d'Arguel");
+    await canvas.findByRole('button', { name: /Arguel déco/ });
+    await canvas.findByRole('button', { name: /Plaine d'Arguel/ });
     await canvas.findByText('Météo sélectionnée');
   }
 );

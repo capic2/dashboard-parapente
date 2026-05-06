@@ -129,6 +129,16 @@ const mockBestSpot = {
 
 const defaultHandlers = [
   http.get('/api/spots', () => HttpResponse.json(mockSites)),
+  http.get('/api/spots/best/hourly', () =>
+    HttpResponse.json({
+      dayIndex: 0,
+      startHour: 9,
+      hours: [
+        { ...mockBestSpot, hour: 9 },
+        { ...mockBestSpot, hour: 10 },
+      ],
+    })
+  ),
   http.get('/api/spots/best', () => HttpResponse.json(mockBestSpot)),
   http.get('/api/spots/:id', ({ params }) => {
     const site = mockSites.sites.find((s) => s.id === params.id);
