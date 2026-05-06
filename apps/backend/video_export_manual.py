@@ -63,6 +63,7 @@ _EXPORT_JOBS_LOCK = threading.Lock()
 _JOB_RUNTIME_LOCK = threading.Lock()
 _JOB_UPDATE_DB: dict[str, bool] = {}
 _JOB_RUNTIME: dict[str, dict[str, Any]] = {}
+_JOB_CANCEL_REQUESTS: set[str] = set()
 
 _CANCEL_CHECK_INTERVAL = 10
 _FFMPEG_STALL_TIMEOUT_SECONDS = 10 * 60
@@ -154,6 +155,7 @@ def _normalize_frontend_url(frontend_url: str) -> str:
 
 
 def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
+    resume_info = _job_resume_info(job)
     snapshot = {
         "job_id": job.id,
         "flight_id": job.flight_id,
@@ -173,6 +175,7 @@ def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
         "created_at": _to_iso(job.created_at),
         "updated_at": _to_iso(job.updated_at),
         "cancelled_at": _to_iso(job.cancelled_at),
+        **resume_info,
     }
 
     with _JOB_RUNTIME_LOCK:
@@ -198,6 +201,21 @@ def _set_job_runtime(job_id: str, **kwargs: Any) -> None:
 def _clear_job_runtime(job_id: str) -> None:
     with _JOB_RUNTIME_LOCK:
         _JOB_RUNTIME.pop(job_id, None)
+
+
+def _set_job_cancel_requested(job_id: str) -> None:
+    with _JOB_RUNTIME_LOCK:
+        _JOB_CANCEL_REQUESTS.add(job_id)
+
+
+def _clear_job_cancel_requested(job_id: str) -> None:
+    with _JOB_RUNTIME_LOCK:
+        _JOB_CANCEL_REQUESTS.discard(job_id)
+
+
+def _is_job_cancel_requested(job_id: str) -> bool:
+    with _JOB_RUNTIME_LOCK:
+        return job_id in _JOB_CANCEL_REQUESTS
 
 
 def _set_memory_snapshot(job_id: str, data: dict[str, Any] | None):
@@ -342,6 +360,9 @@ def _update_job(
 
 
 def _is_cancelled(job_id: str) -> bool:
+    if _is_job_cancel_requested(job_id):
+        return True
+
     snapshot = _get_memory_snapshot(job_id)
     if snapshot and snapshot.get("internal_status") == _STATUS_CANCELLED:
         return True
@@ -398,6 +419,52 @@ def _acquire_next_job() -> str | None:
 def _cleanup_temp_dir(temp_dir: Path | None) -> None:
     if temp_dir is not None:
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def _frame_index_from_path(path: Path) -> int | None:
+    name = path.name
+    if not name.startswith("frame") or not name.endswith(".png"):
+        return None
+
+    raw_index = name.removeprefix("frame").removesuffix(".png")
+    if not raw_index.isdigit():
+        return None
+    return int(raw_index)
+
+
+def _existing_frame_indexes(frames_dir: Path) -> set[int]:
+    if not frames_dir.exists():
+        return set()
+
+    indexes: set[int] = set()
+    for frame_path in frames_dir.glob("frame*.png"):
+        frame_index = _frame_index_from_path(frame_path)
+        if frame_index is not None:
+            indexes.add(frame_index)
+    return indexes
+
+
+def _first_missing_frame_index(frames_dir: Path, total_frames: int) -> int:
+    existing_indexes = _existing_frame_indexes(frames_dir)
+    for frame_index in range(max(total_frames, 0)):
+        if frame_index not in existing_indexes:
+            return frame_index
+    return max(total_frames, 0)
+
+
+def _job_resume_info(job: VideoExportJob) -> dict[str, Any]:
+    frames_dir = _job_frames_dir(_video_temp_images_dir(), job.id)
+    existing_indexes = _existing_frame_indexes(frames_dir)
+    total_frames = job.total_frames or 0
+    resume_from_frame = _first_missing_frame_index(frames_dir, total_frames)
+    is_resumable_status = job.status in {_STATUS_CANCELLED, _STATUS_FAILED}
+    can_resume = is_resumable_status and bool(existing_indexes)
+
+    return {
+        "can_resume": can_resume,
+        "frames_captured": len(existing_indexes),
+        "resume_from_frame": resume_from_frame if can_resume else None,
+    }
 
 
 def _is_path_inside(path: Path, directory: Path) -> bool:
@@ -1080,12 +1147,28 @@ async def _export_video_manual_render(job_id: str):
             ms_per_frame = (duration_seconds * 1000) / max(total_frames, 1)
             print(f"⏱️  Capturing 1 frame every {ms_per_frame:.1f}ms")
             start_time = time.time()
+            resume_from_frame = _first_missing_frame_index(frames_dir, total_frames)
+            if resume_from_frame > 0:
+                frame_count = resume_from_frame
+                progress = _capture_progress_percent(frame_count, total_frames)
+                _set_job_runtime(
+                    job_id,
+                    phase=_STATUS_CAPTURING,
+                    frames_captured=frame_count,
+                    eta_seconds=None,
+                )
+                _update_job(
+                    job_id,
+                    status=_STATUS_CAPTURING,
+                    progress=progress,
+                    message=f"Resuming from frame {resume_from_frame}/{total_frames}",
+                )
+                print(f"▶️  Resuming capture from frame {resume_from_frame}/{total_frames}")
 
-            for i in range(total_frames):
+            for i in range(resume_from_frame, total_frames):
                 if i % _CANCEL_CHECK_INTERVAL == 0 and _is_cancelled(job_id):
                     print("🛑 Export cancelled by user")
                     await browser.close()
-                    _cleanup_temp_dir(temp_dir)
                     _update_job(
                         job_id,
                         status=_STATUS_CANCELLED,
@@ -1157,7 +1240,6 @@ async def _export_video_manual_render(job_id: str):
 
             if _is_cancelled(job_id):
                 print("🛑 Export cancelled by user before encoding")
-                _cleanup_temp_dir(temp_dir)
                 _update_job(
                     job_id,
                     status=_STATUS_CANCELLED,
@@ -1219,7 +1301,6 @@ async def _export_video_manual_render(job_id: str):
                     if _is_cancelled(job_id):
                         process.kill()
                         await process.wait()
-                        _cleanup_temp_dir(temp_dir)
                         _update_job(
                             job_id,
                             status=_STATUS_CANCELLED,
@@ -1327,7 +1408,6 @@ async def _export_video_manual_render(job_id: str):
             print(f"📹 Video: {output_file} ({file_size_mb:.1f} MB)")
 
     except Exception as e:
-        _cleanup_temp_dir(temp_dir)
         print(f"❌ Export failed: {e}")
         traceback.print_exc()
         _update_job(
@@ -1337,6 +1417,7 @@ async def _export_video_manual_render(job_id: str):
             message=f"Error: {e}",
         )
     finally:
+        _clear_job_cancel_requested(job_id)
         _clear_job_auth_token(job_id)
 
 
@@ -1359,6 +1440,9 @@ def cancel_video_export(job_id: str, update_db: bool = True) -> bool:
     if job.status in _TERMINAL_STATUSES:
         return False
 
+    if job.status != _STATUS_QUEUED:
+        _set_job_cancel_requested(job_id)
+
     _update_job(
         job_id,
         status=_STATUS_CANCELLED,
@@ -1369,6 +1453,52 @@ def cancel_video_export(job_id: str, update_db: bool = True) -> bool:
     _clear_job_auth_token(job_id)
 
     print(f"🛑 Video export {job_id} cancelled")
+    return True
+
+
+def resume_video_export(job_id: str, auth_token: str | None = None) -> bool:
+    """Resume a cancelled or failed manual export when captured frames are still present."""
+    job = _get_job(job_id)
+    if not job:
+        return False
+
+    if job.status not in {_STATUS_CANCELLED, _STATUS_FAILED}:
+        return False
+
+    if _is_job_cancel_requested(job_id):
+        return False
+
+    resume_info = _job_resume_info(job)
+    if not resume_info["can_resume"]:
+        return False
+
+    _set_job_update_db_flag(job_id, True)
+    _update_job(
+        job_id,
+        status=_STATUS_QUEUED,
+        progress=_capture_progress_percent(
+            int(resume_info["frames_captured"]),
+            job.total_frames or int(resume_info["frames_captured"]),
+        ),
+        message=(
+            f"Resume enqueued from frame {resume_info['resume_from_frame']}"
+            if resume_info["resume_from_frame"] is not None
+            else "Resume enqueued"
+        ),
+        error=None,
+        video_path=None,
+        completed_at=None,
+        cancelled_at=None,
+    )
+    _set_job_auth_token(job_id, auth_token)
+    _set_job_runtime(
+        job_id,
+        phase=_STATUS_QUEUED,
+        frames_captured=int(resume_info["frames_captured"]),
+        eta_seconds=None,
+    )
+    start_video_export_worker()
+    print(f"▶️  Video export {job_id} resumed")
     return True
 
 

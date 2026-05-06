@@ -277,9 +277,15 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const viewerUnitsRef = useRef<ViewerUnits>(viewerUnits);
 
   const isExportActive = isVideoExportInProgress(flight?.video_export_status);
+  const shouldReadExportStatus = Boolean(
+    flight?.video_export_job_id &&
+      (isExportActive ||
+        flight?.video_export_status === 'failed' ||
+        flight?.video_export_status === 'cancelled')
+  );
   const { status: exportStatus } = useVideoExportStatus(
     flight?.video_export_job_id,
-    Boolean(flight?.video_export_job_id && isExportActive)
+    shouldReadExportStatus
   );
 
   const exportProgress = Math.min(
@@ -287,6 +293,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     Math.max(0, Math.round(exportStatus?.progress ?? 0))
   );
   const exportEta = formatEta(exportStatus?.eta_seconds);
+  const canResumeVideoExport = Boolean(
+    flight?.video_export_job_id && exportStatus?.can_resume
+  );
 
   useEffect(() => {
     if (!flightId || !exportStatus?.internal_status) {
@@ -1404,6 +1413,25 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
   }, [flightId, isStartingVideoExport, queryClient, videoExportMode]);
 
+  const resumeVideoExport = useCallback(async () => {
+    if (isStartingVideoExport || !flight?.video_export_job_id) {
+      return;
+    }
+
+    setIsStartingVideoExport(true);
+    try {
+      await api.post(`exports/${flight.video_export_job_id}/resume`);
+      await queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
+    } finally {
+      setIsStartingVideoExport(false);
+    }
+  }, [
+    flight?.video_export_job_id,
+    flightId,
+    isStartingVideoExport,
+    queryClient,
+  ]);
+
   /**
    * Update site orientation
    */
@@ -1879,11 +1907,16 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             }
                           } else if (
                             !flight.video_export_status ||
-                            flight.video_export_status === 'failed'
+                            flight.video_export_status === 'failed' ||
+                            flight.video_export_status === 'cancelled'
                           ) {
                             // Generate video
                             try {
-                              await startVideoExport();
+                              if (canResumeVideoExport) {
+                                await resumeVideoExport();
+                              } else {
+                                await startVideoExport();
+                              }
                             } catch (error) {
                               if (error instanceof HTTPError) {
                                 const detail = await getHttpErrorDetail(error);
@@ -1928,7 +1961,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                               ? t('flights.viewer.videoDownloadTitle')
                               : flight.video_export_status === 'failed' ||
                                   flight.video_export_status === 'cancelled'
-                                ? t('flights.viewer.videoRegenerateTitle')
+                                ? canResumeVideoExport
+                                  ? t('flights.viewer.videoResumeTitle')
+                                  : t('flights.viewer.videoRegenerateTitle')
                                 : t('flights.viewer.videoGenerateTitle')
                         }
                       >
@@ -1938,10 +1973,20 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           `📥 ${t('flights.viewer.downloadVideo')}`}
                         {(flight.video_export_status === 'failed' ||
                           flight.video_export_status === 'cancelled') &&
-                          `🔄 ${t('flights.viewer.regenerateVideo')}`}
+                          (canResumeVideoExport
+                            ? `▶️ ${t('flights.viewer.resumeVideo')}`
+                            : `🔄 ${t('flights.viewer.regenerateVideo')}`)}
                         {!flight.video_export_status &&
                           `🎥 ${t('flights.viewer.generateVideo')}`}
                       </Button>
+
+                      {canResumeVideoExport && !isExportActive && (
+                        <p className="mb-3 text-xs text-blue-700 dark:text-blue-300">
+                          {t('flights.viewer.videoResumeHint', {
+                            count: exportStatus?.frames_captured ?? 0,
+                          })}
+                        </p>
+                      )}
 
                       {isVideoExportInProgress(flight.video_export_status) &&
                         flight.video_export_job_id && (
