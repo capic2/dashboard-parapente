@@ -66,21 +66,6 @@ export default function WeatherPage() {
       <div className="space-y-4">
         <CityWeatherSearch dayIndex={selectedDayIndex} />
 
-        {/* Site Selector */}
-        <SiteSelector
-          selectedSiteId={selectedSiteId}
-          onSelectSite={(siteId) =>
-            void navigate({
-              to: '/weather',
-              search: {
-                siteId,
-                day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
-              },
-            })
-          }
-          weatherData={weatherDataMap}
-        />
-
         {/* Best Spot for selected day */}
         <BestSpotSuggestion
           bestSpot={bestSpot ?? null}
@@ -96,6 +81,21 @@ export default function WeatherPage() {
             })
           }
           selectedDayIndex={selectedDayIndex}
+        />
+
+        {/* Site Selector */}
+        <SiteSelector
+          selectedSiteId={selectedSiteId}
+          onSelectSite={(siteId) =>
+            void navigate({
+              to: '/weather',
+              search: {
+                siteId,
+                day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
+              },
+            })
+          }
+          weatherData={weatherDataMap}
         />
 
         {/* Current Conditions */}
