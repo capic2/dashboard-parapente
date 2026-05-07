@@ -166,7 +166,7 @@ export default function ThermalAnalysis() {
           </p>
           <Button
             onClick={handleRefresh}
-            disabled={triggerMutation.isPending}
+            isDisabled={triggerMutation.isPending}
             className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
           >
             {triggerMutation.isPending
@@ -192,7 +192,7 @@ export default function ThermalAnalysis() {
         <h1 className="text-3xl font-bold">🌡️ {t('thermal.pageTitle')}</h1>
         <Button
           onClick={handleRefresh}
-          disabled={triggerMutation.isPending}
+          isDisabled={triggerMutation.isPending}
           className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
         >
           {triggerMutation.isPending

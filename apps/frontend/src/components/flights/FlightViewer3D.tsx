@@ -279,9 +279,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const isExportActive = isVideoExportInProgress(flight?.video_export_status);
   const shouldReadExportStatus = Boolean(
     flight?.video_export_job_id &&
-      (isExportActive ||
-        flight?.video_export_status === 'failed' ||
-        flight?.video_export_status === 'cancelled')
+    (isExportActive ||
+      flight?.video_export_status === 'failed' ||
+      flight?.video_export_status === 'cancelled')
   );
   const { status: exportStatus } = useVideoExportStatus(
     flight?.video_export_job_id,
@@ -1936,7 +1936,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             }
                           }
                         }}
-                        disabled={
+                        isDisabled={
                           isStartingVideoExport ||
                           isVideoExportInProgress(flight.video_export_status)
                         }
@@ -2093,7 +2093,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                               toast.error(t('flights.viewer.regenerateError'));
                             }
                           }}
-                          disabled={isStartingVideoExport}
+                          isDisabled={isStartingVideoExport}
                           className="w-full px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed mb-3"
                           title={t('flights.viewer.regenerateTitle')}
                         >
@@ -2272,7 +2272,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         </Button>
                         <Button
                           onClick={saveCameraSettings}
-                          disabled={isUpdatingCamera}
+                          isDisabled={isUpdatingCamera}
                           className={`w-full ${compactControlButtonClassName} bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed`}
                           data-testid="camera-save-button"
                         >
@@ -2303,7 +2303,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                       </label>
                       <Button
                         onClick={calculateAutoElevationOffset}
-                        disabled={isCalculatingOffset}
+                        isDisabled={isCalculatingOffset}
                         className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
                         title={t('flights.viewer.calculateAutoOffsetTitle')}
                       >

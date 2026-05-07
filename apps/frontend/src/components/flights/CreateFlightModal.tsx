@@ -183,13 +183,13 @@ export function CreateFlightModal({
           <Button
             onClick={handleClose}
             className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
-            disabled={isPending}
+            isDisabled={isPending}
           >
             {t('common.cancel')}
           </Button>
           <Button
             onClick={handleUpload}
-            disabled={isPending || !selectedFile}
+            isDisabled={isPending || !selectedFile}
             className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             {isPending ? (

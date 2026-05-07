@@ -808,7 +808,7 @@ function GroupSection({
       <div className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
         <Button
           onPress={onToggle}
-          tone="ghost"
+          variant="ghost"
           className="flex-1 flex items-center gap-3 min-w-0 justify-start"
         >
           <span

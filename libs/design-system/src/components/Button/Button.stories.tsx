@@ -1,4 +1,4 @@
-import preview from '../.storybook/preview';
+import preview from '../../../.storybook/preview';
 import { Button } from './Button';
 
 const meta = preview.meta({
@@ -54,13 +54,13 @@ export const Variants = meta.story({
   name: 'Variants',
   render: () => (
     <div className="flex flex-wrap gap-3">
-      <Button tone="primary">Primary</Button>
-      <Button tone="secondary">Secondary</Button>
-      <Button tone="success">Success</Button>
-      <Button tone="warning">Warning</Button>
-      <Button tone="danger">Danger</Button>
-      <Button tone="ghost">Ghost</Button>
-      <Button tone="outline">Outline</Button>
+      <Button variant="primary">Primary</Button>
+      <Button variant="secondary">Secondary</Button>
+      <Button variant="success">Success</Button>
+      <Button variant="warning">Warning</Button>
+      <Button variant="danger">Danger</Button>
+      <Button variant="ghost">Ghost</Button>
+      <Button variant="outline">Outline</Button>
     </div>
   ),
 });
