@@ -220,12 +220,13 @@ export default function WeatherPage() {
               <div
                 aria-label={t('weather.forecast7Days')}
                 className="flex flex-wrap gap-2"
-                role="group"
+                role="tablist"
               >
                 {Array.from({ length: 7 }, (_, day) => (
                   <Button
                     key={day}
                     aria-pressed={day === selectedDayIndex}
+                    aria-selected={day === selectedDayIndex}
                     onPress={() =>
                       void navigate({
                         to: '/weather',
@@ -235,6 +236,7 @@ export default function WeatherPage() {
                         },
                       })
                     }
+                    role="tab"
                     className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
                       day === selectedDayIndex
                         ? 'bg-sky-600 text-white'

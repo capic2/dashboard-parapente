@@ -100,7 +100,9 @@ export const transformWeatherResponse = (
       wind_direction: formatWindDirection(hour.wind_direction),
       wind_direction_deg: hour.wind_direction ?? null,
       conditions:
-        hour.cloud_cover !== null ? `${Math.round(hour.cloud_cover)}% nuages` : 'N/A',
+        hour.cloud_cover !== null
+          ? `${Math.round(hour.cloud_cover)}% nuages`
+          : 'N/A',
       precipitation: hour.precipitation ?? null,
       para_index: hour.para_index ?? 0,
       verdict: hour.verdict ?? hourToVerdict.get(hour.hour) ?? 'N/A',
@@ -131,7 +133,10 @@ export const transformWeatherResponse = (
 
   const buildCurrentConditions = (): string => {
     const conditions: string[] = [];
-    if (currentHour.cloud_cover !== null && currentHour.cloud_cover !== undefined) {
+    if (
+      currentHour.cloud_cover !== null &&
+      currentHour.cloud_cover !== undefined
+    ) {
       conditions.push(`${Math.round(currentHour.cloud_cover)}% nuages`);
     }
 

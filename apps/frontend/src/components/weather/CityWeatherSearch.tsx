@@ -255,7 +255,8 @@ export default function CityWeatherSearch({
     Math.abs(site.latitude - selectedSpot.latitude) < 0.0001 &&
     Math.abs(site.longitude - selectedSpot.longitude) < 0.0001;
   const isSelectedSpotFavorite = selectedSpot
-    ? createdSpotIds.has(selectedSpot.id) || favoriteSites.some(isSameFavoriteSite)
+    ? createdSpotIds.has(selectedSpot.id) ||
+      favoriteSites.some(isSameFavoriteSite)
     : false;
 
   const handleCreateFavorite = async () => {
