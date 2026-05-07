@@ -178,6 +178,7 @@ export default function CityWeatherSearch({
   const createSite = useCreateSite();
   const [createdSpotIds, setCreatedSpotIds] = useState<Set<string>>(new Set());
   const [favoriteError, setFavoriteError] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(Boolean(selectedTarget));
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedQuery(query), 300);
@@ -227,6 +228,7 @@ export default function CityWeatherSearch({
     setSelectedLocation(location);
     setSelectedOption(target);
     onSelectTarget(target);
+    setIsExpanded(true);
     setFavoriteError(null);
     setQuery(location.name);
     setActiveSuggestionIndex(0);
@@ -239,6 +241,7 @@ export default function CityWeatherSearch({
     const target: SelectedOption = { type, spot };
     setSelectedOption(target);
     onSelectTarget(target);
+    setIsExpanded(true);
     setFavoriteError(null);
   };
 
@@ -299,20 +302,29 @@ export default function CityWeatherSearch({
 
   return (
     <section className="rounded-2xl border border-sky-100 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800 sm:p-6">
-      <div className="mb-4">
-        <p className="text-sm font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
-          Recherche météo par ville
-        </p>
-        <h2 className="text-2xl font-bold text-gray-950 dark:text-white">
-          Choisir une ville, un déco ou un atterro proche
-        </h2>
-        {activeTargetLabel && (
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-            Détail météo affiché pour {activeTargetLabel}
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+            Recherche météo par ville
           </p>
-        )}
+          <h2 className="text-xl font-bold text-gray-950 dark:text-white sm:text-2xl">
+            Choisir une ville, un déco ou un atterro proche
+          </h2>
+          {activeTargetLabel && (
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+              Détail météo affiché pour {activeTargetLabel}
+            </p>
+          )}
+        </div>
+        <Button
+          onPress={() => setIsExpanded((expanded) => !expanded)}
+          className="shrink-0 rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900 sm:hidden"
+        >
+          {isExpanded ? 'Masquer' : 'Ouvrir'}
+        </Button>
       </div>
 
+      <div className={`${isExpanded ? 'block' : 'hidden'} sm:block`}>
       <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-end">
         <TextField className="relative flex flex-col gap-1">
           <Label className="text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -548,6 +560,7 @@ export default function CityWeatherSearch({
           ) : null}
         </div>
       )}
+      </div>
     </section>
   );
 }

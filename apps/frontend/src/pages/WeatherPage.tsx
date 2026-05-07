@@ -106,15 +106,15 @@ export default function WeatherPage() {
   };
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]">
-      <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
-        <section className="rounded-2xl border border-sky-100 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
+    <div className="grid gap-3 sm:gap-4 xl:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]">
+      <aside className="space-y-3 sm:space-y-4 xl:sticky xl:top-4 xl:self-start">
+        <section className="rounded-2xl border border-sky-100 bg-white p-3 shadow-md dark:border-gray-700 dark:bg-gray-800 sm:p-4">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
                 Sites favoris
               </p>
-              <h2 className="text-xl font-bold text-gray-950 dark:text-white">
+              <h2 className="text-lg font-bold text-gray-950 dark:text-white sm:text-xl">
                 Sélection météo
               </h2>
             </div>
@@ -193,7 +193,7 @@ export default function WeatherPage() {
         />
       </aside>
 
-      <div className="space-y-4 min-w-0">
+      <div className="min-w-0 space-y-3 sm:space-y-4">
         {!selectedSearchTarget && !selectedSiteId && (
           <section className="rounded-xl border border-sky-100 bg-white p-6 text-center shadow-md dark:border-gray-700 dark:bg-gray-800">
             <h2 className="text-xl font-bold text-gray-950 dark:text-white">

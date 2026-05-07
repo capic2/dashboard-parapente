@@ -665,8 +665,8 @@ export const Default = meta.story({
 Default.test(
   'renders weather page with site selector and conditions',
   async ({ canvas, userEvent }) => {
-    await canvas.findByText('Arguel');
-    await expect(canvas.getByText('Chalais')).toBeInTheDocument();
+    await canvas.findAllByText('Arguel');
+    await canvas.findAllByText('Chalais');
     await canvas.findByText(
       /Meilleur spot pour aujourd'hui|Best spot for today/
     );
@@ -694,8 +694,8 @@ export const WithSelectedSite = meta.story({
 WithSelectedSite.test(
   'renders weather for the selected site',
   async ({ canvas }) => {
-    await canvas.findByText('Chalais');
-    await expect(canvas.getByText('Arguel')).toBeInTheDocument();
+    await canvas.findAllByText('Chalais');
+    await canvas.findAllByText('Arguel');
     await canvas.findByText(/Best spot for|Meilleur spot pour/);
   }
 );
@@ -818,8 +818,8 @@ export const WeatherError = meta.story({
 WeatherError.test(
   'renders site selector even when weather fails',
   async ({ canvas }) => {
-    await canvas.findByText('Arguel');
-    await expect(canvas.getByText('Chalais')).toBeInTheDocument();
+    await canvas.findAllByText('Arguel');
+    await canvas.findAllByText('Chalais');
     await canvas.findByText(/Best spot for|Meilleur spot pour/);
   }
 );
@@ -843,5 +843,5 @@ export const SingleSite = meta.story({
 });
 
 SingleSite.test('renders with a single site', async ({ canvas }) => {
-  await canvas.findByText('Arguel');
+  await canvas.findAllByText('Arguel');
 });

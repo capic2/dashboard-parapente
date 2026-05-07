@@ -29,6 +29,8 @@ description: Workflow expert for the dashboard-parapente Nx monorepo. Use when i
 ## Worktrees
 - For branch/worktree start-of-work decisions, use the `implementation-worktree-strategy` skill.
 - This skill only defines repository commands, validation strategy, GitHub usage, and tooling preferences.
+- Before opening a PR from a worktree, fetch the remote and update the worktree branch with the latest `origin/main`.
+- Do not create a PR from a stale worktree; resolve merge/rebase conflicts and rerun impacted checks first.
 
 ## Start Of Work
 - Read the closest applicable `AGENTS.md`.
@@ -90,6 +92,9 @@ Run all lint targets:
 - Use `run-many -t test` when changes impact multiple projects or before final validation.
 - Use `run-many -t lint` for global lint validation.
 - Use frontend build when frontend behavior, routing, bundling, or UI code changes.
+- Before creating or updating a PR, run all impacted checks from the active worktree and fix failures first.
+- For frontend PRs, run `nx lint frontend`, `nx test frontend`, and `nx build frontend` from the worktree before opening the PR.
+- Do not create the PR if required checks cannot run locally because of the worktree environment; stop, report the blocker, and ask before proceeding.
 
 ## Git
 - Do not commit unless explicitly requested.
