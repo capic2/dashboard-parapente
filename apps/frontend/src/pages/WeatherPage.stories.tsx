@@ -729,7 +729,9 @@ WithCitySearch.test(
       name: /Ajouter aux favoris/,
     });
     await userEvent.click(addFavoriteButton);
-    await canvas.findByText(/Conditions actuelles.*Arguel déco|Current conditions.*Arguel déco/);
+    await canvas.findByText(
+      /Conditions actuelles.*Arguel déco|Current conditions.*Arguel déco/i
+    );
   }
 );
 
