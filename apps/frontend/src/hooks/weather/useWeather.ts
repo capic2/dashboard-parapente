@@ -10,7 +10,176 @@ import {
   BackendWeatherResponseSchema,
   DailySummarySchema,
 } from '@dashboard-parapente/shared-types';
-import type { ConsensusHour, Slot } from '@dashboard-parapente/shared-types';
+import type {
+  BackendWeatherResponse,
+  ConsensusHour,
+  Slot,
+} from '@dashboard-parapente/shared-types';
+
+export const transformWeatherResponse = (
+  data: BackendWeatherResponse
+): WeatherData => {
+  // Find the hour closest to current time for "Current Conditions"
+  const now = new Date();
+  const nowHour = now.getHours();
+  const currentHourData =
+    data.consensus?.find((h: ConsensusHour) => h.hour === nowHour) ||
+    data.consensus?.[0];
+
+  const currentHour = currentHourData || {
+    hour: 0,
+    temperature: null,
+    wind_speed: null,
+    wind_gust: null,
+    wind_direction: null,
+    precipitation: null,
+    cloud_cover: null,
+  };
+  const metrics = data.metrics || {
+    avg_temp_c: null,
+    avg_wind_kmh: null,
+    max_gust_kmh: null,
+    total_rain_mm: null,
+  };
+
+  const formatWindDirection = (deg: number | null): string => {
+    if (deg === null) return '—';
+    const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    const index = Math.round((deg % 360) / 45) % 8;
+    return directions[index];
+  };
+
+  const timeToHour = (timeStr: string | null): number | null => {
+    if (!timeStr) return null;
+    const parts = timeStr.split(':');
+    const hour = Number.parseInt(parts[0] ?? '', 10);
+    return Number.isFinite(hour) && hour >= 0 && hour <= 23 ? hour : null;
+  };
+
+  let sunriseHour = timeToHour(data.sunrise ?? null);
+  let sunsetHour = timeToHour(data.sunset ?? null);
+
+  if (sunriseHour === null || sunsetHour === null) {
+    const month = new Date().getMonth() + 1;
+    if (month >= 4 && month <= 9) {
+      sunriseHour = 6;
+      sunsetHour = 21;
+    } else {
+      sunriseHour = 7;
+      sunsetHour = 18;
+    }
+  }
+
+  const hourToVerdict = new Map<number, string>();
+  if (data.slots) {
+    data.slots.forEach((slot: Slot) => {
+      const verdictText =
+        slot.verdict === '🟢'
+          ? 'BON'
+          : slot.verdict === '🟡'
+            ? 'MOYEN'
+            : slot.verdict === '🟠'
+              ? 'LIMITE'
+              : 'MAUVAIS';
+      for (let h = slot.start_hour; h <= slot.end_hour; h++) {
+        hourToVerdict.set(h, verdictText);
+      }
+    });
+  }
+
+  let hourlyForecast = (data.consensus || []).map((hour: ConsensusHour) => {
+    return {
+      hour: `${hour.hour}:00`,
+      time: `${hour.hour}:00`,
+      temp: hour.temperature ?? 0,
+      temperature: hour.temperature ?? 0,
+      wind: hour.wind_speed ?? 0,
+      wind_speed: hour.wind_speed ?? 0,
+      wind_gust: hour.wind_gust ?? 0,
+      direction: formatWindDirection(hour.wind_direction),
+      wind_direction: formatWindDirection(hour.wind_direction),
+      wind_direction_deg: hour.wind_direction ?? null,
+      conditions:
+        hour.cloud_cover !== null
+          ? `${Math.round(hour.cloud_cover)}% nuages`
+          : 'N/A',
+      precipitation: hour.precipitation ?? null,
+      para_index: hour.para_index ?? 0,
+      verdict: hour.verdict ?? hourToVerdict.get(hour.hour) ?? 'N/A',
+      cape: hour.cape ?? null,
+      thermal_strength:
+        (hour.thermal_strength?.toLowerCase() as HourlyForecastItem['thermal_strength']) ||
+        'faible',
+      cloud_cover: hour.cloud_cover ?? null,
+      sources: hour.sources || {},
+    };
+  });
+
+  if (sunriseHour !== null && sunsetHour !== null) {
+    hourlyForecast = hourlyForecast.filter((h) => {
+      const hourNum = parseInt(h.hour.split(':')[0], 10);
+      return hourNum >= sunriseHour && hourNum <= sunsetHour;
+    });
+  }
+
+  const dayDate = new Date();
+  dayDate.setDate(dayDate.getDate() + (data.day_index ?? 0));
+  const consensus = data.consensus || [];
+  const temps = consensus
+    .map((h: ConsensusHour) => h.temperature)
+    .filter((t): t is number => t !== null && t !== undefined);
+  const minTemp = temps.length > 0 ? Math.min(...temps) : 0;
+  const maxTemp = temps.length > 0 ? Math.max(...temps) : 0;
+
+  const buildCurrentConditions = (): string => {
+    const conditions: string[] = [];
+    if (
+      currentHour.cloud_cover !== null &&
+      currentHour.cloud_cover !== undefined
+    ) {
+      conditions.push(`${Math.round(currentHour.cloud_cover)}% nuages`);
+    }
+
+    const precip = currentHour.precipitation || 0;
+    if (precip > 0) {
+      conditions.push(`${precip.toFixed(1)}mm pluie`);
+    } else {
+      conditions.push('Sec');
+    }
+
+    return conditions.join(', ') || 'Conditions normales';
+  };
+
+  return {
+    spot_name: data.site_name || 'Unknown',
+    para_index: data.para_index || 0,
+    score: data.score,
+    verdict: data.verdict || 'N/A',
+    temperature: currentHour.temperature ?? metrics.avg_temp_c ?? 0,
+    wind_speed: currentHour.wind_speed ?? metrics.avg_wind_kmh ?? 0,
+    wind_direction: formatWindDirection(currentHour.wind_direction),
+    wind_gusts: currentHour.wind_gust ?? metrics.max_gust_kmh ?? 0,
+    conditions: buildCurrentConditions(),
+    forecast_time: data.cached_at || new Date().toISOString(),
+    cached_at: data.cached_at ?? null,
+    hourly_forecast: hourlyForecast,
+    daily_forecast: [
+      {
+        date: dayDate.toISOString().split('T')[0],
+        day_of_week: dayDate.toLocaleDateString('fr-FR', { weekday: 'short' }),
+        temp_min: Math.round(minTemp),
+        temp_max: Math.round(maxTemp),
+        min_temp: Math.round(minTemp),
+        max_temp: Math.round(maxTemp),
+        wind_avg: Math.round(metrics.avg_wind_kmh ?? 0),
+        conditions: data.slots_summary || data.explanation || 'N/A',
+        precipitation_prob: null,
+        para_index: data.para_index || 0,
+        verdict: data.verdict || 'N/A',
+      },
+    ],
+  };
+};
 
 /**
  * Create the queryFn for fetching and transforming weather data
@@ -39,208 +208,7 @@ export const createWeatherQueryFn =
       );
     }
 
-    // OPTIMIZATION: Only fetch the selected day, return immediately
-    // Use the selected day data for the daily forecast
-    const validatedDailyResponses = [{ data: todayValidation.data }];
-
-    const data = todayValidation.data;
-
-    // Transform backend structure to frontend WeatherData format
-    // Find the hour closest to current time for "Current Conditions"
-    const now = new Date();
-    const nowHour = now.getHours();
-    const currentHourData =
-      data.consensus?.find((h: ConsensusHour) => h.hour === nowHour) ||
-      data.consensus?.[0];
-
-    const currentHour = currentHourData || {
-      hour: 0,
-      temperature: null,
-      wind_speed: null,
-      wind_gust: null,
-      wind_direction: null,
-      precipitation: null,
-      cloud_cover: null,
-    };
-    const metrics = data.metrics || {
-      avg_temp_c: null,
-      avg_wind_kmh: null,
-      max_gust_kmh: null,
-      total_rain_mm: null,
-    };
-
-    // Helper to format wind direction from degrees to cardinal
-    // Backend sends degrees in meteorological convention (where wind comes FROM)
-    // 0° = North wind (from North), 90° = East wind, etc.
-    const formatWindDirection = (deg: number | null): string => {
-      if (deg === null) return '—';
-      const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-      const index = Math.round((deg % 360) / 45) % 8;
-      return directions[index];
-    };
-
-    // Helper to convert HH:MM string to hour number
-    const timeToHour = (timeStr: string | null): number | null => {
-      if (!timeStr) return null;
-      const parts = timeStr.split(':');
-      const hour = Number.parseInt(parts[0] ?? '', 10);
-      return Number.isFinite(hour) && hour >= 0 && hour <= 23 ? hour : null;
-    };
-
-    // Extract sunrise/sunset and convert to hours
-    // API returns sunrise/sunset for the requested day
-    let sunriseHour = timeToHour(data.sunrise ?? null);
-    let sunsetHour = timeToHour(data.sunset ?? null);
-
-    // If sunrise/sunset not available, use seasonal approximation
-    if (sunriseHour === null || sunsetHour === null) {
-      const month = new Date().getMonth() + 1; // 1-12
-      // Approximate sunrise/sunset for France (latitude ~47°)
-      if (month >= 4 && month <= 9) {
-        // Spring/Summer (April-September)
-        sunriseHour = 6;
-        sunsetHour = 21;
-      } else {
-        // Fall/Winter (October-March)
-        sunriseHour = 7;
-        sunsetHour = 18;
-      }
-    }
-
-    // Map slots to hourly verdicts
-    const hourToVerdict = new Map<number, string>();
-    if (data.slots) {
-      data.slots.forEach((slot: Slot) => {
-        const verdictText =
-          slot.verdict === '🟢'
-            ? 'BON'
-            : slot.verdict === '🟡'
-              ? 'MOYEN'
-              : slot.verdict === '🟠'
-                ? 'LIMITE'
-                : 'MAUVAIS';
-        for (let h = slot.start_hour; h <= slot.end_hour; h++) {
-          hourToVerdict.set(h, verdictText);
-        }
-      });
-    }
-
-    // Transform consensus array to hourly forecast
-    // NOTE: Backend now calculates para_index per hour (not daily average)
-    let hourlyForecast = (data.consensus || []).map((hour: ConsensusHour) => {
-      return {
-        hour: `${hour.hour}:00`,
-        time: `${hour.hour}:00`,
-        temp: hour.temperature || 0,
-        temperature: hour.temperature || 0,
-        wind: hour.wind_speed || 0,
-        wind_speed: hour.wind_speed || 0,
-        wind_gust: hour.wind_gust || 0,
-        direction: formatWindDirection(hour.wind_direction),
-        wind_direction: formatWindDirection(hour.wind_direction),
-        wind_direction_deg: hour.wind_direction ?? null,
-        conditions:
-          hour.cloud_cover !== null
-            ? `${Math.round(hour.cloud_cover)}% nuages`
-            : 'N/A',
-        precipitation: hour.precipitation ?? null,
-        para_index: hour.para_index ?? 0, // Use backend calculation (accurate)
-        verdict: hour.verdict ?? 'N/A', // Use backend verdict (accurate)
-        cape: hour.cape ?? null, // CAPE (J/kg)
-        thermal_strength:
-          (hour.thermal_strength?.toLowerCase() as HourlyForecastItem['thermal_strength']) ||
-          'faible', // Thermal strength
-        cloud_cover: hour.cloud_cover ?? null, // Cloud cover percentage
-        sources: hour.sources || {}, // Preserve per-source data for tooltip
-      };
-    });
-
-    // Filter to only show hours between sunrise and sunset
-    if (sunriseHour !== null && sunsetHour !== null) {
-      hourlyForecast = hourlyForecast.filter((h) => {
-        const hourNum = parseInt(h.hour.split(':')[0], 10);
-        return hourNum >= sunriseHour && hourNum <= sunsetHour;
-      });
-    }
-
-    // Transform daily responses to DailyForecastItem[]
-    const dailyForecast = validatedDailyResponses
-      .map((response, index) => {
-        if (!response?.data) return null;
-        const dayData = data;
-        const dayDate = new Date();
-        dayDate.setDate(dayDate.getDate() + index);
-
-        const consensus = dayData.consensus || [];
-        const temps = consensus
-          .map((h: ConsensusHour) => h.temperature)
-          .filter((t): t is number => t !== null && t !== undefined);
-        const minTemp = temps.length > 0 ? Math.min(...temps) : 0;
-        const maxTemp = temps.length > 0 ? Math.max(...temps) : 0;
-
-        return {
-          date: dayDate.toISOString().split('T')[0],
-          day_of_week: dayDate.toLocaleDateString('fr-FR', {
-            weekday: 'short',
-          }),
-          temp_min: Math.round(minTemp),
-          temp_max: Math.round(maxTemp),
-          min_temp: Math.round(minTemp),
-          max_temp: Math.round(maxTemp),
-          wind_avg: Math.round(dayData.metrics?.avg_wind_kmh || 0),
-          conditions: dayData.slots_summary || dayData.explanation || 'N/A',
-          precipitation_prob: Math.round(
-            (dayData.metrics?.total_rain_mm || 0) * 10
-          ),
-          para_index: dayData.para_index || 0,
-          verdict: dayData.verdict || 'N/A',
-        };
-      })
-      .filter((day): day is NonNullable<typeof day> => day !== null);
-
-    // Build current conditions text based on current hour data
-    const buildCurrentConditions = (): string => {
-      const conditions: string[] = [];
-
-      // Cloud cover
-      if (
-        currentHour.cloud_cover !== null &&
-        currentHour.cloud_cover !== undefined
-      ) {
-        conditions.push(`${Math.round(currentHour.cloud_cover)}% nuages`);
-      }
-
-      // Precipitation
-      const precip = currentHour.precipitation || 0;
-      if (precip > 0) {
-        conditions.push(`${precip.toFixed(1)}mm pluie`);
-      } else {
-        conditions.push('Sec');
-      }
-
-      return conditions.join(', ') || 'Conditions normales';
-    };
-
-    const transformed: WeatherData = {
-      spot_name: data.site_name || 'Unknown',
-      para_index: data.para_index || 0,
-      score: data.score,
-      verdict: data.verdict || 'N/A',
-      temperature: currentHour.temperature || metrics.avg_temp_c || 0,
-      wind_speed: currentHour.wind_speed || metrics.avg_wind_kmh || 0,
-      wind_direction: formatWindDirection(currentHour.wind_direction),
-      wind_gusts: currentHour.wind_gust || metrics.max_gust_kmh || 0,
-      conditions: buildCurrentConditions(),
-      forecast_time: data.cached_at || new Date().toISOString(),
-      cached_at: data.cached_at ?? null,
-      hourly_forecast: hourlyForecast,
-      daily_forecast: dailyForecast,
-    };
-
-    // Return transformed data
-    // Note: WeatherData interface is used for type checking but not runtime validation
-    // Backend data is already validated with BackendWeatherResponseSchema
-    return transformed;
+    return transformWeatherResponse(todayValidation.data);
   };
 
 /**
