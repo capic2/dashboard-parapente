@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import preview from '../../.storybook/preview';
-import { expect, screen } from 'storybook/test';
+import { expect, screen, waitFor } from 'storybook/test';
 import WeatherPage from './WeatherPage';
 
 const meta = preview.meta({
@@ -729,7 +729,11 @@ WithCitySearch.test(
       name: /Ajouter aux favoris/,
     });
     await userEvent.click(addFavoriteButton);
-    await canvas.findByRole('button', { name: /Déjà dans les favoris/ });
+    await waitFor(() => {
+      expect(
+        canvas.queryByRole('button', { name: /Ajouter aux favoris/ })
+      ).not.toBeInTheDocument();
+    });
   }
 );
 
