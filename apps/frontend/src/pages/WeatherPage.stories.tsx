@@ -363,8 +363,8 @@ const mockNearbyFlightOptions = {
       id: 'merged-takeoff-arguel',
       name: 'Arguel déco',
       type: 'takeoff' as const,
-      latitude: 47.2,
-      longitude: 6.0,
+      latitude: 47.205,
+      longitude: 6.005,
       elevation_m: 427,
       orientation: 'SW',
       rating: 4,
@@ -388,6 +388,21 @@ const mockNearbyFlightOptions = {
       distance_km: 5.8,
     },
   ],
+};
+
+const mockCreatedSearchSite = {
+  id: 'site-search-arguel',
+  code: 'ARG-SEARCH',
+  name: 'Arguel déco',
+  latitude: 47.205,
+  longitude: 6.005,
+  elevation_m: 427,
+  region: 'Doubs',
+  country: 'FR',
+  orientation: 'SW',
+  usage_type: 'takeoff',
+  flight_count: 0,
+  is_active: true,
 };
 
 const mockBestSpot = {
@@ -484,6 +499,9 @@ const mockLiveWindChalais = {
 };
 
 const spotsHandler = http.get('*/api/spots', () => HttpResponse.json(mockSites));
+const createSpotHandler = http.post('*/api/spots', () =>
+  HttpResponse.json(mockCreatedSearchSite)
+);
 const locationsSearchHandler = http.get('*/api/locations/search', () =>
   HttpResponse.json(mockLocationSearch)
 );
@@ -531,7 +549,9 @@ const hourlyBestSpotsHandler = http.get(
   }
 );
 const spotDetailsHandler = http.get('*/api/spots/:id', ({ params }) => {
-  const site = mockSites.sites.find((s) => s.id === params.id);
+  const site = [...mockSites.sites, mockCreatedSearchSite].find(
+    (s) => s.id === params.id
+  );
   return site
     ? HttpResponse.json(site)
     : new HttpResponse(null, { status: 404 });
@@ -541,6 +561,15 @@ const weatherArguelHandler = http.get('*/api/weather/site-arguel', () =>
 );
 const weatherChalaisHandler = http.get('*/api/weather/site-chalais', () =>
   HttpResponse.json(mockWeatherChalais)
+);
+const weatherSearchFavoriteHandler = http.get(
+  '*/api/weather/site-search-arguel',
+  () =>
+    HttpResponse.json({
+      ...mockWeatherArguel,
+      site_id: 'site-search-arguel',
+      site_name: 'Arguel déco',
+    })
 );
 const dailySummaryHandler = http.get('*/api/weather/:spotId/daily-summary', () =>
   HttpResponse.json(mockDailySummary)
@@ -571,6 +600,7 @@ const emagramHistoryHandler = http.get('*/api/emagram/history', () =>
 
 const defaultHandlers = [
   spotsHandler,
+  createSpotHandler,
   locationsSearchHandler,
   nearbyFlightOptionsHandler,
   coordinatesWeatherHandler,
@@ -580,6 +610,7 @@ const defaultHandlers = [
   spotDetailsHandler,
   weatherArguelHandler,
   weatherChalaisHandler,
+  weatherSearchFavoriteHandler,
   dailySummaryHandler,
   liveWindArguelHandler,
   liveWindChalaisHandler,
@@ -678,15 +709,27 @@ export const WithCitySearch = meta.story({
 });
 
 WithCitySearch.test(
-  'suggests city and displays nearby flight options',
+  'selects a searched spot, displays hourly details, and adds it to favorites',
   async ({ canvas, userEvent }) => {
     const input = await canvas.findByPlaceholderText(/Besançon/);
     await userEvent.type(input, 'Besan');
     const suggestion = await screen.findByRole('option', { name: /Besançon/ });
     await userEvent.click(suggestion);
-    await canvas.findByRole('button', { name: /Arguel déco/ });
+    const searchedSpotButton = await canvas.findByRole('button', {
+      name: /Arguel déco/,
+    });
     await canvas.findByRole('button', { name: /Plaine d'Arguel/ });
+
+    await userEvent.click(searchedSpotButton);
+    await canvas.findByText('Résultat de recherche sélectionné');
     await canvas.findByText('Météo sélectionnée');
+    await canvas.findByText('Prévisions Horaires');
+
+    const addFavoriteButton = await canvas.findByRole('button', {
+      name: /Ajouter aux favoris/,
+    });
+    await userEvent.click(addFavoriteButton);
+    await canvas.findByText(/Conditions actuelles.*Arguel déco|Current conditions.*Arguel déco/);
   }
 );
 

@@ -13,13 +13,21 @@ import {
   useNearbyFlightOptions,
   useSpotWeather,
 } from '../../hooks/weather/useCityWeather';
+import { useCreateSite } from '../../hooks/sites/useSites';
+import type { Site } from '../../types';
 
 type SelectedOption =
   | { type: 'city'; location: LocationSuggestion }
   | { type: 'takeoff' | 'landing'; spot: ParaglidingSpotSearchResult };
 
+export type CityWeatherTarget = SelectedOption;
+
 interface CityWeatherSearchProps {
   dayIndex: number;
+  selectedTarget: CityWeatherTarget | null;
+  favoriteSites: Site[];
+  onSelectTarget: (target: CityWeatherTarget | null) => void;
+  onFavoriteCreated: (siteId: string) => void;
 }
 
 const radiusChoices = [10, 30, 50, 100];
@@ -57,7 +65,9 @@ function WeatherSummaryCard({
             {title}
           </h3>
           <p className="text-sm text-gray-700 dark:text-gray-300">
-            {weather.slots_summary || weather.explanation || 'Prévision disponible'}
+            {weather.slots_summary ||
+              weather.explanation ||
+              'Prévision disponible'}
           </p>
         </div>
         <div className="rounded-lg bg-white px-4 py-3 text-center shadow-sm dark:bg-gray-900">
@@ -137,7 +147,23 @@ function spotDescription(spot: ParaglidingSpotSearchResult) {
   return parts.join(' · ');
 }
 
-export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) {
+const isSpotOption = (
+  option: SelectedOption | null
+): option is Extract<SelectedOption, { type: 'takeoff' | 'landing' }> =>
+  option?.type === 'takeoff' || option?.type === 'landing';
+
+const getOptionName = (option: SelectedOption | null) => {
+  if (!option) return '';
+  return option.type === 'city' ? option.location.name : option.spot.name;
+};
+
+export default function CityWeatherSearch({
+  dayIndex,
+  selectedTarget,
+  favoriteSites,
+  onSelectTarget,
+  onFavoriteCreated,
+}: CityWeatherSearchProps) {
   const listboxId = useId();
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -149,6 +175,9 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
   const [selectedOption, setSelectedOption] = useState<SelectedOption | null>(
     null
   );
+  const createSite = useCreateSite();
+  const [createdSpotIds, setCreatedSpotIds] = useState<Set<string>>(new Set());
+  const [favoriteError, setFavoriteError] = useState<string | null>(null);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedQuery(query), 300);
@@ -156,22 +185,24 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
   }, [query]);
 
   const locationSearch = useLocationSearch(debouncedQuery, 5);
-  const nearbyOptions = useNearbyFlightOptions(selectedLocation, radiusKm, limit);
+  const nearbyOptions = useNearbyFlightOptions(
+    selectedLocation,
+    radiusKm,
+    limit
+  );
   const coordinateWeather = useCoordinateWeather(
     selectedOption?.type === 'city' ? selectedOption.location : null,
     dayIndex
   );
   const spotWeather = useSpotWeather(
-    selectedOption?.type === 'takeoff' || selectedOption?.type === 'landing'
+    isSpotOption(selectedOption)
       ? selectedOption.spot.id
       : null,
     dayIndex
   );
 
-  const weatherTitle =
-    selectedOption?.type === 'city'
-      ? selectedOption.location.name
-      : selectedOption?.spot.name;
+  const weatherTitle = getOptionName(selectedOption);
+  const activeTargetLabel = getOptionName(selectedTarget);
   const suggestions = locationSearch.data?.locations ?? [];
   const isSuggestionsOpen = debouncedQuery.length >= 3 && !selectedLocation;
   const activeSuggestion = suggestions[activeSuggestionIndex];
@@ -185,22 +216,84 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
     selectedWeather = coordinateWeather.data;
     isWeatherLoading = coordinateWeather.isLoading;
     isWeatherError = coordinateWeather.isError;
-  } else if (selectedOption) {
+  } else if (isSpotOption(selectedOption)) {
     selectedWeather = spotWeather.data;
     isWeatherLoading = spotWeather.isLoading;
     isWeatherError = spotWeather.isError;
   }
 
   const handleSelectLocation = (location: LocationSuggestion) => {
+    const target: SelectedOption = { type: 'city', location };
     setSelectedLocation(location);
-    setSelectedOption({ type: 'city', location });
+    setSelectedOption(target);
+    onSelectTarget(target);
+    setFavoriteError(null);
     setQuery(location.name);
     setActiveSuggestionIndex(0);
+  };
+
+  const handleSelectSpot = (
+    type: 'takeoff' | 'landing',
+    spot: ParaglidingSpotSearchResult
+  ) => {
+    const target: SelectedOption = { type, spot };
+    setSelectedOption(target);
+    onSelectTarget(target);
+    setFavoriteError(null);
+  };
+
+  const selectedSpot = isSpotOption(selectedOption)
+    ? selectedOption.spot
+    : null;
+  const selectedSpotUsageType = isSpotOption(selectedOption)
+    ? selectedOption.type
+    : 'both';
+  const isSelectedSpotFavorite = selectedSpot
+    ? favoriteSites.some(
+        (site) =>
+          site.name === selectedSpot.name ||
+          (Math.abs(site.latitude - selectedSpot.latitude) < 0.0001 &&
+            Math.abs(site.longitude - selectedSpot.longitude) < 0.0001)
+      ) || createdSpotIds.has(selectedSpot.id)
+    : false;
+
+  const handleCreateFavorite = async () => {
+    if (!selectedSpot) return;
+
+    try {
+      setFavoriteError(null);
+      const site = await createSite.mutateAsync({
+        name: selectedSpot.name,
+        latitude: selectedSpot.latitude,
+        longitude: selectedSpot.longitude,
+        elevation_m: selectedSpot.elevation_m
+          ? Math.round(selectedSpot.elevation_m)
+          : undefined,
+        country: selectedSpot.country,
+        usage_type: selectedSpotUsageType,
+        description: `Ajouté depuis la recherche météo (${selectedSpot.source})`,
+      });
+
+      setCreatedSpotIds((ids) => new Set(ids).add(selectedSpot.id));
+      onFavoriteCreated(site.id);
+    } catch (error) {
+      setFavoriteError(
+        error instanceof Error
+          ? error.message
+          : "Impossible d'ajouter ce site aux favoris."
+      );
+    }
   };
 
   useEffect(() => {
     setActiveSuggestionIndex(0);
   }, [debouncedQuery]);
+
+  useEffect(() => {
+    if (!selectedTarget) {
+      setSelectedOption(null);
+    }
+  }, [selectedTarget]);
 
   return (
     <section className="rounded-2xl border border-sky-100 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800 sm:p-6">
@@ -211,6 +304,11 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
         <h2 className="text-2xl font-bold text-gray-950 dark:text-white">
           Choisir une ville, un déco ou un atterro proche
         </h2>
+        {activeTargetLabel && (
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+            Détail météo affiché pour {activeTargetLabel}
+          </p>
+        )}
       </div>
 
       <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-end">
@@ -224,6 +322,7 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
               setQuery(event.target.value);
               setSelectedLocation(null);
               setSelectedOption(null);
+              onSelectTarget(null);
             }}
             onKeyDown={(event) => {
               if (!isSuggestionsOpen || !suggestions.length) return;
@@ -335,7 +434,7 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
               </div>
             </div>
             <Button
-              onPress={() => setSelectedOption({ type: 'city', location: selectedLocation })}
+              onPress={() => handleSelectLocation(selectedLocation)}
               className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
             >
               Météo ville
@@ -363,8 +462,11 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
                         key={spot.id}
                         label={spot.name}
                         description={spotDescription(spot)}
-                        isSelected={selectedOption?.type === 'takeoff' && selectedOption.spot.id === spot.id}
-                        onSelect={() => setSelectedOption({ type: 'takeoff', spot })}
+                        isSelected={
+                          selectedOption?.type === 'takeoff' &&
+                          selectedOption.spot.id === spot.id
+                        }
+                        onSelect={() => handleSelectSpot('takeoff', spot)}
                       />
                     ))
                   ) : (
@@ -386,8 +488,11 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
                         key={spot.id}
                         label={spot.name}
                         description={spotDescription(spot)}
-                        isSelected={selectedOption?.type === 'landing' && selectedOption.spot.id === spot.id}
-                        onSelect={() => setSelectedOption({ type: 'landing', spot })}
+                        isSelected={
+                          selectedOption?.type === 'landing' &&
+                          selectedOption.spot.id === spot.id
+                        }
+                        onSelect={() => handleSelectSpot('landing', spot)}
                       />
                     ))
                   ) : (
@@ -405,11 +510,37 @@ export default function CityWeatherSearch({ dayIndex }: CityWeatherSearchProps) 
               Impossible de charger la météo pour {weatherTitle}.
             </div>
           ) : weatherTitle ? (
-            <WeatherSummaryCard
-              title={weatherTitle}
-              weather={selectedWeather}
-              isLoading={isWeatherLoading}
-            />
+            <div className="space-y-3">
+              <WeatherSummaryCard
+                title={weatherTitle}
+                weather={selectedWeather}
+                isLoading={isWeatherLoading}
+              />
+              {selectedSpot && (
+                <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Enregistrer ce site dans vos favoris météo pour le retrouver
+                    directement dans la page.
+                  </p>
+                  <Button
+                    onPress={() => void handleCreateFavorite()}
+                    isDisabled={createSite.isPending || isSelectedSpotFavorite}
+                    className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSelectedSpotFavorite
+                      ? 'Déjà dans les favoris'
+                      : createSite.isPending
+                        ? 'Ajout...'
+                        : 'Ajouter aux favoris'}
+                  </Button>
+                  {favoriteError && (
+                    <p className="text-sm text-red-600 dark:text-red-300">
+                      {favoriteError}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           ) : null}
         </div>
       )}

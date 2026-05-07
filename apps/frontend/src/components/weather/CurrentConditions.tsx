@@ -3,9 +3,15 @@ import { useWeather } from '../../hooks/weather/useWeather';
 import { useSite } from '../../hooks/sites/useSites';
 import { WindIndicator } from '../common/WindIndicator';
 import CacheTimestamp from '../common/CacheTimestamp';
+import type { WeatherData } from '../../types';
 
 interface CurrentConditionsProps {
-  spotId: string;
+  spotId?: string;
+  dayIndex?: number;
+  weatherData?: WeatherData;
+  siteOrientation?: string | null;
+  isLoading?: boolean;
+  isError?: boolean;
 }
 
 const getVerdictClass = (verdict: string): string => {
@@ -27,10 +33,25 @@ const getVerdictEmoji = (verdict: string): string => {
   return '🔴';
 };
 
-export default function CurrentConditions({ spotId }: CurrentConditionsProps) {
+export default function CurrentConditions({
+  spotId,
+  dayIndex = 0,
+  weatherData,
+  siteOrientation,
+  isLoading: isOverrideLoading,
+  isError: isOverrideError,
+}: CurrentConditionsProps) {
   const { t } = useTranslation();
-  const { data: weather, isLoading, error } = useWeather(spotId);
-  const { data: site } = useSite(spotId);
+  const {
+    data: fetchedWeather,
+    isLoading: isFetchedLoading,
+    error,
+  } = useWeather(weatherData ? undefined : spotId, dayIndex);
+  const { data: site } = useSite(spotId ?? '');
+  const weather = weatherData ?? fetchedWeather;
+  const isLoading = isOverrideLoading ?? isFetchedLoading;
+  const hasError = isOverrideError ?? !!error;
+  const orientation = siteOrientation ?? site?.orientation;
 
   if (isLoading) {
     return (
@@ -45,7 +66,7 @@ export default function CurrentConditions({ spotId }: CurrentConditionsProps) {
     );
   }
 
-  if (error || !weather) {
+  if (hasError || !weather) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-sky-600">
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3.5 font-semibold">
@@ -99,13 +120,11 @@ export default function CurrentConditions({ spotId }: CurrentConditionsProps) {
             <span className="font-semibold text-gray-900 dark:text-white text-right">
               {weather.wind_speed} km/h {weather.wind_direction}
             </span>
-            {site?.orientation && (
+            {orientation && (
               <WindIndicator
                 windDirection={weather.wind_direction}
                 siteOrientation={
-                  Array.isArray(site.orientation)
-                    ? site.orientation[0]
-                    : site.orientation
+                  Array.isArray(orientation) ? orientation[0] : orientation
                 }
                 windSpeed={weather.wind_speed}
                 showLabel={false}
