@@ -1,3 +1,4 @@
+import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getStaleTime } from '../../lib/cacheConfig';
 import { useSites } from '../../hooks/sites/useSites';
@@ -57,6 +58,25 @@ function groupSitesByBaseName(sites: Site[]): Record<string, Site[]> {
   return groups;
 }
 
+function getSiteMeta(site: Site): string {
+  return [site.orientation, site.elevation_m ? `${site.elevation_m}m` : null]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function getSiteSearchText(site: Site): string {
+  return [
+    site.name,
+    site.code,
+    site.region,
+    site.orientation,
+    site.elevation_m?.toString(),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
 export default function SiteSelector({
   selectedSiteId,
   onSelectSite,
@@ -65,6 +85,18 @@ export default function SiteSelector({
   const { t } = useTranslation();
   const { data: sites, isLoading, error } = useSites();
   const queryClient = useQueryClient();
+  const searchInputId = useId();
+  const [isMobileSelectorOpen, setIsMobileSelectorOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const filteredSites = useMemo(() => {
+    const availableSites = sites ?? [];
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return availableSites;
+
+    return availableSites.filter((site) =>
+      getSiteSearchText(site).includes(query)
+    );
+  }, [searchQuery, sites]);
 
   // Prefetch site weather on hover (instant navigation)
   const handleMouseEnter = (siteId: string) => {
@@ -101,10 +133,102 @@ export default function SiteSelector({
 
   // Group sites by base name
   const siteGroups = groupSitesByBaseName(sites);
+  const selectedSite = sites.find((site) => site.id === selectedSiteId);
+
+  const handleMobileSelect = (siteId: string) => {
+    onSelectSite(siteId);
+    setIsMobileSelectorOpen(false);
+    setSearchQuery('');
+  };
 
   return (
-    <div className="mb-4 sticky top-0 z-10">
-      <div className="flex gap-2 flex-wrap bg-white dark:bg-gray-800 rounded-xl p-3 shadow-md">
+    <div className="relative">
+      <div className="md:hidden">
+        <Button
+          onClick={() => setIsMobileSelectorOpen((isOpen) => !isOpen)}
+          className="flex w-full items-center justify-between gap-3 rounded-xl border border-sky-100 bg-white p-3 text-left shadow-sm dark:border-gray-700 dark:bg-gray-900"
+        >
+          <div className="min-w-0">
+            <span className="block text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+              Site favori
+            </span>
+            <span className="block truncate text-base font-bold text-gray-950 dark:text-white">
+              {selectedSite?.name ?? 'Choisir un site'}
+            </span>
+            {selectedSite && (
+              <span className="mt-0.5 block text-sm text-gray-600 dark:text-gray-300">
+                {getSiteMeta(selectedSite)}
+              </span>
+            )}
+          </div>
+          <span className="shrink-0 rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white">
+            Changer
+          </span>
+        </Button>
+
+        {isMobileSelectorOpen && (
+          <div className="absolute left-0 right-0 top-full z-30 mt-2 rounded-2xl border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-700 dark:bg-gray-800">
+            <label
+              htmlFor={searchInputId}
+              className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"
+            >
+              Rechercher
+            </label>
+            <input
+              id={searchInputId}
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Nom, orientation, altitude..."
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-950 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:ring-sky-900"
+            />
+
+            <div className="mt-3 max-h-[55vh] space-y-1 overflow-y-auto overscroll-contain pr-1">
+              {filteredSites.length > 0 ? (
+                filteredSites.map((site) => {
+                  const isActive = selectedSiteId === site.id;
+                  const meta = getSiteMeta(site);
+
+                  return (
+                    <Button
+                      key={site.id}
+                      onClick={() => handleMobileSelect(site.id)}
+                      onMouseEnter={() => handleMouseEnter(site.id)}
+                      className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition-colors ${
+                        isActive
+                          ? 'bg-sky-50 text-sky-900 ring-2 ring-sky-200 dark:bg-sky-900/30 dark:text-sky-100 dark:ring-sky-700'
+                          : 'text-gray-900 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-900'
+                      }`}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold">
+                          {site.name}
+                        </span>
+                        {meta && (
+                          <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                            {meta}
+                          </span>
+                        )}
+                      </span>
+                      {isActive && (
+                        <span className="shrink-0 rounded-full bg-sky-600 px-2 py-0.5 text-xs font-bold text-white">
+                          Actif
+                        </span>
+                      )}
+                    </Button>
+                  );
+                })
+              ) : (
+                <div className="rounded-xl bg-gray-50 px-3 py-5 text-center text-sm text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+                  Aucun site trouvé
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="hidden gap-2 flex-wrap rounded-xl bg-white p-3 shadow-md dark:bg-gray-800 md:flex">
         {Object.entries(siteGroups).map(([baseId, groupSites]) => {
           // Single site -> regular button
           if (groupSites.length === 1) {

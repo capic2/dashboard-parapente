@@ -789,8 +789,11 @@ export default function HourlyForecast({
         </h2>
         <CacheTimestamp cachedAt={weather.cached_at} />
       </div>
+      <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400 sm:hidden">
+        Glissez le tableau horizontalement pour voir toutes les mesures.
+      </p>
 
-      <div className="overflow-x-auto -mx-4 px-4">
+      <div className="overflow-x-auto overscroll-x-contain rounded-lg border border-gray-100 touch-pan-x dark:border-gray-700">
         <table className="w-full min-w-[800px] text-sm">
           <thead>
             <tr className="border-b-2 border-gray-200 dark:border-gray-600">
