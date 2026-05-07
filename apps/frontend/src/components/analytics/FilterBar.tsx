@@ -55,7 +55,7 @@ export function FilterBar({
           </h3>
           <Button
             onClick={onResetFilters}
-            tone="ghost"
+            variant="ghost"
             size="sm"
             className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 font-medium"
           >

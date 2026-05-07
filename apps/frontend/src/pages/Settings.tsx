@@ -709,7 +709,7 @@ function PerformanceSection() {
                 onClick={() =>
                   handleBackendSetting('cache_ttl_default', opt.value)
                 }
-                disabled={updateBackend.isPending}
+                isDisabled={updateBackend.isPending}
                 className={`px-5 py-2 rounded-lg font-medium transition-all text-sm ${
                   currentCacheTtl === opt.value
                     ? 'bg-sky-600 text-white shadow-md'
@@ -757,7 +757,7 @@ function PerformanceSection() {
                 onClick={() =>
                   handleBackendSetting('spotair_live_wind_radius_km', opt.value)
                 }
-                disabled={updateBackend.isPending}
+                isDisabled={updateBackend.isPending}
                 className={`px-5 py-2 rounded-lg font-medium transition-all text-sm ${
                   currentSpotairRadius === opt.value
                     ? 'bg-sky-600 text-white shadow-md'
@@ -808,7 +808,7 @@ function PerformanceSection() {
                     opt.value
                   )
                 }
-                disabled={updateBackend.isPending}
+                isDisabled={updateBackend.isPending}
                 className={`px-5 py-2 rounded-lg font-medium transition-all text-sm ${
                   currentSpotairCacheTtl === opt.value
                     ? 'bg-sky-600 text-white shadow-md'
@@ -855,7 +855,7 @@ function PerformanceSection() {
                 onClick={() =>
                   handleBackendSetting('scheduler_interval_minutes', opt.value)
                 }
-                disabled={updateBackend.isPending}
+                isDisabled={updateBackend.isPending}
                 className={`px-5 py-2 rounded-lg font-medium transition-all text-sm ${
                   currentSchedulerInterval === opt.value
                     ? 'bg-sky-600 text-white shadow-md'

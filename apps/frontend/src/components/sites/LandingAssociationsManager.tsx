@@ -124,7 +124,7 @@ export default function LandingAssociationsManager({
                 size="icon"
                 type="button"
                 onClick={() => handleRemove(assoc.id)}
-                tone="ghost"
+                variant="ghost"
                 className="text-red-400 dark:text-red-300 hover:text-red-600 dark:hover:text-red-200 flex-shrink-0 ml-2"
                 title={t('landings.delete')}
               >
@@ -140,9 +140,9 @@ export default function LandingAssociationsManager({
         <Button
           type="button"
           onClick={() => setShowAddDropdown(true)}
-          tone="ghost"
+          variant="ghost"
           className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-          disabled={availableLandings.length === 0}
+          isDisabled={availableLandings.length === 0}
         >
           + {t('landings.addLanding')}
         </Button>
@@ -172,8 +172,8 @@ export default function LandingAssociationsManager({
             <Button
               type="button"
               onClick={handleAdd}
-              tone="ghost"
-              disabled={!selectedLandingId || addMutation.isPending}
+              variant="ghost"
+              isDisabled={!selectedLandingId || addMutation.isPending}
               className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
             >
               {addMutation.isPending ? t('landings.adding') : t('common.add')}
@@ -185,7 +185,7 @@ export default function LandingAssociationsManager({
                 setSelectedLandingId('');
                 setNewNotes('');
               }}
-              tone="ghost"
+              variant="ghost"
               className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             >
               {t('common.cancel')}
