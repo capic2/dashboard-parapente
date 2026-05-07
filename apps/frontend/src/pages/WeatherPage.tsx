@@ -106,8 +106,8 @@ export default function WeatherPage() {
   };
 
   return (
-    <div className="grid gap-3 sm:gap-4 xl:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]">
-      <aside className="space-y-3 sm:space-y-4 xl:sticky xl:top-4 xl:self-start">
+    <div className="grid w-full min-w-0 gap-3 sm:gap-4 xl:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]">
+      <aside className="min-w-0 space-y-3 sm:space-y-4 xl:sticky xl:top-4 xl:self-start">
         <section className="rounded-2xl border border-sky-100 bg-white p-3 shadow-md dark:border-gray-700 dark:bg-gray-800 sm:p-4">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
