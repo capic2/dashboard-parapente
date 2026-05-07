@@ -248,13 +248,14 @@ export default function CityWeatherSearch({
   const selectedSpotUsageType = isSpotOption(selectedOption)
     ? selectedOption.type
     : 'both';
+  const isSameFavoriteSite = (site: Site) =>
+    selectedSpot !== null &&
+    site.name === selectedSpot.name &&
+    site.usage_type === selectedSpotUsageType &&
+    Math.abs(site.latitude - selectedSpot.latitude) < 0.0001 &&
+    Math.abs(site.longitude - selectedSpot.longitude) < 0.0001;
   const isSelectedSpotFavorite = selectedSpot
-    ? favoriteSites.some(
-        (site) =>
-          site.name === selectedSpot.name ||
-          (Math.abs(site.latitude - selectedSpot.latitude) < 0.0001 &&
-            Math.abs(site.longitude - selectedSpot.longitude) < 0.0001)
-      ) || createdSpotIds.has(selectedSpot.id)
+    ? createdSpotIds.has(selectedSpot.id) || favoriteSites.some(isSameFavoriteSite)
     : false;
 
   const handleCreateFavorite = async () => {
@@ -517,24 +518,26 @@ export default function CityWeatherSearch({
                 isLoading={isWeatherLoading}
               />
               {selectedSpot && (
-                <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    Enregistrer ce site dans vos favoris météo pour le retrouver
-                    directement dans la page.
-                  </p>
-                  <Button
-                    onPress={() => void handleCreateFavorite()}
-                    isDisabled={createSite.isPending || isSelectedSpotFavorite}
-                    className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isSelectedSpotFavorite
-                      ? 'Déjà dans les favoris'
-                      : createSite.isPending
-                        ? 'Ajout...'
-                        : 'Ajouter aux favoris'}
-                  </Button>
+                <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      Enregistrer ce site dans vos favoris météo pour le retrouver
+                      directement dans la page.
+                    </p>
+                    <Button
+                      onPress={() => void handleCreateFavorite()}
+                      isDisabled={createSite.isPending || isSelectedSpotFavorite}
+                      className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isSelectedSpotFavorite
+                        ? 'Déjà dans les favoris'
+                        : createSite.isPending
+                          ? 'Ajout...'
+                          : 'Ajouter aux favoris'}
+                    </Button>
+                  </div>
                   {favoriteError && (
-                    <p className="text-sm text-red-600 dark:text-red-300">
+                    <p className="mt-2 text-sm text-red-600 dark:text-red-300">
                       {favoriteError}
                     </p>
                   )}

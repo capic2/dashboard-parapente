@@ -24,17 +24,6 @@ import {
   useSpotWeather,
 } from '../hooks/weather/useCityWeather';
 import { transformWeatherResponse } from '../hooks/weather/useWeather';
-import type { BackendWeatherResponse } from '@dashboard-parapente/shared-types';
-
-const searchDayLabels = [
-  'Aujourd’hui',
-  'Demain',
-  'J+2',
-  'J+3',
-  'J+4',
-  'J+5',
-  'J+6',
-];
 
 const isSpotSearchTarget = (
   target: CityWeatherTarget | null
@@ -44,6 +33,15 @@ const isSpotSearchTarget = (
 const getSearchTargetName = (target: CityWeatherTarget | null) => {
   if (!target) return '';
   return target.type === 'city' ? target.location.name : target.spot.name;
+};
+
+const getSearchDayLabel = (
+  day: number,
+  t: (key: string) => string
+) => {
+  if (day === 0) return t('common.today');
+  if (day === 1) return t('common.tomorrow');
+  return `J+${day}`;
 };
 
 export default function WeatherPage() {
@@ -81,9 +79,7 @@ export default function WeatherPage() {
   const selectedSearchWeatherData = useMemo(
     () =>
       selectedSearchWeather
-        ? transformWeatherResponse(
-            selectedSearchWeather as BackendWeatherResponse
-          )
+        ? transformWeatherResponse(selectedSearchWeather)
         : undefined,
     [selectedSearchWeather]
   );
@@ -221,10 +217,15 @@ export default function WeatherPage() {
                   {selectedSearchTitle}
                 </h2>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {searchDayLabels.map((label, day) => (
+              <div
+                aria-label={t('weather.forecast7Days')}
+                className="flex flex-wrap gap-2"
+                role="group"
+              >
+                {Array.from({ length: 7 }, (_, day) => (
                   <Button
-                    key={label}
+                    key={day}
+                    aria-pressed={day === selectedDayIndex}
                     onPress={() =>
                       void navigate({
                         to: '/weather',
@@ -240,7 +241,7 @@ export default function WeatherPage() {
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-700'
                     }`}
                   >
-                    {label}
+                    {getSearchDayLabel(day, t)}
                   </Button>
                 ))}
               </div>
