@@ -1,3 +1,4 @@
+import { ProgressBar } from 'react-aria-components';
 import { tv } from 'tailwind-variants';
 
 const iconCard = tv({
@@ -58,14 +59,22 @@ export function IconCard({
   return (
     <div className={styles.root()}>
       {!unlocked && progress !== undefined && (
-        <div
-          className={styles.progressOverlay()}
-          style={{
-            height: `${progress}%`,
-            bottom: 0,
-            top: 'auto',
-          }}
-        ></div>
+        <ProgressBar
+          aria-label={`Progression ${title}`}
+          className="absolute inset-0"
+          maxValue={100}
+          minValue={0}
+          value={progress}
+        >
+          <div
+            className={styles.progressOverlay()}
+            style={{
+              height: `${progress}%`,
+              bottom: 0,
+              top: 'auto',
+            }}
+          ></div>
+        </ProgressBar>
       )}
 
       {unlocked ? (
