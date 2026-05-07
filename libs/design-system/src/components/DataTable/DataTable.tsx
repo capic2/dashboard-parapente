@@ -2,22 +2,25 @@ import type { ReactNode } from 'react';
 import { flexRender, type Table } from '@tanstack/react-table';
 import { tv } from 'tailwind-variants';
 
-const headerCell = tv({
-  base: 'text-left py-2 px-2 font-semibold text-gray-700 dark:text-gray-300',
+const dataTable = tv({
+  slots: {
+    headerCell:
+      'text-left py-2 px-2 font-semibold text-gray-700 dark:text-gray-300',
+    row: 'border-b border-gray-100 dark:border-gray-700 transition-colors',
+  },
   variants: {
     sortable: {
-      true: 'cursor-pointer select-none hover:text-sky-600 dark:hover:text-sky-400 transition-colors',
-      false: '',
+      true: {
+        headerCell:
+          'cursor-pointer select-none hover:text-sky-600 dark:hover:text-sky-400 transition-colors',
+      },
+      false: {},
     },
-  },
-});
-
-const row = tv({
-  base: 'border-b border-gray-100 dark:border-gray-700 transition-colors',
-  variants: {
     hoverable: {
-      true: 'hover:bg-gray-50 dark:hover:bg-gray-700',
-      false: '',
+      true: {
+        row: 'hover:bg-gray-50 dark:hover:bg-gray-700',
+      },
+      false: {},
     },
   },
   defaultVariants: {
@@ -49,7 +52,7 @@ export function DataTable<TData>({ table, className }: DataTableProps<TData>) {
                     <th
                       key={header.id}
                       colSpan={header.colSpan}
-                      className={headerCell({ sortable: canSort })}
+                      className={dataTable({ sortable: canSort }).headerCell()}
                       onClick={
                         canSort
                           ? header.column.getToggleSortingHandler()
@@ -75,7 +78,10 @@ export function DataTable<TData>({ table, className }: DataTableProps<TData>) {
           </thead>
           <tbody>
             {table.getRowModel().rows.map((tableRow) => (
-              <tr key={tableRow.id} className={row({ hoverable: true })}>
+              <tr
+                key={tableRow.id}
+                className={dataTable({ hoverable: true }).row()}
+              >
                 {tableRow.getVisibleCells().map((cell) => (
                   <td key={cell.id} className="py-2 px-2">
                     {cell.column.columnDef.cell
