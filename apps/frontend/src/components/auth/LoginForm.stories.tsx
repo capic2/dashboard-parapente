@@ -18,6 +18,5 @@ export const Default = meta.story({
   name: 'Default',
   args: {
     onSubmit: fn(),
-    isPending: false,
   },
 });
