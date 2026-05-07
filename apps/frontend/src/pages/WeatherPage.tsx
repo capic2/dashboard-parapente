@@ -223,11 +223,12 @@ export default function WeatherPage() {
                 role="tablist"
               >
                 {Array.from({ length: 7 }, (_, day) => (
-                  <Button
+                  <button
                     key={day}
                     aria-pressed={day === selectedDayIndex}
                     aria-selected={day === selectedDayIndex}
-                    onPress={() =>
+                    type="button"
+                    onClick={() =>
                       void navigate({
                         to: '/weather',
                         search: {
@@ -244,7 +245,7 @@ export default function WeatherPage() {
                     }`}
                   >
                     {getSearchDayLabel(day, t)}
-                  </Button>
+                  </button>
                 ))}
               </div>
             </div>
