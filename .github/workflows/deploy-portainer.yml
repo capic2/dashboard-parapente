@@ -405,8 +405,8 @@ jobs:
                       return 0
                     fi
 
-                    existing_project=$(docker inspect "$existing_container_id" --format '{{ index .Config.Labels "com.docker.compose.project" }}' 2>/dev/null || true)
-                    existing_workdir=$(docker inspect "$existing_container_id" --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' 2>/dev/null || true)
+                    existing_project=$(docker inspect "$existing_container_id" --format "{{ index .Config.Labels \"com.docker.compose.project\" }}" 2>/dev/null || true)
+                    existing_workdir=$(docker inspect "$existing_container_id" --format "{{ index .Config.Labels \"com.docker.compose.project.working_dir\" }}" 2>/dev/null || true)
                     current_workdir=$(pwd)
 
                     if [ "$existing_project" = "$COMPOSE_PROJECT_NAME" ] && [ "$existing_workdir" = "$current_workdir" ]; then
