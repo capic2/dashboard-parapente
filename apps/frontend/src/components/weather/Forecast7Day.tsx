@@ -104,7 +104,7 @@ export default function Forecast7Day({
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
+    <div className="min-w-0 rounded-xl bg-white p-4 shadow-md dark:bg-gray-800">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
           {t('weather.forecast7Days')}
@@ -114,7 +114,7 @@ export default function Forecast7Day({
         </div>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:pb-0 sm:snap-none md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+      <div className="flex max-w-full min-w-0 snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2 scrollbar-thin sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:pb-0 sm:snap-none md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
         {dailySummary.days.map((day, index) => {
           const isSelected = index === selectedDayIndex;
 
