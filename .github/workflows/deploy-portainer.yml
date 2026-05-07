@@ -176,6 +176,7 @@ jobs:
             DEPLOY_PATH="$REQUESTED_DEPLOY_PATH"
             INSPECT_PATH=""
             STACK_ID=""
+            PORTAINER_VOLUME=""
             TARGET_SHA="${{ github.sha }}"
             TARGET_VERSION="${{ steps.version.outputs.version }}"
             REPO_SLUG="${{ github.repository }}"
@@ -222,6 +223,85 @@ jobs:
               BACKEND_DEPLOY_VERSION="$TARGET_VERSION" compose_cmd up -d --force-recreate --remove-orphans backend redis
             }
 
+            set_portainer_volume() {
+              for volume_name in portainer_data portainer; do
+                if docker volume inspect "$volume_name" >/dev/null 2>&1; then
+                  PORTAINER_VOLUME="$volume_name"
+                  return 0
+                fi
+              done
+
+              return 1
+            }
+
+            resolve_from_container() {
+              container_ref="$1"
+              inspect_path=$(docker inspect "$container_ref" --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' 2>/dev/null || true)
+
+              if [ -n "$inspect_path" ] && [ "$inspect_path" != "<no value>" ]; then
+                INSPECT_PATH="$inspect_path"
+                STACK_ID="${INSPECT_PATH##*/}"
+                return 0
+              fi
+
+              return 1
+            }
+
+            resolve_from_running_containers() {
+              for container_name in parapente-backend dashboard-parapente-backend-1 dashboard-parapente_backend_1; do
+                if resolve_from_container "$container_name"; then
+                  echo "Detected stack working_dir from container $container_name: $INSPECT_PATH"
+                  return 0
+                fi
+              done
+
+              container_ids=$(docker ps -aq \
+                --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" \
+                --filter "label=com.docker.compose.service=backend" 2>/dev/null || true)
+              for container_id in $container_ids; do
+                if resolve_from_container "$container_id"; then
+                  echo "Detected stack working_dir from compose labels: $INSPECT_PATH"
+                  return 0
+                fi
+              done
+
+              container_ids=$(docker ps -aq \
+                --filter "label=project=dashboard-parapente" \
+                --filter "label=service=backend" 2>/dev/null || true)
+              for container_id in $container_ids; do
+                if resolve_from_container "$container_id"; then
+                  echo "Detected stack working_dir from app labels: $INSPECT_PATH"
+                  return 0
+                fi
+              done
+
+              return 1
+            }
+
+            resolve_from_portainer_volume() {
+              if ! set_portainer_volume; then
+                return 1
+              fi
+
+              STACK_ID=$(docker run --rm \
+                -v "$PORTAINER_VOLUME:/data" \
+                docker:27-cli sh -ceu '
+                  for compose_file in /data/compose/*/docker-compose.yml /data/compose/*/compose.yml; do
+                    [ -f "$compose_file" ] || continue
+                    if grep -q "dashboard-parapente" "$compose_file" || grep -q "parapente-backend" "$compose_file"; then
+                      basename "$(dirname "$compose_file")"
+                      exit 0
+                    fi
+                  done
+                ' 2>/dev/null || true)
+
+              if [ -n "$STACK_ID" ]; then
+                echo "Resolved Portainer stack id from volume $PORTAINER_VOLUME: $STACK_ID"
+                return 0
+              fi
+
+              return 1
+            }
             if [ -n "$DEPLOY_PATH" ] && [ -d "$DEPLOY_PATH" ]; then
               echo "Using configured deploy path: $DEPLOY_PATH"
             else
@@ -229,7 +309,7 @@ jobs:
                 echo "Configured deploy path not found: $DEPLOY_PATH"
               fi
 
-              INSPECT_PATH=$(docker inspect parapente-backend --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' 2>/dev/null || true)
+              resolve_from_running_containers || resolve_from_portainer_volume || true
 
               if [ -n "$INSPECT_PATH" ] && [ -d "$INSPECT_PATH" ]; then
                 DEPLOY_PATH="$INSPECT_PATH"
@@ -253,8 +333,8 @@ jobs:
               exit 0
             fi
 
-            if [ -n "$STACK_ID" ] && docker volume inspect portainer_data >/dev/null 2>&1; then
-              echo "Host path unavailable, deploying from Portainer volume (stack $STACK_ID)"
+            if [ -n "$STACK_ID" ] && set_portainer_volume; then
+              echo "Host path unavailable, deploying from Portainer volume $PORTAINER_VOLUME (stack $STACK_ID)"
               docker run --rm \
                 -e TARGET_SHA="$TARGET_SHA" \
                 -e TARGET_VERSION="$TARGET_VERSION" \
@@ -263,7 +343,7 @@ jobs:
                 -e COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" \
                 -e VITE_CESIUM_ION_TOKEN="$VITE_CESIUM_ION_TOKEN" \
                 -v /var/run/docker.sock:/var/run/docker.sock \
-                -v portainer_data:/data \
+                -v "$PORTAINER_VOLUME:/data" \
                 -w "/data/compose/$STACK_ID" \
                 docker:27-cli sh -ceu '
                   apk add --no-cache curl tar >/dev/null
