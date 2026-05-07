@@ -4,6 +4,7 @@ import {
   Default,
   MontPoupetSelected,
   LaCoteSelected,
+  MobileCompact,
   Loading,
   Error,
 } from './SiteSelector.stories.tsx';
@@ -30,6 +31,9 @@ export const SiteSelectorChromatic = meta.story({
       </FigureWrapper>
       <FigureWrapper title={LaCoteSelected.composed.name}>
         <LaCoteSelected.Component />
+      </FigureWrapper>
+      <FigureWrapper title={MobileCompact.composed.name}>
+        <MobileCompact.Component />
       </FigureWrapper>
       <FigureWrapper title={Loading.composed.name}>
         <Loading.Component />

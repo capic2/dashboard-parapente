@@ -3,7 +3,7 @@ import { LoginForm } from './LoginForm.tsx';
 import { fn } from 'storybook/test';
 
 const meta = preview.meta({
-  title: 'Components/Common/AppUpdateBanner/Chromatic',
+  title: 'Components/Auth/LoginForm',
   component: LoginForm,
   parameters: {
     layout: 'padded',

@@ -153,6 +153,21 @@ export const LaCoteSelected = meta.story({
   },
 });
 
+export const MobileCompact = meta.story({
+  name: 'Mobile Compact',
+  args: {
+    selectedSiteId: 'mont-poupet-nord',
+    onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
+  },
+  parameters: {
+    chromatic: {
+      modes: {
+        mobile: { viewport: { width: 375, height: 812 } },
+      },
+    },
+  },
+});
+
 // Loading state story
 export const Loading = meta.story({
   name: 'Loading',
