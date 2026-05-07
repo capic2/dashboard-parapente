@@ -16,6 +16,7 @@ Before any implementation task:
 5. If no, stay on the current branch.
 
 Create worktrees in `.codenomad/worktree` with names starting with `wt-`.
+RENAME the opencode session with the worktree name.
 
 ## Rules
 

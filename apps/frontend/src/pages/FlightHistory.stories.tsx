@@ -59,6 +59,7 @@ const mockFlights = [
     strava_id: '123456',
     notes: 'Superbe vol thermique, base cumulus 1800m',
     gpx_file_path: '/data/flights/arguel-001.gpx',
+    video_file_path: '/data/videos/arguel-001.mp4',
   },
   {
     id: 'flight-002',

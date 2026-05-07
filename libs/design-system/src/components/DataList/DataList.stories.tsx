@@ -124,7 +124,7 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-// @ts-expect-error
+// @ts-expect-error story
 export const Default = meta.story({
   name: 'Default',
   args: {

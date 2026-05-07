@@ -9,24 +9,32 @@ import {
 import { useTranslation } from 'react-i18next';
 import { tv } from 'tailwind-variants';
 
-const sortButton = tv({
-  base: 'px-3 py-2 sm:px-2 sm:py-1 text-xs rounded-md font-medium transition-colors',
+const dataList = tv({
+  slots: {
+    sortButton:
+      'px-3 py-2 sm:px-2 sm:py-1 text-xs rounded-md font-medium transition-colors',
+    paginationButton:
+      'px-3 py-2.5 sm:py-1 text-sm rounded-md font-medium transition-colors',
+  },
   variants: {
     active: {
-      true: 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300',
-      false:
-        'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600',
+      true: {
+        sortButton:
+          'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300',
+      },
+      false: {
+        sortButton:
+          'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600',
+      },
     },
-  },
-});
-
-const paginationButton = tv({
-  base: 'px-3 py-2.5 sm:py-1 text-sm rounded-md font-medium transition-colors',
-  variants: {
     disabled: {
-      true: 'text-gray-300 dark:text-gray-600 cursor-not-allowed',
-      false:
-        'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer',
+      true: {
+        paginationButton: 'text-gray-300 dark:text-gray-600 cursor-not-allowed',
+      },
+      false: {
+        paginationButton:
+          'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer',
+      },
     },
   },
 });
@@ -36,7 +44,7 @@ export interface SortableColumn {
   label: string;
 }
 
-interface DataListProps<TData> {
+export interface DataListProps<TData> {
   table: Table<TData>;
   renderItem: (row: Row<TData>, options: { isSelected: boolean }) => ReactNode;
   sortableColumns?: SortableColumn[];
@@ -87,7 +95,7 @@ export function DataList<TData>({
             return (
               <Button
                 key={col.id}
-                className={sortButton({ active: isActive })}
+                className={dataList({ active: isActive }).sortButton()}
                 aria-label={
                   currentSort
                     ? t(
@@ -161,9 +169,9 @@ export function DataList<TData>({
           <div className="flex gap-1">
             <Button
               aria-label={t('dataList.previousPage')}
-              className={paginationButton({
+              className={dataList({
                 disabled: !table.getCanPreviousPage(),
-              })}
+              }).paginationButton()}
               onPress={() => table.previousPage()}
               isDisabled={!table.getCanPreviousPage()}
             >
@@ -171,9 +179,9 @@ export function DataList<TData>({
             </Button>
             <Button
               aria-label={t('dataList.nextPage')}
-              className={paginationButton({
+              className={dataList({
                 disabled: !table.getCanNextPage(),
-              })}
+              }).paginationButton()}
               onPress={() => table.nextPage()}
               isDisabled={!table.getCanNextPage()}
             >

@@ -233,7 +233,7 @@ export default function FlightHistory() {
             </Button>
             <Button
               onClick={() => setShowMultiDeleteConfirm(true)}
-              disabled={selectedCount === 0}
+              isDisabled={selectedCount === 0}
               className="ml-0 sm:ml-auto px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
               {t('flights.deleteCount', { count: selectedCount })}
@@ -357,7 +357,7 @@ export default function FlightHistory() {
           </Button>
           <Button
             onClick={handleDeleteFlight}
-            disabled={isDeleting}
+            isDisabled={isDeleting}
             className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:opacity-50"
           >
             {isDeleting ? t('flights.deleting') : t('flights.deleteButton')}
@@ -385,7 +385,7 @@ export default function FlightHistory() {
           </Button>
           <Button
             onClick={handleDeleteFlight}
-            disabled={isDeleting}
+            isDisabled={isDeleting}
             className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:opacity-50"
           >
             {isDeleting

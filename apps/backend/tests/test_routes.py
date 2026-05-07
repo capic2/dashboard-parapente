@@ -4,7 +4,7 @@ Test API routes (integration tests)
 
 from datetime import datetime
 
-from models import Flight, Site
+from models import Flight, ParaglidingSpot, Site
 
 
 class TestSpotsEndpoints:
@@ -161,6 +161,106 @@ class TestWeatherEndpoints:
         # This may fail if weather sources aren't available, but endpoint should exist
         response = client.get("/api/weather/site-test?day_index=0", timeout=10)
         assert response.status_code in [200, 500]  # Either success or service error
+
+
+class TestLocationWeatherEndpoints:
+    """Test city search and nearby flight option endpoints"""
+
+    def test_search_locations(self, client, monkeypatch):
+        def fake_search_locations(query, country="FR", limit=5):
+            assert query == "Besan"
+            assert country == "FR"
+            assert limit == 5
+            return [
+                {
+                    "id": "osm-besancon",
+                    "name": "Besançon",
+                    "display_name": "Besançon, Doubs, France",
+                    "latitude": 47.238,
+                    "longitude": 6.024,
+                    "country": "FR",
+                }
+            ]
+
+        monkeypatch.setattr("spots.search_locations", fake_search_locations)
+
+        response = client.get("/api/locations/search?query=Besan")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["query"] == "Besan"
+        assert data["locations"][0]["name"] == "Besançon"
+
+    def test_nearby_flight_options_split_takeoffs_and_landings(self, client, db_session):
+        db_session.add_all(
+            [
+                ParaglidingSpot(
+                    id="takeoff-near",
+                    name="Déco proche",
+                    type="takeoff",
+                    latitude=47.24,
+                    longitude=6.03,
+                    elevation_m=450,
+                    country="FR",
+                    source="test",
+                ),
+                ParaglidingSpot(
+                    id="landing-near",
+                    name="Atterro proche",
+                    type="landing",
+                    latitude=47.23,
+                    longitude=6.02,
+                    elevation_m=250,
+                    country="FR",
+                    source="test",
+                ),
+            ]
+        )
+        db_session.commit()
+
+        response = client.get(
+            "/api/locations/nearby-flight-options?lat=47.238&lon=6.024&name=Besançon&radius_km=10&limit=3"
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["city_option"]["name"] == "Besançon"
+        assert [spot["id"] for spot in data["takeoffs"]] == ["takeoff-near"]
+        assert [spot["id"] for spot in data["landings"]] == ["landing-near"]
+
+    def test_weather_by_coordinates(self, client, monkeypatch):
+        async def fake_forecast(*args, **kwargs):
+            return {
+                "success": True,
+                "total_sources": 1,
+                "sunrise": "07:00",
+                "sunset": "18:00",
+                "cached_at": "2026-05-06T10:00:00Z",
+                "consensus": [
+                    {
+                        "hour": 12,
+                        "temperature": 18,
+                        "wind_speed": 12,
+                        "wind_gust": 18,
+                        "wind_direction": 240,
+                        "precipitation": 0,
+                        "cloud_cover": 20,
+                        "cape": 300,
+                        "lifted_index": -1,
+                    }
+                ],
+            }
+
+        monkeypatch.setattr("routes.get_normalized_forecast", fake_forecast)
+
+        response = client.get("/api/weather/coordinates?lat=47.238&lon=6.024&name=Besançon")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["site_id"] == "coordinates"
+        assert data["site_name"] == "Besançon"
+        assert data["coordinates"] == {"latitude": 47.238, "longitude": 6.024}
+        assert data["para_index"] >= 0
 
 
 class TestAlertsEndpoints:

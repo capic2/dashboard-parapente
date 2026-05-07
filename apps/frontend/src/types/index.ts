@@ -65,7 +65,7 @@ export interface DailyForecastItem {
   max_temp: number;
   wind_avg: number;
   conditions: string;
-  precipitation_prob: number;
+  precipitation_prob: number | null;
   para_index: number;
   verdict: string;
 }

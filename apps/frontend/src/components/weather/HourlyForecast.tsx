@@ -15,13 +15,16 @@ import {
 } from 'lucide-react';
 import { useAppSettings } from '../../hooks/settings/useAppSettings';
 import { useWeather } from '../../hooks/weather/useWeather';
-import type { HourlyForecastItem } from '../../types';
+import type { HourlyForecastItem, WeatherData } from '../../types';
 import CacheTimestamp from '../common/CacheTimestamp';
 import WindArrow from './WindArrow';
 
 interface HourlyForecastProps {
-  spotId: string;
+  spotId?: string;
   dayIndex?: number;
+  weatherData?: WeatherData;
+  isLoading?: boolean;
+  isError?: boolean;
 }
 
 // ============================================================================
@@ -562,10 +565,20 @@ const SourceDataTooltip = ({
 export default function HourlyForecast({
   spotId,
   dayIndex = 0,
+  weatherData,
+  isLoading: isOverrideLoading,
+  isError: isOverrideError,
 }: HourlyForecastProps) {
   const { t } = useTranslation();
-  const { data: weather, isLoading, error } = useWeather(spotId, dayIndex);
+  const {
+    data: fetchedWeather,
+    isLoading: isFetchedLoading,
+    error,
+  } = useWeather(weatherData ? undefined : spotId, dayIndex);
   const { data: appSettings } = useAppSettings();
+  const weather = weatherData ?? fetchedWeather;
+  const isLoading = isOverrideLoading ?? isFetchedLoading;
+  const hasError = isOverrideError ?? !!error;
   const uiThresholds = useMemo<UiThresholds>(
     () => ({
       windLowMax: parseSettingNumber(
@@ -625,7 +638,7 @@ export default function HourlyForecast({
     );
   }
 
-  if (error || !weather || !weather.hourly_forecast) {
+  if (hasError || !weather || !weather.hourly_forecast) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">

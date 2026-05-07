@@ -22,6 +22,9 @@ export type VideoExportJob = {
   cancelled_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  can_resume?: boolean;
+  frames_captured?: number | null;
+  resume_from_frame?: number | null;
   can_cancel: boolean;
 };
 
