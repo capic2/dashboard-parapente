@@ -329,7 +329,6 @@ export function FlightDetails({
               </p>
             )}
           </div>
-
         </>
       )}
     </div>
@@ -365,7 +364,7 @@ export function FlightDetails({
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
           <div className="flex items-center gap-2 mb-4">
             <Button
-              tone="secondary"
+              variant="secondary"
               size="sm"
               className="px-3 py-2 text-sm"
               onPress={onCloseMobile}

@@ -163,7 +163,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Button
             onClick={handleCleanupTempFiles}
-            disabled={cleanupTempFiles.isPending}
+            isDisabled={cleanupTempFiles.isPending}
             className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 dark:bg-amber-900/40 dark:text-amber-200 dark:hover:bg-amber-900/60 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
           >
             {cleanupTempFiles.isPending
@@ -255,7 +255,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
                   {job.can_cancel && (
                     <Button
                       onClick={() => handleCancel(job)}
-                      disabled={cancelJob.isPending}
+                      isDisabled={cancelJob.isPending}
                       className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
                     >
                       {cancelJob.isPending

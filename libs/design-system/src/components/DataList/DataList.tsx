@@ -36,7 +36,7 @@ export interface SortableColumn {
   label: string;
 }
 
-interface DataListProps<TData> {
+export interface DataListProps<TData> {
   table: Table<TData>;
   renderItem: (row: Row<TData>, options: { isSelected: boolean }) => ReactNode;
   sortableColumns?: SortableColumn[];

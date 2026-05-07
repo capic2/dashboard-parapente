@@ -46,7 +46,7 @@ const buttonStyles = tv({
 });
 
 export interface ButtonProps extends AriaButtonProps {
-  tone?:
+  variant?:
     | 'primary'
     | 'secondary'
     | 'success'
@@ -59,29 +59,29 @@ export interface ButtonProps extends AriaButtonProps {
   size?: 'sm' | 'md' | 'lg' | 'icon';
   fullWidth?: boolean;
   className?: string;
-  disabled?: boolean;
   isDisabled?: boolean;
   title?: string;
 }
 
 export function Button({
   className,
-  tone,
+  variant,
   size,
   fullWidth,
   isDisabled,
-  disabled,
   ...props
 }: ButtonProps) {
   const type = props.type ?? 'button';
-  const finalDisabled = isDisabled ?? disabled;
 
   return (
     <AriaButton
       {...props}
       type={type}
-      isDisabled={finalDisabled}
-      className={twMerge(buttonStyles({ tone, size, fullWidth }), className)}
+      isDisabled={isDisabled}
+      className={twMerge(
+        buttonStyles({ tone: variant, size, fullWidth }),
+        className
+      )}
     />
   );
 }
