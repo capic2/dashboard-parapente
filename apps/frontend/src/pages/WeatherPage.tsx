@@ -225,7 +225,6 @@ export default function WeatherPage() {
                 {Array.from({ length: 7 }, (_, day) => (
                   <button
                     key={day}
-                    aria-pressed={day === selectedDayIndex}
                     aria-selected={day === selectedDayIndex}
                     type="button"
                     onClick={() =>
