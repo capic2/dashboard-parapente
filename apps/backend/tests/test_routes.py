@@ -191,7 +191,7 @@ class TestLocationWeatherEndpoints:
         assert data["query"] == "Besan"
         assert data["locations"][0]["name"] == "Besançon"
 
-    def test_nearby_flight_options_split_takeoffs_and_landings(self, client, db_session):
+    def test_nearby_flight_options_split_takeoffs_landings_and_both(self, client, db_session):
         db_session.add_all(
             [
                 ParaglidingSpot(
@@ -214,6 +214,16 @@ class TestLocationWeatherEndpoints:
                     country="FR",
                     source="test",
                 ),
+                ParaglidingSpot(
+                    id="both-near",
+                    name="Site polyvalent proche",
+                    type="both",
+                    latitude=47.238,
+                    longitude=6.024,
+                    elevation_m=350,
+                    country="FR",
+                    source="test",
+                ),
             ]
         )
         db_session.commit()
@@ -225,8 +235,8 @@ class TestLocationWeatherEndpoints:
         assert response.status_code == 200
         data = response.json()
         assert data["city_option"]["name"] == "Besançon"
-        assert [spot["id"] for spot in data["takeoffs"]] == ["takeoff-near"]
-        assert [spot["id"] for spot in data["landings"]] == ["landing-near"]
+        assert [spot["id"] for spot in data["takeoffs"]] == ["both-near", "takeoff-near"]
+        assert [spot["id"] for spot in data["landings"]] == ["both-near", "landing-near"]
 
     def test_weather_by_coordinates(self, client, monkeypatch):
         async def fake_forecast(*args, **kwargs):
