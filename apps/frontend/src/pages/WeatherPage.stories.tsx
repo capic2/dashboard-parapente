@@ -711,6 +711,8 @@ export const WithCitySearch = meta.story({
 WithCitySearch.test(
   'selects a searched spot, displays hourly details, and adds it to favorites',
   async ({ canvas, userEvent }) => {
+    const searchTab = await canvas.findByRole('tab', { name: 'Recherche' });
+    await userEvent.click(searchTab);
     const input = await canvas.findByPlaceholderText(/Besançon/);
     await userEvent.type(input, 'Besan');
     const suggestion = await screen.findByRole('option', { name: /Besançon/ });
