@@ -8,6 +8,20 @@ from typing import Any
 
 from app_settings import get_setting
 
+_THUNDERSTORM_RISK_LABELS = {
+    "nul": "Risque d'orage nul",
+    "faible": "Risque d'orage faible",
+    "modere": "Risque d'orage modéré",
+    "eleve": "Risque d'orage élevé",
+}
+
+_THUNDERSTORM_RISK_RANKS = {
+    "nul": 0,
+    "faible": 1,
+    "modere": 2,
+    "eleve": 3,
+}
+
 _THRESHOLD_DEFAULTS: dict[str, float] = {
     "para_wind_very_low_max": 3.0,
     "para_wind_low_max": 5.0,
@@ -45,6 +59,35 @@ def get_para_index_thresholds() -> dict[str, float]:
     return thresholds
 
 
+def _get_thunderstorm_risk(cape: float | None, lifted_index: float | None) -> str:
+    """Estimate thunderstorm risk from convective energy and instability."""
+    if cape is None and lifted_index is None:
+        return "nul"
+
+    if cape is None:
+        if lifted_index is not None and lifted_index <= -7:
+            return "eleve"
+        if lifted_index is not None and lifted_index <= -5:
+            return "modere"
+        if lifted_index is not None and lifted_index <= -3:
+            return "faible"
+        return "nul"
+
+    if cape >= 2500 or (cape >= 1500 and lifted_index is not None and lifted_index <= -4):
+        return "eleve"
+    if cape >= 1500 or (cape >= 800 and lifted_index is not None and lifted_index <= -2):
+        return "modere"
+    if cape >= 300 or (lifted_index is not None and lifted_index <= -3):
+        return "faible"
+
+    return "nul"
+
+
+def _get_highest_thunderstorm_risk(hours: list[dict[str, Any]]) -> str:
+    risks = [_get_thunderstorm_risk(h.get("cape"), h.get("lifted_index")) for h in hours]
+    return max(risks, key=lambda risk: _THUNDERSTORM_RISK_RANKS[risk], default="nul")
+
+
 def calculate_para_index(consensus_hours: list[dict[str, Any]]) -> dict[str, Any]:
     """
     Calculate daily Para-Index (0-100 score) as the average of hourly scores.
@@ -80,6 +123,7 @@ def calculate_para_index(consensus_hours: list[dict[str, Any]]) -> dict[str, Any
     avg_li = statistics.mean(
         [h["lifted_index"] for h in consensus_hours if h.get("lifted_index")] or [0]
     )
+    thunderstorm_risk = _get_highest_thunderstorm_risk(consensus_hours)
 
     # Build explanation from metrics
     reasons = []
@@ -113,6 +157,8 @@ def calculate_para_index(consensus_hours: list[dict[str, Any]]) -> dict[str, Any
         reasons.append(f"Pluie importante ({total_rain:.1f}mm)")
     if avg_li < li_very_unstable_max:
         reasons.append(f"Thermiques très forts (LI {avg_li:.1f} - instable)")
+    if thunderstorm_risk in {"modere", "eleve"}:
+        reasons.append(_THUNDERSTORM_RISK_LABELS[thunderstorm_risk])
 
     # === VERDICT ===
     if para_index >= thresholds["para_verdict_good_min"]:
@@ -143,6 +189,7 @@ def calculate_para_index(consensus_hours: list[dict[str, Any]]) -> dict[str, Any
             "total_rain_mm": round(total_rain, 1),
             "avg_temp_c": round(avg_temp, 1),
             "avg_lifted_index": round(avg_li, 1),
+            "thunderstorm_risk": thunderstorm_risk,
         },
     }
 
@@ -177,6 +224,7 @@ def analyze_hourly_slots(consensus_hours: list[dict[str, Any]]) -> list[dict[str
         gust = hour.get("wind_gust") or 0
         precip = hour.get("precipitation") or 0
         li = hour.get("lifted_index") or 0
+        thunderstorm_risk = _get_thunderstorm_risk(hour.get("cape"), hour.get("lifted_index"))
 
         verdict = "🟢"
         reasons = []
@@ -210,6 +258,14 @@ def analyze_hourly_slots(consensus_hours: list[dict[str, Any]]) -> list[dict[str
         if li < li_very_unstable_max:
             verdict = "🔴"
             reasons.append("Instabilité")
+
+        # Thunderstorm checks
+        if thunderstorm_risk == "eleve":
+            verdict = "🔴"
+            reasons.append("Orage")
+        elif thunderstorm_risk == "modere":
+            verdict = "🟡" if verdict == "🟢" else verdict
+            reasons.append("Risque d'orage")
 
         hourly_verdicts.append({"hour": hour["hour"], "verdict": verdict, "reasons": reasons})
 
@@ -364,6 +420,7 @@ def calculate_hourly_para_index(
     precip = hour.get("precipitation") or 0
     temp = hour.get("temperature") or 0
     li = hour.get("lifted_index") or 0
+    thunderstorm_risk = _get_thunderstorm_risk(hour.get("cape"), hour.get("lifted_index"))
 
     if thresholds is None:
         thresholds = get_para_index_thresholds()
@@ -415,6 +472,14 @@ def calculate_hourly_para_index(
         score += 10
     elif temp > thresholds["para_temp_cool_min"]:
         score += 5
+
+    # === THUNDERSTORM RISK SCORING ===
+    if thunderstorm_risk == "eleve":
+        score = min(score - 60, 25)
+    elif thunderstorm_risk == "modere":
+        score = min(score - 25, 55)
+    elif thunderstorm_risk == "faible":
+        score -= 5
 
     # Clamp score to 0-100
     return max(0, min(100, score))

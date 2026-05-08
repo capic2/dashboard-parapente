@@ -279,6 +279,27 @@ class TestCalculateParaIndex:
 
         assert get_hourly_verdict(65) == "MOYEN"
 
+    def test_thunderstorm_risk_penalizes_daily_score(self):
+        """High CAPE and instability should make otherwise good conditions poor."""
+        consensus_hours = [
+            {
+                "hour": 12,
+                "temperature": 22.0,
+                "wind_speed": 12.0,
+                "wind_gust": 18.0,
+                "precipitation": 0.0,
+                "cape": 1800.0,
+                "lifted_index": -4.5,
+            }
+        ]
+
+        result = calculate_para_index(consensus_hours)
+
+        assert result["para_index"] <= 25
+        assert result["verdict"] == "MAUVAIS"
+        assert "orage élevé" in result["explanation"].lower()
+        assert result["metrics"]["thunderstorm_risk"] == "eleve"
+
 
 @pytest.mark.unit
 class TestAnalyzeHourlySlots:
@@ -395,6 +416,30 @@ class TestAnalyzeHourlySlots:
         slots = analyze_hourly_slots([])
         assert slots == []
 
+    def test_high_thunderstorm_risk_marks_slot_red(self):
+        """High thunderstorm risk should make a slot non-flyable."""
+        consensus_hours = [
+            {
+                "hour": 12,
+                "wind_speed": 12.0,
+                "wind_gust": 18.0,
+                "precipitation": 0.0,
+                "cape": 1800.0,
+                "lifted_index": -4.5,
+            }
+        ]
+
+        slots = analyze_hourly_slots(consensus_hours)
+
+        assert slots == [
+            {
+                "start_hour": 12,
+                "end_hour": 12,
+                "verdict": "🔴",
+                "reasons": ["Orage"],
+            }
+        ]
+
 
 @pytest.mark.unit
 class TestGetBestSlot:
@@ -492,6 +537,21 @@ class TestCalculateHourlyParaIndex:
 
         assert score < 40
         assert score >= 0
+
+    def test_moderate_thunderstorm_risk_penalizes_hour(self):
+        """Moderate thunderstorm risk should reduce an otherwise optimal hour."""
+        hour = {
+            "wind_speed": 12.0,
+            "wind_gust": 18.0,
+            "precipitation": 0.0,
+            "cape": 1000.0,
+            "lifted_index": -2.5,
+            "temperature": 22.0,
+        }
+
+        score = calculate_hourly_para_index(hour)
+
+        assert score == 55
 
 
 @pytest.mark.unit
