@@ -16,7 +16,7 @@ Before any implementation task:
 5. If no, stay on the current branch.
 
 Create worktrees in `.codenomad/worktree` with names starting with `wt-`.
-RENAME the opencode session with the worktree name.
+Whenever a worktree is created, immediately name the current AI session with the exact worktree name.
 
 ## Rules
 
@@ -24,6 +24,7 @@ RENAME the opencode session with the worktree name.
 
 - Update `main`.
 - Create a worktree from `main`.
+- Name the current AI session with the exact worktree name.
 - Continue implementation in that worktree.
 
 ### If current branch is not `main`
@@ -37,6 +38,7 @@ If yes:
 - Update `main`.
 - Create a worktree from `main` in `.codenomad/worktree`.
 - Use a name like `wt-<task-label>`.
+- Name the current AI session with the exact worktree name.
 - Continue there.
 
 If no:
