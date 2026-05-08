@@ -26,6 +26,7 @@ interface CityWeatherSearchProps {
   dayIndex: number;
   selectedTarget: CityWeatherTarget | null;
   favoriteSites: Site[];
+  isEmbedded?: boolean;
   onSelectTarget: (target: CityWeatherTarget | null) => void;
   onFavoriteCreated: (siteId: string) => void;
 }
@@ -161,6 +162,7 @@ export default function CityWeatherSearch({
   dayIndex,
   selectedTarget,
   favoriteSites,
+  isEmbedded = false,
   onSelectTarget,
   onFavoriteCreated,
 }: CityWeatherSearchProps) {
@@ -301,8 +303,16 @@ export default function CityWeatherSearch({
   }, [selectedTarget]);
 
   return (
-    <section className="rounded-2xl border border-sky-100 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800 sm:p-6">
-      <div className="mb-4 flex items-start justify-between gap-3">
+    <section
+      className={
+        isEmbedded
+          ? ''
+          : 'rounded-2xl border border-sky-100 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800 sm:p-6'
+      }
+    >
+      <div
+        className={`flex items-start justify-between gap-3 ${isEmbedded ? '' : 'mb-4'}`}
+      >
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
             Recherche météo par ville
