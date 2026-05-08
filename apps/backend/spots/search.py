@@ -54,9 +54,9 @@ def search_by_coordinates(
         ParaglidingSpot.longitude <= max_lon,
     )
 
-    # Apply type filter if specified
+    # A "both" spot can be used as either takeoff or landing.
     if spot_type:
-        query = query.filter(ParaglidingSpot.type == spot_type)
+        query = query.filter(ParaglidingSpot.type.in_([spot_type, "both"]))
 
     candidates = query.all()
 
