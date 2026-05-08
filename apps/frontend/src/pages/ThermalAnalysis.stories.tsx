@@ -43,6 +43,16 @@ const mockEmagramLatest = {
       message: 'Renforcement du vent en altitude > 2000m',
     },
   ]),
+  ai_raw_response: JSON.stringify({
+    explication_analyse: {
+      resume:
+        'Le score est moyen-bon : les thermiques existent, mais la couche exploitable reste modérée.',
+      indices: [
+        'La courbe température/point de rosée suggère une instabilité en basses couches -> déclenchement possible.',
+        'La base estimée vers 1600 m limite les marges au-dessus du relief.',
+      ],
+    },
+  }),
   raw_analysis: 'Detailed analysis...',
   source: 'open-meteo',
   created_at: '2026-03-24T08:00:00',

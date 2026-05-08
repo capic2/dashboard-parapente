@@ -174,7 +174,15 @@ Réponds UNIQUEMENT avec ce JSON (sans markdown):
   "score_volabilite": <0-100>,
   "conseils_vol": "<conseils courts MAX 50 mots>",
   "alertes_securite": [<liste ou []>],
-  "details_analyse": "<analyse courte MAX 100 mots>"
+  "details_analyse": "<analyse courte MAX 100 mots>",
+  "explication_analyse": {{
+    "resume": "<pourquoi ce score en 1 phrase>",
+    "indices": [
+      "<courbe/indice observe -> interpretation parapente>",
+      "<courbe/indice observe -> interpretation parapente>"
+    ],
+    "par_source": {{"<source si identifiable>": ["<observation -> consequence>"]}}
+  }}
 }}
 
 IMPORTANT: Réponds UNIQUEMENT le JSON complet, rien d'autre.
@@ -277,6 +285,8 @@ def _parse_gemini_response(response_text: str) -> dict:
         if not isinstance(analysis["alertes_securite"], list):
             analysis["alertes_securite"] = []
 
+        analysis.setdefault("explication_analyse", None)
+
         return analysis
 
     except json.JSONDecodeError as e:
@@ -292,6 +302,7 @@ def _parse_gemini_response(response_text: str) -> dict:
             "conseils_vol": "Analyse impossible - erreur de parsing Gemini",
             "alertes_securite": ["Erreur lors de l'analyse"],
             "details_analyse": f"Erreur de parsing JSON: {str(e)}\n\nRéponse brute: {response_text[:1000]}",
+            "explication_analyse": None,
         }
 
 
@@ -305,6 +316,7 @@ def _get_default_value(field: str):
         "conseils_vol": "",
         "alertes_securite": [],
         "details_analyse": "",
+        "explication_analyse": None,
     }
     return defaults.get(field, None)
 

@@ -50,6 +50,16 @@ const meta = preview.meta({
             score_volabilite: 75,
             plafond_thermique_m: 2500,
             force_thermique_ms: 2.5,
+            ai_raw_response: JSON.stringify({
+              explication_analyse: {
+                resume:
+                  'Le score est bon car les thermiques sont nets, avec une vigilance sur le vent au-dessus du plafond utile.',
+                indices: [
+                  'Température et point de rosée se séparent en basses couches -> convection exploitable.',
+                  'Plafond vers 2500 m -> marge confortable au-dessus du relief.',
+                ],
+              },
+            }),
             analysis_status: 'completed',
             is_from_llm: true,
             has_thermal_data: true,

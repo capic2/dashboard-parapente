@@ -57,6 +57,27 @@ const mockEmagramData = {
   alertes_securite: JSON.stringify([
     'Attention au vent en altitude au-dessus de 2000m',
   ]),
+  ai_raw_response: JSON.stringify({
+    details_analyse:
+      'Les courbes indiquent une convection exploitable avec un plafond correct.',
+    explication_analyse: {
+      resume:
+        'Le score est bon car les thermiques sont établis, mais le vent en altitude limite la marge.',
+      indices: [
+        'La courbe de température s’écarte progressivement du point de rosée, donc l’air devient assez instable pour déclencher des thermiques.',
+        'Le plafond estimé autour de 2500 m donne une marge correcte au-dessus du relief.',
+        'Le vent se renforce au-dessus de 2000 m, donc la dérive devient le principal point de vigilance.',
+      ],
+      par_source: {
+        'meteo-parapente': [
+          'La couche convective monte nettement en milieu de journée -> créneau favorable après 11h.',
+        ],
+        topmeteo: [
+          'Le profil confirme un plafond élevé -> bonnes transitions possibles.',
+        ],
+      },
+    },
+  }),
   is_from_llm: true,
   has_thermal_data: true,
   flyable_hours_formatted: '6h',
@@ -127,6 +148,9 @@ export const Default = meta.story({
 Default.test('displays emagram score and metrics', async ({ canvas }) => {
   await canvas.findByText(/75/);
   await expect(canvas.getByText(/Arguel/)).toBeInTheDocument();
+  await expect(
+    canvas.getByLabelText(/Comment l'IA a analysé/)
+  ).toBeInTheDocument();
 });
 
 /*Default.test('displays screenshot buttons', async ({ canvas }) => {
