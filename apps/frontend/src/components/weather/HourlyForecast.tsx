@@ -782,15 +782,18 @@ export default function HourlyForecast({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
+    <div className="min-w-0 rounded-xl bg-white p-4 shadow-md dark:bg-gray-800">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
           Prévisions Horaires
         </h2>
         <CacheTimestamp cachedAt={weather.cached_at} />
       </div>
+      <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400 sm:hidden">
+        Glissez le tableau horizontalement pour voir toutes les mesures.
+      </p>
 
-      <div className="overflow-x-auto -mx-4 px-4">
+      <div className="max-w-full min-w-0 touch-pan-x overflow-x-auto overscroll-x-contain rounded-lg border border-gray-100 dark:border-gray-700">
         <table className="w-full min-w-[800px] text-sm">
           <thead>
             <tr className="border-b-2 border-gray-200 dark:border-gray-600">

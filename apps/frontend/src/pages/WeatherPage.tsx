@@ -12,7 +12,13 @@ import CityWeatherSearch, {
   type CityWeatherTarget,
 } from '../components/weather/CityWeatherSearch';
 import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
-import { Button } from '@dashboard-parapente/design-system';
+import {
+  Button,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
+} from '@dashboard-parapente/design-system';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import { useAuthStore } from '../stores/authStore';
 import {
@@ -44,6 +50,8 @@ const getSearchDayLabel = (
   return `J+${day}`;
 };
 
+type SelectionTab = 'favorites' | 'search';
+
 export default function WeatherPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -55,6 +63,8 @@ export default function WeatherPage() {
   const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(selectedDayIndex);
   const [selectedSearchTarget, setSelectedSearchTarget] =
     useState<CityWeatherTarget | null>(null);
+  const [selectionTab, setSelectionTab] =
+    useState<SelectionTab>('favorites');
   const selectedSiteId =
     sites.find((site) => site.id === routeSiteId)?.id ?? sites[0]?.id ?? '';
   const selectedSearchTitle = getSearchTargetName(selectedSearchTarget);
@@ -106,74 +116,89 @@ export default function WeatherPage() {
   };
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]">
-      <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
-        <section className="rounded-2xl border border-sky-100 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
-          <div className="mb-3 flex items-start justify-between gap-3">
+    <div className="grid w-full min-w-0 gap-3 sm:gap-4 xl:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]">
+      <aside className="min-w-0 space-y-3 sm:space-y-4 xl:sticky xl:top-4 xl:self-start">
+        <section className="rounded-2xl border border-sky-100 bg-white p-3 shadow-md dark:border-gray-700 dark:bg-gray-800 sm:p-4">
+          <div className="mb-3">
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
-                Sites favoris
+                Choix du site
               </p>
-              <h2 className="text-xl font-bold text-gray-950 dark:text-white">
+              <h2 className="text-lg font-bold text-gray-950 dark:text-white sm:text-xl">
                 Sélection météo
               </h2>
             </div>
-            {selectedSearchTarget && selectedSiteId && (
-              <Button
-                onPress={() => setSelectedSearchTarget(null)}
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900"
-              >
-                Revenir aux favoris
-              </Button>
-            )}
           </div>
-          {sites.length > 0 ? (
-            <SiteSelector
-              selectedSiteId={selectedSearchTarget ? '' : selectedSiteId}
-              onSelectSite={(siteId) => {
-                setSelectedSearchTarget(null);
-                void navigate({
-                  to: '/weather',
-                  search: {
-                    siteId,
-                    day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
-                  },
-                });
-              }}
-              weatherData={weatherDataMap}
-            />
-          ) : (
-            <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-600 dark:bg-gray-900/60 dark:text-gray-300">
-              <p className="font-semibold text-gray-900 dark:text-white">
-                {t('dashboard.noSites')}
-              </p>
-              <p className="mt-1">{t('dashboard.noSitesDescription')}</p>
-              <Button
-                onClick={() => void navigate({ to: '/sites' })}
-                className="mt-3 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
-              >
-                {t('dashboard.addSite')}
-              </Button>
-            </div>
-          )}
+          <Tabs
+            selectedKey={selectionTab}
+            onSelectionChange={(key) => {
+              const nextTab = key as SelectionTab;
+              setSelectionTab(nextTab);
+              if (nextTab === 'favorites') setSelectedSearchTarget(null);
+            }}
+          >
+            <TabList className="grid-cols-2 bg-gray-50 shadow-none dark:bg-gray-900/60">
+              <Tab id="favorites">Favoris</Tab>
+              <Tab id="search">Recherche</Tab>
+            </TabList>
+            <TabPanel id="favorites">
+              {sites.length > 0 ? (
+                <SiteSelector
+                  selectedSiteId={selectedSearchTarget ? '' : selectedSiteId}
+                  onSelectSite={(siteId) => {
+                    setSelectedSearchTarget(null);
+                    setSelectionTab('favorites');
+                    void navigate({
+                      to: '/weather',
+                      search: {
+                        siteId,
+                        day:
+                          selectedDayIndex > 0 ? selectedDayIndex : undefined,
+                      },
+                    });
+                  }}
+                  weatherData={weatherDataMap}
+                />
+              ) : (
+                <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-600 dark:bg-gray-900/60 dark:text-gray-300">
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {t('dashboard.noSites')}
+                  </p>
+                  <p className="mt-1">{t('dashboard.noSitesDescription')}</p>
+                  <Button
+                    onPress={() => void navigate({ to: '/sites' })}
+                    className="mt-3 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+                  >
+                    {t('dashboard.addSite')}
+                  </Button>
+                </div>
+              )}
+            </TabPanel>
+            <TabPanel id="search">
+              <CityWeatherSearch
+                dayIndex={selectedDayIndex}
+                selectedTarget={selectedSearchTarget}
+                favoriteSites={sites}
+                isEmbedded
+                onSelectTarget={(target) => {
+                  setSelectedSearchTarget(target);
+                  setSelectionTab('search');
+                }}
+                onFavoriteCreated={(siteId) => {
+                  setSelectedSearchTarget(null);
+                  setSelectionTab('favorites');
+                  void navigate({
+                    to: '/weather',
+                    search: {
+                      siteId,
+                      day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
+                    },
+                  });
+                }}
+              />
+            </TabPanel>
+          </Tabs>
         </section>
-
-        <CityWeatherSearch
-          dayIndex={selectedDayIndex}
-          selectedTarget={selectedSearchTarget}
-          favoriteSites={sites}
-          onSelectTarget={setSelectedSearchTarget}
-          onFavoriteCreated={(siteId) => {
-            setSelectedSearchTarget(null);
-            void navigate({
-              to: '/weather',
-              search: {
-                siteId,
-                day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
-              },
-            });
-          }}
-        />
 
         <BestSpotSuggestion
           bestSpot={bestSpot ?? null}
@@ -181,6 +206,7 @@ export default function WeatherPage() {
           hourlyStartHour={hourlyBestSpots?.startHour}
           onSelectSite={(siteId) => {
             setSelectedSearchTarget(null);
+            setSelectionTab('favorites');
             void navigate({
               to: '/weather',
               search: {
@@ -193,7 +219,7 @@ export default function WeatherPage() {
         />
       </aside>
 
-      <div className="space-y-4 min-w-0">
+      <div className="min-w-0 space-y-3 sm:space-y-4">
         {!selectedSearchTarget && !selectedSiteId && (
           <section className="rounded-xl border border-sky-100 bg-white p-6 text-center shadow-md dark:border-gray-700 dark:bg-gray-800">
             <h2 className="text-xl font-bold text-gray-950 dark:text-white">

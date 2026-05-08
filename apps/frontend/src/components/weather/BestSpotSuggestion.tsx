@@ -165,12 +165,12 @@ export const BestSpotSuggestion = ({
 
   return (
     <div
-      className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden ${className}`}
+      className={`min-w-0 max-w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800 ${className}`}
     >
       {/* Header with colored accent bar */}
       <div className={`h-1.5 ${scoreColor.bg}`} />
 
-      <div className="p-4">
+      <div className="min-w-0 p-4">
         {/* Top row: title + verdict badge */}
         <div className="flex items-center justify-between mb-3 gap-2">
           <div className="flex items-center gap-2">
@@ -187,8 +187,8 @@ export const BestSpotSuggestion = ({
         </div>
 
         {/* Site name + rating */}
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-xl font-bold text-gray-900 dark:text-white">
+        <div className="flex min-w-0 items-center gap-2 mb-4">
+          <span className="min-w-0 truncate text-xl font-bold text-gray-900 dark:text-white">
             {site.name}
           </span>
           {site.rating != null && site.rating > 0 && (
@@ -323,7 +323,7 @@ export const BestSpotSuggestion = ({
         </p>
 
         {hourlyBestSpots.length > 0 && (
-          <div className="mb-4 border-t border-gray-100 dark:border-gray-700 pt-3">
+          <div className="mb-4 min-w-0 border-t border-gray-100 pt-3 dark:border-gray-700">
             <div className="flex items-center justify-between gap-2 mb-2">
               <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 {t('weather.bestSpotTimeline')}
@@ -332,7 +332,7 @@ export const BestSpotSuggestion = ({
                 {t('weather.byHour')}
               </span>
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div className="flex max-w-full min-w-0 gap-2 overflow-x-auto overscroll-x-contain pb-1">
               {hourlyBestSpots.map((hourlySpot) => {
                 const hourlyScore = Math.min(
                   100,

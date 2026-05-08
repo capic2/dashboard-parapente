@@ -1,6 +1,6 @@
 ---
 name: ui-ux-pro-max
-description: UI/UX design intelligence with searchable database
+description: Provides UI/UX design intelligence for web and mobile interfaces, including design systems, visual styles, color palettes, typography, UX heuristics, charts, accessibility, and stack-specific implementation guidance. Use when the user asks to design, create, implement, redesign, improve, polish, review, or fix UI/UX, frontend screens, landing pages, dashboards, forms, navigation, responsive layouts, visual hierarchy, dark/light mode, accessibility, charts, or mentions React, Next.js, Vue, Svelte, Tailwind, shadcn/ui, mobile UI, Figma, design system, wireframe, prototype, mockup, or visual design.
 ---
 # ui-ux-pro-max
 
