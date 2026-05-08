@@ -166,7 +166,7 @@ export default function WeatherPage() {
                   </p>
                   <p className="mt-1">{t('dashboard.noSitesDescription')}</p>
                   <Button
-                    onClick={() => void navigate({ to: '/sites' })}
+                    onPress={() => void navigate({ to: '/sites' })}
                     className="mt-3 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
                   >
                     {t('dashboard.addSite')}
