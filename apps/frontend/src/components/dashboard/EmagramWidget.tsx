@@ -18,6 +18,7 @@ import {
 import { useState, useMemo, useEffect } from 'react';
 import { parseApiUtcDate } from '../../lib/date';
 import { Lightbox } from '@dashboard-parapente/design-system';
+import { EmagramExplanationTooltip } from './EmagramExplanationTooltip';
 import {
   Slider,
   SliderTrack,
@@ -474,18 +475,21 @@ export default function EmagramWidget({
         <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
           🌡️ Analyse Thermique (Émagramme)
         </h2>
-        <Button
-          onPress={handleRefresh}
-          isDisabled={isRefreshing}
-          className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-          aria-label="Actualiser"
-        >
-          <span
-            className={`text-base ${isRefreshing ? 'animate-spin inline-block' : ''}`}
+        <div className="flex items-center gap-2">
+          <EmagramExplanationTooltip emagram={emagram} compact />
+          <Button
+            onPress={handleRefresh}
+            isDisabled={isRefreshing}
+            className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+            aria-label="Actualiser"
           >
-            🔄
-          </span>
-        </Button>
+            <span
+              className={`text-base ${isRefreshing ? 'animate-spin inline-block' : ''}`}
+            >
+              🔄
+            </span>
+          </Button>
+        </div>
       </div>
 
       {/* Hour Slider */}

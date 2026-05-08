@@ -163,6 +163,7 @@ def _normalize_llm_analysis(
         "conseils_vol": raw_analysis.get("conseils_vol"),
         "alertes_securite": raw_analysis.get("alertes_securite", []),
         "details_analyse": raw_analysis.get("details_analyse"),
+        "explication_analyse": raw_analysis.get("explication_analyse"),
         "llm_provider": provider["provider"],
         "llm_model": raw_analysis.get("llm_model", provider["model"]),
         "llm_tokens_used": raw_analysis.get("llm_tokens_used"),
@@ -415,7 +416,7 @@ def save_emagram_analysis(
         sources_count=screenshot_result.get("sources_successful", 0),
         sources_agreement=analysis_result.get("sources_agreement"),
         sources_errors=json.dumps(sources_errors, ensure_ascii=False) if sources_errors else None,
-        ai_raw_response=analysis_result.get("raw_response"),
+        ai_raw_response=json.dumps(analysis_result, ensure_ascii=False),
         # Status
         analysis_status="completed",
     )
