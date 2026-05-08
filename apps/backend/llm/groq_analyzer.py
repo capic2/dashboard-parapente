@@ -29,7 +29,15 @@ Réponds UNIQUEMENT en JSON valide avec cette structure exacte :
   "score_volabilite": <score 0-100>,
   "conseils_vol": "<conseils pratiques pour le pilote>",
   "alertes_securite": ["<alerte 1>", "<alerte 2>"],
-  "details_analyse": "<resume technique de l'analyse>"
+  "details_analyse": "<resume technique de l'analyse>",
+  "explication_analyse": {{
+    "resume": "<pourquoi ce score en 1 phrase>",
+    "indices": [
+      "<courbe/indice observe -> interpretation parapente>",
+      "<courbe/indice observe -> interpretation parapente>"
+    ],
+    "par_source": {{"<source si identifiable>": ["<observation -> consequence>"]}}
+  }}
 }}"""
 
 
@@ -118,6 +126,7 @@ def analyze_emagram_with_groq(
             result.setdefault("heures_volables", "11:00-17:00")
             result.setdefault("alertes_securite", [])
             result.setdefault("details_analyse", "Analyse par Groq Llama Vision")
+            result.setdefault("explication_analyse", None)
             usage = getattr(response, "usage", None)
             prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
             completion_tokens = getattr(usage, "completion_tokens", 0) or 0

@@ -99,6 +99,12 @@ export interface EmagramListItem {
   created_at: string;
 }
 
+export interface EmagramAnalysisExplanation {
+  resume: string | null;
+  indices: string[];
+  par_source: Record<string, string[]>;
+}
+
 // Parsed alerts (from JSON string)
 type SafetyAlert = string;
 
@@ -126,6 +132,62 @@ export function parseSourcesErrors(
   } catch {
     return {};
   }
+}
+
+export function parseAnalysisExplanation(
+  ai_raw_response: string | null | undefined
+): EmagramAnalysisExplanation | null {
+  if (!ai_raw_response) return null;
+
+  try {
+    const parsed = JSON.parse(ai_raw_response);
+    const rawExplanation =
+      parsed?.explication_analyse ?? parsed?.details_analyse;
+
+    if (!rawExplanation) return null;
+
+    if (typeof rawExplanation === 'string') {
+      return { resume: rawExplanation, indices: [], par_source: {} };
+    }
+
+    if (Array.isArray(rawExplanation)) {
+      return {
+        resume: null,
+        indices: rawExplanation.filter((item) => typeof item === 'string'),
+        par_source: {},
+      };
+    }
+
+    if (typeof rawExplanation === 'object') {
+      const sourceEntries = Object.entries(
+        rawExplanation.par_source ?? {}
+      ).reduce<Record<string, string[]>>((acc, [source, observations]) => {
+        if (Array.isArray(observations)) {
+          acc[source] = observations.filter((item) => typeof item === 'string');
+        } else if (typeof observations === 'string') {
+          acc[source] = [observations];
+        }
+        return acc;
+      }, {});
+
+      return {
+        resume:
+          typeof rawExplanation.resume === 'string'
+            ? rawExplanation.resume
+            : null,
+        indices: Array.isArray(rawExplanation.indices)
+          ? rawExplanation.indices.filter(
+              (item: unknown) => typeof item === 'string'
+            )
+          : [],
+        par_source: sourceEntries,
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 // Score categories
