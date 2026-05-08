@@ -175,22 +175,6 @@ export default function WeatherPage() {
           }}
         />
 
-        <BestSpotSuggestion
-          bestSpot={bestSpot ?? null}
-          hourlyBestSpots={hourlyBestSpots?.hours ?? []}
-          hourlyStartHour={hourlyBestSpots?.startHour}
-          onSelectSite={(siteId) => {
-            setSelectedSearchTarget(null);
-            void navigate({
-              to: '/weather',
-              search: {
-                siteId,
-                day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
-              },
-            });
-          }}
-          selectedDayIndex={selectedDayIndex}
-        />
       </aside>
 
       <div className="min-w-0 space-y-3 sm:space-y-4">
@@ -301,19 +285,38 @@ export default function WeatherPage() {
 
         {/* 7-Day Forecast + Day Selector */}
         {!selectedSearchTarget && selectedSiteId && (
-          <Forecast7Day
-            spotId={selectedSiteId}
-            selectedDayIndex={selectedDayIndex}
-            onSelectDay={(day) =>
-              void navigate({
-                to: '/weather',
-                search: {
-                  ...weatherSearch,
-                  day: day > 0 ? day : undefined,
-                },
-              })
-            }
-          />
+          <>
+            <Forecast7Day
+              spotId={selectedSiteId}
+              selectedDayIndex={selectedDayIndex}
+              onSelectDay={(day) =>
+                void navigate({
+                  to: '/weather',
+                  search: {
+                    ...weatherSearch,
+                    day: day > 0 ? day : undefined,
+                  },
+                })
+              }
+            />
+
+            <BestSpotSuggestion
+              bestSpot={bestSpot ?? null}
+              hourlyBestSpots={hourlyBestSpots?.hours ?? []}
+              hourlyStartHour={hourlyBestSpots?.startHour}
+              onSelectSite={(siteId) => {
+                setSelectedSearchTarget(null);
+                void navigate({
+                  to: '/weather',
+                  search: {
+                    siteId,
+                    day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
+                  },
+                });
+              }}
+              selectedDayIndex={selectedDayIndex}
+            />
+          </>
         )}
 
         {/* Emagram Analysis (authenticated only) */}
