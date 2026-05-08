@@ -22,6 +22,7 @@ import { parseAlerts, getScoreColor } from '../types/emagram';
 import type { EmagramListItem } from '../types/emagram';
 import { DataTable, Button } from '@dashboard-parapente/design-system';
 import { parseApiUtcDate } from '../lib/date';
+import { EmagramExplanationTooltip } from '../components/dashboard/EmagramExplanationTooltip';
 
 const historyColumnHelper = createColumnHelper<EmagramListItem>();
 
@@ -205,9 +206,10 @@ export default function ThermalAnalysis() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         {/* Left Column - Score & Metrics */}
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-          <h2 className="text-lg font-bold mb-4">
-            {t('thermal.scoreCardTitle')}
-          </h2>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="text-lg font-bold">{t('thermal.scoreCardTitle')}</h2>
+            <EmagramExplanationTooltip emagram={latest} compact />
+          </div>
 
           {/* Score Gauge */}
           <div className="flex justify-center mb-6">

@@ -31,7 +31,15 @@ Réponds UNIQUEMENT en JSON valide avec cette structure exacte :
   "score_volabilite": <score 0-100>,
   "conseils_vol": "<conseils pratiques pour le pilote>",
   "alertes_securite": ["<alerte 1>", "<alerte 2>"],
-  "details_analyse": "<resume technique de l'analyse>"
+  "details_analyse": "<resume technique de l'analyse>",
+  "explication_analyse": {{
+    "resume": "<pourquoi ce score en 1 phrase>",
+    "indices": [
+      "<courbe/indice observe -> interpretation parapente>",
+      "<courbe/indice observe -> interpretation parapente>"
+    ],
+    "par_source": {{"<source si identifiable>": ["<observation -> consequence>"]}}
+  }}
 }}"""
 
 
@@ -174,5 +182,6 @@ def _parse_openrouter_response(response_text: str) -> dict[str, Any]:
     result["score_volabilite"] = max(0, min(100, int(result["score_volabilite"])))
     if not isinstance(result["alertes_securite"], list):
         result["alertes_securite"] = []
+    result.setdefault("explication_analyse", None)
 
     return result
