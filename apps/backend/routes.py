@@ -382,7 +382,7 @@ async def get_nearby_flight_options(
     db: Session = Depends(get_db),
 ):
     """Return the selected city plus nearby takeoff and landing options."""
-    from spots import search_by_coordinates
+    from spots import search_by_coordinates, search_remote_by_coordinates
 
     takeoff_result = search_by_coordinates(db, lat, lon, radius_km, "takeoff")
     if "error" in takeoff_result:
@@ -391,6 +391,35 @@ async def get_nearby_flight_options(
     landing_result = search_by_coordinates(db, lat, lon, radius_km, "landing")
     if "error" in landing_result:
         raise HTTPException(status_code=404, detail=landing_result["error"])
+
+    if not takeoff_result["spots"] or not landing_result["spots"]:
+        try:
+            remote_result = await asyncio.to_thread(
+                search_remote_by_coordinates, lat, lon, radius_km, None
+            )
+            remote_spots = remote_result.get("spots", [])
+
+            if not takeoff_result["spots"]:
+                takeoff_spots = [
+                    spot for spot in remote_spots if spot.get("type") in {"takeoff", "both"}
+                ]
+                takeoff_result = {
+                    **remote_result,
+                    "total": len(takeoff_spots),
+                    "spots": takeoff_spots,
+                }
+
+            if not landing_result["spots"]:
+                landing_spots = [
+                    spot for spot in remote_spots if spot.get("type") in {"landing", "both"}
+                ]
+                landing_result = {
+                    **remote_result,
+                    "total": len(landing_spots),
+                    "spots": landing_spots,
+                }
+        except Exception:
+            logger.exception("Remote nearby search failed for %s,%s", lat, lon)
 
     takeoffs = takeoff_result["spots"][:limit]
     landings = landing_result["spots"][:limit]
