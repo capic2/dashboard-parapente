@@ -104,10 +104,6 @@ const mockEmagramLatest = {
   is_from_llm: true,
   has_thermal_data: true,
   flyable_hours_formatted: '5h',
-  screenshot_paths: JSON.stringify({
-    'meteo-parapente': '/tmp/test-meteo-parapente.png',
-    topmeteo: '/tmp/test-topmeteo.png',
-  }),
   sources_count: 2,
   sources_agreement: 'high',
   sources_errors: null,

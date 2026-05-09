@@ -79,7 +79,7 @@ function getSourceLabel(source: string): string {
   return (
     SOURCE_LABELS[source] ??
     source
-      .replaceAll('-', ' ')
+      .replace(/-/g, ' ')
       .split(' ')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ')
