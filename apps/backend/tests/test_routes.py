@@ -238,6 +238,67 @@ class TestLocationWeatherEndpoints:
         assert [spot["id"] for spot in data["takeoffs"]] == ["both-near", "takeoff-near"]
         assert [spot["id"] for spot in data["landings"]] == ["both-near", "landing-near"]
 
+    def test_nearby_flight_options_falls_back_to_remote_sources(self, client, monkeypatch):
+        def fake_search_remote_by_coordinates(lat, lon, radius_km=50, spot_type=None):
+            assert lat == 47.238
+            assert lon == 6.024
+            assert radius_km == 10
+            spots = {
+                "takeoff": [
+                    {
+                        "id": "openaip-takeoff",
+                        "name": "Déco distant",
+                        "type": "takeoff",
+                        "latitude": 47.24,
+                        "longitude": 6.03,
+                        "elevation_m": 450,
+                        "orientation": None,
+                        "rating": None,
+                        "country": "FR",
+                        "source": "openaip",
+                        "distance_km": 0.5,
+                    }
+                ],
+                "landing": [
+                    {
+                        "id": "pgs-landing",
+                        "name": "Atterro distant",
+                        "type": "landing",
+                        "latitude": 47.23,
+                        "longitude": 6.02,
+                        "elevation_m": None,
+                        "orientation": None,
+                        "rating": 4,
+                        "country": "FR",
+                        "source": "paraglidingspots",
+                        "distance_km": 0.8,
+                    }
+                ],
+            }
+            selected_spots = spots[spot_type]
+            return {
+                "query": {
+                    "latitude": lat,
+                    "longitude": lon,
+                    "radius_km": radius_km,
+                    "type": spot_type,
+                    "source": "remote",
+                },
+                "total": len(selected_spots),
+                "spots": selected_spots,
+            }
+
+        monkeypatch.setattr("spots.search_remote_by_coordinates", fake_search_remote_by_coordinates)
+
+        response = client.get(
+            "/api/locations/nearby-flight-options?lat=47.238&lon=6.024&name=Besançon&radius_km=10&limit=3"
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert [spot["id"] for spot in data["takeoffs"]] == ["openaip-takeoff"]
+        assert [spot["id"] for spot in data["landings"]] == ["pgs-landing"]
+
     def test_weather_by_coordinates(self, client, monkeypatch):
         async def fake_forecast(*args, **kwargs):
             return {
