@@ -89,8 +89,9 @@ Run all lint targets:
 
 ## Validation Strategy
 - Prefer targeted lint/test commands during implementation.
-- Use `run-many -t test` when changes impact multiple projects or before final validation.
-- Use `run-many -t lint` for global lint validation.
+- Prefer `nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e` for branch/PR validation.
+- Use `run-many -t test` only when affected detection is not appropriate or a full-repo check is explicitly needed.
+- Use `run-many -t lint` only when affected detection is not appropriate or a full-repo lint is explicitly needed.
 - Use frontend build when frontend behavior, routing, bundling, or UI code changes.
 - Before creating or updating a PR, run all impacted checks from the active worktree and fix failures first.
 - For frontend PRs, run `nx lint frontend`, `nx test frontend`, and `nx build frontend` from the worktree before opening the PR.

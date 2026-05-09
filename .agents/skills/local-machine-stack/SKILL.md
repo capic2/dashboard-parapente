@@ -15,6 +15,12 @@ Use this pnpm binary on this machine:
 
 Do not assume `pnpm`, `npm`, `npx`, `yarn`, or `corepack` are available in `PATH`.
 
+Before running Nx commands, verify local dependencies exist. If `node_modules/.bin/nx` or required packages such as `typescript` are missing, run:
+
+```bash
+CI=true /home/capic/.local/share/pnpm/pnpm install
+```
+
 ## Repository
 
 Workspace root:
@@ -80,6 +86,7 @@ For direct Oxlint checks on frontend/design-system:
 Use the same pnpm binary and disable Nx Cloud if running through Nx:
 
 ```bash
+NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e
 NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm test
 NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm build
 NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx test frontend
@@ -89,6 +96,7 @@ NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx test backend
 
 Use a longer Bash timeout for full-repo tasks:
 
+- affected: `360000`
 - lint: `360000`
 - test: `360000` or higher if e2e/browser tests are involved
 - build: `360000`
