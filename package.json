@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Paragliding Dashboard - Weather, Flights, and Analytics - Nx Monorepo",
   "private": true,
-  "packageManager": "pnpm@10.33.4",
+  "packageManager": "pnpm@11.0.8",
   "scripts": {
     "dev": "nx run-many -t serve -p frontend,backend --parallel",
     "build": "nx run-many -t build --all",
@@ -101,16 +101,6 @@
     "apps/backend/**/*.py": [
       "apps/backend/.venv/bin/ruff check --output-format=github",
       "apps/backend/.venv/bin/black"
-    ]
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "core-js",
-      "esbuild",
-      "highlight.js",
-      "msw",
-      "nx",
-      "protobufjs"
     ]
   },
   "msw": {

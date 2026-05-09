@@ -2,7 +2,15 @@ packages:
   - 'apps/*'
   - 'libs/*'
 
-enableGlobalVirtualStore: true
+enableGlobalVirtualStore: false
+
+allowBuilds:
+  core-js: true
+  esbuild: true
+  highlight.js: true
+  msw: true
+  nx: true
+  protobufjs: true
 
 catalog:
   '@chromatic-com/storybook': ^5.1.1
