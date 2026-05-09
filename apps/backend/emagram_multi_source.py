@@ -44,8 +44,8 @@ def _configured_llm_providers() -> list[dict[str, Any]]:
             "model": config.GROQ_MODEL,
             "label": "Groq Llama Vision",
             "free": True,
-            "call": lambda image_paths, site: analyze_emagram_with_groq(
-                screenshot_paths=image_paths,
+            "call": lambda screenshots, site: analyze_emagram_with_groq(
+                screenshot_paths=screenshots,
                 spot_name=site.name,
                 coordinates=(site.latitude, site.longitude),
                 model_name=config.GROQ_MODEL,
@@ -58,8 +58,8 @@ def _configured_llm_providers() -> list[dict[str, Any]]:
             "model": config.OPENROUTER_MODEL,
             "label": "OpenRouter Vision",
             "free": True,
-            "call": lambda image_paths, site: analyze_emagram_with_openrouter(
-                screenshot_paths=image_paths,
+            "call": lambda screenshots, site: analyze_emagram_with_openrouter(
+                screenshot_paths=screenshots,
                 spot_name=site.name,
                 coordinates=(site.latitude, site.longitude),
                 model_name=config.OPENROUTER_MODEL,
@@ -72,8 +72,8 @@ def _configured_llm_providers() -> list[dict[str, Any]]:
             "model": config.GEMINI_MODEL,
             "label": "Gemini Vision",
             "free": False,
-            "call": lambda image_paths, site: analyze_emagram_with_gemini(
-                screenshot_paths=image_paths,
+            "call": lambda screenshots, site: analyze_emagram_with_gemini(
+                screenshot_paths=screenshots,
                 spot_name=site.name,
                 coordinates=(site.latitude, site.longitude),
                 api_key=config.GOOGLE_API_KEY,
@@ -106,7 +106,9 @@ def _configured_llm_providers() -> list[dict[str, Any]]:
     return configured
 
 
-def _analyze_emagram_with_fallbacks(image_paths: list[str], site: Site) -> dict[str, Any]:
+def _analyze_emagram_with_fallbacks(
+    screenshots: list[dict[str, str]], site: Site
+) -> dict[str, Any]:
     analysis_errors = []
     quota_errors = 0
     providers_tried = 0
@@ -123,7 +125,7 @@ def _analyze_emagram_with_fallbacks(image_paths: list[str], site: Site) -> dict[
         logger.info(f"   Model: {provider['model']}")
 
         try:
-            raw_analysis = provider["call"](image_paths, site)
+            raw_analysis = provider["call"](screenshots, site)
             analysis_result = _normalize_llm_analysis(raw_analysis, provider)
             if not _is_usable_llm_analysis(analysis_result):
                 raise RuntimeError("LLM response is incomplete or unusable")
@@ -301,8 +303,10 @@ async def generate_multi_source_emagram_for_spot(
         logger.info(f"📸 {len(successful_screenshots)}/3 screenshots successful")
 
         # Step 4: Analyze with AI using the configured fallback chain.
-        image_paths = [s["image_path"] for s in successful_screenshots]
-        analysis_result = _analyze_emagram_with_fallbacks(image_paths, site)
+        image_sources = [
+            {"source": s["source"], "path": s["image_path"]} for s in successful_screenshots
+        ]
+        analysis_result = _analyze_emagram_with_fallbacks(image_sources, site)
 
         if not analysis_result.get("success"):
             logger.error(f"LLM analysis failed: {analysis_result.get('error')}")
