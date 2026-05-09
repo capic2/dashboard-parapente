@@ -9,6 +9,9 @@ import json
 import logging
 import time
 from pathlib import Path
+from typing import Any
+
+from llm.screenshot_inputs import ScreenshotInput, normalize_screenshot_inputs
 
 try:
     import google.generativeai as genai
@@ -24,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 def analyze_emagram_with_gemini(
-    screenshot_paths: list[str],
+    screenshot_paths: list[ScreenshotInput],
     spot_name: str,
     coordinates: tuple,
     api_key: str,
@@ -36,7 +39,7 @@ def analyze_emagram_with_gemini(
     Analyze emagram screenshots using Google Gemini Vision API.
 
     Args:
-        screenshot_paths: List of paths to screenshot files (up to 3 sources)
+        screenshot_paths: List of paths or {source, path} screenshot entries
         spot_name: Name of the paragliding spot
         coordinates: (lat, lon) tuple
         api_key: Google API key
@@ -152,7 +155,9 @@ def analyze_emagram_with_gemini(
     raise RuntimeError(f"Gemini API failed after {max_retries} attempts: {last_error}")
 
 
-def _build_analysis_prompt(screenshot_paths: list[str], spot_name: str, coordinates: tuple) -> list:
+def _build_analysis_prompt(
+    screenshot_paths: list[ScreenshotInput], spot_name: str, coordinates: tuple
+) -> list[Any]:
     """
     Build the analysis prompt with embedded images.
 
@@ -161,9 +166,17 @@ def _build_analysis_prompt(screenshot_paths: list[str], spot_name: str, coordina
     """
 
     lat, lon = coordinates
+    screenshots = normalize_screenshot_inputs(screenshot_paths)
+    source_lines = "\n".join(
+        f"- Image {index}: source `{screenshot['source']}`"
+        for index, screenshot in enumerate(screenshots, start=1)
+    )
 
     # Text prompt - CONCIS pour économiser les tokens
-    text_prompt = f"""Analyse ces {len(screenshot_paths)} emagrammes pour {spot_name} ({lat:.4f}, {lon:.4f}).
+    text_prompt = f"""Analyse ces {len(screenshots)} emagrammes pour {spot_name} ({lat:.4f}, {lon:.4f}).
+
+Correspondance des images:
+{source_lines}
 
 Réponds UNIQUEMENT avec ce JSON (sans markdown):
 
@@ -178,12 +191,20 @@ Réponds UNIQUEMENT avec ce JSON (sans markdown):
   "explication_analyse": {{
     "resume": "<pourquoi ce score en 1 phrase>",
     "indices": [
-      "<courbe/indice observe -> interpretation parapente>",
-      "<courbe/indice observe -> interpretation parapente>"
+      "<indice global observe -> interpretation parapente>",
+      "<indice global observe -> interpretation parapente>"
     ],
-    "par_source": {{"<source si identifiable>": ["<observation -> consequence>"]}}
+    "par_source": {{
+      "<source exacte ci-dessus>": [
+        "Courbe observee: <nom/couleur/position> | Comment la reconnaitre: <repere visuel> | Interpretation: <sens meteo> | Consequence parapente: <impact concret>",
+        "Courbe observee: <nom/couleur/position> | Comment la reconnaitre: <repere visuel> | Interpretation: <sens meteo> | Consequence parapente: <impact concret>"
+      ]
+    }}
   }}
 }}
+
+Pour chaque image/source, remplis obligatoirement explication_analyse.par_source avec la cle source exacte indiquee plus haut.
+Explique les courbes visibles: temperature, point de rosee, ecart temperature/point de rosee, parcelle/thermique si visible, base nuageuse/LCL, inversions/couches stables et vent altitude si visible.
 
 IMPORTANT: Réponds UNIQUEMENT le JSON complet, rien d'autre.
 """
@@ -192,7 +213,9 @@ IMPORTANT: Réponds UNIQUEMENT le JSON complet, rien d'autre.
     parts = [text_prompt]
 
     # Add images
-    for path in screenshot_paths:
+    image_count = 0
+    for screenshot in screenshots:
+        path = screenshot["path"]
         image_path = Path(path)
         if not image_path.exists():
             logger.warning(f"Screenshot not found: {path}")
@@ -215,10 +238,14 @@ IMPORTANT: Réponds UNIQUEMENT le JSON complet, rien d'autre.
                 logger.info(f"Resized image {path} from {original_size} to {new_size}")
 
             parts.append(image)
+            image_count += 1
             logger.debug(f"Added image to prompt: {path}")
 
         except Exception as e:
             logger.error(f"Failed to load image {path}: {e}")
+
+    if image_count == 0:
+        raise RuntimeError("No valid images to analyze")
 
     return parts
 
