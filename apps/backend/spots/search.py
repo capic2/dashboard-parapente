@@ -95,6 +95,86 @@ def search_by_coordinates(
     }
 
 
+def search_remote_by_coordinates(
+    lat: float, lon: float, radius_km: int = 50, spot_type: str | None = None
+) -> dict:
+    """
+    Search external spot sources directly without relying on the local database.
+
+    This is used as a fallback when the local ParaglidingSpot table has not been
+    synced yet, while preserving the same response shape as search_by_coordinates.
+    """
+    from .data_fetcher import (
+        fetch_openaip_data,
+        fetch_paraglidingspots_data,
+        merge_duplicate_spots,
+    )
+
+    logger.info(
+        "Searching remote spots at (%s, %s) within %skm, type=%s",
+        lat,
+        lon,
+        radius_km,
+        spot_type,
+    )
+
+    openaip_spots = fetch_openaip_data()
+    pgs_spots = fetch_paraglidingspots_data()
+    all_spots = merge_duplicate_spots(openaip_spots, pgs_spots)
+
+    results = []
+    for spot in all_spots:
+        if spot_type and spot.get("type") not in {spot_type, "both"}:
+            continue
+
+        try:
+            spot_id = spot["id"]
+            spot_name = spot["name"]
+            spot_kind = spot["type"]
+            spot_lat = float(spot["latitude"])
+            spot_lon = float(spot["longitude"])
+        except (KeyError, TypeError, ValueError):
+            continue
+
+        if not spot_id or not spot_name or not spot_kind:
+            continue
+
+        distance = haversine_distance(lat, lon, spot_lat, spot_lon)
+        if distance > radius_km:
+            continue
+
+        results.append(
+            {
+                "id": spot_id,
+                "name": spot_name,
+                "type": spot_kind,
+                "latitude": spot_lat,
+                "longitude": spot_lon,
+                "elevation_m": spot.get("elevation_m"),
+                "orientation": spot.get("orientation"),
+                "rating": spot.get("rating"),
+                "country": spot.get("country", "FR"),
+                "source": spot.get("source", "remote"),
+                "distance_km": distance,
+            }
+        )
+
+    results.sort(key=lambda x: x["distance_km"])
+
+    logger.info("✓ Found %s remote spots within %skm", len(results), radius_km)
+    return {
+        "query": {
+            "latitude": lat,
+            "longitude": lon,
+            "radius_km": radius_km,
+            "type": spot_type,
+            "source": "remote",
+        },
+        "total": len(results),
+        "spots": results,
+    }
+
+
 def search_by_city(
     db: Session,
     city_name: str,

@@ -11,7 +11,13 @@ This module provides functionality to:
 from .data_fetcher import sync_to_database
 from .distance import calculate_bounding_box, haversine_distance
 from .geocoding import geocode_city, search_locations
-from .search import get_spot_by_id, get_sync_status, search_by_city, search_by_coordinates
+from .search import (
+    get_spot_by_id,
+    get_sync_status,
+    search_by_city,
+    search_by_coordinates,
+    search_remote_by_coordinates,
+)
 
 __all__ = [
     "haversine_distance",
@@ -20,6 +26,7 @@ __all__ = [
     "search_locations",
     "search_by_city",
     "search_by_coordinates",
+    "search_remote_by_coordinates",
     "get_spot_by_id",
     "get_sync_status",
     "sync_to_database",
