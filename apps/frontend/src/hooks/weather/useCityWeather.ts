@@ -5,13 +5,11 @@ import {
   BackendWeatherResponseSchema,
   LocationSearchResponseSchema,
   NearbyFlightOptionsResponseSchema,
-  SpotWeatherResponseSchema,
 } from '@dashboard-parapente/shared-types';
 import type {
   BackendWeatherResponse,
   LocationSearchResponse,
   NearbyFlightOptionsResponse,
-  SpotWeatherResponse,
 } from '@dashboard-parapente/shared-types';
 
 export const useLocationSearch = (query: string, limit = 5) => {
@@ -97,23 +95,6 @@ export const useCoordinateWeather = (
       return BackendWeatherResponseSchema.parse(data);
     },
     enabled: !!location,
-    staleTime: getStaleTime(1000 * 60 * 30),
-  });
-};
-
-export const useSpotWeather = (spotId: string | null, dayIndex: number) => {
-  return useQuery<SpotWeatherResponse>({
-    queryKey: ['weather', 'external-spot', spotId, dayIndex],
-    queryFn: async () => {
-      if (!spotId) throw new Error('Spot ID is required');
-      const data = await api
-        .get(`spots/weather/${spotId}`, {
-          searchParams: { day_index: dayIndex },
-        })
-        .json();
-      return SpotWeatherResponseSchema.parse(data);
-    },
-    enabled: !!spotId,
     staleTime: getStaleTime(1000 * 60 * 30),
   });
 };

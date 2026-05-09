@@ -11,7 +11,6 @@ import {
   useCoordinateWeather,
   useLocationSearch,
   useNearbyFlightOptions,
-  useSpotWeather,
 } from '../../hooks/weather/useCityWeather';
 import { useCreateSite } from '../../hooks/sites/useSites';
 import type { Site } from '../../types';
@@ -158,6 +157,12 @@ const getOptionName = (option: SelectedOption | null) => {
   return option.type === 'city' ? option.location.name : option.spot.name;
 };
 
+const getOptionLocation = (option: SelectedOption | null) => {
+  if (!option) return null;
+  if (option.type === 'city') return option.location;
+  return option.spot;
+};
+
 export default function CityWeatherSearch({
   dayIndex,
   selectedTarget,
@@ -193,14 +198,9 @@ export default function CityWeatherSearch({
     radiusKm,
     limit
   );
+  const selectedWeatherLocation = getOptionLocation(selectedOption);
   const coordinateWeather = useCoordinateWeather(
-    selectedOption?.type === 'city' ? selectedOption.location : null,
-    dayIndex
-  );
-  const spotWeather = useSpotWeather(
-    isSpotOption(selectedOption)
-      ? selectedOption.spot.id
-      : null,
+    selectedWeatherLocation,
     dayIndex
   );
 
@@ -220,9 +220,9 @@ export default function CityWeatherSearch({
     isWeatherLoading = coordinateWeather.isLoading;
     isWeatherError = coordinateWeather.isError;
   } else if (isSpotOption(selectedOption)) {
-    selectedWeather = spotWeather.data;
-    isWeatherLoading = spotWeather.isLoading;
-    isWeatherError = spotWeather.isError;
+    selectedWeather = coordinateWeather.data;
+    isWeatherLoading = coordinateWeather.isLoading;
+    isWeatherError = coordinateWeather.isError;
   }
 
   const handleSelectLocation = (location: LocationSuggestion) => {

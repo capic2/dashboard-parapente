@@ -517,11 +517,7 @@ const coordinatesWeatherHandler = http.get('*/api/weather/coordinates', () =>
   })
 );
 const spotWeatherHandler = http.get('*/api/spots/weather/:spotId', () =>
-  HttpResponse.json({
-    ...mockWeatherArguel,
-    spot_id: 'merged-takeoff-arguel',
-    spot_name: 'Arguel déco',
-  })
+  new HttpResponse(null, { status: 404 })
 );
 const bestSpotsHandler = http.get('*/api/spots/best', ({ request }) => {
   const dayIndex = Number(
@@ -725,6 +721,9 @@ WithCitySearch.test(
     await userEvent.click(searchedSpotButton);
     await canvas.findByText('Résultat de recherche sélectionné');
     await canvas.findByText('Météo sélectionnée');
+    expect(
+      canvas.queryByText(/Impossible de charger la météo/u)
+    ).not.toBeInTheDocument();
     await canvas.findByText('Prévisions Horaires');
 
     const addFavoriteButton = await canvas.findByRole('button', {

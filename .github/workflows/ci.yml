@@ -21,6 +21,8 @@ jobs:
     name: main
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
     steps:
       - name: 🏷️ Remove ready-to-merge label
@@ -178,26 +180,22 @@ jobs:
         run: exit 1
 
       - name: 📊 Upload frontend coverage
-        if: always()
+        if: always() && env.CODECOV_TOKEN != ''
         uses: codecov/codecov-action@v6
         with:
           files: ./coverage/apps/frontend/lcov.info
           flags: frontend
           name: frontend-coverage
         continue-on-error: true
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
       - name: 📊 Upload backend coverage
-        if: always()
+        if: always() && env.CODECOV_TOKEN != ''
         uses: codecov/codecov-action@v6
         with:
           files: ./coverage/apps/backend/coverage.xml
           flags: backend
           name: backend-coverage
         continue-on-error: true
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   e2e:
     name: E2E Tests
