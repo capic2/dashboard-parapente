@@ -70,10 +70,12 @@ const mockEmagramData = {
       ],
       par_source: {
         'meteo-parapente': [
-          'La couche convective monte nettement en milieu de journée -> créneau favorable après 11h.',
+          "Courbe observee: temperature bien décroissante sous 2500 m | Comment la reconnaitre: courbe principale inclinée sans cassure nette | Interpretation: couche convective profonde | Consequence parapente: créneau favorable après 11h.",
+          "Courbe observee: point de rosée éloigné de la température | Comment la reconnaitre: grand espace entre les deux courbes | Interpretation: air assez sec | Consequence parapente: plafond correct mais nuages peu nombreux.",
         ],
-        topmeteo: [
-          'Le profil confirme un plafond élevé -> bonnes transitions possibles.',
+        meteociel: [
+          "Courbe observee: inversion faible vers 2600 m | Comment la reconnaitre: la température devient presque verticale | Interpretation: frein en haut de convection | Consequence parapente: plafond exploitable mais transitions au-dessus plus limitées.",
+          "Courbe observee: vent en altitude modéré | Comment la reconnaitre: barbules plus longues au-dessus de 2000 m | Interpretation: dérive en hausse | Consequence parapente: surveiller le retour au terrain.",
         ],
       },
     },
@@ -83,7 +85,7 @@ const mockEmagramData = {
   flyable_hours_formatted: '6h',
   screenshot_paths: JSON.stringify({
     'meteo-parapente': '/tmp/test-mp.png',
-    topmeteo: '/tmp/test-tm.png',
+    meteociel: '/tmp/test-mc.png',
   }),
   sources_count: 2,
   sources_agreement: 'high',

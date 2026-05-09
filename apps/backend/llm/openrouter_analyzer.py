@@ -16,12 +16,16 @@ import httpx
 
 import config
 from llm.exceptions import QuotaExhaustedError
+from llm.screenshot_inputs import ScreenshotInput, normalize_screenshot_inputs
 
 logger = logging.getLogger(__name__)
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 ANALYSIS_PROMPT = """Tu es un expert météorologue spécialisé en parapente. Analyse ces emagrammes pour le spot "{spot_name}" ({lat}, {lon}).
+
+Correspondance des images:
+{source_lines}
 
 Réponds UNIQUEMENT en JSON valide avec cette structure exacte :
 {{
@@ -35,16 +39,24 @@ Réponds UNIQUEMENT en JSON valide avec cette structure exacte :
   "explication_analyse": {{
     "resume": "<pourquoi ce score en 1 phrase>",
     "indices": [
-      "<courbe/indice observe -> interpretation parapente>",
-      "<courbe/indice observe -> interpretation parapente>"
+      "<indice global observe -> interpretation parapente>",
+      "<indice global observe -> interpretation parapente>"
     ],
-    "par_source": {{"<source si identifiable>": ["<observation -> consequence>"]}}
+    "par_source": {{
+      "<source exacte ci-dessus>": [
+        "Courbe observee: <nom/couleur/position> | Comment la reconnaitre: <repere visuel> | Interpretation: <sens meteo> | Consequence parapente: <impact concret>",
+        "Courbe observee: <nom/couleur/position> | Comment la reconnaitre: <repere visuel> | Interpretation: <sens meteo> | Consequence parapente: <impact concret>"
+      ]
+    }}
   }}
-}}"""
+}}
+
+Pour chaque image/source, remplis obligatoirement explication_analyse.par_source avec la cle source exacte indiquee plus haut.
+Explique les courbes visibles: temperature, point de rosee, ecart temperature/point de rosee, parcelle/thermique si visible, base nuageuse/LCL, inversions/couches stables et vent altitude si visible."""
 
 
 def analyze_emagram_with_openrouter(
-    screenshot_paths: list[str],
+    screenshot_paths: list[ScreenshotInput],
     spot_name: str,
     coordinates: tuple[float, float],
     model_name: str = "qwen/qwen2.5-vl-72b-instruct:free",
@@ -70,7 +82,7 @@ def analyze_emagram_with_openrouter(
         "model": model_name,
         "messages": [{"role": "user", "content": content}],
         "temperature": 0.2,
-        "max_tokens": 2000,
+        "max_tokens": 3000,
     }
 
     for attempt in range(max_retries):
@@ -117,11 +129,27 @@ def analyze_emagram_with_openrouter(
 
 
 def _build_message_content(
-    screenshot_paths: list[str], spot_name: str, coordinates: tuple[float, float]
+    screenshot_paths: list[ScreenshotInput], spot_name: str, coordinates: tuple[float, float]
 ) -> list[dict[str, Any]]:
     content: list[dict[str, Any]] = []
+    screenshots = normalize_screenshot_inputs(screenshot_paths)
+    lat, lon = coordinates
+    source_lines = "\n".join(
+        f"- Image {index}: source `{screenshot['source']}`"
+        for index, screenshot in enumerate(screenshots, start=1)
+    )
+    content.append(
+        {
+            "type": "text",
+            "text": ANALYSIS_PROMPT.format(
+                spot_name=spot_name, lat=lat, lon=lon, source_lines=source_lines
+            ),
+        }
+    )
 
-    for path in screenshot_paths:
+    image_count = 0
+    for screenshot in screenshots:
+        path = screenshot["path"]
         image_path = Path(path)
         if not image_path.exists():
             logger.warning(f"Image not found: {path}")
@@ -136,19 +164,13 @@ def _build_message_content(
                     "image_url": {"url": f"data:{mime_type};base64,{img_data}"},
                 }
             )
+            image_count += 1
         except Exception as e:
             logger.warning(f"Failed to encode {path}: {e}")
 
-    if not content:
+    if image_count == 0:
         raise RuntimeError("No valid images to analyze")
 
-    lat, lon = coordinates
-    content.append(
-        {
-            "type": "text",
-            "text": ANALYSIS_PROMPT.format(spot_name=spot_name, lat=lat, lon=lon),
-        }
-    )
     return content
 
 

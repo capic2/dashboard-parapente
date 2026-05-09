@@ -83,7 +83,19 @@ const mockEmagramLatest = {
         'La courbe température/point de rosée suggère une instabilité en basses couches -> déclenchement possible.',
         'La base estimée vers 1600 m limite les marges au-dessus du relief.',
       ],
+      par_source: {
+        'meteo-parapente': [
+          "Courbe observee: température et point de rosée proches en basses couches | Comment la reconnaitre: les deux courbes se rapprochent sous 1700 m | Interpretation: humidité suffisante pour matérialiser la convection | Consequence parapente: déclenchement possible mais plafond modéré.",
+        ],
+        meteociel: [
+          "Courbe observee: vent qui forcit au-dessus de 2000 m | Comment la reconnaitre: barbules plus longues sur la colonne de vent | Interpretation: cisaillement et dérive en altitude | Consequence parapente: rester prudent en transition et près du relief.",
+        ],
+      },
     },
+  }),
+  screenshot_paths: JSON.stringify({
+    'meteo-parapente': '/tmp/test-mp.png',
+    meteociel: '/tmp/test-mc.png',
   }),
   raw_analysis: 'Detailed analysis...',
   skewt_image_path: null,
@@ -92,10 +104,6 @@ const mockEmagramLatest = {
   is_from_llm: true,
   has_thermal_data: true,
   flyable_hours_formatted: '5h',
-  screenshot_paths: JSON.stringify({
-    'meteo-parapente': '/tmp/test-meteo-parapente.png',
-    topmeteo: '/tmp/test-topmeteo.png',
-  }),
   sources_count: 2,
   sources_agreement: 'high',
   sources_errors: null,
