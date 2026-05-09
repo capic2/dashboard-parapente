@@ -27,7 +27,6 @@ import {
 } from '../hooks/weather/useBestSpotAPI';
 import {
   useCoordinateWeather,
-  useSpotWeather,
 } from '../hooks/weather/useCityWeather';
 import { transformWeatherResponse } from '../hooks/weather/useWeather';
 
@@ -39,6 +38,12 @@ const isSpotSearchTarget = (
 const getSearchTargetName = (target: CityWeatherTarget | null) => {
   if (!target) return '';
   return target.type === 'city' ? target.location.name : target.spot.name;
+};
+
+const getSearchTargetLocation = (target: CityWeatherTarget | null) => {
+  if (!target) return null;
+  if (target.type === 'city') return target.location;
+  return target.spot;
 };
 
 const getSearchDayLabel = (
@@ -68,24 +73,14 @@ export default function WeatherPage() {
   const selectedSiteId =
     sites.find((site) => site.id === routeSiteId)?.id ?? sites[0]?.id ?? '';
   const selectedSearchTitle = getSearchTargetName(selectedSearchTarget);
+  const selectedSearchLocation = getSearchTargetLocation(selectedSearchTarget);
   const coordinateWeather = useCoordinateWeather(
-    selectedSearchTarget?.type === 'city'
-      ? selectedSearchTarget.location
-      : null,
+    selectedSearchLocation,
     selectedDayIndex
   );
-  const spotWeather = useSpotWeather(
-    isSpotSearchTarget(selectedSearchTarget)
-      ? selectedSearchTarget.spot.id
-      : null,
-    selectedDayIndex
-  );
-  const selectedSearchWeather =
-    selectedSearchTarget?.type === 'city'
-      ? coordinateWeather.data
-      : selectedSearchTarget
-        ? spotWeather.data
-        : undefined;
+  const selectedSearchWeather = selectedSearchTarget
+    ? coordinateWeather.data
+    : undefined;
   const selectedSearchWeatherData = useMemo(
     () =>
       selectedSearchWeather
@@ -94,17 +89,9 @@ export default function WeatherPage() {
     [selectedSearchWeather]
   );
   const isSearchWeatherLoading =
-    selectedSearchTarget?.type === 'city'
-      ? coordinateWeather.isLoading
-      : selectedSearchTarget
-        ? spotWeather.isLoading
-        : false;
+    selectedSearchTarget ? coordinateWeather.isLoading : false;
   const isSearchWeatherError =
-    selectedSearchTarget?.type === 'city'
-      ? coordinateWeather.isError
-      : selectedSearchTarget
-        ? spotWeather.isError
-        : false;
+    selectedSearchTarget ? coordinateWeather.isError : false;
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [weatherDataMap] = useState<Map<string, Record<string, unknown>>>(
