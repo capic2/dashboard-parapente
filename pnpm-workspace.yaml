@@ -2,6 +2,8 @@ packages:
   - 'apps/*'
   - 'libs/*'
 
+enableGlobalVirtualStore: true
+
 catalog:
   '@chromatic-com/storybook': ^5.1.1
   '@nx/playwright': ^22.6.0

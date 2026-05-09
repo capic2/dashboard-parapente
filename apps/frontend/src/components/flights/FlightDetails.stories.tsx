@@ -97,6 +97,11 @@ const defaultHandlers = [
   http.get('/api/flights/:id/gpx-data', () =>
     HttpResponse.json({ data: mockGPXData })
   ),
+  http.get('/api/flights/:id/gpx', () =>
+    HttpResponse.text('<gpx></gpx>', {
+      headers: { 'Content-Type': 'application/gpx+xml' },
+    })
+  ),
   http.get('/api/flights/:id', () => HttpResponse.json(fullFlight)),
   http.patch('/api/flights/:id', async ({ request }) => {
     const body = await request.json();
@@ -181,6 +186,16 @@ Default.test('The GPX can be replaced', async ({ canvas, step }) => {
   await step('success toast appears', async () => {
     await expect(
       await canvas.findByText(i18n.t('flights.gpxAddedSuccess'))
+    ).toBeInTheDocument();
+  });
+});
+
+Default.test('The GPX can be downloaded', async ({ canvas, step }) => {
+  await step('show the download GPX button', async () => {
+    await expect(
+      await canvas.findByRole('button', {
+        name: i18n.t('flights.downloadGpx'),
+      })
     ).toBeInTheDocument();
   });
 });

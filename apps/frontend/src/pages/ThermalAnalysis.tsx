@@ -20,11 +20,24 @@ import {
 import { useSite } from '../hooks/sites/useSites';
 import { parseAlerts, getScoreColor } from '../types/emagram';
 import type { EmagramListItem } from '../types/emagram';
-import { DataTable, Button } from '@dashboard-parapente/design-system';
+import {
+  DataTable,
+  Button,
+  Lightbox,
+} from '@dashboard-parapente/design-system';
 import { parseApiUtcDate } from '../lib/date';
 import { EmagramExplanationTooltip } from '../components/dashboard/EmagramExplanationTooltip';
 
 const historyColumnHelper = createColumnHelper<EmagramListItem>();
+
+function formatSourceName(source: string): string {
+  return source
+    .replace(/-/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
 
 function ThermalHistoryTable({ history }: { history: EmagramListItem[] }) {
   const { t } = useTranslation();
@@ -133,6 +146,30 @@ export default function ThermalAnalysis() {
   const { data: latest, isLoading, refetch } = useLatestEmagram(selectedSiteId);
   const { data: history } = useEmagramHistory(userLat, userLon, 7);
   const triggerMutation = useTriggerEmagram();
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  const screenshotImages = useMemo(() => {
+    if (!latest?.screenshot_paths) return [];
+
+    try {
+      const screenshots: unknown = JSON.parse(latest.screenshot_paths);
+      if (
+        !screenshots ||
+        typeof screenshots !== 'object' ||
+        Array.isArray(screenshots)
+      ) {
+        return [];
+      }
+
+      return Object.keys(screenshots).map((source) => ({
+        src: `/api/emagram/screenshot/${latest.id}/${source}`,
+        alt: formatSourceName(source),
+      }));
+    } catch {
+      return [];
+    }
+  }, [latest?.id, latest?.screenshot_paths]);
 
   const handleRefresh = async () => {
     if (!selectedSiteId) return;
@@ -294,11 +331,56 @@ export default function ThermalAnalysis() {
           </div>
         </div>
 
-        {/* Middle Column - Skew-T Diagram */}
+        {/* Middle Column - Emagram Images */}
         <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-          <h2 className="text-lg font-bold mb-4">{t('thermal.skewtTitle')}</h2>
+          <h2 className="text-lg font-bold mb-4">
+            {screenshotImages.length > 0
+              ? t('thermal.capturedEmagramsTitle')
+              : t('thermal.skewtTitle')}
+          </h2>
 
-          {latest.skewt_image_path ? (
+          {screenshotImages.length > 0 ? (
+            <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {screenshotImages.map((image, idx) => (
+                  <button
+                    key={image.src}
+                    type="button"
+                    onClick={() => {
+                      setLightboxIndex(idx);
+                      setLightboxOpen(true);
+                    }}
+                    className="group overflow-hidden rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-left shadow-sm transition hover:border-purple-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <img
+                      src={image.src}
+                      alt={image.alt}
+                      className="h-52 w-full object-cover object-top transition group-hover:scale-[1.02]"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = skewtUnavailableSvg;
+                      }}
+                    />
+                    <span className="flex items-center justify-between gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+                      <span>{image.alt}</span>
+                      <span className="text-purple-600 dark:text-purple-300">
+                        {t('thermal.openImage')}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+                {latest.station_name} • {latest.sounding_time} •{' '}
+                {parseApiUtcDate(latest.analysis_datetime).toLocaleDateString()}
+              </p>
+              <Lightbox
+                isOpen={lightboxOpen}
+                onClose={() => setLightboxOpen(false)}
+                images={screenshotImages}
+                initialIndex={lightboxIndex}
+              />
+            </div>
+          ) : latest.skewt_image_path ? (
             <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
               <img
                 src={`/api/files${latest.skewt_image_path}`}
