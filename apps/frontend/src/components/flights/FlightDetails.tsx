@@ -15,6 +15,7 @@ import {
   useUploadGPXToFlight,
 } from '../../hooks/flights/useFlights';
 import { useToast } from '../../hooks/useToast';
+import { api } from '../../lib/api';
 import type { Flight, FlightFormData, Site } from '../../types';
 import { FlightEditForm } from './FlightEditForm';
 
@@ -56,6 +57,7 @@ export function FlightDetails({
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState(flight.notes ?? '');
   const [activeTab, setActiveTab] = useState<FlightDetailsTab>('infos');
+  const [isDownloadingGpx, setIsDownloadingGpx] = useState(false);
 
   const hasGpx = Boolean(flight.gpx_file_path);
   const hasVideo = Boolean(flight.video_file_path);
@@ -123,6 +125,28 @@ export function FlightDetails({
     }
   };
 
+  const handleGPXDownload = async () => {
+    if (!hasGpx || isDownloadingGpx) return;
+
+    setIsDownloadingGpx(true);
+    try {
+      const blob = await api.get(`flights/${flight.id}/gpx`).blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const filename = flightTitle.replace(/[^a-zA-Z0-9._-]+/g, '_');
+
+      a.href = url;
+      a.download = `${filename || flight.id}.gpx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to download GPX:', error);
+      toast.error(t('flights.gpxDownloadError'));
+    } finally {
+      setIsDownloadingGpx(false);
+    }
+  };
+
   const infoCard = (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
       {editingMode ? (
@@ -139,7 +163,7 @@ export function FlightDetails({
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">
               {flightTitle}
             </h2>
-            <div className="flex gap-2 ml-4">
+            <div className="flex flex-wrap justify-end gap-2 ml-4">
               <Button
                 className="px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-all"
                 onPress={() => setEditingMode(true)}
@@ -147,6 +171,17 @@ export function FlightDetails({
               >
                 {t('flights.editButton')}
               </Button>
+              {hasGpx && (
+                <Button
+                  className="px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-all disabled:cursor-not-allowed disabled:bg-gray-400"
+                  onPress={handleGPXDownload}
+                  isDisabled={isDownloadingGpx}
+                >
+                  {isDownloadingGpx
+                    ? t('flights.gpxDownloadInProgress')
+                    : t('flights.downloadGpx')}
+                </Button>
+              )}
               <Button
                 className={`px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm rounded-md transition-all ${
                   flight.gpx_file_path
