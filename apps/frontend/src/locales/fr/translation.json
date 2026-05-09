@@ -760,9 +760,11 @@
     "strengthMetric": "📈 Force",
     "hoursMetric": "⏰ Heures",
     "skewtTitle": "Diagramme Skew-T",
+    "capturedEmagramsTitle": "Émagrammes capturés",
     "skewtAlt": "Diagramme Skew-T",
     "skewtUnavailable": "Diagramme non disponible",
     "imageUnavailable": "Image non disponible",
+    "openImage": "Ouvrir",
     "summaryTitle": "📊 Résumé des Conditions",
     "tipsTitle": "💡 Conseils de Vol",
     "safetyAlertsTitle": "⚠️ Alertes de Sécurité"

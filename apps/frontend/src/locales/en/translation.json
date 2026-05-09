@@ -760,9 +760,11 @@
     "strengthMetric": "📈 Strength",
     "hoursMetric": "⏰ Hours",
     "skewtTitle": "Skew-T Diagram",
+    "capturedEmagramsTitle": "Captured Emagrams",
     "skewtAlt": "Skew-T Diagram",
     "skewtUnavailable": "Diagram unavailable",
     "imageUnavailable": "Image unavailable",
+    "openImage": "Open",
     "summaryTitle": "📊 Conditions Summary",
     "tipsTitle": "💡 Flight Tips",
     "safetyAlertsTitle": "⚠️ Safety Alerts"
