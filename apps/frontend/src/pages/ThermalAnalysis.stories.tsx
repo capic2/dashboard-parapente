@@ -26,11 +26,39 @@ const mockSite = {
 const mockEmagramLatest = {
   id: 'emagram-001',
   analysis_date: '2026-03-24',
+  analysis_time: '12:00',
+  analysis_datetime: '2026-03-24T12:00:00Z',
+  station_code: 'MPO',
+  station_name: 'Mont Poupet Ouest',
+  station_latitude: 46.94,
+  station_longitude: 5.88,
+  distance_km: 0,
+  data_source: 'multi-source',
+  sounding_time: '12Z',
+  llm_provider: 'gemini',
+  llm_model: 'gemini-pro-vision',
+  llm_tokens_used: 1200,
+  llm_cost_usd: 0.01,
+  analysis_method: 'llm_vision',
   latitude: 46.94,
   longitude: 5.88,
+  score_volabilite: 75,
+  plafond_thermique_m: 1600,
+  force_thermique_ms: 2.4,
+  cape_jkg: 320,
+  stabilite_atmospherique: 'instable',
+  cisaillement_vent: 'modéré',
+  heure_debut_thermiques: '12:00',
+  heure_fin_thermiques: '17:00',
+  heures_volables_total: 5,
+  risque_orage: 'faible',
   score: 75,
   summary:
     'Conditions thermiques moderees. Base des cumulus estimee a 1600m. Instabilite presente en basses couches.',
+  resume_conditions:
+    'Conditions thermiques moderees. Base des cumulus estimee a 1600m. Instabilite presente en basses couches.',
+  conseils_vol:
+    'Creneau exploitable en milieu de journee, avec surveillance du vent en altitude.',
   alerts: JSON.stringify([
     {
       type: 'thermal',
@@ -43,6 +71,10 @@ const mockEmagramLatest = {
       message: 'Renforcement du vent en altitude > 2000m',
     },
   ]),
+  alertes_securite: JSON.stringify([
+    'Thermiques moderes attendus a partir de 12h',
+    'Renforcement du vent en altitude > 2000m',
+  ]),
   ai_raw_response: JSON.stringify({
     explication_analyse: {
       resume:
@@ -54,8 +86,23 @@ const mockEmagramLatest = {
     },
   }),
   raw_analysis: 'Detailed analysis...',
+  skewt_image_path: null,
+  raw_sounding_data: null,
   source: 'open-meteo',
+  is_from_llm: true,
+  has_thermal_data: true,
+  flyable_hours_formatted: '5h',
+  screenshot_paths: JSON.stringify({
+    'meteo-parapente': '/tmp/test-meteo-parapente.png',
+    topmeteo: '/tmp/test-topmeteo.png',
+  }),
+  sources_count: 2,
+  sources_agreement: 'high',
+  sources_errors: null,
+  analysis_status: 'completed',
+  error_message: null,
   created_at: '2026-03-24T08:00:00',
+  updated_at: '2026-03-24T08:00:00',
 };
 
 const mockEmagramHistory = [
@@ -75,11 +122,27 @@ const mockEmagramHours = {
   ],
 };
 
+const PLACEHOLDER_PNG = new Uint8Array([
+  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1,
+  0, 0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222, 0, 0, 0, 12, 73, 68,
+  65, 84, 8, 215, 99, 104, 104, 248, 15, 0, 1, 1, 0, 5, 24, 217, 38, 57,
+  0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+]);
+
+const screenshotHandler = http.get(
+  '*/api/emagram/screenshot/:id/:source',
+  () =>
+    new HttpResponse(PLACEHOLDER_PNG, {
+      headers: { 'Content-Type': 'image/png' },
+    })
+);
+
 const defaultHandlers = [
   http.get('/api/spots/:id', () => HttpResponse.json(mockSite)),
   http.get('/api/emagram/hours', () => HttpResponse.json(mockEmagramHours)),
   http.get('/api/emagram/latest', () => HttpResponse.json(mockEmagramLatest)),
   http.get('/api/emagram/history', () => HttpResponse.json(mockEmagramHistory)),
+  screenshotHandler,
   http.post('/api/emagram/analyze', () =>
     HttpResponse.json({ success: true, id: 'emagram-new' })
   ),
