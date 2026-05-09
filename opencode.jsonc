@@ -13,14 +13,14 @@
       "description": "Implementation agent for code changes",
       "model": "opencode/gpt-5.3-codex",
       "temperature": 0.2,
-      "steps": 25
+      "steps": 60
     },
     "ship": {
       "description": "Lightweight git workflow agent",
       "mode": "subagent",
       "model": "opencode/gpt-5.4-mini",
       "temperature": 0.1,
-      "steps": 8,
+      "steps": 20,
       "permission": {
         "edit": "deny",
         "bash": {
