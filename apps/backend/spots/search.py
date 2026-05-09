@@ -128,9 +128,15 @@ def search_remote_by_coordinates(
             continue
 
         try:
+            spot_id = spot["id"]
+            spot_name = spot["name"]
+            spot_kind = spot["type"]
             spot_lat = float(spot["latitude"])
             spot_lon = float(spot["longitude"])
         except (KeyError, TypeError, ValueError):
+            continue
+
+        if not spot_id or not spot_name or not spot_kind:
             continue
 
         distance = haversine_distance(lat, lon, spot_lat, spot_lon)
@@ -139,9 +145,9 @@ def search_remote_by_coordinates(
 
         results.append(
             {
-                "id": spot["id"],
-                "name": spot["name"],
-                "type": spot["type"],
+                "id": spot_id,
+                "name": spot_name,
+                "type": spot_kind,
                 "latitude": spot_lat,
                 "longitude": spot_lon,
                 "elevation_m": spot.get("elevation_m"),
