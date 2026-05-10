@@ -23,7 +23,6 @@ jobs:
     timeout-minutes: 30
     env:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-      NODE_OPTIONS: --preserve-symlinks
 
     steps:
       - name: 🏷️ Remove ready-to-merge label
@@ -146,6 +145,7 @@ jobs:
           run_nx nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e
         continue-on-error: true
         env:
+          NODE_OPTIONS: --preserve-symlinks
           TESTING: true
           BACKEND_DATABASE_URL: sqlite:///./test.db
           BACKEND_WEATHERAPI_KEY: test_key
@@ -169,6 +169,7 @@ jobs:
         if: steps.nx_tasks.outcome == 'failure' && env.NX_CLOUD_EXHAUSTED == 'true'
         run: pnpm exec nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e
         env:
+          NODE_OPTIONS: --preserve-symlinks
           NX_NO_CLOUD: true
           TESTING: true
           BACKEND_DATABASE_URL: sqlite:///./test.db
