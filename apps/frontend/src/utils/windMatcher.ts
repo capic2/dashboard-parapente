@@ -135,24 +135,6 @@ export function getWindFavorabilityLabel(
 }
 
 /**
- * Get emoji indicator for wind favorability
- */
-export function getWindFavorabilityEmoji(
-  favorability: WindFavorability
-): string {
-  switch (favorability) {
-    case 'good':
-      return '🟢';
-    case 'moderate':
-      return '🟡';
-    case 'bad':
-      return '🔴';
-    default:
-      return '⚪';
-  }
-}
-
-/**
  * Get Tailwind color class for wind favorability
  */
 export function getWindFavorabilityColor(

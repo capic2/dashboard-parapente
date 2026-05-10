@@ -18,6 +18,7 @@ import { useWeather } from '../../hooks/weather/useWeather';
 import type { HourlyForecastItem, WeatherData } from '../../types';
 import CacheTimestamp from '../common/CacheTimestamp';
 import WindArrow from './WindArrow';
+import { getVerdictVisual, weatherCardClassName } from './weatherUi';
 
 interface HourlyForecastProps {
   spotId?: string;
@@ -112,30 +113,27 @@ const getSourceUrl = (sourceKey: string): string | null => {
 };
 
 /**
- * Get flyability display with emoji, verdict and reason
- * Format: "🟢 BON" or "🟡 MOYEN — Vent faible" or "🔴 MAUVAIS — Vent insuffisant"
+ * Get flyability display with verdict and reason.
  */
 export const getFlyabilityDisplay = (
   hour: HourlyForecastItem,
   thresholds: UiThresholds
-): { emoji: string; text: string; color: string } => {
+): {
+  text: string;
+  color: string;
+  Icon: ReturnType<typeof getVerdictVisual>['Icon'];
+} => {
   const verdict = hour.verdict?.toLowerCase();
   const verdictUpper = verdict?.toUpperCase() || 'MOYEN';
-
-  // Emoji and color based on verdict
-  let emoji = '🟡';
-  let color = 'text-yellow-700 dark:text-yellow-300';
+  const visual = getVerdictVisual(verdict || 'moyen');
+  let color = visual.textClassName;
 
   if (verdict === 'bon') {
-    emoji = '🟢';
-    color = 'text-green-700 dark:text-green-300';
-    return { emoji, text: 'BON', color };
+    return { text: 'BON', color, Icon: visual.Icon };
   } else if (verdict === 'mauvais') {
-    emoji = '🔴';
-    color = 'text-red-700 dark:text-red-300';
+    color = visual.textClassName;
   } else if (verdict === 'limite') {
-    emoji = '🟠';
-    color = 'text-orange-700 dark:text-orange-300';
+    color = visual.textClassName;
   }
 
   // Determine the reason when not BON
@@ -176,21 +174,15 @@ export const getFlyabilityDisplay = (
   }
 
   return {
-    emoji,
     text: `${verdictUpper} — ${reason}`,
     color,
+    Icon: visual.Icon,
   };
 };
 
 const getVerdictClass = (verdict: string): string => {
   const v = verdict.toLowerCase();
-  if (v === 'bon')
-    return 'bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30';
-  if (v === 'moyen')
-    return 'bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/30';
-  if (v === 'limite')
-    return 'bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30';
-  return 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30';
+  return getVerdictVisual(v).softClassName;
 };
 
 const formatWindDirectionFromDegrees = (deg: number | null): string => {
@@ -265,7 +257,7 @@ const ParaIndexTooltip = ({
     <div className="bg-white dark:bg-gray-800 border-2 border-sky-500 rounded-lg shadow-xl p-4 text-sm max-w-[320px]">
       <div className="font-bold mb-3 text-sky-700 dark:text-sky-400 pr-8">
         <span>
-          📊 {label} - {hour}
+          {label} - {hour}
         </span>
       </div>
       <div className="space-y-2 text-gray-700 dark:text-gray-300">
@@ -627,7 +619,7 @@ export default function HourlyForecast({
 
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
+      <div className={`${weatherCardClassName} p-4`} aria-live="polite">
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
           Prévisions Horaires
         </h2>
@@ -640,7 +632,7 @@ export default function HourlyForecast({
 
   if (hasError || !weather || !weather.hourly_forecast) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
+      <div className={`${weatherCardClassName} p-4`} role="alert">
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
           Prévisions Horaires
         </h2>
@@ -698,7 +690,7 @@ export default function HourlyForecast({
             consensus={data.temperature}
             unit="°C"
             fieldName="temperature"
-            label="🌡️ Température"
+            label="Température"
             color="#dc2626"
           />
         );
@@ -711,7 +703,7 @@ export default function HourlyForecast({
             consensus={data.wind_speed}
             unit="km/h"
             fieldName="wind_speed"
-            label="💨 Vent"
+            label="Vent"
             color="#2563eb"
           />
         );
@@ -724,7 +716,7 @@ export default function HourlyForecast({
             consensus={data.wind_gust ?? null}
             unit="km/h"
             fieldName="wind_gust"
-            label="💨 Rafales"
+            label="Rafales"
             color="#dc2626"
           />
         );
@@ -741,7 +733,7 @@ export default function HourlyForecast({
             )}
             unit=""
             fieldName="wind_direction"
-            label="🧭 Direction"
+            label="Direction"
             color="#7c3aed"
           />
         );
@@ -754,7 +746,7 @@ export default function HourlyForecast({
             consensus={data.precipitation}
             unit="mm"
             fieldName="precipitation"
-            label="🌧️ Précipitations"
+            label="Précipitations"
             color="#0891b2"
           />
         );
@@ -771,7 +763,7 @@ export default function HourlyForecast({
             }
             unit="%"
             fieldName="cloud_cover"
-            label="☁️ Couverture nuageuse"
+            label="Couverture nuageuse"
             color="#64748b"
           />
         );
@@ -782,18 +774,128 @@ export default function HourlyForecast({
   };
 
   return (
-    <div className="min-w-0 rounded-xl bg-white p-4 shadow-md dark:bg-gray-800">
+    <div className={`${weatherCardClassName} min-w-0 p-4`}>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
           Prévisions Horaires
         </h2>
         <CacheTimestamp cachedAt={weather.cached_at} />
       </div>
-      <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400 sm:hidden">
-        Glissez le tableau horizontalement pour voir toutes les mesures.
-      </p>
+      <div className="grid gap-3 md:hidden">
+        {flyingHours.length > 0 ? (
+          flyingHours.map((hour, index) => {
+            const cloudCover =
+              hour.cloud_cover ??
+              hour.sources?.['open-meteo']?.cloud_cover ??
+              hour.sources?.['weatherapi']?.cloud_cover ??
+              null;
+            const gustValue =
+              hour.wind_gust ??
+              hour.sources?.['open-meteo']?.wind_gust ??
+              hour.sources?.['weatherapi']?.wind_gust ??
+              null;
+            const display = getFlyabilityDisplay(hour, uiThresholds);
+            const FlyabilityIcon = display.Icon;
 
-      <div className="max-w-full min-w-0 touch-pan-x overflow-x-auto overscroll-x-contain rounded-lg border border-gray-100 dark:border-gray-700">
+            return (
+              <article
+                key={index}
+                className={`rounded-xl border border-slate-200 p-3 dark:border-slate-700 ${getVerdictClass(hour.verdict)}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 text-sm font-black text-slate-950 dark:text-white">
+                      <Clock
+                        className="h-4 w-4 text-slate-500"
+                        aria-hidden="true"
+                      />
+                      {hour.hour}
+                    </div>
+                    <div
+                      className={`mt-1 inline-flex items-center gap-1.5 text-sm font-bold ${display.color}`}
+                    >
+                      <FlyabilityIcon className="h-4 w-4" aria-hidden="true" />
+                      {display.text}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-black text-sky-600 dark:text-sky-400">
+                      {hour.para_index}
+                    </div>
+                    <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      /100
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                  <div className="rounded-lg bg-white/80 p-2 dark:bg-slate-950/50">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      <Wind
+                        className="h-3.5 w-3.5 text-sky-500"
+                        aria-hidden="true"
+                      />
+                      Vent
+                    </span>
+                    <div className="font-bold text-slate-950 dark:text-white">
+                      {hour.wind}
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-white/80 p-2 dark:bg-slate-950/50">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      <Zap
+                        className="h-3.5 w-3.5 text-orange-500"
+                        aria-hidden="true"
+                      />
+                      Rafales
+                    </span>
+                    <div className="font-bold text-slate-950 dark:text-white">
+                      {gustValue !== null && gustValue !== undefined
+                        ? `${gustValue.toFixed(1)} km/h`
+                        : '—'}
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-white/80 p-2 dark:bg-slate-950/50">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      <CloudRain
+                        className="h-3.5 w-3.5 text-cyan-500"
+                        aria-hidden="true"
+                      />
+                      Pluie
+                    </span>
+                    <div className="font-bold text-slate-950 dark:text-white">
+                      {hour.precipitation !== null &&
+                      hour.precipitation !== undefined
+                        ? `${hour.precipitation.toFixed(1)} mm`
+                        : '—'}
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-white/80 p-2 dark:bg-slate-950/50">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      <Cloud
+                        className="h-3.5 w-3.5 text-slate-500"
+                        aria-hidden="true"
+                      />
+                      Nuages
+                    </span>
+                    <div className="font-bold text-slate-950 dark:text-white">
+                      {cloudCover !== null && cloudCover !== undefined
+                        ? `${Math.round(cloudCover)}%`
+                        : '—'}
+                    </div>
+                  </div>
+                </div>
+              </article>
+            );
+          })
+        ) : (
+          <div className="rounded-xl border border-slate-200 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+            Aucune donnée horaire disponible
+          </div>
+        )}
+      </div>
+
+      <div className="hidden max-w-full min-w-0 touch-pan-x overflow-x-auto overscroll-x-contain rounded-lg border border-gray-100 dark:border-gray-700 md:block">
         <table className="w-full min-w-[800px] text-sm">
           <thead>
             <tr className="border-b-2 border-gray-200 dark:border-gray-600">
@@ -1010,14 +1112,21 @@ export default function HourlyForecast({
                           hour,
                           uiThresholds
                         );
+                        const FlyabilityIcon = display.Icon;
                         return (
                           <TooltipTrigger delay={150} closeDelay={100}>
                             <Button
                               aria-label={`Verdict ${hour.hour}`}
                               className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
                             >
-                              <span className={`font-medium ${display.color}`}>
-                                {display.emoji} {display.text}
+                              <span
+                                className={`inline-flex items-center justify-center gap-1 font-medium ${display.color}`}
+                              >
+                                <FlyabilityIcon
+                                  className="h-4 w-4"
+                                  aria-hidden="true"
+                                />
+                                {display.text}
                               </span>
                             </Button>
                             <Tooltip offset={8} className="z-50">

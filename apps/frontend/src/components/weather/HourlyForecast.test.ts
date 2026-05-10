@@ -51,6 +51,6 @@ describe('getFlyabilityDisplay', () => {
     );
 
     expect(display.text).toBe('BON');
-    expect(display.emoji).toBe('🟢');
+    expect(display.Icon).toBeTypeOf('function');
   });
 });

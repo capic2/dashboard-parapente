@@ -139,7 +139,7 @@ describe('HourlyForecast tooltip behavior', () => {
       screen.getByRole('button', { name: 'Para-Index 10:00' })
     );
 
-    expect(screen.getByText('📊 Para-Index - 10:00')).toBeTruthy();
+    expect(screen.getByText('Para-Index - 10:00')).toBeTruthy();
     expect(screen.getByText(/Metriques utilisees/i)).toBeTruthy();
   });
 

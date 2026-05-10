@@ -1,5 +1,9 @@
 import preview from '../../../.storybook/preview';
-import { WindIndicator, WindIndicatorCompact } from './WindIndicator';
+import {
+  WindIndicator,
+  WindIndicatorCompact,
+  type WindIndicatorProps,
+} from './WindIndicator';
 
 const meta = preview.meta({
   title: 'Components/WindIndicator',
@@ -9,7 +13,7 @@ const meta = preview.meta({
     docs: {
       description: {
         component:
-          'Wind indicator component that shows visual feedback (🟢/🟡/🔴) based on wind favorability for a specific takeoff orientation.',
+          'Wind indicator component that shows visual feedback based on wind favorability for a specific takeoff orientation.',
       },
     },
   },
@@ -55,6 +59,7 @@ export const Perfect = meta.story({
     windSpeed: 15,
     showLabel: true,
     size: 'md',
+    className: '',
   },
 });
 
@@ -69,6 +74,7 @@ export const Good = meta.story({
     windSpeed: 12,
     showLabel: true,
     size: 'md',
+    className: '',
   },
 });
 
@@ -83,6 +89,7 @@ export const Acceptable = meta.story({
     windSpeed: 10,
     showLabel: true,
     size: 'md',
+    className: '',
   },
 });
 
@@ -97,6 +104,7 @@ export const Unfavorable = meta.story({
     windSpeed: 20,
     showLabel: true,
     size: 'md',
+    className: '',
   },
 });
 
@@ -111,6 +119,7 @@ export const TooStrong = meta.story({
     windSpeed: 35,
     showLabel: true,
     size: 'md',
+    className: '',
   },
 });
 
@@ -125,6 +134,7 @@ export const TooWeak = meta.story({
     windSpeed: 3,
     showLabel: true,
     size: 'md',
+    className: '',
   },
 });
 
@@ -139,11 +149,12 @@ export const NoData = meta.story({
     windSpeed: undefined,
     showLabel: true,
     size: 'md',
+    className: '',
   },
 });
 
 /**
- * Without label: Only showing the emoji indicator
+ * Without label: Only showing the icon indicator
  */
 export const WithoutLabel = meta.story({
   name: 'Without Label',
@@ -153,6 +164,7 @@ export const WithoutLabel = meta.story({
     windSpeed: 15,
     showLabel: false,
     size: 'md',
+    className: '',
   },
 });
 
@@ -167,6 +179,7 @@ export const SmallSize = meta.story({
     windSpeed: 12,
     showLabel: true,
     size: 'sm',
+    className: '',
   },
 });
 
@@ -181,6 +194,7 @@ export const LargeSize = meta.story({
     windSpeed: 15,
     showLabel: true,
     size: 'lg',
+    className: '',
   },
 });
 
@@ -239,21 +253,24 @@ export const AllStates = meta.story({
 });
 
 /**
- * Compact version showing only emoji with tooltip
+ * Compact version showing only an icon with tooltip
  */
 export const Compact = meta.story({
   name: 'Compact Version',
-  render: (args) => <WindIndicatorCompact {...args} />,
+  render: (args) => <WindIndicatorCompact {...(args as WindIndicatorProps)} />,
   args: {
     windDirection: 'N',
     siteOrientation: 'N',
     windSpeed: 15,
+    showLabel: false,
+    size: 'md',
+    className: '',
   },
   parameters: {
     docs: {
       description: {
         story:
-          'Compact version showing only emoji with tooltip (hover to see details)',
+          'Compact version showing only an icon with tooltip (hover to see details)',
       },
     },
   },

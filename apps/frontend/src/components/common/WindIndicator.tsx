@@ -1,19 +1,19 @@
 /**
  * WindIndicator Component
  *
- * Shows a visual indicator (🟢/🟡/🔴) based on wind favorability
+ * Shows a visual indicator based on wind favorability
  * for a specific takeoff orientation.
  */
 
 import { useTranslation } from 'react-i18next';
+import { AlertTriangle, CheckCircle2, CircleHelp, XCircle } from 'lucide-react';
 import {
   getWindFavorability,
-  getWindFavorabilityEmoji,
   getWindFavorabilityLabel,
   getWindFavorabilityColor,
 } from '../../utils/windMatcher';
 
-interface WindIndicatorProps {
+export interface WindIndicatorProps {
   windDirection?: string;
   siteOrientation?: string;
   windSpeed?: number;
@@ -21,6 +21,13 @@ interface WindIndicatorProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
 }
+
+const getWindFavorabilityIcon = (favorability: string) => {
+  if (favorability === 'good') return CheckCircle2;
+  if (favorability === 'moderate') return AlertTriangle;
+  if (favorability === 'bad') return XCircle;
+  return CircleHelp;
+};
 
 export function WindIndicator({
   windDirection,
@@ -36,9 +43,9 @@ export function WindIndicator({
     siteOrientation,
     windSpeed
   );
-  const emoji = getWindFavorabilityEmoji(favorability);
   const label = getWindFavorabilityLabel(favorability, i18n.language);
   const colorClass = getWindFavorabilityColor(favorability);
+  const Icon = getWindFavorabilityIcon(favorability);
 
   // Size classes
   const sizeClasses = {
@@ -53,7 +60,10 @@ export function WindIndicator({
       <div
         className={`flex items-center gap-2 ${sizeClasses[size]} ${className}`}
       >
-        <span className="text-gray-400 dark:text-gray-400">⚪</span>
+        <CircleHelp
+          className="h-5 w-5 shrink-0 text-gray-400 dark:text-gray-400"
+          aria-hidden="true"
+        />
         {showLabel && (
           <span className="text-gray-400 dark:text-gray-400">
             {t('weather.windUnavailable')}
@@ -67,7 +77,7 @@ export function WindIndicator({
     <div
       className={`flex items-center gap-2 ${sizeClasses[size]} ${className}`}
     >
-      <span className="text-xl">{emoji}</span>
+      <Icon className={`h-5 w-5 shrink-0 ${colorClass}`} aria-hidden="true" />
       {showLabel && (
         <div className="flex flex-col">
           <span className={`font-medium ${colorClass}`}>{label}</span>
@@ -83,7 +93,7 @@ export function WindIndicator({
 }
 
 /**
- * Compact version showing only emoji with tooltip
+ * Compact version showing only an icon with tooltip
  */
 export function WindIndicatorCompact({
   windDirection,
@@ -97,8 +107,9 @@ export function WindIndicatorCompact({
     siteOrientation,
     windSpeed
   );
-  const emoji = getWindFavorabilityEmoji(favorability);
   const label = getWindFavorabilityLabel(favorability, i18n.language);
+  const colorClass = getWindFavorabilityColor(favorability);
+  const Icon = getWindFavorabilityIcon(favorability);
 
   const tooltipText =
     windDirection && windSpeed != null
@@ -107,11 +118,11 @@ export function WindIndicatorCompact({
 
   return (
     <span
-      className={`text-xl cursor-help ${className}`}
+      className={`inline-flex cursor-help ${className}`}
       title={tooltipText}
       aria-label={tooltipText}
     >
-      {emoji}
+      <Icon className={`h-5 w-5 ${colorClass}`} aria-hidden="true" />
     </span>
   );
 }

@@ -1,4 +1,10 @@
-import { useEffect, useId, useState } from 'react';
+import {
+  type ChangeEvent,
+  type KeyboardEvent,
+  useEffect,
+  useId,
+  useState,
+} from 'react';
 import { Input, Label, TextField } from 'react-aria-components';
 import { Button } from '@dashboard-parapente/design-system';
 import type {
@@ -126,7 +132,7 @@ function OptionButton({
       type="button"
       onClick={onSelect}
       aria-pressed={isSelected}
-      className={`rounded-xl border p-3 text-left transition-all ${
+      className={`cursor-pointer rounded-xl border p-3 text-left transition-colors ${
         isSelected
           ? 'border-sky-500 bg-sky-50 ring-2 ring-sky-200 dark:border-sky-400 dark:bg-sky-950/40 dark:ring-sky-900'
           : 'border-gray-200 bg-white hover:border-sky-300 hover:bg-sky-50/60 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-sky-700 dark:hover:bg-sky-950/20'
@@ -263,6 +269,12 @@ export default function CityWeatherSearch({
     ? createdSpotIds.has(selectedSpot.id) ||
       favoriteSites.some(isSameFavoriteSite)
     : false;
+  let favoriteButtonLabel = 'Ajouter aux favoris';
+  if (isSelectedSpotFavorite) {
+    favoriteButtonLabel = 'Déjà dans les favoris';
+  } else if (createSite.isPending) {
+    favoriteButtonLabel = 'Ajout...';
+  }
 
   const handleCreateFavorite = async () => {
     if (!selectedSpot) return;
@@ -335,241 +347,251 @@ export default function CityWeatherSearch({
       </div>
 
       <div className={`${isExpanded ? 'block' : 'hidden'} sm:block`}>
-      <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-end">
-        <TextField className="relative flex flex-col gap-1">
-          <Label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-            Ville
-          </Label>
-          <Input
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setSelectedLocation(null);
-              setSelectedOption(null);
-              onSelectTarget(null);
-            }}
-            onKeyDown={(event) => {
-              if (!isSuggestionsOpen || !suggestions.length) return;
-              if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                setActiveSuggestionIndex((index) =>
-                  Math.min(index + 1, suggestions.length - 1)
-                );
-              } else if (event.key === 'ArrowUp') {
-                event.preventDefault();
-                setActiveSuggestionIndex((index) => Math.max(index - 1, 0));
-              } else if (event.key === 'Enter') {
-                event.preventDefault();
-                handleSelectLocation(suggestions[activeSuggestionIndex]);
-              }
-            }}
-            role="combobox"
-            aria-expanded={isSuggestionsOpen}
-            aria-haspopup="listbox"
-            aria-autocomplete="list"
-            aria-controls={listboxId}
-            aria-activedescendant={activeSuggestionId}
-            placeholder="Ex: Besançon, Annecy, Grenoble..."
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          />
-          {isSuggestionsOpen && (
-            <div
-              id={listboxId}
-              role="listbox"
-              className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900"
-            >
-              {locationSearch.isLoading ? (
-                <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
-                  Recherche des villes...
-                </div>
-              ) : suggestions.length ? (
-                suggestions.map((location, index) => (
-                  <button
-                    id={`${listboxId}-${location.id}`}
-                    key={location.id}
-                    type="button"
-                    role="option"
-                    aria-selected={index === activeSuggestionIndex}
-                    onMouseEnter={() => setActiveSuggestionIndex(index)}
-                    onClick={() => handleSelectLocation(location)}
-                    className={`block w-full border-b border-gray-100 px-3 py-2 text-left last:border-b-0 dark:border-gray-800 ${
-                      index === activeSuggestionIndex
-                        ? 'bg-sky-100 dark:bg-sky-950/60'
-                        : 'hover:bg-sky-50 dark:hover:bg-sky-950/40'
-                    }`}
-                  >
-                    <span className="block font-medium text-gray-950 dark:text-white">
-                      {location.name}
-                    </span>
-                    <span className="block text-xs text-gray-500 dark:text-gray-400">
-                      {location.display_name}
-                    </span>
-                  </button>
-                ))
-              ) : (
-                <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
-                  Aucune ville trouvée.
-                </div>
-              )}
-            </div>
-          )}
-        </TextField>
-
-        <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-          Rayon
-          <select
-            value={radiusKm}
-            onChange={(event) => setRadiusKm(Number(event.target.value))}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          >
-            {radiusChoices.map((radius) => (
-              <option key={radius} value={radius}>
-                {radius} km
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-          Résultats
-          <select
-            value={limit}
-            onChange={(event) => setLimit(Number(event.target.value))}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          >
-            {limitChoices.map((choice) => (
-              <option key={choice} value={choice}>
-                {choice}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      {selectedLocation && (
-        <div className="mt-5 space-y-4">
-          <div className="flex flex-col gap-2 rounded-xl bg-gray-50 p-3 dark:bg-gray-900/60 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="font-semibold text-gray-950 dark:text-white">
-                {selectedLocation.name}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">
-                {selectedLocation.display_name}
-              </div>
-            </div>
-            <Button
-              onPress={() => handleSelectLocation(selectedLocation)}
-              className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
-            >
-              Météo ville
-            </Button>
-          </div>
-
-          {nearbyOptions.isError ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-              Impossible de charger les décollages et atterrissages proches.
-            </div>
-          ) : nearbyOptions.isLoading ? (
-            <div className="rounded-xl border border-gray-200 p-4 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">
-              Recherche des décollages et atterrissages proches...
-            </div>
-          ) : (
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div>
-                <h3 className="mb-2 font-semibold text-gray-950 dark:text-white">
-                  Décollages proches
-                </h3>
-                <div className="grid gap-2">
-                  {nearbyOptions.data?.takeoffs.length ? (
-                    nearbyOptions.data.takeoffs.map((spot) => (
-                      <OptionButton
-                        key={spot.id}
-                        label={spot.name}
-                        description={spotDescription(spot)}
-                        isSelected={
-                          selectedOption?.type === 'takeoff' &&
-                          selectedOption.spot.id === spot.id
-                        }
-                        onSelect={() => handleSelectSpot('takeoff', spot)}
-                      />
-                    ))
-                  ) : (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Aucun décollage dans ce rayon.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="mb-2 font-semibold text-gray-950 dark:text-white">
-                  Atterrissages proches
-                </h3>
-                <div className="grid gap-2">
-                  {nearbyOptions.data?.landings.length ? (
-                    nearbyOptions.data.landings.map((spot) => (
-                      <OptionButton
-                        key={spot.id}
-                        label={spot.name}
-                        description={spotDescription(spot)}
-                        isSelected={
-                          selectedOption?.type === 'landing' &&
-                          selectedOption.spot.id === spot.id
-                        }
-                        onSelect={() => handleSelectSpot('landing', spot)}
-                      />
-                    ))
-                  ) : (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Aucun atterrissage dans ce rayon.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {weatherTitle && isWeatherError ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-              Impossible de charger la météo pour {weatherTitle}.
-            </div>
-          ) : weatherTitle ? (
-            <div className="space-y-3">
-              <WeatherSummaryCard
-                title={weatherTitle}
-                weather={selectedWeather}
-                isLoading={isWeatherLoading}
-              />
-              {selectedSpot && (
-                <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      Enregistrer ce site dans vos favoris météo pour le retrouver
-                      directement dans la page.
-                    </p>
-                    <Button
-                      onPress={() => void handleCreateFavorite()}
-                      isDisabled={createSite.isPending || isSelectedSpotFavorite}
-                      className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {isSelectedSpotFavorite
-                        ? 'Déjà dans les favoris'
-                        : createSite.isPending
-                          ? 'Ajout...'
-                          : 'Ajouter aux favoris'}
-                    </Button>
+        <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-end">
+          <TextField className="relative flex flex-col gap-1">
+            <Label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+              Ville
+            </Label>
+            <Input
+              value={query}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                setQuery(event.target.value);
+                setSelectedLocation(null);
+                setSelectedOption(null);
+                onSelectTarget(null);
+              }}
+              onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+                if (!isSuggestionsOpen || !suggestions.length) return;
+                if (event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  setActiveSuggestionIndex((index) =>
+                    Math.min(index + 1, suggestions.length - 1)
+                  );
+                } else if (event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  setActiveSuggestionIndex((index) => Math.max(index - 1, 0));
+                } else if (event.key === 'Enter') {
+                  event.preventDefault();
+                  handleSelectLocation(suggestions[activeSuggestionIndex]);
+                }
+              }}
+              role="combobox"
+              aria-expanded={isSuggestionsOpen}
+              aria-haspopup="listbox"
+              aria-autocomplete="list"
+              aria-controls={listboxId}
+              aria-activedescendant={activeSuggestionId}
+              placeholder="Ex: Besançon, Annecy, Grenoble..."
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            />
+            {isSuggestionsOpen && (
+              <div
+                id={listboxId}
+                role="listbox"
+                className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900"
+              >
+                {locationSearch.isLoading ? (
+                  <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
+                    Recherche des villes...
                   </div>
-                  {favoriteError && (
-                    <p className="mt-2 text-sm text-red-600 dark:text-red-300">
-                      {favoriteError}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : null}
+                ) : suggestions.length ? (
+                  suggestions.map((location, index) => (
+                    <button
+                      id={`${listboxId}-${location.id}`}
+                      key={location.id}
+                      type="button"
+                      role="option"
+                      aria-selected={index === activeSuggestionIndex}
+                      onMouseEnter={() => setActiveSuggestionIndex(index)}
+                      onClick={() => handleSelectLocation(location)}
+                      className={`block w-full border-b border-gray-100 px-3 py-2 text-left last:border-b-0 dark:border-gray-800 ${
+                        index === activeSuggestionIndex
+                          ? 'bg-sky-100 dark:bg-sky-950/60'
+                          : 'hover:bg-sky-50 dark:hover:bg-sky-950/40'
+                      }`}
+                    >
+                      <span className="block font-medium text-gray-950 dark:text-white">
+                        {location.name}
+                      </span>
+                      <span className="block text-xs text-gray-500 dark:text-gray-400">
+                        {location.display_name}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
+                    Aucune ville trouvée.
+                  </div>
+                )}
+              </div>
+            )}
+          </TextField>
+
+          <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
+            Rayon
+            <select
+              value={radiusKm}
+              onChange={(event) => setRadiusKm(Number(event.target.value))}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            >
+              {radiusChoices.map((radius) => (
+                <option key={radius} value={radius}>
+                  {radius} km
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
+            Résultats
+            <select
+              value={limit}
+              onChange={(event) => setLimit(Number(event.target.value))}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            >
+              {limitChoices.map((choice) => (
+                <option key={choice} value={choice}>
+                  {choice}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
-      )}
+
+        {selectedLocation && (
+          <div className="mt-5 space-y-4">
+            <div className="flex flex-col gap-2 rounded-xl bg-gray-50 p-3 dark:bg-gray-900/60 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="font-semibold text-gray-950 dark:text-white">
+                  {selectedLocation.name}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-300">
+                  {selectedLocation.display_name}
+                </div>
+              </div>
+              <Button
+                onPress={() => handleSelectLocation(selectedLocation)}
+                className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+              >
+                Météo ville
+              </Button>
+            </div>
+
+            {nearbyOptions.isError ? (
+              <div
+                className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+                role="alert"
+              >
+                Impossible de charger les décollages et atterrissages proches.
+              </div>
+            ) : nearbyOptions.isLoading ? (
+              <div
+                className="rounded-xl border border-gray-200 p-4 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300"
+                aria-live="polite"
+              >
+                Recherche des décollages et atterrissages proches...
+              </div>
+            ) : (
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div>
+                  <h3 className="mb-2 font-semibold text-gray-950 dark:text-white">
+                    Décollages proches
+                  </h3>
+                  <div className="grid gap-2">
+                    {nearbyOptions.data?.takeoffs.length ? (
+                      nearbyOptions.data.takeoffs.map((spot) => (
+                        <OptionButton
+                          key={spot.id}
+                          label={spot.name}
+                          description={spotDescription(spot)}
+                          isSelected={
+                            selectedOption?.type === 'takeoff' &&
+                            selectedOption.spot.id === spot.id
+                          }
+                          onSelect={() => handleSelectSpot('takeoff', spot)}
+                        />
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Aucun décollage dans ce rayon.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="mb-2 font-semibold text-gray-950 dark:text-white">
+                    Atterrissages proches
+                  </h3>
+                  <div className="grid gap-2">
+                    {nearbyOptions.data?.landings.length ? (
+                      nearbyOptions.data.landings.map((spot) => (
+                        <OptionButton
+                          key={spot.id}
+                          label={spot.name}
+                          description={spotDescription(spot)}
+                          isSelected={
+                            selectedOption?.type === 'landing' &&
+                            selectedOption.spot.id === spot.id
+                          }
+                          onSelect={() => handleSelectSpot('landing', spot)}
+                        />
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Aucun atterrissage dans ce rayon.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {weatherTitle && isWeatherError ? (
+              <div
+                className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+                role="alert"
+              >
+                Impossible de charger la météo pour {weatherTitle}.
+              </div>
+            ) : weatherTitle ? (
+              <div className="space-y-3">
+                <WeatherSummaryCard
+                  title={weatherTitle}
+                  weather={selectedWeather}
+                  isLoading={isWeatherLoading}
+                />
+                {selectedSpot && (
+                  <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        Enregistrer ce site dans vos favoris météo pour le
+                        retrouver directement dans la page.
+                      </p>
+                      <Button
+                        onPress={() => void handleCreateFavorite()}
+                        isDisabled={
+                          createSite.isPending || isSelectedSpotFavorite
+                        }
+                        className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {favoriteButtonLabel}
+                      </Button>
+                    </div>
+                    {favoriteError && (
+                      <p
+                        className="mt-2 text-sm text-red-600 dark:text-red-300"
+                        role="alert"
+                      >
+                        {favoriteError}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
     </section>
   );

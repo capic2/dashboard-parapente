@@ -247,7 +247,7 @@ export default function SiteSelector({
                   ${
                     isActive
                       ? 'border-sky-600 bg-gradient-to-br from-sky-600 to-sky-800 text-white'
-                      : 'border-gray-200 bg-white dark:bg-gray-700 dark:border-gray-600 hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100'
+                      : 'border-gray-200 bg-white dark:bg-gray-700 dark:border-gray-600 hover:border-sky-600 hover:shadow-md hover:shadow-sky-100'
                   }
                 `}
                 onClick={() => onSelectSite(site.id)}

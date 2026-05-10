@@ -4,6 +4,8 @@ import { useSite } from '../../hooks/sites/useSites';
 import { WindIndicator } from '../common/WindIndicator';
 import CacheTimestamp from '../common/CacheTimestamp';
 import type { WeatherData } from '../../types';
+import { Cloud, Thermometer, Wind, Zap } from 'lucide-react';
+import { getVerdictVisual, weatherCardClassName } from './weatherUi';
 
 interface CurrentConditionsProps {
   spotId?: string;
@@ -13,25 +15,6 @@ interface CurrentConditionsProps {
   isLoading?: boolean;
   isError?: boolean;
 }
-
-const getVerdictClass = (verdict: string): string => {
-  const v = verdict.toLowerCase();
-  if (v === 'bon')
-    return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200';
-  if (v === 'moyen')
-    return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200';
-  if (v === 'limite')
-    return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200';
-  return 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-100';
-};
-
-const getVerdictEmoji = (verdict: string): string => {
-  const v = verdict.toLowerCase();
-  if (v === 'bon') return '🟢';
-  if (v === 'moyen') return '🟡';
-  if (v === 'limite') return '🟠';
-  return '🔴';
-};
 
 export default function CurrentConditions({
   spotId,
@@ -52,10 +35,11 @@ export default function CurrentConditions({
   const isLoading = isOverrideLoading ?? isFetchedLoading;
   const hasError = isOverrideError ?? !!error;
   const orientation = siteOrientation ?? site?.orientation;
+  const cardClassName = `${weatherCardClassName} border-l-4 border-l-sky-600 p-4`;
 
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-sky-600">
+      <div className={cardClassName} aria-live="polite">
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3.5 font-semibold">
           {t('weather.currentConditions')}
         </h2>
@@ -68,7 +52,7 @@ export default function CurrentConditions({
 
   if (hasError || !weather) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-sky-600">
+      <div className={cardClassName} role="alert">
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3.5 font-semibold">
           {t('weather.currentConditions')}
         </h2>
@@ -79,8 +63,11 @@ export default function CurrentConditions({
     );
   }
 
+  const verdictVisual = getVerdictVisual(weather.verdict);
+  const VerdictIcon = verdictVisual.Icon;
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-sky-600 flex-1 flex flex-col">
+    <div className={`${cardClassName} flex flex-1 flex-col`}>
       <div className="mb-3.5">
         <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
           {t('weather.currentConditionsFor', { name: weather.spot_name })}
@@ -92,9 +79,10 @@ export default function CurrentConditions({
           {weather.score != null ? weather.score : weather.para_index}/100
         </div>
         <div
-          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap ${getVerdictClass(weather.verdict)}`}
+          className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap ${verdictVisual.badgeClassName}`}
         >
-          {getVerdictEmoji(weather.verdict)} {weather.verdict.toUpperCase()}
+          <VerdictIcon className="h-3.5 w-3.5" aria-hidden="true" />
+          {weather.verdict.toUpperCase()}
         </div>
       </div>
       {weather.score != null && weather.score !== weather.para_index && (
@@ -105,16 +93,18 @@ export default function CurrentConditions({
 
       <div className="flex flex-col gap-2">
         <div className="flex justify-between text-sm py-1.5 border-b border-gray-100 dark:border-gray-700">
-          <span className="text-gray-600 dark:text-gray-300 font-medium">
-            🌡️ {t('common.temperature')}
+          <span className="inline-flex items-center gap-1.5 text-gray-600 dark:text-gray-300 font-medium">
+            <Thermometer className="h-4 w-4 text-red-500" aria-hidden="true" />
+            {t('common.temperature')}
           </span>
           <span className="font-semibold text-gray-900 dark:text-white text-right">
             {weather.temperature}°C
           </span>
         </div>
         <div className="flex justify-between text-sm py-1.5 border-b border-gray-100 dark:border-gray-700">
-          <span className="text-gray-600 dark:text-gray-300 font-medium">
-            💨 {t('common.wind')}
+          <span className="inline-flex items-center gap-1.5 text-gray-600 dark:text-gray-300 font-medium">
+            <Wind className="h-4 w-4 text-sky-500" aria-hidden="true" />
+            {t('common.wind')}
           </span>
           <div className="flex flex-col items-end gap-1">
             <span className="font-semibold text-gray-900 dark:text-white text-right">
@@ -135,8 +125,9 @@ export default function CurrentConditions({
         </div>
         {weather.wind_gusts && (
           <div className="flex justify-between text-sm py-1.5 border-b border-gray-100 dark:border-gray-700">
-            <span className="text-gray-600 dark:text-gray-300 font-medium">
-              🌪️ {t('common.gusts')}
+            <span className="inline-flex items-center gap-1.5 text-gray-600 dark:text-gray-300 font-medium">
+              <Zap className="h-4 w-4 text-orange-500" aria-hidden="true" />
+              {t('common.gusts')}
             </span>
             <span className="font-semibold text-gray-900 dark:text-white text-right">
               {weather.wind_gusts} km/h
@@ -144,8 +135,9 @@ export default function CurrentConditions({
           </div>
         )}
         <div className="flex justify-between text-sm py-1.5">
-          <span className="text-gray-600 dark:text-gray-300 font-medium">
-            ☁️ {t('common.conditions')}
+          <span className="inline-flex items-center gap-1.5 text-gray-600 dark:text-gray-300 font-medium">
+            <Cloud className="h-4 w-4 text-slate-500" aria-hidden="true" />
+            {t('common.conditions')}
           </span>
           <span className="font-semibold text-gray-900 dark:text-white text-right">
             {weather.conditions}
