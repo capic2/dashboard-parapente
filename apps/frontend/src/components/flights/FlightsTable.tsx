@@ -3,6 +3,15 @@ import { useTranslation } from 'react-i18next';
 import type { Row, RowSelectionState, OnChangeFn } from '@tanstack/react-table';
 import type { Selection } from 'react-aria-components';
 import { DataList, Button } from '@dashboard-parapente/design-system';
+import {
+  Check,
+  Clock3,
+  MapPin,
+  Mountain,
+  Paperclip,
+  Ruler,
+  Trash2,
+} from 'lucide-react';
 import { useFlightsTable, FLIGHT_SORTABLE_COLUMNS } from './useFlightsTable';
 import type { Flight } from '../../types';
 
@@ -129,39 +138,14 @@ export function FlightsTable({
                 title: flight.title || t('flights.untitledFlight'),
               })}
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                />
-              </svg>
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
             </Button>
           )}
           <div className="flex justify-between items-start mb-2 gap-2 pl-1.5">
             <div className="min-w-0 flex-1">
               {(isActive || isSelected) && (
                 <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-sky-700 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white dark:bg-sky-300 dark:text-sky-950">
-                  <svg
-                    aria-hidden="true"
-                    className="h-3 w-3"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={2}
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="m4.5 12.75 6 6 9-13.5"
-                    />
-                  </svg>
+                  <Check className="h-3 w-3" aria-hidden="true" />
                   {t('flights.activeFlight')}
                 </span>
               )}
@@ -172,8 +156,9 @@ export function FlightsTable({
 
             {/* Badge GPX manquant */}
             {!flight.gpx_file_path && !selectionMode && (
-              <span className="ml-2 px-2 py-0.5 text-xs bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded-full shrink-0">
-                📎 {t('flights.gpxMissing')}
+              <span className="ml-2 inline-flex shrink-0 items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-xs text-orange-700 dark:bg-orange-900/20 dark:text-orange-400">
+                <Paperclip className="h-3 w-3" aria-hidden="true" />
+                {t('flights.gpxMissing')}
               </span>
             )}
           </div>
@@ -213,7 +198,7 @@ export function FlightsTable({
           <div className={`flex flex-wrap gap-2 pl-1.5 text-xs ${statsColor}`}>
             {flight.duration_minutes && (
               <div className="flex items-center gap-1">
-                <span aria-hidden="true">⏱️</span>
+                <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
                 <span>
                   {Math.floor(flight.duration_minutes / 60)}h
                   {flight.duration_minutes % 60}m
@@ -222,13 +207,13 @@ export function FlightsTable({
             )}
             {flight.distance_km && (
               <div className="flex items-center gap-1">
-                <span aria-hidden="true">📏</span>
+                <Ruler className="h-3.5 w-3.5" aria-hidden="true" />
                 <span>{flight.distance_km.toFixed(1)} km</span>
               </div>
             )}
             {flight.max_altitude_m && (
               <div className="flex items-center gap-1">
-                <span aria-hidden="true">⛰️</span>
+                <Mountain className="h-3.5 w-3.5" aria-hidden="true" />
                 <span>{flight.max_altitude_m} m</span>
               </div>
             )}
@@ -237,7 +222,7 @@ export function FlightsTable({
             <div
               className={`mt-2 flex items-center gap-1 pl-1.5 text-xs ${metaColor}`}
             >
-              <span aria-hidden="true">📍</span>
+              <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span className="truncate">
                 {flight.site_name || flight.site_id}
               </span>
