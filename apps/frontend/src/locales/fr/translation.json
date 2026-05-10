@@ -524,6 +524,7 @@
     "createButton": "Créer le vol",
     "untitledFlight": "Vol sans titre",
     "gpxMissing": "GPX manquant",
+    "activeFlight": "Vol sélectionné",
     "at": "à {{time}}",
     "noFlights": "Aucun vol enregistré",
     "listAriaLabel": "Liste des vols",
