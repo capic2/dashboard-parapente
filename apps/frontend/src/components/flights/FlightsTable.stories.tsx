@@ -86,11 +86,15 @@ const mockFlights: Flight[] = [
 function FlightsTableWrapper({
   flights,
   selectionMode = false,
+  initialSelectedFlightId = null,
 }: {
   flights: Flight[];
   selectionMode?: boolean;
+  initialSelectedFlightId?: string | null;
 }) {
-  const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null);
+  const [selectedFlightId, setSelectedFlightId] = useState<string | null>(
+    initialSelectedFlightId
+  );
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   return (
@@ -126,6 +130,16 @@ export const SelectionMode = meta.story({
   name: 'Selection Mode',
   render: () => (
     <FlightsTableWrapper flights={mockFlights} selectionMode={true} />
+  ),
+});
+
+export const ActiveFlight = meta.story({
+  name: 'Active Flight',
+  render: () => (
+    <FlightsTableWrapper
+      flights={mockFlights}
+      initialSelectedFlightId="flight-1"
+    />
   ),
 });
 
