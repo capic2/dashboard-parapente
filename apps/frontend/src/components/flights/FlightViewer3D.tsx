@@ -293,6 +293,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const gpxStartTimeRef = useRef<number>(0);
 
   const trackEntityRef = useRef<Entity | null>(null);
+  const trackFallbackEntityRef = useRef<Entity | null>(null);
   const trackPositionCountRef = useRef(0);
   const cursorEntityRef = useRef<Entity | null>(null);
   const startEntityRef = useRef<Entity | null>(null);
@@ -321,7 +322,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     ) {
       viewer.entities.remove(trackEntityRef.current);
     }
+    if (
+      trackFallbackEntityRef.current &&
+      viewer.entities.contains(trackFallbackEntityRef.current)
+    ) {
+      viewer.entities.remove(trackFallbackEntityRef.current);
+    }
     trackEntityRef.current = null;
+    trackFallbackEntityRef.current = null;
     trackPositionCountRef.current = 0;
   }, []);
 
@@ -346,6 +354,17 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           shape: replayTrackTubeShape,
           cornerType: CornerType.ROUNDED,
           material: Color.fromCssColorString('#ff5a1f').withAlpha(0.92),
+          shadows: ShadowMode.DISABLED,
+        },
+      });
+      trackFallbackEntityRef.current = viewer.entities.add({
+        polyline: {
+          positions: renderablePositions,
+          width: 3,
+          material: Color.fromCssColorString('#ff5a1f').withAlpha(0.95),
+          depthFailMaterial: Color.fromCssColorString('#ff5a1f').withAlpha(
+            0.5
+          ),
           shadows: ShadowMode.DISABLED,
         },
       });
