@@ -181,7 +181,7 @@ export const BestSpotSuggestion = ({
 
   // Calculate the date label based on selectedDayIndex
   const selectedDate = addDays(new Date(), selectedDayIndex);
-  const dateFnsLocale = i18n.language === 'en' ? enUS : fr;
+  const dateFnsLocale = i18n.language.startsWith('en') ? enUS : fr;
   const dateLabel = getDateLabel(
     selectedDayIndex,
     selectedDate,
@@ -507,7 +507,10 @@ export function BestSpotSuggestionCompact({
   }
 
   const { site, paraIndex, score, windDirection, windSpeed } = bestSpot;
-  const adjustedScore = Math.round(score ?? paraIndex);
+  const adjustedScore = Math.min(
+    100,
+    Math.max(0, Math.round(score ?? paraIndex))
+  );
   const scoreColor = getScoreColor(adjustedScore);
 
   return (
