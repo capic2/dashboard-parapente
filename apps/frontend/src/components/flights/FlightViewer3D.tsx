@@ -152,6 +152,21 @@ const createTubeShape = (radiusMeters: number, segments = 10) =>
   });
 
 const replayTrackTubeShape = createTubeShape(0.45);
+const MIN_TRACK_SEGMENT_DISTANCE_SQUARED = 0.01;
+
+const getRenderableTrackPositions = (positions: Cartesian3[]) =>
+  positions.reduce<Cartesian3[]>((uniquePositions, position) => {
+    const previousPosition = uniquePositions[uniquePositions.length - 1];
+    if (
+      !previousPosition ||
+      Cartesian3.distanceSquared(previousPosition, position) >
+        MIN_TRACK_SEGMENT_DISTANCE_SQUARED
+    ) {
+      uniquePositions.push(position);
+    }
+
+    return uniquePositions;
+  }, []);
 
 /**
  * AccordionSection - Collapsible section component for control panel
@@ -299,7 +314,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
   const syncTrackEntity = useCallback(
     (viewer: CesiumViewer) => {
-      if (visiblePositionsRef.current.length < 2) {
+      if (getRenderableTrackPositions(visiblePositionsRef.current).length < 2) {
         removeTrackEntity(viewer);
         return;
       }
@@ -309,7 +324,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       trackEntityRef.current = viewer.entities.add({
         polylineVolume: {
           positions: new CallbackProperty(
-            () => visiblePositionsRef.current,
+            () => getRenderableTrackPositions(visiblePositionsRef.current),
             false
           ),
           shape: replayTrackTubeShape,
