@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Entity } from 'cesium';
 import {
-  ArcType,
   BoundingSphere,
   Cartesian2,
   CallbackProperty,
@@ -16,7 +15,7 @@ import {
   LabelStyle,
   Math as CesiumMath,
   sampleTerrainMostDetailed,
-  SampledPositionProperty,
+  SceneTransforms,
   ShadowMode,
   Terrain,
   VerticalOrigin,
@@ -143,21 +142,68 @@ const renderViewerFrame = (viewer: CesiumViewer) => {
   viewer.render();
 };
 
-const getJulianDateFromTimestamp = (timestamp: number) =>
-  JulianDate.fromDate(new Date(timestamp));
+const resizeTrackCanvas = (canvas: HTMLCanvasElement) => {
+  const rect = canvas.getBoundingClientRect();
+  const pixelRatio = window.devicePixelRatio || 1;
+  const width = Math.max(Math.floor(rect.width * pixelRatio), 1);
+  const height = Math.max(Math.floor(rect.height * pixelRatio), 1);
 
-const createSampledTrackPosition = (
-  positions: Cartesian3[],
-  timestamps: number[]
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+
+  return { width: rect.width, height: rect.height, pixelRatio };
+};
+
+const drawProjectedPath = (
+  viewer: CesiumViewer,
+  canvas: HTMLCanvasElement | null,
+  positions: Cartesian3[]
 ) => {
-  const sampledPosition = new SampledPositionProperty();
+  if (!canvas) return;
 
-  positions.forEach((position, index) => {
-    const timestamp = timestamps[index] ?? timestamps[0] + index * 1000;
-    sampledPosition.addSample(getJulianDateFromTimestamp(timestamp), position);
-  });
+  const context = canvas.getContext('2d');
+  if (!context) return;
 
-  return sampledPosition;
+  const { width, height, pixelRatio } = resizeTrackCanvas(canvas);
+  context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  context.clearRect(0, 0, width, height);
+
+  if (positions.length < 2) return;
+
+  const drawLine = (lineWidth: number, strokeStyle: string) => {
+    context.beginPath();
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+    context.lineWidth = lineWidth;
+    context.strokeStyle = strokeStyle;
+
+    let isDrawing = false;
+    for (const position of positions) {
+      const screenPosition = SceneTransforms.worldToWindowCoordinates(
+        viewer.scene,
+        position
+      );
+
+      if (!screenPosition) {
+        isDrawing = false;
+        continue;
+      }
+
+      if (isDrawing) {
+        context.lineTo(screenPosition.x, screenPosition.y);
+      } else {
+        context.moveTo(screenPosition.x, screenPosition.y);
+        isDrawing = true;
+      }
+    }
+
+    context.stroke();
+  };
+
+  drawLine(7, 'rgba(255, 255, 255, 0.85)');
+  drawLine(4, 'rgba(239, 68, 68, 0.98)');
 };
 
 /**
@@ -273,8 +319,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const realTimeStartRef = useRef<number>(0);
   const gpxStartTimeRef = useRef<number>(0);
 
-  const fullTrackEntityRef = useRef<Entity | null>(null);
-  const polylineEntityRef = useRef<Entity | null>(null);
+  const trackCanvasRef = useRef<HTMLCanvasElement>(null);
   const cursorEntityRef = useRef<Entity | null>(null);
   const startEntityRef = useRef<Entity | null>(null);
   const visiblePositionsRef = useRef<Cartesian3[]>([]);
@@ -481,6 +526,26 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     };
   }, [viewerReady, flightId]);
 
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || !viewerReady) return;
+
+    const drawTrack = () => {
+      drawProjectedPath(
+        viewer,
+        trackCanvasRef.current,
+        visiblePositionsRef.current
+      );
+    };
+
+    viewer.scene.postRender.addEventListener(drawTrack);
+    drawTrack();
+
+    return () => {
+      viewer.scene.postRender.removeEventListener(drawTrack);
+    };
+  }, [viewerReady]);
+
   // Réinitialiser les offsets quand on change de vol
   useEffect(() => {
     setElevationOffset(0);
@@ -535,6 +600,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
 
     const viewer = viewerRef.current;
+    const trackCanvas = trackCanvasRef.current;
 
     try {
       // Convert GPX coordinates to Cartesian3 avec offset d'élévation
@@ -563,19 +629,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         window._cesiumViewer = viewer;
       }
 
+      drawProjectedPath(viewer, trackCanvas, visiblePositionsRef.current);
+
       // Clean old entities
-      if (
-        fullTrackEntityRef.current &&
-        viewer.entities.contains(fullTrackEntityRef.current)
-      ) {
-        viewer.entities.remove(fullTrackEntityRef.current);
-      }
-      if (
-        polylineEntityRef.current &&
-        viewer.entities.contains(polylineEntityRef.current)
-      ) {
-        viewer.entities.remove(polylineEntityRef.current);
-      }
       if (
         cursorEntityRef.current &&
         viewer.entities.contains(cursorEntityRef.current)
@@ -589,46 +645,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         viewer.entities.remove(startEntityRef.current);
       }
 
-      const startTimestamp = timestamps[0];
-      const endTimestamp = timestamps[timestamps.length - 1] ?? startTimestamp;
-      const trackDurationSeconds = Math.max(
-        (endTimestamp - startTimestamp) / 1000,
-        1
-      );
-      const startTime = getJulianDateFromTimestamp(startTimestamp);
-      const stopTime = getJulianDateFromTimestamp(endTimestamp);
-      const sampledTrackPosition = createSampledTrackPosition(
-        positions,
-        timestamps
-      );
-
-      viewer.clock.startTime = startTime;
-      viewer.clock.stopTime = stopTime;
-      viewer.clock.currentTime = startTime;
       viewer.clock.shouldAnimate = false;
-
-      fullTrackEntityRef.current = viewer.entities.add({
-        polyline: {
-          positions,
-          width: 2,
-          material: Color.WHITE.withAlpha(0.35),
-          clampToGround: false,
-          arcType: ArcType.NONE,
-        },
-      });
-
-      // Let Cesium render the replay trail from a sampled time series instead
-      // of rebuilding custom geometry on every animation frame.
-      polylineEntityRef.current = viewer.entities.add({
-        position: sampledTrackPosition,
-        path: {
-          resolution: 1,
-          leadTime: 0,
-          trailTime: trackDurationSeconds,
-          width: 5,
-          material: Color.RED.withAlpha(0.95),
-        },
-      });
 
       // Create cursor
       cursorPositionPropertyRef.current = new ConstantPositionProperty(
@@ -781,18 +798,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       try {
         if (
-          fullTrackEntityRef.current &&
-          viewer.entities.contains(fullTrackEntityRef.current)
-        ) {
-          viewer.entities.remove(fullTrackEntityRef.current);
-        }
-        if (
-          polylineEntityRef.current &&
-          viewer.entities.contains(polylineEntityRef.current)
-        ) {
-          viewer.entities.remove(polylineEntityRef.current);
-        }
-        if (
           cursorEntityRef.current &&
           viewer.entities.contains(cursorEntityRef.current)
         ) {
@@ -808,13 +813,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         console.debug('Cleanup warning:', e);
       }
 
-      fullTrackEntityRef.current = null;
-      polylineEntityRef.current = null;
       cursorEntityRef.current = null;
       startEntityRef.current = null;
       isPlayingRef.current = false;
       currentIndexRef.current = 0;
       visiblePositionsRef.current = [];
+      drawProjectedPath(viewer, trackCanvas, visiblePositionsRef.current);
     };
     // Intentionally exclude site camera fields to avoid replay reset after save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1201,10 +1205,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       const viewer = viewerRef.current;
       if (viewer && !viewer.isDestroyed()) {
-        viewer.clock.currentTime = getJulianDateFromTimestamp(
-          scenePosition.timestamp
-        );
-
         const heading = cameraHeadingRef.current;
         const progress =
           lastIndex > 0
@@ -1258,6 +1258,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         }
 
         renderViewerFrame(viewer);
+        drawProjectedPath(
+          viewer,
+          trackCanvasRef.current,
+          visiblePositionsRef.current
+        );
       }
 
       let progress = 0;
@@ -1418,12 +1423,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       }
 
       if (viewerRef.current && !viewerRef.current.isDestroyed()) {
-        if (timestampsRef.current[0] !== undefined) {
-          viewerRef.current.clock.currentTime = getJulianDateFromTimestamp(
-            timestampsRef.current[0]
-          );
-        }
         viewerRef.current.scene.requestRender();
+        drawProjectedPath(
+          viewerRef.current,
+          trackCanvasRef.current,
+          visiblePositionsRef.current
+        );
       }
     }
   }, [pause]);
@@ -2469,6 +2474,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         className={
           exportOnly ? 'absolute inset-0 h-full w-full' : 'h-full w-full'
         }
+      />
+      <canvas
+        ref={trackCanvasRef}
+        className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
+        aria-hidden="true"
       />
     </div>
   );
