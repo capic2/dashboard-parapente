@@ -74,15 +74,24 @@ export function FlightsTable({
       let surface = 'bg-white dark:bg-gray-800';
       let color =
         'border-gray-200 dark:border-gray-700 hover:border-sky-400 hover:shadow-md';
+      let titleColor = 'text-gray-900 dark:text-white';
+      let metaColor = 'text-gray-500 dark:text-gray-400';
+      let statsColor = 'text-gray-600 dark:text-gray-300';
 
       if (isSelected) {
-        surface = 'bg-sky-50 dark:bg-sky-900/25';
+        surface = 'bg-sky-100 dark:bg-sky-950/70';
         color =
-          'border-sky-600 dark:border-sky-400 shadow-md ring-2 ring-sky-500/20 dark:ring-sky-300/20';
+          'border-sky-700 dark:border-sky-300 shadow-lg ring-2 ring-sky-500/40 dark:ring-sky-300/35';
+        titleColor = 'text-sky-950 dark:text-white';
+        metaColor = 'text-sky-800 dark:text-sky-100';
+        statsColor = 'text-sky-900 dark:text-sky-100';
       } else if (isActive) {
-        surface = 'bg-sky-50 dark:bg-sky-900/25';
+        surface = 'bg-sky-100 dark:bg-sky-950/70';
         color =
-          'border-sky-500 dark:border-sky-400 shadow-md ring-2 ring-sky-500/20 dark:ring-sky-300/20';
+          'border-sky-700 dark:border-sky-300 shadow-lg ring-2 ring-sky-500/40 dark:ring-sky-300/35';
+        titleColor = 'text-sky-950 dark:text-white';
+        metaColor = 'text-sky-800 dark:text-sky-100';
+        statsColor = 'text-sky-900 dark:text-sky-100';
       }
 
       return (
@@ -103,7 +112,7 @@ export function FlightsTable({
           {(isActive || isSelected) && (
             <span
               aria-hidden="true"
-              className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-sky-500 dark:bg-sky-300"
+              className="absolute inset-y-2 left-0 w-1.5 rounded-r-full bg-sky-700 dark:bg-sky-300"
             />
           )}
           {/* Bouton supprimer au survol */}
@@ -135,10 +144,31 @@ export function FlightsTable({
               </svg>
             </Button>
           )}
-          <div className="flex justify-between items-start mb-2">
-            <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate flex-1">
-              {flight.title || t('flights.untitledFlight')}
-            </h3>
+          <div className="flex justify-between items-start mb-2 gap-2 pl-1.5">
+            <div className="min-w-0 flex-1">
+              {(isActive || isSelected) && (
+                <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-sky-700 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white dark:bg-sky-300 dark:text-sky-950">
+                  <svg
+                    aria-hidden="true"
+                    className="h-3 w-3"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="m4.5 12.75 6 6 9-13.5"
+                    />
+                  </svg>
+                  {t('flights.activeFlight')}
+                </span>
+              )}
+              <h3 className={`truncate text-sm font-semibold ${titleColor}`}>
+                {flight.title || t('flights.untitledFlight')}
+              </h3>
+            </div>
 
             {/* Badge GPX manquant */}
             {!flight.gpx_file_path && !selectionMode && (
@@ -149,7 +179,7 @@ export function FlightsTable({
           </div>
 
           {/* Date et heure */}
-          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+          <div className={`mb-2 pl-1.5 text-xs ${metaColor}`}>
             <span className="font-medium">
               {(() => {
                 const [year, month, day] = flight.flight_date.split('-');
@@ -180,7 +210,7 @@ export function FlightsTable({
             )}
           </div>
 
-          <div className="flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-300">
+          <div className={`flex flex-wrap gap-2 pl-1.5 text-xs ${statsColor}`}>
             {flight.duration_minutes && (
               <div className="flex items-center gap-1">
                 <span aria-hidden="true">⏱️</span>
@@ -204,7 +234,9 @@ export function FlightsTable({
             )}
           </div>
           {flight.site_id && (
-            <div className="mt-2 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+            <div
+              className={`mt-2 flex items-center gap-1 pl-1.5 text-xs ${metaColor}`}
+            >
               <span aria-hidden="true">📍</span>
               <span className="truncate">
                 {flight.site_name || flight.site_id}

@@ -524,6 +524,7 @@
     "createButton": "Create flight",
     "untitledFlight": "Untitled flight",
     "gpxMissing": "GPX missing",
+    "activeFlight": "Selected flight",
     "at": "at {{time}}",
     "noFlights": "No flights recorded",
     "listAriaLabel": "Flight list",
