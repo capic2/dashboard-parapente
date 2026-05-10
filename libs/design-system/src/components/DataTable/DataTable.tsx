@@ -33,6 +33,22 @@ interface DataTableProps<TData> {
   className?: string;
 }
 
+function getAriaSort(
+  sorted: false | 'asc' | 'desc',
+  canSort: boolean
+): 'ascending' | 'descending' | 'none' | undefined {
+  if (sorted === 'asc') {
+    return 'ascending';
+  }
+  if (sorted === 'desc') {
+    return 'descending';
+  }
+  if (canSort) {
+    return 'none';
+  }
+  return undefined;
+}
+
 export function DataTable<TData>({ table, className }: DataTableProps<TData>) {
   return (
     <div className={className}>
@@ -47,29 +63,33 @@ export function DataTable<TData>({ table, className }: DataTableProps<TData>) {
                 {headerGroup.headers.map((header) => {
                   const canSort = header.column.getCanSort();
                   const sorted = header.column.getIsSorted();
+                  const headerContent = flexRender(
+                    header.column.columnDef.header,
+                    header.getContext()
+                  );
 
                   return (
                     <th
                       key={header.id}
                       colSpan={header.colSpan}
                       className={dataTable({ sortable: canSort }).headerCell()}
-                      onClick={
-                        canSort
-                          ? header.column.getToggleSortingHandler()
-                          : undefined
-                      }
+                      aria-sort={getAriaSort(sorted, canSort)}
                     >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
+                      {!header.isPlaceholder && canSort && (
+                        <button
+                          type="button"
+                          className="flex w-full cursor-pointer items-center gap-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
+                          onClick={header.column.getToggleSortingHandler()}
+                        >
+                          {headerContent}
+                          {sorted && (
+                            <span aria-hidden="true">
+                              {sorted === 'desc' ? '↓' : '↑'}
+                            </span>
                           )}
-                      {sorted && (
-                        <span className="ml-1">
-                          {sorted === 'desc' ? '↓' : '↑'}
-                        </span>
+                        </button>
                       )}
+                      {!header.isPlaceholder && !canSort && headerContent}
                     </th>
                   );
                 })}

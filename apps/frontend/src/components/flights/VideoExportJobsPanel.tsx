@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button, Modal } from '@dashboard-parapente/design-system';
 import {
   type VideoExportJob,
   useCancelVideoExportJob,
@@ -28,6 +29,12 @@ const statusClassNames: Record<string, string> = {
   processing: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
   queued:
     'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+};
+
+type PendingVideoConfirm = {
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => Promise<void>;
 };
 
 function getJobPhase(job: VideoExportJob) {
@@ -76,6 +83,8 @@ function getDateLabel(job: VideoExportJob) {
 export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
   const { t } = useTranslation();
   const toast = useToast();
+  const [pendingConfirm, setPendingConfirm] =
+    useState<PendingVideoConfirm | null>(null);
   const { data: jobs = [], isLoading, isError, refetch } = useVideoExportJobs();
   const cancelJob = useCancelVideoExportJob();
   const cleanupTempFiles = useCleanupVideoExportTempFiles();
@@ -83,66 +92,62 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
 
   const activeCount = jobs.filter((job) => job.can_cancel).length;
 
-  async function handleCancel(job: VideoExportJob) {
-    if (
-      !window.confirm(
-        t('videoJobs.confirmStop', 'Stopper cette génération vidéo ?')
-      )
-    ) {
-      return;
-    }
-
-    try {
-      await cancelJob.mutateAsync(job.job_id);
-      toast.success(t('videoJobs.stopSuccess', 'Génération stoppée'));
-    } catch {
-      toast.error(
-        t('videoJobs.stopError', 'Impossible de stopper la génération')
-      );
-    }
+  function handleCancel(job: VideoExportJob) {
+    setPendingConfirm({
+      message: t('videoJobs.confirmStop', 'Stopper cette génération vidéo ?'),
+      confirmLabel: t('videoJobs.stop', 'Stopper'),
+      onConfirm: async () => {
+        try {
+          await cancelJob.mutateAsync(job.job_id);
+          toast.success(t('videoJobs.stopSuccess', 'Génération stoppée'));
+        } catch {
+          toast.error(
+            t('videoJobs.stopError', 'Impossible de stopper la génération')
+          );
+        }
+      },
+    });
   }
 
-  async function handleCleanupTempFiles() {
-    if (
-      !window.confirm(
-        t(
-          'videoJobs.confirmCleanupTempFiles',
-          'Supprimer les fichiers temporaires des générations terminées, échouées ou annulées ?'
-        )
-      )
-    ) {
-      return;
-    }
+  function handleCleanupTempFiles() {
+    setPendingConfirm({
+      message: t(
+        'videoJobs.confirmCleanupTempFiles',
+        'Supprimer les fichiers temporaires des générations terminées, échouées ou annulées ?'
+      ),
+      confirmLabel: t('videoJobs.cleanupTempFiles', 'Nettoyer les temporaires'),
+      onConfirm: async () => {
+        try {
+          const result = await cleanupTempFiles.mutateAsync();
+          const deletedCount = result.files_deleted + result.dirs_deleted;
+          if (result.errors.length > 0) {
+            toast.error(
+              t(
+                'videoJobs.cleanupPartialError',
+                '{{count}} élément(s) supprimé(s), mais certains fichiers n’ont pas pu être supprimés',
+                { count: deletedCount }
+              )
+            );
+            return;
+          }
 
-    try {
-      const result = await cleanupTempFiles.mutateAsync();
-      const deletedCount = result.files_deleted + result.dirs_deleted;
-      if (result.errors.length > 0) {
-        toast.error(
-          t(
-            'videoJobs.cleanupPartialError',
-            '{{count}} élément(s) supprimé(s), mais certains fichiers n’ont pas pu être supprimés',
-            { count: deletedCount }
-          )
-        );
-        return;
-      }
-
-      toast.success(
-        t(
-          'videoJobs.cleanupSuccess',
-          '{{count}} élément(s) temporaire(s) supprimé(s)',
-          { count: deletedCount }
-        )
-      );
-    } catch {
-      toast.error(
-        t(
-          'videoJobs.cleanupError',
-          'Impossible de supprimer les fichiers temporaires'
-        )
-      );
-    }
+          toast.success(
+            t(
+              'videoJobs.cleanupSuccess',
+              '{{count}} élément(s) temporaire(s) supprimé(s)',
+              { count: deletedCount }
+            )
+          );
+        } catch {
+          toast.error(
+            t(
+              'videoJobs.cleanupError',
+              'Impossible de supprimer les fichiers temporaires'
+            )
+          );
+        }
+      },
+    });
   }
 
   return (
@@ -189,8 +194,13 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
       )}
 
       {isLoading && (
-        <div className="p-4 text-sm text-gray-600 dark:text-gray-300">
-          {t('common.loading', 'Chargement...')}
+        <div
+          className="space-y-3 p-4"
+          aria-label={t('common.loading', 'Chargement...')}
+        >
+          <div className="h-4 w-40 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+          <div className="h-2 w-full animate-pulse rounded-full bg-gray-100 dark:bg-gray-700" />
+          <div className="h-2 w-2/3 animate-pulse rounded-full bg-gray-100 dark:bg-gray-700" />
         </div>
       )}
 
@@ -284,6 +294,38 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
           })}
         </div>
       )}
+      <Modal
+        isOpen={pendingConfirm !== null}
+        onClose={() => setPendingConfirm(null)}
+        title={t('common.confirm', 'Confirmation')}
+        size="sm"
+        role="alertdialog"
+      >
+        {pendingConfirm && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              {pendingConfirm.message}
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="secondary"
+                onPress={() => setPendingConfirm(null)}
+              >
+                {t('common.cancel', 'Annuler')}
+              </Button>
+              <Button
+                variant="danger"
+                onPress={() => {
+                  void pendingConfirm.onConfirm();
+                  setPendingConfirm(null);
+                }}
+              >
+                {pendingConfirm.confirmLabel}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </section>
   );
 }
