@@ -362,9 +362,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           positions: renderablePositions,
           width: 3,
           material: Color.fromCssColorString('#ff5a1f').withAlpha(0.95),
-          depthFailMaterial: Color.fromCssColorString('#ff5a1f').withAlpha(
-            0.5
-          ),
+          depthFailMaterial: Color.fromCssColorString('#ff5a1f').withAlpha(0.5),
           shadows: ShadowMode.DISABLED,
         },
       });
