@@ -258,6 +258,18 @@ export const Loading = meta.story({
   },
 });
 
+export const Empty = meta.story({
+  name: 'Empty',
+  parameters: {
+    msw: {
+      handlers: [
+        http.get('/api/spots', () => HttpResponse.json({ sites: [] })),
+        ...defaultHandlers.slice(1),
+      ],
+    },
+  },
+});
+
 export const Error = meta.story({
   name: 'Error',
   parameters: {

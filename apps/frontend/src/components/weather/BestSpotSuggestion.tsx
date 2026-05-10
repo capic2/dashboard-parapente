@@ -9,7 +9,17 @@
 
 import { useTranslation } from 'react-i18next';
 import { format, addDays } from 'date-fns';
+import type { Locale } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  Cloud,
+  Target,
+  Wind,
+  XCircle,
+} from 'lucide-react';
 import CacheTimestamp from '../common/CacheTimestamp';
 import { enUS } from 'date-fns/locale';
 import { WindIndicator } from '../common/WindIndicator';
@@ -104,6 +114,61 @@ function getVerdict(paraIndex: number, verdict?: string) {
   };
 }
 
+function getDateLabel(
+  selectedDayIndex: number,
+  selectedDate: Date,
+  dateFnsLocale: Locale,
+  t: (key: string) => string
+) {
+  if (selectedDayIndex === 0) return t('common.today').toLowerCase();
+  if (selectedDayIndex === 1) return t('common.tomorrow').toLowerCase();
+  return format(selectedDate, 'EEEE d MMMM', { locale: dateFnsLocale });
+}
+
+function getWindFavorabilityIcon(windFavorability: string) {
+  if (windFavorability === 'good') {
+    return (
+      <CheckCircle2
+        className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
+        aria-hidden="true"
+      />
+    );
+  }
+
+  if (windFavorability === 'moderate') {
+    return (
+      <AlertTriangle
+        className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400"
+        aria-hidden="true"
+      />
+    );
+  }
+
+  return (
+    <XCircle
+      className="h-5 w-5 shrink-0 text-red-600 dark:text-red-400"
+      aria-hidden="true"
+    />
+  );
+}
+
+function getWindFavorabilityTextClass(windFavorability: string) {
+  if (windFavorability === 'good')
+    return 'text-emerald-600 dark:text-emerald-400';
+  if (windFavorability === 'moderate')
+    return 'text-amber-600 dark:text-amber-400';
+  return 'text-red-600 dark:text-red-400';
+}
+
+function getWindFavorabilityLabel(
+  windFavorability: string,
+  t: (key: string) => string
+) {
+  if (windFavorability === 'good') return t('weather.favorabilityGood');
+  if (windFavorability === 'moderate') return t('weather.favorabilityModerate');
+  return t('weather.favorabilityPoor');
+}
+
 export const BestSpotSuggestion = ({
   bestSpot,
   hourlyBestSpots = [],
@@ -116,25 +181,27 @@ export const BestSpotSuggestion = ({
 
   // Calculate the date label based on selectedDayIndex
   const selectedDate = addDays(new Date(), selectedDayIndex);
-  const dateFnsLocale = i18n.language === 'en' ? enUS : fr;
-  const dateLabel =
-    selectedDayIndex === 0
-      ? t('common.today').toLowerCase()
-      : selectedDayIndex === 1
-        ? t('common.tomorrow').toLowerCase()
-        : format(selectedDate, 'EEEE d MMMM', { locale: dateFnsLocale });
+  const dateFnsLocale = i18n.language.startsWith('en') ? enUS : fr;
+  const dateLabel = getDateLabel(
+    selectedDayIndex,
+    selectedDate,
+    dateFnsLocale,
+    t
+  );
 
   // Show loading state if no data available
   if (!bestSpot || !bestSpot.site) {
     return (
-      <div className="bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-md shadow-slate-200/50 dark:border-slate-700 dark:bg-slate-900/90 dark:shadow-black/20">
         <div className="flex items-center gap-3">
-          <div className="text-3xl">🎯</div>
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+            <Target className="h-6 w-6" aria-hidden="true" />
+          </div>
           <div>
-            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+            <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-300">
               {t('weather.bestSpotFor', { date: dateLabel })}
             </h3>
-            <div className="text-lg text-gray-500 dark:text-gray-400 mt-1">
+            <div className="mt-1 text-lg font-bold text-slate-500 dark:text-slate-400">
               {t('weather.calculating')}
             </div>
           </div>
@@ -157,7 +224,7 @@ export const BestSpotSuggestion = ({
   } = bestSpot;
   const adjustedScore = Math.min(
     100,
-    Math.max(0, score != null ? Math.round(score) : paraIndex)
+    Math.max(0, Math.round(score ?? paraIndex))
   );
   const localizedReason = reason.replace(/Para-Index/g, t('weather.paraIndex'));
   const scoreColor = getScoreColor(adjustedScore);
@@ -165,22 +232,24 @@ export const BestSpotSuggestion = ({
 
   return (
     <div
-      className={`min-w-0 max-w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800 ${className}`}
+      className={`min-w-0 max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-lg shadow-slate-200/70 dark:border-slate-700 dark:bg-slate-900/95 dark:shadow-black/25 ${className}`}
     >
       {/* Header with colored accent bar */}
       <div className={`h-1.5 ${scoreColor.bg}`} />
 
-      <div className="min-w-0 p-4">
+      <div className="min-w-0 p-4 md:p-5">
         {/* Top row: title + verdict badge */}
         <div className="flex items-center justify-between mb-3 gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🎯</span>
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+              <Target className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <h3 className="truncate text-sm font-bold text-slate-600 dark:text-slate-300">
               {t('weather.bestSpotFor', { date: dateLabel })}
             </h3>
           </div>
           <span
-            className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${verdictInfo.className}`}
+            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-black ${verdictInfo.className}`}
           >
             {verdictInfo.label}
           </span>
@@ -188,7 +257,7 @@ export const BestSpotSuggestion = ({
 
         {/* Site name + rating */}
         <div className="flex min-w-0 items-center gap-2 mb-4">
-          <span className="min-w-0 truncate text-xl font-bold text-gray-900 dark:text-white">
+          <span className="min-w-0 truncate text-2xl font-black tracking-tight text-slate-950 dark:text-white">
             {site.name}
           </span>
           {site.rating != null && site.rating > 0 && (
@@ -198,7 +267,7 @@ export const BestSpotSuggestion = ({
             </span>
           )}
           {site.orientation && (
-            <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-medium">
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
               {site.orientation}
             </span>
           )}
@@ -207,24 +276,24 @@ export const BestSpotSuggestion = ({
         {/* Score gauge */}
         <div className="mb-4">
           <div className="flex items-end justify-between mb-1.5">
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+            <span className="text-sm font-bold text-slate-600 dark:text-slate-300">
               {t('weather.score')}
             </span>
             <span className={`text-2xl font-bold ${scoreColor.text}`}>
               {adjustedScore}
-              <span className="text-sm font-normal text-gray-400 dark:text-gray-400">
+              <span className="text-sm font-semibold text-slate-400 dark:text-slate-500">
                 /100
               </span>
             </span>
           </div>
-          <div className="w-full h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
             <div
               className={`h-full rounded-full ${scoreColor.bg} transition-all duration-500`}
               style={{ width: `${adjustedScore}%` }}
             />
           </div>
           {score != null && score !== paraIndex && (
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <div className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
               {t('weather.paraIndex')} {paraIndex}/100
             </div>
           )}
@@ -233,7 +302,7 @@ export const BestSpotSuggestion = ({
         {/* Metrics grid */}
         <div className="grid grid-cols-2 gap-3 mb-4">
           {/* Wind */}
-          <div className="bg-gray-50 dark:bg-gray-750 dark:bg-gray-900/30 rounded-lg p-2.5">
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-800 dark:bg-slate-950/50">
             {windDirection && windSpeed != null ? (
               <WindIndicator
                 windDirection={windDirection}
@@ -242,22 +311,25 @@ export const BestSpotSuggestion = ({
                 size="sm"
               />
             ) : (
-              <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-400">
-                <span>💨</span>
+              <div className="flex items-center gap-2 text-sm text-slate-400 dark:text-slate-400">
+                <Wind className="h-4 w-4" aria-hidden="true" />
                 <span>—</span>
               </div>
             )}
           </div>
 
           {/* Flyable slot */}
-          <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-2.5">
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-800 dark:bg-slate-950/50">
             <div className="flex items-center gap-2">
-              <span className="text-lg">🕐</span>
+              <Clock3
+                className="h-5 w-5 shrink-0 text-sky-600 dark:text-sky-400"
+                aria-hidden="true"
+              />
               <div className="flex flex-col">
-                <span className="text-xs text-gray-500 dark:text-gray-400">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                   {t('weather.flyableSlot')}
                 </span>
-                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                <span className="text-sm font-black text-slate-950 dark:text-white">
                   {flyableSlot || '—'}
                 </span>
               </div>
@@ -266,14 +338,17 @@ export const BestSpotSuggestion = ({
 
           {/* Thermal ceiling */}
           {thermalCeiling != null && (
-            <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-2.5">
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-800 dark:bg-slate-950/50">
               <div className="flex items-center gap-2">
-                <span className="text-lg">☁️</span>
+                <Cloud
+                  className="h-5 w-5 shrink-0 text-orange-600 dark:text-orange-400"
+                  aria-hidden="true"
+                />
                 <div className="flex flex-col">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                     {t('weather.thermalCeiling')}
                   </span>
-                  <span className="text-sm font-bold text-orange-600 dark:text-orange-400">
+                  <span className="text-sm font-black text-orange-600 dark:text-orange-400">
                     {thermalCeiling}m
                   </span>
                 </div>
@@ -283,33 +358,17 @@ export const BestSpotSuggestion = ({
 
           {/* Wind favorability badge */}
           {windFavorability && (
-            <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-2.5">
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-800 dark:bg-slate-950/50">
               <div className="flex items-center gap-2">
-                <span className="text-lg">
-                  {windFavorability === 'good'
-                    ? '✅'
-                    : windFavorability === 'moderate'
-                      ? '⚠️'
-                      : '❌'}
-                </span>
+                {getWindFavorabilityIcon(windFavorability)}
                 <div className="flex flex-col">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                     {t('weather.windOrientation')}
                   </span>
                   <span
-                    className={`text-sm font-bold ${
-                      windFavorability === 'good'
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : windFavorability === 'moderate'
-                          ? 'text-amber-600 dark:text-amber-400'
-                          : 'text-red-600 dark:text-red-400'
-                    }`}
+                    className={`text-sm font-black ${getWindFavorabilityTextClass(windFavorability)}`}
                   >
-                    {windFavorability === 'good'
-                      ? t('weather.favorabilityGood')
-                      : windFavorability === 'moderate'
-                        ? t('weather.favorabilityModerate')
-                        : t('weather.favorabilityPoor')}
+                    {getWindFavorabilityLabel(windFavorability, t)}
                   </span>
                 </div>
               </div>
@@ -318,17 +377,17 @@ export const BestSpotSuggestion = ({
         </div>
 
         {/* Reason text */}
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 leading-relaxed">
+        <p className="mb-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
           {localizedReason}
         </p>
 
         {hourlyBestSpots.length > 0 && (
-          <div className="mb-4 min-w-0 border-t border-gray-100 pt-3 dark:border-gray-700">
+          <div className="mb-4 min-w-0 border-t border-slate-100 pt-3 dark:border-slate-700">
             <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 {t('weather.bestSpotTimeline')}
               </span>
-              <span className="text-xs text-gray-400 dark:text-gray-500">
+              <span className="text-xs font-medium text-slate-400 dark:text-slate-500">
                 {t('weather.byHour')}
               </span>
             </div>
@@ -338,9 +397,7 @@ export const BestSpotSuggestion = ({
                   100,
                   Math.max(
                     0,
-                    hourlySpot.score != null
-                      ? Math.round(hourlySpot.score)
-                      : hourlySpot.paraIndex
+                    Math.round(hourlySpot.score ?? hourlySpot.paraIndex)
                   )
                 );
                 const hourlyScoreColor = getScoreColor(hourlyScore);
@@ -353,7 +410,7 @@ export const BestSpotSuggestion = ({
                     ? t('common.now')
                     : `${hourlySpot.hour}h`;
                 const roundedWindSpeed =
-                  hourlySpot.windSpeed != null
+                  typeof hourlySpot.windSpeed === 'number'
                     ? Math.round(hourlySpot.windSpeed)
                     : null;
                 const windLabel =
@@ -372,10 +429,10 @@ export const BestSpotSuggestion = ({
                         onSelectSite(hourlySpot.site.id);
                       }
                     }}
-                    className="min-w-[176px] flex-col items-stretch justify-start gap-0 whitespace-normal rounded-xl border border-gray-200 bg-white px-3.5 py-3 text-left shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50 dark:hover:bg-gray-900"
+                    className="min-w-[176px] cursor-pointer flex-col items-stretch justify-start gap-0 whitespace-normal rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-left shadow-sm transition-colors hover:border-sky-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:border-sky-800 dark:hover:bg-slate-950"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <span className="text-sm font-extrabold text-gray-900 dark:text-white">
+                      <span className="text-sm font-extrabold text-slate-950 dark:text-white">
                         {hourLabel}
                       </span>
                       <div className="text-right">
@@ -384,18 +441,18 @@ export const BestSpotSuggestion = ({
                         >
                           {hourlyScore}
                         </span>
-                        <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500">
+                        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">
                           /100
                         </span>
                       </div>
                     </div>
-                    <div className="mt-2 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700">
+                    <div className="mt-2 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
                       <div
                         className={`h-full rounded-full ${hourlyScoreColor.bg}`}
                         style={{ width: `${hourlyScore}%` }}
                       />
                     </div>
-                    <div className="mt-2 truncate text-base font-bold text-gray-900 dark:text-gray-50">
+                    <div className="mt-2 truncate text-base font-black text-slate-950 dark:text-gray-50">
                       {hourlySpot.site?.name ?? '—'}
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2">
@@ -405,12 +462,12 @@ export const BestSpotSuggestion = ({
                         {hourlyVerdict.label}
                       </span>
                       {orientationLabel && (
-                        <span className="truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
+                        <span className="truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
                           {orientationLabel}
                         </span>
                       )}
                     </div>
-                    <div className="mt-2 text-xs font-medium text-gray-600 dark:text-gray-300">
+                    <div className="mt-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
                       {windLabel}
                     </div>
                   </Button>
@@ -424,7 +481,7 @@ export const BestSpotSuggestion = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <Button
             onClick={() => onSelectSite(site.id)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors"
+            className="cursor-pointer rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white shadow-sm shadow-sky-600/20 transition-colors hover:bg-sky-700"
           >
             {t('weather.viewForecast')}
           </Button>
@@ -450,18 +507,22 @@ export function BestSpotSuggestionCompact({
   }
 
   const { site, paraIndex, score, windDirection, windSpeed } = bestSpot;
-  const adjustedScore = score != null ? Math.round(score) : paraIndex;
+  const adjustedScore = Math.min(
+    100,
+    Math.max(0, Math.round(score ?? paraIndex))
+  );
   const scoreColor = getScoreColor(adjustedScore);
 
   return (
     <Button
       onClick={() => onSelectSite(site.id)}
-      className={`w-full text-left p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors overflow-hidden ${className}`}
+      className={`w-full overflow-hidden rounded-xl border border-slate-200 bg-white p-3 text-left transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 ${className}`}
     >
       <div className={`h-1 ${scoreColor.bg} -mt-3 -mx-3 mb-2`} />
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-          🎯 {t('weather.recommended')}
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400">
+          <Target className="h-3.5 w-3.5" aria-hidden="true" />
+          {t('weather.recommended')}
         </span>
         {windDirection && windSpeed != null && (
           <WindIndicator

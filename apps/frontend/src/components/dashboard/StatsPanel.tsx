@@ -1,5 +1,55 @@
 import { useTranslation } from 'react-i18next';
+import {
+  CalendarDays,
+  Clock3,
+  Compass,
+  MapPin,
+  Ruler,
+  Timer,
+  Trophy,
+  Waves,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useFlightStats } from '../../hooks/flights/useFlights';
+
+const iconClass = 'h-5 w-5';
+
+interface StatCardProps {
+  icon: LucideIcon;
+  label: string;
+  value: string | number;
+  tone: 'sky' | 'emerald' | 'amber' | 'violet';
+}
+
+const toneClasses: Record<StatCardProps['tone'], string> = {
+  sky: 'bg-sky-100 text-sky-700 ring-sky-200 dark:bg-sky-900/40 dark:text-sky-300 dark:ring-sky-800/70',
+  emerald:
+    'bg-emerald-100 text-emerald-700 ring-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:ring-emerald-800/70',
+  amber:
+    'bg-amber-100 text-amber-700 ring-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:ring-amber-800/70',
+  violet:
+    'bg-violet-100 text-violet-700 ring-violet-200 dark:bg-violet-900/40 dark:text-violet-300 dark:ring-violet-800/70',
+};
+
+function StatCard({ icon: Icon, label, value, tone }: StatCardProps) {
+  return (
+    <div className="group flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/90 p-3 transition-colors hover:border-sky-300 hover:bg-white dark:border-slate-700 dark:bg-slate-950/45 dark:hover:border-sky-700 dark:hover:bg-slate-900/80">
+      <div
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ${toneClasses[tone]}`}
+      >
+        <Icon className={iconClass} aria-hidden="true" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-lg font-black leading-tight text-slate-950 dark:text-white">
+          {value}
+        </div>
+        <div className="mt-0.5 truncate text-xs font-semibold text-slate-600 dark:text-slate-300">
+          {label}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function StatsPanel() {
   const { t, i18n } = useTranslation();
@@ -7,11 +57,15 @@ export default function StatsPanel() {
 
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
-        <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
-          📊 {t('stats.title')}
+      <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-md shadow-slate-200/60 dark:border-slate-700 dark:bg-slate-900/90 dark:shadow-black/20">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+          <Waves
+            className="h-4 w-4 text-sky-600 dark:text-sky-400"
+            aria-hidden="true"
+          />
+          {t('stats.title')}
         </h2>
-        <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
+        <div className="py-5 text-center text-sm text-slate-500 dark:text-slate-400">
           {t('common.loading')}
         </div>
       </div>
@@ -20,9 +74,13 @@ export default function StatsPanel() {
 
   if (error || !stats) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
-        <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
-          📊 {t('stats.title')}
+      <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-md shadow-slate-200/60 dark:border-slate-700 dark:bg-slate-900/90 dark:shadow-black/20">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+          <Waves
+            className="h-4 w-4 text-sky-600 dark:text-sky-400"
+            aria-hidden="true"
+          />
+          {t('stats.title')}
         </h2>
         <div className="py-5 text-center text-red-500 dark:text-red-400 text-sm">
           {t('common.dataUnavailable')}
@@ -47,118 +105,79 @@ export default function StatsPanel() {
       ? (stats.total_hours / stats.total_flights).toFixed(1)
       : '0.0';
 
+  const cards: StatCardProps[] = [
+    {
+      icon: Compass,
+      label: t('stats.totalFlights'),
+      value: stats.total_flights,
+      tone: 'sky',
+    },
+    {
+      icon: Timer,
+      label: t('stats.totalTime'),
+      value: formatDuration(stats.total_hours),
+      tone: 'emerald',
+    },
+    {
+      icon: Ruler,
+      label: t('stats.totalDistance'),
+      value: `${stats.total_distance_km.toFixed(1)} km`,
+      tone: 'violet',
+    },
+    {
+      icon: Clock3,
+      label: t('stats.avgDuration'),
+      value: formatDuration(stats.avg_duration_minutes / 60),
+      tone: 'amber',
+    },
+    {
+      icon: MapPin,
+      label: t('stats.avgDistance'),
+      value: `${avgDistancePerFlight} km`,
+      tone: 'sky',
+    },
+    {
+      icon: Waves,
+      label: t('stats.avgTime'),
+      value: `${avgHoursPerFlight}h`,
+      tone: 'emerald',
+    },
+    {
+      icon: Trophy,
+      label: t('stats.favoriteSite'),
+      value: stats.favorite_spot || 'N/A',
+      tone: 'amber',
+    },
+    {
+      icon: CalendarDays,
+      label: t('stats.lastFlight'),
+      value: stats.last_flight_date
+        ? new Date(stats.last_flight_date).toLocaleDateString(
+            i18n.language.startsWith('en') ? 'en-US' : 'fr-FR',
+            {
+              day: '2-digit',
+              month: '2-digit',
+            }
+          )
+        : 'N/A',
+      tone: 'violet',
+    },
+  ];
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md flex-1 flex flex-col">
-      <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
-        📊 {t('stats.title')}
+    <div className="flex flex-1 flex-col rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-md shadow-slate-200/60 dark:border-slate-700 dark:bg-slate-900/90 dark:shadow-black/20">
+      <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+        <Waves
+          className="h-4 w-4 text-sky-600 dark:text-sky-400"
+          aria-hidden="true"
+        />
+        {t('stats.title')}
       </h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 flex-1">
-        {/* Row 1 */}
-        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 dark:bg-gray-900 rounded-md border-2 border-gray-200 dark:border-gray-600 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
-          <div className="text-2xl leading-none shrink-0">🪂</div>
-          <div className="flex-1 min-w-0">
-            <div className="text-base font-bold text-gray-900 dark:text-white leading-tight truncate">
-              {stats.total_flights}
-            </div>
-            <div className="text-[10px] text-gray-600 dark:text-gray-300 font-medium mt-0.5">
-              {t('stats.totalFlights')}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 dark:bg-gray-900 rounded-md border-2 border-gray-200 dark:border-gray-600 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
-          <div className="text-2xl leading-none shrink-0">⏱️</div>
-          <div className="flex-1 min-w-0">
-            <div className="text-base font-bold text-gray-900 dark:text-white leading-tight truncate">
-              {formatDuration(stats.total_hours)}
-            </div>
-            <div className="text-[10px] text-gray-600 dark:text-gray-300 font-medium mt-0.5">
-              {t('stats.totalTime')}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 dark:bg-gray-900 rounded-md border-2 border-gray-200 dark:border-gray-600 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
-          <div className="text-2xl leading-none shrink-0">📏</div>
-          <div className="flex-1 min-w-0">
-            <div className="text-base font-bold text-gray-900 dark:text-white leading-tight truncate">
-              {stats.total_distance_km.toFixed(1)} km
-            </div>
-            <div className="text-[10px] text-gray-600 dark:text-gray-300 font-medium mt-0.5">
-              {t('stats.totalDistance')}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 dark:bg-gray-900 rounded-md border-2 border-gray-200 dark:border-gray-600 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
-          <div className="text-2xl leading-none shrink-0">⌀</div>
-          <div className="flex-1 min-w-0">
-            <div className="text-base font-bold text-gray-900 dark:text-white leading-tight truncate">
-              {formatDuration(stats.avg_duration_minutes / 60)}
-            </div>
-            <div className="text-[10px] text-gray-600 dark:text-gray-300 font-medium mt-0.5">
-              {t('stats.avgDuration')}
-            </div>
-          </div>
-        </div>
-
-        {/* Row 2 */}
-        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 dark:bg-gray-900 rounded-md border-2 border-gray-200 dark:border-gray-600 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
-          <div className="text-2xl leading-none shrink-0">📍</div>
-          <div className="flex-1 min-w-0">
-            <div className="text-base font-bold text-gray-900 dark:text-white leading-tight truncate">
-              {avgDistancePerFlight} km
-            </div>
-            <div className="text-[10px] text-gray-600 dark:text-gray-300 font-medium mt-0.5">
-              {t('stats.avgDistance')}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 dark:bg-gray-900 rounded-md border-2 border-gray-200 dark:border-gray-600 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
-          <div className="text-2xl leading-none shrink-0">🕐</div>
-          <div className="flex-1 min-w-0">
-            <div className="text-base font-bold text-gray-900 dark:text-white leading-tight truncate">
-              {avgHoursPerFlight}h
-            </div>
-            <div className="text-[10px] text-gray-600 dark:text-gray-300 font-medium mt-0.5">
-              {t('stats.avgTime')}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 dark:bg-gray-900 rounded-md border-2 border-gray-200 dark:border-gray-600 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
-          <div className="text-2xl leading-none shrink-0">⭐</div>
-          <div className="flex-1 min-w-0">
-            <div className="text-base font-bold text-gray-900 dark:text-white leading-tight truncate">
-              {stats.favorite_spot || 'N/A'}
-            </div>
-            <div className="text-[10px] text-gray-600 dark:text-gray-300 font-medium mt-0.5">
-              {t('stats.favoriteSite')}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 dark:bg-gray-900 rounded-md border-2 border-gray-200 dark:border-gray-600 transition-all hover:border-sky-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-100">
-          <div className="text-2xl leading-none shrink-0">📅</div>
-          <div className="flex-1 min-w-0">
-            <div className="text-base font-bold text-gray-900 dark:text-white leading-tight truncate">
-              {stats.last_flight_date
-                ? new Date(stats.last_flight_date).toLocaleDateString(
-                    i18n.language.startsWith('en') ? 'en-US' : 'fr-FR',
-                    {
-                      day: '2-digit',
-                      month: '2-digit',
-                    }
-                  )
-                : 'N/A'}
-            </div>
-            <div className="text-[10px] text-gray-600 dark:text-gray-300 font-medium mt-0.5">
-              {t('stats.lastFlight')}
-            </div>
-          </div>
-        </div>
+        {cards.map((card) => (
+          <StatCard key={card.label} {...card} />
+        ))}
       </div>
     </div>
   );
