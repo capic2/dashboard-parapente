@@ -159,11 +159,11 @@ export function FlightDetails({
         />
       ) : (
         <>
-          <div className="flex justify-between items-start mb-4">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">
               {flightTitle}
             </h2>
-            <div className="flex flex-wrap justify-end gap-2 ml-4">
+            <div className="flex flex-col gap-2 sm:ml-4 sm:flex-row sm:flex-wrap sm:justify-end">
               <Button
                 className="px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-all"
                 onPress={() => setEditingMode(true)}

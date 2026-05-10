@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
 import { Input, TextField } from 'react-aria-components';
 import { Button } from '@dashboard-parapente/design-system';
+import { Plus, Search, Trash2 } from 'lucide-react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import {
   useReactTable,
@@ -136,8 +137,8 @@ export const Sites: React.FC = () => {
     }
   };
 
-  const handleViewFlights = (_site: Site) => {
-    void navigate({ to: '/flights' });
+  const handleViewFlights = (site: Site) => {
+    void navigate({ to: '/flights', search: { siteId: site.id } });
   };
 
   const renderSiteCard = (
@@ -148,7 +149,7 @@ export const Sites: React.FC = () => {
     return (
       <SiteCard
         site={site}
-        flightCount={0}
+        flightCount={site.flight_count}
         onEdit={handleEdit}
         onDelete={handleDelete}
         onViewFlights={handleViewFlights}
@@ -163,14 +164,15 @@ export const Sites: React.FC = () => {
         <h1 className="text-3xl font-bold">{t('sites.management')}</h1>
         <Button
           onPress={handleOpenCreateModal}
-          className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer"
+          className="w-full sm:w-auto px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 cursor-pointer"
         >
-          ➕ {t('sites.newSite')}
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          {t('sites.newSite')}
         </Button>
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Search */}
           <TextField
@@ -178,10 +180,16 @@ export const Sites: React.FC = () => {
             onChange={setSearchQuery}
             aria-label={t('sites.searchPlaceholder')}
           >
-            <Input
-              placeholder={t('sites.searchPlaceholder')}
-              className="px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500 w-full"
-            />
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                aria-hidden="true"
+              />
+              <Input
+                placeholder={t('sites.searchPlaceholder')}
+                className="min-h-11 w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              />
+            </div>
           </TextField>
 
           {/* Type Filter */}
@@ -192,7 +200,8 @@ export const Sites: React.FC = () => {
                 e.target.value as 'all' | 'takeoff' | 'landing' | 'both'
               )
             }
-            className="px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+            aria-label={t('sites.typeFilter')}
+            className="min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
           >
             <option value="all">{t('sites.allTypes')}</option>
             <option value="takeoff">{t('sites.takeoffOnly')}</option>
@@ -224,9 +233,10 @@ export const Sites: React.FC = () => {
         <div className="text-center mt-4">
           <Button
             onPress={handleOpenCreateModal}
-            className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="w-full sm:w-auto px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700"
           >
-            ➕ {t('sites.createFirstSite')}
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {t('sites.createFirstSite')}
           </Button>
         </div>
       )}
@@ -264,7 +274,12 @@ export const Sites: React.FC = () => {
             isDisabled={deleteSite.isPending}
             className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer disabled:opacity-50"
           >
-            {deleteSite.isPending ? '⏳ ...' : t('common.delete', 'Supprimer')}
+            {!deleteSite.isPending && (
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            )}
+            {deleteSite.isPending
+              ? t('common.loading', 'Chargement...')
+              : t('common.delete', 'Supprimer')}
           </Button>
         </div>
       </Modal>
