@@ -71,12 +71,18 @@ export function FlightsTable({
         }
       };
 
-      let color = 'border-gray-200 dark:border-gray-700 hover:border-sky-400';
+      let surface = 'bg-white dark:bg-gray-800';
+      let color =
+        'border-gray-200 dark:border-gray-700 hover:border-sky-400 hover:shadow-md';
 
       if (isSelected) {
-        color = 'border-sky-600 shadow-md bg-sky-50 dark:bg-sky-900/20';
+        surface = 'bg-sky-50 dark:bg-sky-900/25';
+        color =
+          'border-sky-600 dark:border-sky-400 shadow-md ring-2 ring-sky-500/20 dark:ring-sky-300/20';
       } else if (isActive) {
-        color = 'border-sky-600 shadow-md';
+        surface = 'bg-sky-50 dark:bg-sky-900/25';
+        color =
+          'border-sky-500 dark:border-sky-400 shadow-md ring-2 ring-sky-500/20 dark:ring-sky-300/20';
       }
 
       return (
@@ -85,9 +91,7 @@ export function FlightsTable({
           aria-selected={isActive || isSelected}
           tabIndex={0}
           data-testid={`flight-row-${flight.id}`}
-          className={`group relative bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border-2 transition-all cursor-pointer ${
-            color
-          }`}
+          className={`group relative overflow-hidden rounded-lg p-3 shadow-sm border-2 transition-all duration-200 cursor-pointer ${surface} ${color}`}
           onClick={selectFlight}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
@@ -96,6 +100,12 @@ export function FlightsTable({
             }
           }}
         >
+          {(isActive || isSelected) && (
+            <span
+              aria-hidden="true"
+              className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-sky-500 dark:bg-sky-300"
+            />
+          )}
           {/* Bouton supprimer au survol */}
           {!selectionMode && (
             <Button
