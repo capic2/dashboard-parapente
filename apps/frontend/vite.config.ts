@@ -6,6 +6,9 @@ import cesium from 'vite-plugin-cesium';
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
 import path from 'path';
 
+const cesiumBuildRootPath = path.resolve(__dirname, '../../node_modules/cesium/Build');
+const cesiumBuildPath = path.join(cesiumBuildRootPath, 'Cesium');
+
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
   root: __dirname,
@@ -17,7 +20,7 @@ export default defineConfig({
     }),
     react(),
     tailwindcss(),
-    cesium({ cesiumBuildRootPath: 'node_modules/cesium/Build' }),
+    cesium({ cesiumBuildRootPath, cesiumBuildPath }),
   ],
 
   server: {
