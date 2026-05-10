@@ -151,7 +151,7 @@ const createTubeShape = (radiusMeters: number, segments = 10) =>
     );
   });
 
-const replayTrackTubeShape = createTubeShape(1.4);
+const replayTrackTubeShape = createTubeShape(0.45);
 
 /**
  * AccordionSection - Collapsible section component for control panel
@@ -543,7 +543,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       allPositionsRef.current = positions;
       timestampsRef.current = timestamps;
       currentIndexRef.current = 0;
-      visiblePositionsRef.current = [positions[0]];
+      visiblePositionsRef.current = [];
 
       // Expose data globally for video export (Playwright)
       if (typeof window !== 'undefined' && window._exportMode) {
@@ -1363,7 +1363,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     setCurrentElapsedTime(0);
 
     if (allPositionsRef.current.length > 0) {
-      visiblePositionsRef.current = [allPositionsRef.current[0]];
+      visiblePositionsRef.current = [];
 
       if (cursorPositionPropertyRef.current) {
         cursorPositionPropertyRef.current.setValue(allPositionsRef.current[0]);
