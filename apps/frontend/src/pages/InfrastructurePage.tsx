@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useDeferredValue } from 'react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, Input, TextField } from 'react-aria-components';
@@ -293,9 +293,17 @@ function StravaTokenSection() {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
-        {t('infrastructure.strava.title')}
-      </h3>
+      <div>
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+          {t('infrastructure.strava.title')}
+        </h3>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          {t(
+            'infrastructure.strava.description',
+            'Surveille la validité du jeton et les derniers rafraîchissements.'
+          )}
+        </p>
+      </div>
 
       {/* Status card */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md flex flex-wrap items-center gap-6">
@@ -362,6 +370,7 @@ function CacheSection() {
   const { t } = useTranslation();
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
+  const deferredSearchFilter = useDeferredValue(searchFilter);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(
@@ -375,9 +384,9 @@ function CacheSection() {
   const deleteMutation = useDeleteCacheKey();
 
   const filteredGroups = useMemo(() => {
-    if (!searchFilter) return overview.groups;
+    if (!deferredSearchFilter) return overview.groups;
 
-    const lower = searchFilter.toLowerCase();
+    const lower = deferredSearchFilter.toLowerCase();
     const result: typeof overview.groups = {};
     for (const [prefix, group] of Object.entries(overview.groups)) {
       const filteredKeys = group.keys.filter((k) => {
@@ -396,7 +405,7 @@ function CacheSection() {
       }
     }
     return result;
-  }, [overview, searchFilter, t]);
+  }, [overview, deferredSearchFilter, t]);
 
   const toggleGroup = (prefix: string) => {
     setExpandedGroups((prev) => {
@@ -435,9 +444,17 @@ function CacheSection() {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
-        {t('cache.title')}
-      </h3>
+      <div>
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+          {t('cache.title')}
+        </h3>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          {t(
+            'cache.description',
+            'Inspecte les clés actives, leur TTL et les groupes les plus volumineux.'
+          )}
+        </p>
+      </div>
 
       {/* Stats bar */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -481,7 +498,7 @@ function CacheSection() {
           onChange={setAutoRefresh}
           className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 group"
         >
-          {({ isSelected }) => (
+          {({ isSelected }: { isSelected: boolean }) => (
             <>
               <div
                 className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
@@ -669,23 +686,167 @@ function CacheSection() {
 // MAIN PAGE
 // =============================================================================
 
+function InfrastructureStatCard({
+  label,
+  value,
+  detail,
+  tone = 'sky',
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: 'sky' | 'green' | 'amber' | 'red' | 'gray';
+}) {
+  const toneClassNames = {
+    sky: 'border-sky-100 bg-sky-50 text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-300',
+    green:
+      'border-green-100 bg-green-50 text-green-700 dark:border-green-900/60 dark:bg-green-950/40 dark:text-green-300',
+    amber:
+      'border-amber-100 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300',
+    red: 'border-red-100 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300',
+    gray: 'border-gray-100 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300',
+  };
+
+  return (
+    <div className={`rounded-xl border p-4 shadow-sm ${toneClassNames[tone]}`}>
+      <div className="text-xs font-medium uppercase tracking-wide opacity-80">
+        {label}
+      </div>
+      <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+        {value}
+      </div>
+      <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        {detail}
+      </div>
+    </div>
+  );
+}
+
+function InfrastructureOverview() {
+  const { t } = useTranslation();
+  const { data: stravaStatus, isLoading: stravaLoading } =
+    useStravaTokenStatus();
+  const { data: cacheOverview } = useCacheOverview();
+
+  const cacheGroups = Object.keys(cacheOverview.groups).length;
+  let stravaTone: 'gray' | 'green' | 'red' = 'red';
+  let stravaValue = t('infrastructure.strava.expired');
+
+  if (stravaLoading) {
+    stravaTone = 'gray';
+    stravaValue = t('common.loading', 'Chargement...');
+  } else if (stravaStatus?.valid) {
+    stravaTone = 'green';
+    stravaValue = t('infrastructure.strava.valid');
+  }
+
+  return (
+    <section className="rounded-2xl border border-sky-100 bg-white p-4 shadow-md dark:border-sky-900/60 dark:bg-gray-800">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-medium uppercase tracking-wide text-sky-700 dark:text-sky-300">
+            {t('infrastructure.overviewLabel', 'Monitoring')}
+          </p>
+          <h2 className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+            {t('infrastructure.title')}
+          </h2>
+        </div>
+        <p className="max-w-2xl text-sm text-gray-600 dark:text-gray-400">
+          {t(
+            'infrastructure.subtitle',
+            'Vue opérationnelle des intégrations, exports vidéo et données cache.'
+          )}
+        </p>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <InfrastructureStatCard
+          label={t('infrastructure.tabs.strava')}
+          value={stravaValue}
+          detail={
+            stravaStatus?.expires_at
+              ? t('infrastructure.strava.expiresAt') +
+                `: ${formatDate(stravaStatus.expires_at)}`
+              : t('infrastructure.strava.modeUnknown')
+          }
+          tone={stravaTone}
+        />
+        <InfrastructureStatCard
+          label={t('infrastructure.tabs.videoExports')}
+          value={t('infrastructure.videoExports.ready', 'File')}
+          detail={t(
+            'infrastructure.videoExports.description',
+            'Suivi des exports et nettoyage des fichiers temporaires.'
+          )}
+          tone="amber"
+        />
+        <InfrastructureStatCard
+          label={t('cache.totalKeys')}
+          value={String(cacheOverview.total_keys)}
+          detail={t('cache.groups') + `: ${String(cacheGroups)}`}
+          tone={cacheOverview.truncated ? 'amber' : 'sky'}
+        />
+        <InfrastructureStatCard
+          label={t('cache.memoryUsage')}
+          value={cacheOverview.memory_usage ?? '—'}
+          detail={
+            cacheOverview.truncated
+              ? t('cache.truncatedWarning')
+              : t('cache.noResolution')
+          }
+          tone={cacheOverview.truncated ? 'amber' : 'gray'}
+        />
+      </div>
+    </section>
+  );
+}
+
 export default function InfrastructurePage() {
   const { t } = useTranslation();
   const { toasts, removeToast } = useToastStore();
+  const { data: stravaStatus } = useStravaTokenStatus();
+  const { data: cacheOverview } = useCacheOverview();
 
   return (
     <div className="py-4 space-y-8">
       <ToastContainer toasts={toasts} onClose={removeToast} />
 
-      <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-        {t('infrastructure.title')}
-      </h2>
+      <InfrastructureOverview />
 
       <Tabs className="space-y-4">
         <TabList className="grid-cols-1 sm:grid-cols-3">
-          <Tab id="strava">{t('infrastructure.tabs.strava')}</Tab>
-          <Tab id="videoExports">{t('infrastructure.tabs.videoExports')}</Tab>
-          <Tab id="cache">{t('infrastructure.tabs.cache')}</Tab>
+          <Tab id="strava">
+            <span className="flex items-center justify-center gap-2">
+              {t('infrastructure.tabs.strava')}
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs ${
+                  stravaStatus?.valid
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                    : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                }`}
+              >
+                {stravaStatus?.valid
+                  ? t('infrastructure.strava.valid')
+                  : t('infrastructure.strava.expired')}
+              </span>
+            </span>
+          </Tab>
+          <Tab id="videoExports">
+            <span className="flex items-center justify-center gap-2">
+              {t('infrastructure.tabs.videoExports')}
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                {t('infrastructure.videoExports.ready', 'File')}
+              </span>
+            </span>
+          </Tab>
+          <Tab id="cache">
+            <span className="flex items-center justify-center gap-2">
+              {t('infrastructure.tabs.cache')}
+              <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                {String(cacheOverview.total_keys)}
+              </span>
+            </span>
+          </Tab>
         </TabList>
 
         <TabPanel id="strava" className="outline-none">
