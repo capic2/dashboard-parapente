@@ -65,21 +65,43 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
         role="status"
         aria-label={`Statut de la source: ${statusLabels[source.status]}`}
       >
-        ● {statusLabels[source.status]}
+        {statusLabels[source.status]}
       </span>
     );
   };
 
-  // Scraper type icon
-  const getScraperIcon = () => {
+  const getScraperLabel = () => {
     switch (source.scraper_type) {
       case 'api':
-        return '🌐';
+        return 'API';
       case 'playwright':
-        return '🎭';
+        return 'Browser';
       case 'stealth':
-        return '🥷';
+        return 'Stealth';
     }
+  };
+
+  const getNotificationClassName = () => {
+    switch (notification?.type) {
+      case 'error':
+        return 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-700';
+      case 'success':
+        return 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-700';
+      case 'warning':
+        return 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700';
+      default:
+        return '';
+    }
+  };
+
+  const getSuccessRateClassName = () => {
+    if (source.success_rate >= 95) {
+      return 'text-green-600 dark:text-green-400';
+    }
+    if (source.success_rate >= 80) {
+      return 'text-yellow-600 dark:text-yellow-400';
+    }
+    return 'text-red-600 dark:text-red-400';
   };
 
   const notificationTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -174,18 +196,27 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       if (result.success) {
         setTestResult({
           success: true,
-          message: `✅ ${t('settings.weatherSources.testSuccess', { time: result.response_time_ms })}`,
+          message: t('settings.weatherSources.testSuccess', {
+            time: result.response_time_ms,
+          }),
         });
       } else {
         setTestResult({
           success: false,
-          message: `❌ ${t('settings.weatherSources.testFailure', { error: result.error || t('settings.weatherSources.unknownError') })}`,
+          message: t('settings.weatherSources.testFailure', {
+            error: result.error || t('settings.weatherSources.unknownError'),
+          }),
         });
       }
     } catch (error: unknown) {
       setTestResult({
         success: false,
-        message: `❌ ${t('settings.weatherSources.testError', { error: error instanceof Error ? error.message : t('settings.weatherSources.testFailed') })}`,
+        message: t('settings.weatherSources.testError', {
+          error:
+            error instanceof Error
+              ? error.message
+              : t('settings.weatherSources.testFailed'),
+        }),
       });
     } finally {
       setIsTesting(false);
@@ -224,13 +255,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       {/* Notification */}
       {notification && (
         <div
-          className={`mb-3 p-3 rounded-lg text-sm font-medium ${
-            notification.type === 'error'
-              ? 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-700'
-              : notification.type === 'success'
-                ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-700'
-                : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700'
-          }`}
+          className={`mb-3 p-3 rounded-lg text-sm font-medium ${getNotificationClassName()}`}
           role="alert"
           aria-live="assertive"
           aria-atomic="true"
@@ -242,9 +267,9 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-2xl" aria-hidden="true">
-              {getScraperIcon()}
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+              {getScraperLabel()}
             </span>
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">
               {source.display_name}
@@ -291,7 +316,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
               className="text-sm font-medium text-gray-700 dark:text-gray-300"
               aria-hidden="true"
             >
-              🔑 {t('settings.weatherSources.apiKey')}
+              {t('settings.weatherSources.apiKey')}
             </span>
             {source.api_key_configured ? (
               <span
@@ -299,7 +324,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
                 role="status"
                 aria-label={t('settings.weatherSources.apiKeyConfigured')}
               >
-                ✓ {t('settings.weatherSources.apiKeyConfigured')}
+                {t('settings.weatherSources.apiKeyConfigured')}
               </span>
             ) : (
               <span
@@ -307,7 +332,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
                 role="status"
                 aria-label={t('settings.weatherSources.apiKeyMissing')}
               >
-                ✗ {t('settings.weatherSources.apiKeyMissing')}
+                {t('settings.weatherSources.apiKeyMissing')}
               </span>
             )}
           </div>
@@ -335,7 +360,9 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
                     : t('settings.weatherSources.showApiKey')
                 }
               >
-                <span aria-hidden="true">{showApiKey ? '🙈' : '👁️'}</span>
+                {showApiKey
+                  ? t('settings.weatherSources.hideApiKey')
+                  : t('settings.weatherSources.showApiKey')}
               </Button>
               <Button
                 onPress={handleSaveApiKey}
@@ -343,7 +370,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
                 className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 pressed:bg-green-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                 aria-label={t('common.save')}
               >
-                <span aria-hidden="true">✓</span>
+                {t('common.save')}
               </Button>
               <Button
                 onPress={() => {
@@ -353,7 +380,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
                 className="px-3 py-1 text-xs bg-gray-400 text-white rounded hover:bg-gray-500 pressed:bg-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                 aria-label={t('common.cancel')}
               >
-                <span aria-hidden="true">✗</span>
+                {t('common.cancel')}
               </Button>
             </div>
           ) : (
@@ -374,7 +401,6 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
               rel="noopener noreferrer"
               className="text-xs text-blue-600 dark:text-blue-400 hover:underline dark:hover:text-blue-300 mt-1 inline-block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 rounded"
             >
-              <span aria-hidden="true">📖 </span>
               {t('settings.weatherSources.documentation')}
             </Link>
           )}
@@ -395,13 +421,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
             {t('settings.weatherSources.successRate')}
           </div>
           <div
-            className={`text-lg font-bold ${
-              source.success_rate >= 95
-                ? 'text-green-600 dark:text-green-400'
-                : source.success_rate >= 80
-                  ? 'text-yellow-600 dark:text-yellow-400'
-                  : 'text-red-600 dark:text-red-400'
-            }`}
+            className={`text-lg font-bold ${getSuccessRateClassName()}`}
             aria-labelledby={`success-rate-label-${source.source_name}`}
             aria-live="polite"
           >
@@ -450,7 +470,6 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       >
         {source.last_success_at && (
           <div role="status">
-            <span aria-hidden="true">✓ </span>
             <Trans
               i18nKey="settings.weatherSources.lastSuccessMessage"
               values={{ date: formatTimestamp(source.last_success_at) }}
@@ -459,7 +478,6 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
         )}
         {source.last_error_at && (
           <div className="text-red-600 dark:text-red-400" role="alert">
-            <span aria-hidden="true">✗ </span>
             <Trans
               i18nKey="settings.weatherSources.lastErrorMessage"
               values={{ date: formatTimestamp(source.last_error_at) }}
@@ -510,17 +528,11 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
             name: source.display_name,
           })}
         >
-          {isTesting ? (
-            <>
-              <span aria-hidden="true">⏳ </span>
-              <span>{t('settings.weatherSources.testing')}</span>
-            </>
-          ) : (
-            <>
-              <span aria-hidden="true">🔍 </span>
-              <span>{t('settings.weatherSources.test')}</span>
-            </>
-          )}
+          <span>
+            {isTesting
+              ? t('settings.weatherSources.testing')
+              : t('settings.weatherSources.test')}
+          </span>
         </Button>
 
         {onDelete &&
@@ -538,8 +550,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
                 name: source.display_name,
               })}
             >
-              <span aria-hidden="true">🗑️</span>
-              <span className="sr-only">{t('common.delete')}</span>
+              {t('common.delete')}
             </Button>
           )}
       </div>
