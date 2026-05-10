@@ -3,29 +3,12 @@ import {
   useLandingAssociations,
   useLandingWeather,
 } from '../../hooks/sites/useLandingAssociations';
+import { getVerdictVisual, weatherCardClassName } from './weatherUi';
 
 interface WeatherMultiLandingProps {
   spotId: string;
   dayIndex: number;
 }
-
-const getVerdictColor = (verdict: string): string => {
-  const v = verdict?.toLowerCase();
-  if (v === 'bon') return 'border-green-500 bg-green-50 dark:bg-green-900/20';
-  if (v === 'moyen')
-    return 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20';
-  if (v === 'limite')
-    return 'border-orange-500 bg-orange-50 dark:bg-orange-900/20';
-  return 'border-red-500 bg-red-50 dark:bg-red-900/20';
-};
-
-const getVerdictEmoji = (verdict: string): string => {
-  const v = verdict?.toLowerCase();
-  if (v === 'bon') return '🟢';
-  if (v === 'moyen') return '🟡';
-  if (v === 'limite') return '🟠';
-  return '🔴';
-};
 
 export default function WeatherMultiLanding({
   spotId,
@@ -39,7 +22,9 @@ export default function WeatherMultiLanding({
   if (!associations || associations.length === 0) return null;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-indigo-500">
+    <div
+      className={`${weatherCardClassName} border-l-4 border-l-indigo-500 p-4`}
+    >
       <div className="mb-3">
         <h2 className="text-sm text-gray-600 dark:text-gray-400 font-semibold">
           {t('weather.landings')}
@@ -47,7 +32,10 @@ export default function WeatherMultiLanding({
       </div>
 
       {isLoading ? (
-        <div className="py-3 text-center text-gray-500 dark:text-gray-400 text-sm">
+        <div
+          className="py-3 text-center text-gray-500 dark:text-gray-400 text-sm"
+          aria-live="polite"
+        >
           {t('weather.loadingLandings')}
         </div>
       ) : !weatherData || weatherData.length === 0 ? (
@@ -60,6 +48,8 @@ export default function WeatherMultiLanding({
             const weather = entry.weather;
             const hasError = !!weather.error;
             const verdict = weather.verdict || '';
+            const verdictVisual = getVerdictVisual(verdict);
+            const VerdictIcon = verdictVisual.Icon;
 
             return (
               <div
@@ -67,7 +57,7 @@ export default function WeatherMultiLanding({
                 className={`rounded-lg border-l-4 p-3 ${
                   hasError
                     ? 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700'
-                    : getVerdictColor(verdict)
+                    : verdictVisual.borderSoftClassName
                 } ${entry.is_primary ? 'ring-2 ring-indigo-400 ring-offset-1 dark:ring-offset-gray-800' : ''}`}
               >
                 <div className="flex items-center justify-between mb-2">
@@ -80,14 +70,18 @@ export default function WeatherMultiLanding({
                 </div>
 
                 {hasError ? (
-                  <p className="text-xs text-red-500 dark:text-red-400">
+                  <p
+                    className="text-xs text-red-500 dark:text-red-400"
+                    role="alert"
+                  >
                     {weather.error}
                   </p>
                 ) : (
                   <div className="flex items-center gap-3">
-                    <span className="text-lg" title={verdict}>
-                      {getVerdictEmoji(verdict)}
-                    </span>
+                    <VerdictIcon
+                      className={`h-5 w-5 shrink-0 ${verdictVisual.textClassName}`}
+                      aria-hidden="true"
+                    />
                     <div>
                       <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
                         {verdict}

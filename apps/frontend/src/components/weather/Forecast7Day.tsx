@@ -7,31 +7,14 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import CacheTimestamp from '../common/CacheTimestamp';
 import { Button } from '@dashboard-parapente/design-system';
+import { Wind } from 'lucide-react';
+import { getVerdictVisual, weatherCardClassName } from './weatherUi';
 
 interface Forecast7DayProps {
   spotId: string;
   selectedDayIndex?: number;
   onSelectDay?: (index: number) => void;
 }
-
-const getVerdictClass = (verdict: string): string => {
-  const v = verdict.toLowerCase();
-  if (v === 'bon')
-    return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200';
-  if (v === 'moyen')
-    return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200';
-  if (v === 'limite')
-    return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200';
-  return 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-100';
-};
-
-const getVerdictEmoji = (verdict: string): string => {
-  const v = verdict.toLowerCase();
-  if (v === 'bon') return '🟢';
-  if (v === 'moyen') return '🟡';
-  if (v === 'limite') return '🟠';
-  return '🔴';
-};
 
 export default function Forecast7Day({
   spotId,
@@ -79,7 +62,7 @@ export default function Forecast7Day({
 
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
+      <div className={`${weatherCardClassName} p-4`} aria-live="polite">
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
           {t('weather.forecast7Days')}
         </h2>
@@ -92,7 +75,7 @@ export default function Forecast7Day({
 
   if (error || !dailySummary || !dailySummary.days) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
+      <div className={`${weatherCardClassName} p-4`} role="alert">
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
           {t('weather.forecast7Days')}
         </h2>
@@ -104,7 +87,7 @@ export default function Forecast7Day({
   }
 
   return (
-    <div className="min-w-0 rounded-xl bg-white p-4 shadow-md dark:bg-gray-800">
+    <div className={`${weatherCardClassName} min-w-0 p-4`}>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
           {t('weather.forecast7Days')}
@@ -117,13 +100,15 @@ export default function Forecast7Day({
       <div className="flex max-w-full min-w-0 snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2 scrollbar-thin sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:pb-0 sm:snap-none md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
         {dailySummary.days.map((day, index) => {
           const isSelected = index === selectedDayIndex;
+          const verdictVisual = getVerdictVisual(day.verdict);
+          const VerdictIcon = verdictVisual.Icon;
 
           return (
             <Button
               key={index}
               onClick={() => onSelectDay?.(index)}
               onMouseEnter={() => handleMouseEnter(index)}
-              className={`min-w-[150px] flex-shrink-0 snap-start sm:min-w-0 sm:flex-shrink bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border-2 transition-all hover:border-sky-600 hover:-translate-y-1 hover:shadow-md cursor-pointer relative min-h-[150px] ${
+              className={`min-w-[150px] flex-shrink-0 snap-start sm:min-w-0 sm:flex-shrink bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border-2 transition-colors hover:border-sky-600 hover:shadow-md cursor-pointer relative min-h-[150px] ${
                 isSelected
                   ? 'border-sky-600 shadow-lg bg-sky-50 dark:bg-sky-900/20 ring-2 ring-sky-200 dark:ring-sky-700'
                   : 'border-gray-200 dark:border-gray-700'
@@ -141,16 +126,20 @@ export default function Forecast7Day({
                     {day.score != null ? day.score : day.para_index}
                   </span>
                   <span
-                    className={`text-xl ${getVerdictClass(day.verdict)} px-1.5 py-0.5 rounded-full`}
+                    className={`inline-flex items-center justify-center rounded-full px-1.5 py-0.5 ${verdictVisual.badgeClassName}`}
                   >
-                    {getVerdictEmoji(day.verdict)}
+                    <VerdictIcon className="h-4 w-4" aria-hidden="true" />
                   </span>
                 </div>
                 <div className="text-sm text-gray-700 dark:text-gray-300 font-medium text-center">
                   {day.temp_min}° - {day.temp_max}°
                 </div>
-                <div className="text-xs text-gray-600 dark:text-gray-300 text-center">
-                  💨 {Math.round(day.wind_avg)} km/h
+                <div className="inline-flex items-center justify-center gap-1 text-xs text-gray-600 dark:text-gray-300 text-center">
+                  <Wind
+                    className="h-3.5 w-3.5 text-sky-500"
+                    aria-hidden="true"
+                  />
+                  {Math.round(day.wind_avg)} km/h
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 text-center leading-tight min-h-8 break-words">
                   {day.verdict}

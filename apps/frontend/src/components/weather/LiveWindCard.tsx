@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { useLiveWind } from '../../hooks/weather/useLiveWind';
 import type { LiveWindStation } from '../../types';
+import { Thermometer, Wind } from 'lucide-react';
+import { weatherCardClassName } from './weatherUi';
 
 interface LiveWindCardProps {
   siteId: string;
@@ -72,8 +74,8 @@ const StationRow = ({
         </span>
       </div>
 
-      <div className="text-sm text-gray-900 dark:text-white font-medium">
-        💨{' '}
+      <div className="inline-flex items-center gap-1.5 text-sm text-gray-900 dark:text-white font-medium">
+        <Wind className="h-4 w-4 text-sky-500" aria-hidden="true" />
         {formatStationWind(
           station,
           t('weather.windUnavailable'),
@@ -85,7 +87,13 @@ const StationRow = ({
           ? t('weather.liveWindAgeMinutes', { count: station.age_minutes })
           : t('weather.liveWindNoRecent')}
         {station.temperature_c !== null && (
-          <span>• 🌡️ {station.temperature_c}°C</span>
+          <span className="inline-flex items-center gap-1">
+            <Thermometer
+              className="h-3.5 w-3.5 text-red-500"
+              aria-hidden="true"
+            />
+            {station.temperature_c}°C
+          </span>
         )}
         {station.source_url && (
           <a
@@ -108,7 +116,10 @@ export default function LiveWindCard({ siteId }: LiveWindCardProps) {
 
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-sky-600">
+      <div
+        className={`${weatherCardClassName} border-l-4 border-l-sky-600 p-4`}
+        aria-live="polite"
+      >
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3.5 font-semibold">
           {t('weather.liveWindTitle')}
         </h2>
@@ -121,7 +132,10 @@ export default function LiveWindCard({ siteId }: LiveWindCardProps) {
 
   if (error) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-sky-600">
+      <div
+        className={`${weatherCardClassName} border-l-4 border-l-sky-600 p-4`}
+        role="alert"
+      >
         <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3.5 font-semibold">
           {t('weather.liveWindTitle')}
         </h2>
@@ -139,7 +153,9 @@ export default function LiveWindCard({ siteId }: LiveWindCardProps) {
   const additionalStations = stations.slice(1);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-sky-600 flex-1 flex flex-col gap-3">
+    <div
+      className={`${weatherCardClassName} flex flex-1 flex-col gap-3 border-l-4 border-l-sky-600 p-4`}
+    >
       <div>
         <div>
           <h2 className="text-sm text-gray-700 dark:text-gray-300 font-semibold">
