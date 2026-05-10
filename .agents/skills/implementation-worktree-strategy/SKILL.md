@@ -14,9 +14,26 @@ Before any implementation task:
 3. If on another branch, ask whether to create a worktree.
 4. If yes, update `main` and create the worktree from `main`.
 5. If no, stay on the current branch.
+6. When a worktree is created, immediately launch a bootstrap subagent for dependency readiness.
 
 Create worktrees in `.codenomad/worktree` with names starting with `wt-`.
 Whenever a worktree is created, immediately name the current AI session with the exact worktree name.
+
+## Worktree Bootstrap Subagent
+
+After creating a worktree, launch a `general` subagent immediately and let it run in parallel with the main implementation work.
+
+Subagent responsibility:
+
+- Work in the new worktree path.
+- Verify that local dependencies are usable before Nx commands run.
+- Check for `node_modules/.bin/nx` and representative required packages such as `typescript`.
+- Run `CI=true /home/capic/.local/share/pnpm/pnpm install --frozen-lockfile` only when dependencies are missing or unusable.
+- Do not rely on pnpm's global virtual store; each worktree must have a workspace-local dependency layout usable by Nx and Knip.
+- Run a lightweight readiness command after install/check, for example `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx --version`.
+- Return a concise report with status, commands run, failures, and whether any files changed.
+
+The main agent remains responsible for interpreting blockers and making code changes. The bootstrap subagent must not edit source code or commit files.
 
 ## Rules
 
@@ -25,6 +42,7 @@ Whenever a worktree is created, immediately name the current AI session with the
 - Update `main`.
 - Create a worktree from `main`.
 - Name the current AI session with the exact worktree name.
+- Launch the worktree bootstrap subagent.
 - Continue implementation in that worktree.
 
 ### If current branch is not `main`
@@ -39,6 +57,7 @@ If yes:
 - Create a worktree from `main` in `.codenomad/worktree`.
 - Use a name like `wt-<task-label>`.
 - Name the current AI session with the exact worktree name.
+- Launch the worktree bootstrap subagent.
 - Continue there.
 
 If no:
