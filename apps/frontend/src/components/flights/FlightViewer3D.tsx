@@ -151,11 +151,22 @@ const createTubeShape = (radiusMeters: number, segments = 10) =>
     );
   });
 
-const replayTrackTubeShape = createTubeShape(1);
+const replayTrackTubeShape = createTubeShape(1.8);
 const MIN_TRACK_SEGMENT_DISTANCE_SQUARED = 0.01;
+const REPLAY_TRACK_ALTITUDE_OFFSET_METERS = 8;
+
+const liftTrackPosition = (position: Cartesian3) => {
+  const cartographic = Cartographic.fromCartesian(position);
+  return Cartesian3.fromRadians(
+    cartographic.longitude,
+    cartographic.latitude,
+    cartographic.height + REPLAY_TRACK_ALTITUDE_OFFSET_METERS
+  );
+};
 
 const getRenderableTrackPositions = (positions: Cartesian3[]) =>
-  positions.reduce<Cartesian3[]>((uniquePositions, position) => {
+  positions.reduce<Cartesian3[]>((uniquePositions, rawPosition) => {
+    const position = liftTrackPosition(rawPosition);
     const previousPosition = uniquePositions[uniquePositions.length - 1];
     if (
       !previousPosition ||
