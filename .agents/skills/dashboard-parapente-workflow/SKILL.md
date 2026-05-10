@@ -29,6 +29,7 @@ description: Workflow expert for the dashboard-parapente Nx monorepo. Use when i
 ## Worktrees
 - For branch/worktree start-of-work decisions, use the `implementation-worktree-strategy` skill.
 - This skill only defines repository commands, validation strategy, GitHub usage, and tooling preferences.
+- When a worktree is created, use the bootstrap subagent defined by `implementation-worktree-strategy` before relying on Nx commands.
 - Before opening a PR from a worktree, fetch the remote and update the worktree branch with the latest `origin/main`.
 - Do not create a PR from a stale worktree; resolve merge/rebase conflicts and rerun impacted checks first.
 
@@ -89,6 +90,8 @@ Run all lint targets:
 
 ## Validation Strategy
 - Prefer targeted lint/test commands during implementation.
+- For long or multi-command validation runs, prefer a validation subagent that runs commands from the active worktree and returns a concise pass/fail report.
+- Keep the main agent responsible for fixing failures and deciding whether extra validation is needed.
 - Prefer `nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e` for branch/PR validation.
 - Use `run-many -t test` only when affected detection is not appropriate or a full-repo check is explicitly needed.
 - Use `run-many -t lint` only when affected detection is not appropriate or a full-repo lint is explicitly needed.
