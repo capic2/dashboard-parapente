@@ -146,10 +146,13 @@ vi.mock('cesium', () => {
     },
     HorizontalOrigin: { CENTER: 0 },
     Ion: { defaultAccessToken: '' },
-    JulianDate: { fromIso8601: () => ({}) },
+    JulianDate: { fromDate: () => ({}), fromIso8601: () => ({}) },
     LabelStyle: { FILL_AND_OUTLINE: 0 },
     Math: { toRadians: (value: number) => (value * globalThis.Math.PI) / 180 },
     sampleTerrainMostDetailed: vi.fn(),
+    SampledPositionProperty: class SampledPositionProperty {
+      addSample = vi.fn();
+    },
     ShadowMode: { ENABLED: 1, DISABLED: 0 },
     Terrain: { fromWorldTerrain: () => ({}) },
     VerticalOrigin: { BOTTOM: 0 },
