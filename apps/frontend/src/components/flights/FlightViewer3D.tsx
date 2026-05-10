@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Entity } from 'cesium';
 import {
-  ArcType,
   BoundingSphere,
   Cartesian2,
   CallbackProperty,
@@ -9,13 +8,13 @@ import {
   Cartographic,
   Color,
   ConstantPositionProperty,
+  CornerType,
   HeadingPitchRange,
   HorizontalOrigin,
   Ion,
   JulianDate,
   LabelStyle,
   Math as CesiumMath,
-  PolylineGlowMaterialProperty,
   sampleTerrainMostDetailed,
   ShadowMode,
   Terrain,
@@ -142,6 +141,17 @@ const renderViewerFrame = (viewer: CesiumViewer) => {
   viewer.scene.requestRender();
   viewer.render();
 };
+
+const createTubeShape = (radiusMeters: number, segments = 10) =>
+  Array.from({ length: segments }, (_, index) => {
+    const angle = (index / segments) * Math.PI * 2;
+    return new Cartesian2(
+      Math.cos(angle) * radiusMeters,
+      Math.sin(angle) * radiusMeters
+    );
+  });
+
+const replayTrackTubeShape = createTubeShape(1.4);
 
 /**
  * AccordionSection - Collapsible section component for control panel
@@ -568,22 +578,18 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       viewer.clock.shouldAnimate = false;
 
       trackEntityRef.current = viewer.entities.add({
-        polyline: {
+        polylineVolume: {
           positions: new CallbackProperty(
-            () => visiblePositionsRef.current,
+            () =>
+              visiblePositionsRef.current.length > 1
+                ? visiblePositionsRef.current
+                : [],
             false
           ),
-          width: 3,
-          material: new PolylineGlowMaterialProperty({
-            glowPower: 0.12,
-            taperPower: 0.35,
-            color: Color.fromCssColorString('#ff5a1f').withAlpha(0.96),
-          }),
-          depthFailMaterial: Color.fromCssColorString('#ff5a1f').withAlpha(
-            0.35
-          ),
-          clampToGround: false,
-          arcType: ArcType.NONE,
+          shape: replayTrackTubeShape,
+          cornerType: CornerType.ROUNDED,
+          material: Color.fromCssColorString('#ff5a1f').withAlpha(0.92),
+          shadows: ShadowMode.DISABLED,
         },
       });
 

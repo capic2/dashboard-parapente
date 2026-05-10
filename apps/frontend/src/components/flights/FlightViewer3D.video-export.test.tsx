@@ -122,7 +122,6 @@ vi.mock('cesium', () => {
   }
 
   return {
-    ArcType: { NONE: 0 },
     BoundingSphere: { fromPoints: () => ({ radius: 100 }) },
     Cartesian2: class Cartesian2 {
       constructor(
@@ -142,6 +141,7 @@ vi.mock('cesium', () => {
     ConstantPositionProperty: class ConstantPositionProperty {
       setValue = vi.fn();
     },
+    CornerType: { ROUNDED: 0 },
     Entity: class Entity {
       id = 'entity';
     },
@@ -157,9 +157,6 @@ vi.mock('cesium', () => {
     JulianDate: { fromDate: () => ({}), fromIso8601: () => ({}) },
     LabelStyle: { FILL_AND_OUTLINE: 0 },
     Math: { toRadians: (value: number) => (value * globalThis.Math.PI) / 180 },
-    PolylineGlowMaterialProperty: class PolylineGlowMaterialProperty {
-      constructor(public options: unknown) {}
-    },
     sampleTerrainMostDetailed: vi.fn(),
     ShadowMode: { ENABLED: 1, DISABLED: 0 },
     Terrain: { fromWorldTerrain: () => ({}) },
