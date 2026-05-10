@@ -138,8 +138,19 @@ const interpolatePosition = (
     start.z + (end.z - start.z) * ratio
   );
 
+const getViewerScene = (viewer: CesiumViewer | null | undefined) => {
+  if (!viewer || viewer.isDestroyed() || !viewer.scene) {
+    return null;
+  }
+
+  return viewer.scene;
+};
+
 const renderViewerFrame = (viewer: CesiumViewer) => {
-  viewer.scene.requestRender();
+  const scene = getViewerScene(viewer);
+  if (!scene) return;
+
+  scene.requestRender();
   viewer.render();
 };
 
@@ -205,7 +216,7 @@ const getTrackCurtainMinimumHeights = (
 ) =>
   positions.map((position) => {
     const cartographic = Cartographic.fromCartesian(position);
-    const terrainHeight = viewer.scene.globe.getHeight(cartographic);
+    const terrainHeight = getViewerScene(viewer)?.globe.getHeight(cartographic);
     const fallbackHeight = cartographic.height - 120;
 
     return Math.min(cartographic.height - 1, terrainHeight ?? fallbackHeight);
@@ -516,8 +527,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   useEffect(() => {
     viewerUnitsRef.current = viewerUnits;
 
-    if (viewerRef.current && !viewerRef.current.isDestroyed()) {
-      viewerRef.current.scene.requestRender();
+    const scene = getViewerScene(viewerRef.current);
+    if (scene) {
+      scene.requestRender();
     }
   }, [viewerUnits]);
 
@@ -576,8 +588,15 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           selectionIndicator: false,
         });
 
+        const scene = getViewerScene(viewer);
+        if (!scene) {
+          viewer.destroy();
+          setViewerError('Cesium scene could not be initialized');
+          return;
+        }
+
         // Enable terrain collision detection
-        viewer.scene.screenSpaceCameraController.enableCollisionDetection = true;
+        scene.screenSpaceCameraController.enableCollisionDetection = true;
 
         viewerRef.current = viewer;
         setViewerError(null);
@@ -605,13 +624,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   // Monitor terrain loading status
   useEffect(() => {
     const viewer = viewerRef.current;
-    if (!viewer || !viewerReady) return;
+    const scene = getViewerScene(viewer);
+    if (!viewer || !scene || !viewerReady) return;
 
     // Reset terrain ready when checking
     setTerrainReady(false);
 
     // Check if terrain is already loaded
-    const globe = viewer.scene.globe;
+    const globe = scene.globe;
     let isMounted = true;
 
     const checkTerrainReady = () => {
@@ -647,7 +667,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   // Configure terrain rendering (shadows, AO, lighting)
   useEffect(() => {
     const viewer = viewerRef.current;
-    if (!viewer || !viewerReady) return;
+    const scene = getViewerScene(viewer);
+    if (!viewer || !scene || !viewerReady) return;
 
     try {
       // 1. Terrain shadows
@@ -657,7 +678,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         : ShadowMode.DISABLED;
 
       // 2. Ambient Occlusion
-      const aoStage = viewer.scene.postProcessStages.ambientOcclusion;
+      const aoStage = scene.postProcessStages.ambientOcclusion;
       if (aoStage) {
         aoStage.enabled = ambientOcclusion;
         if (ambientOcclusion) {
@@ -672,8 +693,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       viewer.clock.currentTime = JulianDate.fromIso8601(dateStr);
 
       // 4. Light intensity
-      if (viewer.scene.light) {
-        viewer.scene.light.intensity = lightIntensity;
+      if (scene.light) {
+        scene.light.intensity = lightIntensity;
       }
     } catch (error) {
       console.error('Error configuring terrain rendering:', error);
@@ -686,11 +707,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       return;
     }
 
-    if (!viewerRef.current || viewerRef.current.isDestroyed()) {
+    const viewer = viewerRef.current;
+    if (!viewer || !getViewerScene(viewer)) {
       return;
     }
 
-    const viewer = viewerRef.current;
+    const cameraTimers: ReturnType<typeof setTimeout>[] = [];
 
     try {
       // Convert GPX coordinates to Cartesian3 avec offset d'élévation
@@ -827,7 +849,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       // Position camera - MUST happen after elevation offset is calculated
       // Using a very low angle to see the altitude of the flight track
       const positionCamera = async () => {
-        if (viewer && !viewer.isDestroyed()) {
+        if (viewerRef.current === viewer && getViewerScene(viewer)) {
           // Check if camera settings were already loaded from site (camera_angle/camera_distance)
           // Read directly from flight.site to avoid stale ref values
           const hasSavedCameraSettings =
@@ -866,14 +888,18 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       };
 
       // Position immédiate
-      setTimeout(() => positionCamera(), 500);
+      cameraTimers.push(setTimeout(() => positionCamera(), 500));
       // Re-position après calcul de l'offset (1.5s + 500ms)
-      setTimeout(() => positionCamera(), 2500);
+      cameraTimers.push(setTimeout(() => positionCamera(), 2500));
     } catch (err) {
       console.error('Error loading GPX data:', err);
     }
 
     return () => {
+      for (const timer of cameraTimers) {
+        clearTimeout(timer);
+      }
+
       // Reset play state when changing flights
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
@@ -885,7 +911,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       setCurrentProgress(0);
 
       const viewer = viewerRef.current;
-      if (!viewer || viewer.isDestroyed()) return;
+      if (!viewer || !getViewerScene(viewer)) return;
 
       try {
         removeTrackEntity(viewer);
@@ -944,8 +970,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
   // Position camera based on site orientation
   useEffect(() => {
+    const viewer = viewerRef.current;
     if (
-      !viewerRef.current ||
+      !viewer ||
+      !getViewerScene(viewer) ||
       !viewerReady ||
       !gpxData?.coordinates?.length ||
       !allPositionsRef.current.length
@@ -953,7 +981,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       return;
     }
 
-    const viewer = viewerRef.current;
     const firstPosition = allPositionsRef.current[0];
 
     if (!firstPosition) return;
@@ -1295,7 +1322,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       }
 
       const viewer = viewerRef.current;
-      if (viewer && !viewer.isDestroyed()) {
+      const scene = getViewerScene(viewer);
+      if (viewer && scene) {
         const heading = cameraHeadingRef.current;
         const progress =
           lastIndex > 0
@@ -1333,7 +1361,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         const cameraCartographic = Cartographic.fromCartesian(
           viewer.camera.position
         );
-        const globe = viewer.scene.globe;
+        const globe = scene.globe;
         const terrainHeight = globe.getHeight(cameraCartographic);
 
         if (
@@ -1374,7 +1402,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         index: currentIndexRef.current,
         progress: safeProgress,
         ratio: scenePosition.ratio,
-        tilesLoaded: Boolean(viewer?.scene.globe.tilesLoaded),
+        tilesLoaded: Boolean(getViewerScene(viewer)?.globe.tilesLoaded),
       };
     },
     [syncTrackEntity]
@@ -1511,9 +1539,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         cursorPositionPropertyRef.current.setValue(allPositionsRef.current[0]);
       }
 
-      if (viewerRef.current && !viewerRef.current.isDestroyed()) {
-        removeTrackEntity(viewerRef.current);
-        viewerRef.current.scene.requestRender();
+      const viewer = viewerRef.current;
+      const scene = getViewerScene(viewer);
+      if (viewer && scene) {
+        removeTrackEntity(viewer);
+        scene.requestRender();
       }
     }
   }, [pause, removeTrackEntity]);
