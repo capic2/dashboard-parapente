@@ -208,10 +208,7 @@ const getTrackCurtainMinimumHeights = (
     const terrainHeight = viewer.scene.globe.getHeight(cartographic);
     const fallbackHeight = cartographic.height - 120;
 
-    return Math.min(
-      cartographic.height - 1,
-      terrainHeight ?? fallbackHeight
-    );
+    return Math.min(cartographic.height - 1, terrainHeight ?? fallbackHeight);
   });
 
 /**
@@ -424,9 +421,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             ),
             width: 3,
             material: Color.fromCssColorString('#ff5a1f').withAlpha(0.95),
-            depthFailMaterial: Color.fromCssColorString('#ff5a1f').withAlpha(
-              0.5
-            ),
+            depthFailMaterial:
+              Color.fromCssColorString('#ff5a1f').withAlpha(0.5),
             shadows: ShadowMode.DISABLED,
           },
         });
