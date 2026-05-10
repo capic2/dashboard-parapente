@@ -80,6 +80,10 @@ vi.mock('cesium', () => {
       requestRender: vi.fn(),
       render: vi.fn(),
       screenSpaceCameraController: { enableCollisionDetection: true },
+      postRender: {
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
       postProcessStages: { ambientOcclusion: { enabled: false, uniforms: {} } },
       light: { intensity: 1 },
     };
@@ -150,8 +154,8 @@ vi.mock('cesium', () => {
     LabelStyle: { FILL_AND_OUTLINE: 0 },
     Math: { toRadians: (value: number) => (value * globalThis.Math.PI) / 180 },
     sampleTerrainMostDetailed: vi.fn(),
-    SampledPositionProperty: class SampledPositionProperty {
-      addSample = vi.fn();
+    SceneTransforms: {
+      worldToWindowCoordinates: () => ({ x: 0, y: 0 }),
     },
     ShadowMode: { ENABLED: 1, DISABLED: 0 },
     Terrain: { fromWorldTerrain: () => ({}) },
