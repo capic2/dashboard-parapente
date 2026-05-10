@@ -57,7 +57,7 @@ export const SiteCard: React.FC<SiteCardProps> = ({
   const typeBadge = getTypeBadge();
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow duration-200 h-full flex flex-col">
+    <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-sky-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-sky-700">
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
@@ -81,9 +81,9 @@ export const SiteCard: React.FC<SiteCardProps> = ({
       <div className="space-y-2 mb-4 flex-1">
         {/* GPS Coordinates */}
         {site.latitude && site.longitude && (
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex items-start gap-2 text-sm">
             <MapPin
-              className="h-4 w-4 shrink-0 text-gray-600 dark:text-gray-300"
+              className="mt-0.5 h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400"
               aria-hidden="true"
             />
             <span className="text-gray-800 dark:text-gray-100">
@@ -99,9 +99,9 @@ export const SiteCard: React.FC<SiteCardProps> = ({
 
         {/* Orientation */}
         {site.orientation && (
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex items-start gap-2 text-sm">
             <Compass
-              className="h-4 w-4 shrink-0 text-gray-600 dark:text-gray-300"
+              className="mt-0.5 h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400"
               aria-hidden="true"
             />
             <span className="text-gray-800 dark:text-gray-100">
@@ -112,9 +112,9 @@ export const SiteCard: React.FC<SiteCardProps> = ({
 
         {/* Region */}
         {site.region && (
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex items-start gap-2 text-sm">
             <Map
-              className="h-4 w-4 shrink-0 text-gray-600 dark:text-gray-300"
+              className="mt-0.5 h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400"
               aria-hidden="true"
             />
             <span className="text-gray-800 dark:text-gray-100">
@@ -124,9 +124,9 @@ export const SiteCard: React.FC<SiteCardProps> = ({
         )}
 
         {/* Flight count */}
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-start gap-2 text-sm">
           <Plane
-            className="h-4 w-4 shrink-0 text-gray-600 dark:text-gray-300"
+            className="mt-0.5 h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400"
             aria-hidden="true"
           />
           <span className="text-gray-800 dark:text-gray-100">
@@ -148,7 +148,7 @@ export const SiteCard: React.FC<SiteCardProps> = ({
       <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t dark:border-gray-700">
         <Button
           onClick={() => onEdit(site)}
-          className="inline-flex flex-1 items-center justify-center gap-1.5 px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer transition-colors"
+          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-sky-600 px-4 py-2.5 text-sm text-white transition-colors hover:bg-sky-700 sm:px-3 sm:py-1.5"
           title={t('sites.editSite')}
         >
           <Pencil className="h-4 w-4" aria-hidden="true" />
@@ -156,7 +156,7 @@ export const SiteCard: React.FC<SiteCardProps> = ({
         </Button>
         <Button
           onClick={() => onViewFlights(site)}
-          className="inline-flex flex-1 items-center justify-center gap-1.5 px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 cursor-pointer transition-colors"
+          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-gray-100 px-4 py-2.5 text-sm text-gray-800 transition-colors hover:bg-gray-200 sm:px-3 sm:py-1.5 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
           title={t('sites.viewFlights')}
         >
           <List className="h-4 w-4" aria-hidden="true" />
@@ -164,7 +164,7 @@ export const SiteCard: React.FC<SiteCardProps> = ({
         </Button>
         <Button
           onClick={() => onDelete(site)}
-          className="inline-flex items-center justify-center px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer transition-colors"
+          className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2.5 text-sm text-white transition-colors hover:bg-red-700 sm:px-3 sm:py-1.5"
           title={t('sites.deleteSite')}
           aria-label={t('sites.deleteSite')}
         >

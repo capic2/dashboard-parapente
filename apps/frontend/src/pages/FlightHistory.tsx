@@ -1,9 +1,19 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { flightsQueryOptions } from '../hooks/flights/useFlights';
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import type { Flight, Site } from '../types';
 import type { RowSelectionState } from '@tanstack/react-table';
+import { useSearch } from '@tanstack/react-router';
+import { Input, TextField } from 'react-aria-components';
+import {
+  CheckSquare,
+  FilePlus2,
+  Search,
+  Trash2,
+  X,
+  RefreshCw,
+} from 'lucide-react';
 import { StravaSyncModal } from '../components/flights/StravaSyncModal';
 import { CreateFlightModal } from '../components/flights/CreateFlightModal';
 import { CreateSiteModal } from '../components/flights/CreateSiteModal';
@@ -22,8 +32,9 @@ import { useIsMobile } from '../hooks/useIsMobile';
 
 export default function FlightHistory() {
   const { t } = useTranslation();
+  const search = useSearch({ from: '/flights' });
   const { data: flights } = useSuspenseQuery(
-    flightsQueryOptions({ limit: 50 })
+    flightsQueryOptions({ limit: 50, siteId: search.siteId })
   );
 
   const isMobile = useIsMobile();
@@ -37,6 +48,28 @@ export default function FlightHistory() {
   const [showCreateFlightModal, setShowCreateFlightModal] = useState(false);
   const [showCreateSiteModal, setShowCreateSiteModal] = useState(false);
   const [showMobileDetail, setShowMobileDetail] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [gpxFilter, setGpxFilter] = useState<'all' | 'with' | 'missing'>('all');
+
+  const filteredFlights = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    return flights.filter((flight) => {
+      const matchesSearch =
+        normalizedQuery === '' ||
+        flight.title?.toLowerCase().includes(normalizedQuery) ||
+        flight.name?.toLowerCase().includes(normalizedQuery) ||
+        flight.site_name?.toLowerCase().includes(normalizedQuery) ||
+        flight.flight_date.includes(normalizedQuery);
+
+      const matchesGpx =
+        gpxFilter === 'all' ||
+        (gpxFilter === 'with' && Boolean(flight.gpx_file_path)) ||
+        (gpxFilter === 'missing' && !flight.gpx_file_path);
+
+      return matchesSearch && matchesGpx;
+    });
+  }, [flights, searchQuery, gpxFilter]);
 
   const selectedFlight = flights.find((f: Flight) => f.id === selectedFlightId);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -72,11 +105,11 @@ export default function FlightHistory() {
 
   const handleSelectAll = useCallback(() => {
     const allSelected: RowSelectionState = {};
-    for (const flight of flights) {
+    for (const flight of filteredFlights) {
       allSelected[flight.id] = true;
     }
     setRowSelection(allSelected);
-  }, [flights]);
+  }, [filteredFlights]);
 
   const handleDeselectAll = useCallback(() => {
     setRowSelection({});
@@ -180,7 +213,15 @@ export default function FlightHistory() {
                   {t('flights.selected', { count: selectedCount })}
                 </span>
               ) : (
-                <>{t('flights.registered', { count: flights.length })}</>
+                <span>
+                  {search.siteId
+                    ? t('flights.registeredForSite', {
+                        count: filteredFlights.length,
+                      })
+                    : t('flights.registered', {
+                        count: filteredFlights.length,
+                      })}
+                </span>
               )}
             </div>
           </div>
@@ -189,8 +230,9 @@ export default function FlightHistory() {
             {!selectionMode && (
               <Button
                 onClick={() => setShowCreateFlightModal(true)}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all flex items-center gap-2"
+                className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors flex items-center gap-2"
               >
+                <FilePlus2 className="h-4 w-4" aria-hidden="true" />
                 {t('flights.createFlight')}
               </Button>
             )}
@@ -198,24 +240,65 @@ export default function FlightHistory() {
             {!selectionMode && (
               <Button
                 onClick={() => setShowStravaSyncModal(true)}
-                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-all flex items-center gap-2"
+                variant="secondary"
+                className="px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
               >
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
                 {t('flights.syncStrava')}
               </Button>
             )}
 
             <Button
               onClick={handleToggleSelectionMode}
-              className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
                 selectionMode
                   ? 'bg-gray-600 text-white hover:bg-gray-700'
-                  : 'bg-sky-600 text-white hover:bg-sky-700'
+                  : 'bg-white text-sky-700 border border-sky-200 hover:bg-sky-50 dark:bg-gray-800 dark:text-sky-300 dark:border-sky-800 dark:hover:bg-sky-950/40'
               }`}
             >
+              {selectionMode ? (
+                <X className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <CheckSquare className="h-4 w-4" aria-hidden="true" />
+              )}
               {selectionMode ? t('flights.cancel') : t('flights.select')}
             </Button>
           </div>
         </div>
+
+        {!selectionMode && (
+          <div className="grid grid-cols-1 gap-3 border-t border-gray-200 pt-3 dark:border-gray-700 md:grid-cols-[minmax(0,1fr)_220px]">
+            <TextField
+              value={searchQuery}
+              onChange={setSearchQuery}
+              aria-label={t('flights.searchPlaceholder')}
+            >
+              <div className="relative">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                  aria-hidden="true"
+                />
+                <Input
+                  placeholder={t('flights.searchPlaceholder')}
+                  className="min-h-11 w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                />
+              </div>
+            </TextField>
+
+            <select
+              value={gpxFilter}
+              onChange={(event) =>
+                setGpxFilter(event.target.value as 'all' | 'with' | 'missing')
+              }
+              aria-label={t('flights.gpxFilter')}
+              className="min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            >
+              <option value="all">{t('flights.allGpxStatuses')}</option>
+              <option value="with">{t('flights.withGpx')}</option>
+              <option value="missing">{t('flights.withoutGpx')}</option>
+            </select>
+          </div>
+        )}
 
         {selectionMode && (
           <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
@@ -236,6 +319,7 @@ export default function FlightHistory() {
               isDisabled={selectedCount === 0}
               className="ml-0 sm:ml-auto px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
               {t('flights.deleteCount', { count: selectedCount })}
             </Button>
           </div>
@@ -247,7 +331,7 @@ export default function FlightHistory() {
         {(!isMobile || !showMobileDetail) && (
           <div className={isMobile ? '' : 'lg:col-span-1'}>
             <FlightsTable
-              flights={flights}
+              flights={filteredFlights}
               selectedFlightId={selectedFlightId}
               selectionMode={selectionMode}
               onSelectFlight={handleSelectFlight}
