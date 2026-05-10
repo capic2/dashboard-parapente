@@ -202,8 +202,8 @@ const drawProjectedPath = (
     context.stroke();
   };
 
-  drawLine(7, 'rgba(255, 255, 255, 0.85)');
-  drawLine(4, 'rgba(239, 68, 68, 0.98)');
+  drawLine(3, 'rgba(15, 23, 42, 0.45)');
+  drawLine(2, 'rgba(248, 80, 45, 0.95)');
 };
 
 /**
