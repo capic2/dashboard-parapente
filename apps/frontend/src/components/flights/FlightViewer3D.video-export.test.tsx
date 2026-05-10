@@ -11,26 +11,26 @@ const {
   viewerInstances,
   viewerOptions,
 } = vi.hoisted(() => ({
-    apiGet: vi.fn(),
-    apiPost: vi.fn(),
-    exportStatusMock: { current: null as unknown },
-    invalidateQueries: vi.fn(),
-    viewerInstances: [] as {
+  apiGet: vi.fn(),
+  apiPost: vi.fn(),
+  exportStatusMock: { current: null as unknown },
+  invalidateQueries: vi.fn(),
+  viewerInstances: [] as {
+    render: ReturnType<typeof vi.fn>;
+    scene: {
+      requestRender: ReturnType<typeof vi.fn>;
       render: ReturnType<typeof vi.fn>;
-      scene: {
-        requestRender: ReturnType<typeof vi.fn>;
-        render: ReturnType<typeof vi.fn>;
-      };
-    }[],
-    viewerOptions: [] as unknown[],
-    mockFlight: {
-      gpx_file_path: 'sample.gpx',
-      video_export_status: null as string | null,
-      video_export_job_id: null as string | null,
-      video_file_path: null as string | null,
-      site: null,
-    },
-  }));
+    };
+  }[],
+  viewerOptions: [] as unknown[],
+  mockFlight: {
+    gpx_file_path: 'sample.gpx',
+    video_export_status: null as string | null,
+    video_export_job_id: null as string | null,
+    video_file_path: null as string | null,
+    site: null,
+  },
+}));
 
 vi.mock('cesium', () => {
   class Cartesian3 {
