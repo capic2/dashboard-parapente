@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Entity } from 'cesium';
 import {
+  ArcType,
   BoundingSphere,
   Cartesian2,
   CallbackProperty,
@@ -15,6 +16,7 @@ import {
   LabelStyle,
   Math as CesiumMath,
   sampleTerrainMostDetailed,
+  SampledPositionProperty,
   ShadowMode,
   Terrain,
   VerticalOrigin,
@@ -141,15 +143,21 @@ const renderViewerFrame = (viewer: CesiumViewer) => {
   viewer.render();
 };
 
-const createTrackTubeShape = (radiusMeters: number) => {
-  const segments = 12;
-  return Array.from({ length: segments }, (_, index) => {
-    const angle = (index / segments) * Math.PI * 2;
-    return new Cartesian2(
-      Math.cos(angle) * radiusMeters,
-      Math.sin(angle) * radiusMeters
-    );
+const getJulianDateFromTimestamp = (timestamp: number) =>
+  JulianDate.fromDate(new Date(timestamp));
+
+const createSampledTrackPosition = (
+  positions: Cartesian3[],
+  timestamps: number[]
+) => {
+  const sampledPosition = new SampledPositionProperty();
+
+  positions.forEach((position, index) => {
+    const timestamp = timestamps[index] ?? timestamps[0] + index * 1000;
+    sampledPosition.addSample(getJulianDateFromTimestamp(timestamp), position);
   });
+
+  return sampledPosition;
 };
 
 /**
@@ -265,6 +273,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const realTimeStartRef = useRef<number>(0);
   const gpxStartTimeRef = useRef<number>(0);
 
+  const fullTrackEntityRef = useRef<Entity | null>(null);
   const polylineEntityRef = useRef<Entity | null>(null);
   const cursorEntityRef = useRef<Entity | null>(null);
   const startEntityRef = useRef<Entity | null>(null);
@@ -556,6 +565,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       // Clean old entities
       if (
+        fullTrackEntityRef.current &&
+        viewer.entities.contains(fullTrackEntityRef.current)
+      ) {
+        viewer.entities.remove(fullTrackEntityRef.current);
+      }
+      if (
         polylineEntityRef.current &&
         viewer.entities.contains(polylineEntityRef.current)
       ) {
@@ -574,21 +589,44 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         viewer.entities.remove(startEntityRef.current);
       }
 
-      // Create an actual 3D tube instead of a screen-space line, so the track
-      // stays visually anchored to terrain while the camera moves.
+      const startTimestamp = timestamps[0];
+      const endTimestamp = timestamps[timestamps.length - 1] ?? startTimestamp;
+      const trackDurationSeconds = Math.max(
+        (endTimestamp - startTimestamp) / 1000,
+        1
+      );
+      const startTime = getJulianDateFromTimestamp(startTimestamp);
+      const stopTime = getJulianDateFromTimestamp(endTimestamp);
+      const sampledTrackPosition = createSampledTrackPosition(
+        positions,
+        timestamps
+      );
+
+      viewer.clock.startTime = startTime;
+      viewer.clock.stopTime = stopTime;
+      viewer.clock.currentTime = startTime;
+      viewer.clock.shouldAnimate = false;
+
+      fullTrackEntityRef.current = viewer.entities.add({
+        polyline: {
+          positions,
+          width: 2,
+          material: Color.WHITE.withAlpha(0.35),
+          clampToGround: false,
+          arcType: ArcType.NONE,
+        },
+      });
+
+      // Let Cesium render the replay trail from a sampled time series instead
+      // of rebuilding custom geometry on every animation frame.
       polylineEntityRef.current = viewer.entities.add({
-        polylineVolume: {
-          positions: new CallbackProperty(
-            () =>
-              visiblePositionsRef.current.length > 1
-                ? visiblePositionsRef.current
-                : [],
-            false
-          ),
-          shape: createTrackTubeShape(4),
-          material: Color.RED.withAlpha(0.92),
-          outline: true,
-          outlineColor: Color.WHITE.withAlpha(0.75),
+        position: sampledTrackPosition,
+        path: {
+          resolution: 1,
+          leadTime: 0,
+          trailTime: trackDurationSeconds,
+          width: 5,
+          material: Color.RED.withAlpha(0.95),
         },
       });
 
@@ -743,6 +781,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       try {
         if (
+          fullTrackEntityRef.current &&
+          viewer.entities.contains(fullTrackEntityRef.current)
+        ) {
+          viewer.entities.remove(fullTrackEntityRef.current);
+        }
+        if (
           polylineEntityRef.current &&
           viewer.entities.contains(polylineEntityRef.current)
         ) {
@@ -764,6 +808,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         console.debug('Cleanup warning:', e);
       }
 
+      fullTrackEntityRef.current = null;
       polylineEntityRef.current = null;
       cursorEntityRef.current = null;
       startEntityRef.current = null;
@@ -1156,6 +1201,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       const viewer = viewerRef.current;
       if (viewer && !viewer.isDestroyed()) {
+        viewer.clock.currentTime = getJulianDateFromTimestamp(
+          scenePosition.timestamp
+        );
+
         const heading = cameraHeadingRef.current;
         const progress =
           lastIndex > 0
@@ -1369,6 +1418,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       }
 
       if (viewerRef.current && !viewerRef.current.isDestroyed()) {
+        if (timestampsRef.current[0] !== undefined) {
+          viewerRef.current.clock.currentTime = getJulianDateFromTimestamp(
+            timestampsRef.current[0]
+          );
+        }
         viewerRef.current.scene.requestRender();
       }
     }
