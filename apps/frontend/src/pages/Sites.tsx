@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useDeferredValue, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
-import { Input, TextField } from 'react-aria-components';
-import { Button } from '@dashboard-parapente/design-system';
+import { Input, Label, TextField } from 'react-aria-components';
+import { Button, DataList, Modal } from '@dashboard-parapente/design-system';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import {
   useReactTable,
@@ -12,13 +12,11 @@ import {
   type SortingState,
   type Row,
 } from '@tanstack/react-table';
-import { sitesQueryOptions } from '../hooks/sites/useSites';
+import { sitesQueryOptions, useCreateSite } from '../hooks/sites/useSites';
 import { useUpdateSite, useDeleteSite } from '../hooks/sites/useSiteMutations';
-import { useCreateSite } from '../hooks/sites/useSites';
 import type { Site } from '@dashboard-parapente/shared-types';
 import { SiteCard } from '../components/sites/SiteCard';
 import { EditSiteModal } from '../components/sites/EditSiteModal';
-import { DataList, Modal } from '@dashboard-parapente/design-system';
 
 const columnHelper = createColumnHelper<Site>();
 
@@ -58,6 +56,7 @@ export const Sites: React.FC = () => {
 
   // Filters & search
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [typeFilter, setTypeFilter] = useState<
     'all' | 'takeoff' | 'landing' | 'both'
   >('all');
@@ -73,19 +72,28 @@ export const Sites: React.FC = () => {
 
   // Filter logic (search + type filter only, sorting handled by TanStack)
   const filteredSites = useMemo(() => {
+    const normalizedSearch = deferredSearchQuery.trim().toLowerCase();
+
     return sites.filter((site) => {
       const matchesSearch =
-        searchQuery === '' ||
-        site.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        site.code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        site.region?.toLowerCase().includes(searchQuery.toLowerCase());
+        normalizedSearch === '' ||
+        site.name.toLowerCase().includes(normalizedSearch) ||
+        site.code?.toLowerCase().includes(normalizedSearch) ||
+        site.region?.toLowerCase().includes(normalizedSearch);
 
       const matchesType =
         typeFilter === 'all' || site.usage_type === typeFilter;
 
       return matchesSearch && matchesType;
     });
-  }, [sites, searchQuery, typeFilter]);
+  }, [sites, deferredSearchQuery, typeFilter]);
+
+  const hasActiveFilters = searchQuery.trim() !== '' || typeFilter !== 'all';
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setTypeFilter('all');
+  };
 
   const table = useReactTable({
     data: filteredSites,
@@ -131,8 +139,8 @@ export const Sites: React.FC = () => {
     try {
       await deleteSite.mutateAsync(siteToDelete.id);
       setSiteToDelete(null);
-    } catch (error: unknown) {
-      console.error('Failed to delete site:', error);
+    } catch {
+      // Keep the confirmation open so the user can retry.
     }
   };
 
@@ -148,7 +156,7 @@ export const Sites: React.FC = () => {
     return (
       <SiteCard
         site={site}
-        flightCount={0}
+        flightCount={site.flight_count}
         onEdit={handleEdit}
         onDelete={handleDelete}
         onViewFlights={handleViewFlights}
@@ -163,42 +171,60 @@ export const Sites: React.FC = () => {
         <h1 className="text-3xl font-bold">{t('sites.management')}</h1>
         <Button
           onPress={handleOpenCreateModal}
-          className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer"
+          className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer transition-colors"
         >
-          ➕ {t('sites.newSite')}
+          {t('sites.newSite')}
         </Button>
       </div>
 
       {/* Filters Bar */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_220px_auto] gap-4 md:items-end">
           {/* Search */}
           <TextField
             value={searchQuery}
             onChange={setSearchQuery}
-            aria-label={t('sites.searchPlaceholder')}
+            className="flex flex-col gap-1"
           >
-            <Input
-              placeholder={t('sites.searchPlaceholder')}
-              className="px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500 w-full"
-            />
+            <Label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+              {t('sites.searchLabel')}
+            </Label>
+            <div className="relative">
+              <Input
+                placeholder={t('sites.searchPlaceholder')}
+                className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              />
+            </div>
           </TextField>
 
           {/* Type Filter */}
-          <select
-            value={typeFilter}
-            onChange={(e) =>
-              setTypeFilter(
-                e.target.value as 'all' | 'takeoff' | 'landing' | 'both'
-              )
-            }
-            className="px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+              {t('sites.typeFilterLabel')}
+            </span>
+            <select
+              value={typeFilter}
+              onChange={(e) =>
+                setTypeFilter(
+                  e.target.value as 'all' | 'takeoff' | 'landing' | 'both'
+                )
+              }
+              className="rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            >
+              <option value="all">{t('sites.allTypes')}</option>
+              <option value="takeoff">{t('sites.takeoffOnly')}</option>
+              <option value="landing">{t('sites.landingOnly')}</option>
+              <option value="both">{t('sites.both')}</option>
+            </select>
+          </label>
+
+          <Button
+            onPress={handleResetFilters}
+            isDisabled={!hasActiveFilters}
+            className="inline-flex items-center justify-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
           >
-            <option value="all">{t('sites.allTypes')}</option>
-            <option value="takeoff">{t('sites.takeoffOnly')}</option>
-            <option value="landing">{t('sites.landingOnly')}</option>
-            <option value="both">{t('sites.both')}</option>
-          </select>
+            {t('filters.reset')}
+          </Button>
         </div>
       </div>
 
@@ -219,14 +245,28 @@ export const Sites: React.FC = () => {
         getTextValue={(row) => row.original.name}
       />
 
+      {filteredSites.length === 0 && hasActiveFilters && (
+        <div className="mt-4 text-center">
+          <p className="mb-3 text-sm text-gray-600 dark:text-gray-300">
+            {t('sites.adjustFilters')}
+          </p>
+          <Button
+            onPress={handleResetFilters}
+            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer transition-colors dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+          >
+            {t('filters.reset')}
+          </Button>
+        </div>
+      )}
+
       {/* Create button when no sites and no filters */}
       {filteredSites.length === 0 && !searchQuery && typeFilter === 'all' && (
         <div className="text-center mt-4">
           <Button
             onPress={handleOpenCreateModal}
-            className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer transition-colors"
           >
-            ➕ {t('sites.createFirstSite')}
+            {t('sites.createFirstSite')}
           </Button>
         </div>
       )}
@@ -248,23 +288,26 @@ export const Sites: React.FC = () => {
         role="alertdialog"
         isOpen={!!siteToDelete}
         onClose={() => setSiteToDelete(null)}
-        title={t('sites.deleteSiteConfirm', { name: siteToDelete?.name })}
+        title={t('sites.deleteSiteTitle')}
         size="sm"
       >
-        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+        <p className="text-sm text-gray-700 dark:text-gray-300">
+          {t('sites.deleteSiteDescription', { name: siteToDelete?.name })}
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 pt-4">
           <Button
             onPress={() => setSiteToDelete(null)}
             isDisabled={deleteSite.isPending}
-            className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 rounded hover:bg-gray-300 dark:hover:bg-gray-500 cursor-pointer disabled:opacity-50"
+            className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 rounded hover:bg-gray-300 dark:hover:bg-gray-500 cursor-pointer disabled:opacity-50 transition-colors"
           >
             {t('common.cancel')}
           </Button>
           <Button
             onPress={handleConfirmDelete}
             isDisabled={deleteSite.isPending}
-            className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer disabled:opacity-50"
+            className="inline-flex flex-1 items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer disabled:opacity-50 transition-colors"
           >
-            {deleteSite.isPending ? '⏳ ...' : t('common.delete', 'Supprimer')}
+            {deleteSite.isPending ? '...' : t('common.delete', 'Supprimer')}
           </Button>
         </div>
       </Modal>
