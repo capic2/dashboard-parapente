@@ -11,6 +11,7 @@ import {
   CornerType,
   HeadingPitchRange,
   HorizontalOrigin,
+  ImageMaterialProperty,
   Ion,
   JulianDate,
   LabelStyle,
@@ -153,7 +154,26 @@ const createTubeShape = (radiusMeters: number, segments = 10) =>
 
 const replayTrackTubeShape = createTubeShape(1.8);
 const MIN_TRACK_SEGMENT_DISTANCE_SQUARED = 0.01;
-const REPLAY_TRACK_ALTITUDE_OFFSET_METERS = 8;
+const REPLAY_TRACK_ALTITUDE_OFFSET_METERS = 0;
+
+const createReplayTrackCurtainImage = () => {
+  if (typeof document === 'undefined') return undefined;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 4;
+  canvas.height = 256;
+  const context = canvas.getContext('2d');
+  if (!context) return undefined;
+
+  const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, 'rgba(255, 90, 31, 0.34)');
+  gradient.addColorStop(0.45, 'rgba(255, 145, 77, 0.16)');
+  gradient.addColorStop(1, 'rgba(255, 90, 31, 0)');
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  return canvas.toDataURL();
+};
 
 const liftTrackPosition = (position: Cartesian3) => {
   const cartographic = Cartographic.fromCartesian(position);
@@ -178,6 +198,21 @@ const getRenderableTrackPositions = (positions: Cartesian3[]) =>
 
     return uniquePositions;
   }, []);
+
+const getTrackCurtainMinimumHeights = (
+  positions: Cartesian3[],
+  viewer: CesiumViewer
+) =>
+  positions.map((position) => {
+    const cartographic = Cartographic.fromCartesian(position);
+    const terrainHeight = viewer.scene.globe.getHeight(cartographic);
+    const fallbackHeight = cartographic.height - 120;
+
+    return Math.min(
+      cartographic.height - 1,
+      terrainHeight ?? fallbackHeight
+    );
+  });
 
 /**
  * AccordionSection - Collapsible section component for control panel
@@ -294,6 +329,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
   const trackEntityRef = useRef<Entity | null>(null);
   const trackFallbackEntityRef = useRef<Entity | null>(null);
+  const trackCurtainEntityRef = useRef<Entity | null>(null);
   const trackPositionCountRef = useRef(0);
   const cursorEntityRef = useRef<Entity | null>(null);
   const startEntityRef = useRef<Entity | null>(null);
@@ -328,8 +364,15 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     ) {
       viewer.entities.remove(trackFallbackEntityRef.current);
     }
+    if (
+      trackCurtainEntityRef.current &&
+      viewer.entities.contains(trackCurtainEntityRef.current)
+    ) {
+      viewer.entities.remove(trackCurtainEntityRef.current);
+    }
     trackEntityRef.current = null;
     trackFallbackEntityRef.current = null;
+    trackCurtainEntityRef.current = null;
     trackPositionCountRef.current = 0;
   }, []);
 
@@ -344,9 +387,59 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         return;
       }
 
+      if (
+        !trackFallbackEntityRef.current ||
+        !viewer.entities.contains(trackFallbackEntityRef.current)
+      ) {
+        const curtainImage = createReplayTrackCurtainImage();
+
+        trackCurtainEntityRef.current = viewer.entities.add({
+          wall: {
+            positions: new CallbackProperty(
+              () => getRenderableTrackPositions(visiblePositionsRef.current),
+              false
+            ),
+            minimumHeights: new CallbackProperty(
+              () =>
+                getTrackCurtainMinimumHeights(
+                  getRenderableTrackPositions(visiblePositionsRef.current),
+                  viewer
+                ),
+              false
+            ),
+            material: curtainImage
+              ? new ImageMaterialProperty({
+                  image: curtainImage,
+                  transparent: true,
+                })
+              : Color.fromCssColorString('#ff5a1f').withAlpha(0.16),
+            shadows: ShadowMode.DISABLED,
+          },
+        });
+        trackFallbackEntityRef.current = viewer.entities.add({
+          polyline: {
+            positions: new CallbackProperty(
+              () => getRenderableTrackPositions(visiblePositionsRef.current),
+              false
+            ),
+            width: 3,
+            material: Color.fromCssColorString('#ff5a1f').withAlpha(0.95),
+            depthFailMaterial: Color.fromCssColorString('#ff5a1f').withAlpha(
+              0.5
+            ),
+            shadows: ShadowMode.DISABLED,
+          },
+        });
+      }
+
       if (trackPositionCountRef.current === renderablePositions.length) return;
 
-      removeTrackEntity(viewer);
+      if (
+        trackEntityRef.current &&
+        viewer.entities.contains(trackEntityRef.current)
+      ) {
+        viewer.entities.remove(trackEntityRef.current);
+      }
 
       trackEntityRef.current = viewer.entities.add({
         polylineVolume: {
@@ -354,15 +447,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           shape: replayTrackTubeShape,
           cornerType: CornerType.ROUNDED,
           material: Color.fromCssColorString('#ff5a1f').withAlpha(0.92),
-          shadows: ShadowMode.DISABLED,
-        },
-      });
-      trackFallbackEntityRef.current = viewer.entities.add({
-        polyline: {
-          positions: renderablePositions,
-          width: 3,
-          material: Color.fromCssColorString('#ff5a1f').withAlpha(0.95),
-          depthFailMaterial: Color.fromCssColorString('#ff5a1f').withAlpha(0.5),
           shadows: ShadowMode.DISABLED,
         },
       });
