@@ -2,7 +2,7 @@ packages:
   - 'apps/*'
   - 'libs/*'
 
-enableGlobalVirtualStore: false
+enableGlobalVirtualStore: true
 
 allowBuilds:
   core-js: true

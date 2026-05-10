@@ -18,8 +18,12 @@ Do not assume `pnpm`, `npm`, `npx`, `yarn`, or `corepack` are available in `PATH
 Before running Nx commands, verify local dependencies exist. If `node_modules/.bin/nx` or required packages such as `typescript` are missing, run:
 
 ```bash
-CI=true /home/capic/.local/share/pnpm/pnpm install
+CI=true /home/capic/.local/share/pnpm/pnpm install --frozen-lockfile
 ```
+
+For new worktrees, prefer a bootstrap subagent to perform this dependency readiness check in parallel with implementation work. The subagent should only run install when dependencies are missing or unusable.
+
+This repository can use pnpm's global virtual store to make repeated installs across worktrees faster and reduce duplicated package linking. It improves the bootstrap path when the lockfile and pnpm store are already warm, but every worktree still needs a valid local `node_modules` layout before Nx commands run.
 
 ## Repository
 
@@ -106,3 +110,5 @@ Use a longer Bash timeout for full-repo tasks:
 Lint can produce many warnings while still succeeding. Treat the process exit code as authoritative for pass/fail.
 
 If a command creates temporary build artifacts such as `*.tsbuildinfo`, remove untracked generated artifacts unless they are intentionally part of the task.
+
+`enableGlobalVirtualStore` is expected to improve repeated worktree bootstraps by sharing virtual-store data globally. It does not eliminate all install work: pnpm may still need to create or refresh local project links and lifecycle-built artifacts.
