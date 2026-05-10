@@ -1,11 +1,23 @@
 import preview from '../../../.storybook/preview';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
-import { FlightViewer3D } from './FlightViewer3D';
+
+const FlightViewer3DStoryMock = ({ flightId }: { flightId: string }) => (
+  <div className="flex h-full min-h-[420px] items-center justify-center rounded-xl bg-slate-950 p-6 text-white">
+    <div className="max-w-md text-center">
+      <div className="mb-4 h-32 rounded-full bg-gradient-to-b from-orange-500/30 to-transparent" />
+      <p className="text-lg font-semibold">FlightViewer3D</p>
+      <p className="mt-2 text-sm text-slate-300">
+        Cesium viewer placeholder for Storybook snapshots.
+      </p>
+      <p className="mt-1 text-xs text-slate-500">Flight: {flightId}</p>
+    </div>
+  </div>
+);
 
 const meta = preview.meta({
   title: 'Components/Complex/FlightViewer3D',
-  component: FlightViewer3D,
+  component: FlightViewer3DStoryMock,
   decorators: [
     (Story) => {
       // Create a new QueryClient for each story to avoid cache conflicts
