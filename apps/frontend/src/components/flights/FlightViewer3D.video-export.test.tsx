@@ -8,6 +8,7 @@ const {
   exportStatusMock,
   invalidateQueries,
   mockFlight,
+  entityOptions,
   viewerInstances,
   viewerOptions,
 } = vi.hoisted(() => ({
@@ -15,9 +16,11 @@ const {
   apiPost: vi.fn(),
   exportStatusMock: { current: null as unknown },
   invalidateQueries: vi.fn(),
+  entityOptions: [] as unknown[],
   viewerInstances: [] as {
     render: ReturnType<typeof vi.fn>;
-    scene: {
+    destroy: () => void;
+    scene?: {
       requestRender: ReturnType<typeof vi.fn>;
       render: ReturnType<typeof vi.fn>;
     };
@@ -76,7 +79,21 @@ vi.mock('cesium', () => {
   }
 
   class Viewer {
-    scene = {
+    scene:
+      | {
+          globe: {
+            tilesLoaded: boolean;
+            getHeight: () => number;
+          };
+          requestRender: ReturnType<typeof vi.fn>;
+          render: ReturnType<typeof vi.fn>;
+          screenSpaceCameraController: { enableCollisionDetection: boolean };
+          postProcessStages: {
+            ambientOcclusion: { enabled: boolean; uniforms: object };
+          };
+          light: { intensity: number };
+        }
+      | undefined = {
       globe: {
         tilesLoaded: true,
         getHeight: () => 0,
@@ -84,10 +101,6 @@ vi.mock('cesium', () => {
       requestRender: vi.fn(),
       render: vi.fn(),
       screenSpaceCameraController: { enableCollisionDetection: true },
-      postRender: {
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      },
       postProcessStages: { ambientOcclusion: { enabled: false, uniforms: {} } },
       light: { intensity: 1 },
     };
@@ -96,10 +109,14 @@ vi.mock('cesium', () => {
       position: {},
       setView: vi.fn(),
       moveBackward: vi.fn(),
+      moveForward: vi.fn(),
       flyToBoundingSphere: vi.fn(),
     };
     entities = {
-      add: vi.fn(() => ({})),
+      add: vi.fn((options: unknown) => {
+        entityOptions.push(options);
+        return options;
+      }),
       contains: vi.fn(() => false),
       remove: vi.fn(),
     };
@@ -117,6 +134,7 @@ vi.mock('cesium', () => {
     }
 
     destroy() {
+      this.scene = undefined;
       return undefined;
     }
   }
@@ -276,6 +294,7 @@ describe('FlightViewer3D video export mode', () => {
     invalidateQueries.mockClear();
     viewerInstances.length = 0;
     viewerOptions.length = 0;
+    entityOptions.length = 0;
     mockFlight.video_export_status = null;
     mockFlight.video_export_job_id = null;
     mockFlight.video_file_path = null;
@@ -374,8 +393,39 @@ describe('FlightViewer3D video export mode', () => {
     const frameState = window._setExportFrame?.(1, 2);
 
     expect(frameState).toMatchObject({ progress: 100, tilesLoaded: true });
-    expect(viewer.scene.requestRender).toHaveBeenCalled();
+    expect(viewer.scene?.requestRender).toHaveBeenCalled();
     expect(viewer.render).toHaveBeenCalled();
+  });
+
+  it('ignores stale track callbacks after switching flights', async () => {
+    window._exportMode = 'manual_render';
+
+    const { rerender } = render(
+      <FlightViewer3D key="flight-1" flightId="flight-1" exportOnly />
+    );
+
+    await waitFor(() => {
+      expect(window._setExportFrame).toBeTypeOf('function');
+    });
+
+    window._setExportFrame?.(1, 2);
+    const staleWall = entityOptions.find(
+      (
+        options
+      ): options is {
+        wall: { minimumHeights: { callback: () => unknown } };
+      } =>
+        Boolean(
+          (options as { wall?: { minimumHeights?: unknown } }).wall
+            ?.minimumHeights
+        )
+    );
+
+    expect(staleWall).toBeDefined();
+
+    rerender(<FlightViewer3D key="flight-2" flightId="flight-2" exportOnly />);
+
+    expect(() => staleWall?.wall.minimumHeights.callback()).not.toThrow();
   });
 
   it('starts max quality export after switching mode', async () => {
