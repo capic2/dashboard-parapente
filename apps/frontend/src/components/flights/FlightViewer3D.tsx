@@ -151,7 +151,7 @@ const createTubeShape = (radiusMeters: number, segments = 10) =>
     );
   });
 
-const replayTrackTubeShape = createTubeShape(0.45);
+const replayTrackTubeShape = createTubeShape(1);
 const MIN_TRACK_SEGMENT_DISTANCE_SQUARED = 0.01;
 
 const getRenderableTrackPositions = (positions: Cartesian3[]) =>
@@ -282,6 +282,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const gpxStartTimeRef = useRef<number>(0);
 
   const trackEntityRef = useRef<Entity | null>(null);
+  const trackPositionCountRef = useRef(0);
   const cursorEntityRef = useRef<Entity | null>(null);
   const startEntityRef = useRef<Entity | null>(null);
   const visiblePositionsRef = useRef<Cartesian3[]>([]);
@@ -310,29 +311,34 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       viewer.entities.remove(trackEntityRef.current);
     }
     trackEntityRef.current = null;
+    trackPositionCountRef.current = 0;
   }, []);
 
   const syncTrackEntity = useCallback(
     (viewer: CesiumViewer) => {
-      if (getRenderableTrackPositions(visiblePositionsRef.current).length < 2) {
+      const renderablePositions = getRenderableTrackPositions(
+        visiblePositionsRef.current
+      );
+
+      if (renderablePositions.length < 2) {
         removeTrackEntity(viewer);
         return;
       }
 
-      if (trackEntityRef.current) return;
+      if (trackPositionCountRef.current === renderablePositions.length) return;
+
+      removeTrackEntity(viewer);
 
       trackEntityRef.current = viewer.entities.add({
         polylineVolume: {
-          positions: new CallbackProperty(
-            () => getRenderableTrackPositions(visiblePositionsRef.current),
-            false
-          ),
+          positions: renderablePositions,
           shape: replayTrackTubeShape,
           cornerType: CornerType.ROUNDED,
           material: Color.fromCssColorString('#ff5a1f').withAlpha(0.92),
           shadows: ShadowMode.DISABLED,
         },
       });
+      trackPositionCountRef.current = renderablePositions.length;
     },
     [removeTrackEntity]
   );
