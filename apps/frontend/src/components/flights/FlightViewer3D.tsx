@@ -707,6 +707,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       allPositionsRef.current = positions;
       timestampsRef.current = timestamps;
       currentIndexRef.current = 0;
+      currentTimestampRef.current = null;
+      cameraTargetRef.current = null;
       visiblePositionsRef.current = [];
 
       // Expose data globally for video export (Playwright)
@@ -1497,6 +1499,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const reset = useCallback(() => {
     pause();
     currentIndexRef.current = 0;
+    currentTimestampRef.current = null;
+    cameraTargetRef.current = null;
     setCurrentProgress(0);
     setCurrentElapsedTime(0);
 
