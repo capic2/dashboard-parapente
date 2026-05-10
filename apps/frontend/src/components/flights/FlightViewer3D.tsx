@@ -287,6 +287,41 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const containerDivRef = useRef<HTMLDivElement>(null);
   const viewerUnitsRef = useRef<ViewerUnits>(viewerUnits);
 
+  const removeTrackEntity = useCallback((viewer: CesiumViewer) => {
+    if (
+      trackEntityRef.current &&
+      viewer.entities.contains(trackEntityRef.current)
+    ) {
+      viewer.entities.remove(trackEntityRef.current);
+    }
+    trackEntityRef.current = null;
+  }, []);
+
+  const syncTrackEntity = useCallback(
+    (viewer: CesiumViewer) => {
+      if (visiblePositionsRef.current.length < 2) {
+        removeTrackEntity(viewer);
+        return;
+      }
+
+      if (trackEntityRef.current) return;
+
+      trackEntityRef.current = viewer.entities.add({
+        polylineVolume: {
+          positions: new CallbackProperty(
+            () => visiblePositionsRef.current,
+            false
+          ),
+          shape: replayTrackTubeShape,
+          cornerType: CornerType.ROUNDED,
+          material: Color.fromCssColorString('#ff5a1f').withAlpha(0.92),
+          shadows: ShadowMode.DISABLED,
+        },
+      });
+    },
+    [removeTrackEntity]
+  );
+
   const isExportActive = isVideoExportInProgress(flight?.video_export_status);
   const shouldReadExportStatus = Boolean(
     flight?.video_export_job_id &&
@@ -556,12 +591,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       }
 
       // Clean old entities
-      if (
-        trackEntityRef.current &&
-        viewer.entities.contains(trackEntityRef.current)
-      ) {
-        viewer.entities.remove(trackEntityRef.current);
-      }
+      removeTrackEntity(viewer);
       if (
         cursorEntityRef.current &&
         viewer.entities.contains(cursorEntityRef.current)
@@ -576,22 +606,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       }
 
       viewer.clock.shouldAnimate = false;
-
-      trackEntityRef.current = viewer.entities.add({
-        polylineVolume: {
-          positions: new CallbackProperty(
-            () =>
-              visiblePositionsRef.current.length > 1
-                ? visiblePositionsRef.current
-                : [],
-            false
-          ),
-          shape: replayTrackTubeShape,
-          cornerType: CornerType.ROUNDED,
-          material: Color.fromCssColorString('#ff5a1f').withAlpha(0.92),
-          shadows: ShadowMode.DISABLED,
-        },
-      });
 
       // Create cursor
       cursorPositionPropertyRef.current = new ConstantPositionProperty(
@@ -743,12 +757,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       if (!viewer || viewer.isDestroyed()) return;
 
       try {
-        if (
-          trackEntityRef.current &&
-          viewer.entities.contains(trackEntityRef.current)
-        ) {
-          viewer.entities.remove(trackEntityRef.current);
-        }
+        removeTrackEntity(viewer);
         if (
           cursorEntityRef.current &&
           viewer.entities.contains(cursorEntityRef.current)
@@ -765,7 +774,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         console.debug('Cleanup warning:', e);
       }
 
-      trackEntityRef.current = null;
       cursorEntityRef.current = null;
       startEntityRef.current = null;
       isPlayingRef.current = false;
@@ -1209,6 +1217,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           );
         }
 
+        syncTrackEntity(viewer);
         renderViewerFrame(viewer);
       }
 
@@ -1237,7 +1246,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         tilesLoaded: Boolean(viewer?.scene.globe.tilesLoaded),
       };
     },
-    []
+    [syncTrackEntity]
   );
 
   useEffect(() => {
@@ -1370,10 +1379,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       }
 
       if (viewerRef.current && !viewerRef.current.isDestroyed()) {
+        removeTrackEntity(viewerRef.current);
         viewerRef.current.scene.requestRender();
       }
     }
-  }, [pause]);
+  }, [pause, removeTrackEntity]);
 
   const handleProgressChange = useCallback(
     (value: number) => {
