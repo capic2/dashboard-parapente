@@ -1,5 +1,5 @@
 merge_queue:
-  max_parallel_checks: 1
+  max_parallel_checks: 5
 queue_rules:
   - name: default
     merge_method: squash
@@ -12,11 +12,13 @@ queue_rules:
     queue_conditions:
       - check-success=main
       - check-success=E2E Tests
+      - check-success=Chromatic (Frontend)
       - base=main
       - "#approved-reviews-by>=0"
     merge_conditions:
       - check-success=main
       - check-success=E2E Tests
+      - check-success=Chromatic (Frontend)
       - base=main
       - "#approved-reviews-by>=0"
 pull_request_rules:
@@ -26,6 +28,7 @@ pull_request_rules:
       - label=automerge
       - check-success=main
       - check-success=E2E Tests
+      - check-success=Chromatic (Frontend)
       - "#changes-requested-reviews-by=0"
     actions:
       queue:
@@ -39,6 +42,7 @@ pull_request_rules:
       - author=renovate[bot]
       - check-success=main
       - check-success=E2E Tests
+      - check-success=Chromatic (Frontend)
       - title~=^(fix|chore)\(deps\):.*\[SECURITY\]
     actions:
       queue:
@@ -58,6 +62,7 @@ pull_request_rules:
       - author=renovate[bot]
       - check-success=main
       - check-success=E2E Tests
+      - check-success=Chromatic (Frontend)
       - "title~=^fix\\(deps\\):"
       - -title~=major
     actions:
@@ -78,6 +83,7 @@ pull_request_rules:
       - author=renovate[bot]
       - check-success=main
       - check-success=E2E Tests
+      - check-success=Chromatic (Frontend)
       - "title~=^chore\\(deps\\):"
       - -title~=major
     actions:
@@ -115,20 +121,12 @@ pull_request_rules:
 
           Une fois valide, ajoutez le label automerge pour declencher le merge
           automatique.
-  - name: Auto-update branch avec main
-    conditions:
-      - base=main
-      - -closed
-      - -draft
-      - -conflict
-      - "#commits-behind>0"
-    actions:
-      update: {}
   - name: Label ready-to-merge quand conditions remplies
     conditions:
       - base=main
       - check-success=main
       - check-success=E2E Tests
+      - check-success=Chromatic (Frontend)
       - "#changes-requested-reviews-by=0"
       - -draft
       - -conflict
@@ -142,6 +140,7 @@ pull_request_rules:
       - or:
           - check-failure=main
           - check-failure=E2E Tests
+          - check-failure=Chromatic (Frontend)
     actions:
       label:
         remove:
@@ -199,12 +198,12 @@ merge_protections:
       - base=main
     success_conditions:
       - check-success=E2E Tests
-  - name: Branche a jour avec main
-    description: La branche doit etre a jour avec main
+  - name: Verification Chromatic
+    description: Le check Chromatic doit passer
     if:
       - base=main
     success_conditions:
-      - "#commits-behind=0"
+      - check-success=Chromatic (Frontend)
   - name: Pas de changements demandes
     description: Aucune review avec changements demandes
     if:

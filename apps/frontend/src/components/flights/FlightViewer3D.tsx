@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Entity } from 'cesium';
 import {
-  ArcType,
   BoundingSphere,
   Cartesian2,
   CallbackProperty,
@@ -140,6 +139,17 @@ const interpolatePosition = (
 const renderViewerFrame = (viewer: CesiumViewer) => {
   viewer.scene.requestRender();
   viewer.render();
+};
+
+const createTrackTubeShape = (radiusMeters: number) => {
+  const segments = 12;
+  return Array.from({ length: segments }, (_, index) => {
+    const angle = (index / segments) * Math.PI * 2;
+    return new Cartesian2(
+      Math.cos(angle) * radiusMeters,
+      Math.sin(angle) * radiusMeters
+    );
+  });
 };
 
 /**
@@ -564,17 +574,21 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         viewer.entities.remove(startEntityRef.current);
       }
 
-      // Create polyline
+      // Create an actual 3D tube instead of a screen-space line, so the track
+      // stays visually anchored to terrain while the camera moves.
       polylineEntityRef.current = viewer.entities.add({
-        polyline: {
+        polylineVolume: {
           positions: new CallbackProperty(
-            () => visiblePositionsRef.current,
+            () =>
+              visiblePositionsRef.current.length > 1
+                ? visiblePositionsRef.current
+                : [],
             false
           ),
-          width: 2,
-          material: Color.RED,
-          clampToGround: false,
-          arcType: ArcType.NONE,
+          shape: createTrackTubeShape(4),
+          material: Color.RED.withAlpha(0.92),
+          outline: true,
+          outlineColor: Color.WHITE.withAlpha(0.75),
         },
       });
 
