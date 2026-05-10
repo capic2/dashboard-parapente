@@ -8,14 +8,15 @@ import {
   Cartographic,
   Color,
   ConstantPositionProperty,
+  CornerType,
   HeadingPitchRange,
   HorizontalOrigin,
+  ImageMaterialProperty,
   Ion,
   JulianDate,
   LabelStyle,
   Math as CesiumMath,
   sampleTerrainMostDetailed,
-  SceneTransforms,
   ShadowMode,
   Terrain,
   VerticalOrigin,
@@ -142,69 +143,73 @@ const renderViewerFrame = (viewer: CesiumViewer) => {
   viewer.render();
 };
 
-const resizeTrackCanvas = (canvas: HTMLCanvasElement) => {
-  const rect = canvas.getBoundingClientRect();
-  const pixelRatio = window.devicePixelRatio || 1;
-  const width = Math.max(Math.floor(rect.width * pixelRatio), 1);
-  const height = Math.max(Math.floor(rect.height * pixelRatio), 1);
+const createTubeShape = (radiusMeters: number, segments = 10) =>
+  Array.from({ length: segments }, (_, index) => {
+    const angle = (index / segments) * Math.PI * 2;
+    return new Cartesian2(
+      Math.cos(angle) * radiusMeters,
+      Math.sin(angle) * radiusMeters
+    );
+  });
 
-  if (canvas.width !== width || canvas.height !== height) {
-    canvas.width = width;
-    canvas.height = height;
-  }
+const replayTrackTubeShape = createTubeShape(1.8);
+const MIN_TRACK_SEGMENT_DISTANCE_SQUARED = 0.01;
+const REPLAY_TRACK_ALTITUDE_OFFSET_METERS = 0;
 
-  return { width: rect.width, height: rect.height, pixelRatio };
+const createReplayTrackCurtainImage = () => {
+  if (typeof document === 'undefined') return undefined;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 4;
+  canvas.height = 256;
+  const context = canvas.getContext('2d');
+  if (!context) return undefined;
+
+  const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, 'rgba(255, 90, 31, 0.34)');
+  gradient.addColorStop(0.45, 'rgba(255, 145, 77, 0.16)');
+  gradient.addColorStop(1, 'rgba(255, 90, 31, 0)');
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  return canvas.toDataURL();
 };
 
-const drawProjectedPath = (
-  viewer: CesiumViewer,
-  canvas: HTMLCanvasElement | null,
-  positions: Cartesian3[]
-) => {
-  if (!canvas) return;
+const liftTrackPosition = (position: Cartesian3) => {
+  const cartographic = Cartographic.fromCartesian(position);
+  return Cartesian3.fromRadians(
+    cartographic.longitude,
+    cartographic.latitude,
+    cartographic.height + REPLAY_TRACK_ALTITUDE_OFFSET_METERS
+  );
+};
 
-  const context = canvas.getContext('2d');
-  if (!context) return;
-
-  const { width, height, pixelRatio } = resizeTrackCanvas(canvas);
-  context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-  context.clearRect(0, 0, width, height);
-
-  if (positions.length < 2) return;
-
-  const drawLine = (lineWidth: number, strokeStyle: string) => {
-    context.beginPath();
-    context.lineCap = 'round';
-    context.lineJoin = 'round';
-    context.lineWidth = lineWidth;
-    context.strokeStyle = strokeStyle;
-
-    let isDrawing = false;
-    for (const position of positions) {
-      const screenPosition = SceneTransforms.worldToWindowCoordinates(
-        viewer.scene,
-        position
-      );
-
-      if (!screenPosition) {
-        isDrawing = false;
-        continue;
-      }
-
-      if (isDrawing) {
-        context.lineTo(screenPosition.x, screenPosition.y);
-      } else {
-        context.moveTo(screenPosition.x, screenPosition.y);
-        isDrawing = true;
-      }
+const getRenderableTrackPositions = (positions: Cartesian3[]) =>
+  positions.reduce<Cartesian3[]>((uniquePositions, rawPosition) => {
+    const position = liftTrackPosition(rawPosition);
+    const previousPosition = uniquePositions[uniquePositions.length - 1];
+    if (
+      !previousPosition ||
+      Cartesian3.distanceSquared(previousPosition, position) >
+        MIN_TRACK_SEGMENT_DISTANCE_SQUARED
+    ) {
+      uniquePositions.push(position);
     }
 
-    context.stroke();
-  };
+    return uniquePositions;
+  }, []);
 
-  drawLine(7, 'rgba(255, 255, 255, 0.85)');
-  drawLine(4, 'rgba(239, 68, 68, 0.98)');
-};
+const getTrackCurtainMinimumHeights = (
+  positions: Cartesian3[],
+  viewer: CesiumViewer
+) =>
+  positions.map((position) => {
+    const cartographic = Cartographic.fromCartesian(position);
+    const terrainHeight = viewer.scene.globe.getHeight(cartographic);
+    const fallbackHeight = cartographic.height - 120;
+
+    return Math.min(cartographic.height - 1, terrainHeight ?? fallbackHeight);
+  });
 
 /**
  * AccordionSection - Collapsible section component for control panel
@@ -319,7 +324,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const realTimeStartRef = useRef<number>(0);
   const gpxStartTimeRef = useRef<number>(0);
 
-  const trackCanvasRef = useRef<HTMLCanvasElement>(null);
+  const trackEntityRef = useRef<Entity | null>(null);
+  const trackFallbackEntityRef = useRef<Entity | null>(null);
+  const trackCurtainEntityRef = useRef<Entity | null>(null);
+  const trackPositionCountRef = useRef(0);
   const cursorEntityRef = useRef<Entity | null>(null);
   const startEntityRef = useRef<Entity | null>(null);
   const visiblePositionsRef = useRef<Cartesian3[]>([]);
@@ -339,6 +347,109 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const currentTimestampRef = useRef<number | null>(null);
   const containerDivRef = useRef<HTMLDivElement>(null);
   const viewerUnitsRef = useRef<ViewerUnits>(viewerUnits);
+
+  const removeTrackEntity = useCallback((viewer: CesiumViewer) => {
+    if (
+      trackEntityRef.current &&
+      viewer.entities.contains(trackEntityRef.current)
+    ) {
+      viewer.entities.remove(trackEntityRef.current);
+    }
+    if (
+      trackFallbackEntityRef.current &&
+      viewer.entities.contains(trackFallbackEntityRef.current)
+    ) {
+      viewer.entities.remove(trackFallbackEntityRef.current);
+    }
+    if (
+      trackCurtainEntityRef.current &&
+      viewer.entities.contains(trackCurtainEntityRef.current)
+    ) {
+      viewer.entities.remove(trackCurtainEntityRef.current);
+    }
+    trackEntityRef.current = null;
+    trackFallbackEntityRef.current = null;
+    trackCurtainEntityRef.current = null;
+    trackPositionCountRef.current = 0;
+  }, []);
+
+  const syncTrackEntity = useCallback(
+    (viewer: CesiumViewer) => {
+      const renderablePositions = getRenderableTrackPositions(
+        visiblePositionsRef.current
+      );
+
+      if (renderablePositions.length < 2) {
+        removeTrackEntity(viewer);
+        return;
+      }
+
+      if (
+        !trackFallbackEntityRef.current ||
+        !viewer.entities.contains(trackFallbackEntityRef.current)
+      ) {
+        const curtainImage = createReplayTrackCurtainImage();
+
+        trackCurtainEntityRef.current = viewer.entities.add({
+          wall: {
+            positions: new CallbackProperty(
+              () => getRenderableTrackPositions(visiblePositionsRef.current),
+              false
+            ),
+            minimumHeights: new CallbackProperty(
+              () =>
+                getTrackCurtainMinimumHeights(
+                  getRenderableTrackPositions(visiblePositionsRef.current),
+                  viewer
+                ),
+              false
+            ),
+            material: curtainImage
+              ? new ImageMaterialProperty({
+                  image: curtainImage,
+                  transparent: true,
+                })
+              : Color.fromCssColorString('#ff5a1f').withAlpha(0.16),
+            shadows: ShadowMode.DISABLED,
+          },
+        });
+        trackFallbackEntityRef.current = viewer.entities.add({
+          polyline: {
+            positions: new CallbackProperty(
+              () => getRenderableTrackPositions(visiblePositionsRef.current),
+              false
+            ),
+            width: 3,
+            material: Color.fromCssColorString('#ff5a1f').withAlpha(0.95),
+            depthFailMaterial:
+              Color.fromCssColorString('#ff5a1f').withAlpha(0.5),
+            shadows: ShadowMode.DISABLED,
+          },
+        });
+      }
+
+      if (trackPositionCountRef.current === renderablePositions.length) return;
+
+      if (
+        trackEntityRef.current &&
+        viewer.entities.contains(trackEntityRef.current)
+      ) {
+        viewer.entities.remove(trackEntityRef.current);
+      }
+
+      trackEntityRef.current = viewer.entities.add({
+        polylineVolume: {
+          positions: renderablePositions,
+          shape: replayTrackTubeShape,
+          cornerType: CornerType.ROUNDED,
+          material: Color.fromCssColorString('#ff5a1f').withAlpha(0.92),
+          shadows: ShadowMode.DISABLED,
+        },
+      });
+      trackPositionCountRef.current = renderablePositions.length;
+    },
+    [removeTrackEntity]
+  );
 
   const isExportActive = isVideoExportInProgress(flight?.video_export_status);
   const shouldReadExportStatus = Boolean(
@@ -526,26 +637,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     };
   }, [viewerReady, flightId]);
 
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer || !viewerReady) return;
-
-    const drawTrack = () => {
-      drawProjectedPath(
-        viewer,
-        trackCanvasRef.current,
-        visiblePositionsRef.current
-      );
-    };
-
-    viewer.scene.postRender.addEventListener(drawTrack);
-    drawTrack();
-
-    return () => {
-      viewer.scene.postRender.removeEventListener(drawTrack);
-    };
-  }, [viewerReady]);
-
   // Réinitialiser les offsets quand on change de vol
   useEffect(() => {
     setElevationOffset(0);
@@ -600,7 +691,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
 
     const viewer = viewerRef.current;
-    const trackCanvas = trackCanvasRef.current;
 
     try {
       // Convert GPX coordinates to Cartesian3 avec offset d'élévation
@@ -617,7 +707,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       allPositionsRef.current = positions;
       timestampsRef.current = timestamps;
       currentIndexRef.current = 0;
-      visiblePositionsRef.current = [positions[0]];
+      currentTimestampRef.current = null;
+      cameraTargetRef.current = null;
+      visiblePositionsRef.current = [];
 
       // Expose data globally for video export (Playwright)
       if (typeof window !== 'undefined' && window._exportMode) {
@@ -629,9 +721,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         window._cesiumViewer = viewer;
       }
 
-      drawProjectedPath(viewer, trackCanvas, visiblePositionsRef.current);
-
       // Clean old entities
+      removeTrackEntity(viewer);
       if (
         cursorEntityRef.current &&
         viewer.entities.contains(cursorEntityRef.current)
@@ -797,6 +888,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       if (!viewer || viewer.isDestroyed()) return;
 
       try {
+        removeTrackEntity(viewer);
         if (
           cursorEntityRef.current &&
           viewer.entities.contains(cursorEntityRef.current)
@@ -818,7 +910,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       isPlayingRef.current = false;
       currentIndexRef.current = 0;
       visiblePositionsRef.current = [];
-      drawProjectedPath(viewer, trackCanvas, visiblePositionsRef.current);
     };
     // Intentionally exclude site camera fields to avoid replay reset after save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1257,12 +1348,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           );
         }
 
+        syncTrackEntity(viewer);
         renderViewerFrame(viewer);
-        drawProjectedPath(
-          viewer,
-          trackCanvasRef.current,
-          visiblePositionsRef.current
-        );
       }
 
       let progress = 0;
@@ -1290,7 +1377,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         tilesLoaded: Boolean(viewer?.scene.globe.tilesLoaded),
       };
     },
-    []
+    [syncTrackEntity]
   );
 
   useEffect(() => {
@@ -1412,26 +1499,24 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const reset = useCallback(() => {
     pause();
     currentIndexRef.current = 0;
+    currentTimestampRef.current = null;
+    cameraTargetRef.current = null;
     setCurrentProgress(0);
     setCurrentElapsedTime(0);
 
     if (allPositionsRef.current.length > 0) {
-      visiblePositionsRef.current = [allPositionsRef.current[0]];
+      visiblePositionsRef.current = [];
 
       if (cursorPositionPropertyRef.current) {
         cursorPositionPropertyRef.current.setValue(allPositionsRef.current[0]);
       }
 
       if (viewerRef.current && !viewerRef.current.isDestroyed()) {
+        removeTrackEntity(viewerRef.current);
         viewerRef.current.scene.requestRender();
-        drawProjectedPath(
-          viewerRef.current,
-          trackCanvasRef.current,
-          visiblePositionsRef.current
-        );
       }
     }
-  }, [pause]);
+  }, [pause, removeTrackEntity]);
 
   const handleProgressChange = useCallback(
     (value: number) => {
@@ -2474,11 +2559,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         className={
           exportOnly ? 'absolute inset-0 h-full w-full' : 'h-full w-full'
         }
-      />
-      <canvas
-        ref={trackCanvasRef}
-        className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
-        aria-hidden="true"
       />
     </div>
   );

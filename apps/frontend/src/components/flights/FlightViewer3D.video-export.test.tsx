@@ -66,6 +66,10 @@ vi.mock('cesium', () => {
     static WHITE = new Color();
     static GREEN = new Color();
 
+    static fromCssColorString() {
+      return new Color();
+    }
+
     withAlpha() {
       return this;
     }
@@ -118,7 +122,6 @@ vi.mock('cesium', () => {
   }
 
   return {
-    ArcType: { NONE: 0 },
     BoundingSphere: { fromPoints: () => ({ radius: 100 }) },
     Cartesian2: class Cartesian2 {
       constructor(
@@ -138,6 +141,7 @@ vi.mock('cesium', () => {
     ConstantPositionProperty: class ConstantPositionProperty {
       setValue = vi.fn();
     },
+    CornerType: { ROUNDED: 0 },
     Entity: class Entity {
       id = 'entity';
     },
@@ -154,9 +158,6 @@ vi.mock('cesium', () => {
     LabelStyle: { FILL_AND_OUTLINE: 0 },
     Math: { toRadians: (value: number) => (value * globalThis.Math.PI) / 180 },
     sampleTerrainMostDetailed: vi.fn(),
-    SceneTransforms: {
-      worldToWindowCoordinates: () => ({ x: 0, y: 0 }),
-    },
     ShadowMode: { ENABLED: 1, DISABLED: 0 },
     Terrain: { fromWorldTerrain: () => ({}) },
     VerticalOrigin: { BOTTOM: 0 },
