@@ -1,7 +1,7 @@
 import { FigureWrapper } from '../../.storybook/FigureWrapper.tsx';
 import preview from '../../.storybook/preview.tsx';
 import { http, HttpResponse } from 'msw';
-import { Default, Loading, Error } from './Dashboard.stories.tsx';
+import { Default, Loading, Empty, Error } from './Dashboard.stories.tsx';
 
 const mockSites = {
   sites: [
@@ -134,6 +134,9 @@ export const DashboardChromatic = meta.story({
       </FigureWrapper>
       <FigureWrapper title={Loading.composed.name}>
         <Loading.Component />
+      </FigureWrapper>
+      <FigureWrapper title={Empty.composed.name}>
+        <Empty.Component />
       </FigureWrapper>
       <FigureWrapper title={Error.composed.name}>
         <Error.Component />

@@ -158,7 +158,7 @@ describe('Header theme controls', () => {
     fireEvent.click(desktopButton);
 
     const darkOption = screen.getByRole('button', {
-      name: '🌙 Dark',
+      name: 'Dark',
     });
     fireEvent.click(darkOption);
 
@@ -177,7 +177,7 @@ describe('Header theme controls', () => {
     fireEvent.click(mobileButton);
 
     const autoOption = screen.getByRole('button', {
-      name: '🔄 Auto',
+      name: 'Auto',
     });
     fireEvent.click(autoOption);
 
@@ -189,8 +189,6 @@ describe('Header theme controls', () => {
 
     render(<Header />);
 
-    expect(
-      screen.queryByRole('link', { name: 'Exports' })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Exports' })).toBeNull();
   });
 });

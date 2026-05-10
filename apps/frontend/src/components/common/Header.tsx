@@ -12,6 +12,7 @@ import {
   ModalOverlay,
   Popover,
 } from 'react-aria-components';
+import { MonitorCog, Moon, Sun } from 'lucide-react';
 import { Button } from '@dashboard-parapente/design-system';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore, type ThemePreference } from '../../stores/themeStore';
@@ -22,10 +23,10 @@ const linkClass =
 const drawerLinkClass =
   'block py-3 px-4 min-h-11 rounded-md text-gray-700 dark:text-gray-200 text-base transition-all hover:bg-gray-100 dark:hover:bg-gray-700 [&.active]:bg-sky-600 [&.active]:text-white';
 
-const themeIcons: Record<ThemePreference, string> = {
-  light: '☀️',
-  dark: '🌙',
-  auto: '🔄',
+const themeIcons = {
+  light: Sun,
+  dark: Moon,
+  auto: MonitorCog,
 };
 
 const themeOptions: ThemePreference[] = ['light', 'dark', 'auto'];
@@ -94,15 +95,13 @@ export default function Header() {
     setThemePreference(next);
   }
 
-  const themeLabel = `${themeIcons[themePreference]} ${t(
-    `settings.languageTheme.${themePreference}`
-  )}`;
+  const ActiveThemeIcon = themeIcons[themePreference];
   const themeTooltip = `${t('settings.languageTheme.theme')} : ${t(
     `settings.languageTheme.${themePreference}`
   )}`;
 
   return (
-    <header className="bg-white dark:bg-gray-800 rounded-xl p-4 mb-4 shadow-lg flex justify-between items-center gap-2.5">
+    <header className="mb-4 flex items-center justify-between gap-2.5 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg shadow-slate-200/60 dark:border-slate-700 dark:bg-slate-900/95 dark:shadow-black/25">
       <h1 className="text-2xl sm:text-xl text-sky-600 dark:text-sky-400 font-semibold min-w-0 sm:min-w-[200px] m-0 truncate">
         {t('header.title')}
       </h1>
@@ -112,17 +111,19 @@ export default function Header() {
         {navLinks(linkClass)}
         <MenuTrigger>
           <AriaButton
-            className="px-3 py-1.5 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100 text-sm font-medium transition-all hover:bg-gray-300 dark:hover:bg-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100 text-sm font-medium transition-all hover:bg-gray-300 dark:hover:bg-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
             aria-label={`${t('settings.languageTheme.theme')} : ${t(
               `settings.languageTheme.${themePreference}`
             )}`}
           >
-            {themeLabel}
+            <ActiveThemeIcon className="h-4 w-4" aria-hidden="true" />
+            {t(`settings.languageTheme.${themePreference}`)}
           </AriaButton>
           <Popover className="z-40 mt-2 w-44 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg p-1 theme-menu-popin">
             <Menu className="outline-none">
               {themeOptions.map((theme) => {
                 const isActive = theme === themePreference;
+                const ThemeIcon = themeIcons[theme];
                 return (
                   <MenuItem
                     key={theme}
@@ -133,8 +134,9 @@ export default function Header() {
                         : 'text-gray-700 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                   >
-                    <span>
-                      {themeIcons[theme]} {t(`settings.languageTheme.${theme}`)}
+                    <span className="flex items-center gap-2">
+                      <ThemeIcon className="h-4 w-4" aria-hidden="true" />
+                      {t(`settings.languageTheme.${theme}`)}
                     </span>
                     {isActive && <span aria-hidden="true">✓</span>}
                   </MenuItem>
@@ -173,13 +175,14 @@ export default function Header() {
               aria-hidden="true"
               className="text-lg leading-none inline-block"
             >
-              {themeIcons[themePreference]}
+              <ActiveThemeIcon className="h-5 w-5" aria-hidden="true" />
             </span>
           </AriaButton>
           <Popover className="z-40 mt-2 w-44 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg p-1 theme-menu-popin">
             <Menu className="outline-none">
               {themeOptions.map((theme) => {
                 const isActive = theme === themePreference;
+                const ThemeIcon = themeIcons[theme];
                 return (
                   <MenuItem
                     key={theme}
@@ -190,8 +193,9 @@ export default function Header() {
                         : 'text-gray-700 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                   >
-                    <span>
-                      {themeIcons[theme]} {t(`settings.languageTheme.${theme}`)}
+                    <span className="flex items-center gap-2">
+                      <ThemeIcon className="h-4 w-4" aria-hidden="true" />
+                      {t(`settings.languageTheme.${theme}`)}
                     </span>
                     {isActive && <span aria-hidden="true">✓</span>}
                   </MenuItem>
@@ -225,7 +229,7 @@ export default function Header() {
           >
             <Modal className="fixed top-0 left-0 h-full w-64 bg-white dark:bg-gray-800 shadow-xl outline-none animate-[slide-in_0.2s_ease-out]">
               <Dialog className="h-full flex flex-col outline-none">
-                {({ close }) => (
+                {({ close }: { close: () => void }) => (
                   <>
                     <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
                       <span className="text-lg font-semibold text-gray-800 dark:text-gray-100">

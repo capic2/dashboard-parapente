@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
+import { Cloud, Thermometer, Wind } from 'lucide-react';
 import { WindIndicator } from '../common/WindIndicator';
 import CacheTimestamp from '../common/CacheTimestamp';
 import type { WeatherData } from '../../types';
@@ -8,20 +9,20 @@ import type { Site } from '@dashboard-parapente/shared-types';
 const getVerdictClass = (verdict: string): string => {
   const v = verdict.toLowerCase();
   if (v === 'bon')
-    return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200';
+    return 'bg-emerald-100 dark:bg-emerald-900/35 text-emerald-800 dark:text-emerald-200 ring-emerald-200 dark:ring-emerald-800';
   if (v === 'moyen')
-    return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200';
+    return 'bg-amber-100 dark:bg-amber-900/35 text-amber-800 dark:text-amber-200 ring-amber-200 dark:ring-amber-800';
   if (v === 'limite')
-    return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200';
-  return 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-100';
+    return 'bg-orange-100 dark:bg-orange-900/35 text-orange-800 dark:text-orange-200 ring-orange-200 dark:ring-orange-800';
+  return 'bg-red-100 dark:bg-red-900/35 text-red-900 dark:text-red-100 ring-red-200 dark:ring-red-800';
 };
 
-const getVerdictEmoji = (verdict: string): string => {
+const getVerdictDotClass = (verdict: string): string => {
   const v = verdict.toLowerCase();
-  if (v === 'bon') return '🟢';
-  if (v === 'moyen') return '🟡';
-  if (v === 'limite') return '🟠';
-  return '🔴';
+  if (v === 'bon') return 'bg-emerald-500';
+  if (v === 'moyen') return 'bg-amber-500';
+  if (v === 'limite') return 'bg-orange-500';
+  return 'bg-red-500';
 };
 
 export interface SiteWeatherEntry {
@@ -52,22 +53,22 @@ function SiteConditionCard({
     <button
       type="button"
       onClick={handleClick}
-      className="w-full text-left bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border border-gray-200 dark:border-gray-700 hover:border-sky-400 dark:hover:border-sky-500 hover:shadow-lg transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900"
+      className="w-full cursor-pointer rounded-2xl border border-slate-200 bg-white/90 p-4 text-left shadow-md shadow-slate-200/50 transition-colors hover:border-sky-300 hover:bg-white dark:border-slate-700 dark:bg-slate-900/90 dark:shadow-black/20 dark:hover:border-sky-700 dark:hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900"
     >
       {/* Site name + orientation */}
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-bold text-gray-900 dark:text-white truncate">
+        <h3 className="text-sm font-black text-slate-950 dark:text-white truncate">
           {site.name}
         </h3>
         {site.orientation && (
-          <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-medium ml-2 shrink-0">
+          <span className="ml-2 shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
             {site.orientation}
           </span>
         )}
       </div>
 
       {isLoading && (
-        <div className="py-4 text-center text-gray-400 dark:text-gray-400 text-sm">
+        <div className="py-4 text-center text-sm text-slate-500 dark:text-slate-400">
           {t('common.loading')}
         </div>
       )}
@@ -82,31 +83,41 @@ function SiteConditionCard({
         <>
           {/* Score + verdict */}
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-2xl font-bold text-sky-600 dark:text-sky-400">
-              {weather.score != null ? weather.score : weather.para_index}
+            <span className="text-3xl font-black tracking-tight text-sky-600 dark:text-sky-400">
+              {weather.score ?? weather.para_index}
             </span>
-            <span className="text-sm text-gray-400 dark:text-gray-400">
+            <span className="text-sm font-semibold text-slate-400 dark:text-slate-500">
               /100
             </span>
             <span
-              className={`ml-auto px-2 py-0.5 rounded-full text-xs font-semibold ${getVerdictClass(weather.verdict)}`}
+              className={`ml-auto inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${getVerdictClass(weather.verdict)}`}
             >
-              {getVerdictEmoji(weather.verdict)} {weather.verdict.toUpperCase()}
+              <span
+                className={`h-2 w-2 rounded-full ${getVerdictDotClass(weather.verdict)}`}
+                aria-hidden="true"
+              />
+              {weather.verdict.toUpperCase()}
             </span>
           </div>
 
           {/* Metrics */}
           <div className="space-y-1.5 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-500 dark:text-gray-400">🌡️</span>
-              <span className="font-medium text-gray-900 dark:text-white">
+              <Thermometer
+                className="h-4 w-4 text-slate-500 dark:text-slate-400"
+                aria-hidden="true"
+              />
+              <span className="font-bold text-slate-950 dark:text-white">
                 {weather.temperature}°C
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-500 dark:text-gray-400">💨</span>
+              <Wind
+                className="h-4 w-4 text-slate-500 dark:text-slate-400"
+                aria-hidden="true"
+              />
               <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-900 dark:text-white">
+                <span className="font-bold text-slate-950 dark:text-white">
                   {weather.wind_speed} km/h
                 </span>
                 {site.orientation && (
@@ -122,8 +133,11 @@ function SiteConditionCard({
             </div>
             {weather.conditions && (
               <div className="flex justify-between">
-                <span className="text-gray-500 dark:text-gray-400">☁️</span>
-                <span className="font-medium text-gray-900 dark:text-white truncate ml-2">
+                <Cloud
+                  className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400"
+                  aria-hidden="true"
+                />
+                <span className="ml-2 truncate font-bold text-slate-950 dark:text-white">
                   {weather.conditions}
                 </span>
               </div>
@@ -131,7 +145,7 @@ function SiteConditionCard({
           </div>
 
           {/* Cache timestamp */}
-          <div className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+          <div className="mt-3 border-t border-slate-100 pt-2 dark:border-slate-700">
             <CacheTimestamp cachedAt={weather.cached_at} />
           </div>
         </>
@@ -149,7 +163,11 @@ export default function AllSitesConditions({
 
   return (
     <div>
-      <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
+      <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+        <Cloud
+          className="h-4 w-4 text-sky-600 dark:text-sky-400"
+          aria-hidden="true"
+        />
         {t(
           'dashboard.allSitesConditions',
           'Conditions actuelles — tous les sites'
