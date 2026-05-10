@@ -23,6 +23,7 @@ jobs:
     timeout-minutes: 30
     env:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      NODE_OPTIONS: --preserve-symlinks
 
     steps:
       - name: 🏷️ Remove ready-to-merge label
@@ -202,6 +203,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     if: github.event_name == 'pull_request'
+    env:
+      NODE_OPTIONS: --preserve-symlinks
 
     steps:
       - name: 📥 Checkout
