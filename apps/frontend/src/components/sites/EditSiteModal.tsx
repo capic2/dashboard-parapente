@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextField, Label, Input } from 'react-aria-components';
 import { Button } from '@dashboard-parapente/design-system';
+import { Camera, Loader2, Save } from 'lucide-react';
 import type {
   Site,
   SiteUpdate,
@@ -113,7 +114,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
   const parseNumericFields = () => {
     const lat = parseFloat(latitudeRaw) || 0;
     const lon = parseFloat(longitudeRaw) || 0;
-    const elev = parseInt(elevationRaw) || 0;
+    const elev = parseInt(elevationRaw, 10) || 0;
     setFormData((prev) => ({
       ...prev,
       latitude: lat,
@@ -180,8 +181,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         });
       }
       onClose();
-    } catch (error) {
-      console.error('Failed to save site:', error);
+    } catch {
       alert(t('editSite.saveError'));
     } finally {
       setIsSaving(false);
@@ -202,7 +202,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         <TextField
           isRequired
           value={formData.name}
-          onChange={(v) => setFormData({ ...formData, name: v })}
+          onChange={(v: string) => setFormData({ ...formData, name: v })}
           className="flex flex-col gap-1"
         >
           <Label className={labelClass}>{t('editSite.siteName')} *</Label>
@@ -217,7 +217,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         {/* Code */}
         <TextField
           value={formData.code}
-          onChange={(v) => setFormData({ ...formData, code: v })}
+          onChange={(v: string) => setFormData({ ...formData, code: v })}
           isDisabled={!!site}
           className="flex flex-col gap-1"
         >
@@ -278,7 +278,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         </div>
 
         {/* GPS Coordinates */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <TextField
             isRequired
             value={latitudeRaw}
@@ -320,10 +320,10 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         </div>
 
         {/* Region & Country */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <TextField
             value={formData.region}
-            onChange={(v) => setFormData({ ...formData, region: v })}
+            onChange={(v: string) => setFormData({ ...formData, region: v })}
             className="flex flex-col gap-1"
           >
             <Label className={labelClass}>{t('editSite.region')}</Label>
@@ -379,7 +379,11 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         {/* Camera Settings */}
         <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-700">
           <h4 className="text-sm font-semibold mb-3 dark:text-gray-200">
-            📷 {t('editSite.camera3D')}
+            <Camera
+              className="mr-1.5 inline h-4 w-4 align-[-2px]"
+              aria-hidden="true"
+            />
+            {t('editSite.camera3D')}
           </h4>
 
           <div className="mb-3">
@@ -395,7 +399,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  camera_angle: parseInt(e.target.value),
+                  camera_angle: parseInt(e.target.value, 10),
                 })
               }
               className="w-full"
@@ -421,7 +425,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  camera_distance: parseInt(e.target.value),
+                  camera_distance: parseInt(e.target.value, 10),
                 })
               }
               className="w-full"
@@ -445,7 +449,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  camera_close_zoom_percent: parseInt(e.target.value),
+                  camera_close_zoom_percent: parseInt(e.target.value, 10),
                 })
               }
               className="w-full"
@@ -469,7 +473,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  camera_transition_percent: parseInt(e.target.value),
+                  camera_transition_percent: parseInt(e.target.value, 10),
                 })
               }
               className="w-full"
@@ -516,12 +520,15 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           </Button>
           <Button
             type="submit"
-            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
+            className="inline-flex flex-1 items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 cursor-pointer transition-colors"
             isDisabled={isSaving}
           >
-            {isSaving
-              ? `⏳ ${t('editSite.saving')}`
-              : `💾 ${t('editSite.saveButton')}`}
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Save className="h-4 w-4" aria-hidden="true" />
+            )}
+            {isSaving ? t('editSite.saving') : t('editSite.saveButton')}
           </Button>
         </div>
       </form>

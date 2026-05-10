@@ -2,6 +2,15 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Site } from '@dashboard-parapente/shared-types';
 import { Button } from '@dashboard-parapente/design-system';
+import {
+  Compass,
+  List,
+  Map,
+  MapPin,
+  Pencil,
+  Plane,
+  Trash2,
+} from 'lucide-react';
 
 interface SiteCardProps {
   site: Site;
@@ -48,7 +57,7 @@ export const SiteCard: React.FC<SiteCardProps> = ({
   const typeBadge = getTypeBadge();
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow h-full flex flex-col">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow duration-200 h-full flex flex-col">
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
@@ -72,8 +81,11 @@ export const SiteCard: React.FC<SiteCardProps> = ({
       <div className="space-y-2 mb-4 flex-1">
         {/* GPS Coordinates */}
         {site.latitude && site.longitude && (
-          <div className="text-sm">
-            <span className="text-gray-600 dark:text-gray-300">📍 </span>
+          <div className="flex items-center gap-2 text-sm">
+            <MapPin
+              className="h-4 w-4 shrink-0 text-gray-600 dark:text-gray-300"
+              aria-hidden="true"
+            />
             <span className="text-gray-800 dark:text-gray-100">
               {site.latitude.toFixed(4)}°N, {site.longitude.toFixed(4)}°E
             </span>
@@ -87,8 +99,11 @@ export const SiteCard: React.FC<SiteCardProps> = ({
 
         {/* Orientation */}
         {site.orientation && (
-          <div className="text-sm">
-            <span className="text-gray-600 dark:text-gray-300">🧭 </span>
+          <div className="flex items-center gap-2 text-sm">
+            <Compass
+              className="h-4 w-4 shrink-0 text-gray-600 dark:text-gray-300"
+              aria-hidden="true"
+            />
             <span className="text-gray-800 dark:text-gray-100">
               {t('sites.orientation')} {site.orientation}
             </span>
@@ -97,8 +112,11 @@ export const SiteCard: React.FC<SiteCardProps> = ({
 
         {/* Region */}
         {site.region && (
-          <div className="text-sm">
-            <span className="text-gray-600 dark:text-gray-300">🗺️ </span>
+          <div className="flex items-center gap-2 text-sm">
+            <Map
+              className="h-4 w-4 shrink-0 text-gray-600 dark:text-gray-300"
+              aria-hidden="true"
+            />
             <span className="text-gray-800 dark:text-gray-100">
               {site.region}
             </span>
@@ -106,8 +124,11 @@ export const SiteCard: React.FC<SiteCardProps> = ({
         )}
 
         {/* Flight count */}
-        <div className="text-sm">
-          <span className="text-gray-600 dark:text-gray-300">✈️ </span>
+        <div className="flex items-center gap-2 text-sm">
+          <Plane
+            className="h-4 w-4 shrink-0 text-gray-600 dark:text-gray-300"
+            aria-hidden="true"
+          />
           <span className="text-gray-800 dark:text-gray-100">
             {flightCount} {t('common.flight', { count: flightCount })}
           </span>
@@ -127,25 +148,27 @@ export const SiteCard: React.FC<SiteCardProps> = ({
       <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t dark:border-gray-700">
         <Button
           onClick={() => onEdit(site)}
-          className="flex-1 px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+          className="inline-flex flex-1 items-center justify-center gap-1.5 px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer transition-colors"
           title={t('sites.editSite')}
         >
-          ✏️ {t('common.edit')}
+          <Pencil className="h-4 w-4" aria-hidden="true" />
+          {t('common.edit')}
         </Button>
         <Button
           onClick={() => onViewFlights(site)}
-          className="flex-1 px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
+          className="inline-flex flex-1 items-center justify-center gap-1.5 px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 cursor-pointer transition-colors"
           title={t('sites.viewFlights')}
         >
-          📋 {t('header.flights')}
+          <List className="h-4 w-4" aria-hidden="true" />
+          {t('header.flights')}
         </Button>
         <Button
           onClick={() => onDelete(site)}
-          className="px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+          className="inline-flex items-center justify-center px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer transition-colors"
           title={t('sites.deleteSite')}
           aria-label={t('sites.deleteSite')}
         >
-          <span aria-hidden="true">🗑️</span>
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
         </Button>
       </div>
     </div>
