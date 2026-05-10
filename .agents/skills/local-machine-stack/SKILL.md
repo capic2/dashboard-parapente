@@ -23,7 +23,7 @@ CI=true /home/capic/.local/share/pnpm/pnpm install --frozen-lockfile
 
 For new worktrees, prefer a bootstrap subagent to perform this dependency readiness check in parallel with implementation work. The subagent should only run install when dependencies are missing or unusable.
 
-This repository can use pnpm's global virtual store to make repeated installs across worktrees faster and reduce duplicated package linking. It improves the bootstrap path when the lockfile and pnpm store are already warm, but every worktree still needs a valid local `node_modules` layout before Nx commands run.
+Do not enable pnpm's global virtual store in this repository. Nx and Knip expect dependency resolution from the workspace-local `node_modules` layout, and CI can fail when packages resolve through a global virtual store path.
 
 ## Repository
 
@@ -111,4 +111,4 @@ Lint can produce many warnings while still succeeding. Treat the process exit co
 
 If a command creates temporary build artifacts such as `*.tsbuildinfo`, remove untracked generated artifacts unless they are intentionally part of the task.
 
-`enableGlobalVirtualStore` is expected to improve repeated worktree bootstraps by sharing virtual-store data globally. It does not eliminate all install work: pnpm may still need to create or refresh local project links and lifecycle-built artifacts.
+Keep `enableGlobalVirtualStore: false` in `pnpm-workspace.yaml` so workspace tools resolve dependencies from local project links.

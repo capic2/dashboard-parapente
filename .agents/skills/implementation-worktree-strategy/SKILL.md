@@ -29,7 +29,7 @@ Subagent responsibility:
 - Verify that local dependencies are usable before Nx commands run.
 - Check for `node_modules/.bin/nx` and representative required packages such as `typescript`.
 - Run `CI=true /home/capic/.local/share/pnpm/pnpm install --frozen-lockfile` only when dependencies are missing or unusable.
-- Prefer the existing pnpm global virtual store when configured; do not run install just because the worktree is new.
+- Do not rely on pnpm's global virtual store; each worktree must have a workspace-local dependency layout usable by Nx and Knip.
 - Run a lightweight readiness command after install/check, for example `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx --version`.
 - Return a concise report with status, commands run, failures, and whether any files changed.
 
