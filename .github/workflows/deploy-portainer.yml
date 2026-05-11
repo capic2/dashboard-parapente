@@ -746,6 +746,25 @@ jobs:
           echo "Verification step outcome: ${{ steps.verify_deploy.outcome }}"
           echo "Computed deployment version: ${{ steps.version.outputs.version }}"
 
+      - name: Summarize deployment failure
+        if: steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success'
+        run: |
+          {
+            echo "## Production deployment failed"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Repository | ${{ github.repository }} |"
+            echo "| Branch | ${{ github.ref_name }} |"
+            echo "| Commit | ${{ github.sha }} |"
+            echo "| Deployment version | ${{ steps.version.outputs.version }} |"
+            echo "| SSH deployment | ${{ steps.trigger_deploy.conclusion }} |"
+            echo "| Version verification | ${{ steps.verify_deploy.outcome }} |"
+            echo "| Run | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |"
+            echo ""
+            echo "The deployment job is intentionally failed so GitHub sends the native Actions failure email notification."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Fail job when deployment failed
         if: steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success'
         run: |
