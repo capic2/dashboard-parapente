@@ -21,6 +21,7 @@ const {
     render: ReturnType<typeof vi.fn>;
     destroy: () => void;
     isDestroyed: () => boolean;
+    useDefaultRenderLoop: boolean;
     scene?: {
       requestRender: ReturnType<typeof vi.fn>;
       render: ReturnType<typeof vi.fn>;
