@@ -20,6 +20,7 @@ const {
   viewerInstances: [] as {
     render: ReturnType<typeof vi.fn>;
     destroy: () => void;
+    isDestroyed: () => boolean;
     scene?: {
       requestRender: ReturnType<typeof vi.fn>;
       render: ReturnType<typeof vi.fn>;
@@ -123,6 +124,7 @@ vi.mock('cesium', () => {
     shadows = false;
     terrainShadows = 0;
     render = vi.fn();
+    destroyed = false;
 
     constructor(_container: Element, options: unknown) {
       viewerOptions.push(options);
@@ -130,10 +132,11 @@ vi.mock('cesium', () => {
     }
 
     isDestroyed() {
-      return false;
+      return this.destroyed;
     }
 
     destroy() {
+      this.destroyed = true;
       this.scene = undefined;
       return undefined;
     }
@@ -301,6 +304,9 @@ describe('FlightViewer3D video export mode', () => {
     exportStatusMock.current = null;
     window._exportMode = undefined;
     window._setExportFrame = undefined;
+    window._getExportMetadata = undefined;
+    window._gpxData = undefined;
+    window._cesiumViewer = undefined;
   });
 
   afterEach(() => {
@@ -328,6 +334,9 @@ describe('FlightViewer3D video export mode', () => {
     }
     window._exportMode = undefined;
     window._setExportFrame = undefined;
+    window._getExportMetadata = undefined;
+    window._gpxData = undefined;
+    window._cesiumViewer = undefined;
   });
 
   it('starts fast smooth export by default and shows its hint', async () => {
@@ -426,6 +435,33 @@ describe('FlightViewer3D video export mode', () => {
     rerender(<FlightViewer3D key="flight-2" flightId="flight-2" exportOnly />);
 
     expect(() => staleWall?.wall.minimumHeights.callback()).not.toThrow();
+  });
+
+  it('clears export globals when the Cesium viewer unmounts', async () => {
+    window._exportMode = 'manual_render';
+
+    const { unmount } = render(
+      <FlightViewer3D flightId="flight-1" exportOnly />
+    );
+
+    await waitFor(() => {
+      expect(window._setExportFrame).toBeTypeOf('function');
+    });
+
+    expect(window._cesiumViewer).toBe(
+      viewerInstances[viewerInstances.length - 1]
+    );
+    expect(window._gpxData).toBeDefined();
+
+    unmount();
+
+    expect(window._setExportFrame).toBeUndefined();
+    expect(window._getExportMetadata).toBeUndefined();
+    expect(window._cesiumViewer).toBeUndefined();
+    expect(window._gpxData).toBeUndefined();
+    expect(viewerInstances[viewerInstances.length - 1]?.isDestroyed()).toBe(
+      true
+    );
   });
 
   it('starts max quality export after switching mode', async () => {
