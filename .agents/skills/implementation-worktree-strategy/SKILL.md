@@ -21,7 +21,7 @@ Whenever a worktree is created, immediately name the current AI session with the
 
 ## Worktree Bootstrap Subagent
 
-After creating a worktree, launch a `general` subagent immediately and let it run in parallel with the main implementation work.
+After creating a worktree, launch a `general` subagent immediately with the smallest available OpenAI model and let it run in parallel with the main implementation work.
 
 Subagent responsibility:
 
