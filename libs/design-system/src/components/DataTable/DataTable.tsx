@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { flexRender, type Table } from '@tanstack/react-table';
+import { useTranslation } from 'react-i18next';
 import { tv } from 'tailwind-variants';
 
 const dataTable = tv({
@@ -76,8 +77,9 @@ function getAriaSort(
 export function DataTable<TData>({
   table,
   className,
-  emptyMessage = 'Aucune donnee disponible',
+  emptyMessage,
 }: DataTableProps<TData>) {
+  const { t } = useTranslation();
   const rows = table.getRowModel().rows;
   const visibleColumnCount = table.getVisibleLeafColumns().length;
 
@@ -147,7 +149,7 @@ export function DataTable<TData>({
                   colSpan={visibleColumnCount}
                   className="px-3 py-8 text-center text-sm font-medium text-gray-600 dark:text-gray-300"
                 >
-                  {emptyMessage}
+                  {emptyMessage ?? t('dataTable.noItems')}
                 </td>
               </tr>
             )}

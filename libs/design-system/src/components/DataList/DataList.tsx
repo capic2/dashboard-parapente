@@ -1,8 +1,22 @@
-import type { ReactNode } from 'react';
+import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import type { Table, Row } from '@tanstack/react-table';
 import { Button, type Selection } from 'react-aria-components';
 import { useTranslation } from 'react-i18next';
 import { tv } from 'tailwind-variants';
+
+const interactiveSelector = [
+  'a[href]',
+  'button',
+  'input',
+  'select',
+  'textarea',
+  '[role="button"]',
+  '[role="checkbox"]',
+  '[role="link"]',
+  '[role="menuitem"]',
+  '[role="switch"]',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
 
 const dataList = tv({
   slots: {
@@ -80,6 +94,18 @@ function ChevronIcon({ direction }: { direction: 'previous' | 'next' }) {
   );
 }
 
+function isFromInteractiveChild(
+  event: MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>
+) {
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    return false;
+  }
+
+  const interactiveElement = target.closest(interactiveSelector);
+  return !!interactiveElement && interactiveElement !== event.currentTarget;
+}
+
 export interface SortableColumn {
   id: string;
   label: string;
@@ -123,6 +149,7 @@ export function DataList<TData>({
   const sorting = table.getState().sorting;
   const pageCount = table.getPageCount();
   const isSelectable = selectionMode !== 'none';
+  const allRows = table.getCoreRowModel().rows;
 
   const isRowSelected = (rowId: string) => {
     return selectedKeys === 'all' || selectedKeys?.has(rowId) || false;
@@ -138,7 +165,9 @@ export function DataList<TData>({
       return;
     }
 
-    const nextKeys = new Set(selectedKeys === 'all' ? [] : selectedKeys);
+    const nextKeys = new Set(
+      selectedKeys === 'all' ? allRows.map((row) => row.id) : selectedKeys
+    );
     if (nextKeys.has(rowId)) {
       nextKeys.delete(rowId);
     } else {
@@ -196,19 +225,18 @@ export function DataList<TData>({
 
       {/* Items */}
       <div
-        role="grid"
+        role="listbox"
         aria-label={ariaLabel}
+        aria-multiselectable={selectionMode === 'multiple' ? true : undefined}
         className={itemsClassName || 'space-y-2'}
         data-layout={layout}
       >
         {rows.length === 0 ? (
-          <div role="row" aria-label={emptyMessage ?? t('dataList.noItems')}>
-            <div role="gridcell">
-              <div className="col-span-full bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center">
-                <p className="text-gray-700 dark:text-gray-300 font-medium">
-                  {emptyMessage ?? t('dataList.noItems')}
-                </p>
-              </div>
+          <div role="status" aria-label={emptyMessage ?? t('dataList.noItems')}>
+            <div className="col-span-full bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center">
+              <p className="text-gray-700 dark:text-gray-300 font-medium">
+                {emptyMessage ?? t('dataList.noItems')}
+              </p>
             </div>
           </div>
         ) : (
@@ -219,20 +247,28 @@ export function DataList<TData>({
             return (
               <div
                 key={row.id}
-                role="row"
+                role="option"
                 aria-label={textValue}
                 aria-selected={isSelectable ? isSelected : undefined}
                 tabIndex={isSelectable ? 0 : undefined}
                 className="outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 rounded-lg h-full"
-                onClick={() => toggleSelection(row.id)}
+                onClick={(event) => {
+                  if (!isFromInteractiveChild(event)) {
+                    toggleSelection(row.id);
+                  }
+                }}
                 onKeyDown={(event) => {
+                  if (isFromInteractiveChild(event)) {
+                    return;
+                  }
+
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
                     toggleSelection(row.id);
                   }
                 }}
               >
-                <div role="gridcell">{renderItem(row, { isSelected })}</div>
+                {renderItem(row, { isSelected })}
               </div>
             );
           })

@@ -153,7 +153,7 @@ Default.test(
   async ({ canvas, userEvent, context }: DataListContext) => {
     const pageSize = context.parameters.dataList?.pageSize ?? 5;
     let names = [...mockData].map((data) => data.name).slice(0, pageSize);
-    let rowNames = canvas.getAllByRole('row').map((row) => row.ariaLabel);
+    let rowNames = canvas.getAllByRole('option').map((row) => row.ariaLabel);
 
     await expect(rowNames).toEqual(names);
 
@@ -165,7 +165,7 @@ Default.test(
       .sort((d1, d2) => d2.value - d1.value)
       .map((data) => data.name)
       .slice(0, pageSize);
-    rowNames = canvas.getAllByRole('row').map((row) => row.ariaLabel);
+    rowNames = canvas.getAllByRole('option').map((row) => row.ariaLabel);
 
     await expect(rowNames).toEqual(names);
   }
@@ -173,21 +173,21 @@ Default.test(
 Default.test('It is paginated', async ({ canvas, context, userEvent }) => {
   const pageSize = context.parameters.dataList?.pageSize ?? 5;
   let names = [...mockData].map((data) => data.name).slice(0, pageSize);
-  let rowNames = canvas.getAllByRole('row').map((row) => row.ariaLabel);
+  let rowNames = canvas.getAllByRole('option').map((row) => row.ariaLabel);
 
   await expect(rowNames).toEqual(names);
 
   await userEvent.click(canvas.getByRole('button', { name: 'Page suivante' }));
 
   names = [...mockData].map((data) => data.name).slice(pageSize, pageSize * 2);
-  rowNames = canvas.getAllByRole('row').map((row) => row.ariaLabel);
+  rowNames = canvas.getAllByRole('option').map((row) => row.ariaLabel);
 
   await expect(rowNames).toEqual(names);
 });
 Default.test(
   'triggers the onselectionchange callback',
   async ({ canvas, args, userEvent }) => {
-    await userEvent.click(canvas.getByRole('row', { name: 'Alpha' }));
+    await userEvent.click(canvas.getByRole('option', { name: 'Alpha' }));
     await expect(args.onSelectionChange).toHaveBeenCalled();
   }
 );
