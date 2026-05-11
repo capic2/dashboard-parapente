@@ -150,6 +150,9 @@ const getViewerScene = (viewer: CesiumViewer | null | undefined) => {
   }
 };
 
+const hasActiveViewerScene = (viewer: CesiumViewer | null | undefined) =>
+  Boolean(getViewerScene(viewer));
+
 const destroyViewer = (viewer: CesiumViewer) => {
   try {
     viewer.useDefaultRenderLoop = false;
@@ -171,8 +174,12 @@ const renderViewerFrame = (viewer: CesiumViewer) => {
   const scene = getViewerScene(viewer);
   if (!scene) return;
 
-  scene.requestRender();
-  viewer.render();
+  try {
+    scene.requestRender();
+    viewer.render();
+  } catch {
+    // Ignore late render calls while Cesium is tearing down between flights.
+  }
 };
 
 const createTubeShape = (radiusMeters: number, segments = 10) =>
@@ -237,8 +244,9 @@ const getTrackCurtainMinimumHeights = (
 ) =>
   positions.map((position) => {
     const cartographic = Cartographic.fromCartesian(position);
-    const terrainHeight = getViewerScene(viewer)?.globe.getHeight(cartographic);
+    const scene = getViewerScene(viewer);
     const fallbackHeight = cartographic.height - 120;
+    const terrainHeight = scene?.globe.getHeight(cartographic);
 
     return Math.min(cartographic.height - 1, terrainHeight ?? fallbackHeight);
   });
@@ -380,6 +388,19 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const currentTimestampRef = useRef<number | null>(null);
   const containerDivRef = useRef<HTMLDivElement>(null);
   const viewerUnitsRef = useRef<ViewerUnits>(viewerUnits);
+  const delayedPlaybackTimeoutRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const cameraApplyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+
+  const clearDelayedPlayback = useCallback(() => {
+    if (delayedPlaybackTimeoutRef.current) {
+      clearTimeout(delayedPlaybackTimeoutRef.current);
+      delayedPlaybackTimeoutRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -389,6 +410,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
+      }
+      if (delayedPlaybackTimeoutRef.current) {
+        clearTimeout(delayedPlaybackTimeoutRef.current);
+        delayedPlaybackTimeoutRef.current = null;
+      }
+      if (cameraApplyTimeoutRef.current) {
+        clearTimeout(cameraApplyTimeoutRef.current);
+        cameraApplyTimeoutRef.current = null;
       }
       if (typeof window !== 'undefined') {
         window._setExportFrame = undefined;
@@ -400,7 +429,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   }, []);
 
   const isActiveViewer = useCallback((viewer: CesiumViewer) => {
-    return viewerRef.current === viewer && Boolean(getViewerScene(viewer));
+    return viewerRef.current === viewer && hasActiveViewerScene(viewer);
   }, []);
 
   const removeTrackEntity = useCallback((viewer: CesiumViewer) => {
@@ -438,7 +467,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
   const syncTrackEntity = useCallback(
     (viewer: CesiumViewer) => {
-      if (!getViewerScene(viewer)) return;
+      if (!isActiveViewer(viewer)) return;
 
       const renderablePositions = getRenderableTrackPositions(
         visiblePositionsRef.current
@@ -458,15 +487,20 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         trackCurtainEntityRef.current = viewer.entities.add({
           wall: {
             positions: new CallbackProperty(
-              () => getRenderableTrackPositions(visiblePositionsRef.current),
+              () =>
+                isActiveViewer(viewer)
+                  ? getRenderableTrackPositions(visiblePositionsRef.current)
+                  : [],
               false
             ),
             minimumHeights: new CallbackProperty(
               () =>
-                getTrackCurtainMinimumHeights(
-                  getRenderableTrackPositions(visiblePositionsRef.current),
-                  viewer
-                ),
+                isActiveViewer(viewer)
+                  ? getTrackCurtainMinimumHeights(
+                      getRenderableTrackPositions(visiblePositionsRef.current),
+                      viewer
+                    )
+                  : [],
               false
             ),
             material: curtainImage
@@ -481,7 +515,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         trackFallbackEntityRef.current = viewer.entities.add({
           polyline: {
             positions: new CallbackProperty(
-              () => getRenderableTrackPositions(visiblePositionsRef.current),
+              () =>
+                isActiveViewer(viewer)
+                  ? getRenderableTrackPositions(visiblePositionsRef.current)
+                  : [],
               false
             ),
             width: 3,
@@ -513,7 +550,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       });
       trackPositionCountRef.current = renderablePositions.length;
     },
-    [removeTrackEntity]
+    [isActiveViewer, removeTrackEntity]
   );
 
   const isExportActive = isVideoExportInProgress(flight?.video_export_status);
@@ -971,6 +1008,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
     return () => {
       isEffectActive = false;
+      clearDelayedPlayback();
       for (const timer of cameraTimers) {
         clearTimeout(timer);
       }
@@ -1019,7 +1057,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     };
     // Intentionally exclude site camera fields to avoid replay reset after save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [elevationOffset, gpxData, isActiveViewer, viewerReady]);
+  }, [
+    clearDelayedPlayback,
+    elevationOffset,
+    gpxData,
+    isActiveViewer,
+    viewerReady,
+  ]);
 
   // Initialize camera settings from flight data
   useEffect(() => {
@@ -1596,13 +1640,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   ]);
 
   const pause = useCallback(() => {
+    clearDelayedPlayback();
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
     isPlayingRef.current = false;
     setIsPlaying(false);
-  }, []);
+  }, [clearDelayedPlayback]);
 
   const togglePlayPause = useCallback(() => {
     if (isPlayingRef.current) {
@@ -1652,10 +1697,22 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       // Reprendre la lecture si elle était active
       if (wasPlaying) {
-        setTimeout(() => play(), 50);
+        clearDelayedPlayback();
+        delayedPlaybackTimeoutRef.current = setTimeout(() => {
+          delayedPlaybackTimeoutRef.current = null;
+          if (isMountedRef.current) {
+            play();
+          }
+        }, 50);
       }
     },
-    [applyScenePosition, getScenePositionFromProgress, pause, play]
+    [
+      applyScenePosition,
+      clearDelayedPlayback,
+      getScenePositionFromProgress,
+      pause,
+      play,
+    ]
   );
 
   const handleSpeedChange = (value: number) => {
@@ -1664,7 +1721,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
     if (isPlayingRef.current) {
       pause();
-      setTimeout(() => play(), 50);
+      clearDelayedPlayback();
+      delayedPlaybackTimeoutRef.current = setTimeout(() => {
+        delayedPlaybackTimeoutRef.current = null;
+        if (isMountedRef.current) {
+          play();
+        }
+      }, 50);
     }
   };
 
@@ -1865,8 +1928,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     );
 
     // Keep current viewport in sync after save without reloading the viewer.
-    setTimeout(() => {
-      applyCameraToCurrentPlayback(false);
+    if (cameraApplyTimeoutRef.current) {
+      clearTimeout(cameraApplyTimeoutRef.current);
+    }
+    cameraApplyTimeoutRef.current = setTimeout(() => {
+      cameraApplyTimeoutRef.current = null;
+      if (isMountedRef.current) {
+        applyCameraToCurrentPlayback(false);
+      }
     }, 150);
   };
 
