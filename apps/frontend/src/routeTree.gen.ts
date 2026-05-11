@@ -20,6 +20,7 @@ import { Route as ExportViewerRouteImport } from './routes/export-viewer'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ViewerFlightIdRouteImport } from './routes/viewer.$flightId'
+import { Route as FlightsFlightIdRouteImport } from './routes/flights.$flightId'
 
 const WeatherRoute = WeatherRouteImport.update({
   id: '/weather',
@@ -80,31 +81,40 @@ const ViewerFlightIdRoute = ViewerFlightIdRouteImport.update({
 } as any).lazy(() =>
   import('./routes/viewer.$flightId.lazy').then((d) => d.Route),
 )
+const FlightsFlightIdRoute = FlightsFlightIdRouteImport.update({
+  id: '/$flightId',
+  path: '/$flightId',
+  getParentRoute: () => FlightsRoute,
+} as any).lazy(() =>
+  import('./routes/flights.$flightId.lazy').then((d) => d.Route),
+)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/export-viewer': typeof ExportViewerRoute
-  '/flights': typeof FlightsRoute
+  '/flights': typeof FlightsRouteWithChildren
   '/infrastructure': typeof InfrastructureRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
   '/weather': typeof WeatherRoute
+  '/flights/$flightId': typeof FlightsFlightIdRoute
   '/viewer/$flightId': typeof ViewerFlightIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/export-viewer': typeof ExportViewerRoute
-  '/flights': typeof FlightsRoute
+  '/flights': typeof FlightsRouteWithChildren
   '/infrastructure': typeof InfrastructureRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
   '/weather': typeof WeatherRoute
+  '/flights/$flightId': typeof FlightsFlightIdRoute
   '/viewer/$flightId': typeof ViewerFlightIdRoute
 }
 export interface FileRoutesById {
@@ -112,13 +122,14 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/export-viewer': typeof ExportViewerRoute
-  '/flights': typeof FlightsRoute
+  '/flights': typeof FlightsRouteWithChildren
   '/infrastructure': typeof InfrastructureRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
   '/weather': typeof WeatherRoute
+  '/flights/$flightId': typeof FlightsFlightIdRoute
   '/viewer/$flightId': typeof ViewerFlightIdRoute
 }
 export interface FileRouteTypes {
@@ -134,6 +145,7 @@ export interface FileRouteTypes {
     | '/sites'
     | '/thermal'
     | '/weather'
+    | '/flights/$flightId'
     | '/viewer/$flightId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -147,6 +159,7 @@ export interface FileRouteTypes {
     | '/sites'
     | '/thermal'
     | '/weather'
+    | '/flights/$flightId'
     | '/viewer/$flightId'
   id:
     | '__root__'
@@ -160,6 +173,7 @@ export interface FileRouteTypes {
     | '/sites'
     | '/thermal'
     | '/weather'
+    | '/flights/$flightId'
     | '/viewer/$flightId'
   fileRoutesById: FileRoutesById
 }
@@ -167,7 +181,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AnalyticsRoute: typeof AnalyticsRoute
   ExportViewerRoute: typeof ExportViewerRoute
-  FlightsRoute: typeof FlightsRoute
+  FlightsRoute: typeof FlightsRouteWithChildren
   InfrastructureRoute: typeof InfrastructureRoute
   LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRoute
@@ -256,14 +270,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ViewerFlightIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/flights/$flightId': {
+      id: '/flights/$flightId'
+      path: '/$flightId'
+      fullPath: '/flights/$flightId'
+      preLoaderRoute: typeof FlightsFlightIdRouteImport
+      parentRoute: typeof FlightsRoute
+    }
   }
 }
+
+interface FlightsRouteChildren {
+  FlightsFlightIdRoute: typeof FlightsFlightIdRoute
+}
+
+const FlightsRouteChildren: FlightsRouteChildren = {
+  FlightsFlightIdRoute: FlightsFlightIdRoute,
+}
+
+const FlightsRouteWithChildren =
+  FlightsRoute._addFileChildren(FlightsRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnalyticsRoute: AnalyticsRoute,
   ExportViewerRoute: ExportViewerRoute,
-  FlightsRoute: FlightsRoute,
+  FlightsRoute: FlightsRouteWithChildren,
   InfrastructureRoute: InfrastructureRoute,
   LoginRoute: LoginRoute,
   SettingsRoute: SettingsRoute,
