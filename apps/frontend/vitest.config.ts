@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
+process.env.NODE_ENV = 'test';
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   test: {

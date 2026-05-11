@@ -1,10 +1,10 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { flightsQueryOptions } from '../hooks/flights/useFlights';
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import type { Flight, Site } from '../types';
 import type { RowSelectionState } from '@tanstack/react-table';
-import { useSearch } from '@tanstack/react-router';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { Input, TextField } from 'react-aria-components';
 import {
   CheckSquare,
@@ -32,6 +32,7 @@ import { useIsMobile } from '../hooks/useIsMobile';
 
 export default function FlightHistory() {
   const { t } = useTranslation();
+  const navigate = useNavigate({ from: '/flights' });
   const search = useSearch({ from: '/flights' });
   const { data: flights } = useSuspenseQuery(
     flightsQueryOptions({ limit: 50, siteId: search.siteId })
@@ -39,7 +40,7 @@ export default function FlightHistory() {
 
   const isMobile = useIsMobile();
 
-  const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null);
+  const selectedFlightId = search.flightId ?? null;
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [selectionMode, setSelectionMode] = useState(false);
   const [flightToDelete, setFlightToDelete] = useState<Flight | null>(null);
@@ -78,6 +79,24 @@ export default function FlightHistory() {
   const toast = useToast();
   const { toasts, removeToast } = useToastStore();
 
+  const setSelectedFlightId = useCallback(
+    (flightId: string | undefined) => {
+      void navigate({
+        search: {
+          flightId,
+          siteId: search.siteId,
+        },
+      });
+    },
+    [navigate, search.siteId]
+  );
+
+  useEffect(() => {
+    if (isMobile && selectedFlight) {
+      setShowMobileDetail(true);
+    }
+  }, [isMobile, selectedFlight]);
+
   const handleSelectFlight = useCallback(
     (flight: Flight) => {
       setSelectedFlightId(flight.id);
@@ -85,20 +104,20 @@ export default function FlightHistory() {
         setShowMobileDetail(true);
       }
     },
-    [isMobile]
+    [isMobile, setSelectedFlightId]
   );
 
   const handleCloseMobileDetail = useCallback(() => {
     setShowMobileDetail(false);
-    setSelectedFlightId(null);
-  }, []);
+    setSelectedFlightId(undefined);
+  }, [setSelectedFlightId]);
 
   const handleToggleSelectionMode = useCallback(() => {
     setSelectionMode((prev) => !prev);
     setRowSelection({});
-    setSelectedFlightId(null);
+    setSelectedFlightId(undefined);
     setShowMobileDetail(false);
-  }, []);
+  }, [setSelectedFlightId]);
 
   const selectedFlightIds = Object.keys(rowSelection);
   const selectedCount = selectedFlightIds.length;
@@ -163,7 +182,7 @@ export default function FlightHistory() {
         queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] });
         toast.success(t('flights.deletedSuccess'));
         if (selectedFlightId === flightToDelete.id) {
-          setSelectedFlightId(null);
+          setSelectedFlightId(undefined);
           setShowMobileDetail(false);
         }
         setFlightToDelete(null);
@@ -191,6 +210,7 @@ export default function FlightHistory() {
     selectedFlightIds,
     selectedCount,
     selectionMode,
+    setSelectedFlightId,
     toast,
     queryClient,
     t,

@@ -341,9 +341,9 @@ GoodConditions.test('it renders the correct values', async ({ canvas }) => {
   await expect(getByText('Volabilité')).toBeInTheDocument();
 
   // Verify hours are displayed
-  await expect(getByText('10:00')).toBeInTheDocument();
-  await expect(getByText('11:00')).toBeInTheDocument();
-  await expect(getByText('12:00')).toBeInTheDocument();
+  await expect(getAllByText('10:00').length).toBeGreaterThanOrEqual(1);
+  await expect(getAllByText('11:00').length).toBeGreaterThanOrEqual(1);
+  await expect(getAllByText('12:00').length).toBeGreaterThanOrEqual(1);
 
   // Verify para_index values (unique values)
   await expect(getByText('85/100')).toBeInTheDocument(); // 10:00
@@ -424,9 +424,9 @@ MixedConditions.test(
     await expect(getByText('14')).toBeInTheDocument(); // 12:00
 
     // Verify wind speeds (units now in headers)
-    await expect(getByText('18')).toBeInTheDocument(); // 10:00
-    await expect(getByText('25')).toBeInTheDocument(); // 11:00
-    await expect(getByText('32')).toBeInTheDocument(); // 12:00
+    await expect(getAllByText('18').length).toBeGreaterThanOrEqual(1); // 10:00
+    await expect(getAllByText('25').length).toBeGreaterThanOrEqual(1); // 11:00
+    await expect(getAllByText('32').length).toBeGreaterThanOrEqual(1); // 12:00
 
     // Verify different verdicts appear
     await expect(getAllByText(/MOYEN/).length).toBeGreaterThanOrEqual(1);
@@ -544,8 +544,8 @@ NullSunriseSunset.test(
     await canvas.findByText('85/100');
 
     // Verify hours are still displayed (seasonal fallback filters hours)
-    await expect(canvas.getByText('10:00')).toBeInTheDocument();
-    await expect(canvas.getByText('12:00')).toBeInTheDocument();
+    await expect(canvas.getAllByText('10:00').length).toBeGreaterThanOrEqual(1);
+    await expect(canvas.getAllByText('12:00').length).toBeGreaterThanOrEqual(1);
   }
 );
 

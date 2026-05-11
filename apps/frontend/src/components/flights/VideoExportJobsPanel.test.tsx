@@ -110,9 +110,8 @@ describe('VideoExportJobsPanel', () => {
 
     render(<VideoExportJobsPanel />);
     fireEvent.click(screen.getByRole('button', { name: 'Stopper' }));
-    fireEvent.click(
-      screen.getAllByRole('button', { name: 'Stopper' }).slice(-1)[0]!
-    );
+    const stopButtons = screen.getAllByRole('button', { name: 'Stopper' });
+    fireEvent.click(stopButtons[stopButtons.length - 1]!);
 
     await waitFor(() => expect(cancelJob).toHaveBeenCalledWith('job-active'));
     expect(toastSuccess).toHaveBeenCalledWith('Génération stoppée');
@@ -131,11 +130,10 @@ describe('VideoExportJobsPanel', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Nettoyer les temporaires' })
     );
-    fireEvent.click(
-      screen
-        .getAllByRole('button', { name: 'Nettoyer les temporaires' })
-        .slice(-1)[0]!
-    );
+    const cleanupButtons = screen.getAllByRole('button', {
+      name: 'Nettoyer les temporaires',
+    });
+    fireEvent.click(cleanupButtons[cleanupButtons.length - 1]!);
 
     await waitFor(() => expect(cleanupTempFiles).toHaveBeenCalled());
     expect(toastSuccess).toHaveBeenCalledWith(

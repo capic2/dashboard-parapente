@@ -52,6 +52,10 @@ vi.mock('cesium', () => {
     static fromRadians() {
       return new Cartesian3();
     }
+
+    static distanceSquared() {
+      return 1;
+    }
   }
 
   class Cartographic {
