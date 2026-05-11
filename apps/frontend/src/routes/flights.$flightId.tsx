@@ -8,7 +8,7 @@ type FlightsSearch = {
   siteId?: string;
 };
 
-export const Route = createFileRoute('/flights')({
+export const Route = createFileRoute('/flights/$flightId')({
   validateSearch: (search: Record<string, unknown>): FlightsSearch => ({
     siteId: typeof search.siteId === 'string' ? search.siteId : undefined,
   }),
