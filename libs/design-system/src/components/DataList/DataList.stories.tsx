@@ -5,6 +5,7 @@ import {
   getCoreRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  type PaginationState,
   type SortingState,
   useReactTable,
 } from '@tanstack/react-table';
@@ -67,20 +68,22 @@ function DataListWrapper({
   onSelectionChange?: (keys: Selection) => void;
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize,
+  });
   const [selectedKeys, setSelectedKeys] = useState<Selection>(new Set());
 
   const table = useReactTable({
     data,
     columns,
-    state: { sorting },
+    state: { sorting, pagination },
     onSortingChange: setSorting,
+    onPaginationChange: setPagination,
     getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    initialState: {
-      pagination: { pageIndex: 0, pageSize },
-    },
   });
 
   return (

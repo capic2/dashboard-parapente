@@ -29,7 +29,6 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
     this.setState({
       error,
       errorInfo,
@@ -58,8 +57,22 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           role="alert"
         >
           <div className="max-w-2xl w-full bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8">
-            <h2 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-4">
-              ❌ {t('errors.errorOccurred')}
+            <h2 className="flex items-center gap-2 text-2xl font-bold text-red-600 dark:text-red-400 mb-4">
+              <svg
+                aria-hidden="true"
+                className="h-6 w-6 shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"
+                />
+              </svg>
+              {t('errors.errorOccurred')}
             </h2>
             <p className="text-gray-700 dark:text-gray-300 mb-6">
               {t('errors.errorMessage')}
@@ -89,15 +102,15 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             <div className="flex gap-3 flex-wrap">
               <button
                 onClick={this.handleReset}
-                className="px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-all hover:shadow-lg"
+                className="cursor-pointer px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-colors hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
               >
-                🔄 {t('common.retry')}
+                {t('common.retry')}
               </button>
               <button
                 onClick={() => (window.location.href = '/')}
-                className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
+                className="cursor-pointer px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-800"
               >
-                🏠 {t('common.backToHome')}
+                {t('common.backToHome')}
               </button>
             </div>
           </div>

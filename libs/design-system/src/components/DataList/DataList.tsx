@@ -1,11 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Table, Row } from '@tanstack/react-table';
-import {
-  Button,
-  GridList,
-  GridListItem,
-  type Selection,
-} from 'react-aria-components';
+import { Button, type Selection } from 'react-aria-components';
 import { useTranslation } from 'react-i18next';
 import { tv } from 'tailwind-variants';
 
@@ -38,6 +33,52 @@ const dataList = tv({
     },
   },
 });
+
+function DirectionIcon({ direction }: { direction: 'asc' | 'desc' }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="ml-1 h-3.5 w-3.5 shrink-0"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d={
+          direction === 'desc'
+            ? 'm19.5 8.25-7.5 7.5-7.5-7.5'
+            : 'm4.5 15.75 7.5-7.5 7.5 7.5'
+        }
+      />
+    </svg>
+  );
+}
+
+function ChevronIcon({ direction }: { direction: 'previous' | 'next' }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d={
+          direction === 'previous'
+            ? 'M15.75 19.5 8.25 12l7.5-7.5'
+            : 'm8.25 4.5 7.5 7.5-7.5 7.5'
+        }
+      />
+    </svg>
+  );
+}
 
 export interface SortableColumn {
   id: string;
@@ -74,10 +115,37 @@ export function DataList<TData>({
   getTextValue,
 }: DataListProps<TData>) {
   const { t } = useTranslation();
-  const rows = table.getRowModel().rows;
+  const { pageIndex, pageSize } = table.getState().pagination;
+  const startIndex = pageIndex * pageSize;
+  const rows = table
+    .getSortedRowModel()
+    .rows.slice(startIndex, startIndex + pageSize);
   const sorting = table.getState().sorting;
   const pageCount = table.getPageCount();
-  const { pageIndex } = table.getState().pagination;
+  const isSelectable = selectionMode !== 'none';
+
+  const isRowSelected = (rowId: string) => {
+    return selectedKeys === 'all' || selectedKeys?.has(rowId) || false;
+  };
+
+  const toggleSelection = (rowId: string) => {
+    if (!isSelectable) {
+      return;
+    }
+
+    if (selectionMode === 'single') {
+      onSelectionChange?.(new Set([rowId]));
+      return;
+    }
+
+    const nextKeys = new Set(selectedKeys === 'all' ? [] : selectedKeys);
+    if (nextKeys.has(rowId)) {
+      nextKeys.delete(rowId);
+    } else {
+      nextKeys.add(rowId);
+    }
+    onSelectionChange?.(nextKeys);
+  };
 
   return (
     <div className={className}>
@@ -116,9 +184,9 @@ export function DataList<TData>({
               >
                 {col.label}
                 {currentSort && (
-                  <span aria-hidden="true" className="ml-1">
-                    {currentSort.desc ? '↓' : '↑'}
-                  </span>
+                  <DirectionIcon
+                    direction={currentSort.desc ? 'desc' : 'asc'}
+                  />
                 )}
               </Button>
             );
@@ -127,32 +195,49 @@ export function DataList<TData>({
       )}
 
       {/* Items */}
-      <GridList
-        items={rows}
+      <div
+        role="grid"
         aria-label={ariaLabel}
         className={itemsClassName || 'space-y-2'}
-        layout={layout}
-        selectionMode={selectionMode}
-        selectedKeys={selectedKeys}
-        onSelectionChange={onSelectionChange}
-        renderEmptyState={() => (
-          <div className="col-span-full bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center">
-            <p className="text-gray-700 dark:text-gray-300 font-medium">
-              {emptyMessage ?? t('dataList.noItems')}
-            </p>
-          </div>
-        )}
+        data-layout={layout}
       >
-        {(row) => (
-          <GridListItem
-            id={row.id}
-            textValue={getTextValue?.(row) || row.id}
-            className="outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 rounded-lg h-full"
-          >
-            {({ isSelected }) => renderItem(row, { isSelected })}
-          </GridListItem>
+        {rows.length === 0 ? (
+          <div role="row" aria-label={emptyMessage ?? t('dataList.noItems')}>
+            <div role="gridcell">
+              <div className="col-span-full bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center">
+                <p className="text-gray-700 dark:text-gray-300 font-medium">
+                  {emptyMessage ?? t('dataList.noItems')}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          rows.map((row) => {
+            const textValue = getTextValue?.(row) || row.id;
+            const isSelected = isRowSelected(row.id);
+
+            return (
+              <div
+                key={row.id}
+                role="row"
+                aria-label={textValue}
+                aria-selected={isSelectable ? isSelected : undefined}
+                tabIndex={isSelectable ? 0 : undefined}
+                className="outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 rounded-lg h-full"
+                onClick={() => toggleSelection(row.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    toggleSelection(row.id);
+                  }
+                }}
+              >
+                <div role="gridcell">{renderItem(row, { isSelected })}</div>
+              </div>
+            );
+          })
         )}
-      </GridList>
+      </div>
 
       {/* Pagination */}
       {pageCount > 1 && (
@@ -175,7 +260,7 @@ export function DataList<TData>({
               onPress={() => table.previousPage()}
               isDisabled={!table.getCanPreviousPage()}
             >
-              <span aria-hidden="true">←</span>
+              <ChevronIcon direction="previous" />
             </Button>
             <Button
               aria-label={t('dataList.nextPage')}
@@ -185,7 +270,7 @@ export function DataList<TData>({
               onPress={() => table.nextPage()}
               isDisabled={!table.getCanNextPage()}
             >
-              <span aria-hidden="true">→</span>
+              <ChevronIcon direction="next" />
             </Button>
           </div>
         </nav>

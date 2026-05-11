@@ -55,6 +55,7 @@ export const SingleToast = meta.story({
       },
     ],
     onClose: fn(),
+    autoDismissMs: false,
   },
 });
 
@@ -65,7 +66,9 @@ SingleToast.test(
     const canvas = within(canvasElement);
 
     // Find and click the close button
-    const closeButton = canvas.getByRole('button', { name: /×/i });
+    const closeButton = canvas.getByRole('button', {
+      name: /fermer la notification/i,
+    });
     await userEvent.click(closeButton);
 
     // Verify onClose was called with the correct ID
@@ -95,6 +98,7 @@ export const MultipleToasts = meta.story({
       },
     ],
     onClose: fn(),
+    autoDismissMs: false,
   },
 });
 
@@ -122,6 +126,7 @@ export const ManyToasts = meta.story({
       { id: '5', title: 'Fifth notification', type: 'success' as const },
     ],
     onClose: fn(),
+    autoDismissMs: false,
   },
 });
 
@@ -152,6 +157,7 @@ export const MixedTypes = meta.story({
       },
     ],
     onClose: fn(),
+    autoDismissMs: false,
   },
 });
 
@@ -177,6 +183,7 @@ export const RealisticFlow = meta.story({
       },
     ],
     onClose: fn(),
+    autoDismissMs: false,
   },
   parameters: {
     docs: {
