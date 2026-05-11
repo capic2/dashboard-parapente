@@ -288,6 +288,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const toast = useToast();
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<CesiumViewer | null>(null);
+  const isMountedRef = useRef(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [replaySpeed, setReplaySpeed] = useState(10);
   const [viewerError, setViewerError] = useState<string | null>(null);
@@ -359,7 +360,37 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const containerDivRef = useRef<HTMLDivElement>(null);
   const viewerUnitsRef = useRef<ViewerUnits>(viewerUnits);
 
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      if (typeof window !== 'undefined') {
+        window._setExportFrame = undefined;
+        window._getExportMetadata = undefined;
+        window._gpxData = undefined;
+        window._cesiumViewer = undefined;
+      }
+    };
+  }, []);
+
+  const isActiveViewer = useCallback((viewer: CesiumViewer) => {
+    return viewerRef.current === viewer && Boolean(getViewerScene(viewer));
+  }, []);
+
   const removeTrackEntity = useCallback((viewer: CesiumViewer) => {
+    if (!getViewerScene(viewer)) {
+      trackEntityRef.current = null;
+      trackFallbackEntityRef.current = null;
+      trackCurtainEntityRef.current = null;
+      trackPositionCountRef.current = 0;
+      return;
+    }
+
     if (
       trackEntityRef.current &&
       viewer.entities.contains(trackEntityRef.current)
@@ -386,6 +417,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
   const syncTrackEntity = useCallback(
     (viewer: CesiumViewer) => {
+      if (!getViewerScene(viewer)) return;
+
       const renderablePositions = getRenderableTrackPositions(
         visiblePositionsRef.current
       );
@@ -542,7 +575,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     const tryCreateViewer = () => {
       attemptCount++;
 
-      if (!isMounted) return;
+      if (!isMounted || !isMountedRef.current) return;
 
       if (!containerRef.current) {
         if (attemptCount < maxAttempts) {
@@ -602,6 +635,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         setViewerError(null);
         setViewerReady(true);
       } catch (error) {
+        if (!isMounted || !isMountedRef.current) return;
         const errorMsg = error instanceof Error ? error.message : String(error);
         setViewerError(errorMsg);
       }
@@ -616,8 +650,16 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       if (viewerRef.current && !viewerRef.current.isDestroyed()) {
         viewerRef.current.destroy();
       }
+      if (typeof window !== 'undefined') {
+        window._setExportFrame = undefined;
+        window._getExportMetadata = undefined;
+        window._gpxData = undefined;
+        window._cesiumViewer = undefined;
+      }
       viewerRef.current = null;
-      setViewerReady(false);
+      if (isMountedRef.current) {
+        setViewerReady(false);
+      }
     };
   }, []);
 
@@ -631,29 +673,32 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     setTerrainReady(false);
 
     // Check if terrain is already loaded
-    const globe = scene.globe;
     let isMounted = true;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const checkTerrainReady = () => {
-      if (!isMounted) return;
+      const currentScene = getViewerScene(viewer);
+      if (!isMounted || viewerRef.current !== viewer || !currentScene) return;
 
       // Check if tiles are loaded in the current view
-      const tilesLoaded = globe.tilesLoaded;
+      const tilesLoaded = currentScene.globe.tilesLoaded;
 
       if (tilesLoaded) {
         setTerrainReady(true);
       } else {
         // Check again after a short delay
-        setTimeout(checkTerrainReady, 500);
+        timeoutId = setTimeout(checkTerrainReady, 500);
       }
     };
 
     // Start checking after a small delay
-    const timeoutId = setTimeout(checkTerrainReady, 1000);
+    timeoutId = setTimeout(checkTerrainReady, 1000);
 
     return () => {
       isMounted = false;
-      clearTimeout(timeoutId);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
   }, [viewerReady, flightId]);
 
@@ -708,11 +753,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
 
     const viewer = viewerRef.current;
-    if (!viewer || !getViewerScene(viewer)) {
+    if (!viewer || !isActiveViewer(viewer)) {
       return;
     }
 
     const cameraTimers: ReturnType<typeof setTimeout>[] = [];
+    let isEffectActive = true;
 
     try {
       // Convert GPX coordinates to Cartesian3 avec offset d'élévation
@@ -815,7 +861,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       const boundingSphere = BoundingSphere.fromPoints(positions);
 
       // Calculate camera heading to face the takeoff point
-      const calculateOptimalHeading = async (): Promise<number> => {
+      const calculateOptimalHeading = (): number => {
         if (gpxData.coordinates.length < 2) return 0;
 
         const numPoints = gpxData.coordinates.length;
@@ -848,43 +894,46 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       // Position camera - MUST happen after elevation offset is calculated
       // Using a very low angle to see the altitude of the flight track
-      const positionCamera = async () => {
-        if (viewerRef.current === viewer && getViewerScene(viewer)) {
-          // Check if camera settings were already loaded from site (camera_angle/camera_distance)
-          // Read directly from flight.site to avoid stale ref values
-          const hasSavedCameraSettings =
-            flight?.site?.camera_angle !== null &&
-            flight?.site?.camera_angle !== undefined;
-
-          let heading: number;
-          let distance: number;
-
-          if (hasSavedCameraSettings) {
-            // Read camera settings directly from flight.site
-            const cameraAngle = flight?.site?.camera_angle ?? 0;
-            distance = flight?.site?.camera_distance || 500;
-            heading = CesiumMath.toRadians(cameraAngle);
-
-            // Also update refs for replay mode
-            cameraHeadingRef.current = heading;
-            cameraDistanceRef.current = distance;
-          } else {
-            // Calculate optimal heading automatically
-            heading = await calculateOptimalHeading();
-            distance = boundingSphere.radius * 0.8;
-            cameraHeadingRef.current = heading;
-            cameraDistanceRef.current = distance;
-          }
-
-          viewer.camera.flyToBoundingSphere(boundingSphere, {
-            duration: 2,
-            offset: new HeadingPitchRange(
-              heading, // heading perpendicular to flight direction
-              -0.05, // pitch: légèrement incliné vers le bas pour voir le sol
-              distance // distance plus proche pour meilleure immersion
-            ),
-          });
+      const positionCamera = () => {
+        if (
+          !isEffectActive ||
+          !isMountedRef.current ||
+          !isActiveViewer(viewer)
+        ) {
+          return;
         }
+
+        // Check if camera settings were already loaded from site (camera_angle/camera_distance)
+        // Read directly from flight.site to avoid stale ref values
+        const hasSavedCameraSettings =
+          flight?.site?.camera_angle !== null &&
+          flight?.site?.camera_angle !== undefined;
+
+        let heading: number;
+        let distance: number;
+
+        if (hasSavedCameraSettings) {
+          // Read camera settings directly from flight.site
+          const cameraAngle = flight?.site?.camera_angle ?? 0;
+          distance = flight?.site?.camera_distance || 500;
+          heading = CesiumMath.toRadians(cameraAngle);
+        } else {
+          // Calculate optimal heading automatically
+          heading = calculateOptimalHeading();
+          distance = boundingSphere.radius * 0.8;
+        }
+
+        cameraHeadingRef.current = heading;
+        cameraDistanceRef.current = distance;
+
+        viewer.camera.flyToBoundingSphere(boundingSphere, {
+          duration: 2,
+          offset: new HeadingPitchRange(
+            heading, // heading perpendicular to flight direction
+            -0.05, // pitch: légèrement incliné vers le bas pour voir le sol
+            distance // distance plus proche pour meilleure immersion
+          ),
+        });
       };
 
       // Position immédiate
@@ -896,6 +945,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
 
     return () => {
+      isEffectActive = false;
       for (const timer of cameraTimers) {
         clearTimeout(timer);
       }
@@ -910,22 +960,27 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       currentIndexRef.current = 0;
       setCurrentProgress(0);
 
-      const viewer = viewerRef.current;
-      if (!viewer || !getViewerScene(viewer)) return;
+      if (typeof window !== 'undefined' && window._cesiumViewer === viewer) {
+        window._cesiumViewer = undefined;
+        window._gpxData = undefined;
+      }
+
+      const currentViewer = viewerRef.current;
+      if (!currentViewer || !isActiveViewer(currentViewer)) return;
 
       try {
-        removeTrackEntity(viewer);
+        removeTrackEntity(currentViewer);
         if (
           cursorEntityRef.current &&
-          viewer.entities.contains(cursorEntityRef.current)
+          currentViewer.entities.contains(cursorEntityRef.current)
         ) {
-          viewer.entities.remove(cursorEntityRef.current);
+          currentViewer.entities.remove(cursorEntityRef.current);
         }
         if (
           startEntityRef.current &&
-          viewer.entities.contains(startEntityRef.current)
+          currentViewer.entities.contains(startEntityRef.current)
         ) {
-          viewer.entities.remove(startEntityRef.current);
+          currentViewer.entities.remove(startEntityRef.current);
         }
       } catch (e) {
         console.debug('Cleanup warning:', e);
@@ -939,7 +994,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     };
     // Intentionally exclude site camera fields to avoid replay reset after save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [elevationOffset, gpxData, viewerReady]);
+  }, [elevationOffset, gpxData, isActiveViewer, viewerReady]);
 
   // Initialize camera settings from flight data
   useEffect(() => {
@@ -1037,12 +1092,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
   // Calculer automatiquement l'offset d'élévation
   const calculateAutoElevationOffset = useCallback(async () => {
-    if (!viewerRef.current || !gpxData?.coordinates?.[0]) return;
+    const viewer = viewerRef.current;
+    if (!viewer || !isActiveViewer(viewer) || !gpxData?.coordinates?.[0]) {
+      return;
+    }
 
     setIsCalculatingOffset(true);
 
     try {
-      const viewer = viewerRef.current;
       const firstPoint = gpxData.coordinates[0];
 
       // Créer une position cartographique pour le premier point
@@ -1054,6 +1111,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       const samples = await sampleTerrainMostDetailed(terrainProvider, [
         cartographic,
       ]);
+
+      if (!isMountedRef.current || !isActiveViewer(viewer)) {
+        return;
+      }
 
       if (samples && samples.length > 0 && samples[0].height !== undefined) {
         const terrainHeight = samples[0].height;
@@ -1071,9 +1132,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     } catch (error) {
       console.error("Erreur lors du calcul de l'offset d'élévation:", error);
     } finally {
-      setIsCalculatingOffset(false);
+      if (isMountedRef.current && isActiveViewer(viewer)) {
+        setIsCalculatingOffset(false);
+      }
     }
-  }, [gpxData]);
+  }, [gpxData, isActiveViewer]);
 
   // Activer l'auto-élévation par défaut au chargement
   useEffect(() => {
@@ -1704,40 +1767,47 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   };
 
   // Function to manually reposition camera (can be called after settings update)
-  const repositionCamera = useCallback((angle: number, distance: number) => {
-    if (!viewerRef.current || !allPositionsRef.current.length) {
-      return;
-    }
+  const repositionCamera = useCallback(
+    (angle: number, distance: number) => {
+      const viewer = viewerRef.current;
+      if (
+        !viewer ||
+        !isActiveViewer(viewer) ||
+        !allPositionsRef.current.length
+      ) {
+        return;
+      }
 
-    const viewer = viewerRef.current;
-    const index =
-      allPositionsRef.current.length > 0 ? currentIndexRef.current : 0;
-    const position =
-      allPositionsRef.current[index] || allPositionsRef.current[0];
-    if (!position) {
-      return;
-    }
+      const index =
+        allPositionsRef.current.length > 0 ? currentIndexRef.current : 0;
+      const position =
+        allPositionsRef.current[index] || allPositionsRef.current[0];
+      if (!position) {
+        return;
+      }
 
-    // Update refs for replay mode
-    cameraHeadingRef.current = CesiumMath.toRadians(angle);
-    cameraDistanceRef.current = distance;
+      // Update refs for replay mode
+      cameraHeadingRef.current = CesiumMath.toRadians(angle);
+      cameraDistanceRef.current = distance;
 
-    // Calculate opposite heading (camera looks back at takeoff)
-    const oppositeHeading = (angle + 180) % 360;
+      // Calculate opposite heading (camera looks back at takeoff)
+      const oppositeHeading = (angle + 180) % 360;
 
-    // Position camera
-    viewer.camera.setView({
-      destination: position,
-      orientation: {
-        heading: CesiumMath.toRadians(oppositeHeading),
-        pitch: CesiumMath.toRadians(-10),
-        roll: 0.0,
-      },
-    });
+      // Position camera
+      viewer.camera.setView({
+        destination: position,
+        orientation: {
+          heading: CesiumMath.toRadians(oppositeHeading),
+          pitch: CesiumMath.toRadians(-10),
+          roll: 0.0,
+        },
+      });
 
-    // Move camera forward to position it at specified distance
-    viewer.camera.moveForward(distance);
-  }, []);
+      // Move camera forward to position it at specified distance
+      viewer.camera.moveForward(distance);
+    },
+    [isActiveViewer]
+  );
 
   const applyCameraToCurrentPlayback = (showToast = true) => {
     if (!allPositionsRef.current.length) {
