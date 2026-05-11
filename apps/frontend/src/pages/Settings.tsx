@@ -1558,7 +1558,7 @@ export default function Settings() {
       {/* Save Button */}
       <div className="mt-6 sticky bottom-4 z-10">
         <Button
-          onClick={saveSettings}
+          onClick={() => saveSettings()}
           className={`w-full px-6 py-4 rounded-xl font-bold text-lg shadow-lg transition-all ${
             saved
               ? 'bg-green-600 text-white'
