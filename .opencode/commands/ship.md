@@ -1,7 +1,7 @@
 ---
 description: Validate, commit, push, and open a pull request for the current branch.
 agent: build
-modele: openai/gpt.5.4-mini-fast
+model: openai/gpt.5.4-mini-fast
 ---
 
 Ship the current branch or worktree.
