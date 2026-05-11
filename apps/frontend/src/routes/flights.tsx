@@ -13,10 +13,11 @@ export const Route = createFileRoute('/flights')({
     siteId: typeof search.siteId === 'string' ? search.siteId : undefined,
   }),
   beforeLoad: requireAuth,
-  loader: async ({ search }) => {
+  loaderDeps: ({ search }) => search,
+  loader: async ({ deps }) => {
     await Promise.all([
       queryClient.ensureQueryData(
-        flightsQueryOptions({ limit: 50, siteId: search.siteId })
+        flightsQueryOptions({ limit: 50, siteId: deps.siteId })
       ),
       queryClient.ensureQueryData(sitesQueryOptions()),
     ]);

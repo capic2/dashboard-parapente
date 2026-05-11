@@ -7,6 +7,7 @@ WORKDIR /workspace
 
 ARG VITE_CESIUM_ION_TOKEN
 ENV VITE_CESIUM_ION_TOKEN=${VITE_CESIUM_ION_TOKEN}
+ENV NX_NO_CLOUD=true
 
 # Installer pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
@@ -22,7 +23,7 @@ COPY libs/design-system ./libs/design-system
 COPY apps/frontend ./apps/frontend
 
 # Installer toutes les dépendances (root + frontend)
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --config.enable-global-virtual-store=false
 
 # Build frontend avec Nx
 RUN pnpm exec nx build frontend --configuration=production
