@@ -423,7 +423,10 @@ describe('FlightViewer3D video export mode', () => {
       (
         options
       ): options is {
-        wall: { minimumHeights: { callback: () => unknown } };
+        wall: {
+          positions: { callback: () => unknown };
+          minimumHeights: { callback: () => unknown };
+        };
       } =>
         Boolean(
           (options as { wall?: { minimumHeights?: unknown } }).wall
@@ -435,7 +438,8 @@ describe('FlightViewer3D video export mode', () => {
 
     rerender(<FlightViewer3D key="flight-2" flightId="flight-2" exportOnly />);
 
-    expect(() => staleWall?.wall.minimumHeights.callback()).not.toThrow();
+    expect(staleWall?.wall.positions.callback()).toEqual([]);
+    expect(staleWall?.wall.minimumHeights.callback()).toEqual([]);
   });
 
   it('clears export globals when the Cesium viewer unmounts', async () => {
