@@ -21,7 +21,7 @@ Before running Nx commands, verify local dependencies exist. If `node_modules/.b
 CI=true /home/capic/.local/share/pnpm/pnpm install --frozen-lockfile
 ```
 
-For new worktrees, prefer a bootstrap subagent to perform this dependency readiness check in parallel with implementation work. The subagent should only run install when dependencies are missing or unusable.
+For new worktrees, prefer the `worktree-bootstrap` subagent to perform this dependency readiness check in parallel with implementation work. The subagent should only run install when dependencies are missing or unusable.
 
 Do not enable pnpm's global virtual store in this repository. Nx and Knip expect dependency resolution from the workspace-local `node_modules` layout, and CI can fail when packages resolve through a global virtual store path.
 

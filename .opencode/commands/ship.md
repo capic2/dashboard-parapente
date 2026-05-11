@@ -1,0 +1,28 @@
+---
+description: Validate, commit, push, and open a pull request for the current branch.
+agent: build
+---
+
+Ship the current branch or worktree.
+
+Follow the dashboard-parapente workflow and these guardrails:
+
+- Inspect Git state with `git status`, unstaged diff, staged diff, and recent log before changing anything.
+- Refuse to ship from `main`.
+- Refuse to commit secrets, credentials, `.env` files, or unrelated dirty files.
+- Stage only files relevant to the requested shipment.
+- Run impacted validation before committing. Prefer targeted Nx checks; for PR validation prefer `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e` when appropriate.
+- For frontend changes, run `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx lint frontend`, `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx test frontend`, and `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx build frontend`.
+- For backend changes, run `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx lint backend` and `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx test backend`.
+- Create a Conventional Commit that reflects the actual diff.
+- Push the branch, using upstream setup only when needed.
+- Open a PR with `gh pr create` after fetching the remote and ensuring the branch is not stale against `origin/main`.
+- Never force-push.
+- Never use destructive Git commands.
+- Never use `--no-verify` unless the user explicitly requested it.
+- Never amend unless the user explicitly requested it and it is safe.
+- Never push directly to `main`.
+- If checks are missing or failing, report the blocker instead of opening a PR unless the user explicitly wants to proceed.
+- Use `gh` for all GitHub interactions.
+
+Return a concise report with commit SHA, branch, PR URL, validation status, blockers, and warnings.

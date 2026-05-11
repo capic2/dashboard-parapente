@@ -31,7 +31,7 @@ description: Workflow expert for the dashboard-parapente Nx monorepo. Use when i
 ## Worktrees
 - For branch/worktree start-of-work decisions, use the `implementation-worktree-strategy` skill.
 - This skill only defines repository commands, validation strategy, GitHub usage, and tooling preferences.
-- When a worktree is created, use the bootstrap subagent defined by `implementation-worktree-strategy` before relying on Nx commands.
+- When a worktree is created, use the `worktree-bootstrap` subagent defined by `implementation-worktree-strategy` before relying on Nx commands.
 - Before opening a PR from a worktree, fetch the remote and update the worktree branch with the latest `origin/main`.
 - Do not create a PR from a stale worktree; resolve merge/rebase conflicts and rerun impacted checks first.
 
