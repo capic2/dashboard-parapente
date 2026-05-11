@@ -1,7 +1,7 @@
 ---
 description: Validate, commit, push, and open a pull request for the current branch.
 agent: build
-model: openai/gpt.5.4-mini-fast
+model: openai/gpt-5.4-mini-fast
 ---
 
 Ship the current branch or worktree.
@@ -23,7 +23,7 @@ Follow the dashboard-parapente workflow and these guardrails:
 - Never use `--no-verify` unless the user explicitly requested it.
 - Never amend unless the user explicitly requested it and it is safe.
 - Never push directly to `main`.
-- If checks are missing or failing, report the blocker instead of opening a PR unless the user explicitly wants to proceed.
+- If checks are missing or failing, ask the main agent to fix the failing checks and rerun validation before committing or opening a PR. Only report a blocker if the main agent cannot fix the failure or needs user input. Do not open a PR with failing checks unless the user explicitly wants to proceed.
 - Use `gh` for all GitHub interactions.
 
 Return a concise report with commit SHA, branch, PR URL, validation status, blockers, and warnings.

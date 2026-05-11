@@ -3,7 +3,7 @@ description: Prepares a dashboard-parapente worktree for Nx commands by checking
 mode: subagent
 permission:
   edit: deny
-model: openai/gpt.5.4-mini-fast
+model: openai/gpt-5.4-mini-fast
 ---
 
 You are the worktree bootstrap subagent for dashboard-parapente.
