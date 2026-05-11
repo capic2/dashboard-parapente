@@ -18,6 +18,9 @@
     "previousPage": "Page précédente",
     "nextPage": "Page suivante"
   },
+  "dataTable": {
+    "noItems": "Aucune donnée disponible"
+  },
   "errors": {
     "errorOccurred": "Une erreur est survenue",
     "errorMessage": "L'application a rencontré une erreur inattendue. Veuillez réessayer ou revenir à la page d'accueil.",

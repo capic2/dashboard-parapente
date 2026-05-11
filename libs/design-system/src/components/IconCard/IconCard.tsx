@@ -1,10 +1,11 @@
+import type { ReactNode } from 'react';
 import { ProgressBar } from 'react-aria-components';
 import { tv } from 'tailwind-variants';
 
 const iconCard = tv({
   slots: {
     root: 'flex flex-col items-center p-3 border-2 rounded-lg relative overflow-hidden',
-    icon: 'text-3xl mb-1',
+    icon: 'mb-1 flex h-9 w-9 items-center justify-center text-sky-600 dark:text-sky-400',
     title: 'text-xs font-semibold text-center',
     description: 'text-xs text-center mt-1',
     progress: 'text-xs text-sky-600 dark:text-sky-400 font-medium mt-1',
@@ -30,7 +31,7 @@ const iconCard = tv({
 });
 
 interface IconCardProps {
-  icon: string;
+  icon: ReactNode;
   title: string;
   description: string;
   unlocked: boolean;
@@ -45,13 +46,18 @@ export function IconCard({
   progress,
 }: IconCardProps) {
   const styles = iconCard({ unlocked });
+  const clampedProgress = Math.min(100, Math.max(0, progress ?? 0));
   const content = (
     <>
-      <span className={styles.icon()}>{icon}</span>
+      <span aria-hidden="true" className={styles.icon()}>
+        {icon}
+      </span>
       <span className={styles.title()}>{title}</span>
       <span className={styles.description()}>{description}</span>
       {!unlocked && progress !== undefined && progress > 0 && (
-        <span className={styles.progress()}>{Math.round(progress)}%</span>
+        <span className={styles.progress()}>
+          {Math.round(clampedProgress)}%
+        </span>
       )}
     </>
   );
@@ -64,12 +70,12 @@ export function IconCard({
           className="absolute inset-0"
           maxValue={100}
           minValue={0}
-          value={progress}
+          value={clampedProgress}
         >
           <div
             className={styles.progressOverlay()}
             style={{
-              height: `${progress}%`,
+              height: `${clampedProgress}%`,
               bottom: 0,
               top: 'auto',
             }}

@@ -18,6 +18,9 @@
     "previousPage": "Previous page",
     "nextPage": "Next page"
   },
+  "dataTable": {
+    "noItems": "No data available"
+  },
   "errors": {
     "errorOccurred": "An error occurred",
     "errorMessage": "The application encountered an unexpected error. Please try again or go back to the home page.",

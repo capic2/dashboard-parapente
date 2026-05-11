@@ -2,19 +2,21 @@ interface LoadingSkeletonProps {
   type?: 'card' | 'chart' | 'list' | 'text';
   count?: number;
   height?: string;
+  label?: string;
 }
 
 export default function LoadingSkeleton({
   type = 'card',
   count = 1,
   height,
+  label = 'Chargement en cours',
 }: LoadingSkeletonProps) {
   const renderSkeleton = () => {
     switch (type) {
       case 'card':
         return (
           <div
-            className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md animate-pulse"
+            className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md animate-pulse motion-reduce:animate-none"
             style={{ height }}
           >
             <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded mb-3 w-3/4"></div>
@@ -26,7 +28,7 @@ export default function LoadingSkeleton({
       case 'chart':
         return (
           <div
-            className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md animate-pulse"
+            className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md animate-pulse motion-reduce:animate-none"
             style={{ height: height || '300px' }}
           >
             <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded mb-4 w-1/3"></div>
@@ -36,7 +38,7 @@ export default function LoadingSkeleton({
 
       case 'list':
         return (
-          <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm animate-pulse">
+          <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm animate-pulse motion-reduce:animate-none">
             <div className="w-12 h-12 bg-gray-200 dark:bg-gray-600 rounded-full shrink-0"></div>
             <div className="flex-1">
               <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded mb-2"></div>
@@ -47,7 +49,7 @@ export default function LoadingSkeleton({
 
       case 'text':
         return (
-          <div className="space-y-2 animate-pulse">
+          <div className="space-y-2 animate-pulse motion-reduce:animate-none">
             <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded"></div>
             <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded"></div>
             <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-1/2"></div>
@@ -57,7 +59,7 @@ export default function LoadingSkeleton({
       default:
         return (
           <div
-            className="bg-gray-200 dark:bg-gray-600 rounded animate-pulse"
+            className="bg-gray-200 dark:bg-gray-600 rounded animate-pulse motion-reduce:animate-none"
             style={{ height }}
           ></div>
         );
@@ -65,7 +67,13 @@ export default function LoadingSkeleton({
   };
 
   return (
-    <div className="space-y-4">
+    <div
+      className="space-y-4"
+      role="status"
+      aria-busy="true"
+      aria-label={label}
+    >
+      <span className="sr-only">{label}</span>
       {Array.from({ length: count }).map((_, index) => (
         <div key={index}>{renderSkeleton()}</div>
       ))}
