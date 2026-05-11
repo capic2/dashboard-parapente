@@ -57,6 +57,7 @@ export function FlightDetails({
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState(flight.notes ?? '');
   const [activeTab, setActiveTab] = useState<FlightDetailsTab>('infos');
+  const [hasOpenedReplay, setHasOpenedReplay] = useState(false);
   const [isDownloadingGpx, setIsDownloadingGpx] = useState(false);
 
   const hasGpx = Boolean(flight.gpx_file_path);
@@ -74,6 +75,7 @@ export function FlightDetails({
 
   useEffect(() => {
     setActiveTab('infos');
+    setHasOpenedReplay(false);
     setEditingMode(false);
     setEditingNotes(false);
     setNotesText(flight.notes ?? '');
@@ -414,7 +416,13 @@ export function FlightDetails({
 
         <Tabs
           selectedKey={activeTab}
-          onSelectionChange={(key) => setActiveTab(key as FlightDetailsTab)}
+          onSelectionChange={(key) => {
+            const tab = key as FlightDetailsTab;
+            setActiveTab(tab);
+            if (tab === 'replay') {
+              setHasOpenedReplay(true);
+            }
+          }}
           className="space-y-4"
         >
           <TabList className="mb-4 grid-cols-2">
@@ -430,7 +438,7 @@ export function FlightDetails({
             {infoCard}
           </TabPanel>
           <TabPanel id="replay" className="outline-none">
-            {replayCard}
+            {hasOpenedReplay ? replayCard : null}
           </TabPanel>
         </Tabs>
       </div>

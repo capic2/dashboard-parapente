@@ -41,8 +41,13 @@ const flightsRouteConfig = {
       path: '/flights',
       element: 'story' as const,
       validateSearch: (search: Record<string, unknown>) => ({
-        flightId:
-          typeof search.flightId === 'string' ? search.flightId : undefined,
+        siteId: typeof search.siteId === 'string' ? search.siteId : undefined,
+      }),
+    },
+    {
+      path: '/flights/$flightId',
+      element: 'story' as const,
+      validateSearch: (search: Record<string, unknown>) => ({
         siteId: typeof search.siteId === 'string' ? search.siteId : undefined,
       }),
     },
@@ -326,6 +331,7 @@ MobileFlow.test(
         name: i18n.t('flights.listAriaLabel'),
       });
       await expect(flightList).toBeInTheDocument();
+      gpxRequestCount = 0;
     });
 
     await step('opens a flight in mobile detail mode', async () => {

@@ -4,7 +4,7 @@ import { flightsQueryOptions } from '../hooks/flights/useFlights';
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import type { Flight, Site } from '../types';
 import type { RowSelectionState } from '@tanstack/react-table';
-import { useNavigate, useSearch } from '@tanstack/react-router';
+import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { Input, TextField } from 'react-aria-components';
 import {
   CheckSquare,
@@ -32,15 +32,16 @@ import { useIsMobile } from '../hooks/useIsMobile';
 
 export default function FlightHistory() {
   const { t } = useTranslation();
-  const navigate = useNavigate({ from: '/flights' });
-  const search = useSearch({ from: '/flights' });
+  const navigate = useNavigate();
+  const params = useParams({ strict: false });
+  const search = useSearch({ strict: false }) as { siteId?: string };
   const { data: flights } = useSuspenseQuery(
     flightsQueryOptions({ limit: 50, siteId: search.siteId })
   );
 
   const isMobile = useIsMobile();
 
-  const selectedFlightId = search.flightId ?? null;
+  const selectedFlightId = params.flightId ?? null;
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [selectionMode, setSelectionMode] = useState(false);
   const [flightToDelete, setFlightToDelete] = useState<Flight | null>(null);
@@ -81,11 +82,18 @@ export default function FlightHistory() {
 
   const setSelectedFlightId = useCallback(
     (flightId: string | undefined) => {
+      if (flightId) {
+        void navigate({
+          to: '/flights/$flightId',
+          params: { flightId },
+          search: { siteId: search.siteId },
+        });
+        return;
+      }
+
       void navigate({
-        search: {
-          flightId,
-          siteId: search.siteId,
-        },
+        to: '/flights',
+        search: { siteId: search.siteId },
       });
     },
     [navigate, search.siteId]
