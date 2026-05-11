@@ -123,6 +123,7 @@ vi.mock('cesium', () => {
     };
     shadows = false;
     terrainShadows = 0;
+    useDefaultRenderLoop = true;
     render = vi.fn();
     destroyed = false;
 
@@ -455,6 +456,9 @@ describe('FlightViewer3D video export mode', () => {
 
     unmount();
 
+    expect(
+      viewerInstances[viewerInstances.length - 1]?.useDefaultRenderLoop
+    ).toBe(false);
     expect(window._setExportFrame).toBeUndefined();
     expect(window._getExportMetadata).toBeUndefined();
     expect(window._cesiumViewer).toBeUndefined();

@@ -139,11 +139,32 @@ const interpolatePosition = (
   );
 
 const getViewerScene = (viewer: CesiumViewer | null | undefined) => {
-  if (!viewer || viewer.isDestroyed() || !viewer.scene) {
+  try {
+    if (!viewer || viewer.isDestroyed()) {
+      return null;
+    }
+
+    return viewer.scene ?? null;
+  } catch {
     return null;
   }
+};
 
-  return viewer.scene;
+const destroyViewer = (viewer: CesiumViewer) => {
+  try {
+    viewer.useDefaultRenderLoop = false;
+    viewer.clock.shouldAnimate = false;
+  } catch {
+    // Cesium can invalidate internals while tearing down the WebGL context.
+  }
+
+  try {
+    if (!viewer.isDestroyed()) {
+      viewer.destroy();
+    }
+  } catch {
+    // Avoid surfacing late Cesium teardown errors during route transitions.
+  }
 };
 
 const renderViewerFrame = (viewer: CesiumViewer) => {
@@ -571,6 +592,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     let isMounted = true;
     let attemptCount = 0;
     const maxAttempts = 10;
+    let createViewerTimeout: ReturnType<typeof setTimeout> | null = null;
 
     const tryCreateViewer = () => {
       attemptCount++;
@@ -579,7 +601,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       if (!containerRef.current) {
         if (attemptCount < maxAttempts) {
-          setTimeout(tryCreateViewer, 100);
+          createViewerTimeout = setTimeout(tryCreateViewer, 100);
           return;
         }
         setViewerError('Container element not found after multiple attempts');
@@ -623,7 +645,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
         const scene = getViewerScene(viewer);
         if (!scene) {
-          viewer.destroy();
+          destroyViewer(viewer);
           setViewerError('Cesium scene could not be initialized');
           return;
         }
@@ -642,13 +664,17 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     };
 
     // Start trying to create viewer after a small delay
-    const initialTimeout = setTimeout(tryCreateViewer, 100);
+    createViewerTimeout = setTimeout(tryCreateViewer, 100);
 
     return () => {
       isMounted = false;
-      clearTimeout(initialTimeout);
-      if (viewerRef.current && !viewerRef.current.isDestroyed()) {
-        viewerRef.current.destroy();
+      if (createViewerTimeout) {
+        clearTimeout(createViewerTimeout);
+      }
+      const viewer = viewerRef.current;
+      viewerRef.current = null;
+      if (viewer) {
+        destroyViewer(viewer);
       }
       if (typeof window !== 'undefined') {
         window._setExportFrame = undefined;
@@ -656,7 +682,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         window._gpxData = undefined;
         window._cesiumViewer = undefined;
       }
-      viewerRef.current = null;
       if (isMountedRef.current) {
         setViewerReady(false);
       }
