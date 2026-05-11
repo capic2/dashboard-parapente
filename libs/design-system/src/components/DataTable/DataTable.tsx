@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { flexRender, type Table } from '@tanstack/react-table';
+import { useTranslation } from 'react-i18next';
 import { tv } from 'tailwind-variants';
 
 const dataTable = tv({
@@ -31,6 +32,30 @@ const dataTable = tv({
 interface DataTableProps<TData> {
   table: Table<TData>;
   className?: string;
+  emptyMessage?: string;
+}
+
+function SortIcon({ direction }: { direction: 'asc' | 'desc' }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-3.5 w-3.5 shrink-0"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d={
+          direction === 'desc'
+            ? 'm19.5 8.25-7.5 7.5-7.5-7.5'
+            : 'm4.5 15.75 7.5-7.5 7.5 7.5'
+        }
+      />
+    </svg>
+  );
 }
 
 function getAriaSort(
@@ -49,7 +74,15 @@ function getAriaSort(
   return undefined;
 }
 
-export function DataTable<TData>({ table, className }: DataTableProps<TData>) {
+export function DataTable<TData>({
+  table,
+  className,
+  emptyMessage,
+}: DataTableProps<TData>) {
+  const { t } = useTranslation();
+  const rows = table.getRowModel().rows;
+  const visibleColumnCount = table.getVisibleLeafColumns().length;
+
   return (
     <div className={className}>
       <div className="overflow-x-auto">
@@ -82,11 +115,7 @@ export function DataTable<TData>({ table, className }: DataTableProps<TData>) {
                           onClick={header.column.getToggleSortingHandler()}
                         >
                           {headerContent}
-                          {sorted && (
-                            <span aria-hidden="true">
-                              {sorted === 'desc' ? '↓' : '↑'}
-                            </span>
-                          )}
+                          {sorted && <SortIcon direction={sorted} />}
                         </button>
                       )}
                       {!header.isPlaceholder && !canSort && headerContent}
@@ -97,7 +126,7 @@ export function DataTable<TData>({ table, className }: DataTableProps<TData>) {
             ))}
           </thead>
           <tbody>
-            {table.getRowModel().rows.map((tableRow) => (
+            {rows.map((tableRow) => (
               <tr
                 key={tableRow.id}
                 className={dataTable({ hoverable: true }).row()}
@@ -114,6 +143,16 @@ export function DataTable<TData>({ table, className }: DataTableProps<TData>) {
                 ))}
               </tr>
             ))}
+            {rows.length === 0 && (
+              <tr>
+                <td
+                  colSpan={visibleColumnCount}
+                  className="px-3 py-8 text-center text-sm font-medium text-gray-600 dark:text-gray-300"
+                >
+                  {emptyMessage ?? t('dataTable.noItems')}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

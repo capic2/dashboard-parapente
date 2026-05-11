@@ -44,6 +44,7 @@ export const Success = meta.story({
     title: 'Operation completed successfully!',
     type: 'success',
     onClose: fn(),
+    autoDismissMs: false,
   },
 });
 
@@ -54,7 +55,9 @@ Success.test(
     const canvas = within(canvasElement);
 
     // Find and click the close button
-    const closeButton = canvas.getByRole('button', { name: /×/i });
+    const closeButton = canvas.getByRole('button', {
+      name: /fermer la notification/i,
+    });
     await userEvent.click(closeButton);
 
     // Verify onClose was called with the correct ID
@@ -70,6 +73,7 @@ export const Error = meta.story({
     title: 'An error occurred. Please try again.',
     type: 'error',
     onClose: fn(),
+    autoDismissMs: false,
   },
 });
 
@@ -81,6 +85,7 @@ export const Info = meta.story({
     title: 'New updates are available',
     type: 'info',
     onClose: fn(),
+    autoDismissMs: false,
   },
 });
 
@@ -93,6 +98,7 @@ export const LongMessage = meta.story({
       'This is a very long toast message that demonstrates how the component handles longer text content. It should wrap properly and maintain readability.',
     type: 'info',
     onClose: fn(),
+    autoDismissMs: false,
   },
 });
 
@@ -104,6 +110,7 @@ export const ShortMessage = meta.story({
     title: 'Done!',
     type: 'success',
     onClose: fn(),
+    autoDismissMs: false,
   },
 });
 
@@ -117,18 +124,21 @@ export const AllTypes = meta.story({
         title="Success: Operation completed"
         type="success"
         onClose={fn()}
+        autoDismissMs={false}
       />
       <Toast
         id="error-compare"
         title="Error: Something went wrong"
         type="error"
         onClose={fn()}
+        autoDismissMs={false}
       />
       <Toast
         id="info-compare"
         title="Info: New notification"
         type="info"
         onClose={fn()}
+        autoDismissMs={false}
       />
     </div>
   ),
