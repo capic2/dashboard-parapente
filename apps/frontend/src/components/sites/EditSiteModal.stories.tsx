@@ -176,7 +176,7 @@ export const SavingState = meta.story({
 
 SavingState.test('interaction test', async ({ userEvent }) => {
   const dialog = within(screen.getByRole('dialog'));
-  const saveButton = dialog.getByText('💾 Enregistrer');
+  const saveButton = dialog.getByRole('button', { name: /Enregistrer/ });
   await userEvent.click(saveButton);
 });
 

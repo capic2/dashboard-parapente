@@ -34,11 +34,26 @@ function installMatchMediaMock(isMobile: boolean) {
   };
 }
 
+const flightsRouteConfig = {
+  initialPath: '/flights',
+  routes: [
+    {
+      path: '/flights',
+      element: 'story' as const,
+      validateSearch: (search: Record<string, unknown>) => ({
+        flightId:
+          typeof search.flightId === 'string' ? search.flightId : undefined,
+        siteId: typeof search.siteId === 'string' ? search.siteId : undefined,
+      }),
+    },
+  ],
+};
+
 const meta = preview.meta({
   title: 'Pages/FlightHistory',
   component: FlightHistory,
   decorators: [(Story, context) => <Story key={context.id} />],
-  parameters: { layout: 'fullscreen' },
+  parameters: { layout: 'fullscreen', router: flightsRouteConfig },
   tags: ['autodocs'],
 });
 
