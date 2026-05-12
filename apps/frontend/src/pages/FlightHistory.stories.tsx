@@ -398,6 +398,7 @@ MobileFlowWithReplay.test(
           name: i18n.t('flights.backToList'),
         })
       ).toBeInTheDocument();
+      gpxRequestCount = 0;
     });
 
     await step('does not load GPX while Infos tab is active', () => {
