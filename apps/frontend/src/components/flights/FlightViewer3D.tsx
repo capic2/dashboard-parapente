@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { Entity } from 'cesium';
 import {
   BoundingSphere,
@@ -54,10 +60,9 @@ import {
 } from '@dashboard-parapente/shared-types';
 import {
   computeCursorTelemetryLabel,
-  DEFAULT_VIEWER_UNITS,
-  getViewerUnitsFromStorage,
   type ViewerUnits,
 } from './flightViewerTelemetry';
+import { useAppSettingsStore } from '../../stores/appSettingsStore';
 
 const isVideoExportInProgress = (status?: string | null) =>
   Boolean(status && VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(status));
@@ -333,10 +338,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [videoExportMode, setVideoExportMode] =
     useState<VideoExportMode>('manual_fast');
   const [isStartingVideoExport, setIsStartingVideoExport] = useState(false);
-  const [viewerUnits, setViewerUnits] = useState<ViewerUnits>(() =>
-    typeof window === 'undefined'
-      ? DEFAULT_VIEWER_UNITS
-      : getViewerUnitsFromStorage(window.localStorage)
+  const appUnits = useAppSettingsStore((state) => state.settings.units);
+  const viewerUnits: ViewerUnits = useMemo(
+    () => ({
+      altitude: appUnits.altitude,
+      speed: appUnits.speed,
+    }),
+    [appUnits.altitude, appUnits.speed]
   );
 
   // Terrain rendering states
@@ -589,31 +597,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       });
     }
   }, [exportStatus?.internal_status, flightId, queryClient]);
-
-  useEffect(() => {
-    const refreshUnits = () => {
-      const nextUnits = getViewerUnitsFromStorage(window.localStorage);
-      setViewerUnits((previousUnits) => {
-        if (
-          previousUnits.altitude === nextUnits.altitude &&
-          previousUnits.speed === nextUnits.speed
-        ) {
-          return previousUnits;
-        }
-
-        return nextUnits;
-      });
-    };
-
-    refreshUnits();
-    window.addEventListener('storage', refreshUnits);
-    window.addEventListener('focus', refreshUnits);
-
-    return () => {
-      window.removeEventListener('storage', refreshUnits);
-      window.removeEventListener('focus', refreshUnits);
-    };
-  }, []);
 
   useEffect(() => {
     viewerUnitsRef.current = viewerUnits;

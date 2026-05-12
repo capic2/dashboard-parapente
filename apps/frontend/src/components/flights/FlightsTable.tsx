@@ -14,6 +14,11 @@ import {
 } from 'lucide-react';
 import { useFlightsTable, FLIGHT_SORTABLE_COLUMNS } from './useFlightsTable';
 import type { Flight } from '../../types';
+import {
+  formatAltitudeMeters,
+  formatDistanceKm,
+  useAppSettingsStore,
+} from '../../stores/appSettingsStore';
 
 interface FlightsTableProps {
   flights: Flight[];
@@ -36,6 +41,7 @@ export function FlightsTable({
   onRowSelectionChange,
 }: FlightsTableProps) {
   const { t, i18n } = useTranslation();
+  const units = useAppSettingsStore((state) => state.settings.units);
   const { table } = useFlightsTable({
     data: flights,
     selectionMode,
@@ -208,13 +214,17 @@ export function FlightsTable({
             {flight.distance_km && (
               <div className="flex items-center gap-1">
                 <Ruler className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>{flight.distance_km.toFixed(1)} km</span>
+                <span>
+                  {formatDistanceKm(flight.distance_km, units.distance)}
+                </span>
               </div>
             )}
             {flight.max_altitude_m && (
               <div className="flex items-center gap-1">
                 <Mountain className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>{flight.max_altitude_m} m</span>
+                <span>
+                  {formatAltitudeMeters(flight.max_altitude_m, units.altitude)}
+                </span>
               </div>
             )}
           </div>
@@ -231,7 +241,15 @@ export function FlightsTable({
         </div>
       );
     },
-    [selectionMode, selectedFlightId, onSelectFlight, onDeleteFlight, t, i18n]
+    [
+      selectionMode,
+      selectedFlightId,
+      onSelectFlight,
+      onDeleteFlight,
+      t,
+      i18n,
+      units,
+    ]
   );
 
   return (

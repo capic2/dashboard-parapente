@@ -222,6 +222,9 @@
   "settings": {
     "title": "Settings",
     "subtitle": "Configure your paragliding dashboard",
+    "description": "Preferences are applied immediately to the relevant pages and kept in this browser.",
+    "autoSave": "Auto-save",
+    "saved": "Applied",
     "tabs": {
       "general": "General",
       "favoriteSites": "Favorite Sites",
@@ -230,6 +233,7 @@
     },
     "units": {
       "title": "Units of Measurement",
+      "description": "Set the display used in flights, flight details and the 3D viewer.",
       "distance": "Distance",
       "kilometers": "Kilometers (km)",
       "miles": "Miles (mi)",
@@ -240,6 +244,7 @@
     },
     "languageTheme": {
       "title": "Language & Theme",
+      "description": "Adapt the interface to your language and display preference.",
       "language": "Language",
       "theme": "Theme",
       "light": "Light",
@@ -248,12 +253,17 @@
     },
     "notifications": {
       "title": "Notifications",
+      "description": "Stored preferences for future notifications. No external delivery is triggered here.",
       "weatherAlerts": "Weather alerts",
+      "weatherAlertsHelp": "Prepares alerts tied to weather conditions.",
       "newFlights": "New flights",
-      "customAlerts": "Custom alerts"
+      "newFlightsHelp": "Prepares notifications when new flights are imported.",
+      "customAlerts": "Custom alerts",
+      "customAlertsHelp": "Keeps your choice for future custom scenarios."
     },
     "favorites": {
       "title": "Manage your Favorite Sites",
+      "description": "{{count}} favorite site(s) used first in weather and selectors.",
       "noSites": "No sites available",
       "favorite": "Favorite",
       "add": "Add",
@@ -327,10 +337,12 @@
     },
     "data": {
       "backupTitle": "Backup & Restore",
+      "backupDescription": "Export or restore your local preferences and browser cache settings.",
       "export": "Export my settings",
       "import": "Import settings",
       "importWarning": "Importing will replace your current settings",
       "resetTitle": "Reset",
+      "resetDescription": "Return local preferences and browser cache to their default values.",
       "resetAll": "Reset all settings",
       "resetWarning": "This action is irreversible (unless you have exported a backup)",
       "importSuccess": "Settings imported successfully!",
