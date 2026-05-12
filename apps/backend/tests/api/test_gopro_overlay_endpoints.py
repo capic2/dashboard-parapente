@@ -1,8 +1,17 @@
+from io import BytesIO
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
+from starlette.datastructures import Headers
+from starlette.datastructures import UploadFile
 
+import config
+import gopro_overlay_export
 from gopro_overlay_export import _prepare_layout_file
+from gopro_overlay_export import cancel_gopro_overlay_job
+from gopro_overlay_export import create_gopro_overlay_job
 
 API_PREFIX = "/api"
 
@@ -101,3 +110,97 @@ def test_prepare_layout_file_removes_pip_without_video(tmp_path):
     _prepare_layout_file(source, destination, has_pip=False)
 
     assert 'type="video"' not in destination.read_text()
+
+
+@pytest.mark.asyncio
+async def test_create_gopro_overlay_job_cleans_uploads_after_validation_failure(
+    tmp_path,
+    monkeypatch,
+):
+    upload_dir = tmp_path / "uploads"
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_UPLOAD_DIR", str(upload_dir))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_OUTPUT_DIR", str(tmp_path / "outputs"))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(tmp_path / "layouts"))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+
+    with pytest.raises(ValueError, match="Unknown layout"):
+        await create_gopro_overlay_job(
+            video_file=_upload("flight.mp4", b"video"),
+            gpx_file=_upload("flight.gpx", b"<gpx />"),
+            pip_file=None,
+            layout_id="missing-layout",
+            output_filename="flight-overlay.mp4",
+        )
+
+    assert not upload_dir.exists() or not any(upload_dir.iterdir())
+
+
+@pytest.mark.asyncio
+async def test_create_gopro_overlay_job_uses_job_unique_output_paths(tmp_path, monkeypatch):
+    upload_dir = tmp_path / "uploads"
+    output_dir = tmp_path / "outputs"
+    layout_dir = tmp_path / "layouts"
+    layout_dir.mkdir()
+    (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_UPLOAD_DIR", str(upload_dir))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_OUTPUT_DIR", str(output_dir))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+
+    with patch("gopro_overlay_export.threading.Thread") as thread:
+        first = await create_gopro_overlay_job(
+            video_file=_upload("flight.mp4", b"video"),
+            gpx_file=_upload("flight.gpx", b"<gpx />"),
+            pip_file=None,
+            layout_id="parapente-1080",
+            output_filename="overlay.mp4",
+        )
+        second = await create_gopro_overlay_job(
+            video_file=_upload("flight.mp4", b"video"),
+            gpx_file=_upload("flight.gpx", b"<gpx />"),
+            pip_file=None,
+            layout_id="parapente-1080",
+            output_filename="overlay.mp4",
+        )
+
+    assert first["output_filename"] == "overlay.mp4"
+    assert second["output_filename"] == "overlay.mp4"
+    assert first["output_path"] != second["output_path"]
+    assert Path(first["output_path"]).parent.name == first["job_id"]
+    assert Path(second["output_path"]).parent.name == second["job_id"]
+    assert thread.call_count == 2
+
+
+def test_cancelled_queued_job_does_not_start_process():
+    job_id = "queued-job"
+    gopro_overlay_export._JOBS[job_id] = {
+        "job_id": job_id,
+        "status": "queued",
+        "progress": 0,
+        "message": "Overlay queued",
+        "gpx_path": "track.gpx",
+        "layout_path": "layout.xml",
+        "video_path": "flight.mp4",
+        "output_path": "overlay.mp4",
+        "pip_path": None,
+        "video_width": None,
+        "video_height": None,
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
+    try:
+        assert cancel_gopro_overlay_job(job_id)
+        with patch("gopro_overlay_export.subprocess.Popen") as popen:
+            gopro_overlay_export._run_job(job_id)
+        assert not popen.called
+        assert gopro_overlay_export._JOBS[job_id]["status"] == "cancelled"
+    finally:
+        gopro_overlay_export._JOBS.pop(job_id, None)
+        gopro_overlay_export._PROCESSES.pop(job_id, None)
+
+
+def _upload(filename: str, content: bytes) -> UploadFile:
+    return UploadFile(
+        file=BytesIO(content),
+        filename=filename,
+        headers=Headers({"content-type": "application/octet-stream"}),
+    )

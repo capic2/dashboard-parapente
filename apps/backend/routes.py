@@ -19,6 +19,7 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
+    Response,
     UploadFile,
 )
 from fastapi.responses import FileResponse, StreamingResponse
@@ -231,7 +232,11 @@ router = APIRouter(prefix="/api", tags=["api"], dependencies=[Depends(get_curren
 
 
 @public_router.post("/auth/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(
+    response: Response,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
     """Authenticate with email + password, returns JWT access token."""
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
@@ -241,6 +246,14 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
             headers={"WWW-Authenticate": "Bearer"},
         )
     token = create_access_token(user.email)
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        max_age=config.JWT_EXPIRE_HOURS * 60 * 60,
+        httponly=True,
+        samesite="lax",
+        secure=config.ENVIRONMENT == "production",
+    )
     return {"access_token": token, "token_type": "bearer"}
 
 
@@ -4493,7 +4506,7 @@ def list_flight_exports(flight_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/gopro-overlays/dependencies")
-def get_gopro_overlay_dependencies():
+def get_gopro_overlay_dependencies() -> dict[str, bool]:
     """Return availability of the external GoPro overlay toolchain."""
     return check_gopro_overlay_dependencies()
 
@@ -4502,13 +4515,13 @@ def get_gopro_overlay_dependencies():
 def get_gopro_overlay_layouts(
     width: int | None = None,
     height: int | None = None,
-):
+) -> dict[str, list[dict[str, Any]]]:
     """List parapente layouts and mark the best match for an optional resolution."""
     return {"layouts": list_gopro_overlay_layouts(video_width=width, video_height=height)}
 
 
 @router.post("/gopro-overlays/probe")
-async def probe_gopro_overlay_video(video_file: UploadFile = File(...)):
+async def probe_gopro_overlay_video(video_file: UploadFile = File(...)) -> dict[str, Any]:
     """Probe an uploaded video resolution without starting a render job."""
     temp_path = Path(config.GOPRO_OVERLAY_UPLOAD_DIR) / "probe" / f"{uuid.uuid4()}.mp4"
     try:
@@ -4530,7 +4543,7 @@ async def create_gopro_overlay_render_job(
     pip_file: UploadFile | None = File(None),
     layout_id: str | None = Form(None),
     output_filename: str | None = Form(None),
-):
+) -> dict[str, Any]:
     """Create a GoPro overlay render job from uploaded video, GPX, and optional PIP video."""
     dependencies = check_gopro_overlay_dependencies()
     missing = [name for name, available in dependencies.items() if not available]
@@ -4553,7 +4566,7 @@ async def create_gopro_overlay_render_job(
 
 
 @router.get("/gopro-overlays/jobs/{job_id}/status")
-def get_gopro_overlay_render_job_status(job_id: str):
+def get_gopro_overlay_render_job_status(job_id: str) -> dict[str, Any]:
     """Get current GoPro overlay render status."""
     job = get_gopro_overlay_job(job_id)
     if not job:
@@ -4562,19 +4575,22 @@ def get_gopro_overlay_render_job_status(job_id: str):
 
 
 @router.get("/gopro-overlays/jobs/{job_id}/stream")
-async def stream_gopro_overlay_render_job_status(job_id: str) -> StreamingResponse:
+async def stream_gopro_overlay_render_job_status(
+    job_id: str,
+    request: Request,
+) -> StreamingResponse:
     """Stream GoPro overlay render status as Server-Sent Events."""
     if not get_gopro_overlay_job(job_id):
         raise HTTPException(status_code=404, detail="GoPro overlay job not found")
     return StreamingResponse(
-        stream_gopro_overlay_job(job_id),
+        stream_gopro_overlay_job(job_id, request.is_disconnected),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 
 @router.delete("/gopro-overlays/jobs/{job_id}/cancel")
-def cancel_gopro_overlay_render_job(job_id: str):
+def cancel_gopro_overlay_render_job(job_id: str) -> dict[str, str]:
     """Cancel a running GoPro overlay render job."""
     if not cancel_gopro_overlay_job(job_id):
         raise HTTPException(status_code=404, detail="GoPro overlay job not found")
@@ -4582,7 +4598,7 @@ def cancel_gopro_overlay_render_job(job_id: str):
 
 
 @router.get("/gopro-overlays/jobs/{job_id}/download")
-def download_gopro_overlay_render_job(job_id: str):
+def download_gopro_overlay_render_job(job_id: str) -> FileResponse:
     """Download the completed GoPro overlay video."""
     job = get_gopro_overlay_job(job_id)
     if not job:

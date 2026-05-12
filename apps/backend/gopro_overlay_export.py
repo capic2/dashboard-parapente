@@ -1,10 +1,12 @@
 import asyncio
 import json
+import os
 import shutil
 import subprocess
 import threading
 import uuid
 import xml.etree.ElementTree as ET
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,6 +21,7 @@ _STATUS_RUNNING = "running"
 _STATUS_COMPLETED = "completed"
 _STATUS_FAILED = "failed"
 _STATUS_CANCELLED = "cancelled"
+_TERMINAL_STATUSES = {_STATUS_COMPLETED, _STATUS_FAILED, _STATUS_CANCELLED}
 
 _VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v"}
 _GPX_EXTENSIONS = {".gpx", ".fit"}
@@ -120,6 +123,33 @@ def _safe_filename(filename: str | None, fallback: str) -> str:
 def _update_job(job_id: str, **changes: Any) -> dict[str, Any]:
     with _LOCK:
         job = _JOBS[job_id]
+        if job["status"] in _TERMINAL_STATUSES:
+            return job.copy()
+        job.update(changes)
+        job["updated_at"] = _utc_now()
+        return job.copy()
+
+
+def _transition_job_to_running(job_id: str, command: list[str]) -> dict[str, Any] | None:
+    with _LOCK:
+        job = _JOBS.get(job_id)
+        if not job or job["status"] != _STATUS_QUEUED:
+            return None
+        job.update(
+            status=_STATUS_RUNNING,
+            progress=5,
+            message="Rendering overlay",
+            command=command,
+            updated_at=_utc_now(),
+        )
+        return job.copy()
+
+
+def _finish_job(job_id: str, **changes: Any) -> dict[str, Any]:
+    with _LOCK:
+        job = _JOBS[job_id]
+        if job["status"] in _TERMINAL_STATUSES:
+            return job.copy()
         job.update(changes)
         job["updated_at"] = _utc_now()
         return job.copy()
@@ -227,38 +257,42 @@ async def create_gopro_overlay_job(
     if Path(output_name).suffix.lower() != ".mp4":
         output_name = f"{Path(output_name).stem}.mp4"
 
-    video_path = await save_uploaded_file(
-        video_file,
-        job_upload_dir / _safe_filename(video_file.filename, "input.mp4"),
-        _VIDEO_EXTENSIONS,
-    )
-    gpx_path = await save_uploaded_file(
-        gpx_file,
-        job_upload_dir / _safe_filename(gpx_file.filename, "track.gpx"),
-        _GPX_EXTENSIONS,
-    )
-    pip_path = None
-    if pip_file and pip_file.filename:
-        pip_path = await save_uploaded_file(
-            pip_file,
-            job_upload_dir / _safe_filename(pip_file.filename, "pip.mp4"),
+    try:
+        video_path = await save_uploaded_file(
+            video_file,
+            job_upload_dir / _safe_filename(video_file.filename, "input.mp4"),
             _VIDEO_EXTENSIONS,
         )
+        gpx_path = await save_uploaded_file(
+            gpx_file,
+            job_upload_dir / _safe_filename(gpx_file.filename, "track.gpx"),
+            _GPX_EXTENSIONS,
+        )
+        pip_path = None
+        if pip_file and pip_file.filename:
+            pip_path = await save_uploaded_file(
+                pip_file,
+                job_upload_dir / _safe_filename(pip_file.filename, "pip.mp4"),
+                _VIDEO_EXTENSIONS,
+            )
 
-    width, height = probe_video_resolution(video_path)
-    selected_layout = _find_layout(layout_id) if layout_id else _nearest_layout(width, height)
-    if not selected_layout:
-        raise ValueError("Unknown layout")
-    source_layout_path = _layout_path(selected_layout)
-    if not source_layout_path.exists():
-        raise ValueError(f"Layout file not found: {source_layout_path}")
-    layout_path = _prepare_layout_file(
-        source_layout_path,
-        job_upload_dir / source_layout_path.name,
-        has_pip=pip_path is not None,
-    )
+        width, height = probe_video_resolution(video_path)
+        selected_layout = _find_layout(layout_id) if layout_id else _nearest_layout(width, height)
+        if not selected_layout:
+            raise ValueError("Unknown layout")
+        source_layout_path = _layout_path(selected_layout)
+        if not source_layout_path.exists():
+            raise ValueError(f"Layout file not found: {source_layout_path}")
+        layout_path = _prepare_layout_file(
+            source_layout_path,
+            job_upload_dir / source_layout_path.name,
+            has_pip=pip_path is not None,
+        )
+    except Exception:
+        shutil.rmtree(job_upload_dir, ignore_errors=True)
+        raise
 
-    output_path = _output_dir() / output_name
+    output_path = _output_dir() / job_id / output_name
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     job = {
@@ -311,19 +345,18 @@ def _run_job(job_id: str) -> None:
         command.extend(["--video", f"pip={job['pip_path']}"])
     command.extend([job["video_path"], job["output_path"]])
 
-    _update_job(
-        job_id, status=_STATUS_RUNNING, progress=5, message="Rendering overlay", command=command
-    )
+    if not _transition_job_to_running(job_id, command):
+        return
     try:
         process = subprocess.Popen(
             command,
-            cwd=config.GOPRO_OVERLAY_ROOT,
+            cwd=config.GOPRO_OVERLAY_ROOT or None,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
         )
     except FileNotFoundError as exc:
-        _update_job(
+        _finish_job(
             job_id,
             status=_STATUS_FAILED,
             progress=100,
@@ -334,6 +367,9 @@ def _run_job(job_id: str) -> None:
         return
 
     with _LOCK:
+        if _JOBS[job_id]["status"] == _STATUS_CANCELLED:
+            process.terminate()
+            return
         _PROCESSES[job_id] = process
 
     output_lines: list[str] = []
@@ -353,7 +389,7 @@ def _run_job(job_id: str) -> None:
             return
 
         if return_code != 0:
-            _update_job(
+            _finish_job(
                 job_id,
                 status=_STATUS_FAILED,
                 progress=100,
@@ -364,7 +400,7 @@ def _run_job(job_id: str) -> None:
             return
 
         if not Path(job["output_path"]).exists():
-            _update_job(
+            _finish_job(
                 job_id,
                 status=_STATUS_FAILED,
                 progress=100,
@@ -374,7 +410,7 @@ def _run_job(job_id: str) -> None:
             )
             return
 
-        _update_job(
+        _finish_job(
             job_id,
             status=_STATUS_COMPLETED,
             progress=100,
@@ -400,15 +436,17 @@ def get_gopro_overlay_job(job_id: str, include_command: bool = False) -> dict[st
 def cancel_gopro_overlay_job(job_id: str) -> bool:
     with _LOCK:
         process = _PROCESSES.get(job_id)
-        job_exists = job_id in _JOBS
+        job = _JOBS.get(job_id)
 
-    if not job_exists:
+    if not job:
         return False
+    if job["status"] in _TERMINAL_STATUSES:
+        return True
 
     if process and process.poll() is None:
         process.terminate()
 
-    _update_job(
+    _finish_job(
         job_id,
         status=_STATUS_CANCELLED,
         progress=100,
@@ -418,9 +456,14 @@ def cancel_gopro_overlay_job(job_id: str) -> bool:
     return True
 
 
-async def stream_gopro_overlay_job(job_id: str):
+async def stream_gopro_overlay_job(
+    job_id: str,
+    is_disconnected: Callable[[], Awaitable[bool]] | None = None,
+) -> AsyncGenerator[str, None]:
     last_payload = ""
     while True:
+        if is_disconnected and await is_disconnected():
+            break
         job = get_gopro_overlay_job(job_id)
         if not job:
             yield 'event: error\ndata: {"detail": "Job not found"}\n\n'
@@ -445,8 +488,14 @@ def gopro_overlay_output_path(job_id: str) -> Path | None:
 
 
 def check_gopro_overlay_dependencies() -> dict[str, bool]:
+    gopro_bin = config.GOPRO_OVERLAY_BIN
+    has_gopro_dashboard = (
+        Path(gopro_bin).exists()
+        if os.path.sep in gopro_bin
+        else shutil.which(gopro_bin) is not None
+    )
     return {
-        "gopro_dashboard": Path(config.GOPRO_OVERLAY_BIN).exists(),
+        "gopro_dashboard": has_gopro_dashboard,
         "ffmpeg": shutil.which("ffmpeg") is not None,
         "ffprobe": shutil.which("ffprobe") is not None,
     }

@@ -38,21 +38,25 @@ export const goproOverlayHandlers = [
   http.get('*/api/gopro-overlays/layouts', () =>
     HttpResponse.json({ layouts })
   ),
-  http.post('*/api/gopro-overlays/jobs', () =>
-    HttpResponse.json({
+  http.post('*/api/gopro-overlays/jobs', async ({ request }) => {
+    const formData = await request.formData();
+    const layoutId = String(formData.get('layout_id') || 'parapente-1080');
+    const layout = layouts.find((item) => item.id === layoutId) || layouts[0];
+
+    return HttpResponse.json({
       job_id: 'job-gopro-story',
       status: 'queued',
       progress: 0,
       message: 'Overlay queued',
-      layout_id: 'parapente-1080',
-      layout_label: 'Parapente 1920x1080',
+      layout_id: layout.id,
+      layout_label: layout.label,
       output_filename: 'arguel-overlay.mp4',
-      video_width: 1920,
-      video_height: 1080,
+      video_width: layout.width,
+      video_height: layout.height,
       created_at: '2026-05-12T12:00:00Z',
       updated_at: '2026-05-12T12:00:00Z',
-    })
-  ),
+    });
+  }),
 ];
 
 export const missingGoproOverlayLayoutsHandlers = [

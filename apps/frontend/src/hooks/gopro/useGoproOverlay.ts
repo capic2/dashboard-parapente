@@ -1,6 +1,5 @@
 import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { useAuthStore } from '../../stores/authStore';
 import { useEffect, useState } from 'react';
 
 export type GoproOverlayLayout = {
@@ -84,7 +83,6 @@ const initialState = {
 
 export function useGoproOverlayJobStream(jobId?: string | null) {
   const [state, setState] = useState(initialState);
-  const token = useAuthStore((s) => s.token);
 
   useEffect(() => {
     setState(initialState);
@@ -96,11 +94,9 @@ export function useGoproOverlayJobStream(jobId?: string | null) {
       `/api/gopro-overlays/jobs/${jobId}/stream`,
       window.location.origin
     );
-    if (token) {
-      url.searchParams.set('access_token', token);
-    }
-
-    const eventSource = new EventSource(url.toString());
+    const eventSource = new EventSource(url.toString(), {
+      withCredentials: true,
+    });
     const onStatus = (event: MessageEvent<string>) => {
       try {
         setState({
@@ -123,7 +119,7 @@ export function useGoproOverlayJobStream(jobId?: string | null) {
       eventSource.removeEventListener('error', onError);
       eventSource.close();
     };
-  }, [jobId, token]);
+  }, [jobId]);
 
   return state;
 }

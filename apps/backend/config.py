@@ -157,13 +157,18 @@ VIDEO_TEMP_IMAGES_DIR = os.getenv(
 # ============================================================================
 # GOPRO OVERLAY EXPORT
 # ============================================================================
+_GOPRO_OVERLAY_ROOT_DEFAULT = ""
 GOPRO_OVERLAY_ROOT = os.getenv(
     "BACKEND_GOPRO_OVERLAY_ROOT",
-    "/media/usb/data-m2/developement/gopro-overlay-dasboard",
+    _GOPRO_OVERLAY_ROOT_DEFAULT,
 )
 GOPRO_OVERLAY_BIN = os.getenv(
     "BACKEND_GOPRO_OVERLAY_BIN",
-    str(Path(GOPRO_OVERLAY_ROOT) / "venv" / "bin" / "gopro-dashboard.py"),
+    (
+        str(Path(GOPRO_OVERLAY_ROOT) / "venv" / "bin" / "gopro-dashboard.py")
+        if GOPRO_OVERLAY_ROOT
+        else "gopro-dashboard.py"
+    ),
 )
 GOPRO_OVERLAY_UPLOAD_DIR = os.getenv(
     "BACKEND_GOPRO_OVERLAY_UPLOAD_DIR",
@@ -175,7 +180,7 @@ GOPRO_OVERLAY_OUTPUT_DIR = os.getenv(
 )
 GOPRO_OVERLAY_LAYOUT_DIR = os.getenv(
     "BACKEND_GOPRO_OVERLAY_LAYOUT_DIR",
-    GOPRO_OVERLAY_ROOT,
+    GOPRO_OVERLAY_ROOT or str(BACKEND_ROOT / "gopro-overlay-layouts"),
 )
 
 # ============================================================================
