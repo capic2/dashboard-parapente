@@ -222,6 +222,9 @@
   "settings": {
     "title": "Paramètres",
     "subtitle": "Configuration de votre dashboard parapente",
+    "description": "Les préférences sont appliquées immédiatement aux pages concernées et conservées dans ce navigateur.",
+    "autoSave": "Auto-save",
+    "saved": "Appliqué",
     "tabs": {
       "general": "Général",
       "favoriteSites": "Sites Favoris",
@@ -230,6 +233,7 @@
     },
     "units": {
       "title": "Unités de Mesure",
+      "description": "Définissez l'affichage utilisé dans les vols, le détail et le viewer 3D.",
       "distance": "Distance",
       "kilometers": "Kilomètres (km)",
       "miles": "Miles (mi)",
@@ -240,6 +244,7 @@
     },
     "languageTheme": {
       "title": "Langue & Thème",
+      "description": "Adaptez l'interface à votre langue et à votre préférence d'affichage.",
       "language": "Langue",
       "theme": "Thème",
       "light": "Clair",
@@ -248,12 +253,17 @@
     },
     "notifications": {
       "title": "Notifications",
+      "description": "Préférences stockées pour les futures notifications. Aucun envoi externe n'est déclenché ici.",
       "weatherAlerts": "Alertes météo",
+      "weatherAlertsHelp": "Prépare les alertes liées aux conditions météo.",
       "newFlights": "Nouveaux vols",
-      "customAlerts": "Alertes personnalisées"
+      "newFlightsHelp": "Prépare les notifications lors de nouveaux vols importés.",
+      "customAlerts": "Alertes personnalisées",
+      "customAlertsHelp": "Conserve votre choix pour de futurs scénarios personnalisés."
     },
     "favorites": {
       "title": "Gérer vos Sites Favoris",
+      "description": "{{count}} site(s) favori(s) utilisés en priorité dans la météo et les sélecteurs.",
       "noSites": "Aucun site disponible",
       "favorite": "Favori",
       "add": "Ajouter",
@@ -327,10 +337,12 @@
     },
     "data": {
       "backupTitle": "Sauvegarde & Restauration",
+      "backupDescription": "Exportez ou restaurez vos préférences locales et vos réglages de cache navigateur.",
       "export": "Exporter mes paramètres",
       "import": "Importer des paramètres",
       "importWarning": "L'import remplacera vos paramètres actuels",
       "resetTitle": "Réinitialisation",
+      "resetDescription": "Revenez aux valeurs par défaut pour les préférences locales et le cache navigateur.",
       "resetAll": "Réinitialiser tous les paramètres",
       "resetWarning": "Cette action est irréversible (sauf si vous avez exporté une sauvegarde)",
       "importSuccess": "Paramètres importés avec succès !",

@@ -51,6 +51,7 @@ type SettingsTabKey = 'general' | 'sites' | 'weather' | 'data';
 
 type SettingsIconName =
   | 'bell'
+  | 'check'
   | 'database'
   | 'globe'
   | 'mapPin'
@@ -64,6 +65,7 @@ function SettingsIcon({ name }: { name: SettingsIconName }) {
     bell: (
       <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 0 0-5-5.9V4a1 1 0 1 0-2 0v1.1A6 6 0 0 0 6 11v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0a3 3 0 0 1-6 0" />
     ),
+    check: <path d="m5 12 4 4L19 6" />,
     database: (
       <path d="M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3Zm0 0v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" />
     ),
@@ -101,18 +103,53 @@ function SettingsIcon({ name }: { name: SettingsIconName }) {
   );
 }
 
-function SectionTitle({
+function SettingsCard({
   icon,
+  title,
+  description,
   children,
 }: {
   icon: SettingsIconName;
+  title: React.ReactNode;
+  description?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-white">
-      <SettingsIcon name={icon} />
+    <section className="rounded-2xl border border-sky-100 bg-white p-5 shadow-md shadow-sky-100/50 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/20 sm:p-6">
+      <div className="mb-5 flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+          <SettingsIcon name={icon} />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold text-gray-950 dark:text-white">
+            {title}
+          </h2>
+          {description && (
+            <p className="mt-1 text-sm leading-5 text-gray-600 dark:text-gray-300">
+              {description}
+            </p>
+          )}
+        </div>
+      </div>
       {children}
-    </h2>
+    </section>
+  );
+}
+
+function SavedStatus({ isVisible }: { isVisible: boolean }) {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition-opacity duration-200 ${
+        isVisible
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 opacity-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
+          : 'border-sky-200 bg-white/80 text-sky-700 opacity-70 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300'
+      }`}
+    >
+      <SettingsIcon name={isVisible ? 'check' : 'settings'} />
+      <span>{isVisible ? t('settings.saved') : t('settings.autoSave')}</span>
+    </div>
   );
 }
 
@@ -126,10 +163,16 @@ function SitesTab({
 }) {
   const { t } = useTranslation();
   const { data: sites } = useSuspenseQuery(sitesQueryOptions());
+  const favoriteCount = settings.favoriteSites.length;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-      <SectionTitle icon="mapPin">{t('settings.favorites.title')}</SectionTitle>
+    <SettingsCard
+      icon="mapPin"
+      title={t('settings.favorites.title')}
+      description={t('settings.favorites.description', {
+        count: favoriteCount,
+      })}
+    >
       {sites.length === 0 ? (
         <p className="text-gray-600 dark:text-gray-300 text-center py-8">
           {t('settings.favorites.noSites')}
@@ -139,10 +182,10 @@ function SitesTab({
           {(sites as unknown as ApiSite[]).map((site: ApiSite) => (
             <div
               key={site.id}
-              className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
+              className={`flex flex-col gap-3 rounded-xl border p-4 transition-colors sm:flex-row sm:items-center sm:justify-between ${
                 settings.favoriteSites.includes(site.id)
-                  ? 'border-sky-600 bg-sky-50 dark:bg-sky-900/20'
-                  : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-600'
+                  ? 'border-sky-300 bg-sky-50 dark:border-sky-700 dark:bg-sky-900/20'
+                  : 'border-gray-200 bg-gray-50 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600'
               }`}
             >
               <div className="flex-1">
@@ -164,7 +207,7 @@ function SitesTab({
               <Button
                 onClick={() => toggleFavorite(site.id)}
                 aria-pressed={settings.favoriteSites.includes(site.id)}
-                className={`ml-4 px-4 py-2 rounded-lg font-medium transition-all ${
+                className={`px-4 py-2 rounded-lg font-medium transition-colors sm:ml-4 ${
                   settings.favoriteSites.includes(site.id)
                     ? 'bg-sky-600 text-white hover:bg-sky-700'
                     : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
@@ -178,11 +221,11 @@ function SitesTab({
           ))}
         </div>
       )}
-      <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-800 dark:text-blue-200">
+      <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-200">
         <strong>{t('settings.favorites.tip')}</strong>{' '}
         {t('settings.favorites.tipText')}
       </div>
-    </div>
+    </SettingsCard>
   );
 }
 
@@ -985,16 +1028,23 @@ export default function Settings() {
   const settings = useAppSettingsStore((state) => state.settings);
   const setSettings = useAppSettingsStore((state) => state.setSettings);
   const resetSettings = useAppSettingsStore((state) => state.resetSettings);
+  const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTabKey>('general');
 
   useEffect(() => {
     void i18n.changeLanguage(settings.language);
   }, [i18n, settings.language]);
 
+  const showSaved = () => {
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1800);
+  };
+
   const updateSettings = (
     updater: AppSettings | ((current: AppSettings) => AppSettings)
   ) => {
     setSettings(updater);
+    showSaved();
   };
 
   // Toggle favorite site
@@ -1096,16 +1146,24 @@ export default function Settings() {
   };
 
   return (
-    <div className="pb-24">
-      <div className="mb-4 bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
-        <h1 className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
-          <SettingsIcon name="settings" />
-          {t('settings.title')}
-        </h1>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-          {t('settings.subtitle')}
-        </p>
-      </div>
+    <div className="space-y-4 pb-8">
+      <section className="overflow-hidden rounded-3xl border border-sky-100 bg-gradient-to-br from-white via-sky-50/70 to-blue-50 p-5 shadow-lg shadow-sky-100/70 dark:border-slate-700/80 dark:from-slate-950 dark:via-slate-900 dark:to-sky-950/50 dark:shadow-black/30 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-700 shadow-sm dark:border-sky-800/80 dark:bg-sky-950/50 dark:text-sky-300">
+              <SettingsIcon name="settings" />
+              {t('settings.title')}
+            </div>
+            <h1 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white sm:text-3xl">
+              {t('settings.subtitle')}
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+              {t('settings.description')}
+            </p>
+          </div>
+          <SavedStatus isVisible={saved} />
+        </div>
+      </section>
 
       <Tabs
         selectedKey={activeTab}
@@ -1149,10 +1207,11 @@ export default function Settings() {
           {/* GENERAL TAB */}
           <TabPanel id="general" className="space-y-4 outline-none">
             {/* Units Section */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-              <SectionTitle icon="ruler">
-                {t('settings.units.title')}
-              </SectionTitle>
+            <SettingsCard
+              icon="ruler"
+              title={t('settings.units.title')}
+              description={t('settings.units.description')}
+            >
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -1274,13 +1333,14 @@ export default function Settings() {
                   </div>
                 </div>
               </div>
-            </div>
+            </SettingsCard>
 
             {/* Language & Theme Section */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-              <SectionTitle icon="globe">
-                {t('settings.languageTheme.title')}
-              </SectionTitle>
+            <SettingsCard
+              icon="globe"
+              title={t('settings.languageTheme.title')}
+              description={t('settings.languageTheme.description')}
+            >
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -1341,19 +1401,26 @@ export default function Settings() {
                   </div>
                 </div>
               </div>
-            </div>
+            </SettingsCard>
 
             {/* Notifications Section */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-              <SectionTitle icon="bell">
-                {t('settings.notifications.title')}
-              </SectionTitle>
+            <SettingsCard
+              icon="bell"
+              title={t('settings.notifications.title')}
+              description={t('settings.notifications.description')}
+            >
               <div className="space-y-3">
-                <label className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all cursor-pointer">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {t('settings.notifications.weatherAlerts')}
+                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                  <span>
+                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {t('settings.notifications.weatherAlerts')}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                      {t('settings.notifications.weatherAlertsHelp')}
+                    </span>
                   </span>
                   <Switch
+                    aria-label={t('settings.notifications.weatherAlerts')}
                     isSelected={settings.notifications.weather}
                     onChange={(isSelected: boolean) =>
                       updateSettings((prev) => ({
@@ -1372,12 +1439,18 @@ export default function Settings() {
                       </div>
                     </div>
                   </Switch>
-                </label>
-                <label className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all cursor-pointer">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {t('settings.notifications.newFlights')}
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                  <span>
+                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {t('settings.notifications.newFlights')}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                      {t('settings.notifications.newFlightsHelp')}
+                    </span>
                   </span>
                   <Switch
+                    aria-label={t('settings.notifications.newFlights')}
                     isSelected={settings.notifications.flights}
                     onChange={(isSelected: boolean) =>
                       updateSettings((prev) => ({
@@ -1396,12 +1469,18 @@ export default function Settings() {
                       </div>
                     </div>
                   </Switch>
-                </label>
-                <label className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all cursor-pointer">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {t('settings.notifications.customAlerts')}
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                  <span>
+                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {t('settings.notifications.customAlerts')}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                      {t('settings.notifications.customAlertsHelp')}
+                    </span>
                   </span>
                   <Switch
+                    aria-label={t('settings.notifications.customAlerts')}
                     isSelected={settings.notifications.alerts}
                     onChange={(isSelected: boolean) =>
                       updateSettings((prev) => ({
@@ -1420,9 +1499,9 @@ export default function Settings() {
                       </div>
                     </div>
                   </Switch>
-                </label>
+                </div>
               </div>
-            </div>
+            </SettingsCard>
 
             {/* Performance Section */}
             <PerformanceSection />
@@ -1455,10 +1534,11 @@ export default function Settings() {
           <TabPanel id="data" className="outline-none">
             <div className="space-y-4">
               {/* Export/Import Section */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-                <SectionTitle icon="database">
-                  {t('settings.data.backupTitle')}
-                </SectionTitle>
+              <SettingsCard
+                icon="database"
+                title={t('settings.data.backupTitle')}
+                description={t('settings.data.backupDescription')}
+              >
                 <div className="space-y-3">
                   <Button
                     onClick={exportData}
@@ -1479,13 +1559,14 @@ export default function Settings() {
                 <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
                   {t('settings.data.importWarning')}
                 </div>
-              </div>
+              </SettingsCard>
 
               {/* Clear Data Section */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-                  {t('settings.data.resetTitle')}
-                </h2>
+              <SettingsCard
+                icon="settings"
+                title={t('settings.data.resetTitle')}
+                description={t('settings.data.resetDescription')}
+              >
                 <Button
                   onClick={clearData}
                   className="w-full px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"
@@ -1495,13 +1576,10 @@ export default function Settings() {
                 <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-sm text-red-800 dark:text-red-200">
                   {t('settings.data.resetWarning')}
                 </div>
-              </div>
+              </SettingsCard>
 
               {/* User Profile Placeholder */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-                  {t('settings.profile.title')}
-                </h2>
+              <SettingsCard icon="bell" title={t('settings.profile.title')}>
                 <div className="p-8 bg-gray-50 dark:bg-gray-900 rounded-lg text-center">
                   <p className="text-gray-600 dark:text-gray-300 mb-2">
                     {t('settings.profile.wip')}
@@ -1510,7 +1588,7 @@ export default function Settings() {
                     {t('settings.profile.wipDetails')}
                   </p>
                 </div>
-              </div>
+              </SettingsCard>
             </div>
           </TabPanel>
         </div>
