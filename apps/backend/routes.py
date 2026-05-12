@@ -5847,7 +5847,11 @@ def get_app_settings(db: Session = Depends(get_db)):
 
 
 @router.put("/settings")
-async def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db)):
+def update_app_settings(
+    settings: dict[str, str],
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     """
     Update application settings.
     Body: {"key": "value", ...}
@@ -5999,13 +6003,10 @@ async def update_app_settings(settings: dict[str, str], db: Session = Depends(ge
         "ui_reason_",
     )
     if any(key.startswith(cache_sensitive_prefixes) for key in updated):
-        try:
-            from cache import delete_cached
+        from cache import delete_cached
 
-            await delete_cached("weather:*")
-            await delete_cached("best_spot:*")
-        except Exception as e:
-            logger.warning(f"Failed to invalidate weather caches after settings update: {e}")
+        background_tasks.add_task(delete_cached, "weather:*")
+        background_tasks.add_task(delete_cached, "best_spot:*")
 
     # If scheduler interval changed, reschedule dynamically
     scheduler_error = None

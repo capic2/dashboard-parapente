@@ -75,8 +75,9 @@ export default function WeatherPage() {
     const matchedFavorites = sites.filter((site) => favoriteSet.has(site.id));
     return matchedFavorites.length > 0 ? matchedFavorites : sites;
   }, [favoriteSiteIds, sites]);
+  const routeSiteExists = sites.some((site) => site.id === routeSiteId);
   const selectedSiteId =
-    sites.find((site) => site.id === routeSiteId)?.id ??
+    (routeSiteExists ? routeSiteId : undefined) ??
     favoriteSites[0]?.id ??
     sites[0]?.id ??
     '';

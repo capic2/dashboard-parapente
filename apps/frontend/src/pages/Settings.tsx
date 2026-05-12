@@ -985,29 +985,16 @@ export default function Settings() {
   const settings = useAppSettingsStore((state) => state.settings);
   const setSettings = useAppSettingsStore((state) => state.setSettings);
   const resetSettings = useAppSettingsStore((state) => state.resetSettings);
-  const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTabKey>('general');
 
   useEffect(() => {
     void i18n.changeLanguage(settings.language);
   }, [i18n, settings.language]);
 
-  const showSaved = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
-
   const updateSettings = (
     updater: AppSettings | ((current: AppSettings) => AppSettings)
   ) => {
     setSettings(updater);
-    showSaved();
-  };
-
-  // Kept as a confirmation affordance now that settings are applied immediately.
-  const saveSettings = (nextSettings = settings) => {
-    setSettings(nextSettings);
-    showSaved();
   };
 
   // Toggle favorite site
@@ -1054,7 +1041,7 @@ export default function Settings() {
       try {
         const imported = JSON.parse(e.target?.result as string);
         if (imported.settings) {
-          saveSettings(imported.settings as AppSettings);
+          updateSettings(imported.settings as AppSettings);
         }
         if (imported.cacheSettings) {
           const { setFreshnessLevel, setAutoRefreshWeather, setHttpTimeout } =
@@ -1528,20 +1515,6 @@ export default function Settings() {
           </TabPanel>
         </div>
       </Tabs>
-
-      {/* Save Button */}
-      <div className="mt-6 sticky bottom-4 z-10">
-        <Button
-          onClick={() => saveSettings()}
-          className={`w-full px-6 py-4 rounded-xl font-bold text-lg shadow-lg transition-all ${
-            saved
-              ? 'bg-green-600 text-white'
-              : 'bg-sky-600 text-white hover:bg-sky-700 hover:shadow-xl'
-          }`}
-        >
-          {saved ? t('settings.saved') : t('settings.saveButton')}
-        </Button>
-      </div>
     </div>
   );
 }

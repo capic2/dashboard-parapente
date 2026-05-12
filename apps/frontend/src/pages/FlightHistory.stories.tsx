@@ -384,6 +384,8 @@ export const MobileFlowWithReplay = meta.story({
 MobileFlowWithReplay.test(
   'loads GPX data only when Replay tab is selected',
   async ({ canvas, userEvent, step }) => {
+    let requestsAfterOpeningFlight = 0;
+
     await step('has the flight list', async () => {
       const flightList = await canvas.findByRole('listbox', {
         name: i18n.t('flights.listAriaLabel'),
@@ -398,11 +400,11 @@ MobileFlowWithReplay.test(
           name: i18n.t('flights.backToList'),
         })
       ).toBeInTheDocument();
-      gpxRequestCount = 0;
+      requestsAfterOpeningFlight = gpxRequestCount;
     });
 
     await step('does not load GPX while Infos tab is active', () => {
-      expect(gpxRequestCount).toBe(0);
+      expect(gpxRequestCount).toBe(requestsAfterOpeningFlight);
     });
 
     await step('switches to Replay and shows loading state', async () => {
@@ -417,7 +419,7 @@ MobileFlowWithReplay.test(
 
     await step('triggers GPX loading once Replay is active', async () => {
       await waitFor(() => {
-        expect(gpxRequestCount).toBeGreaterThan(0);
+        expect(gpxRequestCount).toBeGreaterThan(requestsAfterOpeningFlight);
       });
     });
   }

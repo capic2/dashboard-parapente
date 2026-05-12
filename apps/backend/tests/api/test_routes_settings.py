@@ -4,7 +4,7 @@ API tests for /settings endpoints.
 Tests HTTP endpoints for reading and updating application settings.
 """
 
-from unittest.mock import AsyncMock, call, patch
+from unittest.mock import AsyncMock, patch
 
 import app_settings
 from models import AppSetting
@@ -113,7 +113,9 @@ class TestUpdateSettings:
             )
 
         assert response.status_code == 200
-        delete_cached.assert_has_awaits([call("weather:*"), call("best_spot:*")])
+        delete_cached.assert_any_await("weather:*")
+        delete_cached.assert_any_await("best_spot:*")
+        assert delete_cached.await_count == 2
 
     def test_non_cache_sensitive_settings_do_not_clear_weather_cache(self, client, db_session):
         """Scheduler-only changes should not evict weather response caches."""
