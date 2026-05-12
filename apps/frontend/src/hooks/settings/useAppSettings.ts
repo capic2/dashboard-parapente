@@ -51,6 +51,10 @@ export function useUpdateAppSettings() {
       api.put('settings', { json: settings }).json(),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['app-settings'] });
+      void queryClient.invalidateQueries({ queryKey: ['weather'] });
+      void queryClient.invalidateQueries({ queryKey: ['bestSpot'] });
+      void queryClient.invalidateQueries({ queryKey: ['live-wind'] });
+      void queryClient.invalidateQueries({ queryKey: ['landings-weather'] });
     },
   });
 }

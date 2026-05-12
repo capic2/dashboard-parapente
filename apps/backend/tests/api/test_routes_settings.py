@@ -4,7 +4,7 @@ API tests for /settings endpoints.
 Tests HTTP endpoints for reading and updating application settings.
 """
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, call, patch
 
 import app_settings
 from models import AppSetting
@@ -103,6 +103,32 @@ class TestUpdateSettings:
         assert response.status_code == 200
         data = response.json()
         assert len(data["updated"]) == 2
+
+    def test_cache_sensitive_settings_invalidate_weather_cache(self, client, db_session):
+        """Settings that affect displayed weather clear cached weather responses."""
+        with patch("cache.delete_cached", new_callable=AsyncMock) as delete_cached:
+            response = client.put(
+                f"{API_PREFIX}/settings",
+                json={"para_gust_high_max": "26"},
+            )
+
+        assert response.status_code == 200
+        delete_cached.assert_has_awaits([call("weather:*"), call("best_spot:*")])
+
+    def test_non_cache_sensitive_settings_do_not_clear_weather_cache(self, client, db_session):
+        """Scheduler-only changes should not evict weather response caches."""
+        with (
+            patch("cache.delete_cached", new_callable=AsyncMock) as delete_cached,
+            patch("scheduler.reschedule"),
+            patch("emagram_scheduler.emagram_scheduler.reschedule"),
+        ):
+            response = client.put(
+                f"{API_PREFIX}/settings",
+                json={"scheduler_interval_minutes": "15"},
+            )
+
+        assert response.status_code == 200
+        delete_cached.assert_not_awaited()
 
     def test_update_emagram_max_age_minutes(self, client, db_session):
         """Updates emagram freshness window setting."""

@@ -5847,7 +5847,7 @@ def get_app_settings(db: Session = Depends(get_db)):
 
 
 @router.put("/settings")
-def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db)):
+async def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db)):
     """
     Update application settings.
     Body: {"key": "value", ...}
@@ -5991,6 +5991,21 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
     for key, normalized_value in validated_updates.items():
         set_setting(db, key, normalized_value)
         updated[key] = normalized_value
+
+    cache_sensitive_prefixes = (
+        "cache_ttl_",
+        "spotair_live_wind_",
+        "para_",
+        "ui_reason_",
+    )
+    if any(key.startswith(cache_sensitive_prefixes) for key in updated):
+        try:
+            from cache import delete_cached
+
+            await delete_cached("weather:*")
+            await delete_cached("best_spot:*")
+        except Exception as e:
+            logger.warning(f"Failed to invalidate weather caches after settings update: {e}")
 
     # If scheduler interval changed, reschedule dynamically
     scheduler_error = None

@@ -228,15 +228,15 @@ export const Default = meta.story({
 Default.test(
   'Can cancel a simple flight deletion',
   async ({ canvas, userEvent, step }) => {
-    const flightList = await canvas.findByRole('grid', {
+    const flightList = await canvas.findByRole('listbox', {
       name: i18n.t('flights.listAriaLabel'),
     });
 
     await step('have flights', async () => {
       await waitFor(async () => {
-        await expect(within(flightList).getAllByRole('row')).toHaveLength(
-          mockFlights.length
-        );
+        await expect(
+          within(flightList).getAllByTestId(/^flight-row-/)
+        ).toHaveLength(mockFlights.length);
       });
     });
 
@@ -262,24 +262,24 @@ Default.test(
 
     await step('the flight is not deleted', async () => {
       await expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-      await expect(within(flightList).getAllByRole('row')).toHaveLength(
-        mockFlights.length
-      );
+      await expect(
+        within(flightList).getAllByTestId(/^flight-row-/)
+      ).toHaveLength(mockFlights.length);
     });
   }
 );
 Default.test(
   'can delete a simple flight',
   async ({ canvas, userEvent, step }) => {
-    const flightList = await canvas.findByRole('grid', {
+    const flightList = await canvas.findByRole('listbox', {
       name: i18n.t('flights.listAriaLabel'),
     });
 
     await step('have flights', async () => {
       await waitFor(async () => {
-        await expect(within(flightList).getAllByRole('row')).toHaveLength(
-          mockFlights.length
-        );
+        await expect(
+          within(flightList).getAllByTestId(/^flight-row-/)
+        ).toHaveLength(mockFlights.length);
       });
     });
 
@@ -307,9 +307,9 @@ Default.test(
       await waitFor(async () => {
         await expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
 
-        await expect(within(flightList).getAllByRole('row')).toHaveLength(
-          mockFlights.length - 1
-        );
+        await expect(
+          within(flightList).getAllByTestId(/^flight-row-/)
+        ).toHaveLength(mockFlights.length - 1);
       });
     });
   }
@@ -327,7 +327,7 @@ MobileFlow.test(
   'opens a flight, switches tabs, and returns to list on mobile',
   async ({ canvas, userEvent, step }) => {
     await step('has the flight list', async () => {
-      const flightList = await canvas.findByRole('grid', {
+      const flightList = await canvas.findByRole('listbox', {
         name: i18n.t('flights.listAriaLabel'),
       });
       await expect(flightList).toBeInTheDocument();
@@ -357,7 +357,7 @@ MobileFlow.test(
         canvas.getByRole('button', { name: i18n.t('flights.backToList') })
       );
       await expect(
-        await canvas.findByRole('grid', {
+        await canvas.findByRole('listbox', {
           name: i18n.t('flights.listAriaLabel'),
         })
       ).toBeInTheDocument();
@@ -385,7 +385,7 @@ MobileFlowWithReplay.test(
   'loads GPX data only when Replay tab is selected',
   async ({ canvas, userEvent, step }) => {
     await step('has the flight list', async () => {
-      const flightList = await canvas.findByRole('grid', {
+      const flightList = await canvas.findByRole('listbox', {
         name: i18n.t('flights.listAriaLabel'),
       });
       await expect(flightList).toBeInTheDocument();

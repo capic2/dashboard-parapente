@@ -25,10 +25,9 @@ import {
   useBestSpotAPI,
   useHourlyBestSpotsAPI,
 } from '../hooks/weather/useBestSpotAPI';
-import {
-  useCoordinateWeather,
-} from '../hooks/weather/useCityWeather';
+import { useCoordinateWeather } from '../hooks/weather/useCityWeather';
 import { transformWeatherResponse } from '../hooks/weather/useWeather';
+import { useAppSettingsStore } from '../stores/appSettingsStore';
 
 const isSpotSearchTarget = (
   target: CityWeatherTarget | null
@@ -46,10 +45,7 @@ const getSearchTargetLocation = (target: CityWeatherTarget | null) => {
   return target.spot;
 };
 
-const getSearchDayLabel = (
-  day: number,
-  t: (key: string) => string
-) => {
+const getSearchDayLabel = (day: number, t: (key: string) => string) => {
   if (day === 0) return t('common.today');
   if (day === 1) return t('common.tomorrow');
   return `J+${day}`;
@@ -61,6 +57,9 @@ export default function WeatherPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data: sites } = useSuspenseQuery(sitesQueryOptions());
+  const favoriteSiteIds = useAppSettingsStore(
+    (state) => state.settings.favoriteSites
+  );
   const search = useSearch({ from: '/weather' });
   const routeSiteId = search ? search.siteId : '';
   const selectedDayIndex = search.day ?? 0;
@@ -68,10 +67,19 @@ export default function WeatherPage() {
   const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(selectedDayIndex);
   const [selectedSearchTarget, setSelectedSearchTarget] =
     useState<CityWeatherTarget | null>(null);
-  const [selectionTab, setSelectionTab] =
-    useState<SelectionTab>('favorites');
+  const [selectionTab, setSelectionTab] = useState<SelectionTab>('favorites');
+  const favoriteSites = useMemo(() => {
+    if (favoriteSiteIds.length === 0) return sites;
+
+    const favoriteSet = new Set(favoriteSiteIds);
+    const matchedFavorites = sites.filter((site) => favoriteSet.has(site.id));
+    return matchedFavorites.length > 0 ? matchedFavorites : sites;
+  }, [favoriteSiteIds, sites]);
   const selectedSiteId =
-    sites.find((site) => site.id === routeSiteId)?.id ?? sites[0]?.id ?? '';
+    sites.find((site) => site.id === routeSiteId)?.id ??
+    favoriteSites[0]?.id ??
+    sites[0]?.id ??
+    '';
   const selectedSearchTitle = getSearchTargetName(selectedSearchTarget);
   const selectedSearchLocation = getSearchTargetLocation(selectedSearchTarget);
   const coordinateWeather = useCoordinateWeather(
@@ -88,10 +96,12 @@ export default function WeatherPage() {
         : undefined,
     [selectedSearchWeather]
   );
-  const isSearchWeatherLoading =
-    selectedSearchTarget ? coordinateWeather.isLoading : false;
-  const isSearchWeatherError =
-    selectedSearchTarget ? coordinateWeather.isError : false;
+  const isSearchWeatherLoading = selectedSearchTarget
+    ? coordinateWeather.isLoading
+    : false;
+  const isSearchWeatherError = selectedSearchTarget
+    ? coordinateWeather.isError
+    : false;
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [weatherDataMap] = useState<Map<string, Record<string, unknown>>>(

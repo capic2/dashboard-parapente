@@ -17,6 +17,11 @@ import {
 } from '../hooks/weather/useWeatherSources';
 import { WeatherSourceCard } from '../components/settings/WeatherSourceCard';
 import type { WeatherSource } from '../types/weatherSources';
+import {
+  DEFAULT_APP_SETTINGS,
+  useAppSettingsStore,
+  type AppSettings,
+} from '../stores/appSettingsStore';
 import { useThemeStore } from '../stores/themeStore';
 import type { ThemePreference } from '../stores/themeStore';
 import { useCacheSettingsStore } from '../stores/cacheSettingsStore';
@@ -40,23 +45,6 @@ interface ApiSite {
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
-}
-
-// Default settings structure
-interface AppSettings {
-  units: {
-    distance: 'km' | 'miles';
-    altitude: 'm' | 'ft';
-    speed: 'kmh' | 'mph';
-  };
-  language: 'fr' | 'en';
-  theme: 'light' | 'dark' | 'auto';
-  notifications: {
-    weather: boolean;
-    flights: boolean;
-    alerts: boolean;
-  };
-  favoriteSites: string[];
 }
 
 type SettingsTabKey = 'general' | 'sites' | 'weather' | 'data';
@@ -127,22 +115,6 @@ function SectionTitle({
     </h2>
   );
 }
-
-const DEFAULT_SETTINGS: AppSettings = {
-  units: {
-    distance: 'km',
-    altitude: 'm',
-    speed: 'kmh',
-  },
-  language: 'fr',
-  theme: 'light',
-  notifications: {
-    weather: true,
-    flights: true,
-    alerts: true,
-  },
-  favoriteSites: [],
-};
 
 // Sites Favorites Tab Component
 function SitesTab({
@@ -1010,17 +982,9 @@ export default function Settings() {
   const { t, i18n } = useTranslation();
   const { preference: themePreference, setPreference: setThemePreference } =
     useThemeStore();
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    const stored = localStorage.getItem('paragliding-settings');
-    if (stored) {
-      try {
-        return JSON.parse(stored) as AppSettings;
-      } catch {
-        // Invalid JSON in localStorage, keep defaults
-      }
-    }
-    return DEFAULT_SETTINGS;
-  });
+  const settings = useAppSettingsStore((state) => state.settings);
+  const setSettings = useAppSettingsStore((state) => state.setSettings);
+  const resetSettings = useAppSettingsStore((state) => state.resetSettings);
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTabKey>('general');
 
@@ -1028,16 +992,27 @@ export default function Settings() {
     void i18n.changeLanguage(settings.language);
   }, [i18n, settings.language]);
 
-  // Save settings to localStorage
-  const saveSettings = (nextSettings = settings) => {
-    localStorage.setItem('paragliding-settings', JSON.stringify(nextSettings));
+  const showSaved = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const updateSettings = (
+    updater: AppSettings | ((current: AppSettings) => AppSettings)
+  ) => {
+    setSettings(updater);
+    showSaved();
+  };
+
+  // Kept as a confirmation affordance now that settings are applied immediately.
+  const saveSettings = (nextSettings = settings) => {
+    setSettings(nextSettings);
+    showSaved();
+  };
+
   // Toggle favorite site
   const toggleFavorite = (siteId: string) => {
-    setSettings((prev) => ({
+    updateSettings((prev) => ({
       ...prev,
       favoriteSites: prev.favoriteSites.includes(siteId)
         ? prev.favoriteSites.filter((id) => id !== siteId)
@@ -1079,7 +1054,6 @@ export default function Settings() {
       try {
         const imported = JSON.parse(e.target?.result as string);
         if (imported.settings) {
-          setSettings(imported.settings);
           saveSettings(imported.settings as AppSettings);
         }
         if (imported.cacheSettings) {
@@ -1122,14 +1096,14 @@ export default function Settings() {
   // Clear all data
   const clearData = () => {
     if (window.confirm(t('settings.data.resetConfirm'))) {
-      setSettings(DEFAULT_SETTINGS);
-      localStorage.removeItem('paragliding-settings');
+      resetSettings();
       // Reset cache settings to defaults
       const { setFreshnessLevel, setAutoRefreshWeather, setHttpTimeout } =
         useCacheSettingsStore.getState();
       setFreshnessLevel('normal');
       setAutoRefreshWeather(true);
       setHttpTimeout(30000);
+      setThemePreference(DEFAULT_APP_SETTINGS.theme);
       alert(t('settings.data.resetSuccess'));
     }
   };
@@ -1200,7 +1174,7 @@ export default function Settings() {
                   <div className="flex flex-wrap gap-2 sm:gap-4">
                     <Button
                       onClick={() =>
-                        setSettings((prev) => ({
+                        updateSettings((prev) => ({
                           ...prev,
                           units: { ...prev.units, distance: 'km' },
                         }))
@@ -1216,7 +1190,7 @@ export default function Settings() {
                     </Button>
                     <Button
                       onClick={() =>
-                        setSettings((prev) => ({
+                        updateSettings((prev) => ({
                           ...prev,
                           units: { ...prev.units, distance: 'miles' },
                         }))
@@ -1240,7 +1214,7 @@ export default function Settings() {
                   <div className="flex flex-wrap gap-2 sm:gap-4">
                     <Button
                       onClick={() =>
-                        setSettings((prev) => ({
+                        updateSettings((prev) => ({
                           ...prev,
                           units: { ...prev.units, altitude: 'm' },
                         }))
@@ -1256,7 +1230,7 @@ export default function Settings() {
                     </Button>
                     <Button
                       onClick={() =>
-                        setSettings((prev) => ({
+                        updateSettings((prev) => ({
                           ...prev,
                           units: { ...prev.units, altitude: 'ft' },
                         }))
@@ -1280,7 +1254,7 @@ export default function Settings() {
                   <div className="flex flex-wrap gap-2 sm:gap-4">
                     <Button
                       onClick={() =>
-                        setSettings((prev) => ({
+                        updateSettings((prev) => ({
                           ...prev,
                           units: { ...prev.units, speed: 'kmh' },
                         }))
@@ -1296,7 +1270,7 @@ export default function Settings() {
                     </Button>
                     <Button
                       onClick={() =>
-                        setSettings((prev) => ({
+                        updateSettings((prev) => ({
                           ...prev,
                           units: { ...prev.units, speed: 'mph' },
                         }))
@@ -1328,7 +1302,7 @@ export default function Settings() {
                   <div className="flex flex-wrap gap-2 sm:gap-4">
                     <Button
                       onClick={() => {
-                        setSettings((prev) => ({ ...prev, language: 'fr' }));
+                        updateSettings((prev) => ({ ...prev, language: 'fr' }));
                       }}
                       aria-pressed={settings.language === 'fr'}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
@@ -1341,7 +1315,7 @@ export default function Settings() {
                     </Button>
                     <Button
                       onClick={() => {
-                        setSettings((prev) => ({ ...prev, language: 'en' }));
+                        updateSettings((prev) => ({ ...prev, language: 'en' }));
                       }}
                       aria-pressed={settings.language === 'en'}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
@@ -1365,7 +1339,7 @@ export default function Settings() {
                         key={theme}
                         onClick={() => {
                           setThemePreference(theme as ThemePreference);
-                          setSettings((prev) => ({ ...prev, theme }));
+                          updateSettings((prev) => ({ ...prev, theme }));
                         }}
                         aria-pressed={themePreference === theme}
                         className={`px-6 py-2 rounded-lg font-medium transition-all ${
@@ -1395,7 +1369,7 @@ export default function Settings() {
                   <Switch
                     isSelected={settings.notifications.weather}
                     onChange={(isSelected: boolean) =>
-                      setSettings((prev) => ({
+                      updateSettings((prev) => ({
                         ...prev,
                         notifications: {
                           ...prev.notifications,
@@ -1419,7 +1393,7 @@ export default function Settings() {
                   <Switch
                     isSelected={settings.notifications.flights}
                     onChange={(isSelected: boolean) =>
-                      setSettings((prev) => ({
+                      updateSettings((prev) => ({
                         ...prev,
                         notifications: {
                           ...prev.notifications,
@@ -1443,7 +1417,7 @@ export default function Settings() {
                   <Switch
                     isSelected={settings.notifications.alerts}
                     onChange={(isSelected: boolean) =>
-                      setSettings((prev) => ({
+                      updateSettings((prev) => ({
                         ...prev,
                         notifications: {
                           ...prev.notifications,
