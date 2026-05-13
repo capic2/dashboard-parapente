@@ -195,9 +195,12 @@ vi.mock('cesium', () => {
 vi.mock('@dashboard-parapente/design-system', () => ({
   Button: ({
     children,
+    isDisabled,
     ...props
-  }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
-    <button type="button" {...props}>
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    isDisabled?: boolean;
+  }) => (
+    <button type="button" disabled={isDisabled} {...props}>
       {children}
     </button>
   ),
@@ -350,13 +353,42 @@ describe('FlightViewer3D video export mode', () => {
 
     expect(screen.getByText('Fast hint')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Generate video/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Generate video/u }));
 
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith('flights/flight-1/export-video', {
         searchParams: { mode: 'manual_fast' },
       });
     });
+  });
+
+  it('allows generation when an in-progress status has no job id', async () => {
+    mockFlight.video_export_status = 'processing';
+    mockFlight.video_export_job_id = null;
+
+    render(<FlightViewer3D flightId="flight-1" />);
+
+    const button = screen.getByRole('button', { name: /Generate video/u });
+    expect(button).not.toBeDisabled();
+
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(apiPost).toHaveBeenCalledWith('flights/flight-1/export-video', {
+        searchParams: { mode: 'manual_fast' },
+      });
+    });
+  });
+
+  it('keeps generation disabled when an in-progress status has a job id', () => {
+    mockFlight.video_export_status = 'processing';
+    mockFlight.video_export_job_id = 'job-processing';
+
+    render(<FlightViewer3D flightId="flight-1" />);
+
+    expect(
+      screen.getByRole('button', { name: /flights\.viewer\.videoGenerating/u })
+    ).toBeDisabled();
   });
 
   it('hides viewer controls in export-only mode', () => {
@@ -371,7 +403,7 @@ describe('FlightViewer3D video export mode', () => {
     );
     expect(screen.queryByText('Fast hint')).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /Generate video/ })
+      screen.queryByRole('button', { name: /Generate video/u })
     ).not.toBeInTheDocument();
   });
 
@@ -486,7 +518,7 @@ describe('FlightViewer3D video export mode', () => {
 
     expect(screen.getByText('Manual hint')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Generate video/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Generate video/u }));
 
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith('flights/flight-1/export-video', {
@@ -511,7 +543,7 @@ describe('FlightViewer3D video export mode', () => {
 
     expect(screen.getByText('frames preserved')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Resume generation/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Resume generation/u }));
 
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith('exports/job-cancelled/resume');
@@ -535,7 +567,7 @@ describe('FlightViewer3D video export mode', () => {
 
     render(<FlightViewer3D flightId="flight-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Download video/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Download video/u }));
 
     await waitFor(() => {
       expect(apiGet).toHaveBeenCalledWith('exports/job-video/download', {

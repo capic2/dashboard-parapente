@@ -137,9 +137,30 @@ def _video_export_mode_label(mode: str) -> str:
     return "manual render"
 
 
-def _ensure_no_active_export(flight: Flight):
-    if flight.video_export_status in _VIDEO_EXPORT_IN_PROGRESS_STATUSES:
-        raise HTTPException(status_code=400, detail="Video conversion already in progress")
+def _ensure_no_active_export(flight: Flight) -> None:
+    if flight.video_export_status not in _VIDEO_EXPORT_IN_PROGRESS_STATUSES:
+        return
+
+    if not flight.video_export_job_id:
+        logger.warning(
+            "Flight %s has orphan video export status %s without job id; allowing restart",
+            flight.id,
+            flight.video_export_status,
+        )
+        return
+
+    if not _resolve_export_status(flight.video_export_job_id):
+        logger.warning(
+            "Flight %s references missing video export job %s; allowing restart",
+            flight.id,
+            flight.video_export_job_id,
+        )
+        return
+
+    raise HTTPException(
+        status_code=400,
+        detail="Video conversion already in progress",
+    )
 
 
 def _mark_flight_export_processing(db: Session, flight: Flight, job_id: str):
