@@ -68,6 +68,16 @@ export function useCreateGoproOverlayJob() {
   });
 }
 
+export function useCreateFlightGoproOverlayJob(flightId: string) {
+  return useMutation({
+    mutationFn: async () => {
+      return await api
+        .post(`flights/${flightId}/gopro-overlay`, { timeout: false })
+        .json<GoproOverlayJob>();
+    },
+  });
+}
+
 export function useCancelGoproOverlayJob() {
   return useMutation({
     mutationFn: async (jobId: string) => {
