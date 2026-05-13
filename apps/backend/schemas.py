@@ -13,7 +13,7 @@ class GoproOverlayDependencies(BaseModel):
 class GoproOverlayLayout(BaseModel):
     id: str
     label: str
-    path: str
+    filename: str
     width: int | None = None
     height: int | None = None
     exists: bool
@@ -40,9 +40,9 @@ class GoproOverlayJob(BaseModel):
     output_filename: str
     video_width: int | None = None
     video_height: int | None = None
-    created_at: str
-    updated_at: str
-    completed_at: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None = None
 
 
 class GoproOverlayCancelResponse(BaseModel):

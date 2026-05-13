@@ -4,7 +4,7 @@ const layouts = [
   {
     id: 'parapente-1080',
     label: 'Parapente 1920x1080',
-    path: '/media/usb/data-m2/developement/gopro-overlay-dasboard/layout_parapente_1080.xml',
+    filename: 'layout_parapente_1080.xml',
     width: 1920,
     height: 1080,
     exists: true,
@@ -13,7 +13,7 @@ const layouts = [
   {
     id: 'parapente-3840',
     label: 'Parapente 3840x2160',
-    path: '/media/usb/data-m2/developement/gopro-overlay-dasboard/layout_parapente_3840.xml',
+    filename: 'layout_parapente_3840.xml',
     width: 3840,
     height: 2160,
     exists: true,
@@ -22,7 +22,7 @@ const layouts = [
   {
     id: 'parapente-7680',
     label: 'Parapente 7680x4320',
-    path: '/media/usb/data-m2/developement/gopro-overlay-dasboard/layout_parapente_7680.xml',
+    filename: 'layout_parapente_7680.xml',
     width: 7680,
     height: 4320,
     exists: true,

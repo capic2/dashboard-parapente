@@ -186,7 +186,7 @@ def list_gopro_overlay_layouts(
         {
             "id": layout.id,
             "label": layout.label,
-            "path": str(_layout_path(layout)),
+            "filename": layout.path,
             "width": layout.width,
             "height": layout.height,
             "exists": _layout_path(layout).exists(),

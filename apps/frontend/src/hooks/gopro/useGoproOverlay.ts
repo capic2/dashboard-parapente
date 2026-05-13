@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 export type GoproOverlayLayout = {
   id: string;
   label: string;
-  path: string;
+  filename: string;
   width: number | null;
   height: number | null;
   exists: boolean;
