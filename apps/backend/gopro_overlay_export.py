@@ -120,6 +120,20 @@ def _safe_filename(filename: str | None, fallback: str) -> str:
     return cleaned or fallback
 
 
+def _validate_file_extension(path: Path, allowed_extensions: set[str]) -> None:
+    suffix = path.suffix.lower()
+    if suffix not in allowed_extensions:
+        allowed = ", ".join(sorted(allowed_extensions))
+        raise ValueError(f"Unsupported file extension '{suffix}'. Expected one of: {allowed}")
+
+
+def _copy_job_input(source: Path, destination: Path, allowed_extensions: set[str]) -> Path:
+    _validate_file_extension(source, allowed_extensions)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    return destination
+
+
 def _update_job(job_id: str, **changes: Any) -> dict[str, Any]:
     with _LOCK:
         job = _JOBS[job_id]
@@ -232,10 +246,7 @@ async def save_uploaded_file(
     destination: Path,
     allowed_extensions: set[str],
 ) -> Path:
-    suffix = Path(upload.filename or "").suffix.lower()
-    if suffix not in allowed_extensions:
-        allowed = ", ".join(sorted(allowed_extensions))
-        raise ValueError(f"Unsupported file extension '{suffix}'. Expected one of: {allowed}")
+    _validate_file_extension(Path(upload.filename or ""), allowed_extensions)
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     with destination.open("wb") as output:
@@ -293,6 +304,11 @@ def create_gopro_overlay_job_from_paths(
     layout_id: str | None,
     output_filename: str | None,
 ) -> dict[str, Any]:
+    _validate_file_extension(video_path, _VIDEO_EXTENSIONS)
+    _validate_file_extension(gpx_path, _GPX_EXTENSIONS)
+    if pip_path:
+        _validate_file_extension(pip_path, _VIDEO_EXTENSIONS)
+
     job_id = str(uuid.uuid4())
     work_dir = _upload_dir() / job_id
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -305,6 +321,7 @@ def create_gopro_overlay_job_from_paths(
             layout_id=layout_id,
             output_filename=output_filename,
             work_dir=work_dir,
+            pin_inputs=True,
         )
     except Exception:
         shutil.rmtree(work_dir, ignore_errors=True)
@@ -319,10 +336,29 @@ def _create_gopro_overlay_job_from_paths(
     layout_id: str | None,
     output_filename: str | None,
     work_dir: Path,
+    pin_inputs: bool = False,
 ) -> dict[str, Any]:
     output_name = _safe_filename(output_filename, f"gopro-overlay-{job_id}.mp4")
     if Path(output_name).suffix.lower() != ".mp4":
         output_name = f"{Path(output_name).stem}.mp4"
+
+    if pin_inputs:
+        video_path = _copy_job_input(
+            video_path,
+            work_dir / f"input{video_path.suffix.lower()}",
+            _VIDEO_EXTENSIONS,
+        )
+        gpx_path = _copy_job_input(
+            gpx_path,
+            work_dir / f"track{gpx_path.suffix.lower()}",
+            _GPX_EXTENSIONS,
+        )
+        if pip_path:
+            pip_path = _copy_job_input(
+                pip_path,
+                work_dir / f"pip{pip_path.suffix.lower()}",
+                _VIDEO_EXTENSIONS,
+            )
 
     width, height = probe_video_resolution(video_path)
     selected_layout = _find_layout(layout_id) if layout_id else _nearest_layout(width, height)

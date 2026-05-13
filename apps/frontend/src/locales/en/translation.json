@@ -461,7 +461,7 @@
         }
       }
     },
-    "saved": "Settings saved!",
+    "saveSuccess": "Settings saved!",
     "saveButton": "Save changes"
   },
   "analytics": {

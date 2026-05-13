@@ -67,6 +67,7 @@ export function FlightDetails({
   const cancelGoproOverlayJob = useCancelGoproOverlayJob();
   const resetGoproOverlayJob = createGoproOverlayJob.reset;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeFlightIdRef = useRef(flight.id);
 
   const [editingMode, setEditingMode] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
@@ -98,14 +99,18 @@ export function FlightDetails({
     })();
 
   useEffect(() => {
+    activeFlightIdRef.current = flight.id;
     setActiveTab('infos');
     setHasOpenedReplay(false);
     setEditingMode(false);
     setEditingNotes(false);
-    setNotesText(flight.notes ?? '');
     setGoproOverlayJobId(null);
     resetGoproOverlayJob();
-  }, [flight.id, flight.notes, resetGoproOverlayJob]);
+  }, [flight.id, resetGoproOverlayJob]);
+
+  useEffect(() => {
+    setNotesText(flight.notes ?? '');
+  }, [flight.notes]);
 
   const handleSubmitEdit = async (values: FlightFormData) => {
     await updateFlight.mutateAsync(values);
@@ -177,9 +182,11 @@ export function FlightDetails({
 
   const handleStartGoproOverlay = async () => {
     if (!hasGpx || !hasVideo || isGoproOverlayRunning) return;
+    const requestedFlightId = flight.id;
 
     try {
       const job = await createGoproOverlayJob.mutateAsync();
+      if (activeFlightIdRef.current !== requestedFlightId) return;
       setGoproOverlayJobId(job.job_id);
       toast.success(t('flights.goproOverlayStarted'));
     } catch {

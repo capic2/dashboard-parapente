@@ -465,7 +465,7 @@
         }
       }
     },
-    "saved": "Paramètres sauvegardés !",
+    "saveSuccess": "Paramètres sauvegardés !",
     "saveButton": "Sauvegarder les modifications"
   },
   "analytics": {
