@@ -45,6 +45,30 @@ class TestFlightsListEndpoint:
         assert "flights" in data
         assert len(data["flights"]) == 3
 
+    def test_get_flights_includes_video_export_fields(self, client, db_session, arguel_site):
+        """GET /flights includes video fields used by flight details actions."""
+        flight = Flight(
+            id="flight-with-video",
+            name="Flight with video",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            gpx_file_path="db/gpx/flight-with-video.gpx",
+            video_file_path="/exports/flight-with-video.mp4",
+            video_export_job_id="job-video",
+            video_export_status="completed",
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights")
+
+        assert response.status_code == 200
+        returned = response.json()["flights"][0]
+        assert returned["gpx_file_path"] == "db/gpx/flight-with-video.gpx"
+        assert returned["video_file_path"] == "/exports/flight-with-video.mp4"
+        assert returned["video_export_job_id"] == "job-video"
+        assert returned["video_export_status"] == "completed"
+
     def test_get_flights_filter_by_site(self, client, db_session, arguel_site, chalais_site):
         """GET /flights?site_id=X filters by site"""
         # Create flights for different sites
