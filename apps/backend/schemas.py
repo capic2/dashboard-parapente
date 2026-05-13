@@ -4,6 +4,52 @@ from typing import Any, Literal
 from pydantic import BaseModel, validator
 
 
+class GoproOverlayDependencies(BaseModel):
+    gopro_dashboard: bool
+    ffmpeg: bool
+    ffprobe: bool
+
+
+class GoproOverlayLayout(BaseModel):
+    id: str
+    label: str
+    filename: str
+    width: int | None = None
+    height: int | None = None
+    exists: bool
+    recommended: bool
+
+
+class GoproOverlayLayoutsResponse(BaseModel):
+    layouts: list[GoproOverlayLayout]
+
+
+class GoproOverlayProbeResponse(GoproOverlayLayoutsResponse):
+    width: int | None = None
+    height: int | None = None
+
+
+class GoproOverlayJob(BaseModel):
+    job_id: str
+    status: Literal["queued", "running", "completed", "failed", "cancelled"]
+    progress: int
+    message: str
+    error: str | None = None
+    layout_id: str
+    layout_label: str
+    output_filename: str
+    video_width: int | None = None
+    video_height: int | None = None
+    created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None = None
+
+
+class GoproOverlayCancelResponse(BaseModel):
+    job_id: str
+    message: str
+
+
 # Sites
 class SiteBase(BaseModel):
     code: str | None = None  # Optional - some sites may not have a code
