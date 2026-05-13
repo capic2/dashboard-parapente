@@ -42,7 +42,7 @@ This is an Nx monorepo with these main projects:
 
 ## Lint
 
-For the full repository lint, prefer disabling Nx Cloud noise and use a long timeout.
+For Nx lint tasks, prefer `affected`, disable Nx Cloud noise, and use a long timeout.
 
 Bash tool settings:
 
@@ -52,10 +52,10 @@ Bash tool settings:
 Command:
 
 ```bash
-NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm lint
+NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t lint --parallel=5 --exclude=e2e
 ```
 
-Equivalent direct Nx command:
+Only use a full-repo direct Nx command when affected detection is explicitly inappropriate:
 
 ```bash
 NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx run-many -t lint --all
@@ -67,16 +67,17 @@ When output is very large, verify success with the exit code:
 NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm lint >/tmp/dashboard-parapente-lint.log 2>&1; status=$?; printf 'lint_exit_code=%s\n' "$status"; exit "$status"
 ```
 
-## Targeted Nx Commands
+## Affected Nx Commands
 
-Use targeted commands when only one project is impacted:
+Use affected commands for Nx validation, even when only one project appears impacted:
 
 ```bash
-NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx lint frontend
-NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx lint backend
-NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx lint design-system
-NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx lint shared-types
+NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t lint --parallel=5 --exclude=e2e
+NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t test --parallel=5 --exclude=e2e
+NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t build --parallel=5 --exclude=e2e
 ```
+
+Use direct project targets such as `nx affected lint frontend` or `nx affected test backend` only as follow-up diagnostics after an affected run identifies a failing project, or when explicitly requested.
 
 For direct Oxlint checks on frontend/design-system:
 
@@ -91,11 +92,8 @@ Use the same pnpm binary and disable Nx Cloud if running through Nx:
 
 ```bash
 NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e
-NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm test
-NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm build
-NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx test frontend
-NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx build frontend
-NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx test backend
+NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t test --parallel=5 --exclude=e2e
+NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t build --parallel=5 --exclude=e2e
 ```
 
 Use a longer Bash timeout for full-repo tasks:

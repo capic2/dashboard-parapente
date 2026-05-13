@@ -52,13 +52,13 @@ Use when files are under `apps/frontend`.
 - Use CSF Factory.
 - Update `apps/frontend/chromatic.config.json` when stories are added or restructured.
 
-Commands:
+Prefer affected Nx tasks for validation:
 
 ```bash
-/home/capic/.local/share/pnpm/pnpm nx lint frontend
-/home/capic/.local/share/pnpm/pnpm nx test frontend
-/home/capic/.local/share/pnpm/pnpm nx build frontend
+NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t lint,test,build --parallel=5 --exclude=e2e
 ```
+
+Use direct project targets only for a narrow diagnostic rerun after an affected task identifies a specific failing project.
 
 ## Backend
 
@@ -70,36 +70,38 @@ Use when files are under `apps/backend`.
 - Validate API input/output with Pydantic.
 - Add pytest coverage for new business behavior or bug fixes.
 
-Commands:
+Prefer affected Nx tasks for validation:
 
 ```bash
-/home/capic/.local/share/pnpm/pnpm nx lint backend
-/home/capic/.local/share/pnpm/pnpm nx test backend
+NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t lint,test --parallel=5 --exclude=e2e
 ```
+
+Use direct project targets only for a narrow diagnostic rerun after an affected task identifies a specific failing project.
 
 ## Global Commands
-Run all tests:
+Run impacted tests:
 
 ```bash
-/home/capic/.local/share/pnpm/pnpm nx run-many -t test
+NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t test --parallel=5 --exclude=e2e
 ```
 
-Run all lint targets:
+Run impacted lint targets:
 
 ```bash
-/home/capic/.local/share/pnpm/pnpm nx run-many -t lint
+NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t lint --parallel=5 --exclude=e2e
 ```
 
 ## Validation Strategy
-- Prefer targeted lint/test commands during implementation.
+- Prefer `nx affected` for Nx lint/test/build tasks during implementation and PR validation.
 - For long or multi-command validation runs, prefer a validation subagent that runs commands from the active worktree and returns a concise pass/fail report.
 - Keep the main agent responsible for fixing failures and deciding whether extra validation is needed.
 - Prefer `nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e` for branch/PR validation.
+- Use direct project commands such as `nx lint frontend` or `nx test backend` only as a follow-up diagnostic when an affected run has already identified a failing project, or when the user explicitly asks for a direct project target.
 - Use `run-many -t test` only when affected detection is not appropriate or a full-repo check is explicitly needed.
 - Use `run-many -t lint` only when affected detection is not appropriate or a full-repo lint is explicitly needed.
 - Use frontend build when frontend behavior, routing, bundling, or UI code changes.
 - Before creating or updating a PR, run all impacted checks from the active worktree and fix failures first.
-- For frontend PRs, run `nx lint frontend`, `nx test frontend`, and `nx build frontend` from the worktree before opening the PR.
+- For frontend PRs, run `nx affected -t lint,test,build --parallel=5 --exclude=e2e` from the worktree before opening the PR.
 - Do not create the PR if required checks cannot run locally because of the worktree environment; stop, report the blocker, and ask before proceeding.
 
 ## Git
