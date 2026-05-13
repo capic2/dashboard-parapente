@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useSuspenseQuery, useQueries } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { CalendarDays, CloudSun, MapPinned, Video } from 'lucide-react';
+import { CalendarDays, CloudSun, MapPinned } from 'lucide-react';
 import StatsPanel from '../components/dashboard/StatsPanel';
 import AllSitesConditions from '../components/dashboard/AllSitesConditions';
 import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
@@ -106,13 +106,6 @@ export default function Dashboard() {
               className="rounded-2xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-sky-600/20 transition-colors hover:bg-sky-700"
             >
               {t('weather.viewForecast')}
-            </Button>
-            <Button
-              onClick={() => void navigate({ to: '/gopro-overlay' })}
-              className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-slate-950/20 transition-colors hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"
-            >
-              <Video className="h-4 w-4" aria-hidden="true" />
-              {t('header.goproOverlay')}
             </Button>
           </div>
         </div>
