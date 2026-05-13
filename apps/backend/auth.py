@@ -22,11 +22,17 @@ ALGORITHM = "HS256"
 
 
 def _extract_access_token(request: Request) -> str | None:
-    """Read bearer token from Authorization header or access_token query param."""
+    """Read bearer token from Authorization header, auth cookie, or legacy query param."""
     auth_header = request.headers.get("authorization", "")
     scheme, _, value = auth_header.partition(" ")
     if scheme.lower() == "bearer":
         token = value.strip()
+        if token:
+            return token
+
+    cookie_token = request.cookies.get("access_token")
+    if cookie_token:
+        token = cookie_token.strip()
         if token:
             return token
 
