@@ -396,7 +396,7 @@ def test_create_gopro_overlay_job_from_paths_uses_custom_output_dir(
     monkeypatch,
 ):
     upload_dir = tmp_path / "uploads"
-    output_dir = tmp_path / "custom-outputs"
+    output_root = tmp_path / "outputs"
     layout_dir = tmp_path / "layouts"
     layout_dir.mkdir()
     (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
@@ -405,6 +405,7 @@ def test_create_gopro_overlay_job_from_paths_uses_custom_output_dir(
     video_path.write_bytes(b"video")
     gpx_path.write_text("<gpx />")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_UPLOAD_DIR", str(upload_dir))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_OUTPUT_DIR", str(output_root))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
     monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
 
@@ -415,10 +416,39 @@ def test_create_gopro_overlay_job_from_paths_uses_custom_output_dir(
             pip_path=None,
             layout_id="parapente-1080",
             output_filename="overlay.mp4",
-            output_dir=str(output_dir),
+            output_dir="custom-outputs",
         )
 
-    assert Path(job["output_path"]).parent == output_dir / job["job_id"]
+    assert Path(job["output_path"]).parent == output_root / "custom-outputs" / job["job_id"]
+
+
+def test_create_gopro_overlay_job_from_paths_rejects_output_dir_outside_root(
+    tmp_path,
+    monkeypatch,
+):
+    upload_dir = tmp_path / "uploads"
+    output_root = tmp_path / "outputs"
+    layout_dir = tmp_path / "layouts"
+    layout_dir.mkdir()
+    (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
+    video_path = tmp_path / "source.mp4"
+    gpx_path = tmp_path / "source.gpx"
+    video_path.write_bytes(b"video")
+    gpx_path.write_text("<gpx />")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_UPLOAD_DIR", str(upload_dir))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_OUTPUT_DIR", str(output_root))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+
+    with pytest.raises(ValueError, match="Output directory must be inside"):
+        create_gopro_overlay_job_from_paths(
+            video_path=video_path,
+            gpx_path=gpx_path,
+            pip_path=None,
+            layout_id="parapente-1080",
+            output_filename="overlay.mp4",
+            output_dir=str(tmp_path / "outside"),
+        )
 
 
 def test_cancelled_queued_job_does_not_start_process():

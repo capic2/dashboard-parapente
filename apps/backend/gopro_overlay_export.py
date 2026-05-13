@@ -89,9 +89,18 @@ def _output_dir() -> Path:
 
 
 def _resolve_output_dir(output_dir: str | None) -> Path:
+    base_dir = _output_dir().expanduser().resolve()
     if not output_dir or not output_dir.strip():
-        return _output_dir()
-    return Path(output_dir.strip()).expanduser()
+        return base_dir
+
+    candidate = Path(output_dir.strip()).expanduser()
+    if not candidate.is_absolute():
+        candidate = base_dir / candidate
+
+    resolved = candidate.resolve()
+    if resolved != base_dir and base_dir not in resolved.parents:
+        raise ValueError("Output directory must be inside the configured GoPro overlay output root")
+    return resolved
 
 
 def _layout_path(layout: GoproOverlayLayout) -> Path:

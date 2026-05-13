@@ -50,6 +50,17 @@ const labelClass = 'text-xs text-gray-600 dark:text-gray-300';
 const valueClass =
   'block text-sm font-medium text-gray-900 dark:text-white mt-1';
 
+function sanitizeOverlayBasename(raw: string) {
+  const cleaned = raw
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/gu, '')
+    .replace(/[^a-zA-Z0-9._-]+/gu, '_')
+    .replace(/[._-]{2,}/gu, '_')
+    .replace(/^[._-]+|[._-]+$/gu, '')
+    .slice(0, 80);
+  return cleaned || 'flight';
+}
+
 export function FlightDetails({
   flight,
   sites,
@@ -222,7 +233,10 @@ export function FlightDetails({
     const formData = new FormData();
     formData.append('video_file', goproOverlayVideoFile);
     formData.append('output_dir', goproOverlayOutputDir.trim());
-    formData.append('output_filename', `${flightTitle}-overlay.mp4`);
+    formData.append(
+      'output_filename',
+      `${sanitizeOverlayBasename(flightTitle)}-overlay.mp4`
+    );
     if (goproOverlayGpxFile) {
       formData.append('gpx_file', goproOverlayGpxFile);
     }
