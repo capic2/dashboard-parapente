@@ -35,7 +35,6 @@ from flight_backfill import calculate_and_persist_missing_max_speed
 from gopro_overlay_export import cancel_gopro_overlay_job
 from gopro_overlay_export import check_gopro_overlay_dependencies
 from gopro_overlay_export import create_gopro_overlay_job
-from gopro_overlay_export import create_gopro_overlay_job_from_paths
 from gopro_overlay_export import get_gopro_overlay_job
 from gopro_overlay_export import gopro_overlay_output_path
 from gopro_overlay_export import list_gopro_overlay_layouts
@@ -4558,11 +4557,17 @@ def get_gopro_overlay_dependencies() -> GoproOverlayDependencies:
     "/flights/{flight_id}/gopro-overlay",
     response_model=GoproOverlayJob,
 )
-def create_flight_gopro_overlay_job(
+async def create_flight_gopro_overlay_job(
     flight_id: str,
+    video_file: UploadFile = File(...),
+    gpx_file: UploadFile | None = File(None),
+    osv_video_file: UploadFile | None = File(None),
+    output_dir: str = Form(...),
+    layout_id: str | None = Form(None),
+    output_filename: str | None = Form(None),
     db: Session = Depends(get_db),
 ) -> GoproOverlayJob:
-    """Create a GoPro overlay render job from a flight's existing video and GPX."""
+    """Create a GoPro overlay render job from provided media and the flight GPX fallback."""
     dependencies = check_gopro_overlay_dependencies()
     missing = [name for name, available in dependencies.items() if not available]
     if missing:
@@ -4575,24 +4580,28 @@ def create_flight_gopro_overlay_job(
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
-    gpx_path = _resolve_flight_file_path(flight.gpx_file_path)
-    if not gpx_path or not gpx_path.exists():
+    fallback_gpx_path = _resolve_flight_file_path(flight.gpx_file_path)
+    if (not gpx_file or not gpx_file.filename) and (
+        not fallback_gpx_path or not fallback_gpx_path.exists()
+    ):
         raise HTTPException(status_code=400, detail="Flight has no GPX file")
-
-    video_path = _resolve_flight_file_path(flight.video_file_path)
-    if not video_path or not video_path.exists():
-        raise HTTPException(status_code=400, detail="Flight has no video file")
+    fallback_pip_path = _resolve_flight_file_path(flight.video_file_path)
+    if not fallback_pip_path or not fallback_pip_path.exists():
+        fallback_pip_path = None
 
     title = flight.title or flight.name or flight.id
-    output_filename = f"{title}-overlay.mp4"
+    resolved_output_filename = output_filename or f"{title}-overlay.mp4"
 
     try:
-        return create_gopro_overlay_job_from_paths(
-            video_path=video_path,
-            gpx_path=gpx_path,
-            pip_path=None,
-            layout_id=None,
-            output_filename=output_filename,
+        return await create_gopro_overlay_job(
+            video_file=video_file,
+            gpx_file=gpx_file,
+            fallback_gpx_path=fallback_gpx_path,
+            fallback_pip_path=fallback_pip_path,
+            pip_file=osv_video_file,
+            layout_id=layout_id,
+            output_filename=resolved_output_filename,
+            output_dir=output_dir,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
