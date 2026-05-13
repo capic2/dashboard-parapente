@@ -1,6 +1,6 @@
 ---
 name: implementation-worktree-strategy
-description: Enforces the Git start-of-work strategy for repository code changes by checking the current branch, updating `main` when required, and deciding whether to stay on the current branch or create a worktree from `main`. Use when the user asks to implémenter, ajouter, corriger, refactorer, modifier du code, faire une feature, faire une implémentation, changer le frontend, changer le backend, or otherwise requests a code change, especially when worktrees must be created in `.codenomad/worktree` with names prefixed by `wt-`.
+description: Enforces the Git start-of-work strategy for repository code changes by checking the current branch, fetching `origin/main`, and deciding whether to stay on the current branch or create a worktree from `origin/main`. Use when the user asks to implémenter, ajouter, corriger, refactorer, modifier du code, faire une feature, faire une implémentation, changer le frontend, changer le backend, or otherwise requests a code change, especially when worktrees must be created in `.codenomad/worktree` with names prefixed by `wt-`.
 ---
 
 # Implementation Worktree Strategy
@@ -10,9 +10,9 @@ description: Enforces the Git start-of-work strategy for repository code changes
 Before any implementation task:
 
 1. Check the current Git branch.
-2. If on `main`, update `main` with `gh pull` and create a worktree from `main`.
+2. If on `main`, fetch `origin/main` and create a worktree from `origin/main`.
 3. If on another branch, ask whether to create a worktree.
-4. If yes, update `main` and create the worktree from `main`.
+4. If yes, fetch `origin/main` and create the worktree from `origin/main`.
 5. If no, stay on the current branch.
 6. When a worktree is created, immediately launch the `worktree-bootstrap` subagent for dependency readiness.
 
@@ -39,8 +39,8 @@ The main agent remains responsible for interpreting blockers and making code cha
 
 ### If current branch is `main`
 
-- Update `main`.
-- Create a worktree from `main`.
+- Fetch `origin/main`.
+- Create a worktree from `origin/main`.
 - Name the current AI session with the exact worktree name.
 - Launch the `worktree-bootstrap` subagent.
 - Continue implementation in that worktree.
@@ -53,8 +53,8 @@ Ask:
 
 If yes:
 
-- Update `main`.
-- Create a worktree from `main` in `.codenomad/worktree`.
+- Fetch `origin/main`.
+- Create a worktree from `origin/main` in `.codenomad/worktree`.
 - Use a name like `wt-<task-label>`.
 - Name the current AI session with the exact worktree name.
 - Launch the `worktree-bootstrap` subagent.
@@ -64,6 +64,14 @@ If no:
 
 - Stay on the current branch.
 - Continue there.
+
+## Required commands
+
+Before creating any worktree, run `git fetch origin main`.
+
+Create the worktree and branch from `origin/main`, not from local `main`: `git worktree add -b wt-<task-label> .codenomad/worktree/wt-<task-label> origin/main`.
+
+Never create an implementation worktree from stale local `main` unless the repository has no remote, and report that limitation.
 
 ## Naming
 
