@@ -7,28 +7,22 @@ description: Guides implementation, debugging, review, validation, and GitHub wo
 
 ## Quick Start
 
-Use this skill for repository workflow decisions, validation strategy, GitHub operations, and frontend/backend conventions.
+Use this skill for repository workflow decisions, GitHub operations, and frontend/backend conventions.
 
 1. Read the closest applicable `AGENTS.md`.
 2. Inspect the current structure before editing.
 3. Keep changes minimal and scoped.
 4. Do not modify unrelated dirty files.
-5. Prefer affected Nx tasks for validation.
+5. Load `local-machine-stack` before running pnpm, Nx, lint, test, build, or type-check commands.
 
 Projects: `frontend` in `apps/frontend`, `backend` in `apps/backend`, `design-system` in `libs/design-system`, `shared-types` in `libs/shared-types`.
-
-Package manager:
-
-```bash
-/home/capic/.local/share/pnpm/pnpm
-```
 
 ## Tooling
 
 - Use `Glob` for file discovery, `Grep` for code search, and `Read` for known files.
 - Use `apply_patch` for manual edits; avoid shell-based file editing.
 - Never use destructive git commands.
-- Load `local-machine-stack` for pnpm, dependency readiness, command timeouts, and machine-specific command details.
+- Use `local-machine-stack` as the source of truth for pnpm paths, dependency readiness, command timeouts, and Nx validation commands.
 
 ## Worktrees
 
@@ -48,13 +42,7 @@ Applies to `apps/frontend/**`; follow `apps/frontend/AGENTS.md`.
 - Keep Storybook stories focused and use CSF Factory.
 - Update `apps/frontend/chromatic.config.json` when stories are added or restructured.
 
-Frontend validation:
-
-```bash
-NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t lint,test,build --parallel=5 --exclude=e2e
-```
-
-Run frontend build when behavior, routing, bundling, or UI code changes.
+Run frontend build when behavior, routing, bundling, or UI code changes. Use `local-machine-stack` for the exact validation command.
 
 ## Backend
 
@@ -66,21 +54,11 @@ Applies to `apps/backend/**`; follow `apps/backend/AGENTS.md`.
 - Follow existing SQLAlchemy patterns.
 - Add pytest coverage for new business behavior or bug fixes.
 
-Backend validation:
-
-```bash
-NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t lint,test --parallel=5 --exclude=e2e
-```
+Use `local-machine-stack` for the exact backend validation command.
 
 ## Validation
 
-Prefer this command for implementation and PR validation:
-
-```bash
-NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e
-```
-
-Use direct project targets only after an affected run identifies a failing project, or when explicitly requested. Use `run-many` only when affected detection is inappropriate or a full-repo check is required.
+Prefer affected Nx validation from `local-machine-stack` for implementation and PR validation. Use direct project targets only after an affected run identifies a failing project, or when explicitly requested. Use `run-many` only when affected detection is inappropriate or a full-repo check is required.
 
 For long validation runs, prefer a validation subagent that runs commands from the active worktree and returns a concise pass/fail report. The main agent fixes failures and decides whether more validation is needed.
 
