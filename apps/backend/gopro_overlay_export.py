@@ -253,10 +253,6 @@ async def create_gopro_overlay_job(
 ) -> dict[str, Any]:
     job_id = str(uuid.uuid4())
     job_upload_dir = _upload_dir() / job_id
-    output_name = _safe_filename(output_filename, f"gopro-overlay-{job_id}.mp4")
-    if Path(output_name).suffix.lower() != ".mp4":
-        output_name = f"{Path(output_name).stem}.mp4"
-
     try:
         video_path = await save_uploaded_file(
             video_file,
@@ -276,21 +272,70 @@ async def create_gopro_overlay_job(
                 _VIDEO_EXTENSIONS,
             )
 
-        width, height = probe_video_resolution(video_path)
-        selected_layout = _find_layout(layout_id) if layout_id else _nearest_layout(width, height)
-        if not selected_layout:
-            raise ValueError("Unknown layout")
-        source_layout_path = _layout_path(selected_layout)
-        if not source_layout_path.exists():
-            raise ValueError(f"Layout file not found: {source_layout_path}")
-        layout_path = _prepare_layout_file(
-            source_layout_path,
-            job_upload_dir / source_layout_path.name,
-            has_pip=pip_path is not None,
+        return _create_gopro_overlay_job_from_paths(
+            job_id=job_id,
+            video_path=video_path,
+            gpx_path=gpx_path,
+            pip_path=pip_path,
+            layout_id=layout_id,
+            output_filename=output_filename,
+            work_dir=job_upload_dir,
         )
     except Exception:
         shutil.rmtree(job_upload_dir, ignore_errors=True)
         raise
+
+
+def create_gopro_overlay_job_from_paths(
+    video_path: Path,
+    gpx_path: Path,
+    pip_path: Path | None,
+    layout_id: str | None,
+    output_filename: str | None,
+) -> dict[str, Any]:
+    job_id = str(uuid.uuid4())
+    work_dir = _upload_dir() / job_id
+    work_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        return _create_gopro_overlay_job_from_paths(
+            job_id=job_id,
+            video_path=video_path,
+            gpx_path=gpx_path,
+            pip_path=pip_path,
+            layout_id=layout_id,
+            output_filename=output_filename,
+            work_dir=work_dir,
+        )
+    except Exception:
+        shutil.rmtree(work_dir, ignore_errors=True)
+        raise
+
+
+def _create_gopro_overlay_job_from_paths(
+    job_id: str,
+    video_path: Path,
+    gpx_path: Path,
+    pip_path: Path | None,
+    layout_id: str | None,
+    output_filename: str | None,
+    work_dir: Path,
+) -> dict[str, Any]:
+    output_name = _safe_filename(output_filename, f"gopro-overlay-{job_id}.mp4")
+    if Path(output_name).suffix.lower() != ".mp4":
+        output_name = f"{Path(output_name).stem}.mp4"
+
+    width, height = probe_video_resolution(video_path)
+    selected_layout = _find_layout(layout_id) if layout_id else _nearest_layout(width, height)
+    if not selected_layout:
+        raise ValueError("Unknown layout")
+    source_layout_path = _layout_path(selected_layout)
+    if not source_layout_path.exists():
+        raise ValueError(f"Layout file not found: {source_layout_path}")
+    layout_path = _prepare_layout_file(
+        source_layout_path,
+        work_dir / source_layout_path.name,
+        has_pip=pip_path is not None,
+    )
 
     output_path = _output_dir() / job_id / output_name
     output_path.parent.mkdir(parents=True, exist_ok=True)

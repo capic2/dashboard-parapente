@@ -66,13 +66,6 @@ export default function Header() {
           <Link to="/sites" className={linkClassName} onClick={onNavigate}>
             {t('header.sites')}
           </Link>
-          <Link
-            to="/gopro-overlay"
-            className={linkClassName}
-            onClick={onNavigate}
-          >
-            {t('header.goproOverlay')}
-          </Link>
           <Link to="/settings" className={linkClassName} onClick={onNavigate}>
             {t('header.settings')}
           </Link>

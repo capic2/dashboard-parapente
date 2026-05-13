@@ -81,6 +81,71 @@ def test_create_gopro_overlay_job_passes_uploaded_files(client: TestClient):
     assert create_job.call_args.kwargs["pip_file"] is not None
 
 
+def test_create_flight_gopro_overlay_job_uses_flight_files(
+    client: TestClient,
+    db_session,
+    sample_flight,
+    tmp_path,
+):
+    video_path = tmp_path / "flight.mp4"
+    gpx_path = tmp_path / "flight.gpx"
+    video_path.write_bytes(b"video")
+    gpx_path.write_text("<gpx />")
+    sample_flight.video_file_path = str(video_path)
+    sample_flight.gpx_file_path = str(gpx_path)
+    sample_flight.title = "Arguel test"
+    db_session.commit()
+
+    expected = {
+        "job_id": "job-flight-gopro",
+        "status": "queued",
+        "progress": 0,
+        "message": "queued",
+        "layout_id": "parapente-1080",
+        "layout_label": "Parapente 1920x1080",
+        "output_filename": "Arguel_test-overlay.mp4",
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
+
+    with (
+        patch(
+            "routes.check_gopro_overlay_dependencies",
+            return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
+        ),
+        patch("routes.create_gopro_overlay_job_from_paths", return_value=expected) as create_job,
+    ):
+        response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay")
+
+    assert response.status_code == 200
+    assert response.json()["job_id"] == "job-flight-gopro"
+    assert create_job.call_args.kwargs["video_path"] == video_path
+    assert create_job.call_args.kwargs["gpx_path"] == gpx_path
+    assert create_job.call_args.kwargs["output_filename"] == "Arguel test-overlay.mp4"
+
+
+def test_create_flight_gopro_overlay_job_requires_existing_video(
+    client: TestClient,
+    db_session,
+    sample_flight,
+    tmp_path,
+):
+    gpx_path = tmp_path / "flight.gpx"
+    gpx_path.write_text("<gpx />")
+    sample_flight.gpx_file_path = str(gpx_path)
+    sample_flight.video_file_path = str(tmp_path / "missing.mp4")
+    db_session.commit()
+
+    with patch(
+        "routes.check_gopro_overlay_dependencies",
+        return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
+    ):
+        response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay")
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Flight has no video file"
+
+
 def test_download_gopro_overlay_rejects_unfinished_job(client: TestClient):
     with patch(
         "routes.get_gopro_overlay_job",

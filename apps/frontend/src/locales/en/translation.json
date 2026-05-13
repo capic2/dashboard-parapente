@@ -423,7 +423,9 @@
         "help": "Controls how sensitive the score and time slots are to atmospheric instability.",
         "fields": {
           "para_li_stable_min": { "label": "Stable above" },
-          "para_li_slightly_unstable_min": { "label": "Slightly unstable above" },
+          "para_li_slightly_unstable_min": {
+            "label": "Slightly unstable above"
+          },
           "para_li_very_unstable_max": { "label": "Very unstable below" }
         }
       },
@@ -449,9 +451,13 @@
         "help": "Adjusts the textual reasons shown in the flyability column (frontend only).",
         "fields": {
           "ui_reason_wind_moderate_min": { "label": "UI: moderate wind min" },
-          "ui_reason_wind_very_strong_min": { "label": "UI: very strong wind min" },
+          "ui_reason_wind_very_strong_min": {
+            "label": "UI: very strong wind min"
+          },
           "ui_reason_gust_high_min": { "label": "UI: high gusts min" },
-          "ui_reason_cloud_very_cloudy_min": { "label": "UI: very cloudy min (%)" }
+          "ui_reason_cloud_very_cloudy_min": {
+            "label": "UI: very cloudy min (%)"
+          }
         }
       }
     },
@@ -606,6 +612,26 @@
     "noNotes": "No notes for this flight",
     "gpxBadge": "GPX available",
     "videoBadge": "Video available",
+    "goproOverlayGenerate": "Generate GoPro overlay",
+    "goproOverlayStarting": "Starting...",
+    "goproOverlayCancel": "Cancel overlay",
+    "goproOverlayDownload": "Download overlay",
+    "goproOverlayGenerateTitle": "Generate a GoPro overlay video for this flight",
+    "goproOverlayNeedsGpx": "Add a GPX to this flight before generating the overlay",
+    "goproOverlayNeedsVideo": "Generate the flight video before adding the overlay",
+    "goproOverlayStarted": "GoPro overlay generation started",
+    "goproOverlayStartError": "Unable to start GoPro overlay",
+    "goproOverlayCancelled": "GoPro overlay generation cancelled",
+    "goproOverlayCancelError": "Unable to cancel GoPro overlay",
+    "goproOverlayDownloadError": "Unable to download GoPro overlay",
+    "goproOverlayJobTitle": "Flight GoPro overlay",
+    "goproOverlayStatus": {
+      "queued": "Queued",
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Error",
+      "cancelled": "Cancelled"
+    },
     "loading3dViewer": "Loading 3D viewer...",
     "flightOf": "Flight on {{date}}",
     "selectFlightHint": "Select a flight to view details and 3D trajectory",
