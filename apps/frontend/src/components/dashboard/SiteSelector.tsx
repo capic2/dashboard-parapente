@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createWeatherQueryFn } from '../../hooks/weather/useWeather';
 import type { Site } from '../../types';
 import { Button } from '@dashboard-parapente/design-system';
+import { useAppSettingsStore } from '../../stores/appSettingsStore';
 
 interface SiteSelectorProps {
   selectedSiteId: string;
@@ -84,19 +85,31 @@ export default function SiteSelector({
 }: SiteSelectorProps) {
   const { t } = useTranslation();
   const { data: sites, isLoading, error } = useSites();
+  const favoriteSiteIds = useAppSettingsStore(
+    (state) => state.settings.favoriteSites
+  );
   const queryClient = useQueryClient();
   const searchInputId = useId();
   const [isMobileSelectorOpen, setIsMobileSelectorOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const filteredSites = useMemo(() => {
+  const visibleSites = useMemo(() => {
     const availableSites = sites ?? [];
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return availableSites;
+    if (favoriteSiteIds.length === 0) return availableSites;
 
-    return availableSites.filter((site) =>
+    const favoriteSet = new Set(favoriteSiteIds);
+    const matchedFavorites = availableSites.filter((site) =>
+      favoriteSet.has(site.id)
+    );
+    return matchedFavorites.length > 0 ? matchedFavorites : availableSites;
+  }, [favoriteSiteIds, sites]);
+  const filteredSites = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return visibleSites;
+
+    return visibleSites.filter((site) =>
       getSiteSearchText(site).includes(query)
     );
-  }, [searchQuery, sites]);
+  }, [searchQuery, visibleSites]);
 
   // Prefetch site weather on hover (instant navigation)
   const handleMouseEnter = (siteId: string) => {
@@ -132,7 +145,7 @@ export default function SiteSelector({
   }
 
   // Group sites by base name
-  const siteGroups = groupSitesByBaseName(sites);
+  const siteGroups = groupSitesByBaseName(visibleSites);
   const selectedSite = sites.find((site) => site.id === selectedSiteId);
 
   const handleMobileSelect = (siteId: string) => {

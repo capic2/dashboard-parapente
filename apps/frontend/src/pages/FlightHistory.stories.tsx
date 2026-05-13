@@ -228,15 +228,15 @@ export const Default = meta.story({
 Default.test(
   'Can cancel a simple flight deletion',
   async ({ canvas, userEvent, step }) => {
-    const flightList = await canvas.findByRole('grid', {
+    const flightList = await canvas.findByRole('listbox', {
       name: i18n.t('flights.listAriaLabel'),
     });
 
     await step('have flights', async () => {
       await waitFor(async () => {
-        await expect(within(flightList).getAllByRole('row')).toHaveLength(
-          mockFlights.length
-        );
+        await expect(
+          within(flightList).getAllByTestId(/^flight-row-/)
+        ).toHaveLength(mockFlights.length);
       });
     });
 
@@ -262,24 +262,24 @@ Default.test(
 
     await step('the flight is not deleted', async () => {
       await expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-      await expect(within(flightList).getAllByRole('row')).toHaveLength(
-        mockFlights.length
-      );
+      await expect(
+        within(flightList).getAllByTestId(/^flight-row-/)
+      ).toHaveLength(mockFlights.length);
     });
   }
 );
 Default.test(
   'can delete a simple flight',
   async ({ canvas, userEvent, step }) => {
-    const flightList = await canvas.findByRole('grid', {
+    const flightList = await canvas.findByRole('listbox', {
       name: i18n.t('flights.listAriaLabel'),
     });
 
     await step('have flights', async () => {
       await waitFor(async () => {
-        await expect(within(flightList).getAllByRole('row')).toHaveLength(
-          mockFlights.length
-        );
+        await expect(
+          within(flightList).getAllByTestId(/^flight-row-/)
+        ).toHaveLength(mockFlights.length);
       });
     });
 
@@ -307,9 +307,9 @@ Default.test(
       await waitFor(async () => {
         await expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
 
-        await expect(within(flightList).getAllByRole('row')).toHaveLength(
-          mockFlights.length - 1
-        );
+        await expect(
+          within(flightList).getAllByTestId(/^flight-row-/)
+        ).toHaveLength(mockFlights.length - 1);
       });
     });
   }
@@ -327,7 +327,7 @@ MobileFlow.test(
   'opens a flight, switches tabs, and returns to list on mobile',
   async ({ canvas, userEvent, step }) => {
     await step('has the flight list', async () => {
-      const flightList = await canvas.findByRole('grid', {
+      const flightList = await canvas.findByRole('listbox', {
         name: i18n.t('flights.listAriaLabel'),
       });
       await expect(flightList).toBeInTheDocument();
@@ -357,7 +357,7 @@ MobileFlow.test(
         canvas.getByRole('button', { name: i18n.t('flights.backToList') })
       );
       await expect(
-        await canvas.findByRole('grid', {
+        await canvas.findByRole('listbox', {
           name: i18n.t('flights.listAriaLabel'),
         })
       ).toBeInTheDocument();
@@ -384,8 +384,10 @@ export const MobileFlowWithReplay = meta.story({
 MobileFlowWithReplay.test(
   'loads GPX data only when Replay tab is selected',
   async ({ canvas, userEvent, step }) => {
+    let requestsAfterOpeningFlight = 0;
+
     await step('has the flight list', async () => {
-      const flightList = await canvas.findByRole('grid', {
+      const flightList = await canvas.findByRole('listbox', {
         name: i18n.t('flights.listAriaLabel'),
       });
       await expect(flightList).toBeInTheDocument();
@@ -398,10 +400,11 @@ MobileFlowWithReplay.test(
           name: i18n.t('flights.backToList'),
         })
       ).toBeInTheDocument();
+      requestsAfterOpeningFlight = gpxRequestCount;
     });
 
     await step('does not load GPX while Infos tab is active', () => {
-      expect(gpxRequestCount).toBe(0);
+      expect(gpxRequestCount).toBe(requestsAfterOpeningFlight);
     });
 
     await step('switches to Replay and shows loading state', async () => {
@@ -416,7 +419,7 @@ MobileFlowWithReplay.test(
 
     await step('triggers GPX loading once Replay is active', async () => {
       await waitFor(() => {
-        expect(gpxRequestCount).toBeGreaterThan(0);
+        expect(gpxRequestCount).toBeGreaterThan(requestsAfterOpeningFlight);
       });
     });
   }

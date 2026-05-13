@@ -18,6 +18,12 @@ import { useToast } from '../../hooks/useToast';
 import { api } from '../../lib/api';
 import type { Flight, FlightFormData, Site } from '../../types';
 import { FlightEditForm } from './FlightEditForm';
+import {
+  formatAltitudeMeters,
+  formatDistanceKm,
+  formatSpeedKmh,
+  useAppSettingsStore,
+} from '../../stores/appSettingsStore';
 
 const FlightViewer3D = lazy(() =>
   import('./FlightViewer3D').then((m) => ({
@@ -49,6 +55,7 @@ export function FlightDetails({
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const units = useAppSettingsStore((state) => state.settings.units);
   const updateFlight = useUpdateFlight(flight.id);
   const uploadGPXMutation = useUploadGPXToFlight(flight.id);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -285,7 +292,7 @@ export function FlightDetails({
               <span className={labelClass}>{t('flights.distanceLabel')}</span>
               <span className={valueClass}>
                 {flight.distance_km != null
-                  ? `${flight.distance_km.toFixed(2)} km`
+                  ? formatDistanceKm(flight.distance_km, units.distance)
                   : 'N/A'}
               </span>
             </div>
@@ -296,7 +303,7 @@ export function FlightDetails({
               </span>
               <span className={valueClass}>
                 {flight.max_altitude_m != null
-                  ? `${flight.max_altitude_m} m`
+                  ? formatAltitudeMeters(flight.max_altitude_m, units.altitude)
                   : 'N/A'}
               </span>
             </div>
@@ -307,7 +314,10 @@ export function FlightDetails({
               </span>
               <span className={valueClass}>
                 {flight.elevation_gain_m != null
-                  ? `${flight.elevation_gain_m} m`
+                  ? formatAltitudeMeters(
+                      flight.elevation_gain_m,
+                      units.altitude
+                    )
                   : 'N/A'}
               </span>
             </div>
@@ -316,7 +326,7 @@ export function FlightDetails({
               <span className={labelClass}>{t('flights.maxSpeedLabel')}</span>
               <span className={valueClass}>
                 {flight.max_speed_kmh != null
-                  ? `${flight.max_speed_kmh.toFixed(2)} km/h`
+                  ? formatSpeedKmh(flight.max_speed_kmh, units.speed)
                   : 'N/A'}
               </span>
             </div>
