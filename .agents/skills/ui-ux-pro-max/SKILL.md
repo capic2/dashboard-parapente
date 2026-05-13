@@ -9,12 +9,7 @@ Use this skill for concrete UI/UX work: design systems, frontend screens, visual
 
 ## Required Workflow
 
-1. Extract the request context before searching:
-- Product type: SaaS, e-commerce, portfolio, dashboard, landing page, mobile app, etc.
-- Industry: healthcare, fintech, gaming, education, beauty, service, etc.
-- Style keywords: minimal, playful, professional, elegant, dark, brutalist, etc.
-- Target surface: landing page, app screen, dashboard, chart, form, settings, etc.
-- Stack: use the user's stack, otherwise default to `html-tailwind`.
+1. Extract the request context before searching: product type, industry, style keywords, target surface, and stack. Use the user's stack, otherwise default to `html-tailwind`.
 
 2. Generate a design system first. Do this before implementation or critique:
 
@@ -34,10 +29,7 @@ python3 .agents/skills/ui-ux-pro-max/scripts/search.py "<query>" --design-system
 python3 .agents/skills/ui-ux-pro-max/scripts/search.py "<query>" --design-system --persist -p "<Project Name>" --page "<page>"
 ```
 
-5. For a persisted project, use hierarchical retrieval:
-- Check `design-system/<project-slug>/pages/<page>.md` first.
-- If the page file exists, its rules override `MASTER.md`.
-- If no page file exists, follow `design-system/<project-slug>/MASTER.md`.
+5. For a persisted project, check `design-system/<project-slug>/pages/<page>.md` first. Page rules override `MASTER.md`; otherwise follow `MASTER.md`.
 
 6. Supplement with focused searches only when needed:
 
@@ -56,32 +48,9 @@ python3 .agents/skills/ui-ux-pro-max/scripts/search.py "layout responsive forms"
 
 ## Search Reference
 
-Available domains:
-- `product`: product type recommendations.
-- `style`: visual styles, effects, CSS keywords, prompt keywords.
-- `typography`: font pairings and Google Fonts guidance.
-- `color`: palettes by product type and mood.
-- `landing`: section order, CTA placement, conversion strategy.
-- `chart`: chart type, color guidance, chart accessibility.
-- `ux`: usability, accessibility, loading, motion, z-index, mobile behavior.
-- `icons`: icon library and icon usage guidance.
-- `react`: React and Next.js performance guidance.
-- `web`: semantic HTML, ARIA, forms, focus, keyboard, virtualization.
+Available domains: `product`, `style`, `typography`, `color`, `landing`, `chart`, `ux`, `icons`, `react`, `web`.
 
-Available stacks:
-- `html-tailwind`
-- `react`
-- `nextjs`
-- `astro`
-- `vue`
-- `nuxtjs`
-- `nuxt-ui`
-- `svelte`
-- `swiftui`
-- `react-native`
-- `flutter`
-- `shadcn`
-- `jetpack-compose`
+Available stacks: `html-tailwind`, `react`, `nextjs`, `astro`, `vue`, `nuxtjs`, `nuxt-ui`, `svelte`, `swiftui`, `react-native`, `flutter`, `shadcn`, `jetpack-compose`.
 
 ## Implementation Rules
 
