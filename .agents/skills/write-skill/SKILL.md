@@ -9,7 +9,7 @@ description: Create new agent skills with proper structure, progressive disclosu
 
 1. **Gather requirements** - ask what task/domain the skill covers, which use cases it handles, whether it needs scripts or just instructions, and which reference materials to include.
 
-2. **Draft the skill** - create `SKILL.md` with concise instructions, add reference files if content exceeds 500 lines, and add utility scripts for deterministic operations.
+2. **Draft the skill** - create `SKILL.md` with concise instructions, add reference files if content exceeds 100 lines, and add utility scripts for deterministic operations.
 
 3. **Review with user** - present the draft and ask whether it covers the use cases, whether anything is missing or unclear, and whether any section needs more or less detail.
 
