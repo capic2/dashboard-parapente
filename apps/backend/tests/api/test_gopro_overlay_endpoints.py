@@ -115,18 +115,52 @@ def test_create_flight_gopro_overlay_job_uses_flight_files(
             "routes.check_gopro_overlay_dependencies",
             return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
         ),
-        patch("routes.create_gopro_overlay_job_from_paths", return_value=expected) as create_job,
+        patch("routes.create_gopro_overlay_job", AsyncMock(return_value=expected)) as create_job,
     ):
-        response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay")
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay",
+            files={
+                "video_file": ("camera.mp4", b"camera", "video/mp4"),
+                "osv_video_file": ("osv.mp4", b"osv", "video/mp4"),
+            },
+            data={"output_dir": str(tmp_path / "exports")},
+        )
 
     assert response.status_code == 200
     assert response.json()["job_id"] == "job-flight-gopro"
-    assert create_job.call_args.kwargs["video_path"] == video_path
-    assert create_job.call_args.kwargs["gpx_path"] == gpx_path
+    assert create_job.call_args.kwargs["video_file"] is not None
+    assert create_job.call_args.kwargs["gpx_file"] is None
+    assert create_job.call_args.kwargs["fallback_gpx_path"] == gpx_path
+    assert create_job.call_args.kwargs["fallback_pip_path"] == video_path
+    assert create_job.call_args.kwargs["pip_file"] is not None
+    assert create_job.call_args.kwargs["output_dir"] == str(tmp_path / "exports")
     assert create_job.call_args.kwargs["output_filename"] == "Arguel test-overlay.mp4"
 
 
-def test_create_flight_gopro_overlay_job_requires_existing_video(
+def test_create_flight_gopro_overlay_job_requires_gpx_when_no_upload(
+    client: TestClient,
+    db_session,
+    sample_flight,
+    tmp_path,
+):
+    sample_flight.gpx_file_path = None
+    db_session.commit()
+
+    with patch(
+        "routes.check_gopro_overlay_dependencies",
+        return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
+    ):
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay",
+            files={"video_file": ("camera.mp4", b"camera", "video/mp4")},
+            data={"output_dir": str(tmp_path / "exports")},
+        )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Flight has no GPX file"
+
+
+def test_create_flight_gopro_overlay_job_uses_uploaded_gpx_over_fallback(
     client: TestClient,
     db_session,
     sample_flight,
@@ -135,17 +169,39 @@ def test_create_flight_gopro_overlay_job_requires_existing_video(
     gpx_path = tmp_path / "flight.gpx"
     gpx_path.write_text("<gpx />")
     sample_flight.gpx_file_path = str(gpx_path)
-    sample_flight.video_file_path = str(tmp_path / "missing.mp4")
     db_session.commit()
 
-    with patch(
-        "routes.check_gopro_overlay_dependencies",
-        return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
-    ):
-        response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay")
+    expected = {
+        "job_id": "job-flight-gopro-uploaded-gpx",
+        "status": "queued",
+        "progress": 0,
+        "message": "queued",
+        "layout_id": "parapente-1080",
+        "layout_label": "Parapente 1920x1080",
+        "output_filename": "flight-overlay.mp4",
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
 
-    assert response.status_code == 400
-    assert response.json()["detail"] == "Flight has no video file"
+    with (
+        patch(
+            "routes.check_gopro_overlay_dependencies",
+            return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
+        ),
+        patch("routes.create_gopro_overlay_job", AsyncMock(return_value=expected)) as create_job,
+    ):
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay",
+            files={
+                "video_file": ("camera.mp4", b"camera", "video/mp4"),
+                "gpx_file": ("uploaded.gpx", b"<gpx />", "application/gpx+xml"),
+            },
+            data={"output_dir": str(tmp_path / "exports")},
+        )
+
+    assert response.status_code == 200
+    assert create_job.call_args.kwargs["gpx_file"] is not None
+    assert create_job.call_args.kwargs["fallback_gpx_path"] == gpx_path
 
 
 def test_create_flight_gopro_overlay_job_resolves_relative_paths(
@@ -156,13 +212,9 @@ def test_create_flight_gopro_overlay_job_resolves_relative_paths(
     monkeypatch,
 ):
     backend_root = tmp_path / "backend"
-    video_path = backend_root / "db" / "videos" / "flight.mp4"
     gpx_path = backend_root / "db" / "gpx" / "flight.gpx"
-    video_path.parent.mkdir(parents=True)
     gpx_path.parent.mkdir(parents=True)
-    video_path.write_bytes(b"video")
     gpx_path.write_text("<gpx />")
-    sample_flight.video_file_path = "db/videos/flight.mp4"
     sample_flight.gpx_file_path = "db/gpx/flight.gpx"
     db_session.commit()
 
@@ -184,13 +236,16 @@ def test_create_flight_gopro_overlay_job_resolves_relative_paths(
             "routes.check_gopro_overlay_dependencies",
             return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
         ),
-        patch("routes.create_gopro_overlay_job_from_paths", return_value=expected) as create_job,
+        patch("routes.create_gopro_overlay_job", AsyncMock(return_value=expected)) as create_job,
     ):
-        response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay")
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay",
+            files={"video_file": ("camera.mp4", b"camera", "video/mp4")},
+            data={"output_dir": str(tmp_path / "exports")},
+        )
 
     assert response.status_code == 200
-    assert create_job.call_args.kwargs["video_path"] == video_path
-    assert create_job.call_args.kwargs["gpx_path"] == gpx_path
+    assert create_job.call_args.kwargs["fallback_gpx_path"] == gpx_path
 
 
 def test_download_gopro_overlay_rejects_unfinished_job(client: TestClient):
@@ -334,6 +389,36 @@ def test_create_gopro_overlay_job_from_paths_copies_inputs_into_job_dir(
     assert Path(job["gpx_path"]).parent == upload_dir / job["job_id"]
     assert Path(job["video_path"]).read_bytes() == b"video"
     assert Path(job["gpx_path"]).read_text() == "<gpx />"
+
+
+def test_create_gopro_overlay_job_from_paths_uses_custom_output_dir(
+    tmp_path,
+    monkeypatch,
+):
+    upload_dir = tmp_path / "uploads"
+    output_dir = tmp_path / "custom-outputs"
+    layout_dir = tmp_path / "layouts"
+    layout_dir.mkdir()
+    (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
+    video_path = tmp_path / "source.mp4"
+    gpx_path = tmp_path / "source.gpx"
+    video_path.write_bytes(b"video")
+    gpx_path.write_text("<gpx />")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_UPLOAD_DIR", str(upload_dir))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+
+    with patch("gopro_overlay_export.threading.Thread"):
+        job = create_gopro_overlay_job_from_paths(
+            video_path=video_path,
+            gpx_path=gpx_path,
+            pip_path=None,
+            layout_id="parapente-1080",
+            output_filename="overlay.mp4",
+            output_dir=str(output_dir),
+        )
+
+    assert Path(job["output_path"]).parent == output_dir / job["job_id"]
 
 
 def test_cancelled_queued_job_does_not_start_process():

@@ -88,6 +88,12 @@ def _output_dir() -> Path:
     return Path(config.GOPRO_OVERLAY_OUTPUT_DIR)
 
 
+def _resolve_output_dir(output_dir: str | None) -> Path:
+    if not output_dir or not output_dir.strip():
+        return _output_dir()
+    return Path(output_dir.strip()).expanduser()
+
+
 def _layout_path(layout: GoproOverlayLayout) -> Path:
     return _layout_dir() / layout.path
 
@@ -257,10 +263,13 @@ async def save_uploaded_file(
 
 async def create_gopro_overlay_job(
     video_file: UploadFile,
-    gpx_file: UploadFile,
+    gpx_file: UploadFile | None,
     pip_file: UploadFile | None,
     layout_id: str | None,
     output_filename: str | None,
+    fallback_gpx_path: Path | None = None,
+    fallback_pip_path: Path | None = None,
+    output_dir: str | None = None,
 ) -> dict[str, Any]:
     job_id = str(uuid.uuid4())
     job_upload_dir = _upload_dir() / job_id
@@ -270,11 +279,17 @@ async def create_gopro_overlay_job(
             job_upload_dir / _safe_filename(video_file.filename, "input.mp4"),
             _VIDEO_EXTENSIONS,
         )
-        gpx_path = await save_uploaded_file(
-            gpx_file,
-            job_upload_dir / _safe_filename(gpx_file.filename, "track.gpx"),
-            _GPX_EXTENSIONS,
-        )
+        if gpx_file and gpx_file.filename:
+            gpx_path = await save_uploaded_file(
+                gpx_file,
+                job_upload_dir / _safe_filename(gpx_file.filename, "track.gpx"),
+                _GPX_EXTENSIONS,
+            )
+        elif fallback_gpx_path:
+            _validate_file_extension(fallback_gpx_path, _GPX_EXTENSIONS)
+            gpx_path = fallback_gpx_path
+        else:
+            raise ValueError("A GPX file is required")
         pip_path = None
         if pip_file and pip_file.filename:
             pip_path = await save_uploaded_file(
@@ -282,6 +297,9 @@ async def create_gopro_overlay_job(
                 job_upload_dir / _safe_filename(pip_file.filename, "pip.mp4"),
                 _VIDEO_EXTENSIONS,
             )
+        elif fallback_pip_path:
+            _validate_file_extension(fallback_pip_path, _VIDEO_EXTENSIONS)
+            pip_path = fallback_pip_path
 
         return _create_gopro_overlay_job_from_paths(
             job_id=job_id,
@@ -291,6 +309,7 @@ async def create_gopro_overlay_job(
             layout_id=layout_id,
             output_filename=output_filename,
             work_dir=job_upload_dir,
+            output_dir=output_dir,
         )
     except Exception:
         shutil.rmtree(job_upload_dir, ignore_errors=True)
@@ -303,6 +322,7 @@ def create_gopro_overlay_job_from_paths(
     pip_path: Path | None,
     layout_id: str | None,
     output_filename: str | None,
+    output_dir: str | None = None,
 ) -> dict[str, Any]:
     _validate_file_extension(video_path, _VIDEO_EXTENSIONS)
     _validate_file_extension(gpx_path, _GPX_EXTENSIONS)
@@ -322,6 +342,7 @@ def create_gopro_overlay_job_from_paths(
             output_filename=output_filename,
             work_dir=work_dir,
             pin_inputs=True,
+            output_dir=output_dir,
         )
     except Exception:
         shutil.rmtree(work_dir, ignore_errors=True)
@@ -337,6 +358,7 @@ def _create_gopro_overlay_job_from_paths(
     output_filename: str | None,
     work_dir: Path,
     pin_inputs: bool = False,
+    output_dir: str | None = None,
 ) -> dict[str, Any]:
     output_name = _safe_filename(output_filename, f"gopro-overlay-{job_id}.mp4")
     if Path(output_name).suffix.lower() != ".mp4":
@@ -373,7 +395,7 @@ def _create_gopro_overlay_job_from_paths(
         has_pip=pip_path is not None,
     )
 
-    output_path = _output_dir() / job_id / output_name
+    output_path = _resolve_output_dir(output_dir) / job_id / output_name
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     job = {
