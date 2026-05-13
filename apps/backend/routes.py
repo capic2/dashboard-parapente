@@ -52,6 +52,11 @@ from models import (
 )
 from para_index import analyze_hourly_slots, calculate_para_index, format_slots_summary
 from schemas import EmagramAnalysis as EmagramAnalysisSchema
+from schemas import GoproOverlayCancelResponse
+from schemas import GoproOverlayDependencies
+from schemas import GoproOverlayJob
+from schemas import GoproOverlayLayoutsResponse
+from schemas import GoproOverlayProbeResponse
 from schemas import (
     EmagramAnalysisListItem,
     EmagramTriggerRequest,
@@ -4505,23 +4510,34 @@ def list_flight_exports(flight_id: str, db: Session = Depends(get_db)):
     return {"exports": exports}
 
 
-@router.get("/gopro-overlays/dependencies")
-def get_gopro_overlay_dependencies() -> dict[str, bool]:
+@router.get(
+    "/gopro-overlays/dependencies",
+    response_model=GoproOverlayDependencies,
+)
+def get_gopro_overlay_dependencies() -> GoproOverlayDependencies:
     """Return availability of the external GoPro overlay toolchain."""
     return check_gopro_overlay_dependencies()
 
 
-@router.get("/gopro-overlays/layouts")
+@router.get(
+    "/gopro-overlays/layouts",
+    response_model=GoproOverlayLayoutsResponse,
+)
 def get_gopro_overlay_layouts(
     width: int | None = None,
     height: int | None = None,
-) -> dict[str, list[dict[str, Any]]]:
+) -> GoproOverlayLayoutsResponse:
     """List parapente layouts and mark the best match for an optional resolution."""
     return {"layouts": list_gopro_overlay_layouts(video_width=width, video_height=height)}
 
 
-@router.post("/gopro-overlays/probe")
-async def probe_gopro_overlay_video(video_file: UploadFile = File(...)) -> dict[str, Any]:
+@router.post(
+    "/gopro-overlays/probe",
+    response_model=GoproOverlayProbeResponse,
+)
+async def probe_gopro_overlay_video(
+    video_file: UploadFile = File(...),
+) -> GoproOverlayProbeResponse:
     """Probe an uploaded video resolution without starting a render job."""
     temp_path = Path(config.GOPRO_OVERLAY_UPLOAD_DIR) / "probe" / f"{uuid.uuid4()}.mp4"
     try:
@@ -4536,14 +4552,17 @@ async def probe_gopro_overlay_video(video_file: UploadFile = File(...)) -> dict[
             temp_path.unlink()
 
 
-@router.post("/gopro-overlays/jobs")
+@router.post(
+    "/gopro-overlays/jobs",
+    response_model=GoproOverlayJob,
+)
 async def create_gopro_overlay_render_job(
     video_file: UploadFile = File(...),
     gpx_file: UploadFile = File(...),
     pip_file: UploadFile | None = File(None),
     layout_id: str | None = Form(None),
     output_filename: str | None = Form(None),
-) -> dict[str, Any]:
+) -> GoproOverlayJob:
     """Create a GoPro overlay render job from uploaded video, GPX, and optional PIP video."""
     dependencies = check_gopro_overlay_dependencies()
     missing = [name for name, available in dependencies.items() if not available]
@@ -4565,8 +4584,11 @@ async def create_gopro_overlay_render_job(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get("/gopro-overlays/jobs/{job_id}/status")
-def get_gopro_overlay_render_job_status(job_id: str) -> dict[str, Any]:
+@router.get(
+    "/gopro-overlays/jobs/{job_id}/status",
+    response_model=GoproOverlayJob,
+)
+def get_gopro_overlay_render_job_status(job_id: str) -> GoproOverlayJob:
     """Get current GoPro overlay render status."""
     job = get_gopro_overlay_job(job_id)
     if not job:
@@ -4589,8 +4611,11 @@ async def stream_gopro_overlay_render_job_status(
     )
 
 
-@router.delete("/gopro-overlays/jobs/{job_id}/cancel")
-def cancel_gopro_overlay_render_job(job_id: str) -> dict[str, str]:
+@router.delete(
+    "/gopro-overlays/jobs/{job_id}/cancel",
+    response_model=GoproOverlayCancelResponse,
+)
+def cancel_gopro_overlay_render_job(job_id: str) -> GoproOverlayCancelResponse:
     """Cancel a running GoPro overlay render job."""
     if not cancel_gopro_overlay_job(job_id):
         raise HTTPException(status_code=404, detail="GoPro overlay job not found")

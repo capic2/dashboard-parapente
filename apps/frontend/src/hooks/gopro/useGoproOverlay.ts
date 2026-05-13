@@ -40,7 +40,7 @@ export const goproOverlayLayoutsQueryOptions = (
     queryKey: ['gopro-overlays', 'layouts', width ?? null, height ?? null],
     queryFn: async () => {
       const searchParams: Record<string, string> = {};
-      if (width && height) {
+      if (width != null && height != null) {
         searchParams.width = String(width);
         searchParams.height = String(height);
       }
