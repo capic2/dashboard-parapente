@@ -20,13 +20,7 @@ services:
       - parapente-network
 
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - BUILDKIT_INLINE_CACHE=1
-        - VITE_CESIUM_ION_TOKEN=${VITE_CESIUM_ION_TOKEN:?required}
-    image: parapente-backend:nx-latest
+    image: ${BACKEND_IMAGE:-parapente-backend:nx-latest}
     container_name: parapente-backend
     restart: unless-stopped
     ports:
@@ -101,6 +95,11 @@ services:
       - BACKEND_VIDEO_EXPORT_DIR=${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
       - BACKEND_VIDEO_TEMP_IMAGES_DIR=${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
 
+      # Backend - GoPro overlay toolchain
+      - BACKEND_GOPRO_OVERLAY_ROOT=${BACKEND_GOPRO_OVERLAY_ROOT:-/media/usb/data-m2/developement/gopro-overlay-dasboard}
+      - BACKEND_GOPRO_OVERLAY_BIN=${BACKEND_GOPRO_OVERLAY_BIN:-/media/usb/data-m2/developement/gopro-overlay-dasboard/venv/bin/gopro-dashboard.py}
+      - BACKEND_GOPRO_OVERLAY_LAYOUT_DIR=${BACKEND_GOPRO_OVERLAY_LAYOUT_DIR:-/media/usb/data-m2/developement/gopro-overlay-dasboard}
+
       # Backend - Deployment metadata
       - BACKEND_DEPLOY_VERSION=${BACKEND_DEPLOY_VERSION}
     depends_on:
@@ -110,6 +109,7 @@ services:
       - /home/capic/docker-data/dashboard-parapente/db:/app/db
       - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:/app/video-exports
       - ${VIDEO_TEMP_IMAGES_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/video-temp-images}:/app/video-temp-images
+      - ${GOPRO_OVERLAY_HOST_DIR:-/media/usb/data-m2/developement/gopro-overlay-dasboard}:${BACKEND_GOPRO_OVERLAY_ROOT:-/media/usb/data-m2/developement/gopro-overlay-dasboard}:ro
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8001/']
       interval: 30s
