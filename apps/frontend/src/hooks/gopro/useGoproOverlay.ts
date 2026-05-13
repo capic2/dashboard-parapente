@@ -70,9 +70,12 @@ export function useCreateGoproOverlayJob() {
 
 export function useCreateFlightGoproOverlayJob(flightId: string) {
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (formData: FormData) => {
       return await api
-        .post(`flights/${flightId}/gopro-overlay`, { timeout: false })
+        .post(`flights/${flightId}/gopro-overlay`, {
+          body: formData,
+          timeout: false,
+        })
         .json<GoproOverlayJob>();
     },
   });
