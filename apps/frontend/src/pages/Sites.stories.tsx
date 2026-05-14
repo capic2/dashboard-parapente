@@ -70,8 +70,8 @@ const resetSitesDb = () => {
 };
 
 export const defaultHandlers = [
-  http.get('/api/spots', () => HttpResponse.json({ sites: sitesDb })),
-  http.post('/api/spots', async ({ request }) => {
+  http.get('*/api/spots', () => HttpResponse.json({ sites: sitesDb })),
+  http.post('*/api/spots', async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>;
     const newSite = {
       id: `site-${Date.now()}`,
@@ -84,8 +84,8 @@ export const defaultHandlers = [
     sitesDb.push(newSite);
     return HttpResponse.json(newSite);
   }),
-  http.get('/api/sites/:siteId/landings', () => HttpResponse.json([])),
-  http.patch('/api/sites/:siteId', async ({ params, request }) => {
+  http.get('*/api/sites/:siteId/landings', () => HttpResponse.json([])),
+  http.patch('*/api/sites/:siteId', async ({ params, request }) => {
     const body = (await request.json()) as Record<string, unknown>;
     const index = sitesDb.findIndex((s) => s.id === params.siteId);
     if (index !== -1) {
@@ -94,7 +94,7 @@ export const defaultHandlers = [
     }
     return new HttpResponse(null, { status: 404 });
   }),
-  http.delete('/api/sites/:siteId', ({ params }) => {
+  http.delete('*/api/sites/:siteId', ({ params }) => {
     const index = sitesDb.findIndex((s) => s.id === params.siteId);
     if (index !== -1) {
       sitesDb.splice(index, 1);
@@ -255,7 +255,7 @@ export const EmptyState = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('/api/spots', () => HttpResponse.json({ sites: [] })),
+        http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
       ],
     },
   },
@@ -266,7 +266,7 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('/api/spots', async () => {
+        http.get('*/api/spots', async () => {
           await new Promise(() => {});
         }),
       ],

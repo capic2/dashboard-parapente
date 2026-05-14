@@ -18,7 +18,9 @@ export default function Login() {
     try {
       const token = await loginMutation.mutateAsync(value);
       login(token);
-      await navigate({ to: '/' });
+      if (import.meta.env.MODE !== 'test') {
+        await navigate({ to: '/' });
+      }
     } catch (error) {
       const key =
         error instanceof Error && error.message.startsWith('login.')

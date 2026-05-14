@@ -91,13 +91,9 @@ export function FlightDetails({
     null
   );
   const [showGoproOverlayForm, setShowGoproOverlayForm] = useState(false);
-  const [goproOverlayGpxFile, setGoproOverlayGpxFile] = useState<File | null>(
-    null
-  );
-  const [goproOverlayVideoFile, setGoproOverlayVideoFile] =
-    useState<File | null>(null);
-  const [goproOverlayOsvVideoFile, setGoproOverlayOsvVideoFile] =
-    useState<File | null>(null);
+  const [goproOverlayVideoPath, setGoproOverlayVideoPath] = useState('');
+  const [goproOverlayGpxPath, setGoproOverlayGpxPath] = useState('');
+  const [goproOverlayPipPath, setGoproOverlayPipPath] = useState('');
   const [goproOverlayOutputDir, setGoproOverlayOutputDir] = useState('');
 
   const hasGpx = Boolean(flight.gpx_file_path);
@@ -127,9 +123,9 @@ export function FlightDetails({
     setEditingNotes(false);
     setGoproOverlayJobId(null);
     setShowGoproOverlayForm(false);
-    setGoproOverlayGpxFile(null);
-    setGoproOverlayVideoFile(null);
-    setGoproOverlayOsvVideoFile(null);
+    setGoproOverlayVideoPath('');
+    setGoproOverlayGpxPath('');
+    setGoproOverlayPipPath('');
     setGoproOverlayOutputDir('');
     resetGoproOverlayJob();
   }, [flight.id, resetGoproOverlayJob]);
@@ -217,32 +213,41 @@ export function FlightDetails({
   ) => {
     event.preventDefault();
     if (isGoproOverlayRunning) return;
-    if (!goproOverlayVideoFile) {
+    const videoPath = goproOverlayVideoPath.trim();
+    const gpxPath = goproOverlayGpxPath.trim();
+    const pipPath = goproOverlayPipPath.trim();
+    const outputDir = goproOverlayOutputDir.trim();
+
+    if (!videoPath) {
       toast.error(t('flights.goproOverlayNeedsCameraVideo'));
       return;
     }
-    if (!goproOverlayGpxFile && !hasGpx) {
+    if (!gpxPath && !hasGpx) {
       toast.error(t('flights.goproOverlayNeedsGpx'));
       return;
     }
-    if (!goproOverlayOutputDir.trim()) {
+    if (!pipPath && !hasVideo) {
+      toast.error(t('flights.goproOverlayNeedsPipVideo'));
+      return;
+    }
+    if (!outputDir) {
       toast.error(t('flights.goproOverlayNeedsOutputDir'));
       return;
     }
 
     const requestedFlightId = flight.id;
     const formData = new FormData();
-    formData.append('video_file', goproOverlayVideoFile);
-    formData.append('output_dir', goproOverlayOutputDir.trim());
+    formData.append('video_path', videoPath);
+    formData.append('output_dir', outputDir);
     formData.append(
       'output_filename',
       `${sanitizeOverlayBasename(flightTitle)}-overlay.mp4`
     );
-    if (goproOverlayGpxFile) {
-      formData.append('gpx_file', goproOverlayGpxFile);
+    if (gpxPath) {
+      formData.append('gpx_path', gpxPath);
     }
-    if (goproOverlayOsvVideoFile) {
-      formData.append('osv_video_file', goproOverlayOsvVideoFile);
+    if (pipPath) {
+      formData.append('pip_path', pipPath);
     }
 
     try {
@@ -317,23 +322,24 @@ export function FlightDetails({
             {t('flights.goproOverlayCameraVideo')}
             <input
               className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              type="file"
-              accept="video/mp4,video/quicktime,.mp4,.mov,.m4v"
+              type="text"
+              value={goproOverlayVideoPath}
               required
-              onChange={(event) =>
-                setGoproOverlayVideoFile(event.target.files?.[0] ?? null)
-              }
+              placeholder="camera/GX010001.mp4"
+              onChange={(event) => setGoproOverlayVideoPath(event.target.value)}
             />
+            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+              {t('flights.goproOverlayPathHelp')}
+            </span>
           </label>
           <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
             {t('flights.goproOverlayGpxFile')}
             <input
               className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              type="file"
-              accept=".gpx,.fit"
-              onChange={(event) =>
-                setGoproOverlayGpxFile(event.target.files?.[0] ?? null)
-              }
+              type="text"
+              value={goproOverlayGpxPath}
+              placeholder="tracks/flight.gpx"
+              onChange={(event) => setGoproOverlayGpxPath(event.target.value)}
             />
             <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
               {hasGpx
@@ -345,12 +351,16 @@ export function FlightDetails({
             {t('flights.goproOverlayOsvVideo')}
             <input
               className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              type="file"
-              accept="video/mp4,video/quicktime,.mp4,.mov,.m4v"
-              onChange={(event) =>
-                setGoproOverlayOsvVideoFile(event.target.files?.[0] ?? null)
-              }
+              type="text"
+              value={goproOverlayPipPath}
+              placeholder="exports/flight-pip.mp4"
+              onChange={(event) => setGoproOverlayPipPath(event.target.value)}
             />
+            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+              {hasVideo
+                ? t('flights.goproOverlayPipFallback')
+                : t('flights.goproOverlayNeedsPipVideo')}
+            </span>
           </label>
           <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
             {t('flights.goproOverlayOutputDir')}
@@ -471,23 +481,28 @@ export function FlightDetails({
                   {t('flights.goproOverlayCameraVideo')}
                   <input
                     className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                    type="file"
-                    accept="video/mp4,video/quicktime,.mp4,.mov,.m4v"
+                    type="text"
+                    value={goproOverlayVideoPath}
                     required
                     onChange={(event) =>
-                      setGoproOverlayVideoFile(event.target.files?.[0] ?? null)
+                      setGoproOverlayVideoPath(event.target.value)
                     }
+                    placeholder="camera/GX010001.mp4"
                   />
+                  <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                    {t('flights.goproOverlayPathHelp')}
+                  </span>
                 </label>
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
                   {t('flights.goproOverlayGpxFile')}
                   <input
                     className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                    type="file"
-                    accept=".gpx,.fit"
+                    type="text"
+                    value={goproOverlayGpxPath}
                     onChange={(event) =>
-                      setGoproOverlayGpxFile(event.target.files?.[0] ?? null)
+                      setGoproOverlayGpxPath(event.target.value)
                     }
+                    placeholder="tracks/flight.gpx"
                   />
                   <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
                     {hasGpx
@@ -499,14 +514,18 @@ export function FlightDetails({
                   {t('flights.goproOverlayOsvVideo')}
                   <input
                     className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                    type="file"
-                    accept="video/mp4,video/quicktime,.mp4,.mov,.m4v"
+                    type="text"
+                    value={goproOverlayPipPath}
                     onChange={(event) =>
-                      setGoproOverlayOsvVideoFile(
-                        event.target.files?.[0] ?? null
-                      )
+                      setGoproOverlayPipPath(event.target.value)
                     }
+                    placeholder="exports/flight-pip.mp4"
                   />
+                  <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                    {hasVideo
+                      ? t('flights.goproOverlayPipFallback')
+                      : t('flights.goproOverlayNeedsPipVideo')}
+                  </span>
                 </label>
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
                   {t('flights.goproOverlayOutputDir')}

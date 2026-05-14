@@ -25,6 +25,7 @@ import { enUS } from 'date-fns/locale';
 import { WindIndicator } from '../common/WindIndicator';
 import { Button } from '@dashboard-parapente/design-system';
 import type { BestSpotResult } from '@dashboard-parapente/shared-types';
+import { weatherCardClassName } from './weatherUi';
 
 type HourlyBestSpot = BestSpotResult & { hour: number };
 
@@ -192,7 +193,7 @@ export const BestSpotSuggestion = ({
   // Show loading state if no data available
   if (!bestSpot || !bestSpot.site) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-md shadow-slate-200/50 dark:border-slate-700 dark:bg-slate-900/90 dark:shadow-black/20">
+      <div className={`${weatherCardClassName} p-4`}>
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
             <Target className="h-6 w-6" aria-hidden="true" />
@@ -226,13 +227,16 @@ export const BestSpotSuggestion = ({
     100,
     Math.max(0, Math.round(score ?? paraIndex))
   );
-  const localizedReason = reason.replace(/Para-Index/g, t('weather.paraIndex'));
+  const localizedReason = reason.replace(
+    /Para-Index/gu,
+    t('weather.paraIndex')
+  );
   const scoreColor = getScoreColor(adjustedScore);
   const verdictInfo = getVerdict(adjustedScore, verdict ?? undefined);
 
   return (
     <div
-      className={`min-w-0 max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-lg shadow-slate-200/70 dark:border-slate-700 dark:bg-slate-900/95 dark:shadow-black/25 ${className}`}
+      className={`${weatherCardClassName} min-w-0 max-w-full overflow-hidden ${className}`}
     >
       {/* Header with colored accent bar */}
       <div className={`h-1.5 ${scoreColor.bg}`} />
@@ -302,7 +306,7 @@ export const BestSpotSuggestion = ({
         {/* Metrics grid */}
         <div className="grid grid-cols-2 gap-3 mb-4">
           {/* Wind */}
-          <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-800 dark:bg-slate-950/50">
+          <div className="rounded-xl border border-slate-100 bg-slate-50/90 p-2.5 dark:border-slate-800 dark:bg-slate-950/50">
             {windDirection && windSpeed != null ? (
               <WindIndicator
                 windDirection={windDirection}
@@ -338,7 +342,7 @@ export const BestSpotSuggestion = ({
 
           {/* Thermal ceiling */}
           {thermalCeiling != null && (
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-800 dark:bg-slate-950/50">
+            <div className="rounded-xl border border-slate-100 bg-slate-50/90 p-2.5 dark:border-slate-800 dark:bg-slate-950/50">
               <div className="flex items-center gap-2">
                 <Cloud
                   className="h-5 w-5 shrink-0 text-orange-600 dark:text-orange-400"
@@ -358,7 +362,7 @@ export const BestSpotSuggestion = ({
 
           {/* Wind favorability badge */}
           {windFavorability && (
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-800 dark:bg-slate-950/50">
+            <div className="rounded-xl border border-slate-100 bg-slate-50/90 p-2.5 dark:border-slate-800 dark:bg-slate-950/50">
               <div className="flex items-center gap-2">
                 {getWindFavorabilityIcon(windFavorability)}
                 <div className="flex flex-col">
@@ -424,12 +428,12 @@ export const BestSpotSuggestion = ({
                 return (
                   <Button
                     key={`${hourlySpot.hour}-${hourlySpot.site?.id ?? 'none'}`}
-                    onClick={() => {
+                    onPress={() => {
                       if (hourlySpot.site) {
                         onSelectSite(hourlySpot.site.id);
                       }
                     }}
-                    className="min-w-[176px] cursor-pointer flex-col items-stretch justify-start gap-0 whitespace-normal rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-left shadow-sm transition-colors hover:border-sky-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:border-sky-800 dark:hover:bg-slate-950"
+                    className="min-w-[176px] cursor-pointer flex-col items-stretch justify-start gap-0 whitespace-normal rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-left shadow-sm transition-colors hover:border-sky-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:border-sky-800 dark:hover:bg-slate-950"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-sm font-extrabold text-slate-950 dark:text-white">
@@ -480,8 +484,8 @@ export const BestSpotSuggestion = ({
         {/* Footer: button + cache */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <Button
-            onClick={() => onSelectSite(site.id)}
-            className="cursor-pointer rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white shadow-sm shadow-sky-600/20 transition-colors hover:bg-sky-700"
+            onPress={() => onSelectSite(site.id)}
+            className="cursor-pointer rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white shadow-sm shadow-sky-600/20 transition-colors hover:bg-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
           >
             {t('weather.viewForecast')}
           </Button>
@@ -515,7 +519,7 @@ export function BestSpotSuggestionCompact({
 
   return (
     <Button
-      onClick={() => onSelectSite(site.id)}
+      onPress={() => onSelectSite(site.id)}
       className={`w-full overflow-hidden rounded-xl border border-slate-200 bg-white p-3 text-left transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 ${className}`}
     >
       <div className={`h-1 ${scoreColor.bg} -mt-3 -mx-3 mb-2`} />

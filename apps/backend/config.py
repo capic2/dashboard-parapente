@@ -178,6 +178,10 @@ GOPRO_OVERLAY_OUTPUT_DIR = os.getenv(
     "BACKEND_GOPRO_OVERLAY_OUTPUT_DIR",
     str(BACKEND_ROOT / "exports" / "gopro-overlays" / "outputs"),
 )
+GOPRO_OVERLAY_PARAGLIDING_ROOT = os.getenv(
+    "BACKEND_GOPRO_OVERLAY_PARAGLIDING_ROOT",
+    "",
+)
 GOPRO_OVERLAY_LAYOUT_DIR = os.getenv(
     "BACKEND_GOPRO_OVERLAY_LAYOUT_DIR",
     GOPRO_OVERLAY_ROOT or str(BACKEND_ROOT / "gopro-overlay-layouts"),

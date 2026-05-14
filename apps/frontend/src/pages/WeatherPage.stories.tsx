@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import preview from '../../.storybook/preview';
-import { expect, screen, waitFor } from 'storybook/test';
+import { expect, waitFor } from 'storybook/test';
 import WeatherPage from './WeatherPage';
 
 const meta = preview.meta({
@@ -498,7 +498,9 @@ const mockLiveWindChalais = {
   ],
 };
 
-const spotsHandler = http.get('*/api/spots', () => HttpResponse.json(mockSites));
+const spotsHandler = http.get('*/api/spots', () =>
+  HttpResponse.json(mockSites)
+);
 const createSpotHandler = http.post('*/api/spots', () =>
   HttpResponse.json(mockCreatedSearchSite)
 );
@@ -516,8 +518,9 @@ const coordinatesWeatherHandler = http.get('*/api/weather/coordinates', () =>
     site_name: 'Besançon',
   })
 );
-const spotWeatherHandler = http.get('*/api/spots/weather/:spotId', () =>
-  new HttpResponse(null, { status: 404 })
+const spotWeatherHandler = http.get(
+  '*/api/spots/weather/:spotId',
+  () => new HttpResponse(null, { status: 404 })
 );
 const bestSpotsHandler = http.get('*/api/spots/best', ({ request }) => {
   const dayIndex = Number(
@@ -567,11 +570,13 @@ const weatherSearchFavoriteHandler = http.get(
       site_name: 'Arguel déco',
     })
 );
-const dailySummaryHandler = http.get('*/api/weather/:spotId/daily-summary', () =>
-  HttpResponse.json(mockDailySummary)
+const dailySummaryHandler = http.get(
+  '*/api/weather/:spotId/daily-summary',
+  () => HttpResponse.json(mockDailySummary)
 );
-const liveWindArguelHandler = http.get('*/api/sites/site-arguel/live-wind', () =>
-  HttpResponse.json(mockLiveWindArguel)
+const liveWindArguelHandler = http.get(
+  '*/api/sites/site-arguel/live-wind',
+  () => HttpResponse.json(mockLiveWindArguel)
 );
 const liveWindChalaisHandler = http.get(
   '*/api/sites/site-chalais/live-wind',
@@ -711,7 +716,7 @@ WithCitySearch.test(
     await userEvent.click(searchTab);
     const input = await canvas.findByPlaceholderText(/Besançon/);
     await userEvent.type(input, 'Besan');
-    const suggestion = await screen.findByRole('option', { name: /Besançon/ });
+    const suggestion = await canvas.findByRole('option', { name: /Besançon/ });
     await userEvent.click(suggestion);
     const searchedSpotButton = await canvas.findByRole('button', {
       name: /Arguel déco/,

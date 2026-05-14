@@ -8,7 +8,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import CacheTimestamp from '../common/CacheTimestamp';
 import { Button } from '@dashboard-parapente/design-system';
 import { Wind } from 'lucide-react';
-import { getVerdictVisual, weatherCardClassName } from './weatherUi';
+import {
+  getVerdictVisual,
+  weatherCardClassName,
+  weatherSectionTitleClassName,
+} from './weatherUi';
 
 interface Forecast7DayProps {
   spotId: string;
@@ -63,7 +67,7 @@ export default function Forecast7Day({
   if (isLoading) {
     return (
       <div className={`${weatherCardClassName} p-4`} aria-live="polite">
-        <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
+        <h2 className={weatherSectionTitleClassName}>
           {t('weather.forecast7Days')}
         </h2>
         <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
@@ -76,7 +80,7 @@ export default function Forecast7Day({
   if (error || !dailySummary || !dailySummary.days) {
     return (
       <div className={`${weatherCardClassName} p-4`} role="alert">
-        <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
+        <h2 className={weatherSectionTitleClassName}>
           {t('weather.forecast7Days')}
         </h2>
         <div className="py-5 text-center text-red-500 dark:text-red-400 text-sm">
@@ -87,11 +91,16 @@ export default function Forecast7Day({
   }
 
   return (
-    <div className={`${weatherCardClassName} min-w-0 p-4`}>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
-          {t('weather.forecast7Days')}
-        </h2>
+    <div className={`${weatherCardClassName} min-w-0 p-4 sm:p-5`}>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className={weatherSectionTitleClassName}>
+            {t('weather.forecast7Days')}
+          </h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            Sélectionnez une journée pour charger le détail horaire.
+          </p>
+        </div>
         <div className="flex items-center gap-2">
           <CacheTimestamp cachedAt={dailySummary.cached_at} />
         </div>
@@ -108,22 +117,22 @@ export default function Forecast7Day({
               key={index}
               onClick={() => onSelectDay?.(index)}
               onMouseEnter={() => handleMouseEnter(index)}
-              className={`min-w-[150px] flex-shrink-0 snap-start sm:min-w-0 sm:flex-shrink bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border-2 transition-colors hover:border-sky-600 hover:shadow-md cursor-pointer relative min-h-[150px] ${
+              className={`relative min-h-[158px] min-w-[150px] flex-shrink-0 snap-start rounded-2xl border p-3 text-left transition-colors hover:border-sky-500 hover:bg-sky-50/70 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:hover:bg-sky-950/30 sm:min-w-0 sm:flex-shrink ${
                 isSelected
-                  ? 'border-sky-600 shadow-lg bg-sky-50 dark:bg-sky-900/20 ring-2 ring-sky-200 dark:ring-sky-700'
-                  : 'border-gray-200 dark:border-gray-700'
+                  ? 'border-sky-600 bg-sky-50 shadow-lg ring-2 ring-sky-200 dark:bg-sky-900/20 dark:ring-sky-700'
+                  : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900'
               }`}
             >
               {isSelected && (
                 <div className="absolute top-1 right-1 w-2 h-2 bg-sky-600 rounded-full" />
               )}
-              <div className="flex h-full flex-col justify-between gap-1">
-                <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 text-center">
+              <div className="flex h-full flex-col justify-between gap-2">
+                <div className="text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-300">
                   {formatDate(day.date)}
                 </div>
-                <div className="flex items-center justify-center gap-2">
-                  <span className="text-2xl font-bold text-sky-600 dark:text-sky-400">
-                    {day.score != null ? day.score : day.para_index}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-3xl font-black leading-none text-sky-600 dark:text-sky-400">
+                    {day.score ?? day.para_index}
                   </span>
                   <span
                     className={`inline-flex items-center justify-center rounded-full px-1.5 py-0.5 ${verdictVisual.badgeClassName}`}
@@ -131,17 +140,17 @@ export default function Forecast7Day({
                     <VerdictIcon className="h-4 w-4" aria-hidden="true" />
                   </span>
                 </div>
-                <div className="text-sm text-gray-700 dark:text-gray-300 font-medium text-center">
+                <div className="text-sm font-bold text-gray-800 dark:text-gray-200">
                   {day.temp_min}° - {day.temp_max}°
                 </div>
-                <div className="inline-flex items-center justify-center gap-1 text-xs text-gray-600 dark:text-gray-300 text-center">
+                <div className="inline-flex items-center gap-1 text-xs font-semibold text-gray-600 dark:text-gray-300">
                   <Wind
                     className="h-3.5 w-3.5 text-sky-500"
                     aria-hidden="true"
                   />
                   {Math.round(day.wind_avg)} km/h
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 text-center leading-tight min-h-8 break-words">
+                <div className="min-h-8 break-words text-xs leading-tight text-gray-500 dark:text-gray-400">
                   {day.verdict}
                 </div>
               </div>

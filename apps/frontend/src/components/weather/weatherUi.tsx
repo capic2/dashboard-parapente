@@ -62,7 +62,13 @@ const verdictVisuals: Record<VerdictTone, VerdictVisual> = {
 };
 
 export const weatherCardClassName =
-  'rounded-2xl border border-slate-200 bg-white/95 shadow-md shadow-slate-200/60 dark:border-slate-700 dark:bg-slate-900/95 dark:shadow-black/20';
+  'rounded-2xl border border-slate-200 bg-white/95 shadow-lg shadow-slate-200/60 dark:border-slate-700 dark:bg-slate-900/95 dark:shadow-black/25';
+
+export const weatherSectionTitleClassName =
+  'text-sm font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400';
+
+export const weatherMetricTileClassName =
+  'rounded-xl border border-slate-100 bg-slate-50/90 p-3 dark:border-slate-800 dark:bg-slate-950/50';
 
 export const getVerdictVisual = (verdict: string): VerdictVisual => {
   const normalized = verdict.toLowerCase();

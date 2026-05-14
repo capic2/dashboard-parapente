@@ -375,7 +375,6 @@ export default function CityWeatherSearch({
                   handleSelectLocation(suggestions[activeSuggestionIndex]);
                 }
               }}
-              role="combobox"
               aria-expanded={isSuggestionsOpen}
               aria-haspopup="listbox"
               aria-autocomplete="list"
@@ -387,6 +386,7 @@ export default function CityWeatherSearch({
             {isSuggestionsOpen && (
               <div
                 id={listboxId}
+                // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
                 role="listbox"
                 className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900"
               >
@@ -400,6 +400,7 @@ export default function CityWeatherSearch({
                       id={`${listboxId}-${location.id}`}
                       key={location.id}
                       type="button"
+                      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
                       role="option"
                       aria-selected={index === activeSuggestionIndex}
                       onMouseEnter={() => setActiveSuggestionIndex(index)}

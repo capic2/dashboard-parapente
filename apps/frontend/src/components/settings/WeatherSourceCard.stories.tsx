@@ -198,7 +198,7 @@ export const Default = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('/api/weather-sources/other/test', () => {
+        http.post('*/api/weather-sources/other/test', () => {
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
             response_time_ms: 145,
@@ -239,7 +239,7 @@ export const ActiveAPISource = meta.story({
     msw: {
       handlers: [
         // PATCH /api/weather-sources/{sourceName}
-        http.patch('/api/weather-sources/:sourceName', async () => {
+        http.patch('*/api/weather-sources/:sourceName', async () => {
           await delay(300);
           return HttpResponse.json({
             ...mockOpenMeteo,
@@ -247,7 +247,7 @@ export const ActiveAPISource = meta.story({
           });
         }),
         // POST /api/weather-sources/{sourceName}/test
-        http.post('/api/weather-sources/:sourceName/test', async () => {
+        http.post('*/api/weather-sources/:sourceName/test', async () => {
           await delay(500);
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
@@ -273,7 +273,7 @@ export const WithAPIKey = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.patch('/api/weather-sources/:sourceName', async ({ request }) => {
+        http.patch('*/api/weather-sources/:sourceName', async ({ request }) => {
           await delay(300);
           const body = (await request.json()) as any;
           return HttpResponse.json({
@@ -285,7 +285,7 @@ export const WithAPIKey = meta.story({
             updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-        http.post('/api/weather-sources/:sourceName/test', async () => {
+        http.post('*/api/weather-sources/:sourceName/test', async () => {
           await delay(800);
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
@@ -311,14 +311,14 @@ export const PlaywrightScraper = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.patch('/api/weather-sources/:sourceName', async () => {
+        http.patch('*/api/weather-sources/:sourceName', async () => {
           await delay(300);
           return HttpResponse.json({
             ...mockMeteoParapente,
             updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-        http.post('/api/weather-sources/:sourceName/test', async () => {
+        http.post('*/api/weather-sources/:sourceName/test', async () => {
           await delay(2000);
           // Simulate occasional error
           if (Math.random() > 0.7) {
@@ -353,7 +353,7 @@ export const DisabledSource = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.patch('/api/weather-sources/:sourceName', async ({ request }) => {
+        http.patch('*/api/weather-sources/:sourceName', async ({ request }) => {
           await delay(300);
           const body = (await request.json()) as any;
           return HttpResponse.json({
@@ -381,7 +381,7 @@ export const ErrorSource = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.patch('/api/weather-sources/:sourceName', async ({ request }) => {
+        http.patch('*/api/weather-sources/:sourceName', async ({ request }) => {
           await delay(300);
           const body = (await request.json()) as any;
           return HttpResponse.json({
@@ -394,7 +394,7 @@ export const ErrorSource = meta.story({
             updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-        http.post('/api/weather-sources/:sourceName/test', async () => {
+        http.post('*/api/weather-sources/:sourceName/test', async () => {
           await delay(500);
           return HttpResponse.json<WeatherSourceTestResult>({
             success: false,
@@ -421,14 +421,14 @@ export const UnknownSource = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.patch('/api/weather-sources/:sourceName', async () => {
+        http.patch('*/api/weather-sources/:sourceName', async () => {
           await delay(300);
           return HttpResponse.json({
             ...mockUnknownSource,
             updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-        http.post('/api/weather-sources/:sourceName/test', async () => {
+        http.post('*/api/weather-sources/:sourceName/test', async () => {
           await delay(1000);
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
@@ -460,7 +460,7 @@ export const LastActiveSource = meta.story({
     },
     msw: {
       handlers: [
-        http.patch('/api/weather-sources/:sourceName', async () => {
+        http.patch('*/api/weather-sources/:sourceName', async () => {
           await delay(300);
           // Should not reach here as the UI prevents toggling
           return HttpResponse.json({
@@ -468,7 +468,7 @@ export const LastActiveSource = meta.story({
             updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-        http.post('/api/weather-sources/:sourceName/test', async () => {
+        http.post('*/api/weather-sources/:sourceName/test', async () => {
           await delay(500);
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
@@ -500,7 +500,7 @@ export const LowSuccessRate = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.patch('/api/weather-sources/:sourceName', async () => {
+        http.patch('*/api/weather-sources/:sourceName', async () => {
           await delay(300);
           return HttpResponse.json({
             ...mockMeteoParapente,
@@ -508,7 +508,7 @@ export const LowSuccessRate = meta.story({
             updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-        http.post('/api/weather-sources/:sourceName/test', async () => {
+        http.post('*/api/weather-sources/:sourceName/test', async () => {
           await delay(2500);
           // Simulate frequent failures
           if (Math.random() > 0.65) {
@@ -543,7 +543,7 @@ export const StealthScraper = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.patch('/api/weather-sources/:sourceName', async ({ request }) => {
+        http.patch('*/api/weather-sources/:sourceName', async ({ request }) => {
           await delay(300);
           const body = (await request.json()) as any;
           return HttpResponse.json({
@@ -553,7 +553,7 @@ export const StealthScraper = meta.story({
             updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-        http.post('/api/weather-sources/:sourceName/test', async () => {
+        http.post('*/api/weather-sources/:sourceName/test', async () => {
           await delay(3000);
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
@@ -581,7 +581,7 @@ export const HighResponseTime = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.patch('/api/weather-sources/:sourceName', async () => {
+        http.patch('*/api/weather-sources/:sourceName', async () => {
           await delay(300);
           return HttpResponse.json({
             ...mockMeteoParapente,
@@ -589,7 +589,7 @@ export const HighResponseTime = meta.story({
             updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-        http.post('/api/weather-sources/:sourceName/test', async () => {
+        http.post('*/api/weather-sources/:sourceName/test', async () => {
           await delay(5500);
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
@@ -626,7 +626,7 @@ export const AllSourceTypes = meta.story({
     msw: {
       handlers: [
         http.patch(
-          '/api/weather-sources/:sourceName',
+          '*/api/weather-sources/:sourceName',
           async ({ params, request }) => {
             await delay(300);
             const sourceName = params.sourceName as string;
@@ -650,7 +650,7 @@ export const AllSourceTypes = meta.story({
           }
         ),
         http.post(
-          '/api/weather-sources/:sourceName/test',
+          '*/api/weather-sources/:sourceName/test',
           async ({ params }) => {
             await delay(500);
             const sourceName = params.sourceName as string;
