@@ -14,8 +14,16 @@ from sqlalchemy import create_engine, text
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+def required_env(name: str) -> str:
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        raise ValueError(f"{name} environment variable is required")
+    return value
+
+
 # Database connection
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./db/dashboard.db")
+DATABASE_URL = required_env("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 
 

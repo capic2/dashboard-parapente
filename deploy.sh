@@ -26,6 +26,9 @@ echo ""
 
 # Étape 2 : Rebuild Docker en production
 echo "🐳 Étape 2/3 : Rebuild Docker..."
+echo "Validation de la configuration Docker Compose..."
+docker compose config >/dev/null
+
 echo "Arrêt des conteneurs..."
 docker compose down
 
