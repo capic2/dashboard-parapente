@@ -7,21 +7,11 @@ description: Create new agent skills with proper structure, progressive disclosu
 
 ## Process
 
-1. **Gather requirements** - ask user about:
-    - What task/domain does the skill cover?
-    - What specific use cases should it handle?
-    - Does it need executable scripts or just instructions?
-    - Any reference materials to include?
+1. **Gather requirements** - ask what task/domain the skill covers, which use cases it handles, whether it needs scripts or just instructions, and which reference materials to include.
 
-2. **Draft the skill** - create:
-    - SKILL.md with concise instructions
-    - Additional reference files if content exceeds 500 lines
-    - Utility scripts if deterministic operations needed
+2. **Draft the skill** - create `SKILL.md` with concise instructions, add reference files if content exceeds 100 lines, and add utility scripts for deterministic operations.
 
-3. **Review with user** - present draft and ask:
-    - Does this cover your use cases?
-    - Anything missing or unclear?
-    - Should any section be more/less detailed?
+3. **Review with user** - present the draft and ask whether it covers the use cases, whether anything is missing or unclear, and whether any section needs more or less detail.
 
 ## Skill Structure
 
@@ -61,10 +51,7 @@ description: Brief description of capability. Use when [specific triggers].
 
 The description is **the only thing your agent sees** when deciding which skill to load. It's surfaced in the system prompt alongside all other installed skills. Your agent reads these descriptions and picks the relevant skill based on the user's request.
 
-**Goal**: Give your agent just enough info to know:
-
-1. What capability this skill provides
-2. When/why to trigger it (specific keywords, contexts, file types)
+**Goal**: Give your agent just enough info to know what capability the skill provides and when to trigger it, using specific keywords, contexts, and file types.
 
 **Format**:
 
@@ -79,13 +66,7 @@ The description is **the only thing your agent sees** when deciding which skill 
 Extract text and tables from PDF files, fill forms, merge documents. Use when working with PDF files or when user mentions PDFs, forms, or document extraction.
 ```
 
-**Bad example**:
-
-```
-Helps with documents.
-```
-
-The bad example gives your agent no way to distinguish this from other document skills.
+Avoid vague descriptions such as `Helps with documents.` because they do not distinguish the skill from related document skills.
 
 ## When to Add Scripts
 

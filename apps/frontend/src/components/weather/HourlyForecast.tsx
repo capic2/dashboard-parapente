@@ -18,7 +18,11 @@ import { useWeather } from '../../hooks/weather/useWeather';
 import type { HourlyForecastItem, WeatherData } from '../../types';
 import CacheTimestamp from '../common/CacheTimestamp';
 import WindArrow from './WindArrow';
-import { getVerdictVisual, weatherCardClassName } from './weatherUi';
+import {
+  getVerdictVisual,
+  weatherCardClassName,
+  weatherSectionTitleClassName,
+} from './weatherUi';
 
 interface HourlyForecastProps {
   spotId?: string;
@@ -196,6 +200,11 @@ const formatWindDirectionWithDegrees = (deg: number | null): string => {
   if (deg === null) return '—';
   const cardinal = formatWindDirectionFromDegrees(deg);
   return `${cardinal} (${Math.round(deg)}°)`;
+};
+
+const formatConsensusValue = (value: number | string | null): string => {
+  if (value === null) return '—';
+  return typeof value === 'number' ? value.toFixed(1) : value;
 };
 
 const SOURCE_NAMES: Record<string, string> = {
@@ -536,13 +545,8 @@ const SourceDataTooltip = ({
 
         <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
           <div className="text-xs font-bold text-gray-800 dark:text-gray-100">
-            Consensus :{' '}
-            {consensus !== null && consensus !== undefined
-              ? typeof consensus === 'number'
-                ? consensus.toFixed(1)
-                : consensus
-              : '—'}{' '}
-            {consensus !== null && consensus !== undefined ? unit : ''}
+            Consensus : {formatConsensusValue(consensus)}{' '}
+            {consensus === null ? '' : unit}
           </div>
         </div>
       </div>
@@ -774,11 +778,14 @@ export default function HourlyForecast({
   };
 
   return (
-    <div className={`${weatherCardClassName} min-w-0 p-4`}>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
-          Prévisions Horaires
-        </h2>
+    <div className={`${weatherCardClassName} min-w-0 p-4 sm:p-5`}>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className={weatherSectionTitleClassName}>Prévisions Horaires</h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            Créneaux de vol, consensus des sources et points de vigilance.
+          </p>
+        </div>
         <CacheTimestamp cachedAt={weather.cached_at} />
       </div>
       <div className="grid gap-3 md:hidden">
@@ -800,7 +807,7 @@ export default function HourlyForecast({
             return (
               <article
                 key={index}
-                className={`rounded-xl border border-slate-200 p-3 dark:border-slate-700 ${getVerdictClass(hour.verdict)}`}
+                className={`rounded-2xl border border-slate-200 p-3 shadow-sm dark:border-slate-700 ${getVerdictClass(hour.verdict)}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -829,7 +836,7 @@ export default function HourlyForecast({
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                  <div className="rounded-lg bg-white/80 p-2 dark:bg-slate-950/50">
+                  <div className="rounded-xl border border-white/80 bg-white/85 p-2 dark:border-slate-800 dark:bg-slate-950/55">
                     <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                       <Wind
                         className="h-3.5 w-3.5 text-sky-500"
@@ -841,7 +848,7 @@ export default function HourlyForecast({
                       {hour.wind}
                     </div>
                   </div>
-                  <div className="rounded-lg bg-white/80 p-2 dark:bg-slate-950/50">
+                  <div className="rounded-xl border border-white/80 bg-white/85 p-2 dark:border-slate-800 dark:bg-slate-950/55">
                     <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                       <Zap
                         className="h-3.5 w-3.5 text-orange-500"
@@ -855,7 +862,7 @@ export default function HourlyForecast({
                         : '—'}
                     </div>
                   </div>
-                  <div className="rounded-lg bg-white/80 p-2 dark:bg-slate-950/50">
+                  <div className="rounded-xl border border-white/80 bg-white/85 p-2 dark:border-slate-800 dark:bg-slate-950/55">
                     <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                       <CloudRain
                         className="h-3.5 w-3.5 text-cyan-500"
@@ -870,7 +877,7 @@ export default function HourlyForecast({
                         : '—'}
                     </div>
                   </div>
-                  <div className="rounded-lg bg-white/80 p-2 dark:bg-slate-950/50">
+                  <div className="rounded-xl border border-white/80 bg-white/85 p-2 dark:border-slate-800 dark:bg-slate-950/55">
                     <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                       <Cloud
                         className="h-3.5 w-3.5 text-slate-500"
@@ -895,61 +902,61 @@ export default function HourlyForecast({
         )}
       </div>
 
-      <div className="hidden max-w-full min-w-0 touch-pan-x overflow-x-auto overscroll-x-contain rounded-lg border border-gray-100 dark:border-gray-700 md:block">
+      <div className="hidden max-w-full min-w-0 touch-pan-x overflow-x-auto overscroll-x-contain rounded-2xl border border-gray-200 dark:border-gray-700 md:block">
         <table className="w-full min-w-[800px] text-sm">
-          <thead>
-            <tr className="border-b-2 border-gray-200 dark:border-gray-600">
-              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
+          <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur dark:bg-slate-950/95">
+            <tr className="border-b border-gray-200 dark:border-gray-700">
+              <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Clock size={14} /> Heure
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
+              <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Gauge size={14} /> {t('weather.paraIndex')}
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
+              <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Wind size={14} /> Vent (km/h)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
+              <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Zap size={14} /> Rafales (km/h)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
+              <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Compass size={14} /> Direction
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
+              <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Thermometer size={14} /> Temp (°C)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
+              <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <CloudRain size={14} /> Précip. (mm)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
+              <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Cloud size={14} /> Nuages (%)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
+              <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Zap size={14} /> CAPE (J/kg)
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
+              <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <Flame size={14} /> Thermiques
                 </span>
               </th>
-              <th className="text-center py-2 px-2 font-semibold text-gray-800 dark:text-gray-200">
+              <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <CircleCheck size={14} /> Volabilité
                 </span>
@@ -976,7 +983,7 @@ export default function HourlyForecast({
                 return (
                   <tr
                     key={index}
-                    className={`border-b border-gray-100 dark:border-gray-700 ${getVerdictClass(hour.verdict)}`}
+                    className={`border-b border-gray-100 transition-colors dark:border-gray-700 ${getVerdictClass(hour.verdict)}`}
                   >
                     <td className="py-2.5 px-2 font-medium text-center">
                       {hour.hour}
@@ -1034,13 +1041,13 @@ export default function HourlyForecast({
                           aria-label={`Direction ${hour.hour}`}
                           className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors flex justify-center"
                         >
-                          {hour.wind_direction_deg != null ? (
+                          {hour.wind_direction_deg == null ? (
+                            '—'
+                          ) : (
                             <WindArrow
                               degrees={hour.wind_direction_deg}
                               className="text-violet-600 dark:text-violet-400"
                             />
-                          ) : (
-                            '—'
                           )}
                         </Button>
                         <Tooltip offset={8} className="z-50">

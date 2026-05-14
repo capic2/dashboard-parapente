@@ -184,12 +184,48 @@ class TestGenerateVideoEndpoint:
     ):
         """In-progress internal states must be treated as running conversions."""
         sample_flight.video_export_status = "capturing"
+        sample_flight.video_export_job_id = "job-capturing"
         sample_flight.gpx_file_path = "db/gpx/sample.gpx"
         db_session.commit()
 
-        response = client.post(f"{API_PREFIX}/flights/flight-test-001/generate-video")
+        with patch("routes._resolve_export_status", return_value={"status": "capturing"}):
+            response = client.post(f"{API_PREFIX}/flights/flight-test-001/generate-video")
+
         assert response.status_code == 400
         assert response.json()["detail"] == "Video conversion already in progress"
+
+    def test_generate_video_allows_orphan_in_progress_status(
+        self, client: TestClient, db_session, sample_flight
+    ):
+        """Stale in-progress flight state without a job id should not block generation."""
+        sample_flight.video_export_status = "processing"
+        sample_flight.video_export_job_id = None
+        sample_flight.gpx_file_path = "db/gpx/sample.gpx"
+        db_session.commit()
+
+        with patch("routes.start_video_export_manual", return_value="job-manual"):
+            response = client.post(f"{API_PREFIX}/flights/flight-test-001/generate-video")
+
+        assert response.status_code == 200
+        assert response.json()["job_id"] == "job-manual"
+
+    def test_generate_video_allows_missing_in_progress_job(
+        self, client: TestClient, db_session, sample_flight
+    ):
+        """Stale in-progress flight state pointing to a missing job should not block generation."""
+        sample_flight.video_export_status = "processing"
+        sample_flight.video_export_job_id = "job-missing"
+        sample_flight.gpx_file_path = "db/gpx/sample.gpx"
+        db_session.commit()
+
+        with (
+            patch("routes._resolve_export_status", return_value=None),
+            patch("routes.start_video_export_manual", return_value="job-manual"),
+        ):
+            response = client.post(f"{API_PREFIX}/flights/flight-test-001/generate-video")
+
+        assert response.status_code == 200
+        assert response.json()["job_id"] == "job-manual"
 
 
 class TestExportStatusAndCancel:

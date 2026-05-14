@@ -5,6 +5,7 @@
     "flights": "Vols",
     "analytics": "Analyses",
     "sites": "Sites",
+    "goproOverlay": "Overlay GoPro",
     "settings": "Paramètres",
     "infrastructure": "Infrastructure",
     "weather": "Météo",
@@ -222,6 +223,9 @@
   "settings": {
     "title": "Paramètres",
     "subtitle": "Configuration de votre dashboard parapente",
+    "description": "Les préférences sont appliquées immédiatement aux pages concernées et conservées dans ce navigateur.",
+    "autoSave": "Auto-save",
+    "saved": "Appliqué",
     "tabs": {
       "general": "Général",
       "favoriteSites": "Sites Favoris",
@@ -230,6 +234,7 @@
     },
     "units": {
       "title": "Unités de Mesure",
+      "description": "Définissez l'affichage utilisé dans les vols, le détail et le viewer 3D.",
       "distance": "Distance",
       "kilometers": "Kilomètres (km)",
       "miles": "Miles (mi)",
@@ -240,6 +245,7 @@
     },
     "languageTheme": {
       "title": "Langue & Thème",
+      "description": "Adaptez l'interface à votre langue et à votre préférence d'affichage.",
       "language": "Langue",
       "theme": "Thème",
       "light": "Clair",
@@ -248,12 +254,17 @@
     },
     "notifications": {
       "title": "Notifications",
+      "description": "Préférences stockées pour les futures notifications. Aucun envoi externe n'est déclenché ici.",
       "weatherAlerts": "Alertes météo",
+      "weatherAlertsHelp": "Prépare les alertes liées aux conditions météo.",
       "newFlights": "Nouveaux vols",
-      "customAlerts": "Alertes personnalisées"
+      "newFlightsHelp": "Prépare les notifications lors de nouveaux vols importés.",
+      "customAlerts": "Alertes personnalisées",
+      "customAlertsHelp": "Conserve votre choix pour de futurs scénarios personnalisés."
     },
     "favorites": {
       "title": "Gérer vos Sites Favoris",
+      "description": "{{count}} site(s) favori(s) utilisés en priorité dans la météo et les sélecteurs.",
       "noSites": "Aucun site disponible",
       "favorite": "Favori",
       "add": "Ajouter",
@@ -327,10 +338,12 @@
     },
     "data": {
       "backupTitle": "Sauvegarde & Restauration",
+      "backupDescription": "Exportez ou restaurez vos préférences locales et vos réglages de cache navigateur.",
       "export": "Exporter mes paramètres",
       "import": "Importer des paramètres",
       "importWarning": "L'import remplacera vos paramètres actuels",
       "resetTitle": "Réinitialisation",
+      "resetDescription": "Revenez aux valeurs par défaut pour les préférences locales et le cache navigateur.",
       "resetAll": "Réinitialiser tous les paramètres",
       "resetWarning": "Cette action est irréversible (sauf si vous avez exporté une sauvegarde)",
       "importSuccess": "Paramètres importés avec succès !",
@@ -410,8 +423,12 @@
         "help": "Contrôle la sensibilité à l'instabilité atmosphérique dans le score et les créneaux.",
         "fields": {
           "para_li_stable_min": { "label": "Stable au-dessus de" },
-          "para_li_slightly_unstable_min": { "label": "Légèrement instable au-dessus de" },
-          "para_li_very_unstable_max": { "label": "Très instable en dessous de" }
+          "para_li_slightly_unstable_min": {
+            "label": "Légèrement instable au-dessus de"
+          },
+          "para_li_very_unstable_max": {
+            "label": "Très instable en dessous de"
+          }
         }
       },
       "temperature": {
@@ -436,13 +453,19 @@
         "help": "Ajuste les raisons textuelles affichées dans la colonne Volabilité (frontend uniquement).",
         "fields": {
           "ui_reason_wind_moderate_min": { "label": "UI : vent modéré min" },
-          "ui_reason_wind_very_strong_min": { "label": "UI : vent très fort min" },
-          "ui_reason_gust_high_min": { "label": "UI : rafales importantes min" },
-          "ui_reason_cloud_very_cloudy_min": { "label": "UI : très nuageux min (%)" }
+          "ui_reason_wind_very_strong_min": {
+            "label": "UI : vent très fort min"
+          },
+          "ui_reason_gust_high_min": {
+            "label": "UI : rafales importantes min"
+          },
+          "ui_reason_cloud_very_cloudy_min": {
+            "label": "UI : très nuageux min (%)"
+          }
         }
       }
     },
-    "saved": "Paramètres sauvegardés !",
+    "saveSuccess": "Paramètres sauvegardés !",
     "saveButton": "Sauvegarder les modifications"
   },
   "analytics": {
@@ -593,6 +616,36 @@
     "noNotes": "Aucune note pour ce vol",
     "gpxBadge": "GPX disponible",
     "videoBadge": "Vidéo disponible",
+    "goproOverlayGenerate": "Générer overlay GoPro",
+    "goproOverlayStarting": "Lancement...",
+    "goproOverlayLaunch": "Lancer la génération",
+    "goproOverlayCancel": "Annuler overlay",
+    "goproOverlayDownload": "Télécharger overlay",
+    "goproOverlayGenerateTitle": "Générer une vidéo avec overlay GoPro pour ce vol",
+    "goproOverlayCanProvideGpx": "Fournissez un GPX dans l'étape suivante ou ajoutez-en un au vol",
+    "goproOverlayNeedsGpx": "Ajoutez un GPX à ce vol pour générer l'overlay",
+    "goproOverlayNeedsVideo": "Générez d'abord la vidéo du vol pour ajouter l'overlay",
+    "goproOverlayNeedsCameraVideo": "Fournissez la vidéo caméra embarquée",
+    "goproOverlayNeedsOutputDir": "Renseignez le dossier de sortie",
+    "goproOverlayStarted": "Génération overlay GoPro lancée",
+    "goproOverlayStartError": "Impossible de lancer l'overlay GoPro",
+    "goproOverlayCancelled": "Génération overlay GoPro annulée",
+    "goproOverlayCancelError": "Impossible d'annuler l'overlay GoPro",
+    "goproOverlayDownloadError": "Impossible de télécharger l'overlay GoPro",
+    "goproOverlayJobTitle": "Overlay GoPro du vol",
+    "goproOverlayFormTitle": "Paramètres de génération GoPro",
+    "goproOverlayCameraVideo": "Vidéo MP4 caméra embarquée",
+    "goproOverlayGpxFile": "Fichier GPX/FIT optionnel",
+    "goproOverlayGpxFallback": "Si aucun fichier n'est choisi, le GPX du vol sera utilisé.",
+    "goproOverlayOsvVideo": "Vidéo OSV / PIP optionnelle (sinon vidéo générée du vol)",
+    "goproOverlayOutputDir": "Dossier de sortie côté serveur",
+    "goproOverlayStatus": {
+      "queued": "En attente",
+      "running": "En cours",
+      "completed": "Terminé",
+      "failed": "Erreur",
+      "cancelled": "Annulé"
+    },
     "loading3dViewer": "Chargement du viewer 3D...",
     "flightOf": "Vol du {{date}}",
     "selectFlightHint": "Sélectionnez un vol pour visualiser les détails et la trajectoire 3D",

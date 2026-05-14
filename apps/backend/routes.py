@@ -15,9 +15,11 @@ from fastapi import (
     BackgroundTasks,
     Depends,
     File,
+    Form,
     HTTPException,
     Query,
     Request,
+    Response,
     UploadFile,
 )
 from fastapi.responses import FileResponse, StreamingResponse
@@ -30,6 +32,15 @@ from auth import authenticate_user, create_access_token, get_current_user
 from database import get_db
 from emagram_freshness import get_emagram_cutoff_utc
 from flight_backfill import calculate_and_persist_missing_max_speed
+from gopro_overlay_export import cancel_gopro_overlay_job
+from gopro_overlay_export import check_gopro_overlay_dependencies
+from gopro_overlay_export import create_gopro_overlay_job
+from gopro_overlay_export import get_gopro_overlay_job
+from gopro_overlay_export import gopro_overlay_output_path
+from gopro_overlay_export import list_gopro_overlay_layouts
+from gopro_overlay_export import probe_video_resolution
+from gopro_overlay_export import save_uploaded_file
+from gopro_overlay_export import stream_gopro_overlay_job
 from models import User
 from models import (
     EmagramAnalysis,
@@ -41,6 +52,11 @@ from models import (
 )
 from para_index import analyze_hourly_slots, calculate_para_index, format_slots_summary
 from schemas import EmagramAnalysis as EmagramAnalysisSchema
+from schemas import GoproOverlayCancelResponse
+from schemas import GoproOverlayDependencies
+from schemas import GoproOverlayJob
+from schemas import GoproOverlayLayoutsResponse
+from schemas import GoproOverlayProbeResponse
 from schemas import (
     EmagramAnalysisListItem,
     EmagramTriggerRequest,
@@ -120,9 +136,30 @@ def _video_export_mode_label(mode: str) -> str:
     return "manual render"
 
 
-def _ensure_no_active_export(flight: Flight):
-    if flight.video_export_status in _VIDEO_EXPORT_IN_PROGRESS_STATUSES:
-        raise HTTPException(status_code=400, detail="Video conversion already in progress")
+def _ensure_no_active_export(flight: Flight) -> None:
+    if flight.video_export_status not in _VIDEO_EXPORT_IN_PROGRESS_STATUSES:
+        return
+
+    if not flight.video_export_job_id:
+        logger.warning(
+            "Flight %s has orphan video export status %s without job id; allowing restart",
+            flight.id,
+            flight.video_export_status,
+        )
+        return
+
+    if not _resolve_export_status(flight.video_export_job_id):
+        logger.warning(
+            "Flight %s references missing video export job %s; allowing restart",
+            flight.id,
+            flight.video_export_job_id,
+        )
+        return
+
+    raise HTTPException(
+        status_code=400,
+        detail="Video conversion already in progress",
+    )
 
 
 def _mark_flight_export_processing(db: Session, flight: Flight, job_id: str):
@@ -132,6 +169,16 @@ def _mark_flight_export_processing(db: Session, flight: Flight, job_id: str):
     flight.video_file_path = None
     db.commit()
     db.refresh(flight)
+
+
+def _resolve_flight_file_path(file_path: str | None) -> Path | None:
+    if not file_path:
+        return None
+
+    path = Path(file_path)
+    if path.is_absolute() or path.exists():
+        return path
+    return Path(__file__).parent / path
 
 
 def _resolve_export_status(job_id: str) -> dict[str, Any] | None:
@@ -221,7 +268,11 @@ router = APIRouter(prefix="/api", tags=["api"], dependencies=[Depends(get_curren
 
 
 @public_router.post("/auth/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(
+    response: Response,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
     """Authenticate with email + password, returns JWT access token."""
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
@@ -231,6 +282,14 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
             headers={"WWW-Authenticate": "Bearer"},
         )
     token = create_access_token(user.email)
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        max_age=config.JWT_EXPIRE_HOURS * 60 * 60,
+        httponly=True,
+        samesite="lax",
+        secure=config.ENVIRONMENT == "production",
+    )
     return {"access_token": token, "token_type": "bearer"}
 
 
@@ -2810,6 +2869,9 @@ def get_flights(
             "elevation_gain_m": flight.elevation_gain_m,
             "notes": flight.notes,
             "gpx_file_path": flight.gpx_file_path,
+            "video_export_job_id": flight.video_export_job_id,
+            "video_export_status": flight.video_export_status,
+            "video_file_path": flight.video_file_path,
             "external_url": flight.external_url,
             "created_at": flight.created_at.isoformat() if flight.created_at else None,
             "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
@@ -4482,6 +4544,186 @@ def list_flight_exports(flight_id: str, db: Session = Depends(get_db)):
     return {"exports": exports}
 
 
+@router.get(
+    "/gopro-overlays/dependencies",
+    response_model=GoproOverlayDependencies,
+)
+def get_gopro_overlay_dependencies() -> GoproOverlayDependencies:
+    """Return availability of the external GoPro overlay toolchain."""
+    return check_gopro_overlay_dependencies()
+
+
+@router.post(
+    "/flights/{flight_id}/gopro-overlay",
+    response_model=GoproOverlayJob,
+)
+async def create_flight_gopro_overlay_job(
+    flight_id: str,
+    video_file: UploadFile = File(...),
+    gpx_file: UploadFile | None = File(None),
+    osv_video_file: UploadFile | None = File(None),
+    output_dir: str = Form(...),
+    layout_id: str | None = Form(None),
+    output_filename: str | None = Form(None),
+    db: Session = Depends(get_db),
+) -> GoproOverlayJob:
+    """Create a GoPro overlay render job from provided media and the flight GPX fallback."""
+    dependencies = check_gopro_overlay_dependencies()
+    missing = [name for name, available in dependencies.items() if not available]
+    if missing:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Missing GoPro overlay dependencies: {', '.join(missing)}",
+        )
+
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    fallback_gpx_path = _resolve_flight_file_path(flight.gpx_file_path)
+    if (not gpx_file or not gpx_file.filename) and (
+        not fallback_gpx_path or not fallback_gpx_path.exists()
+    ):
+        raise HTTPException(status_code=400, detail="Flight has no GPX file")
+    fallback_pip_path = _resolve_flight_file_path(flight.video_file_path)
+    if not fallback_pip_path or not fallback_pip_path.exists():
+        fallback_pip_path = None
+
+    title = flight.title or flight.name or flight.id
+    resolved_output_filename = output_filename or f"{title}-overlay.mp4"
+
+    try:
+        return await create_gopro_overlay_job(
+            video_file=video_file,
+            gpx_file=gpx_file,
+            fallback_gpx_path=fallback_gpx_path,
+            fallback_pip_path=fallback_pip_path,
+            pip_file=osv_video_file,
+            layout_id=layout_id,
+            output_filename=resolved_output_filename,
+            output_dir=output_dir,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get(
+    "/gopro-overlays/layouts",
+    response_model=GoproOverlayLayoutsResponse,
+)
+def get_gopro_overlay_layouts(
+    width: int | None = None,
+    height: int | None = None,
+) -> GoproOverlayLayoutsResponse:
+    """List parapente layouts and mark the best match for an optional resolution."""
+    return {"layouts": list_gopro_overlay_layouts(video_width=width, video_height=height)}
+
+
+@router.post(
+    "/gopro-overlays/probe",
+    response_model=GoproOverlayProbeResponse,
+)
+async def probe_gopro_overlay_video(
+    video_file: UploadFile = File(...),
+) -> GoproOverlayProbeResponse:
+    """Probe an uploaded video resolution without starting a render job."""
+    temp_path = Path(config.GOPRO_OVERLAY_UPLOAD_DIR) / "probe" / f"{uuid.uuid4()}.mp4"
+    try:
+        saved_path = await save_uploaded_file(video_file, temp_path, {".mp4", ".mov", ".m4v"})
+        width, height = probe_video_resolution(saved_path)
+        layouts = list_gopro_overlay_layouts(video_width=width, video_height=height)
+        return {"width": width, "height": height, "layouts": layouts}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+
+
+@router.post(
+    "/gopro-overlays/jobs",
+    response_model=GoproOverlayJob,
+)
+async def create_gopro_overlay_render_job(
+    video_file: UploadFile = File(...),
+    gpx_file: UploadFile = File(...),
+    pip_file: UploadFile | None = File(None),
+    layout_id: str | None = Form(None),
+    output_filename: str | None = Form(None),
+) -> GoproOverlayJob:
+    """Create a GoPro overlay render job from uploaded video, GPX, and optional PIP video."""
+    dependencies = check_gopro_overlay_dependencies()
+    missing = [name for name, available in dependencies.items() if not available]
+    if missing:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Missing GoPro overlay dependencies: {', '.join(missing)}",
+        )
+
+    try:
+        return await create_gopro_overlay_job(
+            video_file=video_file,
+            gpx_file=gpx_file,
+            pip_file=pip_file,
+            layout_id=layout_id,
+            output_filename=output_filename,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get(
+    "/gopro-overlays/jobs/{job_id}/status",
+    response_model=GoproOverlayJob,
+)
+def get_gopro_overlay_render_job_status(job_id: str) -> GoproOverlayJob:
+    """Get current GoPro overlay render status."""
+    job = get_gopro_overlay_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="GoPro overlay job not found")
+    return job
+
+
+@router.get("/gopro-overlays/jobs/{job_id}/stream")
+async def stream_gopro_overlay_render_job_status(
+    job_id: str,
+    request: Request,
+) -> StreamingResponse:
+    """Stream GoPro overlay render status as Server-Sent Events."""
+    if not get_gopro_overlay_job(job_id):
+        raise HTTPException(status_code=404, detail="GoPro overlay job not found")
+    return StreamingResponse(
+        stream_gopro_overlay_job(job_id, request.is_disconnected),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.delete(
+    "/gopro-overlays/jobs/{job_id}/cancel",
+    response_model=GoproOverlayCancelResponse,
+)
+def cancel_gopro_overlay_render_job(job_id: str) -> GoproOverlayCancelResponse:
+    """Cancel a running GoPro overlay render job."""
+    if not cancel_gopro_overlay_job(job_id):
+        raise HTTPException(status_code=404, detail="GoPro overlay job not found")
+    return {"job_id": job_id, "message": "GoPro overlay job cancelled"}
+
+
+@router.get("/gopro-overlays/jobs/{job_id}/download")
+def download_gopro_overlay_render_job(job_id: str) -> FileResponse:
+    """Download the completed GoPro overlay video."""
+    job = get_gopro_overlay_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="GoPro overlay job not found")
+
+    output_path = gopro_overlay_output_path(job_id)
+    if not output_path:
+        raise HTTPException(status_code=400, detail="GoPro overlay video is not ready")
+
+    return FileResponse(path=output_path, media_type="video/mp4", filename=output_path.name)
+
+
 # ============================================================================
 # WEATHER SOURCE CONFIGURATION ENDPOINTS
 # ============================================================================
@@ -5847,7 +6089,11 @@ def get_app_settings(db: Session = Depends(get_db)):
 
 
 @router.put("/settings")
-def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db)):
+def update_app_settings(
+    settings: dict[str, str],
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     """
     Update application settings.
     Body: {"key": "value", ...}
@@ -5991,6 +6237,18 @@ def update_app_settings(settings: dict[str, str], db: Session = Depends(get_db))
     for key, normalized_value in validated_updates.items():
         set_setting(db, key, normalized_value)
         updated[key] = normalized_value
+
+    cache_sensitive_prefixes = (
+        "cache_ttl_",
+        "spotair_live_wind_",
+        "para_",
+        "ui_reason_",
+    )
+    if any(key.startswith(cache_sensitive_prefixes) for key in updated):
+        from cache import delete_cached
+
+        background_tasks.add_task(delete_cached, "weather:*")
+        background_tasks.add_task(delete_cached, "best_spot:*")
 
     # If scheduler interval changed, reschedule dynamically
     scheduler_error = None

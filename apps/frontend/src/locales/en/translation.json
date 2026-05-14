@@ -5,6 +5,7 @@
     "flights": "Flights",
     "analytics": "Analytics",
     "sites": "Sites",
+    "goproOverlay": "GoPro Overlay",
     "settings": "Settings",
     "infrastructure": "Infrastructure",
     "weather": "Weather",
@@ -222,6 +223,9 @@
   "settings": {
     "title": "Settings",
     "subtitle": "Configure your paragliding dashboard",
+    "description": "Preferences are applied immediately to the relevant pages and kept in this browser.",
+    "autoSave": "Auto-save",
+    "saved": "Applied",
     "tabs": {
       "general": "General",
       "favoriteSites": "Favorite Sites",
@@ -230,6 +234,7 @@
     },
     "units": {
       "title": "Units of Measurement",
+      "description": "Set the display used in flights, flight details and the 3D viewer.",
       "distance": "Distance",
       "kilometers": "Kilometers (km)",
       "miles": "Miles (mi)",
@@ -240,6 +245,7 @@
     },
     "languageTheme": {
       "title": "Language & Theme",
+      "description": "Adapt the interface to your language and display preference.",
       "language": "Language",
       "theme": "Theme",
       "light": "Light",
@@ -248,12 +254,17 @@
     },
     "notifications": {
       "title": "Notifications",
+      "description": "Stored preferences for future notifications. No external delivery is triggered here.",
       "weatherAlerts": "Weather alerts",
+      "weatherAlertsHelp": "Prepares alerts tied to weather conditions.",
       "newFlights": "New flights",
-      "customAlerts": "Custom alerts"
+      "newFlightsHelp": "Prepares notifications when new flights are imported.",
+      "customAlerts": "Custom alerts",
+      "customAlertsHelp": "Keeps your choice for future custom scenarios."
     },
     "favorites": {
       "title": "Manage your Favorite Sites",
+      "description": "{{count}} favorite site(s) used first in weather and selectors.",
       "noSites": "No sites available",
       "favorite": "Favorite",
       "add": "Add",
@@ -327,10 +338,12 @@
     },
     "data": {
       "backupTitle": "Backup & Restore",
+      "backupDescription": "Export or restore your local preferences and browser cache settings.",
       "export": "Export my settings",
       "import": "Import settings",
       "importWarning": "Importing will replace your current settings",
       "resetTitle": "Reset",
+      "resetDescription": "Return local preferences and browser cache to their default values.",
       "resetAll": "Reset all settings",
       "resetWarning": "This action is irreversible (unless you have exported a backup)",
       "importSuccess": "Settings imported successfully!",
@@ -410,7 +423,9 @@
         "help": "Controls how sensitive the score and time slots are to atmospheric instability.",
         "fields": {
           "para_li_stable_min": { "label": "Stable above" },
-          "para_li_slightly_unstable_min": { "label": "Slightly unstable above" },
+          "para_li_slightly_unstable_min": {
+            "label": "Slightly unstable above"
+          },
           "para_li_very_unstable_max": { "label": "Very unstable below" }
         }
       },
@@ -436,13 +451,17 @@
         "help": "Adjusts the textual reasons shown in the flyability column (frontend only).",
         "fields": {
           "ui_reason_wind_moderate_min": { "label": "UI: moderate wind min" },
-          "ui_reason_wind_very_strong_min": { "label": "UI: very strong wind min" },
+          "ui_reason_wind_very_strong_min": {
+            "label": "UI: very strong wind min"
+          },
           "ui_reason_gust_high_min": { "label": "UI: high gusts min" },
-          "ui_reason_cloud_very_cloudy_min": { "label": "UI: very cloudy min (%)" }
+          "ui_reason_cloud_very_cloudy_min": {
+            "label": "UI: very cloudy min (%)"
+          }
         }
       }
     },
-    "saved": "Settings saved!",
+    "saveSuccess": "Settings saved!",
     "saveButton": "Save changes"
   },
   "analytics": {
@@ -593,6 +612,36 @@
     "noNotes": "No notes for this flight",
     "gpxBadge": "GPX available",
     "videoBadge": "Video available",
+    "goproOverlayGenerate": "Generate GoPro overlay",
+    "goproOverlayStarting": "Starting...",
+    "goproOverlayLaunch": "Start generation",
+    "goproOverlayCancel": "Cancel overlay",
+    "goproOverlayDownload": "Download overlay",
+    "goproOverlayGenerateTitle": "Generate a GoPro overlay video for this flight",
+    "goproOverlayCanProvideGpx": "Provide a GPX in the next step or add one to the flight",
+    "goproOverlayNeedsGpx": "Add a GPX to this flight before generating the overlay",
+    "goproOverlayNeedsVideo": "Generate the flight video before adding the overlay",
+    "goproOverlayNeedsCameraVideo": "Provide the onboard camera video",
+    "goproOverlayNeedsOutputDir": "Enter the output folder",
+    "goproOverlayStarted": "GoPro overlay generation started",
+    "goproOverlayStartError": "Unable to start GoPro overlay",
+    "goproOverlayCancelled": "GoPro overlay generation cancelled",
+    "goproOverlayCancelError": "Unable to cancel GoPro overlay",
+    "goproOverlayDownloadError": "Unable to download GoPro overlay",
+    "goproOverlayJobTitle": "Flight GoPro overlay",
+    "goproOverlayFormTitle": "GoPro generation settings",
+    "goproOverlayCameraVideo": "Onboard camera MP4 video",
+    "goproOverlayGpxFile": "Optional GPX/FIT file",
+    "goproOverlayGpxFallback": "If no file is selected, the flight GPX will be used.",
+    "goproOverlayOsvVideo": "Optional OSV / PIP video (otherwise generated flight video)",
+    "goproOverlayOutputDir": "Server-side output folder",
+    "goproOverlayStatus": {
+      "queued": "Queued",
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Error",
+      "cancelled": "Cancelled"
+    },
     "loading3dViewer": "Loading 3D viewer...",
     "flightOf": "Flight on {{date}}",
     "selectFlightHint": "Select a flight to view details and 3D trajectory",
