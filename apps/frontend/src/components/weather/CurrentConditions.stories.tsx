@@ -35,8 +35,6 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-
-
 // Mock data - matches BackendWeatherResponseSchema
 // Current hour is used for CurrentConditions display
 const currentHour = 10;
@@ -214,7 +212,11 @@ export const ModerateConditions = meta.story({
 ModerateConditions.test(
   'displays moderate conditions correctly',
   async ({ canvas }) => {
-    await canvas.findByText(/65\/100/);
+    await expect(
+      canvas.getByText(
+        (_, element) => element?.textContent?.replace(/\s+/g, '') === '65/100'
+      )
+    ).toBeInTheDocument();
 
     await expect(canvas.getByText(/MOYEN/)).toBeInTheDocument();
     await expect(canvas.getByText('18°C')).toBeInTheDocument();
@@ -247,7 +249,11 @@ export const LimiteConditions = meta.story({
 LimiteConditions.test(
   'displays limite conditions correctly',
   async ({ canvas }) => {
-    await canvas.findByText(/45\/100/);
+    await expect(
+      canvas.getByText(
+        (_, element) => element?.textContent?.replace(/\s+/g, '') === '45/100'
+      )
+    ).toBeInTheDocument();
 
     await expect(canvas.getByText(/LIMITE/)).toBeInTheDocument();
     await expect(canvas.getByText('15°C')).toBeInTheDocument();
@@ -278,7 +284,11 @@ export const BadConditions = meta.story({
 });
 
 BadConditions.test('displays bad conditions correctly', async ({ canvas }) => {
-  await canvas.findByText(/25\/100/);
+  await expect(
+    canvas.getByText(
+      (_, element) => element?.textContent?.replace(/\s+/g, '') === '25/100'
+    )
+  ).toBeInTheDocument();
 
   await expect(canvas.getByText(/MAUVAIS/)).toBeInTheDocument();
   await expect(canvas.getByText('10°C')).toBeInTheDocument();
