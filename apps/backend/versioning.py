@@ -8,24 +8,17 @@ from urllib.parse import urlparse
 
 import fcntl
 
+from env_utils import required_env
+
 logger = logging.getLogger(__name__)
 
-VERSION_STATE_FILE = Path(
-    os.getenv(
-        "BACKEND_VERSION_STATE_FILE",
-        Path(__file__).parent / "db" / "version_state.json",
-    )
-)
+VERSION_STATE_FILE = Path(required_env("BACKEND_VERSION_STATE_FILE"))
 
 _current_version_payload: dict[str, int | str | None] | None = None
 
 
 def _today_string() -> str:
     return datetime.now(timezone.utc).strftime("%Y.%m.%d")
-
-
-def _is_testing_mode() -> bool:
-    return os.getenv("TESTING", "false").lower() == "true"
 
 
 def _release_notes_url() -> str | None:
@@ -93,15 +86,6 @@ def initialize_deployment_version() -> dict[str, int | str | None]:
             "release_notes_url": _release_notes_url(),
         }
         logger.info("Deployment version forced from BACKEND_DEPLOY_VERSION: %s", forced_version)
-        return _current_version_payload
-
-    if _is_testing_mode() and "BACKEND_VERSION_STATE_FILE" not in os.environ:
-        _current_version_payload = {
-            "version": f"{today}.0",
-            "build_date": today,
-            "build_number": 0,
-            "release_notes_url": _release_notes_url(),
-        }
         return _current_version_payload
 
     VERSION_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)

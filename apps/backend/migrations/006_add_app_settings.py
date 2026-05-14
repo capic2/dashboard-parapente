@@ -5,17 +5,19 @@ Description: Adds key-value settings table for configurable cache, scheduler, an
 """
 
 import logging
-import os
 from datetime import datetime
 
 from sqlalchemy import create_engine, text
+
+from env_utils import required_env
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 # Database connection
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./db/dashboard.db")
+DATABASE_URL = required_env("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 
 

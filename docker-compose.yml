@@ -39,7 +39,8 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:-production}
 
       # Backend - Database
-      - BACKEND_DATABASE_URL=${BACKEND_DATABASE_URL:-sqlite:///./db/dashboard.db}
+      - BACKEND_DATABASE_URL=${BACKEND_DATABASE_URL:?BACKEND_DATABASE_URL is required}
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
 
       # Backend - Redis
       - BACKEND_REDIS_HOST=redis
@@ -79,7 +80,7 @@ services:
 
       # Backend - Logging
       - BACKEND_LOG_LEVEL=${BACKEND_LOG_LEVEL:-INFO}
-      - BACKEND_LOG_FILE=${BACKEND_LOG_FILE:-logs/dashboard.log}
+      - BACKEND_LOG_FILE=${BACKEND_LOG_FILE:?BACKEND_LOG_FILE is required}
 
       # Backend - Monitoring
       - BACKEND_METRICS_TOKEN=${BACKEND_METRICS_TOKEN:?required}
@@ -97,24 +98,28 @@ services:
       - BACKEND_FRONTEND_URL=${BACKEND_FRONTEND_URL}
 
       # Backend - Video export storage
-      - BACKEND_VIDEO_EXPORT_DIR=${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
-      - BACKEND_VIDEO_TEMP_IMAGES_DIR=${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
+      - BACKEND_VIDEO_EXPORT_DIR=${BACKEND_VIDEO_EXPORT_DIR:?BACKEND_VIDEO_EXPORT_DIR is required}
+      - BACKEND_VIDEO_TEMP_IMAGES_DIR=${BACKEND_VIDEO_TEMP_IMAGES_DIR:?BACKEND_VIDEO_TEMP_IMAGES_DIR is required}
 
       # Backend - GoPro overlay toolchain
-      - BACKEND_GOPRO_OVERLAY_ROOT=${BACKEND_GOPRO_OVERLAY_ROOT:-/media/usb/data-m2/developement/gopro-overlay-dasboard}
-      - BACKEND_GOPRO_OVERLAY_BIN=${BACKEND_GOPRO_OVERLAY_BIN:-/media/usb/data-m2/developement/gopro-overlay-dasboard/venv/bin/gopro-dashboard.py}
-      - BACKEND_GOPRO_OVERLAY_LAYOUT_DIR=${BACKEND_GOPRO_OVERLAY_LAYOUT_DIR:-/media/usb/data-m2/developement/gopro-overlay-dasboard}
+      - BACKEND_GOPRO_OVERLAY_ROOT=${BACKEND_GOPRO_OVERLAY_ROOT:?BACKEND_GOPRO_OVERLAY_ROOT is required}
+      - BACKEND_GOPRO_OVERLAY_BIN=${BACKEND_GOPRO_OVERLAY_BIN:?BACKEND_GOPRO_OVERLAY_BIN is required}
+      - BACKEND_GOPRO_OVERLAY_UPLOAD_DIR=${BACKEND_GOPRO_OVERLAY_UPLOAD_DIR:?BACKEND_GOPRO_OVERLAY_UPLOAD_DIR is required}
+      - BACKEND_GOPRO_OVERLAY_OUTPUT_DIR=${BACKEND_GOPRO_OVERLAY_OUTPUT_DIR:?BACKEND_GOPRO_OVERLAY_OUTPUT_DIR is required}
+      - BACKEND_GOPRO_OVERLAY_PARAGLIDING_ROOT=${BACKEND_GOPRO_OVERLAY_PARAGLIDING_ROOT:?BACKEND_GOPRO_OVERLAY_PARAGLIDING_ROOT is required}
+      - BACKEND_GOPRO_OVERLAY_LAYOUT_DIR=${BACKEND_GOPRO_OVERLAY_LAYOUT_DIR:?BACKEND_GOPRO_OVERLAY_LAYOUT_DIR is required}
 
       # Backend - Deployment metadata
       - BACKEND_DEPLOY_VERSION=${BACKEND_DEPLOY_VERSION}
+      - BACKEND_VERSION_STATE_FILE=${BACKEND_VERSION_STATE_FILE:?BACKEND_VERSION_STATE_FILE is required}
     depends_on:
       redis:
         condition: service_healthy
     volumes:
       - /home/capic/docker-data/dashboard-parapente/db:/app/db
-      - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:/app/video-exports
-      - ${VIDEO_TEMP_IMAGES_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/video-temp-images}:/app/video-temp-images
-      - ${GOPRO_OVERLAY_HOST_DIR:-/media/usb/data-m2/developement/gopro-overlay-dasboard}:${BACKEND_GOPRO_OVERLAY_ROOT:-/media/usb/data-m2/developement/gopro-overlay-dasboard}:ro
+      - ${VIDEO_EXPORT_HOST_DIR:?VIDEO_EXPORT_HOST_DIR is required}:${BACKEND_VIDEO_EXPORT_DIR:?BACKEND_VIDEO_EXPORT_DIR is required}
+      - ${VIDEO_TEMP_IMAGES_HOST_DIR:?VIDEO_TEMP_IMAGES_HOST_DIR is required}:${BACKEND_VIDEO_TEMP_IMAGES_DIR:?BACKEND_VIDEO_TEMP_IMAGES_DIR is required}
+      - ${GOPRO_OVERLAY_HOST_DIR:?GOPRO_OVERLAY_HOST_DIR is required}:${BACKEND_GOPRO_OVERLAY_ROOT:?BACKEND_GOPRO_OVERLAY_ROOT is required}:ro
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8001/']
       interval: 30s

@@ -11,6 +11,25 @@ import pytest
 # Set testing mode before importing config
 os.environ["TESTING"] = "true"
 os.environ["BACKEND_USE_FAKE_REDIS"] = "true"
+os.environ["BACKEND_DATABASE_URL"] = "sqlite:///./test.db"
+os.environ["BACKEND_LOG_FILE"] = "logs/test-dashboard.log"
+os.environ["BACKEND_VIDEO_EXPORT_DIR"] = "/tmp/dashboard-parapente-test/video-exports"
+os.environ["BACKEND_VIDEO_TEMP_IMAGES_DIR"] = "/tmp/dashboard-parapente-test/video-temp-images"
+os.environ["BACKEND_GOPRO_OVERLAY_ROOT"] = "/tmp/dashboard-parapente-test/gopro-overlay"
+os.environ["BACKEND_GOPRO_OVERLAY_BIN"] = (
+    "/tmp/dashboard-parapente-test/gopro-overlay/gopro-dashboard.py"
+)
+os.environ["BACKEND_GOPRO_OVERLAY_UPLOAD_DIR"] = (
+    "/tmp/dashboard-parapente-test/gopro-overlays/uploads"
+)
+os.environ["BACKEND_GOPRO_OVERLAY_OUTPUT_DIR"] = (
+    "/tmp/dashboard-parapente-test/gopro-overlays/outputs"
+)
+os.environ["BACKEND_GOPRO_OVERLAY_PARAGLIDING_ROOT"] = "/tmp/dashboard-parapente-test/paragliding"
+os.environ["BACKEND_GOPRO_OVERLAY_LAYOUT_DIR"] = (
+    "/tmp/dashboard-parapente-test/gopro-overlay-layouts"
+)
+os.environ["BACKEND_VERSION_STATE_FILE"] = "/tmp/dashboard-parapente-test/version_state.json"
 
 # Set dummy API keys for tests
 os.environ["BACKEND_WEATHERAPI_KEY"] = "test_weather_key"

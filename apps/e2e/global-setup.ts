@@ -8,6 +8,7 @@ function globalSetup(): void {
   const scriptPath = path.join(backendPath, 'init_e2e_db.py');
   const dbPath = path.join(backendPath, 'test.db');
   const absoluteDbUrl = `sqlite:///${dbPath}`;
+  const e2eRuntimeDir = path.join(backendPath, 'e2e-runtime');
 
   // Use python3 on Unix systems, python on Windows
   const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
@@ -22,6 +23,16 @@ function globalSetup(): void {
         ENVIRONMENT: 'test',
         TESTING: 'false',
         BACKEND_DATABASE_URL: absoluteDbUrl,
+        BACKEND_LOG_FILE: path.join(e2eRuntimeDir, 'dashboard.log'),
+        BACKEND_VIDEO_EXPORT_DIR: path.join(e2eRuntimeDir, 'video-exports'),
+        BACKEND_VIDEO_TEMP_IMAGES_DIR: path.join(e2eRuntimeDir, 'video-temp-images'),
+        BACKEND_GOPRO_OVERLAY_ROOT: path.join(e2eRuntimeDir, 'gopro-overlay'),
+        BACKEND_GOPRO_OVERLAY_BIN: path.join(e2eRuntimeDir, 'gopro-overlay', 'gopro-dashboard.py'),
+        BACKEND_GOPRO_OVERLAY_UPLOAD_DIR: path.join(e2eRuntimeDir, 'gopro-overlays', 'uploads'),
+        BACKEND_GOPRO_OVERLAY_OUTPUT_DIR: path.join(e2eRuntimeDir, 'gopro-overlays', 'outputs'),
+        BACKEND_GOPRO_OVERLAY_PARAGLIDING_ROOT: path.join(e2eRuntimeDir, 'paragliding'),
+        BACKEND_GOPRO_OVERLAY_LAYOUT_DIR: path.join(e2eRuntimeDir, 'gopro-overlay-layouts'),
+        BACKEND_VERSION_STATE_FILE: path.join(e2eRuntimeDir, 'version_state.json'),
         BACKEND_JWT_SECRET: process.env.BACKEND_JWT_SECRET || 'e2e-test-secret',
         BACKEND_ADMIN_EMAIL: process.env.BACKEND_ADMIN_EMAIL || 'e2e@test.local',
         BACKEND_ADMIN_PASSWORD: process.env.BACKEND_ADMIN_PASSWORD || 'e2e-test-password',
