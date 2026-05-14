@@ -5,7 +5,12 @@ import { WindIndicator } from '../common/WindIndicator';
 import CacheTimestamp from '../common/CacheTimestamp';
 import type { WeatherData } from '../../types';
 import { Cloud, Thermometer, Wind, Zap } from 'lucide-react';
-import { getVerdictVisual, weatherCardClassName } from './weatherUi';
+import {
+  getVerdictVisual,
+  weatherCardClassName,
+  weatherMetricTileClassName,
+  weatherSectionTitleClassName,
+} from './weatherUi';
 
 interface CurrentConditionsProps {
   spotId?: string;
@@ -35,15 +40,15 @@ export default function CurrentConditions({
   const isLoading = isOverrideLoading ?? isFetchedLoading;
   const hasError = isOverrideError ?? !!error;
   const orientation = siteOrientation ?? site?.orientation;
-  const cardClassName = `${weatherCardClassName} border-l-4 border-l-sky-600 p-4`;
+  const cardClassName = `${weatherCardClassName} overflow-hidden`;
 
   if (isLoading) {
     return (
-      <div className={cardClassName} aria-live="polite">
-        <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3.5 font-semibold">
+      <div className={`${cardClassName} p-4`} aria-live="polite">
+        <h2 className={weatherSectionTitleClassName}>
           {t('weather.currentConditions')}
         </h2>
-        <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
+        <div className="py-5 text-center text-sm text-gray-500 dark:text-gray-400">
           {t('common.loading')}
         </div>
       </div>
@@ -52,11 +57,11 @@ export default function CurrentConditions({
 
   if (hasError || !weather) {
     return (
-      <div className={cardClassName} role="alert">
-        <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3.5 font-semibold">
+      <div className={`${cardClassName} p-4`} role="alert">
+        <h2 className={weatherSectionTitleClassName}>
           {t('weather.currentConditions')}
         </h2>
-        <div className="py-5 text-center text-red-500 dark:text-red-400 text-sm">
+        <div className="py-5 text-center text-sm text-red-500 dark:text-red-400">
           {t('weather.loadError')}
         </div>
       </div>
@@ -68,85 +73,103 @@ export default function CurrentConditions({
 
   return (
     <div className={`${cardClassName} flex flex-1 flex-col`}>
-      <div className="mb-3.5">
-        <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
-          {t('weather.currentConditionsFor', { name: weather.spot_name })}
-        </h2>
-      </div>
-
-      <div className="flex items-center gap-3 mb-4">
-        <div className="text-4xl sm:text-3xl font-bold text-sky-600 dark:text-sky-400 leading-none">
-          {weather.score != null ? weather.score : weather.para_index}/100
-        </div>
-        <div
-          className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap ${verdictVisual.badgeClassName}`}
-        >
-          <VerdictIcon className="h-3.5 w-3.5" aria-hidden="true" />
-          {weather.verdict.toUpperCase()}
-        </div>
-      </div>
-      {weather.score != null && weather.score !== weather.para_index && (
-        <div className="text-xs text-gray-500 dark:text-gray-400 -mt-3 mb-3">
-          {t('weather.paraIndex')} {weather.para_index}/100
-        </div>
-      )}
-
-      <div className="flex flex-col gap-2">
-        <div className="flex justify-between text-sm py-1.5 border-b border-gray-100 dark:border-gray-700">
-          <span className="inline-flex items-center gap-1.5 text-gray-600 dark:text-gray-300 font-medium">
-            <Thermometer className="h-4 w-4 text-red-500" aria-hidden="true" />
-            {t('common.temperature')}
-          </span>
-          <span className="font-semibold text-gray-900 dark:text-white text-right">
-            {weather.temperature}°C
-          </span>
-        </div>
-        <div className="flex justify-between text-sm py-1.5 border-b border-gray-100 dark:border-gray-700">
-          <span className="inline-flex items-center gap-1.5 text-gray-600 dark:text-gray-300 font-medium">
-            <Wind className="h-4 w-4 text-sky-500" aria-hidden="true" />
-            {t('common.wind')}
-          </span>
-          <div className="flex flex-col items-end gap-1">
-            <span className="font-semibold text-gray-900 dark:text-white text-right">
-              {weather.wind_speed} km/h {weather.wind_direction}
-            </span>
-            {orientation && (
-              <WindIndicator
-                windDirection={weather.wind_direction}
-                siteOrientation={
-                  Array.isArray(orientation) ? orientation[0] : orientation
-                }
-                windSpeed={weather.wind_speed}
-                showLabel={false}
-                size="sm"
-              />
-            )}
+      <div className="border-l-4 border-l-sky-600 p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className={weatherSectionTitleClassName}>
+              {t('weather.currentConditions')}
+            </p>
+            <h2 className="mt-1 truncate text-xl font-black text-slate-950 dark:text-white">
+              {weather.spot_name}
+            </h2>
+          </div>
+          <div
+            className={`inline-flex w-fit items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold whitespace-nowrap ${verdictVisual.badgeClassName}`}
+          >
+            <VerdictIcon className="h-3.5 w-3.5" aria-hidden="true" />
+            {weather.verdict.toUpperCase()}
           </div>
         </div>
-        {weather.wind_gusts && (
-          <div className="flex justify-between text-sm py-1.5 border-b border-gray-100 dark:border-gray-700">
-            <span className="inline-flex items-center gap-1.5 text-gray-600 dark:text-gray-300 font-medium">
-              <Zap className="h-4 w-4 text-orange-500" aria-hidden="true" />
-              {t('common.gusts')}
+
+        <div className="mt-4 rounded-2xl bg-gradient-to-br from-sky-50 to-white p-4 dark:from-sky-950/40 dark:to-slate-950/40">
+          <div className="text-sm font-bold text-slate-500 dark:text-slate-400">
+            Score météo
+          </div>
+          <div className="mt-1 flex items-end gap-2">
+            <span className="text-5xl font-black leading-none tracking-tight text-sky-600 dark:text-sky-400">
+              {weather.score ?? weather.para_index}
             </span>
-            <span className="font-semibold text-gray-900 dark:text-white text-right">
-              {weather.wind_gusts} km/h
+            <span className="pb-1 text-lg font-bold text-slate-400 dark:text-slate-500">
+              /100
             </span>
+          </div>
+        </div>
+        {weather.score != null && weather.score !== weather.para_index && (
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            {t('weather.paraIndex')} {weather.para_index}/100
           </div>
         )}
-        <div className="flex justify-between text-sm py-1.5">
-          <span className="inline-flex items-center gap-1.5 text-gray-600 dark:text-gray-300 font-medium">
-            <Cloud className="h-4 w-4 text-slate-500" aria-hidden="true" />
-            {t('common.conditions')}
-          </span>
-          <span className="font-semibold text-gray-900 dark:text-white text-right">
-            {weather.conditions}
-          </span>
-        </div>
-      </div>
 
-      <div className="mt-3 text-center pt-2 border-t border-gray-100 dark:border-gray-700">
-        <CacheTimestamp cachedAt={weather.cached_at} />
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className={weatherMetricTileClassName}>
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
+              <Thermometer
+                className="h-4 w-4 text-red-500"
+                aria-hidden="true"
+              />
+              {t('common.temperature')}
+            </span>
+            <div className="mt-1 text-lg font-black text-gray-900 dark:text-white">
+              {weather.temperature}°C
+            </div>
+          </div>
+          <div className={weatherMetricTileClassName}>
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
+              <Wind className="h-4 w-4 text-sky-500" aria-hidden="true" />
+              {t('common.wind')}
+            </span>
+            <div className="mt-1 flex flex-col gap-1">
+              <span className="text-lg font-black text-gray-900 dark:text-white">
+                {weather.wind_speed} km/h {weather.wind_direction}
+              </span>
+              {orientation && (
+                <WindIndicator
+                  windDirection={weather.wind_direction}
+                  siteOrientation={
+                    Array.isArray(orientation) ? orientation[0] : orientation
+                  }
+                  windSpeed={weather.wind_speed}
+                  showLabel={false}
+                  size="sm"
+                />
+              )}
+            </div>
+          </div>
+          {weather.wind_gusts && (
+            <div className={weatherMetricTileClassName}>
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
+                <Zap className="h-4 w-4 text-orange-500" aria-hidden="true" />
+                {t('common.gusts')}
+              </span>
+              <div className="mt-1 text-lg font-black text-gray-900 dark:text-white">
+                {weather.wind_gusts} km/h
+              </div>
+            </div>
+          )}
+          <div className={weatherMetricTileClassName}>
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
+              <Cloud className="h-4 w-4 text-slate-500" aria-hidden="true" />
+              {t('common.conditions')}
+            </span>
+            <div className="mt-1 text-base font-black text-gray-900 dark:text-white">
+              {weather.conditions}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 border-t border-gray-100 pt-3 text-center dark:border-gray-700">
+          <CacheTimestamp cachedAt={weather.cached_at} />
+        </div>
       </div>
     </div>
   );
