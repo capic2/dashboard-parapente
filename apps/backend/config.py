@@ -13,7 +13,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from env_utils import required_env
+
 logger = logging.getLogger(__name__)
+
 
 # Déterminer le répertoire racine du projet
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -43,7 +46,7 @@ else:
 # ============================================================================
 # DATABASE
 # ============================================================================
-DATABASE_URL = os.getenv("BACKEND_DATABASE_URL", "sqlite:///./db/dashboard.db")
+DATABASE_URL = required_env("BACKEND_DATABASE_URL")
 
 # ============================================================================
 # REDIS
@@ -117,7 +120,7 @@ ADMIN_PASSWORD = os.getenv("BACKEND_ADMIN_PASSWORD")
 # LOGGING
 # ============================================================================
 LOG_LEVEL = os.getenv("BACKEND_LOG_LEVEL", "INFO")
-LOG_FILE = os.getenv("BACKEND_LOG_FILE", "logs/dashboard.log")
+LOG_FILE = required_env("BACKEND_LOG_FILE")
 
 # Monitoring
 METRICS_TOKEN = os.getenv("BACKEND_METRICS_TOKEN")
@@ -136,56 +139,18 @@ FRONTEND_URL = os.getenv("BACKEND_FRONTEND_URL")
 # ============================================================================
 # VIDEO EXPORT
 # ============================================================================
-_USE_CONTAINER_VIDEO_PATHS = ENVIRONMENT == "production"
-VIDEO_EXPORT_DIR = os.getenv(
-    "BACKEND_VIDEO_EXPORT_DIR",
-    (
-        "/app/video-exports"
-        if _USE_CONTAINER_VIDEO_PATHS
-        else str(BACKEND_ROOT / "exports" / "videos")
-    ),
-)
-VIDEO_TEMP_IMAGES_DIR = os.getenv(
-    "BACKEND_VIDEO_TEMP_IMAGES_DIR",
-    (
-        "/app/video-temp-images"
-        if _USE_CONTAINER_VIDEO_PATHS
-        else str(BACKEND_ROOT / "exports" / "video-temp-images")
-    ),
-)
+VIDEO_EXPORT_DIR = required_env("BACKEND_VIDEO_EXPORT_DIR")
+VIDEO_TEMP_IMAGES_DIR = required_env("BACKEND_VIDEO_TEMP_IMAGES_DIR")
 
 # ============================================================================
 # GOPRO OVERLAY EXPORT
 # ============================================================================
-_GOPRO_OVERLAY_ROOT_DEFAULT = ""
-GOPRO_OVERLAY_ROOT = os.getenv(
-    "BACKEND_GOPRO_OVERLAY_ROOT",
-    _GOPRO_OVERLAY_ROOT_DEFAULT,
-)
-GOPRO_OVERLAY_BIN = os.getenv(
-    "BACKEND_GOPRO_OVERLAY_BIN",
-    (
-        str(Path(GOPRO_OVERLAY_ROOT) / "venv" / "bin" / "gopro-dashboard.py")
-        if GOPRO_OVERLAY_ROOT
-        else "gopro-dashboard.py"
-    ),
-)
-GOPRO_OVERLAY_UPLOAD_DIR = os.getenv(
-    "BACKEND_GOPRO_OVERLAY_UPLOAD_DIR",
-    str(BACKEND_ROOT / "exports" / "gopro-overlays" / "uploads"),
-)
-GOPRO_OVERLAY_OUTPUT_DIR = os.getenv(
-    "BACKEND_GOPRO_OVERLAY_OUTPUT_DIR",
-    str(BACKEND_ROOT / "exports" / "gopro-overlays" / "outputs"),
-)
-GOPRO_OVERLAY_PARAGLIDING_ROOT = os.getenv(
-    "BACKEND_GOPRO_OVERLAY_PARAGLIDING_ROOT",
-    "",
-)
-GOPRO_OVERLAY_LAYOUT_DIR = os.getenv(
-    "BACKEND_GOPRO_OVERLAY_LAYOUT_DIR",
-    GOPRO_OVERLAY_ROOT or str(BACKEND_ROOT / "gopro-overlay-layouts"),
-)
+GOPRO_OVERLAY_ROOT = required_env("BACKEND_GOPRO_OVERLAY_ROOT")
+GOPRO_OVERLAY_BIN = required_env("BACKEND_GOPRO_OVERLAY_BIN")
+GOPRO_OVERLAY_UPLOAD_DIR = required_env("BACKEND_GOPRO_OVERLAY_UPLOAD_DIR")
+GOPRO_OVERLAY_OUTPUT_DIR = required_env("BACKEND_GOPRO_OVERLAY_OUTPUT_DIR")
+GOPRO_OVERLAY_PARAGLIDING_ROOT = required_env("BACKEND_GOPRO_OVERLAY_PARAGLIDING_ROOT")
+GOPRO_OVERLAY_LAYOUT_DIR = required_env("BACKEND_GOPRO_OVERLAY_LAYOUT_DIR")
 
 # ============================================================================
 # VALIDATION

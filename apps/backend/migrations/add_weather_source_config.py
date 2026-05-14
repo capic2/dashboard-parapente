@@ -10,20 +10,23 @@ from datetime import datetime
 import uuid
 import logging
 
+from env_utils import required_env
+
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 # Database connection
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./db/dashboard.db")
+DATABASE_URL = required_env("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 
 
 def upgrade():
     """Create weather_source_config table and insert default sources"""
-    
+
     logger.info("🔧 Creating weather_source_config table...")
-    
+
     # Create the table
     with engine.connect() as conn:
         conn.execute(text("""
@@ -49,29 +52,29 @@ def upgrade():
                 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         """))
-        
+
         # Create indexes
         conn.execute(text("""
-            CREATE INDEX IF NOT EXISTS idx_weather_source_name 
+            CREATE INDEX IF NOT EXISTS idx_weather_source_name
             ON weather_source_config(source_name)
         """))
-        
+
         conn.execute(text("""
-            CREATE INDEX IF NOT EXISTS idx_weather_source_enabled 
+            CREATE INDEX IF NOT EXISTS idx_weather_source_enabled
             ON weather_source_config(is_enabled)
         """))
-        
+
         conn.commit()
-    
+
     logger.info("✅ Table created successfully")
-    
+
     # Insert default sources
     logger.info("📦 Inserting default weather sources...")
-    
+
     # Get API keys from environment
     weatherapi_key = os.getenv("WEATHERAPI_KEY")
     meteoblue_key = os.getenv("METEOBLUE_API_KEY")
-    
+
     default_sources = [
         {
             "id": str(uuid.uuid4()),
@@ -89,7 +92,7 @@ def upgrade():
             "error_count": 0,
             "total_response_time_ms": 0,
             "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
+            "updated_at": datetime.utcnow().isoformat(),
         },
         {
             "id": str(uuid.uuid4()),
@@ -107,7 +110,7 @@ def upgrade():
             "error_count": 0,
             "total_response_time_ms": 0,
             "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
+            "updated_at": datetime.utcnow().isoformat(),
         },
         {
             "id": str(uuid.uuid4()),
@@ -125,7 +128,7 @@ def upgrade():
             "error_count": 0,
             "total_response_time_ms": 0,
             "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
+            "updated_at": datetime.utcnow().isoformat(),
         },
         {
             "id": str(uuid.uuid4()),
@@ -143,7 +146,7 @@ def upgrade():
             "error_count": 0,
             "total_response_time_ms": 0,
             "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
+            "updated_at": datetime.utcnow().isoformat(),
         },
         {
             "id": str(uuid.uuid4()),
@@ -161,18 +164,18 @@ def upgrade():
             "error_count": 0,
             "total_response_time_ms": 0,
             "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
-        }
+            "updated_at": datetime.utcnow().isoformat(),
+        },
     ]
-    
+
     with engine.connect() as conn:
         for source in default_sources:
             # Check if source already exists
             result = conn.execute(
                 text("SELECT id FROM weather_source_config WHERE source_name = :name"),
-                {"name": source["source_name"]}
+                {"name": source["source_name"]},
             )
-            
+
             if result.fetchone() is None:
                 # Insert source
                 conn.execute(
@@ -191,15 +194,15 @@ def upgrade():
                             :created_at, :updated_at
                         )
                     """),
-                    source
+                    source,
                 )
                 status = "✅" if source["is_enabled"] else "⚠️ (disabled - no API key)"
                 logger.info(f"  {status} Inserted: {source['display_name']}")
             else:
                 logger.info(f"  ⏭️  Skipped (exists): {source['display_name']}")
-        
+
         conn.commit()
-    
+
     logger.info("✅ Default sources inserted successfully")
     logger.info("🎉 Migration completed!")
 
@@ -207,17 +210,17 @@ def upgrade():
 def downgrade():
     """Drop weather_source_config table (rollback)"""
     logger.info("⚠️  Rolling back weather_source_config table...")
-    
+
     with engine.connect() as conn:
         conn.execute(text("DROP TABLE IF EXISTS weather_source_config"))
         conn.commit()
-    
+
     logger.info("✅ Table dropped successfully")
 
 
 if __name__ == "__main__":
     import sys
-    
+
     if len(sys.argv) > 1 and sys.argv[1] == "downgrade":
         downgrade()
     else:
