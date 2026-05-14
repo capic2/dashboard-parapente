@@ -559,6 +559,9 @@ jobs:
             if ! docker image prune -f; then
               echo "Docker image cleanup failed; deployment remains successful"
             fi
+            if ! docker buildx prune -af; then
+              echo "Docker buildx cleanup failed; deployment remains successful"
+            fi
 
       - name: Label merged PRs with deployed version
         if: steps.trigger_deploy.conclusion == 'success' && steps.verify_deploy.outcome == 'success'
