@@ -94,20 +94,20 @@ const mockGPXData = {
 };
 
 const defaultHandlers = [
-  http.get('/api/flights/:id/gpx-data', () =>
+  http.get('*/api/flights/:id/gpx-data', () =>
     HttpResponse.json({ data: mockGPXData })
   ),
-  http.get('/api/flights/:id/gpx', () =>
+  http.get('*/api/flights/:id/gpx', () =>
     HttpResponse.text('<gpx></gpx>', {
       headers: { 'Content-Type': 'application/gpx+xml' },
     })
   ),
-  http.get('/api/flights/:id', () => HttpResponse.json(fullFlight)),
-  http.patch('/api/flights/:id', async ({ request }) => {
+  http.get('*/api/flights/:id', () => HttpResponse.json(fullFlight)),
+  http.patch('*/api/flights/:id', async ({ request }) => {
     const body = await request.json();
     return HttpResponse.json({ data: { ...fullFlight, ...(body as object) } });
   }),
-  http.post('/api/flights/:id/upload-gpx', () =>
+  http.post('*/api/flights/:id/upload-gpx', () =>
     HttpResponse.json({
       success: true,
       flight_id: 'flight-001',
