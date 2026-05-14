@@ -94,16 +94,16 @@ class MeteocielScraper(BaseScraper):
             logger.error(f"Error fetching INSEE code for {city_name}: {e}")
             return None
 
-    async def _get_nearest_insee_code(self, lat: float, lon: float) -> str | None:
+    async def _get_nearest_commune(self, lat: float, lon: float) -> tuple[str, str] | None:
         """
-        Get INSEE code for nearest French city using reverse geocoding
+        Get nearest French city using reverse geocoding
 
         Args:
             lat: Latitude
             lon: Longitude
 
         Returns:
-            INSEE code or None if not in France
+            Tuple of (INSEE code, city name) or None if not in France
         """
         try:
             url = "https://geo.api.gouv.fr/communes"
@@ -120,7 +120,7 @@ class MeteocielScraper(BaseScraper):
                     logger.info(
                         f"Found nearest French city at {lat:.4f},{lon:.4f}: {city_name} (INSEE: {insee_code})"
                     )
-                    return insee_code
+                    return insee_code, city_name
                 else:
                     logger.warning(f"No French city found near coordinates {lat:.4f},{lon:.4f}")
                     return None
@@ -151,19 +151,22 @@ class MeteocielScraper(BaseScraper):
         try:
             # Step 1: Get INSEE code
             insee_code = await self._get_insee_code(site_name)
+            city_name_for_url = site_name
 
             if not insee_code:
                 # Graceful degradation: Try to find nearest French city using coordinates
                 logger.info(
                     f"No INSEE code found for {site_name}, trying reverse geocoding with coordinates"
                 )
-                insee_code = await self._get_nearest_insee_code(lat, lon)
+                nearest_commune = await self._get_nearest_commune(lat, lon)
 
-                if not insee_code:
+                if not nearest_commune:
                     return self._build_response(
                         success=False,
                         error=f"Meteociel only supports French cities. Could not find INSEE code for {site_name} or nearby location.",
                     )
+
+                insee_code, city_name_for_url = nearest_commune
 
             # Step 2: Build URL - Using AROME hourly forecasts (1h resolution)
             # Normalize city name: lowercase, remove accents, replace spaces
@@ -171,7 +174,7 @@ class MeteocielScraper(BaseScraper):
 
             city_normalized = "".join(
                 c
-                for c in unicodedata.normalize("NFD", site_name)
+                for c in unicodedata.normalize("NFD", city_name_for_url)
                 if unicodedata.category(c) != "Mn"
             )
             city_slug = city_normalized.lower().replace(" ", "-").replace("_", "-")
