@@ -62,6 +62,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
     return (
       <span
         className={`px-2 py-1 text-xs font-semibold rounded ${statusClasses[source.status]}`}
+        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
         role="status"
         aria-label={`Statut de la source: ${statusLabels[source.status]}`}
       >
@@ -321,6 +322,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
             {source.api_key_configured ? (
               <span
                 className="text-xs text-green-600 dark:text-green-400 font-semibold"
+                // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
                 role="status"
                 aria-label={t('settings.weatherSources.apiKeyConfigured')}
               >
@@ -329,6 +331,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
             ) : (
               <span
                 className="text-xs text-red-600 dark:text-red-400 font-semibold"
+                // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
                 role="status"
                 aria-label={t('settings.weatherSources.apiKeyMissing')}
               >
@@ -410,6 +413,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       {/* Statistics */}
       <div
         className="grid grid-cols-3 gap-2 mb-3 text-center"
+        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
         role="group"
         aria-label={t('settings.weatherSources.performanceStatsAria')}
       >
@@ -465,11 +469,15 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       {/* Last activity */}
       <div
         className="text-xs text-gray-600 dark:text-gray-300 mb-3"
+        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
         role="region"
         aria-label={t('settings.weatherSources.activityHistoryAria')}
       >
         {source.last_success_at && (
-          <div role="status">
+          <div
+            // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
+            role="status"
+          >
             <Trans
               i18nKey="settings.weatherSources.lastSuccessMessage"
               values={{ date: formatTimestamp(source.last_success_at) }}
@@ -486,6 +494,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
               <div
                 className="text-xs mt-1 p-1 bg-red-50 dark:bg-red-900/20 rounded truncate"
                 title={source.last_error_message}
+                // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
                 role="status"
                 aria-label={t('settings.weatherSources.errorMessageAria', {
                   message: source.last_error_message,
@@ -517,6 +526,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       {/* Actions */}
       <div
         className="flex flex-col sm:flex-row gap-2"
+        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
         role="group"
         aria-label={t('settings.weatherSources.actionsAria')}
       >

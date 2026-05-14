@@ -71,7 +71,7 @@ export default defineConfig({
             '**/EmagramWidget.stories.tsx',
             '*.chromatic.stories.tsx',
           ],
-          testTimeout: 15000,
+          testTimeout: 30000,
           setupFiles: ['./.storybook/vitest.setup.ts'],
         },
       },

@@ -1,7 +1,10 @@
 import { http, HttpResponse } from 'msw';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Outlet } from '@tanstack/react-router';
+import { Suspense } from 'react';
 import preview from '../../.storybook/preview';
-import { expect } from 'storybook/test';
 import Dashboard from './Dashboard';
+import i18n from '../../.storybook/i18n';
 
 const meta = preview.meta({
   title: 'Pages/Dashboard',
@@ -128,8 +131,8 @@ const mockBestSpot = {
 };
 
 const defaultHandlers = [
-  http.get('/api/spots', () => HttpResponse.json(mockSites)),
-  http.get('/api/spots/best/hourly', () =>
+  http.get('*/api/spots', () => HttpResponse.json(mockSites)),
+  http.get('*/api/spots/best/hourly', () =>
     HttpResponse.json({
       dayIndex: 0,
       startHour: 9,
@@ -139,23 +142,23 @@ const defaultHandlers = [
       ],
     })
   ),
-  http.get('/api/spots/best', () => HttpResponse.json(mockBestSpot)),
-  http.get('/api/spots/:id', ({ params }) => {
+  http.get('*/api/spots/best', () => HttpResponse.json(mockBestSpot)),
+  http.get('*/api/spots/:id', ({ params }) => {
     const site = mockSites.sites.find((s) => s.id === params.id);
     return site
       ? HttpResponse.json(site)
       : new HttpResponse(null, { status: 404 });
   }),
-  http.get('/api/weather/site-arguel', () =>
+  http.get('*/api/weather/site-arguel', () =>
     HttpResponse.json(mockWeatherArguel)
   ),
-  http.get('/api/weather/site-chalais', () =>
+  http.get('*/api/weather/site-chalais', () =>
     HttpResponse.json(mockWeatherChalais)
   ),
-  http.get('/api/flights/stats', () => HttpResponse.json(mockStats)),
-  http.get('/api/sites/:siteId/landings', () => HttpResponse.json([])),
-  http.get('/api/sites/:siteId/landings/weather', () => HttpResponse.json([])),
-  http.get('/api/emagram/hours', () =>
+  http.get('*/api/flights/stats', () => HttpResponse.json(mockStats)),
+  http.get('*/api/sites/:siteId/landings', () => HttpResponse.json([])),
+  http.get('*/api/sites/:siteId/landings/weather', () => HttpResponse.json([])),
+  http.get('*/api/emagram/hours', () =>
     HttpResponse.json({
       site_id: '07280',
       forecast_date: '2026-03-24',
@@ -167,7 +170,7 @@ const defaultHandlers = [
       ],
     })
   ),
-  http.get('/api/emagram/latest', () =>
+  http.get('*/api/emagram/latest', () =>
     HttpResponse.json({
       id: 'emagram-001',
       analysis_date: '2026-03-24',
@@ -228,19 +231,63 @@ const defaultHandlers = [
       updated_at: '2026-03-24T12:05:00Z',
     })
   ),
-  http.get('/api/emagram/history', () => HttpResponse.json([])),
+  http.get('*/api/emagram/history', () => HttpResponse.json([])),
 ];
 
 export const Default = meta.story({
   name: 'Default',
-  parameters: { msw: { handlers: defaultHandlers } },
+  parameters: {
+    msw: { handlers: defaultHandlers },
+    router: {
+      initialPath: 'dashboard',
+      renderRootRoute: () => (
+        <QueryClientProvider client={new QueryClient()}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Outlet />
+          </Suspense>
+        </QueryClientProvider>
+      ),
+      routes: [
+        {
+          path: 'weather',
+          element: () => <>Weather page</>,
+        },
+        {
+          path: 'dashboard',
+          element: 'story' as const,
+        },
+      ],
+    },
+  },
 });
 
 Default.test(
-  'renders dashboard with best spot and all sites conditions',
-  async ({ canvas }) => {
-    await canvas.findByText('Arguel');
-    await expect(canvas.getByText('Chalais')).toBeInTheDocument();
+  'it redirects to weather page, when click on view forecast',
+  async ({ canvas, userEvent }) => {
+    await userEvent.click(
+      await canvas.findByRole('button', {
+        name: i18n.t('weather.viewForecast'),
+      })
+    );
+
+    await canvas.findByText('Weather page');
+  }
+);
+Default.test(
+  'it redirects to weather page with proper site when click on best spot hour per hour card',
+  async ({ canvas, userEvent }) => {
+    const timelineTitle = await canvas.findByText(
+      i18n.t('weather.bestSpotTimeline')
+    );
+    const timeline = timelineTitle.parentElement?.nextElementSibling;
+    const hourlySpotButton = timeline?.querySelector('button');
+
+    if (!hourlySpotButton) {
+      throw new globalThis.Error('Hourly best spot button not found');
+    }
+
+    await userEvent.click(hourlySpotButton);
+    await canvas.findByText('Weather page');
   }
 );
 
@@ -249,7 +296,7 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('/api/spots', async () => {
+        http.get('*/api/spots', async () => {
           await new Promise(() => {});
         }),
         ...defaultHandlers.slice(1),
@@ -263,7 +310,7 @@ export const Empty = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('/api/spots', () => HttpResponse.json({ sites: [] })),
+        http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
         ...defaultHandlers.slice(1),
       ],
     },
@@ -275,7 +322,7 @@ export const Error = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('/api/spots', () => new HttpResponse(null, { status: 500 })),
+        http.get('*/api/spots', () => new HttpResponse(null, { status: 500 })),
         ...defaultHandlers.slice(1),
       ],
     },
