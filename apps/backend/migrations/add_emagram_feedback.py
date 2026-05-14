@@ -5,18 +5,12 @@ Description: Pilot feedback system to compare predictions vs reality
 """
 
 from sqlalchemy import create_engine, text
-import os
 import logging
+
+from env_utils import required_env
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-def required_env(name: str) -> str:
-    value = os.getenv(name)
-    if value is None or not value.strip():
-        raise ValueError(f"{name} environment variable is required")
-    return value
 
 
 DATABASE_URL = required_env("DATABASE_URL")

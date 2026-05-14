@@ -15,3 +15,9 @@ def test_required_env_rejects_empty_variable(monkeypatch):
 
     with pytest.raises(ValueError, match="BACKEND_EMPTY_PATH environment variable is required"):
         config.required_env("BACKEND_EMPTY_PATH")
+
+
+def test_required_env_accepts_non_empty_variable(monkeypatch):
+    monkeypatch.setenv("BACKEND_VALID_PATH", "  /valid/path  ")
+
+    assert config.required_env("BACKEND_VALID_PATH") == "/valid/path"

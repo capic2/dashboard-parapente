@@ -8,18 +8,11 @@ from urllib.parse import urlparse
 
 import fcntl
 
+from env_utils import required_env
+
 logger = logging.getLogger(__name__)
 
-
-def _required_env(name: str) -> str:
-    value = os.getenv(name)
-    if value is None or not value.strip():
-        logger.error("Required environment variable %s is missing or empty", name)
-        raise ValueError(f"{name} environment variable is required")
-    return value
-
-
-VERSION_STATE_FILE = Path(_required_env("BACKEND_VERSION_STATE_FILE"))
+VERSION_STATE_FILE = Path(required_env("BACKEND_VERSION_STATE_FILE"))
 
 _current_version_payload: dict[str, int | str | None] | None = None
 
