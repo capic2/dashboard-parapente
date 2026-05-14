@@ -40,6 +40,11 @@ if ! docker image prune -f; then
   echo "⚠️  Nettoyage des images ignoré (échec non bloquant)"
 fi
 
+echo "Nettoyage du cache Docker Buildx..."
+if ! docker buildx prune -af; then
+  echo "⚠️  Nettoyage Buildx ignoré (échec non bloquant)"
+fi
+
 echo "✅ Docker redémarré"
 echo ""
 
