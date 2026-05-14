@@ -34,8 +34,6 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-
-
 // Mock successful flight creation
 const mockFlightResult = {
   flight: {
@@ -60,7 +58,7 @@ export const FlightModal = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.post('/api/flights/create-from-gpx', () => {
+        http.post('*/api/flights/create-from-gpx', () => {
           return HttpResponse.json(mockFlightResult);
         }),
       ],
@@ -163,7 +161,7 @@ FlightModal.test(
     parameters: {
       msw: {
         handlers: [
-          http.post('/api/flights/create-from-gpx', async () => {
+          http.post('*/api/flights/create-from-gpx', async () => {
             await delay(100);
             return new HttpResponse(
               JSON.stringify({
@@ -220,7 +218,9 @@ FlightModal.test(
 
     // Verify the error message contains helpful text
     await expect(
-      await screen.findByText('Le fichier GPX ne contient pas de données de vol valides')
+      await screen.findByText(
+        'Le fichier GPX ne contient pas de données de vol valides'
+      )
     ).toBeInTheDocument();
 
     // Verify that onCreateComplete was NOT called (since upload failed)

@@ -19,6 +19,7 @@ export default function AppUpdateBanner({
 }: AppUpdateBannerProps) {
   return (
     <div
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
       role="status"
       aria-live="polite"
       className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-700 dark:bg-amber-900/30"
