@@ -1,4 +1,7 @@
 import { http, HttpResponse } from 'msw';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Outlet } from '@tanstack/react-router';
+import { Suspense } from 'react';
 import preview from '../../.storybook/preview';
 import Dashboard from './Dashboard';
 import i18n from '../../.storybook/i18n';
@@ -236,15 +239,22 @@ export const Default = meta.story({
   parameters: {
     msw: { handlers: defaultHandlers },
     router: {
-      initialPath: '/',
+      initialPath: 'dashboard',
+      renderRootRoute: () => (
+        <QueryClientProvider client={new QueryClient()}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Outlet />
+          </Suspense>
+        </QueryClientProvider>
+      ),
       routes: [
         {
-          path: '/',
-          element: 'story' as const,
+          path: 'weather',
+          element: () => <>Weather page</>,
         },
         {
-          path: '/weather',
-          element: () => <>Weather page</>,
+          path: 'dashboard',
+          element: 'story' as const,
         },
       ],
     },
@@ -259,12 +269,25 @@ Default.test(
         name: i18n.t('weather.viewForecast'),
       })
     );
+
+    await canvas.findByText('Weather page');
   }
 );
 Default.test(
   'it redirects to weather page with proper site when click on best spot hour per hour card',
-  async ({ canvas }) => {
-    await canvas.findByText(i18n.t('weather.bestSpotTimeline'));
+  async ({ canvas, userEvent }) => {
+    const timelineTitle = await canvas.findByText(
+      i18n.t('weather.bestSpotTimeline')
+    );
+    const timeline = timelineTitle.parentElement?.nextElementSibling;
+    const hourlySpotButton = timeline?.querySelector('button');
+
+    if (!hourlySpotButton) {
+      throw new globalThis.Error('Hourly best spot button not found');
+    }
+
+    await userEvent.click(hourlySpotButton);
+    await canvas.findByText('Weather page');
   }
 );
 

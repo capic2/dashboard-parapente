@@ -102,13 +102,13 @@ export default function Dashboard() {
               <span className="capitalize">{todayLabel}</span>
             </div>
             <Button
-              onClick={() => void navigate({ to: '/weather' })}
+              onPress={() => void navigate({ to: '/weather' })}
               className="rounded-2xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-sky-600/20 transition-colors hover:bg-sky-700"
             >
               {t('weather.viewForecast')}
             </Button>
             <Button
-              onClick={() => void navigate({ to: '/gopro-overlay' })}
+              onPress={() => void navigate({ to: '/gopro-overlay' })}
               className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-slate-950/20 transition-colors hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"
             >
               <Video className="h-4 w-4" aria-hidden="true" />
