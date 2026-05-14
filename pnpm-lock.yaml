@@ -117,6 +117,9 @@ catalogs:
     lint-staged:
       specifier: ^17.0.0
       version: 17.0.4
+    lucide-react:
+      specifier: ^1.7.0
+      version: 1.14.0
     msw:
       specifier: ^2.13.6
       version: 2.14.6
@@ -144,9 +147,6 @@ catalogs:
     react-dom:
       specifier: ^19.0.0
       version: 19.2.6
-    react-i18next:
-      specifier: ^17.0.1
-      version: 17.0.7
     react-is:
       specifier: ^19.2.4
       version: 19.2.6
@@ -229,7 +229,7 @@ importers:
         version: 19.2.6(react@19.2.6)
       react-i18next:
         specifier: 'catalog:'
-        version: 17.0.7(i18next@26.1.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+        version: 17.0.8(i18next@26.1.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
       react-is:
         specifier: 'catalog:'
         version: 19.2.6
@@ -353,7 +353,7 @@ importers:
         version: 10.4.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@testing-library/dom@10.4.1)(@types/react@19.2.14)(prettier@3.8.3)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       storybook-react-i18next:
         specifier: 'catalog:'
-        version: 10.1.2(i18next-browser-languagedetector@8.2.1)(i18next-http-backend@3.0.2)(i18next@26.1.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react-i18next@17.0.7(i18next@26.1.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(react@19.2.6)(storybook@10.4.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@testing-library/dom@10.4.1)(@types/react@19.2.14)(prettier@3.8.3)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))
+        version: 10.1.2(i18next-browser-languagedetector@8.2.1)(i18next-http-backend@3.0.2)(i18next@26.1.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react-i18next@17.0.8(i18next@26.1.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(react@19.2.6)(storybook@10.4.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@testing-library/dom@10.4.1)(@types/react@19.2.14)(prettier@3.8.3)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.0
@@ -380,7 +380,7 @@ importers:
         version: link:../../libs/shared-types
       lucide-react:
         specifier: 'catalog:'
-        version: 1.16.0(react@19.2.6)
+        version: 1.14.0(react@19.2.6)
 
   libs/design-system:
     dependencies:
@@ -4079,8 +4079,8 @@ packages:
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
 
-  lucide-react@1.16.0:
-    resolution: {integrity: sha512-dYwyPzb4MEKpGUmNYk3WKWPnMrHs3FKM+q94kAnJrcDIqqn1hq2xY8scaS2ovsOCM5D51ey2gaRG3PBb1vgoYQ==}
+  lucide-react@1.14.0:
+    resolution: {integrity: sha512-+1mdWcfSJVUsaTIjN9zoezmUhfXo5l0vP7ekBMPo3jcS/aIkxHnXqAPsByszMZx/Y8oQBRJxJx5xg+RH3urzxA==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
@@ -4443,10 +4443,10 @@ packages:
     peerDependencies:
       react: ^19.2.6
 
-  react-i18next@17.0.7:
-    resolution: {integrity: sha512-rwtPXsb/zwzDafN+gytcjF5YnqGQQIRmCQ6DctBC1VSipRB8GD/MWEVrFP42vjMyuYydxWxM8CZRt+yiNuuoHg==}
+  react-i18next@17.0.8:
+    resolution: {integrity: sha512-0ooKbGLU8JXhe1zwpQUWIeXSgLPOfwJmgheWRIUpcoA0CpyabpGhayjdG+/eA5esC1AQ8h2jWpXjJfzQzeDOCw==}
     peerDependencies:
-      i18next: '>= 26.0.10'
+      i18next: '>= 26.2.0'
       react: '>= 16.8.0'
       react-dom: '*'
       react-native: '*'
@@ -8644,7 +8644,7 @@ snapshots:
     dependencies:
       yallist: 3.1.1
 
-  lucide-react@1.16.0(react@19.2.6):
+  lucide-react@1.14.0(react@19.2.6):
     dependencies:
       react: 19.2.6
 
@@ -9205,7 +9205,7 @@ snapshots:
       react: 19.2.6
       scheduler: 0.27.0
 
-  react-i18next@17.0.7(i18next@26.1.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3):
+  react-i18next@17.0.8(i18next@26.1.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3):
     dependencies:
       '@babel/runtime': 7.29.2
       html-parse-stringify: 3.0.1
@@ -9518,12 +9518,12 @@ snapshots:
       - react
       - react-dom
 
-  storybook-react-i18next@10.1.2(i18next-browser-languagedetector@8.2.1)(i18next-http-backend@3.0.2)(i18next@26.1.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react-i18next@17.0.7(i18next@26.1.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(react@19.2.6)(storybook@10.4.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@testing-library/dom@10.4.1)(@types/react@19.2.14)(prettier@3.8.3)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)):
+  storybook-react-i18next@10.1.2(i18next-browser-languagedetector@8.2.1)(i18next-http-backend@3.0.2)(i18next@26.1.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react-i18next@17.0.8(i18next@26.1.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3))(react@19.2.6)(storybook@10.4.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@testing-library/dom@10.4.1)(@types/react@19.2.14)(prettier@3.8.3)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)):
     dependencies:
       i18next: 26.1.0(typescript@6.0.3)
       i18next-browser-languagedetector: 8.2.1
       i18next-http-backend: 3.0.2
-      react-i18next: 17.0.7(i18next@26.1.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      react-i18next: 17.0.8(i18next@26.1.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
       storybook: 10.4.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@testing-library/dom@10.4.1)(@types/react@19.2.14)(prettier@3.8.3)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       storybook-i18n: 10.1.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(storybook@10.4.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@testing-library/dom@10.4.1)(@types/react@19.2.14)(prettier@3.8.3)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))
     transitivePeerDependencies:
