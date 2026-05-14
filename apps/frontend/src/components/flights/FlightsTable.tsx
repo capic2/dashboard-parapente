@@ -111,6 +111,7 @@ export function FlightsTable({
 
       return (
         <div
+          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
           role="option"
           aria-selected={isActive || isSelected}
           tabIndex={0}
