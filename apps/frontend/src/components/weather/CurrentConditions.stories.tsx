@@ -212,11 +212,8 @@ export const ModerateConditions = meta.story({
 ModerateConditions.test(
   'displays moderate conditions correctly',
   async ({ canvas }) => {
-    await expect(
-      canvas.getByText(
-        (_, element) => element?.textContent?.replace(/\s+/g, '') === '65/100'
-      )
-    ).toBeInTheDocument();
+    await canvas.findByText('65', { selector: 'span' });
+    await canvas.findByText('/100', { selector: 'span' });
 
     await expect(canvas.getByText(/MOYEN/)).toBeInTheDocument();
     await expect(canvas.getByText('18°C')).toBeInTheDocument();
@@ -249,11 +246,8 @@ export const LimiteConditions = meta.story({
 LimiteConditions.test(
   'displays limite conditions correctly',
   async ({ canvas }) => {
-    await expect(
-      canvas.getByText(
-        (_, element) => element?.textContent?.replace(/\s+/g, '') === '45/100'
-      )
-    ).toBeInTheDocument();
+    await canvas.findByText('45', { selector: 'span' });
+    await canvas.findByText('/100', { selector: 'span' });
 
     await expect(canvas.getByText(/LIMITE/)).toBeInTheDocument();
     await expect(canvas.getByText('15°C')).toBeInTheDocument();
@@ -284,11 +278,8 @@ export const BadConditions = meta.story({
 });
 
 BadConditions.test('displays bad conditions correctly', async ({ canvas }) => {
-  await expect(
-    canvas.getByText(
-      (_, element) => element?.textContent?.replace(/\s+/g, '') === '25/100'
-    )
-  ).toBeInTheDocument();
+  await canvas.findByText('25', { selector: 'span' });
+  await canvas.findByText('/100', { selector: 'span' });
 
   await expect(canvas.getByText(/MAUVAIS/)).toBeInTheDocument();
   await expect(canvas.getByText('10°C')).toBeInTheDocument();
