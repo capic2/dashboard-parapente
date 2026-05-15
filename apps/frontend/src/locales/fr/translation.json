@@ -627,7 +627,7 @@
     "goproOverlayNeedsVideo": "Générez d'abord la vidéo du vol pour ajouter l'overlay",
     "goproOverlayNeedsCameraVideo": "Renseignez le chemin de la vidéo MP4 caméra embarquée",
     "goproOverlayNeedsPipVideo": "Générez d'abord la vidéo du vol ou renseignez un chemin PIP",
-    "goproOverlayNeedsOutputDir": "Renseignez le dossier de sortie",
+    "goproOverlayNeedsOutputFilename": "Renseignez le nom du fichier de sortie",
     "goproOverlayStarted": "Génération overlay GoPro lancée",
     "goproOverlayStartError": "Impossible de lancer l'overlay GoPro",
     "goproOverlayCancelled": "Génération overlay GoPro annulée",
@@ -641,7 +641,7 @@
     "goproOverlayOsvVideo": "Chemin vidéo PIP optionnel",
     "goproOverlayPipFallback": "Si aucun chemin n'est renseigné, la vidéo générée du vol sera utilisée.",
     "goproOverlayPathHelp": "Chemin relatif à GOPRO_OVERLAY_PARAGLIDING_ROOT ou absolu.",
-    "goproOverlayOutputDir": "Dossier de sortie côté serveur",
+    "goproOverlayOutputFilename": "Nom du fichier de sortie",
     "goproOverlayStatus": {
       "queued": "En attente",
       "running": "En cours",
