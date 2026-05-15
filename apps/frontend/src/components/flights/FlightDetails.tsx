@@ -94,6 +94,7 @@ export function FlightDetails({
   const [goproOverlayVideoPath, setGoproOverlayVideoPath] = useState('');
   const [goproOverlayGpxPath, setGoproOverlayGpxPath] = useState('');
   const [goproOverlayPipPath, setGoproOverlayPipPath] = useState('');
+  const [goproOverlayOutputDir, setGoproOverlayOutputDir] = useState('');
   const [goproOverlayOutputFilename, setGoproOverlayOutputFilename] =
     useState('');
 
@@ -127,6 +128,7 @@ export function FlightDetails({
     setGoproOverlayVideoPath('');
     setGoproOverlayGpxPath('');
     setGoproOverlayPipPath('');
+    setGoproOverlayOutputDir('');
     setGoproOverlayOutputFilename('');
     resetGoproOverlayJob();
   }, [flight.id, resetGoproOverlayJob]);
@@ -205,12 +207,6 @@ export function FlightDetails({
 
   const handleStartGoproOverlay = () => {
     if (isGoproOverlayRunning) return;
-
-    if (!goproOverlayOutputFilename) {
-      setGoproOverlayOutputFilename(
-        `${sanitizeOverlayBasename(flightTitle)}-overlay.mp4`
-      );
-    }
     setShowGoproOverlayForm(true);
   };
 
@@ -222,34 +218,25 @@ export function FlightDetails({
     const videoPath = goproOverlayVideoPath.trim();
     const gpxPath = goproOverlayGpxPath.trim();
     const pipPath = goproOverlayPipPath.trim();
+    const outputDir = goproOverlayOutputDir.trim();
     const outputFilename = goproOverlayOutputFilename.trim();
-
-    if (!videoPath) {
-      toast.error(t('flights.goproOverlayNeedsCameraVideo'));
-      return;
-    }
-    if (!gpxPath && !hasGpx) {
-      toast.error(t('flights.goproOverlayNeedsGpx'));
-      return;
-    }
-    if (!pipPath && !hasVideo) {
-      toast.error(t('flights.goproOverlayNeedsPipVideo'));
-      return;
-    }
-    if (!outputFilename) {
-      toast.error(t('flights.goproOverlayNeedsOutputFilename'));
-      return;
-    }
 
     const requestedFlightId = flight.id;
     const formData = new FormData();
-    formData.append('video_path', videoPath);
-    formData.append('output_filename', outputFilename);
+    if (videoPath) {
+      formData.append('video_path', videoPath);
+    }
     if (gpxPath) {
       formData.append('gpx_path', gpxPath);
     }
     if (pipPath) {
       formData.append('pip_path', pipPath);
+    }
+    if (outputDir) {
+      formData.append('output_dir', outputDir);
+    }
+    if (outputFilename) {
+      formData.append('output_filename', outputFilename);
     }
 
     try {
@@ -326,8 +313,7 @@ export function FlightDetails({
               className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
               type="text"
               value={goproOverlayVideoPath}
-              required
-              placeholder="camera/GX010001.mp4"
+              placeholder="camera.mp4"
               onChange={(event) => setGoproOverlayVideoPath(event.target.value)}
             />
             <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
@@ -346,7 +332,7 @@ export function FlightDetails({
             <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
               {hasGpx
                 ? t('flights.goproOverlayGpxFallback')
-                : t('flights.goproOverlayNeedsGpx')}
+                : t('flights.goproOverlayAutoPathHelp')}
             </span>
           </label>
           <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -361,7 +347,20 @@ export function FlightDetails({
             <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
               {hasVideo
                 ? t('flights.goproOverlayPipFallback')
-                : t('flights.goproOverlayNeedsPipVideo')}
+                : t('flights.goproOverlayAutoPathHelp')}
+            </span>
+          </label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+            {t('flights.goproOverlayOutputDir')}
+            <input
+              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              type="text"
+              value={goproOverlayOutputDir}
+              placeholder="exports/overlays"
+              onChange={(event) => setGoproOverlayOutputDir(event.target.value)}
+            />
+            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+              {t('flights.goproOverlayOutputDirFallback')}
             </span>
           </label>
           <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -370,7 +369,6 @@ export function FlightDetails({
               className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
               type="text"
               value={goproOverlayOutputFilename}
-              required
               placeholder={`${sanitizeOverlayBasename(flightTitle)}-overlay.mp4`}
               onChange={(event) =>
                 setGoproOverlayOutputFilename(event.target.value)
@@ -487,11 +485,10 @@ export function FlightDetails({
                     className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                     type="text"
                     value={goproOverlayVideoPath}
-                    required
                     onChange={(event) =>
                       setGoproOverlayVideoPath(event.target.value)
                     }
-                    placeholder="camera/GX010001.mp4"
+                    placeholder="camera.mp4"
                   />
                   <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
                     {t('flights.goproOverlayPathHelp')}
@@ -511,7 +508,7 @@ export function FlightDetails({
                   <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
                     {hasGpx
                       ? t('flights.goproOverlayGpxFallback')
-                      : t('flights.goproOverlayNeedsGpx')}
+                      : t('flights.goproOverlayAutoPathHelp')}
                   </span>
                 </label>
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -528,7 +525,22 @@ export function FlightDetails({
                   <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
                     {hasVideo
                       ? t('flights.goproOverlayPipFallback')
-                      : t('flights.goproOverlayNeedsPipVideo')}
+                      : t('flights.goproOverlayAutoPathHelp')}
+                  </span>
+                </label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                  {t('flights.goproOverlayOutputDir')}
+                  <input
+                    className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                    type="text"
+                    value={goproOverlayOutputDir}
+                    onChange={(event) =>
+                      setGoproOverlayOutputDir(event.target.value)
+                    }
+                    placeholder="exports/overlays"
+                  />
+                  <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                    {t('flights.goproOverlayOutputDirFallback')}
                   </span>
                 </label>
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -537,7 +549,6 @@ export function FlightDetails({
                     className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                     type="text"
                     value={goproOverlayOutputFilename}
-                    required
                     placeholder={`${sanitizeOverlayBasename(flightTitle)}-overlay.mp4`}
                     onChange={(event) =>
                       setGoproOverlayOutputFilename(event.target.value)

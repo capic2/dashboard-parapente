@@ -3,6 +3,7 @@ import json
 import logging
 import math
 import os
+import subprocess
 import uuid
 import xml.etree.ElementTree as ET
 from typing import Any
@@ -197,6 +198,57 @@ def _resolve_gopro_paragliding_path(file_path: str | None) -> Path | None:
     if resolved != root_path and root_path not in resolved.parents:
         raise ValueError("GoPro overlay path must be inside the paragliding root")
     return resolved
+
+
+def _latest_matching_file(directory: Path, pattern: str) -> Path | None:
+    matches = [path for path in directory.glob(pattern) if path.is_file()]
+    if not matches:
+        return None
+    return max(matches, key=lambda path: path.stat().st_mtime)
+
+
+def _matching_files_by_mtime(directory: Path, pattern: str) -> list[Path]:
+    matches = [path for path in directory.glob(pattern) if path.is_file()]
+    return sorted(matches, key=lambda path: (path.stat().st_mtime, path.name))
+
+
+def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: Path) -> Path:
+    if not osv_paths:
+        return gpx_path
+
+    merge_script = Path(config.GOPRO_OVERLAY_ROOT) / "osv_merge.py"
+    if not merge_script.exists():
+        raise ValueError(f"OSV merge script not found: {merge_script}")
+
+    work_dir = input_dir / ".gopro-overlay-work"
+    work_dir.mkdir(parents=True, exist_ok=True)
+    merged_gpx_path = work_dir / f"merged-{uuid.uuid4()}.gpx"
+    command = [
+        "python3",
+        str(merge_script),
+        *(str(path) for path in osv_paths),
+        str(gpx_path),
+        str(merged_gpx_path),
+    ]
+
+    try:
+        result = subprocess.run(
+            command,
+            cwd=config.GOPRO_OVERLAY_ROOT or None,
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired as exc:
+        detail = exc.stderr or exc.stdout or "OSV merge timed out"
+        raise ValueError(detail) from exc
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "OSV merge failed"
+        raise ValueError(detail)
+    if not merged_gpx_path.exists():
+        raise ValueError("OSV merge did not create a GPX file")
+    return merged_gpx_path
 
 
 def _resolve_export_status(job_id: str) -> dict[str, Any] | None:
@@ -4562,6 +4614,7 @@ async def create_flight_gopro_overlay_job(
     video_path: str | None = Form(None),
     gpx_path: str | None = Form(None),
     pip_path: str | None = Form(None),
+    output_dir: str | None = Form(None),
     layout_id: str | None = Form(None),
     output_filename: str | None = Form(None),
     db: Session = Depends(get_db),
@@ -4580,15 +4633,40 @@ async def create_flight_gopro_overlay_job(
         raise HTTPException(status_code=404, detail="Flight not found")
 
     title = flight.title or flight.name or flight.id
-    resolved_output_filename = output_filename or f"{title}-overlay.mp4"
-    output_dir = str(ensure_flight_directory(db, flight))
+    input_dir = ensure_flight_directory(db, flight)
+    use_input_output_dir = not output_dir or not output_dir.strip()
+    resolved_output_filename = (
+        "final.mp4" if use_input_output_dir else output_filename or f"{title}-overlay.mp4"
+    )
 
     try:
+        resolved_output_dir = (
+            str(input_dir)
+            if use_input_output_dir
+            else str(_resolve_gopro_paragliding_path(output_dir))
+        )
         resolved_video_path = _resolve_gopro_paragliding_path(video_path)
         resolved_gpx_path = _resolve_gopro_paragliding_path(gpx_path)
         resolved_pip_path = _resolve_gopro_paragliding_path(pip_path)
-        fallback_gpx_path = resolved_gpx_path or _resolve_flight_file_path(flight.gpx_file_path)
-        fallback_pip_path = resolved_pip_path or _resolve_flight_file_path(flight.video_file_path)
+        auto_video_path = input_dir / "camera.mp4"
+        auto_gpx_path = _latest_matching_file(input_dir, "Zepp*.gpx")
+        auto_pip_path = _latest_matching_file(input_dir, "flight*.mp4")
+        auto_osv_paths = _matching_files_by_mtime(input_dir, "*.osv")
+        if not resolved_video_path and auto_video_path.exists():
+            resolved_video_path = auto_video_path
+        fallback_gpx_path = (
+            resolved_gpx_path or auto_gpx_path or _resolve_flight_file_path(flight.gpx_file_path)
+        )
+        fallback_pip_path = (
+            resolved_pip_path or auto_pip_path or _resolve_flight_file_path(flight.video_file_path)
+        )
+        if fallback_gpx_path and fallback_gpx_path.exists() and auto_osv_paths:
+            fallback_gpx_path = await asyncio.to_thread(
+                _merge_osv_files_with_gpx,
+                auto_osv_paths,
+                fallback_gpx_path,
+                input_dir,
+            )
 
         if resolved_video_path:
             if not resolved_video_path.exists():
@@ -4606,7 +4684,7 @@ async def create_flight_gopro_overlay_job(
                 pip_path=fallback_pip_path,
                 layout_id=layout_id,
                 output_filename=resolved_output_filename,
-                output_dir=output_dir,
+                output_dir=resolved_output_dir,
             )
 
         if not video_file or not video_file.filename:
@@ -4631,7 +4709,7 @@ async def create_flight_gopro_overlay_job(
             pip_file=osv_video_file,
             layout_id=layout_id,
             output_filename=resolved_output_filename,
-            output_dir=output_dir,
+            output_dir=resolved_output_dir,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
