@@ -31,10 +31,6 @@ import {
 import { useFlightGPX } from '../../hooks/flights/useFlightGPX';
 import { useFlight } from '../../hooks/flights/useFlight';
 import {
-  formatEta,
-  useVideoExportStatus,
-} from '../../hooks/flights/useVideoExportStatus';
-import {
   getHeadingFromOrientation,
   getOrientationLabel,
   getOrientationOptions,
@@ -50,59 +46,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '@dashboard-parapente/design-system';
 import { Disclosure, DisclosurePanel } from 'react-aria-components';
-import { HTTPError } from 'ky';
 import { useTranslation } from 'react-i18next';
 
 import type { GPXData } from '@dashboard-parapente/shared-types';
-import {
-  VIDEO_EXPORT_IN_PROGRESS_STATUSES,
-  type Flight,
-} from '@dashboard-parapente/shared-types';
+import type { Flight } from '@dashboard-parapente/shared-types';
 import {
   computeCursorTelemetryLabel,
   type ViewerUnits,
 } from './flightViewerTelemetry';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
-
-const isVideoExportInProgress = (status?: string | null) =>
-  Boolean(status && VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(status));
-
-const hasActiveVideoExport = (
-  flight?: Pick<Flight, 'video_export_job_id' | 'video_export_status'> | null
-) =>
-  Boolean(
-    flight?.video_export_job_id &&
-    isVideoExportInProgress(flight.video_export_status)
-  );
-
-type VideoExportMode = 'manual_fast' | 'manual';
-
-const getHttpErrorDetail = async (error: HTTPError): Promise<string | null> => {
-  try {
-    const body = (await error.response.json()) as {
-      detail?: unknown;
-      message?: unknown;
-    };
-    const raw = body.detail ?? body.message;
-
-    if (typeof raw === 'string') {
-      const trimmed = raw.trim();
-      return trimmed || null;
-    }
-
-    if (Array.isArray(raw)) {
-      return raw.map((item) => String(item)).join(' • ');
-    }
-
-    if (raw && typeof raw === 'object') {
-      return JSON.stringify(raw);
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-};
 
 declare global {
   interface Window {
@@ -343,9 +295,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(compact);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentElapsedTime, setCurrentElapsedTime] = useState(0);
-  const [videoExportMode, setVideoExportMode] =
-    useState<VideoExportMode>('manual_fast');
-  const [isStartingVideoExport, setIsStartingVideoExport] = useState(false);
   const appUnits = useAppSettingsStore((state) => state.settings.units);
   const viewerUnits: ViewerUnits = useMemo(
     () => ({
@@ -568,43 +517,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     },
     [isActiveViewer, removeTrackEntity]
   );
-
-  const isExportActive = hasActiveVideoExport(flight);
-  const shouldReadExportStatus = Boolean(
-    flight?.video_export_job_id &&
-    (isExportActive ||
-      flight?.video_export_status === 'failed' ||
-      flight?.video_export_status === 'cancelled')
-  );
-  const { status: exportStatus } = useVideoExportStatus(
-    flight?.video_export_job_id,
-    shouldReadExportStatus
-  );
-
-  const exportProgress = Math.min(
-    100,
-    Math.max(0, Math.round(exportStatus?.progress ?? 0))
-  );
-  const exportEta = formatEta(exportStatus?.eta_seconds);
-  const canResumeVideoExport = Boolean(
-    flight?.video_export_job_id && exportStatus?.can_resume
-  );
-
-  useEffect(() => {
-    if (!flightId || !exportStatus?.internal_status) {
-      return;
-    }
-
-    if (
-      exportStatus.internal_status === 'completed' ||
-      exportStatus.internal_status === 'failed' ||
-      exportStatus.internal_status === 'cancelled'
-    ) {
-      queryClient.invalidateQueries({
-        queryKey: ['flights', flightId],
-      });
-    }
-  }, [exportStatus?.internal_status, flightId, queryClient]);
 
   useEffect(() => {
     viewerUnitsRef.current = viewerUnits;
@@ -1722,46 +1634,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
   };
 
-  const startVideoExport = useCallback(async () => {
-    if (isStartingVideoExport) {
-      return;
-    }
-
-    setIsStartingVideoExport(true);
-    try {
-      await api.post(`flights/${flightId}/export-video`, {
-        searchParams: {
-          mode: videoExportMode,
-        },
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: ['flights', flightId],
-      });
-    } finally {
-      setIsStartingVideoExport(false);
-    }
-  }, [flightId, isStartingVideoExport, queryClient, videoExportMode]);
-
-  const resumeVideoExport = useCallback(async () => {
-    if (isStartingVideoExport || !flight?.video_export_job_id) {
-      return;
-    }
-
-    setIsStartingVideoExport(true);
-    try {
-      await api.post(`exports/${flight.video_export_job_id}/resume`);
-      await queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
-    } finally {
-      setIsStartingVideoExport(false);
-    }
-  }, [
-    flight?.video_export_job_id,
-    flightId,
-    isStartingVideoExport,
-    queryClient,
-  ]);
-
   /**
    * Update site orientation
    */
@@ -2170,278 +2042,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   </div>
                 </AccordionSection>
 
-                {/* ========== SECTION 2: VIDÉO ========== */}
-                {flight?.gpx_file_path && (
-                  <AccordionSection
-                    title={t('flights.viewer.videoSection')}
-                    emoji="📹"
-                    defaultOpen={false}
-                  >
-                    <>
-                      {!isVideoExportInProgress(flight.video_export_status) && (
-                        <div className="mb-3 rounded border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900/30">
-                          <label
-                            htmlFor="video-export-mode"
-                            className="mb-1 block text-xs font-semibold text-gray-700 dark:text-gray-200"
-                          >
-                            {t('flights.viewer.videoExportMode')}
-                          </label>
-                          <select
-                            id="video-export-mode"
-                            value={videoExportMode}
-                            onChange={(event) =>
-                              setVideoExportMode(
-                                event.target.value as VideoExportMode
-                              )
-                            }
-                            className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                          >
-                            <option value="manual_fast">
-                              {t('flights.viewer.videoModeManualFast')}
-                            </option>
-                            <option value="manual">
-                              {t('flights.viewer.videoModeManual')}
-                            </option>
-                          </select>
-                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            {videoExportMode === 'manual_fast'
-                              ? t('flights.viewer.videoModeManualFastHint')
-                              : t('flights.viewer.videoModeManualHint')}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Download/Generate Button */}
-                      <Button
-                        onClick={async () => {
-                          if (
-                            flight.video_export_status === 'completed' &&
-                            flight.video_file_path
-                          ) {
-                            // Download video with authenticated API client
-                            try {
-                              const blob = await api
-                                .get(
-                                  `exports/${flight.video_export_job_id}/download`,
-                                  { timeout: false }
-                                )
-                                .blob();
-
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = `flight-${flightId}.mp4`;
-                              a.click();
-                              URL.revokeObjectURL(url);
-                            } catch (error) {
-                              if (error instanceof HTTPError) {
-                                const detail = await getHttpErrorDetail(error);
-                                toast.error(
-                                  detail ||
-                                    t('flights.viewer.videoDownloadError')
-                                );
-                                return;
-                              }
-
-                              console.error('Failed to download video:', error);
-                              toast.error(
-                                t('flights.viewer.videoDownloadError')
-                              );
-                            }
-                          } else if (!hasActiveVideoExport(flight)) {
-                            // Generate video
-                            try {
-                              if (canResumeVideoExport) {
-                                await resumeVideoExport();
-                              } else {
-                                await startVideoExport();
-                              }
-                            } catch (error) {
-                              if (error instanceof HTTPError) {
-                                const detail = await getHttpErrorDetail(error);
-                                toast.error(
-                                  detail || t('flights.viewer.videoStartError')
-                                );
-                                return;
-                              }
-
-                              console.error(
-                                '❌ Failed to start video generation:',
-                                error
-                              );
-                              toast.error(
-                                t('flights.viewer.videoStartGenericError')
-                              );
-                            }
-                          }
-                        }}
-                        isDisabled={
-                          isStartingVideoExport || hasActiveVideoExport(flight)
-                        }
-                        className={`w-full ${compactControlButtonClassName} text-white rounded ${
-                          flight.video_export_status === 'completed'
-                            ? 'mb-2'
-                            : 'mb-3'
-                        } ${
-                          flight.video_export_status === 'completed'
-                            ? 'bg-green-600 hover:bg-green-700'
-                            : isStartingVideoExport ||
-                                hasActiveVideoExport(flight)
-                              ? 'bg-gray-400 cursor-not-allowed'
-                              : 'bg-blue-600 hover:bg-blue-700'
-                        }`}
-                        title={
-                          hasActiveVideoExport(flight)
-                            ? t('flights.viewer.videoGeneratingTitle')
-                            : flight.video_export_status === 'completed'
-                              ? t('flights.viewer.videoDownloadTitle')
-                              : flight.video_export_status === 'failed' ||
-                                  flight.video_export_status === 'cancelled'
-                                ? canResumeVideoExport
-                                  ? t('flights.viewer.videoResumeTitle')
-                                  : t('flights.viewer.videoRegenerateTitle')
-                                : t('flights.viewer.videoGenerateTitle')
-                        }
-                      >
-                        {hasActiveVideoExport(flight) &&
-                          `⏳ ${t('flights.viewer.videoGenerating')}`}
-                        {flight.video_export_status === 'completed' &&
-                          `📥 ${t('flights.viewer.downloadVideo')}`}
-                        {(flight.video_export_status === 'failed' ||
-                          flight.video_export_status === 'cancelled') &&
-                          (canResumeVideoExport
-                            ? `▶️ ${t('flights.viewer.resumeVideo')}`
-                            : `🔄 ${t('flights.viewer.regenerateVideo')}`)}
-                        {(!flight.video_export_status ||
-                          isVideoExportInProgress(
-                            flight.video_export_status
-                          )) &&
-                          !hasActiveVideoExport(flight) &&
-                          `🎥 ${t('flights.viewer.generateVideo')}`}
-                      </Button>
-
-                      {canResumeVideoExport && !isExportActive && (
-                        <p className="mb-3 text-xs text-blue-700 dark:text-blue-300">
-                          {t('flights.viewer.videoResumeHint', {
-                            count: exportStatus?.frames_captured ?? 0,
-                          })}
-                        </p>
-                      )}
-
-                      {hasActiveVideoExport(flight) && (
-                        <div className="mb-3 rounded border border-blue-200 bg-blue-50 p-2 dark:border-blue-700 dark:bg-blue-900/20">
-                          <div className="mb-1 flex items-center justify-between text-xs font-medium text-blue-900 dark:text-blue-100">
-                            <span>{t('flights.viewer.videoProgress')}</span>
-                            <span>{exportProgress}%</span>
-                          </div>
-                          <div className="h-2 w-full overflow-hidden rounded bg-blue-100 dark:bg-blue-950/40">
-                            <div
-                              className="h-full rounded bg-blue-600 transition-all duration-500"
-                              style={{ width: `${exportProgress}%` }}
-                            />
-                          </div>
-                          <p className="mt-2 text-xs text-blue-900 dark:text-blue-100">
-                            {exportStatus?.message ||
-                              t('flights.viewer.videoGenerating')}
-                          </p>
-                          {exportEta && (
-                            <p className="mt-1 text-xs text-blue-900 dark:text-blue-100">
-                              {t('flights.viewer.videoEta', {
-                                time: exportEta,
-                              })}
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Cancel Button (only when export is active) */}
-                      {hasActiveVideoExport(flight) && (
-                        <Button
-                          onClick={async () => {
-                            if (
-                              !confirm(
-                                t('flights.viewer.confirmCancelGeneration')
-                              )
-                            ) {
-                              return;
-                            }
-
-                            try {
-                              await api.delete(
-                                `exports/${flight.video_export_job_id}/cancel`
-                              );
-
-                              // Refresh flight data to get updated status
-                              queryClient.invalidateQueries({
-                                queryKey: ['flights', flightId],
-                              });
-                            } catch (error) {
-                              if (error instanceof HTTPError) {
-                                const detail = await getHttpErrorDetail(error);
-                                toast.error(
-                                  detail ||
-                                    t('flights.viewer.cancelGenerationError')
-                                );
-                                return;
-                              }
-
-                              console.error(
-                                'Failed to cancel video generation:',
-                                error
-                              );
-                              toast.error(t('flights.viewer.cancelError'));
-                            }
-                          }}
-                          className="w-full px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 mb-3"
-                          title={t('flights.viewer.cancelGenerationTitle')}
-                        >
-                          🛑 {t('flights.viewer.cancelGeneration')}
-                        </Button>
-                      )}
-
-                      {/* Regenerate Button (only when video exists) */}
-                      {flight.video_export_status === 'completed' && (
-                        <Button
-                          onClick={async () => {
-                            if (
-                              !confirm(
-                                t('flights.viewer.confirmRegenerateVideo')
-                              )
-                            ) {
-                              return;
-                            }
-
-                            try {
-                              await startVideoExport();
-                            } catch (error) {
-                              if (error instanceof HTTPError) {
-                                const detail = await getHttpErrorDetail(error);
-                                toast.error(
-                                  detail ||
-                                    t('flights.viewer.regenerateStartError')
-                                );
-                                return;
-                              }
-
-                              console.error(
-                                'Failed to regenerate video:',
-                                error
-                              );
-                              toast.error(t('flights.viewer.regenerateError'));
-                            }
-                          }}
-                          isDisabled={isStartingVideoExport}
-                          className="w-full px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed mb-3"
-                          title={t('flights.viewer.regenerateTitle')}
-                        >
-                          🔄 {t('flights.viewer.regenerateVideo')}
-                        </Button>
-                      )}
-                    </>
-                  </AccordionSection>
-                )}
-
-                {/* ========== SECTION 3: SITE & CAMÉRA ========== */}
+                {/* ========== SECTION 2: SITE & CAMÉRA ========== */}
                 {flight?.site && (
                   <AccordionSection
                     title={t('flights.viewer.siteCameraSection')}
