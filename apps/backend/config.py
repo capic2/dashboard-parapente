@@ -152,8 +152,10 @@ VIDEO_TEMP_IMAGES_DIR = (
 # ============================================================================
 # GOPRO OVERLAY EXPORT
 # ============================================================================
-GOPRO_OVERLAY_ROOT = required_env("BACKEND_GOPRO_OVERLAY_ROOT")
-GOPRO_OVERLAY_DATA_ROOT = required_env("BACKEND_GOPRO_OVERLAY_DATA_ROOT")
+GOPRO_OVERLAY_ROOT = (os.getenv("BACKEND_GOPRO_OVERLAY_ROOT") or "/app/gopro-overlay").strip()
+GOPRO_OVERLAY_DATA_ROOT = (
+    os.getenv("BACKEND_GOPRO_OVERLAY_DATA_ROOT") or "/app/gopro-overlays/parapente"
+).strip()
 GOPRO_OVERLAY_BIN = os.getenv(
     "BACKEND_GOPRO_OVERLAY_BIN",
     str(Path(GOPRO_OVERLAY_ROOT) / "venv" / "bin" / "gopro-dashboard.py"),
