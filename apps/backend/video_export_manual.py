@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 import config
 from database import SessionLocal
+from flight_storage import ensure_flight_directory
 from models import Flight, VideoExportJob
 
 # Storage for export jobs (compatibility snapshot)
@@ -638,8 +639,16 @@ def _job_frames_dir(temp_root: Path, job_id: str) -> Path:
     return _job_temp_dir(temp_root, job_id) / "frames"
 
 
-def _video_output_path(export_root: Path, flight_id: str, timestamp: str) -> Path:
-    return export_root / f"flight-{flight_id}-{timestamp}.mp4"
+def _video_output_path(flight_id: str, timestamp: str) -> Path:
+    try:
+        with SessionLocal() as db:
+            flight = db.query(Flight).filter(Flight.id == flight_id).first()
+            if flight:
+                return ensure_flight_directory(db, flight) / f"history-{timestamp}.mp4"
+    except Exception as exc:
+        print(f"⚠️ Could not resolve flight storage directory: {exc}")
+
+    return _video_export_dir() / f"flight-{flight_id}-{timestamp}.mp4"
 
 
 def _capture_progress_percent(frame_count: int, total_frames: int) -> int:
@@ -1256,7 +1265,7 @@ async def _export_video_manual_render(job_id: str):
             _set_job_runtime(job_id, phase=_STATUS_ENCODING, eta_seconds=None)
 
             timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-            output_file = _video_output_path(export_root, flight_id, timestamp)
+            output_file = _video_output_path(flight_id, timestamp)
             ffmpeg_preset, ffmpeg_crf = _ffmpeg_encoding_settings(is_fast_mode)
 
             ffmpeg_cmd = [

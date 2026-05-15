@@ -67,8 +67,6 @@ export default defineConfig({
         TESTING: 'false',
         BACKEND_DATABASE_URL: absoluteDbUrl,
         BACKEND_LOG_FILE: path.join(e2eRuntimeDir, 'dashboard.log'),
-        BACKEND_GOPRO_OVERLAY_ROOT: path.join(e2eRuntimeDir, 'gopro-overlay'),
-        BACKEND_GOPRO_OVERLAY_DATA_ROOT: path.join(e2eRuntimeDir, 'paragliding'),
         BACKEND_VERSION_STATE_FILE: path.join(e2eRuntimeDir, 'version_state.json'),
         BACKEND_WEATHERAPI_KEY: process.env.BACKEND_WEATHERAPI_KEY || 'test_key',
         BACKEND_METEOBLUE_API_KEY: process.env.BACKEND_METEOBLUE_API_KEY || 'test_key',

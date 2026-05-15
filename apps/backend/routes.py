@@ -32,6 +32,8 @@ from auth import authenticate_user, create_access_token, get_current_user
 from database import get_db
 from emagram_freshness import get_emagram_cutoff_utc
 from flight_backfill import calculate_and_persist_missing_max_speed
+from flight_storage import ensure_flight_directory
+from flight_storage import write_flight_text_file
 from gopro_overlay_export import cancel_gopro_overlay_job
 from gopro_overlay_export import check_gopro_overlay_dependencies
 from gopro_overlay_export import create_gopro_overlay_job
@@ -3290,7 +3292,6 @@ async def sync_strava_activities(request: dict, db: Session = Depends(get_db)):
         download_gpx,
         get_activities_by_period,
         match_site_by_coordinates,
-        save_gpx_file,
     )
 
     date_from = request.get("date_from")
@@ -3331,14 +3332,7 @@ async def sync_strava_activities(request: dict, db: Session = Depends(get_db)):
                 # 4. Télécharger GPX
                 gpx_content = await download_gpx(strava_id)
 
-                gpx_path = None
-                if gpx_content:
-                    # 5. Sauvegarder GPX
-                    gpx_path = save_gpx_file(gpx_content, strava_id)
-
-                    if not gpx_path:
-                        logger.warning(f"Failed to save GPX for activity {strava_id}")
-                else:
+                if not gpx_content:
                     logger.warning(f"No GPX available for activity {strava_id}")
 
                 # 6. Détecter le site depuis les coordonnées GPX
@@ -3395,11 +3389,14 @@ async def sync_strava_activities(request: dict, db: Session = Depends(get_db)):
                         if activity.get("total_elevation_gain")
                         else None
                     ),
-                    gpx_file_path=gpx_path,
                     external_url=f"https://www.strava.com/activities/{strava_id}",
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow(),
                 )
+
+                if gpx_content:
+                    gpx_path = write_flight_text_file(db, flight, "strava.gpx", gpx_content)
+                    flight.gpx_file_path = str(gpx_path)
 
                 db.add(flight)
                 imported_flights.append(
@@ -3452,23 +3449,11 @@ async def upload_gpx_to_flight(
         gpx_content = await gpx_file.read()
         gpx_str = gpx_content.decode("utf-8")
 
-        # 3. Sauvegarder fichier
-        gpx_dir = Path(__file__).parent / "db" / "gpx"
-        gpx_dir.mkdir(parents=True, exist_ok=True)
-
-        # Utiliser strava_id si disponible, sinon flight_id
-        if flight.strava_id:
-            file_name = f"strava_{flight.strava_id}.gpx"
-        else:
-            file_name = f"manual_{flight_id}.gpx"
-
-        file_path = gpx_dir / file_name
-
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(gpx_str)
+        file_name = "strava.gpx" if flight.strava_id else "watch.gpx"
+        file_path = write_flight_text_file(db, flight, file_name, gpx_str)
 
         # 4. Mettre à jour SEULEMENT le chemin du fichier (pas les stats!)
-        flight.gpx_file_path = f"db/gpx/{file_name}"
+        flight.gpx_file_path = str(file_path)
         flight.updated_at = datetime.utcnow()
 
         db.commit()
@@ -3608,17 +3593,10 @@ async def create_flight_from_gpx(
             updated_at=datetime.utcnow(),
         )
 
-        # 6. Sauvegarder le fichier (GPX ou IGC)
-        gpx_dir = Path(__file__).parent / "db" / "gpx"
-        gpx_dir.mkdir(parents=True, exist_ok=True)
-
-        file_name = f"manual_{flight_id}.{file_type}"
-        file_path = gpx_dir / file_name
-
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(file_str)
-
-        flight.gpx_file_path = f"db/gpx/{file_name}"
+        # 6. Sauvegarder le fichier dans le dossier du vol.
+        file_name = f"watch.{file_type}"
+        file_path = write_flight_text_file(db, flight, file_name, file_str)
+        flight.gpx_file_path = str(file_path)
 
         # 7. Enregistrer en base
         db.add(flight)
@@ -4600,6 +4578,7 @@ async def create_flight_gopro_overlay_job(
 
     title = flight.title or flight.name or flight.id
     resolved_output_filename = output_filename or f"{title}-overlay.mp4"
+    output_dir = str(ensure_flight_directory(db, flight))
 
     try:
         resolved_video_path = _resolve_gopro_paragliding_path(video_path)
@@ -4624,6 +4603,7 @@ async def create_flight_gopro_overlay_job(
                 pip_path=fallback_pip_path,
                 layout_id=layout_id,
                 output_filename=resolved_output_filename,
+                output_dir=output_dir,
             )
 
         if not video_file or not video_file.filename:
@@ -4648,6 +4628,7 @@ async def create_flight_gopro_overlay_job(
             pip_file=osv_video_file,
             layout_id=layout_id,
             output_filename=resolved_output_filename,
+            output_dir=output_dir,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -12,6 +12,7 @@ from pathlib import Path
 
 import config
 from database import SessionLocal
+from flight_storage import ensure_flight_directory
 from models import Flight
 
 # Storage for export jobs
@@ -81,8 +82,16 @@ def _job_debug_dir(temp_root: Path, job_id: str) -> Path:
     return _job_temp_dir(temp_root, job_id) / "debug"
 
 
-def _video_output_path(export_root: Path, flight_id: str, timestamp: str) -> Path:
-    return export_root / f"flight-{flight_id}-{timestamp}.mp4"
+def _video_output_path(flight_id: str, timestamp: str) -> Path:
+    try:
+        with SessionLocal() as db:
+            flight = db.query(Flight).filter(Flight.id == flight_id).first()
+            if flight:
+                return ensure_flight_directory(db, flight) / f"history-{timestamp}.mp4"
+    except Exception as exc:
+        print(f"⚠️ Could not resolve flight storage directory: {exc}")
+
+    return _video_export_dir() / f"flight-{flight_id}-{timestamp}.mp4"
 
 
 def _prepare_export_dirs(export_root: Path, temp_dir: Path, debug_dir: Path) -> None:
@@ -543,7 +552,7 @@ async def _export_video_playwright(
             export_jobs[job_id]["progress"] = 50
             export_jobs[job_id]["message"] = "Converting WebM to MP4..."
 
-            output_file = _video_output_path(export_root, flight_id, timestamp)
+            output_file = _video_output_path(flight_id, timestamp)
 
             # Convert WebM to MP4
             ffmpeg_cmd = [

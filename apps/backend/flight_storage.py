@@ -1,0 +1,47 @@
+from pathlib import Path
+
+from sqlalchemy.orm import Session
+
+import config
+from models import Flight
+
+
+def flight_storage_root() -> Path:
+    return Path(config.PARAGLIDING_DATA_ROOT)
+
+
+def flight_sequence_number(db: Session, flight: Flight) -> int:
+    flights = list(db.query(Flight).filter(Flight.flight_date == flight.flight_date).all())
+    if not any(existing.id == flight.id for existing in flights):
+        flights.append(flight)
+
+    def sort_key(candidate: Flight) -> tuple[str, str, str]:
+        departure_time = (
+            candidate.departure_time.isoformat() if candidate.departure_time else "9999"
+        )
+        created_at = candidate.created_at.isoformat() if candidate.created_at else "9999"
+        return departure_time, created_at, candidate.id
+
+    flights.sort(key=sort_key)
+    for index, candidate in enumerate(flights, start=1):
+        if candidate.id == flight.id:
+            return index
+
+    return len(flights) + 1
+
+
+def flight_directory(db: Session, flight: Flight) -> Path:
+    day_dir = flight_storage_root() / flight.flight_date.isoformat()
+    return day_dir / f"{flight_sequence_number(db, flight):02d}"
+
+
+def ensure_flight_directory(db: Session, flight: Flight) -> Path:
+    directory = flight_directory(db, flight)
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def write_flight_text_file(db: Session, flight: Flight, filename: str, content: str) -> Path:
+    file_path = ensure_flight_directory(db, flight) / filename
+    file_path.write_text(content, encoding="utf-8")
+    return file_path

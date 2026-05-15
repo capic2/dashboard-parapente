@@ -137,33 +137,25 @@ TELEGRAM_CHAT_ID = os.getenv("BACKEND_TELEGRAM_CHAT_ID")
 FRONTEND_URL = os.getenv("BACKEND_FRONTEND_URL")
 
 # ============================================================================
-# VIDEO EXPORT
+# FLIGHT FILE STORAGE
 # ============================================================================
-_USE_CONTAINER_VIDEO_PATHS = ENVIRONMENT == "production"
-VIDEO_EXPORT_DIR = (
-    "/app/video-exports" if _USE_CONTAINER_VIDEO_PATHS else str(BACKEND_ROOT / "exports" / "videos")
+PARAGLIDING_DATA_ROOT = (
+    "/tmp/dashboard-parapente-test/parapente"
+    if TESTING or ENVIRONMENT == "test"
+    else "/app/parapente"
 )
-VIDEO_TEMP_IMAGES_DIR = (
-    "/app/video-temp-images"
-    if _USE_CONTAINER_VIDEO_PATHS
-    else str(BACKEND_ROOT / "exports" / "video-temp-images")
-)
+VIDEO_EXPORT_DIR = PARAGLIDING_DATA_ROOT
+VIDEO_TEMP_IMAGES_DIR = str(Path(PARAGLIDING_DATA_ROOT) / ".tmp" / "video-frames")
 
 # ============================================================================
 # GOPRO OVERLAY EXPORT
 # ============================================================================
-GOPRO_OVERLAY_ROOT = (os.getenv("BACKEND_GOPRO_OVERLAY_ROOT") or "/app/gopro-overlay").strip()
-GOPRO_OVERLAY_DATA_ROOT = (
-    os.getenv("BACKEND_GOPRO_OVERLAY_DATA_ROOT") or "/app/gopro-overlays/parapente"
-).strip()
-GOPRO_OVERLAY_BIN = os.getenv(
-    "BACKEND_GOPRO_OVERLAY_BIN",
-    str(Path(GOPRO_OVERLAY_ROOT) / "venv" / "bin" / "gopro-dashboard.py"),
-)
-GOPRO_OVERLAY_LAYOUT_DIR = os.getenv("BACKEND_GOPRO_OVERLAY_LAYOUT_DIR", GOPRO_OVERLAY_ROOT)
-GOPRO_OVERLAY_PARAGLIDING_ROOT = GOPRO_OVERLAY_DATA_ROOT
-GOPRO_OVERLAY_OUTPUT_DIR = str(Path(GOPRO_OVERLAY_DATA_ROOT) / "input-overlay")
-GOPRO_OVERLAY_UPLOAD_DIR = str(Path(GOPRO_OVERLAY_OUTPUT_DIR) / "uploads")
+GOPRO_OVERLAY_ROOT = "/app/gopro-overlay"
+GOPRO_OVERLAY_BIN = str(Path(GOPRO_OVERLAY_ROOT) / "venv" / "bin" / "gopro-dashboard.py")
+GOPRO_OVERLAY_LAYOUT_DIR = GOPRO_OVERLAY_ROOT
+GOPRO_OVERLAY_PARAGLIDING_ROOT = PARAGLIDING_DATA_ROOT
+GOPRO_OVERLAY_OUTPUT_DIR = PARAGLIDING_DATA_ROOT
+GOPRO_OVERLAY_UPLOAD_DIR = str(Path(PARAGLIDING_DATA_ROOT) / ".tmp" / "gopro-uploads")
 
 # ============================================================================
 # VALIDATION
