@@ -187,14 +187,11 @@ def _resolve_gopro_paragliding_path(file_path: str | None) -> Path | None:
         return None
 
     path = Path(file_path.strip()).expanduser()
-    if path.is_absolute():
-        return path
-
     root = config.GOPRO_OVERLAY_PARAGLIDING_ROOT.strip()
     if not root:
         raise ValueError("GoPro overlay paragliding root is not configured")
     root_path = Path(root).expanduser().resolve()
-    resolved = (root_path / path).resolve()
+    resolved = path.resolve() if path.is_absolute() else (root_path / path).resolve()
     if resolved != root_path and root_path not in resolved.parents:
         raise ValueError("GoPro overlay path must be inside the paragliding root")
     return resolved
@@ -4581,7 +4578,6 @@ async def create_flight_gopro_overlay_job(
     video_file: UploadFile | None = File(None),
     gpx_file: UploadFile | None = File(None),
     osv_video_file: UploadFile | None = File(None),
-    output_dir: str = Form(...),
     video_path: str | None = Form(None),
     gpx_path: str | None = Form(None),
     pip_path: str | None = Form(None),
@@ -4604,8 +4600,6 @@ async def create_flight_gopro_overlay_job(
 
     title = flight.title or flight.name or flight.id
     resolved_output_filename = output_filename or f"{title}-overlay.mp4"
-    if not output_dir.strip():
-        raise HTTPException(status_code=400, detail="Output directory is required")
 
     try:
         resolved_video_path = _resolve_gopro_paragliding_path(video_path)
@@ -4630,7 +4624,6 @@ async def create_flight_gopro_overlay_job(
                 pip_path=fallback_pip_path,
                 layout_id=layout_id,
                 output_filename=resolved_output_filename,
-                output_dir=output_dir,
             )
 
         if not video_file or not video_file.filename:
@@ -4655,7 +4648,6 @@ async def create_flight_gopro_overlay_job(
             pip_file=osv_video_file,
             layout_id=layout_id,
             output_filename=resolved_output_filename,
-            output_dir=output_dir,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -4681,7 +4673,7 @@ async def probe_gopro_overlay_video(
     video_file: UploadFile = File(...),
 ) -> GoproOverlayProbeResponse:
     """Probe an uploaded video resolution without starting a render job."""
-    temp_path = Path(config.GOPRO_OVERLAY_UPLOAD_DIR) / "probe" / f"{uuid.uuid4()}.mp4"
+    temp_path = Path("/tmp/dashboard-parapente/gopro-overlays/probe") / f"{uuid.uuid4()}.mp4"
     try:
         saved_path = await save_uploaded_file(video_file, temp_path, {".mp4", ".mov", ".m4v"})
         width, height = probe_video_resolution(saved_path)

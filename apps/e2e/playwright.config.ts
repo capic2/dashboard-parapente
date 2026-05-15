@@ -69,8 +69,6 @@ export default defineConfig({
         BACKEND_LOG_FILE: path.join(e2eRuntimeDir, 'dashboard.log'),
         BACKEND_GOPRO_OVERLAY_ROOT: path.join(e2eRuntimeDir, 'gopro-overlay'),
         BACKEND_GOPRO_OVERLAY_BIN: path.join(e2eRuntimeDir, 'gopro-overlay', 'gopro-dashboard.py'),
-        BACKEND_GOPRO_OVERLAY_UPLOAD_DIR: path.join(e2eRuntimeDir, 'gopro-overlays', 'uploads'),
-        BACKEND_GOPRO_OVERLAY_OUTPUT_DIR: path.join(e2eRuntimeDir, 'gopro-overlays', 'outputs'),
         BACKEND_GOPRO_OVERLAY_PARAGLIDING_ROOT: path.join(e2eRuntimeDir, 'paragliding'),
         BACKEND_GOPRO_OVERLAY_LAYOUT_DIR: path.join(e2eRuntimeDir, 'gopro-overlay-layouts'),
         BACKEND_VERSION_STATE_FILE: path.join(e2eRuntimeDir, 'version_state.json'),
