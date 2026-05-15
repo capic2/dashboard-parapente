@@ -13,8 +13,8 @@ Follow the dashboard-parapente workflow and these guardrails:
 - Refuse to commit secrets, credentials, `.env` files, or unrelated dirty files.
 - Stage only files relevant to the requested shipment.
 - Run impacted validation before committing. Prefer targeted Nx checks; for PR validation prefer `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e` when appropriate.
-- For frontend changes, run `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx lint frontend`, `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t test frontend --parallel=5`, and `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx build frontend`.
-- For backend changes, run `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx lint backend` and `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t test backend --parallel=5`.
+- For frontend changes, run `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t lint frontend`, `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t test frontend --parallel=5`, and `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx build frontend`.
+- For backend changes, run `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t lint backend` and `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx affected -t test backend --parallel=5`.
 - Create a Conventional Commit that reflects the actual diff.
 - Push the branch, using upstream setup only when needed.
 - Open a PR with `gh pr create` after fetching the remote and ensuring the branch is not stale against `origin/main`.
