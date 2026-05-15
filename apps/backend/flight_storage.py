@@ -17,8 +17,10 @@ def flight_sequence_number(db: Session, flight: Flight) -> int:
         flights.append(flight)
 
     def sort_key(candidate: Flight) -> tuple[str, str]:
-        created_at = candidate.created_at.isoformat() if candidate.created_at else "9999"
-        return created_at, candidate.id
+        departure_time = (
+            candidate.departure_time.isoformat() if candidate.departure_time else "9999"
+        )
+        return departure_time, candidate.id
 
     flights.sort(key=sort_key)
     for index, candidate in enumerate(flights, start=1):
@@ -29,8 +31,8 @@ def flight_sequence_number(db: Session, flight: Flight) -> int:
 
 
 def flight_directory(db: Session, flight: Flight) -> Path:
-    day_dir = flight_storage_root() / flight.flight_date.isoformat()
-    return day_dir / f"{flight_sequence_number(db, flight):02d}"
+    day_dir = flight_storage_root() / flight.flight_date.strftime("%Y%m%d")
+    return day_dir / str(flight_sequence_number(db, flight))
 
 
 def ensure_flight_directory(db: Session, flight: Flight) -> Path:

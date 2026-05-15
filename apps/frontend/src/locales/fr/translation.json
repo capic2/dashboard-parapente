@@ -640,7 +640,10 @@
     "goproOverlayGpxFallback": "Si aucun chemin n'est renseigné, le GPX du vol sera utilisé.",
     "goproOverlayOsvVideo": "Chemin vidéo PIP optionnel",
     "goproOverlayPipFallback": "Si aucun chemin n'est renseigné, la vidéo générée du vol sera utilisée.",
-    "goproOverlayPathHelp": "Chemin relatif à GOPRO_OVERLAY_PARAGLIDING_ROOT ou absolu.",
+    "goproOverlayPathHelp": "Si vide, recherche automatique dans parapente/YYYYMMDD/N.",
+    "goproOverlayAutoPathHelp": "Si vide, recherche automatique dans parapente/YYYYMMDD/N.",
+    "goproOverlayOutputDir": "Dossier de sortie optionnel",
+    "goproOverlayOutputDirFallback": "Si vide, écrit final.mp4 dans le dossier du vol.",
     "goproOverlayOutputFilename": "Nom du fichier de sortie",
     "goproOverlayStatus": {
       "queued": "En attente",

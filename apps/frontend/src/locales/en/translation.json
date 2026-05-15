@@ -636,7 +636,10 @@
     "goproOverlayGpxFallback": "If no path is entered, the flight GPX will be used.",
     "goproOverlayOsvVideo": "Optional PIP video path",
     "goproOverlayPipFallback": "If no path is entered, the generated flight video will be used.",
-    "goproOverlayPathHelp": "Path relative to GOPRO_OVERLAY_PARAGLIDING_ROOT or absolute.",
+    "goproOverlayPathHelp": "If empty, files are auto-detected in parapente/YYYYMMDD/N.",
+    "goproOverlayAutoPathHelp": "If empty, files are auto-detected in parapente/YYYYMMDD/N.",
+    "goproOverlayOutputDir": "Optional output folder",
+    "goproOverlayOutputDirFallback": "If empty, writes final.mp4 in the flight folder.",
     "goproOverlayOutputFilename": "Output file name",
     "goproOverlayStatus": {
       "queued": "Queued",

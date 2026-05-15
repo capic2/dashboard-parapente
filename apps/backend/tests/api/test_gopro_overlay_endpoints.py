@@ -1,4 +1,6 @@
+from datetime import date, datetime
 from io import BytesIO
+import os
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -14,6 +16,7 @@ from gopro_overlay_export import _prepare_layout_file
 from gopro_overlay_export import cancel_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job_from_paths
+from models import Flight
 
 API_PREFIX = "/api"
 
@@ -123,7 +126,10 @@ def test_create_flight_gopro_overlay_job_uses_flight_files(
                 "video_file": ("camera.mp4", b"camera", "video/mp4"),
                 "osv_video_file": ("osv.mp4", b"osv", "video/mp4"),
             },
-            data={"output_filename": "Arguel test-overlay.mp4"},
+            data={
+                "output_filename": "Arguel test-overlay.mp4",
+                "output_dir": str(tmp_path / "exports"),
+            },
         )
 
     assert response.status_code == 200
@@ -134,6 +140,7 @@ def test_create_flight_gopro_overlay_job_uses_flight_files(
     assert create_job.call_args.kwargs["fallback_pip_path"] == video_path
     assert create_job.call_args.kwargs["pip_file"] is not None
     assert create_job.call_args.kwargs["output_filename"] == "Arguel test-overlay.mp4"
+    assert create_job.call_args.kwargs["output_dir"] == str(tmp_path / "exports")
 
 
 def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
@@ -183,6 +190,7 @@ def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
                 "gpx_path": "tracks/flight.gpx",
                 "pip_path": "pip/flight-pip.mp4",
                 "output_filename": "Arguel test-overlay.mp4",
+                "output_dir": str(tmp_path / "exports"),
             },
         )
 
@@ -191,6 +199,171 @@ def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
     assert create_job.call_args.kwargs["gpx_path"] == gpx_path
     assert create_job.call_args.kwargs["pip_path"] == pip_path
     assert create_job.call_args.kwargs["output_filename"] == "Arguel test-overlay.mp4"
+    assert create_job.call_args.kwargs["output_dir"] == str(tmp_path / "exports")
+
+
+def test_create_flight_gopro_overlay_job_uses_auto_flight_directory_files(
+    client: TestClient,
+    db_session,
+    sample_flight,
+    tmp_path,
+    monkeypatch,
+):
+    paragliding_root = tmp_path / "parapente"
+    input_dir = paragliding_root / "20260315" / "1"
+    input_dir.mkdir(parents=True)
+    camera_path = input_dir / "camera.mp4"
+    old_gpx_path = input_dir / "Zepp-old.gpx"
+    new_gpx_path = input_dir / "Zepp-new.gpx"
+    old_pip_path = input_dir / "flight-old.mp4"
+    new_pip_path = input_dir / "flight-new.mp4"
+    camera_path.write_bytes(b"camera")
+    old_gpx_path.write_text("<gpx>old</gpx>")
+    new_gpx_path.write_text("<gpx>new</gpx>")
+    old_pip_path.write_bytes(b"old")
+    new_pip_path.write_bytes(b"new")
+    os.utime(old_gpx_path, (1, 1))
+    os.utime(old_pip_path, (1, 1))
+    os.utime(new_gpx_path, (2, 2))
+    os.utime(new_pip_path, (2, 2))
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(paragliding_root))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
+
+    expected = {
+        "job_id": "job-flight-gopro-auto",
+        "status": "queued",
+        "progress": 0,
+        "message": "queued",
+        "layout_id": "parapente-1080",
+        "layout_label": "Parapente 1920x1080",
+        "output_filename": "final.mp4",
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
+
+    with (
+        patch(
+            "routes.check_gopro_overlay_dependencies",
+            return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
+        ),
+        patch("routes.create_gopro_overlay_job_from_paths", return_value=expected) as create_job,
+    ):
+        response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay")
+
+    assert response.status_code == 200
+    assert create_job.call_args.kwargs["video_path"] == camera_path
+    assert create_job.call_args.kwargs["gpx_path"] == new_gpx_path
+    assert create_job.call_args.kwargs["pip_path"] == new_pip_path
+    assert create_job.call_args.kwargs["output_dir"] == str(input_dir)
+    assert create_job.call_args.kwargs["output_filename"] == "final.mp4"
+
+
+def test_create_flight_gopro_overlay_job_uses_daily_departure_index(
+    client: TestClient,
+    db_session,
+    sample_flight,
+    tmp_path,
+    monkeypatch,
+):
+    earlier = Flight(
+        id="flight-earlier",
+        flight_date=date(2026, 3, 15),
+        departure_time=datetime(2026, 3, 15, 8, 0),
+    )
+    db_session.add(earlier)
+    db_session.commit()
+    paragliding_root = tmp_path / "parapente"
+    input_dir = paragliding_root / "20260315" / "2"
+    input_dir.mkdir(parents=True)
+    camera_path = input_dir / "camera.mp4"
+    gpx_path = input_dir / "Zepp-track.gpx"
+    pip_path = input_dir / "flight-pip.mp4"
+    camera_path.write_bytes(b"camera")
+    gpx_path.write_text("<gpx />")
+    pip_path.write_bytes(b"pip")
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(paragliding_root))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
+
+    expected = {
+        "job_id": "job-flight-gopro-second",
+        "status": "queued",
+        "progress": 0,
+        "message": "queued",
+        "layout_id": "parapente-1080",
+        "layout_label": "Parapente 1920x1080",
+        "output_filename": "final.mp4",
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
+
+    with (
+        patch(
+            "routes.check_gopro_overlay_dependencies",
+            return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
+        ),
+        patch("routes.create_gopro_overlay_job_from_paths", return_value=expected) as create_job,
+    ):
+        response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay")
+
+    assert response.status_code == 200
+    assert create_job.call_args.kwargs["video_path"] == camera_path
+    assert create_job.call_args.kwargs["gpx_path"] == gpx_path
+    assert create_job.call_args.kwargs["pip_path"] == pip_path
+
+
+def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
+    client: TestClient,
+    db_session,
+    sample_flight,
+    tmp_path,
+    monkeypatch,
+):
+    paragliding_root = tmp_path / "parapente"
+    input_dir = paragliding_root / "20260315" / "1"
+    input_dir.mkdir(parents=True)
+    camera_path = input_dir / "camera.mp4"
+    gpx_path = input_dir / "Zepp-track.gpx"
+    pip_path = input_dir / "flight-pip.mp4"
+    first_osv = input_dir / "first.osv"
+    second_osv = input_dir / "second.osv"
+    merged_gpx_path = input_dir / ".gopro-overlay-work" / "merged.gpx"
+    camera_path.write_bytes(b"camera")
+    gpx_path.write_text("<gpx />")
+    pip_path.write_bytes(b"pip")
+    first_osv.write_bytes(b"first")
+    second_osv.write_bytes(b"second")
+    merged_gpx_path.parent.mkdir(parents=True)
+    merged_gpx_path.write_text("<gpx>merged</gpx>")
+    os.utime(first_osv, (1, 1))
+    os.utime(second_osv, (2, 2))
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(paragliding_root))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
+
+    expected = {
+        "job_id": "job-flight-gopro-osv",
+        "status": "queued",
+        "progress": 0,
+        "message": "queued",
+        "layout_id": "parapente-1080",
+        "layout_label": "Parapente 1920x1080",
+        "output_filename": "final.mp4",
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
+
+    with (
+        patch(
+            "routes.check_gopro_overlay_dependencies",
+            return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
+        ),
+        patch("routes._merge_osv_files_with_gpx", return_value=merged_gpx_path) as merge_osv,
+        patch("routes.create_gopro_overlay_job_from_paths", return_value=expected) as create_job,
+    ):
+        response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay")
+
+    assert response.status_code == 200
+    assert merge_osv.call_args.args == ([first_osv, second_osv], gpx_path, input_dir)
+    assert create_job.call_args.kwargs["gpx_path"] == merged_gpx_path
 
 
 def test_create_flight_gopro_overlay_job_rejects_paths_outside_paragliding_root(
