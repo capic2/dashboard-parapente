@@ -28,3 +28,11 @@ def test_video_export_paths_are_fixed():
     assert config.VIDEO_TEMP_IMAGES_DIR == str(
         config.BACKEND_ROOT / "exports" / "video-temp-images"
     )
+
+
+def test_gopro_overlay_paths_are_derived_from_data_root():
+    assert config.GOPRO_OVERLAY_PARAGLIDING_ROOT == config.GOPRO_OVERLAY_DATA_ROOT
+    assert config.GOPRO_OVERLAY_OUTPUT_DIR == f"{config.GOPRO_OVERLAY_DATA_ROOT}/input-overlay"
+    assert config.GOPRO_OVERLAY_UPLOAD_DIR == (
+        f"{config.GOPRO_OVERLAY_DATA_ROOT}/input-overlay/uploads"
+    )
