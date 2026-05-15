@@ -97,7 +97,7 @@
       "executor": "nx:run-commands",
       "outputs": ["dist/storybook/frontend"],
       "options": {
-        "command": "storybook build -o ../../dist/storybook/frontend",
+        "command": "pnpm exec storybook build",
         "cwd": "apps/frontend"
       }
     }
