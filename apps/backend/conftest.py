@@ -17,12 +17,6 @@ os.environ["BACKEND_GOPRO_OVERLAY_ROOT"] = "/tmp/dashboard-parapente-test/gopro-
 os.environ["BACKEND_GOPRO_OVERLAY_BIN"] = (
     "/tmp/dashboard-parapente-test/gopro-overlay/gopro-dashboard.py"
 )
-os.environ["BACKEND_GOPRO_OVERLAY_UPLOAD_DIR"] = (
-    "/tmp/dashboard-parapente-test/gopro-overlays/uploads"
-)
-os.environ["BACKEND_GOPRO_OVERLAY_OUTPUT_DIR"] = (
-    "/tmp/dashboard-parapente-test/gopro-overlays/outputs"
-)
 os.environ["BACKEND_GOPRO_OVERLAY_PARAGLIDING_ROOT"] = "/tmp/dashboard-parapente-test/paragliding"
 os.environ["BACKEND_GOPRO_OVERLAY_LAYOUT_DIR"] = (
     "/tmp/dashboard-parapente-test/gopro-overlay-layouts"
