@@ -33,7 +33,7 @@ from auth import authenticate_user, create_access_token, get_current_user
 from database import get_db
 from emagram_freshness import get_emagram_cutoff_utc
 from flight_backfill import calculate_and_persist_missing_max_speed
-from flight_storage import ensure_flight_directory
+from flight_storage import flight_sequence_number
 from flight_storage import write_flight_text_file
 from gopro_overlay_export import cancel_gopro_overlay_job
 from gopro_overlay_export import check_gopro_overlay_dependencies
@@ -192,7 +192,10 @@ def _resolve_gopro_paragliding_path(file_path: str | None) -> Path | None:
     path = Path(file_path.strip()).expanduser()
     root = config.GOPRO_OVERLAY_PARAGLIDING_ROOT.strip()
     if not root:
-        raise ValueError("GoPro overlay paragliding root is not configured")
+        raise HTTPException(
+            status_code=400,
+            detail="GoPro overlay paragliding root is not configured",
+        )
     root_path = Path(root).expanduser().resolve()
     resolved = path.resolve() if path.is_absolute() else (root_path / path).resolve()
     if resolved != root_path and root_path not in resolved.parents:
@@ -207,9 +210,25 @@ def _latest_matching_file(directory: Path, pattern: str) -> Path | None:
     return max(matches, key=lambda path: path.stat().st_mtime)
 
 
+def _first_matching_file(directory: Path, pattern: str) -> Path | None:
+    matches = sorted(path for path in directory.glob(pattern) if path.is_file())
+    return matches[0] if matches else None
+
+
 def _matching_files_by_mtime(directory: Path, pattern: str) -> list[Path]:
     matches = [path for path in directory.glob(pattern) if path.is_file()]
     return sorted(matches, key=lambda path: (path.stat().st_mtime, path.name))
+
+
+def _gopro_overlay_flight_directory(db: Session, flight: Flight) -> Path:
+    root = config.GOPRO_OVERLAY_PARAGLIDING_ROOT.strip()
+    if not root:
+        raise ValueError("GoPro overlay paragliding root is not configured")
+    date_dir = flight.flight_date.strftime("%Y%m%d")
+    sequence = flight_sequence_number(db, flight)
+    directory = Path(root).expanduser().resolve() / "parapente" / date_dir / str(sequence)
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
 
 
 def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: Path) -> Path:
@@ -4633,7 +4652,7 @@ async def create_flight_gopro_overlay_job(
         raise HTTPException(status_code=404, detail="Flight not found")
 
     title = flight.title or flight.name or flight.id
-    input_dir = ensure_flight_directory(db, flight)
+    input_dir = _gopro_overlay_flight_directory(db, flight)
     use_input_output_dir = not output_dir or not output_dir.strip()
     resolved_output_filename = (
         "final.mp4" if use_input_output_dir else output_filename or f"{title}-overlay.mp4"
@@ -4649,7 +4668,7 @@ async def create_flight_gopro_overlay_job(
         resolved_gpx_path = _resolve_gopro_paragliding_path(gpx_path)
         resolved_pip_path = _resolve_gopro_paragliding_path(pip_path)
         auto_video_path = input_dir / "camera.mp4"
-        auto_gpx_path = _latest_matching_file(input_dir, "Zepp*.gpx")
+        auto_gpx_path = _first_matching_file(input_dir, "Zepp*.gpx")
         auto_pip_path = _latest_matching_file(input_dir, "flight*.mp4")
         auto_osv_paths = _matching_files_by_mtime(input_dir, "*.osv")
         if not resolved_video_path and auto_video_path.exists():

@@ -214,24 +214,23 @@ def test_create_flight_gopro_overlay_job_uses_auto_flight_directory_files(
     tmp_path,
     monkeypatch,
 ):
-    paragliding_root = tmp_path / "parapente"
-    input_dir = paragliding_root / "20260315" / "1"
+    paragliding_root = tmp_path / "gopro-root"
+    input_dir = paragliding_root / "parapente" / "20260315" / "1"
     input_dir.mkdir(parents=True)
     camera_path = input_dir / "camera.mp4"
-    old_gpx_path = input_dir / "Zepp-old.gpx"
-    new_gpx_path = input_dir / "Zepp-new.gpx"
+    first_gpx_path = input_dir / "Zepp-a.gpx"
+    second_gpx_path = input_dir / "Zepp-b.gpx"
     old_pip_path = input_dir / "flight-old.mp4"
     new_pip_path = input_dir / "flight-new.mp4"
     camera_path.write_bytes(b"camera")
-    old_gpx_path.write_text("<gpx>old</gpx>")
-    new_gpx_path.write_text("<gpx>new</gpx>")
+    first_gpx_path.write_text("<gpx>first</gpx>")
+    second_gpx_path.write_text("<gpx>second</gpx>")
     old_pip_path.write_bytes(b"old")
     new_pip_path.write_bytes(b"new")
-    os.utime(old_gpx_path, (1, 1))
+    os.utime(first_gpx_path, (2, 2))
+    os.utime(second_gpx_path, (1, 1))
     os.utime(old_pip_path, (1, 1))
-    os.utime(new_gpx_path, (2, 2))
     os.utime(new_pip_path, (2, 2))
-    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(paragliding_root))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
 
     expected = {
@@ -257,10 +256,37 @@ def test_create_flight_gopro_overlay_job_uses_auto_flight_directory_files(
 
     assert response.status_code == 200
     assert create_job.call_args.kwargs["video_path"] == camera_path
-    assert create_job.call_args.kwargs["gpx_path"] == new_gpx_path
+    assert create_job.call_args.kwargs["gpx_path"] == first_gpx_path
     assert create_job.call_args.kwargs["pip_path"] == new_pip_path
     assert create_job.call_args.kwargs["output_dir"] == str(input_dir)
     assert create_job.call_args.kwargs["output_filename"] == "final.mp4"
+
+
+def test_create_flight_gopro_overlay_job_requires_auto_zepp_gpx(
+    client: TestClient,
+    db_session,
+    sample_flight,
+    tmp_path,
+    monkeypatch,
+):
+    paragliding_root = tmp_path / "gopro-root"
+    input_dir = paragliding_root / "parapente" / "20260315" / "1"
+    input_dir.mkdir(parents=True)
+    (input_dir / "camera.mp4").write_bytes(b"camera")
+    (input_dir / "flight-pip.mp4").write_bytes(b"pip")
+    sample_flight.gpx_file_path = None
+    sample_flight.video_file_path = None
+    db_session.commit()
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
+
+    with patch(
+        "routes.check_gopro_overlay_dependencies",
+        return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
+    ):
+        response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay")
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Flight has no GPX file"
 
 
 def test_create_flight_gopro_overlay_job_uses_daily_departure_index(
@@ -277,8 +303,8 @@ def test_create_flight_gopro_overlay_job_uses_daily_departure_index(
     )
     db_session.add(earlier)
     db_session.commit()
-    paragliding_root = tmp_path / "parapente"
-    input_dir = paragliding_root / "20260315" / "2"
+    paragliding_root = tmp_path / "gopro-root"
+    input_dir = paragliding_root / "parapente" / "20260315" / "2"
     input_dir.mkdir(parents=True)
     camera_path = input_dir / "camera.mp4"
     gpx_path = input_dir / "Zepp-track.gpx"
@@ -286,7 +312,6 @@ def test_create_flight_gopro_overlay_job_uses_daily_departure_index(
     camera_path.write_bytes(b"camera")
     gpx_path.write_text("<gpx />")
     pip_path.write_bytes(b"pip")
-    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(paragliding_root))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
 
     expected = {
@@ -323,8 +348,8 @@ def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
     tmp_path,
     monkeypatch,
 ):
-    paragliding_root = tmp_path / "parapente"
-    input_dir = paragliding_root / "20260315" / "1"
+    paragliding_root = tmp_path / "gopro-root"
+    input_dir = paragliding_root / "parapente" / "20260315" / "1"
     input_dir.mkdir(parents=True)
     camera_path = input_dir / "camera.mp4"
     gpx_path = input_dir / "Zepp-track.gpx"
@@ -341,7 +366,6 @@ def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
     merged_gpx_path.write_text("<gpx>merged</gpx>")
     os.utime(first_osv, (1, 1))
     os.utime(second_osv, (2, 2))
-    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(paragliding_root))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
 
     expected = {

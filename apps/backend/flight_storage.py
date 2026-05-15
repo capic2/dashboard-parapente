@@ -16,11 +16,12 @@ def flight_sequence_number(db: Session, flight: Flight) -> int:
     if not any(existing.id == flight.id for existing in flights):
         flights.append(flight)
 
-    def sort_key(candidate: Flight) -> tuple[str, str]:
+    def sort_key(candidate: Flight) -> tuple[str, str, str]:
         departure_time = (
             candidate.departure_time.isoformat() if candidate.departure_time else "9999"
         )
-        return departure_time, candidate.id
+        created_at = candidate.created_at.isoformat() if candidate.created_at else "9999"
+        return departure_time, created_at, candidate.id
 
     flights.sort(key=sort_key)
     for index, candidate in enumerate(flights, start=1):
