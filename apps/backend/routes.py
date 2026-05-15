@@ -3394,11 +3394,12 @@ async def sync_strava_activities(request: dict, db: Session = Depends(get_db)):
                     updated_at=datetime.utcnow(),
                 )
 
+                db.add(flight)
+                db.flush()
                 if gpx_content:
                     gpx_path = write_flight_text_file(db, flight, "strava.gpx", gpx_content)
                     flight.gpx_file_path = str(gpx_path)
 
-                db.add(flight)
                 imported_flights.append(
                     {
                         "id": flight.id,
@@ -3593,13 +3594,15 @@ async def create_flight_from_gpx(
             updated_at=datetime.utcnow(),
         )
 
+        db.add(flight)
+        db.flush()
+
         # 6. Sauvegarder le fichier dans le dossier du vol.
         file_name = f"watch.{file_type}"
         file_path = write_flight_text_file(db, flight, file_name, file_str)
         flight.gpx_file_path = str(file_path)
 
         # 7. Enregistrer en base
-        db.add(flight)
         db.commit()
         db.refresh(flight)
 

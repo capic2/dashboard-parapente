@@ -105,8 +105,8 @@ services:
         condition: service_healthy
     volumes:
       - /home/capic/docker-data/dashboard-parapente/db:/app/db
-      - /media/nas/DS211_Synology_2/parapente:/app/parapente
-      - /media/usb/data-m2/developement/gopro-overlay-dasboard:/app/gopro-overlay:ro
+      - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
+      - ${GOPRO_OVERLAY_HOST_DIR:?GOPRO_OVERLAY_HOST_DIR is required}:/app/gopro-overlay:ro
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8001/']
       interval: 30s

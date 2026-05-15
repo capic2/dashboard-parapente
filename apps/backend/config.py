@@ -25,6 +25,7 @@ BACKEND_ROOT = Path(__file__).parent
 # Charger les variables d'environnement selon le contexte
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 TESTING = os.getenv("TESTING", "false").lower() == "true"
+IS_TEST_ENV = TESTING or ENVIRONMENT == "test"
 
 if ENVIRONMENT != "production":
     # En développement : chercher .env.development puis .env
@@ -140,9 +141,7 @@ FRONTEND_URL = os.getenv("BACKEND_FRONTEND_URL")
 # FLIGHT FILE STORAGE
 # ============================================================================
 PARAGLIDING_DATA_ROOT = (
-    "/tmp/dashboard-parapente-test/parapente"
-    if TESTING or ENVIRONMENT == "test"
-    else "/app/parapente"
+    "/tmp/dashboard-parapente-test/parapente" if IS_TEST_ENV else "/app/parapente"
 )
 VIDEO_EXPORT_DIR = PARAGLIDING_DATA_ROOT
 VIDEO_TEMP_IMAGES_DIR = str(Path(PARAGLIDING_DATA_ROOT) / ".tmp" / "video-frames")
@@ -162,7 +161,7 @@ GOPRO_OVERLAY_UPLOAD_DIR = str(Path(PARAGLIDING_DATA_ROOT) / ".tmp" / "gopro-upl
 # ============================================================================
 
 # Valider les variables critiques (sauf en mode test)
-if not TESTING:
+if not IS_TEST_ENV:
     if not JWT_SECRET:
         logger.error("❌ BACKEND_JWT_SECRET is required")
         raise ValueError("BACKEND_JWT_SECRET environment variable is required")

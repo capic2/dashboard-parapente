@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 import config
 from database import SessionLocal
-from flight_storage import ensure_flight_directory
+from flight_storage import get_video_output_path
 from models import Flight, VideoExportJob
 
 # Storage for export jobs (compatibility snapshot)
@@ -640,15 +640,7 @@ def _job_frames_dir(temp_root: Path, job_id: str) -> Path:
 
 
 def _video_output_path(flight_id: str, timestamp: str) -> Path:
-    try:
-        with SessionLocal() as db:
-            flight = db.query(Flight).filter(Flight.id == flight_id).first()
-            if flight:
-                return ensure_flight_directory(db, flight) / f"history-{timestamp}.mp4"
-    except Exception as exc:
-        print(f"⚠️ Could not resolve flight storage directory: {exc}")
-
-    return _video_export_dir() / f"flight-{flight_id}-{timestamp}.mp4"
+    return get_video_output_path(flight_id, timestamp)
 
 
 def _capture_progress_percent(frame_count: int, total_frames: int) -> int:
