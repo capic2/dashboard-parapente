@@ -107,8 +107,8 @@ services:
         condition: service_healthy
     volumes:
       - /home/capic/docker-data/dashboard-parapente/db:/app/db
-      - ${VIDEO_EXPORT_HOST_DIR:?VIDEO_EXPORT_HOST_DIR is required}:/app/video-exports
-      - ${VIDEO_TEMP_IMAGES_HOST_DIR:?VIDEO_TEMP_IMAGES_HOST_DIR is required}:/app/video-temp-images
+      - "/media/nas/DS211_Synology_1/DJI shoots/parapente/:/app/video-exports"
+      - "/media/nas/DS211_Synology_1/DJI shoots/parapente/img_tmp/:/app/video-temp-images"
       - ${GOPRO_OVERLAY_HOST_DIR:?GOPRO_OVERLAY_HOST_DIR is required}:/app/gopro-overlay:ro
       - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/gopro-overlays/parapente
     healthcheck:
