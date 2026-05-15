@@ -768,6 +768,74 @@ jobs:
             echo "The deployment job is intentionally failed so GitHub sends the native Actions failure email notification."
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Notify deployment failure
+        if: steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success'
+        continue-on-error: true
+        uses: actions/github-script@v9
+        env:
+          NOTIFY_USERS: ${{ vars.DEPLOY_FAILURE_NOTIFY_USERS || github.repository_owner }}
+          FAILURE_LABEL: deployment failed
+          DEPLOYMENT_VERSION: ${{ steps.version.outputs.version }}
+          SSH_DEPLOYMENT: ${{ steps.trigger_deploy.conclusion }}
+          VERSION_VERIFICATION: ${{ steps.verify_deploy.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const labelName = process.env.FAILURE_LABEL;
+            const rawNotifyUsers = process.env.NOTIFY_USERS || '';
+            const notifyUsers = rawNotifyUsers
+              .split(/[\s,]+/)
+              .map((user) => user.trim().replace(/^@/, ''))
+              .filter(Boolean);
+            const mentions = notifyUsers.map((user) => `@${user}`).join(' ');
+            const runUrl = process.env.RUN_URL;
+            const title = `Production deployment failed: ${process.env.DEPLOYMENT_VERSION}`;
+            const body = [
+              mentions ? `${mentions} le déploiement automatique en production a échoué.` : 'Le déploiement automatique en production a échoué.',
+              '',
+              '| Field | Value |',
+              '| --- | --- |',
+              `| Repository | ${context.repo.owner}/${context.repo.repo} |`,
+              `| Branch | ${context.ref.replace('refs/heads/', '')} |`,
+              `| Commit | ${context.sha} |`,
+              `| Deployment version | ${process.env.DEPLOYMENT_VERSION} |`,
+              `| SSH deployment | ${process.env.SSH_DEPLOYMENT} |`,
+              `| Version verification | ${process.env.VERSION_VERIFICATION} |`,
+              `| Run | ${runUrl} |`,
+            ].join('\n');
+
+            try {
+              await github.request('GET /repos/{owner}/{repo}/labels/{name}', {
+                owner,
+                repo,
+                name: labelName,
+              });
+            } catch (error) {
+              if (error.status === 404) {
+                await github.request('POST /repos/{owner}/{repo}/labels', {
+                  owner,
+                  repo,
+                  name: labelName,
+                  color: 'D73A4A',
+                  description: 'Automatic production deployment failed',
+                });
+              } else {
+                throw error;
+              }
+            }
+
+            const issue = await github.request('POST /repos/{owner}/{repo}/issues', {
+              owner,
+              repo,
+              title,
+              body,
+              labels: [labelName],
+            });
+
+            core.info(`Created deployment failure notification issue: ${issue.data.html_url}`);
+
       - name: Fail job when deployment failed
         if: steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success'
         run: |
