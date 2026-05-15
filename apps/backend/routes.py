@@ -223,7 +223,10 @@ def _matching_files_by_mtime(directory: Path, pattern: str) -> list[Path]:
 def _gopro_overlay_flight_directory(db: Session, flight: Flight) -> Path:
     root = config.GOPRO_OVERLAY_PARAGLIDING_ROOT.strip()
     if not root:
-        raise ValueError("GoPro overlay paragliding root is not configured")
+        raise HTTPException(
+            status_code=400,
+            detail="GoPro overlay paragliding root is not configured",
+        )
     date_dir = flight.flight_date.strftime("%Y%m%d")
     sequence = flight_sequence_number(db, flight)
     directory = Path(root).expanduser().resolve() / "parapente" / date_dir / str(sequence)
