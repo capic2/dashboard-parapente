@@ -198,11 +198,13 @@ def test_encoding_progress_percent_spans_encoding_phase_range():
 
 
 def test_video_output_path_uses_configured_export_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: tmp_path / "videos")
-
-    output_path = video_export_manual._video_output_path(
-        video_export_manual._video_export_dir(), "flight-123", "20260430-120000"
+    monkeypatch.setattr(
+        video_export_manual,
+        "get_video_output_path",
+        lambda flight_id, timestamp: tmp_path / "videos" / f"flight-{flight_id}-{timestamp}.mp4",
     )
+
+    output_path = video_export_manual._video_output_path("flight-123", "20260430-120000")
 
     assert output_path == tmp_path / "videos" / "flight-flight-123-20260430-120000.mp4"
 
@@ -350,12 +352,17 @@ def test_cleanup_temp_dir_removes_nested_files(tmp_path):
 def test_stream_export_paths_use_configured_storage_dirs(tmp_path, monkeypatch):
     monkeypatch.setattr(video_export, "_video_export_dir", lambda: tmp_path / "videos")
     monkeypatch.setattr(video_export, "_video_temp_images_dir", lambda: tmp_path / "temp-images")
+    monkeypatch.setattr(
+        video_export,
+        "get_video_output_path",
+        lambda flight_id, timestamp: tmp_path / "videos" / f"flight-{flight_id}-{timestamp}.mp4",
+    )
 
     export_root = video_export._video_export_dir()
     temp_root = video_export._video_temp_images_dir()
     temp_dir = video_export._job_temp_dir(temp_root, "job-123")
     debug_dir = video_export._job_debug_dir(temp_root, "job-123")
-    output_path = video_export._video_output_path(export_root, "flight-123", "20260430-120000")
+    output_path = video_export._video_output_path("flight-123", "20260430-120000")
 
     video_export._prepare_export_dirs(export_root, temp_dir, debug_dir)
 
