@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 import config
@@ -31,8 +33,8 @@ def test_video_export_paths_are_fixed():
 
 
 def test_gopro_overlay_paths_are_derived_from_data_root():
-    assert config.GOPRO_OVERLAY_PARAGLIDING_ROOT == config.GOPRO_OVERLAY_DATA_ROOT
-    assert config.GOPRO_OVERLAY_OUTPUT_DIR == f"{config.GOPRO_OVERLAY_DATA_ROOT}/input-overlay"
-    assert config.GOPRO_OVERLAY_UPLOAD_DIR == (
-        f"{config.GOPRO_OVERLAY_DATA_ROOT}/input-overlay/uploads"
-    )
+    data_root = Path(config.GOPRO_OVERLAY_DATA_ROOT)
+
+    assert Path(config.GOPRO_OVERLAY_PARAGLIDING_ROOT) == data_root
+    assert Path(config.GOPRO_OVERLAY_OUTPUT_DIR) == data_root / "input-overlay"
+    assert Path(config.GOPRO_OVERLAY_UPLOAD_DIR) == data_root / "input-overlay" / "uploads"
