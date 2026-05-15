@@ -91,6 +91,7 @@ def test_create_flight_gopro_overlay_job_uses_flight_files(
     db_session,
     sample_flight,
     tmp_path,
+    monkeypatch,
 ):
     video_path = tmp_path / "flight.mp4"
     gpx_path = tmp_path / "flight.gpx"
@@ -100,6 +101,9 @@ def test_create_flight_gopro_overlay_job_uses_flight_files(
     sample_flight.gpx_file_path = str(gpx_path)
     sample_flight.title = "Arguel test"
     db_session.commit()
+    paragliding_root = tmp_path / "parapente"
+    output_dir = paragliding_root / "exports"
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
 
     expected = {
         "job_id": "job-flight-gopro",
@@ -128,7 +132,7 @@ def test_create_flight_gopro_overlay_job_uses_flight_files(
             },
             data={
                 "output_filename": "Arguel test-overlay.mp4",
-                "output_dir": str(tmp_path / "exports"),
+                "output_dir": str(output_dir),
             },
         )
 
@@ -140,7 +144,7 @@ def test_create_flight_gopro_overlay_job_uses_flight_files(
     assert create_job.call_args.kwargs["fallback_pip_path"] == video_path
     assert create_job.call_args.kwargs["pip_file"] is not None
     assert create_job.call_args.kwargs["output_filename"] == "Arguel test-overlay.mp4"
-    assert create_job.call_args.kwargs["output_dir"] == str(tmp_path / "exports")
+    assert create_job.call_args.kwargs["output_dir"] == str(output_dir)
 
 
 def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
@@ -154,6 +158,7 @@ def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
     video_path = paragliding_root / "camera" / "flight.mp4"
     gpx_path = paragliding_root / "tracks" / "flight.gpx"
     pip_path = paragliding_root / "pip" / "flight-pip.mp4"
+    output_dir = paragliding_root / "exports"
     video_path.parent.mkdir(parents=True)
     gpx_path.parent.mkdir(parents=True)
     pip_path.parent.mkdir(parents=True)
@@ -190,7 +195,7 @@ def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
                 "gpx_path": "tracks/flight.gpx",
                 "pip_path": "pip/flight-pip.mp4",
                 "output_filename": "Arguel test-overlay.mp4",
-                "output_dir": str(tmp_path / "exports"),
+                "output_dir": str(output_dir),
             },
         )
 
@@ -199,7 +204,7 @@ def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
     assert create_job.call_args.kwargs["gpx_path"] == gpx_path
     assert create_job.call_args.kwargs["pip_path"] == pip_path
     assert create_job.call_args.kwargs["output_filename"] == "Arguel test-overlay.mp4"
-    assert create_job.call_args.kwargs["output_dir"] == str(tmp_path / "exports")
+    assert create_job.call_args.kwargs["output_dir"] == str(output_dir)
 
 
 def test_create_flight_gopro_overlay_job_uses_auto_flight_directory_files(
@@ -387,6 +392,31 @@ def test_create_flight_gopro_overlay_job_rejects_paths_outside_paragliding_root(
         response = client.post(
             f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay",
             data={"video_path": str(outside_video)},
+        )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "GoPro overlay path must be inside the paragliding root"
+
+
+def test_create_flight_gopro_overlay_job_rejects_output_dir_outside_paragliding_root(
+    client: TestClient,
+    db_session,
+    sample_flight,
+    tmp_path,
+    monkeypatch,
+):
+    paragliding_root = tmp_path / "paragliding"
+    outside_output_dir = tmp_path / "outside"
+    db_session.commit()
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
+
+    with patch(
+        "routes.check_gopro_overlay_dependencies",
+        return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
+    ):
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay",
+            data={"output_dir": str(outside_output_dir)},
         )
 
     assert response.status_code == 400

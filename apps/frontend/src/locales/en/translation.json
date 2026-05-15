@@ -637,7 +637,7 @@
     "goproOverlayOsvVideo": "Optional PIP video path",
     "goproOverlayPipFallback": "If no path is entered, the generated flight video will be used.",
     "goproOverlayPathHelp": "If empty, files are auto-detected in parapente/YYYYMMDD/N.",
-    "goproOverlayAutoPathHelp": "If empty, files are auto-detected in parapente/YYYYMMDD/N.",
+    "goproOverlayAutoPathHelp": "If empty, this asset will be auto-detected from the flight folder.",
     "goproOverlayOutputDir": "Optional output folder",
     "goproOverlayOutputDirFallback": "If empty, writes final.mp4 in the flight folder.",
     "goproOverlayOutputFilename": "Output file name",

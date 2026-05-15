@@ -5,6 +5,7 @@ import config
 import flight_storage
 from flight_storage import ensure_flight_directory
 from flight_storage import flight_directory
+from flight_storage import flight_sequence_number
 from flight_storage import get_video_output_path
 from flight_storage import write_flight_text_file
 from models import Flight
@@ -57,6 +58,57 @@ def test_flight_directory_uses_departure_time_order(db_session, monkeypatch, tmp
 
     assert flight_directory(db_session, second) == tmp_path / "20260515" / "1"
     assert flight_directory(db_session, first) == tmp_path / "20260515" / "2"
+
+
+def test_flight_directory_sequence_changes_when_departure_order_reverses(
+    db_session, monkeypatch, tmp_path
+):
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    first = Flight(
+        id="flight-first",
+        flight_date=date(2026, 5, 15),
+        departure_time=datetime(2026, 5, 15, 9, 0),
+    )
+    second = Flight(
+        id="flight-second",
+        flight_date=date(2026, 5, 15),
+        departure_time=datetime(2026, 5, 15, 14, 0),
+    )
+    db_session.add_all([first, second])
+    db_session.commit()
+
+    assert flight_directory(db_session, first) == tmp_path / "20260515" / "1"
+    assert flight_directory(db_session, second) == tmp_path / "20260515" / "2"
+
+    first.departure_time = datetime(2026, 5, 15, 15, 0)
+    second.departure_time = datetime(2026, 5, 15, 8, 0)
+    db_session.commit()
+
+    assert flight_directory(db_session, second) == tmp_path / "20260515" / "1"
+    assert flight_directory(db_session, first) == tmp_path / "20260515" / "2"
+
+
+def test_flight_sequence_places_missing_departure_time_last(db_session, monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    morning = Flight(
+        id="flight-morning",
+        flight_date=date(2026, 5, 15),
+        departure_time=datetime(2026, 5, 15, 9, 0),
+    )
+    afternoon = Flight(
+        id="flight-afternoon",
+        flight_date=date(2026, 5, 15),
+        departure_time=datetime(2026, 5, 15, 14, 0),
+    )
+    missing_a = Flight(id="flight-missing-a", flight_date=date(2026, 5, 15))
+    missing_b = Flight(id="flight-missing-b", flight_date=date(2026, 5, 15))
+    db_session.add_all([missing_b, afternoon, missing_a, morning])
+    db_session.commit()
+
+    assert flight_sequence_number(db_session, morning) == 1
+    assert flight_sequence_number(db_session, afternoon) == 2
+    assert flight_sequence_number(db_session, missing_a) == 3
+    assert flight_sequence_number(db_session, missing_b) == 4
 
 
 def test_write_flight_text_file_creates_file_in_flight_directory(db_session, monkeypatch, tmp_path):

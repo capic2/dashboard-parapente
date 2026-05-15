@@ -641,7 +641,7 @@
     "goproOverlayOsvVideo": "Chemin vidéo PIP optionnel",
     "goproOverlayPipFallback": "Si aucun chemin n'est renseigné, la vidéo générée du vol sera utilisée.",
     "goproOverlayPathHelp": "Si vide, recherche automatique dans parapente/YYYYMMDD/N.",
-    "goproOverlayAutoPathHelp": "Si vide, recherche automatique dans parapente/YYYYMMDD/N.",
+    "goproOverlayAutoPathHelp": "Si vide, ce fichier sera recherché automatiquement dans le dossier du vol.",
     "goproOverlayOutputDir": "Dossier de sortie optionnel",
     "goproOverlayOutputDirFallback": "Si vide, écrit final.mp4 dans le dossier du vol.",
     "goproOverlayOutputFilename": "Nom du fichier de sortie",

@@ -231,13 +231,18 @@ def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: 
         str(merged_gpx_path),
     ]
 
-    result = subprocess.run(
-        command,
-        cwd=config.GOPRO_OVERLAY_ROOT or None,
-        capture_output=True,
-        check=False,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            command,
+            cwd=config.GOPRO_OVERLAY_ROOT or None,
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired as exc:
+        detail = exc.stderr or exc.stdout or "OSV merge timed out"
+        raise ValueError(detail) from exc
     if result.returncode != 0:
         detail = result.stderr.strip() or result.stdout.strip() or "OSV merge failed"
         raise ValueError(detail)
@@ -4630,12 +4635,16 @@ async def create_flight_gopro_overlay_job(
     title = flight.title or flight.name or flight.id
     input_dir = ensure_flight_directory(db, flight)
     use_input_output_dir = not output_dir or not output_dir.strip()
-    resolved_output_dir = str(input_dir) if use_input_output_dir else output_dir
     resolved_output_filename = (
         "final.mp4" if use_input_output_dir else output_filename or f"{title}-overlay.mp4"
     )
 
     try:
+        resolved_output_dir = (
+            str(input_dir)
+            if use_input_output_dir
+            else str(_resolve_gopro_paragliding_path(output_dir))
+        )
         resolved_video_path = _resolve_gopro_paragliding_path(video_path)
         resolved_gpx_path = _resolve_gopro_paragliding_path(gpx_path)
         resolved_pip_path = _resolve_gopro_paragliding_path(pip_path)
@@ -4652,8 +4661,11 @@ async def create_flight_gopro_overlay_job(
             resolved_pip_path or auto_pip_path or _resolve_flight_file_path(flight.video_file_path)
         )
         if fallback_gpx_path and fallback_gpx_path.exists() and auto_osv_paths:
-            fallback_gpx_path = _merge_osv_files_with_gpx(
-                auto_osv_paths, fallback_gpx_path, input_dir
+            fallback_gpx_path = await asyncio.to_thread(
+                _merge_osv_files_with_gpx,
+                auto_osv_paths,
+                fallback_gpx_path,
+                input_dir,
             )
 
         if resolved_video_path:
