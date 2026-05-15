@@ -652,6 +652,8 @@
       "failed": "Erreur",
       "cancelled": "Annulé"
     },
+    "videoProductionActions": "Production vidéo",
+    "flightFileActions": "Vol & fichiers",
     "loading3dViewer": "Chargement du viewer 3D...",
     "flightOf": "Vol du {{date}}",
     "selectFlightHint": "Sélectionnez un vol pour visualiser les détails et la trajectoire 3D",

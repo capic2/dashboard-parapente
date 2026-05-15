@@ -648,6 +648,8 @@
       "failed": "Error",
       "cancelled": "Cancelled"
     },
+    "videoProductionActions": "Video production",
+    "flightFileActions": "Flight & files",
     "loading3dViewer": "Loading 3D viewer...",
     "flightOf": "Flight on {{date}}",
     "selectFlightHint": "Select a flight to view details and 3D trajectory",
