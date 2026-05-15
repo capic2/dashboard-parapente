@@ -98,6 +98,12 @@ def _output_path_for_video(video_path: Path, output_name: str) -> Path:
     return video_path.expanduser().resolve().parent / output_name
 
 
+def _output_path_for_dir(output_dir: str | None, video_path: Path, output_name: str) -> Path:
+    if not output_dir or not output_dir.strip():
+        return _output_path_for_video(video_path, output_name)
+    return Path(output_dir).expanduser().resolve() / output_name
+
+
 def _prepare_layout_file(layout_path: Path, destination: Path, has_pip: bool) -> Path:
     tree = ET.parse(layout_path)
     root = tree.getroot()
@@ -269,6 +275,7 @@ async def create_gopro_overlay_job(
     output_filename: str | None,
     fallback_gpx_path: Path | None = None,
     fallback_pip_path: Path | None = None,
+    output_dir: str | None = None,
 ) -> dict[str, Any]:
     job_id = str(uuid.uuid4())
     job_upload_dir = _uploaded_job_work_dir(job_id)
@@ -308,6 +315,7 @@ async def create_gopro_overlay_job(
             layout_id=layout_id,
             output_filename=output_filename,
             work_dir=job_upload_dir,
+            output_dir=output_dir,
         )
     except Exception:
         shutil.rmtree(job_upload_dir, ignore_errors=True)
@@ -320,6 +328,7 @@ def create_gopro_overlay_job_from_paths(
     pip_path: Path | None,
     layout_id: str | None,
     output_filename: str | None,
+    output_dir: str | None = None,
 ) -> dict[str, Any]:
     _validate_file_extension(video_path, _VIDEO_EXTENSIONS)
     _validate_file_extension(gpx_path, _GPX_EXTENSIONS)
@@ -339,6 +348,7 @@ def create_gopro_overlay_job_from_paths(
             output_filename=output_filename,
             work_dir=work_dir,
             pin_inputs=True,
+            output_dir=output_dir,
         )
     except Exception:
         shutil.rmtree(work_dir, ignore_errors=True)
@@ -354,11 +364,12 @@ def _create_gopro_overlay_job_from_paths(
     output_filename: str | None,
     work_dir: Path,
     pin_inputs: bool = False,
+    output_dir: str | None = None,
 ) -> dict[str, Any]:
     output_name = _safe_filename(output_filename, f"gopro-overlay-{job_id}.mp4")
     if Path(output_name).suffix.lower() != ".mp4":
         output_name = f"{Path(output_name).stem}.mp4"
-    output_path = _output_path_for_video(video_path, output_name)
+    output_path = _output_path_for_dir(output_dir, video_path, output_name)
 
     if pin_inputs:
         video_path = _copy_job_input(
