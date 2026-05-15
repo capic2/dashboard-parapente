@@ -24,8 +24,6 @@ function globalSetup(): void {
         TESTING: 'false',
         BACKEND_DATABASE_URL: absoluteDbUrl,
         BACKEND_LOG_FILE: path.join(e2eRuntimeDir, 'dashboard.log'),
-        BACKEND_GOPRO_OVERLAY_ROOT: path.join(e2eRuntimeDir, 'gopro-overlay'),
-        BACKEND_GOPRO_OVERLAY_DATA_ROOT: path.join(e2eRuntimeDir, 'paragliding'),
         BACKEND_VERSION_STATE_FILE: path.join(e2eRuntimeDir, 'version_state.json'),
         BACKEND_JWT_SECRET: process.env.BACKEND_JWT_SECRET || 'e2e-test-secret',
         BACKEND_ADMIN_EMAIL: process.env.BACKEND_ADMIN_EMAIL || 'e2e@test.local',
