@@ -98,8 +98,6 @@ services:
       - BACKEND_FRONTEND_URL=${BACKEND_FRONTEND_URL}
 
       # Backend - Video export storage
-      - BACKEND_VIDEO_EXPORT_DIR=${BACKEND_VIDEO_EXPORT_DIR:?BACKEND_VIDEO_EXPORT_DIR is required}
-      - BACKEND_VIDEO_TEMP_IMAGES_DIR=${BACKEND_VIDEO_TEMP_IMAGES_DIR:?BACKEND_VIDEO_TEMP_IMAGES_DIR is required}
 
       # Backend - GoPro overlay toolchain
       - BACKEND_GOPRO_OVERLAY_ROOT=${BACKEND_GOPRO_OVERLAY_ROOT:?BACKEND_GOPRO_OVERLAY_ROOT is required}
@@ -117,8 +115,8 @@ services:
         condition: service_healthy
     volumes:
       - /home/capic/docker-data/dashboard-parapente/db:/app/db
-      - ${VIDEO_EXPORT_HOST_DIR:?VIDEO_EXPORT_HOST_DIR is required}:${BACKEND_VIDEO_EXPORT_DIR:?BACKEND_VIDEO_EXPORT_DIR is required}
-      - ${VIDEO_TEMP_IMAGES_HOST_DIR:?VIDEO_TEMP_IMAGES_HOST_DIR is required}:${BACKEND_VIDEO_TEMP_IMAGES_DIR:?BACKEND_VIDEO_TEMP_IMAGES_DIR is required}
+      - ${VIDEO_EXPORT_HOST_DIR:?VIDEO_EXPORT_HOST_DIR is required}:/app/video-exports
+      - ${VIDEO_TEMP_IMAGES_HOST_DIR:?VIDEO_TEMP_IMAGES_HOST_DIR is required}:/app/video-temp-images
       - ${GOPRO_OVERLAY_HOST_DIR:?GOPRO_OVERLAY_HOST_DIR is required}:${BACKEND_GOPRO_OVERLAY_ROOT:?BACKEND_GOPRO_OVERLAY_ROOT is required}:ro
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8001/']

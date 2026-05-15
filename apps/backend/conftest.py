@@ -13,8 +13,6 @@ os.environ["TESTING"] = "true"
 os.environ["BACKEND_USE_FAKE_REDIS"] = "true"
 os.environ["BACKEND_DATABASE_URL"] = "sqlite:///./test.db"
 os.environ["BACKEND_LOG_FILE"] = "logs/test-dashboard.log"
-os.environ["BACKEND_VIDEO_EXPORT_DIR"] = "/tmp/dashboard-parapente-test/video-exports"
-os.environ["BACKEND_VIDEO_TEMP_IMAGES_DIR"] = "/tmp/dashboard-parapente-test/video-temp-images"
 os.environ["BACKEND_GOPRO_OVERLAY_ROOT"] = "/tmp/dashboard-parapente-test/gopro-overlay"
 os.environ["BACKEND_GOPRO_OVERLAY_BIN"] = (
     "/tmp/dashboard-parapente-test/gopro-overlay/gopro-dashboard.py"

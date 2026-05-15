@@ -24,8 +24,6 @@ function globalSetup(): void {
         TESTING: 'false',
         BACKEND_DATABASE_URL: absoluteDbUrl,
         BACKEND_LOG_FILE: path.join(e2eRuntimeDir, 'dashboard.log'),
-        BACKEND_VIDEO_EXPORT_DIR: path.join(e2eRuntimeDir, 'video-exports'),
-        BACKEND_VIDEO_TEMP_IMAGES_DIR: path.join(e2eRuntimeDir, 'video-temp-images'),
         BACKEND_GOPRO_OVERLAY_ROOT: path.join(e2eRuntimeDir, 'gopro-overlay'),
         BACKEND_GOPRO_OVERLAY_BIN: path.join(e2eRuntimeDir, 'gopro-overlay', 'gopro-dashboard.py'),
         BACKEND_GOPRO_OVERLAY_UPLOAD_DIR: path.join(e2eRuntimeDir, 'gopro-overlays', 'uploads'),
