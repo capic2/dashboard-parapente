@@ -1,6 +1,13 @@
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal } from '@dashboard-parapente/design-system';
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type SortingState,
+} from '@tanstack/react-table';
+import { Button, DataTable, Modal } from '@dashboard-parapente/design-system';
 import {
   type VideoExportJob,
   useCancelVideoExportJob,
@@ -30,6 +37,18 @@ const statusClassNames: Record<string, string> = {
   queued:
     'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
 };
+
+const statusFilters = [
+  { id: 'all', label: 'Tous' },
+  { id: 'active', label: 'En cours' },
+  { id: 'completed', label: 'Terminés' },
+  { id: 'failed', label: 'Erreurs' },
+  { id: 'cancelled', label: 'Annulés' },
+] as const;
+
+type StatusFilter = (typeof statusFilters)[number]['id'];
+
+const columnHelper = createColumnHelper<VideoExportJob>();
 
 type PendingVideoConfirm = {
   message: string;
@@ -63,6 +82,25 @@ function getProgress(job: VideoExportJob) {
   return Math.min(100, Math.max(0, Math.round(job.progress)));
 }
 
+function getFlightLabel(job: VideoExportJob) {
+  return job.flight_title || job.flight_name || job.flight_id || job.job_id;
+}
+
+function getLastActivityTime(job: VideoExportJob) {
+  const rawDate =
+    job.completed_at ||
+    job.cancelled_at ||
+    job.updated_at ||
+    job.started_at ||
+    job.created_at;
+  if (!rawDate) {
+    return 0;
+  }
+
+  const time = new Date(rawDate).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
 function getDateLabel(job: VideoExportJob) {
   const rawDate =
     job.completed_at ||
@@ -87,34 +125,226 @@ function getDateLabel(job: VideoExportJob) {
   }).format(date);
 }
 
+function isJobInFilter(job: VideoExportJob, filter: StatusFilter) {
+  if (filter === 'all') {
+    return true;
+  }
+  if (filter === 'active') {
+    return (
+      job.can_cancel || ['queued', 'running', 'processing'].includes(job.status)
+    );
+  }
+  return job.status === filter;
+}
+
+function JobStatusBadge({ job }: { job: VideoExportJob }) {
+  const { t } = useTranslation();
+  const phase = getJobPhase(job);
+  const statusLabel = getStatusLabelParts(job);
+  const statusClassName =
+    statusClassNames[job.status] ||
+    statusClassNames[phase] ||
+    statusClassNames.processing;
+
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClassName}`}
+    >
+      {t(statusLabel.key, statusLabel.fallback)}
+    </span>
+  );
+}
+
+function ProgressMeter({ progress }: { progress: number }) {
+  return (
+    <div className="min-w-28">
+      <div className="mb-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+        <span>{progress}%</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
+        <div
+          className="h-full rounded-full bg-sky-500 transition-[width] duration-200 motion-reduce:transition-none"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function JobModeBadge({ mode }: { mode: string }) {
+  const { t } = useTranslation();
+  const modeLabel = getModeLabelParts(mode);
+
+  return (
+    <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-200">
+      {t(modeLabel.key, modeLabel.fallback)}
+    </span>
+  );
+}
+
 export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
   const { t } = useTranslation();
   const toast = useToast();
   const [pendingConfirm, setPendingConfirm] =
     useState<PendingVideoConfirm | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: 'last_activity', desc: true },
+  ]);
   const { data: jobs = [], isLoading, isError, refetch } = useVideoExportJobs();
   const cancelJob = useCancelVideoExportJob();
   const cleanupTempFiles = useCleanupVideoExportTempFiles();
-  const visibleJobs = typeof limit === 'number' ? jobs.slice(0, limit) : jobs;
+
+  const filteredJobs = useMemo(
+    () => jobs.filter((job) => isJobInFilter(job, statusFilter)),
+    [jobs, statusFilter]
+  );
+  const visibleJobs =
+    typeof limit === 'number' ? filteredJobs.slice(0, limit) : filteredJobs;
 
   const activeCount = jobs.filter((job) => job.can_cancel).length;
+  const completedCount = jobs.filter(
+    (job) => job.status === 'completed'
+  ).length;
+  const failedCount = jobs.filter((job) => job.status === 'failed').length;
+  const cancelledCount = jobs.filter(
+    (job) => job.status === 'cancelled'
+  ).length;
 
-  function handleCancel(job: VideoExportJob) {
-    setPendingConfirm({
-      message: t('videoJobs.confirmStop', 'Stopper cette génération vidéo ?'),
-      confirmLabel: t('videoJobs.stop', 'Stopper'),
-      onConfirm: async () => {
-        try {
-          await cancelJob.mutateAsync(job.job_id);
-          toast.success(t('videoJobs.stopSuccess', 'Génération stoppée'));
-        } catch {
-          toast.error(
-            t('videoJobs.stopError', 'Impossible de stopper la génération')
+  const handleCancel = useCallback(
+    (job: VideoExportJob) => {
+      setPendingConfirm({
+        message: t('videoJobs.confirmStop', 'Stopper cette génération vidéo ?'),
+        confirmLabel: t('videoJobs.stop', 'Stopper'),
+        onConfirm: async () => {
+          try {
+            await cancelJob.mutateAsync(job.job_id);
+            toast.success(t('videoJobs.stopSuccess', 'Génération stoppée'));
+          } catch {
+            toast.error(
+              t('videoJobs.stopError', 'Impossible de stopper la génération')
+            );
+          }
+        },
+      });
+    },
+    [cancelJob, t, toast]
+  );
+
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('status', {
+        header: t('videoJobs.table.status', 'Statut'),
+        cell: ({ row }) => <JobStatusBadge job={row.original} />,
+        sortingFn: 'alphanumeric',
+      }),
+      columnHelper.accessor((job) => getFlightLabel(job), {
+        id: 'flight',
+        header: t('videoJobs.table.flight', 'Vol'),
+        cell: ({ row, getValue }) => (
+          <div className="max-w-64">
+            <p className="truncate font-semibold text-gray-900 dark:text-white">
+              {getValue()}
+            </p>
+            {(row.original.message || row.original.error) && (
+              <p
+                className={`mt-0.5 truncate text-xs ${
+                  row.original.error
+                    ? 'text-red-600 dark:text-red-300'
+                    : 'text-gray-500 dark:text-gray-400'
+                }`}
+              >
+                {row.original.error || row.original.message}
+              </p>
+            )}
+          </div>
+        ),
+        sortingFn: 'alphanumeric',
+      }),
+      columnHelper.accessor('mode', {
+        header: t('videoJobs.table.mode', 'Mode'),
+        cell: ({ getValue }) => {
+          const mode = getValue();
+          return mode ? <JobModeBadge mode={mode} /> : <span>-</span>;
+        },
+        sortingFn: 'alphanumeric',
+      }),
+      columnHelper.accessor((job) => getProgress(job), {
+        id: 'progress',
+        header: t('videoJobs.table.progress', 'Progression'),
+        cell: ({ getValue }) => <ProgressMeter progress={getValue()} />,
+        sortingFn: 'basic',
+      }),
+      columnHelper.accessor((job) => getJobPhase(job), {
+        id: 'phase',
+        header: t('videoJobs.table.phase', 'Phase'),
+        cell: ({ getValue }) => {
+          const phase = getValue();
+          return t(
+            `videoJobs.status.${phase}`,
+            statusLabelFallbacks[phase] || phase
           );
-        }
-      },
-    });
-  }
+        },
+        sortingFn: 'alphanumeric',
+      }),
+      columnHelper.accessor((job) => getLastActivityTime(job), {
+        id: 'last_activity',
+        header: t('videoJobs.table.lastActivity', 'Dernière activité'),
+        cell: ({ row }) => getDateLabel(row.original) || '-',
+        sortingFn: 'basic',
+      }),
+      columnHelper.display({
+        id: 'frames',
+        header: t('videoJobs.table.frames', 'Frames'),
+        cell: ({ row }) => {
+          const { frames_captured: frames, resume_from_frame: resumeFrom } =
+            row.original;
+          if (typeof frames !== 'number' && typeof resumeFrom !== 'number') {
+            return <span>-</span>;
+          }
+          return (
+            <span className="text-gray-700 dark:text-gray-200">
+              {typeof frames === 'number' ? frames : '-'}
+              {typeof resumeFrom === 'number' && (
+                <span className="text-gray-500 dark:text-gray-400">
+                  {' '}
+                  / {resumeFrom}
+                </span>
+              )}
+            </span>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: 'actions',
+        header: t('videoJobs.table.actions', 'Actions'),
+        cell: ({ row }) =>
+          row.original.can_cancel ? (
+            <Button
+              onClick={() => handleCancel(row.original)}
+              isDisabled={cancelJob.isPending}
+              className="cursor-pointer rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 disabled:cursor-not-allowed disabled:bg-gray-300"
+            >
+              {cancelJob.isPending
+                ? t('videoJobs.stopping', 'Arrêt...')
+                : t('videoJobs.stop', 'Stopper')}
+            </Button>
+          ) : (
+            <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
+          ),
+      }),
+    ],
+    [cancelJob.isPending, handleCancel, t]
+  );
+
+  const table = useReactTable({
+    data: visibleJobs,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
 
   function handleCleanupTempFiles() {
     setPendingConfirm({
@@ -171,6 +401,28 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
                 })
               : t('videoJobs.noActive', 'Aucune génération en cours')}
           </p>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+            <span className="rounded-full bg-sky-50 px-2.5 py-1 font-medium text-sky-700 dark:bg-sky-900/40 dark:text-sky-200">
+              {t('videoJobs.summary.active', '{{count}} actifs', {
+                count: activeCount,
+              })}
+            </span>
+            <span className="rounded-full bg-green-50 px-2.5 py-1 font-medium text-green-700 dark:bg-green-900/40 dark:text-green-200">
+              {t('videoJobs.summary.completed', '{{count}} terminés', {
+                count: completedCount,
+              })}
+            </span>
+            <span className="rounded-full bg-red-50 px-2.5 py-1 font-medium text-red-700 dark:bg-red-900/40 dark:text-red-200">
+              {t('videoJobs.summary.failed', '{{count}} erreurs', {
+                count: failedCount,
+              })}
+            </span>
+            <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+              {t('videoJobs.summary.cancelled', '{{count}} annulés', {
+                count: cancelledCount,
+              })}
+            </span>
+          </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Button
@@ -211,96 +463,129 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
         </div>
       )}
 
-      {!isLoading && !isError && visibleJobs.length === 0 && (
-        <div className="p-4 text-sm text-gray-600 dark:text-gray-300">
+      {!isLoading && !isError && jobs.length === 0 && (
+        <div className="border-t border-gray-100 p-4 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">
           {t('videoJobs.empty', 'Aucune génération vidéo pour le moment.')}
         </div>
       )}
 
-      {!isLoading && !isError && visibleJobs.length > 0 && (
-        <div className="divide-y divide-gray-100 dark:divide-gray-700">
-          {visibleJobs.map((job) => {
-            const progress = getProgress(job);
-            const phase = getJobPhase(job);
-            const dateLabel = getDateLabel(job);
-            const statusLabel = getStatusLabelParts(job);
-            const statusClassName =
-              statusClassNames[job.status] ||
-              statusClassNames[phase] ||
-              statusClassNames.processing;
-            const modeLabel = job.mode ? getModeLabelParts(job.mode) : null;
-
+      {!isLoading && !isError && jobs.length > 0 && (
+        <div className="flex flex-wrap gap-2 border-t border-gray-100 p-3 dark:border-gray-700">
+          {statusFilters.map((filter) => {
+            const isSelected = statusFilter === filter.id;
             return (
-              <article key={job.job_id} className="p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClassName}`}
-                      >
-                        {t(statusLabel.key, statusLabel.fallback)}
-                      </span>
-                      {modeLabel && (
-                        <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-200">
-                          {t(modeLabel.key, modeLabel.fallback)}
-                        </span>
-                      )}
-                      {dateLabel && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {dateLabel}
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="mt-2 truncate text-sm font-semibold text-gray-900 dark:text-white">
-                      {job.flight_title ||
-                        job.flight_name ||
-                        job.flight_id ||
-                        job.job_id}
-                    </h3>
-                    {(job.message || job.error) && (
-                      <p
-                        className={`mt-1 text-sm ${
-                          job.error
-                            ? 'text-red-600 dark:text-red-300'
-                            : 'text-gray-600 dark:text-gray-300'
-                        }`}
-                      >
-                        {job.error || job.message}
-                      </p>
-                    )}
-                  </div>
-
-                  {job.can_cancel && (
-                    <Button
-                      onClick={() => handleCancel(job)}
-                      isDisabled={cancelJob.isPending}
-                      className="cursor-pointer rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 disabled:cursor-not-allowed disabled:bg-gray-300"
-                    >
-                      {cancelJob.isPending
-                        ? t('videoJobs.stopping', 'Arrêt...')
-                        : t('videoJobs.stop', 'Stopper')}
-                    </Button>
-                  )}
-                </div>
-
-                <div className="mt-3">
-                  <div className="mb-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                    <span>
-                      {t('flights.viewer.videoProgress', 'Progression')}
-                    </span>
-                    <span>{progress}%</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
-                    <div
-                      className="h-full rounded-full bg-sky-500 transition-all"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                </div>
-              </article>
+              <button
+                key={filter.id}
+                type="button"
+                aria-pressed={isSelected}
+                className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 ${
+                  isSelected
+                    ? 'border-sky-600 bg-sky-600 text-white dark:border-sky-300 dark:bg-sky-300 dark:text-sky-950'
+                    : 'border-gray-200 bg-white text-gray-700 hover:border-sky-300 hover:bg-sky-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-sky-700 dark:hover:bg-sky-950/40'
+                }`}
+                onClick={() => setStatusFilter(filter.id)}
+              >
+                {t(`videoJobs.filters.${filter.id}`, filter.label)}
+              </button>
             );
           })}
         </div>
+      )}
+
+      {!isLoading &&
+        !isError &&
+        jobs.length > 0 &&
+        visibleJobs.length === 0 && (
+          <div className="border-t border-gray-100 p-4 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">
+            {t(
+              'videoJobs.emptyFiltered',
+              'Aucune génération ne correspond à ce filtre.'
+            )}
+          </div>
+        )}
+
+      {!isLoading && !isError && visibleJobs.length > 0 && (
+        <>
+          <div className="hidden p-3 md:block">
+            <DataTable
+              table={table}
+              emptyMessage={t(
+                'videoJobs.emptyFiltered',
+                'Aucune génération ne correspond à ce filtre.'
+              )}
+            />
+          </div>
+          <div className="divide-y divide-gray-100 dark:divide-gray-700 md:hidden">
+            {visibleJobs.map((job) => {
+              const progress = getProgress(job);
+              const dateLabel = getDateLabel(job);
+              const modeLabel = job.mode ? getModeLabelParts(job.mode) : null;
+
+              return (
+                <article key={job.job_id} className="p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <JobStatusBadge job={job} />
+                        {modeLabel && (
+                          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-200">
+                            {t(modeLabel.key, modeLabel.fallback)}
+                          </span>
+                        )}
+                        {dateLabel && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {dateLabel}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="mt-2 truncate text-sm font-semibold text-gray-900 dark:text-white">
+                        {getFlightLabel(job)}
+                      </h3>
+                      {(job.message || job.error) && (
+                        <p
+                          className={`mt-1 text-sm ${
+                            job.error
+                              ? 'text-red-600 dark:text-red-300'
+                              : 'text-gray-600 dark:text-gray-300'
+                          }`}
+                        >
+                          {job.error || job.message}
+                        </p>
+                      )}
+                    </div>
+
+                    {job.can_cancel && (
+                      <Button
+                        onClick={() => handleCancel(job)}
+                        isDisabled={cancelJob.isPending}
+                        className="cursor-pointer rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 disabled:cursor-not-allowed disabled:bg-gray-300"
+                      >
+                        {cancelJob.isPending
+                          ? t('videoJobs.stopping', 'Arrêt...')
+                          : t('videoJobs.stop', 'Stopper')}
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="mt-3">
+                    <div className="mb-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                      <span>
+                        {t('flights.viewer.videoProgress', 'Progression')}
+                      </span>
+                      <span>{progress}%</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
+                      <div
+                        className="h-full rounded-full bg-sky-500 transition-[width] duration-200 motion-reduce:transition-none"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </>
       )}
       <Modal
         isOpen={pendingConfirm !== null}
