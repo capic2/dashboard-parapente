@@ -229,7 +229,7 @@ def _gopro_overlay_flight_directory(db: Session, flight: Flight) -> Path:
         )
     date_dir = flight.flight_date.strftime("%Y%m%d")
     sequence = flight_sequence_number(db, flight)
-    directory = Path(root).expanduser().resolve() / "parapente" / date_dir / str(sequence)
+    directory = Path(root).expanduser().resolve() / "parapente" / date_dir / f"{sequence:02d}"
     directory.mkdir(parents=True, exist_ok=True)
     return directory
 
