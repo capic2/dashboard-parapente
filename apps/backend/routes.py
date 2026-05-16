@@ -41,6 +41,7 @@ from gopro_overlay_export import create_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job_from_paths
 from gopro_overlay_export import get_gopro_overlay_job
 from gopro_overlay_export import gopro_overlay_output_path
+from gopro_overlay_export import list_gopro_overlay_jobs
 from gopro_overlay_export import list_gopro_overlay_layouts
 from gopro_overlay_export import probe_video_resolution
 from gopro_overlay_export import save_uploaded_file
@@ -305,6 +306,9 @@ def _video_export_public_status(export: dict[str, Any]) -> str:
 
 
 def _video_export_can_cancel(export: dict[str, Any]) -> bool:
+    if export.get("mode") == "gopro_overlay":
+        return export.get("status") in {"queued", "running"} and bool(export.get("job_id"))
+
     internal_status = export.get("internal_status")
     if isinstance(internal_status, str):
         return internal_status in _VIDEO_EXPORT_CANCELLABLE_STATUSES
@@ -314,6 +318,25 @@ def _video_export_can_cancel(export: dict[str, Any]) -> bool:
         "processing",
         *_VIDEO_EXPORT_CANCELLABLE_STATUSES,
     } and bool(export.get("job_id"))
+
+
+def _gopro_overlay_export_job_payload(job: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "job_id": job.get("job_id"),
+        "status": job.get("status"),
+        "internal_status": job.get("status"),
+        "progress": job.get("progress"),
+        "message": job.get("message"),
+        "error": job.get("error"),
+        "mode": "gopro_overlay",
+        "flight_title": job.get("output_filename") or job.get("layout_label"),
+        "flight_name": job.get("layout_label"),
+        "created_at": job.get("created_at"),
+        "updated_at": job.get("updated_at"),
+        "completed_at": job.get("completed_at"),
+        "output_filename": job.get("output_filename"),
+        "layout_label": job.get("layout_label"),
+    }
 
 
 def _build_video_export_jobs_payload(
@@ -4465,7 +4488,9 @@ def list_video_export_jobs(
 ):
     """List video export jobs across all flights."""
     jobs = _build_video_export_jobs_payload(
-        list_exports_manual() + list_exports_stream(),
+        list_exports_manual()
+        + list_exports_stream()
+        + [_gopro_overlay_export_job_payload(job) for job in list_gopro_overlay_jobs()],
         db,
     )
     if active_only:
@@ -4551,6 +4576,8 @@ def cancel_video_export(job_id: str):
     success = cancel_video_export_manual(job_id)
     if not success:
         success = cancel_video_export_stream(job_id)
+    if not success:
+        success = cancel_gopro_overlay_job(job_id)
 
     if not success:
         raise HTTPException(

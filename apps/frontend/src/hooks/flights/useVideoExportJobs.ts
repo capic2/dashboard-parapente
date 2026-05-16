@@ -25,6 +25,8 @@ export type VideoExportJob = {
   can_resume?: boolean;
   frames_captured?: number | null;
   resume_from_frame?: number | null;
+  output_filename?: string | null;
+  layout_label?: string | null;
   can_cancel: boolean;
 };
 

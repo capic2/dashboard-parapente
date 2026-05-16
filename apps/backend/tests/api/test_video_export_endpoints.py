@@ -256,6 +256,7 @@ class TestExportStatusAndCancel:
         with (
             patch("routes.cancel_video_export_manual", return_value=False),
             patch("routes.cancel_video_export_stream", return_value=False),
+            patch("routes.cancel_gopro_overlay_job", return_value=False),
         ):
             response = client.delete(f"{API_PREFIX}/exports/job-abc/cancel")
 
@@ -267,12 +268,27 @@ class TestExportStatusAndCancel:
         with (
             patch("routes.cancel_video_export_manual", return_value=False),
             patch("routes.cancel_video_export_stream", return_value=True) as mock_stream,
+            patch("routes.cancel_gopro_overlay_job", return_value=False) as mock_overlay,
         ):
             response = client.delete(f"{API_PREFIX}/exports/job-stream/cancel")
 
         assert response.status_code == 200
         assert response.json()["job_id"] == "job-stream"
         mock_stream.assert_called_once_with("job-stream")
+        mock_overlay.assert_not_called()
+
+    def test_export_cancel_falls_back_to_gopro_overlay_cancel(self, client: TestClient):
+        """Cancel endpoint should stop overlay jobs when no video export matches."""
+        with (
+            patch("routes.cancel_video_export_manual", return_value=False),
+            patch("routes.cancel_video_export_stream", return_value=False),
+            patch("routes.cancel_gopro_overlay_job", return_value=True) as mock_overlay,
+        ):
+            response = client.delete(f"{API_PREFIX}/exports/job-overlay/cancel")
+
+        assert response.status_code == 200
+        assert response.json()["job_id"] == "job-overlay"
+        mock_overlay.assert_called_once_with("job-overlay")
 
     def test_export_resume_requeues_resumable_manual_job(self, client: TestClient):
         """Resume endpoint should pass auth token through to manual exporter."""
@@ -396,18 +412,36 @@ class TestVideoExportJobsEndpoint:
         with (
             patch("routes.list_exports_manual", return_value=manual_jobs),
             patch("routes.list_exports_stream", return_value=[]),
+            patch(
+                "routes.list_gopro_overlay_jobs",
+                return_value=[
+                    {
+                        "job_id": "job-overlay",
+                        "status": "running",
+                        "progress": 50,
+                        "message": "Rendering overlay",
+                        "layout_label": "Parapente 1920x1080",
+                        "output_filename": "flight-overlay.mp4",
+                        "updated_at": "2026-04-30T11:00:00",
+                    }
+                ],
+            ),
         ):
             response = client.get(f"{API_PREFIX}/video-export-jobs")
 
         assert response.status_code == 200
         jobs = response.json()["jobs"]
-        assert jobs[0]["job_id"] == "job-running"
-        assert jobs[0]["status"] == "processing"
+        assert jobs[0]["job_id"] == "job-overlay"
+        assert jobs[0]["status"] == "running"
+        assert jobs[0]["mode"] == "gopro_overlay"
         assert jobs[0]["can_cancel"] is True
-        assert jobs[0]["flight_name"] == sample_flight.name
-        assert jobs[1]["job_id"] == "job-cancelled"
-        assert jobs[1]["status"] == "cancelled"
-        assert jobs[1]["can_cancel"] is False
+        assert jobs[1]["job_id"] == "job-running"
+        assert jobs[1]["status"] == "processing"
+        assert jobs[1]["can_cancel"] is True
+        assert jobs[1]["flight_name"] == sample_flight.name
+        assert jobs[2]["job_id"] == "job-cancelled"
+        assert jobs[2]["status"] == "cancelled"
+        assert jobs[2]["can_cancel"] is False
 
     def test_video_export_jobs_can_filter_active_jobs(self, client: TestClient):
         with (
@@ -438,12 +472,31 @@ class TestVideoExportJobsEndpoint:
                     }
                 ],
             ),
+            patch(
+                "routes.list_gopro_overlay_jobs",
+                return_value=[
+                    {
+                        "job_id": "job-overlay-running",
+                        "status": "running",
+                        "progress": 50,
+                    },
+                    {
+                        "job_id": "job-overlay-complete",
+                        "status": "completed",
+                        "progress": 100,
+                    },
+                ],
+            ),
         ):
             response = client.get(f"{API_PREFIX}/video-export-jobs?active_only=true")
 
         assert response.status_code == 200
         jobs = response.json()["jobs"]
-        assert {job["job_id"] for job in jobs} == {"job-queued", "job-stream-encoding"}
+        assert {job["job_id"] for job in jobs} == {
+            "job-queued",
+            "job-stream-encoding",
+            "job-overlay-running",
+        }
         assert all(job["can_cancel"] is True for job in jobs)
 
     def test_video_export_jobs_temp_files_endpoint_cleans_known_exports(self, client: TestClient):

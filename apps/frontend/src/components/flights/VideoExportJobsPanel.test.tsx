@@ -31,6 +31,16 @@ const { cancelJob, cleanupTempFiles, toastError, toastSuccess, refetch, jobs } =
         progress: 100,
         can_cancel: false,
       },
+      {
+        job_id: 'job-overlay',
+        flight_title: 'vol-overlay.mp4',
+        status: 'running',
+        internal_status: 'running',
+        progress: 50,
+        message: 'Rendering overlay',
+        mode: 'gopro_overlay',
+        can_cancel: true,
+      },
     ],
   }));
 
@@ -91,6 +101,16 @@ describe('VideoExportJobsPanel', () => {
         internal_status: 'completed',
         progress: 100,
         can_cancel: false,
+      },
+      {
+        job_id: 'job-overlay',
+        flight_title: 'vol-overlay.mp4',
+        status: 'running',
+        internal_status: 'running',
+        progress: 50,
+        message: 'Rendering overlay',
+        mode: 'gopro_overlay',
+        can_cancel: true,
       }
     );
   });
@@ -101,15 +121,17 @@ describe('VideoExportJobsPanel', () => {
     expect(screen.getByText('Générations vidéo')).toBeInTheDocument();
     expect(screen.getByText('Vol test')).toBeInTheDocument();
     expect(screen.getByText('Vol terminé')).toBeInTheDocument();
+    expect(screen.getByText('vol-overlay.mp4')).toBeInTheDocument();
+    expect(screen.getByText('Overlay GoPro')).toBeInTheDocument();
     expect(screen.getByText('42%')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Stopper' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Stopper' })).toHaveLength(2);
   });
 
   it('cancels a running job after confirmation', async () => {
     cancelJob.mockResolvedValue(undefined);
 
     render(<VideoExportJobsPanel />);
-    fireEvent.click(screen.getByRole('button', { name: 'Stopper' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Stopper' })[0]!);
     const stopButtons = screen.getAllByRole('button', { name: 'Stopper' });
     fireEvent.click(stopButtons[stopButtons.length - 1]!);
 

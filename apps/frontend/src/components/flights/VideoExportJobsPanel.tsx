@@ -48,6 +48,13 @@ function getStatusLabelParts(job: VideoExportJob) {
   return { key: `videoJobs.status.${status}`, fallback };
 }
 
+function getModeLabelParts(mode: string) {
+  if (mode === 'gopro_overlay') {
+    return { key: 'videoJobs.mode.goproOverlay', fallback: 'Overlay GoPro' };
+  }
+  return { key: `videoJobs.mode.${mode}`, fallback: mode };
+}
+
 function getProgress(job: VideoExportJob) {
   if (typeof job.progress !== 'number' || !Number.isFinite(job.progress)) {
     return 0;
@@ -169,7 +176,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
           <Button
             onClick={handleCleanupTempFiles}
             isDisabled={cleanupTempFiles.isPending}
-            className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 dark:bg-amber-900/40 dark:text-amber-200 dark:hover:bg-amber-900/60 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
+            className="cursor-pointer rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 dark:bg-amber-900/40 dark:text-amber-200 dark:hover:bg-amber-900/60 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
           >
             {cleanupTempFiles.isPending
               ? t('videoJobs.cleaningTempFiles', 'Nettoyage...')
@@ -177,7 +184,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
           </Button>
           <Button
             onClick={() => refetch()}
-            className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+            className="cursor-pointer rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
           >
             {t('common.retry', 'Rafraîchir')}
           </Button>
@@ -221,6 +228,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
               statusClassNames[job.status] ||
               statusClassNames[phase] ||
               statusClassNames.processing;
+            const modeLabel = job.mode ? getModeLabelParts(job.mode) : null;
 
             return (
               <article key={job.job_id} className="p-4">
@@ -232,9 +240,9 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
                       >
                         {t(statusLabel.key, statusLabel.fallback)}
                       </span>
-                      {job.mode && (
+                      {modeLabel && (
                         <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-200">
-                          {job.mode}
+                          {t(modeLabel.key, modeLabel.fallback)}
                         </span>
                       )}
                       {dateLabel && (
@@ -266,7 +274,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
                     <Button
                       onClick={() => handleCancel(job)}
                       isDisabled={cancelJob.isPending}
-                      className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                      className="cursor-pointer rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 disabled:cursor-not-allowed disabled:bg-gray-300"
                     >
                       {cancelJob.isPending
                         ? t('videoJobs.stopping', 'Arrêt...')
