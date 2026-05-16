@@ -11,7 +11,7 @@ import {
   TabPanel,
   Tabs,
 } from '@dashboard-parapente/design-system';
-import { Download, Edit3, FileUp, Pencil, Video, Wand2 } from 'lucide-react';
+import { Download, Edit3, FileUp, Pencil, Wand2 } from 'lucide-react';
 import {
   useUpdateFlight,
   useUploadGPXToFlight,
@@ -497,7 +497,7 @@ export function FlightDetails({
   );
 
   const infoCard = (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
+    <div className="rounded-xl bg-white p-4 shadow-md dark:bg-gray-800">
       {editingMode ? (
         <FlightEditForm
           flight={flight}
@@ -508,20 +508,20 @@ export function FlightDetails({
         />
       ) : (
         <>
-          <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                 {flightTitle}
               </h2>
               {(hasGpx || hasVideo) && (
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap gap-1.5">
                   {hasGpx && (
-                    <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200">
+                    <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200">
                       {t('flights.gpxBadge')}
                     </span>
                   )}
                   {hasVideo && (
-                    <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+                    <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
                       {t('flights.videoBadge')}
                     </span>
                   )}
@@ -529,101 +529,81 @@ export function FlightDetails({
               )}
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-900/50 xl:max-w-[34rem]">
-              <div className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                <Video className="h-3.5 w-3.5" aria-hidden="true" />
-                {t('flights.videoProductionActions')}
-              </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {hasGpx && (
-                  <FlightVideoExportControls
-                    flight={flight}
-                    className="contents"
-                    buttonClassName="min-h-11 w-full justify-center rounded-xl bg-blue-600 px-3.5 py-2.5 hover:bg-blue-700"
-                    compact
-                    showModeSelector={false}
-                  />
-                )}
-                <Button
-                  variant="cyan"
-                  className="min-h-11 w-full rounded-xl px-3.5 py-2.5 text-sm"
-                  onPress={goproOverlayAction}
-                  isDisabled={
-                    createGoproOverlayJob.isPending ||
-                    cancelGoproOverlayJob.isPending
-                  }
-                  title={goproOverlayTitle}
-                >
-                  <Wand2 className="h-4 w-4" aria-hidden="true" />
-                  {goproOverlayLabel}
-                </Button>
-              </div>
-
-              <div className="mt-2 grid grid-cols-1 gap-2 border-t border-slate-200 pt-2 dark:border-slate-700 sm:grid-cols-3">
-                <Button
-                  variant="outline"
-                  className="min-h-10 w-full rounded-xl px-3 py-2 text-sm"
-                  onPress={() => setEditingMode(true)}
-                  aria-label={t('flights.editFlight')}
-                >
-                  <Edit3 className="h-4 w-4" aria-hidden="true" />
-                  {t('flights.editButton')}
-                </Button>
-                {hasGpx && (
-                  <Button
-                    variant="outline"
-                    className="min-h-10 w-full rounded-xl px-3 py-2 text-sm"
-                    onPress={handleGPXDownload}
-                    isDisabled={isDownloadingGpx}
-                  >
-                    <Download className="h-4 w-4" aria-hidden="true" />
-                    {isDownloadingGpx
-                      ? t('flights.gpxDownloadInProgress')
-                      : t('flights.downloadGpx')}
-                  </Button>
-                )}
-                <Button
-                  variant={flight.gpx_file_path ? 'success' : 'warning'}
-                  className="min-h-10 w-full rounded-xl px-3 py-2 text-sm"
-                  onPress={() => fileInputRef.current?.click()}
-                  isDisabled={uploadGPXMutation.isPending}
-                >
-                  <FileUp className="h-4 w-4" aria-hidden="true" />
-                  {uploadGPXMutation.isPending
-                    ? t('flights.uploadInProgress')
-                    : flight.gpx_file_path
-                      ? t('flights.replaceGpx')
-                      : t('flights.addGpx')}
-                </Button>
-              </div>
+            <div className="flex flex-wrap gap-2 sm:justify-end">
+              {hasGpx && (
+                <FlightVideoExportControls
+                  flight={flight}
+                  className="flex flex-col gap-2"
+                  buttonClassName="min-h-10 rounded-lg bg-sky-600 px-3 py-2 text-sm hover:bg-sky-700"
+                  compact
+                  showModeSelector={false}
+                />
+              )}
+              <Button
+                variant="outline"
+                className="min-h-10 rounded-lg border-cyan-200 px-3 py-2 text-sm text-cyan-800 hover:bg-cyan-50 dark:border-cyan-800 dark:text-cyan-200 dark:hover:bg-cyan-950/40"
+                onPress={goproOverlayAction}
+                isDisabled={
+                  createGoproOverlayJob.isPending ||
+                  cancelGoproOverlayJob.isPending
+                }
+                title={goproOverlayTitle}
+              >
+                <Wand2 className="h-4 w-4" aria-hidden="true" />
+                {goproOverlayLabel}
+              </Button>
             </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".gpx"
-              aria-label={t('flights.gpxFileInput')}
-              onChange={handleGPXUpload}
-              className="hidden"
-            />
           </div>
 
-          {(hasGpx || hasVideo) && (
-            <div className="mb-4 flex flex-wrap gap-2">
-              {hasGpx && (
-                <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800 dark:bg-green-900/30 dark:text-green-200">
-                  {t('flights.gpxBadge')}
-                </span>
-              )}
-              {hasVideo && (
-                <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-200">
-                  {t('flights.videoBadge')}
-                </span>
-              )}
-            </div>
-          )}
+          <div className="flex flex-wrap gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
+            <Button
+              variant="ghost"
+              className="min-h-10 rounded-lg px-3 py-2 text-sm"
+              onPress={() => setEditingMode(true)}
+              aria-label={t('flights.editFlight')}
+            >
+              <Edit3 className="h-4 w-4" aria-hidden="true" />
+              {t('flights.editButton')}
+            </Button>
+            {hasGpx && (
+              <Button
+                variant="ghost"
+                className="min-h-10 rounded-lg px-3 py-2 text-sm"
+                onPress={handleGPXDownload}
+                isDisabled={isDownloadingGpx}
+              >
+                <Download className="h-4 w-4" aria-hidden="true" />
+                {isDownloadingGpx
+                  ? t('flights.gpxDownloadInProgress')
+                  : t('flights.downloadGpx')}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              className="min-h-10 rounded-lg px-3 py-2 text-sm"
+              onPress={() => fileInputRef.current?.click()}
+              isDisabled={uploadGPXMutation.isPending}
+            >
+              <FileUp className="h-4 w-4" aria-hidden="true" />
+              {uploadGPXMutation.isPending
+                ? t('flights.uploadInProgress')
+                : flight.gpx_file_path
+                  ? t('flights.replaceGpx')
+                  : t('flights.addGpx')}
+            </Button>
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".gpx"
+            aria-label={t('flights.gpxFileInput')}
+            onChange={handleGPXUpload}
+            className="hidden"
+          />
 
           {goproOverlayJob && (
-            <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -660,7 +640,7 @@ export function FlightDetails({
             </div>
           )}
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 mb-4">
             <div>
               <span className={labelClass}>{t('flights.dateLabel')}</span>
               <span className={valueClass}>
@@ -763,7 +743,7 @@ export function FlightDetails({
           <div>
             <label
               htmlFor="flight-notes"
-              className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 block"
+              className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
             >
               {t('flights.notesLabel')}
             </label>
@@ -774,12 +754,12 @@ export function FlightDetails({
                     id="flight-notes"
                     placeholder={t('flights.notesPlaceholder')}
                     rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600 resize-none dark:bg-gray-700 dark:text-gray-100"
+                    className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                   />
                 </TextField>
                 <div className="flex gap-2">
                   <Button
-                    className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-all disabled:opacity-50"
+                    className="rounded-md bg-green-600 px-4 py-2 text-sm text-white transition-all hover:bg-green-700 disabled:opacity-50"
                     onPress={handleSaveNotes}
                     isDisabled={updateFlight.isPending}
                   >
@@ -788,7 +768,7 @@ export function FlightDetails({
                       : t('flights.saveButton')}
                   </Button>
                   <Button
-                    className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition-all"
+                    className="rounded-md bg-gray-200 px-4 py-2 text-sm text-gray-700 transition-all hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
                     onPress={() => {
                       setNotesText(flight.notes ?? '');
                       setEditingNotes(false);
@@ -799,7 +779,7 @@ export function FlightDetails({
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 p-3 rounded-lg">
+              <p className="rounded-lg bg-gray-50 p-3 text-sm text-gray-600 dark:bg-gray-900 dark:text-gray-300">
                 {flight.notes ?? t('flights.noNotes')}
               </p>
             )}
