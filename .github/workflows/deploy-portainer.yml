@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   issues: write
+  packages: write
   pull-requests: write
 
 concurrency:
@@ -158,8 +159,48 @@ jobs:
               }
             }
 
+      - name: Checkout source for image build
+        uses: actions/checkout@v5
+
+      - name: Verify GoPro overlay build context
+        env:
+          GOPRO_OVERLAY_BUILD_CONTEXT: ${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT }}
+        run: |
+          if [ -z "$GOPRO_OVERLAY_BUILD_CONTEXT" ]; then
+            echo "Missing repository variable GOPRO_OVERLAY_BUILD_CONTEXT"
+            echo "Set it to a Docker BuildKit context for gopro-overlay-src, for example a Git URL."
+            exit 1
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push backend image
+        id: build_image
+        continue-on-error: true
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          build-args: |
+            VITE_CESIUM_ION_TOKEN=${{ secrets.VITE_CESIUM_ION_TOKEN }}
+          build-contexts: |
+            gopro-overlay-src=${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT }}
+          tags: |
+            ghcr.io/${{ github.repository }}/backend:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository }}/backend:sha-${{ github.sha }}
+
       - name: Deploy on production server
         id: trigger_deploy
+        if: steps.build_image.outcome == 'success'
         continue-on-error: true
         uses: appleboy/ssh-action@v1.2.5
         with:
@@ -174,129 +215,36 @@ jobs:
 
             REQUESTED_DEPLOY_PATH="${{ secrets.SSH_DEPLOY_PATH }}"
             DEPLOY_PATH="$REQUESTED_DEPLOY_PATH"
-            INSPECT_PATH=""
             STACK_ID=""
             PORTAINER_VOLUME=""
             TARGET_SHA="${{ github.sha }}"
             TARGET_VERSION="${{ steps.version.outputs.version }}"
             REPO_SLUG="${{ github.repository }}"
             COMPOSE_PROJECT_NAME="dashboard-parapente"
-            VITE_CESIUM_ION_TOKEN="${{ secrets.VITE_CESIUM_ION_TOKEN }}"
+            BACKEND_IMAGE="ghcr.io/${{ github.repository }}/backend:${{ steps.version.outputs.version }}"
+            GHCR_USERNAME="${{ github.actor }}"
+            GHCR_TOKEN="${{ secrets.GHCR_READ_TOKEN }}"
 
-            deploy_from_host_path() {
+            if [ -z "$GHCR_TOKEN" ]; then
+              echo "Missing GHCR_READ_TOKEN secret for production image pull"
+              exit 1
+            fi
+
+            is_forbidden_deploy_path() {
               path="$1"
-              cd "$path"
+              case "$path" in
+                .codenomad|.codenomad/*|*/.codenomad|*/.codenomad/*|.agents|.agents/*|*/.agents|*/.agents/*|.opencode|.opencode/*|*/.opencode|*/.opencode/*)
+                  return 0
+                  ;;
+              esac
 
-              if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-                echo "Deploy path is not a git repository: $path"
-                return 1
-              fi
-
-              git fetch origin main --tags
-              git fetch --no-tags origin "$TARGET_SHA"
-              git checkout --force --detach "$TARGET_SHA"
-              test "$(git rev-parse HEAD)" = "$TARGET_SHA"
-
-              if [ -f stack.env ]; then
-                if [ -n "$VITE_CESIUM_ION_TOKEN" ]; then
-                  export VITE_CESIUM_ION_TOKEN
-                fi
-                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" --env-file stack.env "$@"; }
-                echo "Using stack.env for docker compose"
-              elif [ -f .env ]; then
-                if [ -n "$VITE_CESIUM_ION_TOKEN" ]; then
-                  export VITE_CESIUM_ION_TOKEN
-                fi
-                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" --env-file .env "$@"; }
-                echo "Using .env for docker compose"
-              else
-                if [ -z "$VITE_CESIUM_ION_TOKEN" ]; then
-                  echo "Missing VITE_CESIUM_ION_TOKEN secret and no stack.env/.env fallback"
-                  return 1
-                fi
-                export VITE_CESIUM_ION_TOKEN
-                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" "$@"; }
-                echo "No env file found (stack.env/.env), using shell environment"
-              fi
-
-              compose_cmd build --pull backend
-              remove_conflicting_container parapente-backend
-              BACKEND_DEPLOY_VERSION="$TARGET_VERSION" compose_cmd up -d --force-recreate --remove-orphans backend redis
-            }
-
-            remove_conflicting_container() {
-              container_name="$1"
-              existing_container_id=""
-
-              for container_id in $(docker ps -aq --filter "name=^/${container_name}$" 2>/dev/null || true); do
-                existing_container_id="$container_id"
-                break
-              done
-
-              if [ -z "$existing_container_id" ]; then
-                return 0
-              fi
-
-              existing_project=$(docker inspect "$existing_container_id" --format '{{ index .Config.Labels "com.docker.compose.project" }}' 2>/dev/null || true)
-              existing_workdir=$(docker inspect "$existing_container_id" --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' 2>/dev/null || true)
-              current_workdir=$(pwd)
-
-              if [ "$existing_project" = "$COMPOSE_PROJECT_NAME" ] && [ "$existing_workdir" = "$current_workdir" ]; then
-                return 0
-              fi
-
-              echo "Removing conflicting container $container_name ($existing_container_id) from previous deploy context"
-              docker rm -f "$existing_container_id"
+              return 1
             }
 
             set_portainer_volume() {
               for volume_name in portainer_data portainer; do
                 if docker volume inspect "$volume_name" >/dev/null 2>&1; then
                   PORTAINER_VOLUME="$volume_name"
-                  return 0
-                fi
-              done
-
-              return 1
-            }
-
-            resolve_from_container() {
-              container_ref="$1"
-              inspect_path=$(docker inspect "$container_ref" --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' 2>/dev/null || true)
-
-              if [ -n "$inspect_path" ] && [ "$inspect_path" != "<no value>" ]; then
-                INSPECT_PATH="$inspect_path"
-                STACK_ID="${INSPECT_PATH##*/}"
-                return 0
-              fi
-
-              return 1
-            }
-
-            resolve_from_running_containers() {
-              for container_name in parapente-backend dashboard-parapente-backend-1 dashboard-parapente_backend_1; do
-                if resolve_from_container "$container_name"; then
-                  echo "Detected stack working_dir from container $container_name: $INSPECT_PATH"
-                  return 0
-                fi
-              done
-
-              container_ids=$(docker ps -aq \
-                --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" \
-                --filter "label=com.docker.compose.service=backend" 2>/dev/null || true)
-              for container_id in $container_ids; do
-                if resolve_from_container "$container_id"; then
-                  echo "Detected stack working_dir from compose labels: $INSPECT_PATH"
-                  return 0
-                fi
-              done
-
-              container_ids=$(docker ps -aq \
-                --filter "label=project=dashboard-parapente" \
-                --filter "label=service=backend" 2>/dev/null || true)
-              for container_id in $container_ids; do
-                if resolve_from_container "$container_id"; then
-                  echo "Detected stack working_dir from app labels: $INSPECT_PATH"
                   return 0
                 fi
               done
@@ -328,125 +276,108 @@ jobs:
 
               return 1
             }
-            if [ -n "$DEPLOY_PATH" ] && [ -d "$DEPLOY_PATH" ]; then
-              echo "Using configured deploy path: $DEPLOY_PATH"
-            else
-              if [ -n "$DEPLOY_PATH" ]; then
-                echo "Configured deploy path not found: $DEPLOY_PATH"
+
+            configure_compose_cmd() {
+              if [ -f stack.env ]; then
+                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" --env-file stack.env "$@"; }
+                echo "Using stack.env for docker compose"
+              elif [ -f .env ]; then
+                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" --env-file .env "$@"; }
+                echo "Using .env for docker compose"
+              else
+                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" "$@"; }
+                echo "No env file found (stack.env/.env), using shell environment"
+              fi
+            }
+
+            deploy_from_compose_path() {
+              path="$1"
+
+              if is_forbidden_deploy_path "$path"; then
+                echo "Refusing to deploy from forbidden path: $path"
+                return 1
               fi
 
-              resolve_from_running_containers || resolve_from_portainer_volume || true
+              cd "$path"
 
-              if [ -n "$INSPECT_PATH" ] && [ -d "$INSPECT_PATH" ]; then
-                DEPLOY_PATH="$INSPECT_PATH"
-                echo "Using docker-inspected deploy path: $DEPLOY_PATH"
-              elif [ -n "$INSPECT_PATH" ]; then
-                STACK_ID="${INSPECT_PATH##*/}"
-                for base_path in /data/compose /var/lib/docker/volumes/portainer_data/_data/compose /var/lib/docker/volumes/portainer/_data/compose; do
-                  CANDIDATE_PATH="$base_path/$STACK_ID"
-                  if [ -d "$CANDIDATE_PATH" ]; then
-                    DEPLOY_PATH="$CANDIDATE_PATH"
-                    echo "Using resolved Portainer deploy path: $DEPLOY_PATH"
-                    break
-                  fi
-                done
+              if [ -d .git ]; then
+                echo "Refusing to deploy from a Git checkout: $path"
+                return 1
               fi
-            fi
 
-            if [ -n "$DEPLOY_PATH" ] && [ -d "$DEPLOY_PATH" ]; then
-              echo "Deploying from host path: $DEPLOY_PATH"
-              deploy_from_host_path "$DEPLOY_PATH"
-              exit 0
-            fi
+              echo "Updating production compose file from $REPO_SLUG@$TARGET_SHA"
+              curl -fsSL "https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.yml" -o docker-compose.yml.tmp
+              mv docker-compose.yml.tmp docker-compose.yml
 
-            if [ -n "$STACK_ID" ] && set_portainer_volume; then
-              echo "Host path unavailable, deploying from Portainer volume $PORTAINER_VOLUME (stack $STACK_ID)"
+              configure_compose_cmd
+
+              printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+
+              export BACKEND_IMAGE
+              export BACKEND_DEPLOY_VERSION="$TARGET_VERSION"
+
+              compose_cmd pull backend backend-worker redis
+              compose_cmd up -d --force-recreate --remove-orphans backend backend-worker redis
+            }
+
+            deploy_from_portainer_volume() {
               docker run --rm \
+                -e BACKEND_IMAGE="$BACKEND_IMAGE" \
+                -e COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" \
+                -e GHCR_TOKEN="$GHCR_TOKEN" \
+                -e GHCR_USERNAME="$GHCR_USERNAME" \
+                -e REPO_SLUG="$REPO_SLUG" \
                 -e TARGET_SHA="$TARGET_SHA" \
                 -e TARGET_VERSION="$TARGET_VERSION" \
-                -e REPO_SLUG="$REPO_SLUG" \
                 -e STACK_ID="$STACK_ID" \
-                -e COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" \
-                -e VITE_CESIUM_ION_TOKEN="$VITE_CESIUM_ION_TOKEN" \
                 -v /var/run/docker.sock:/var/run/docker.sock \
                 -v "$PORTAINER_VOLUME:/data" \
                 -w "/data/compose/$STACK_ID" \
                 docker:27-cli sh -ceu '
-                  apk add --no-cache curl tar >/dev/null
+                  apk add --no-cache curl >/dev/null
                   work_dir="/data/compose/$STACK_ID"
-                  temp_dir="$(mktemp -d)"
-                  stage_dir="$temp_dir/stage"
-                  extracted_dir="$temp_dir/extracted"
-                  mkdir -p "$stage_dir" "$extracted_dir"
-                  trap "rm -rf \"$temp_dir\"" EXIT
-
-                  archive_url="https://codeload.github.com/$REPO_SLUG/tar.gz/$TARGET_SHA"
-                  curl -fsSL "$archive_url" -o "$temp_dir/src.tar.gz"
-                  tar -xzf "$temp_dir/src.tar.gz" -C "$extracted_dir" --strip-components=1 --exclude=".env" --exclude="stack.env"
-
-                  cp -a "$extracted_dir"/. "$stage_dir"/
-                  if [ -f "$work_dir/stack.env" ]; then cp -f "$work_dir/stack.env" "$stage_dir/stack.env"; fi
-                  if [ -f "$work_dir/.env" ]; then cp -f "$work_dir/.env" "$stage_dir/.env"; fi
-
-                  find "$work_dir" -mindepth 1 -maxdepth 1 ! -name stack.env ! -name .env -exec rm -rf {} +
-                  cp -a "$stage_dir"/. "$work_dir"/
                   cd "$work_dir"
 
-                  remove_conflicting_container() {
-                    container_name="$1"
-                    existing_container_id=""
-
-                    for container_id in $(docker ps -aq --filter "name=^/${container_name}$" 2>/dev/null || true); do
-                      existing_container_id="$container_id"
-                      break
-                    done
-
-                    if [ -z "$existing_container_id" ]; then
-                      return 0
-                    fi
-
-                    existing_project=$(docker inspect "$existing_container_id" --format "{{ index .Config.Labels \"com.docker.compose.project\" }}" 2>/dev/null || true)
-                    existing_workdir=$(docker inspect "$existing_container_id" --format "{{ index .Config.Labels \"com.docker.compose.project.working_dir\" }}" 2>/dev/null || true)
-                    current_workdir=$(pwd)
-
-                    if [ "$existing_project" = "$COMPOSE_PROJECT_NAME" ] && [ "$existing_workdir" = "$current_workdir" ]; then
-                      return 0
-                    fi
-
-                    echo "Removing conflicting container $container_name ($existing_container_id) from previous deploy context"
-                    docker rm -f "$existing_container_id"
-                  }
+                  curl -fsSL "https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.yml" -o docker-compose.yml.tmp
+                  mv docker-compose.yml.tmp docker-compose.yml
 
                   if [ -f stack.env ]; then
-                    if [ -n "$VITE_CESIUM_ION_TOKEN" ]; then export VITE_CESIUM_ION_TOKEN; fi
-                    docker compose -p "$COMPOSE_PROJECT_NAME" --env-file stack.env build --pull backend
-                    remove_conflicting_container parapente-backend
-                    BACKEND_DEPLOY_VERSION="$TARGET_VERSION" docker compose -p "$COMPOSE_PROJECT_NAME" --env-file stack.env up -d --force-recreate --remove-orphans backend redis
+                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" --env-file stack.env "$@"; }
                   elif [ -f .env ]; then
-                    if [ -n "$VITE_CESIUM_ION_TOKEN" ]; then export VITE_CESIUM_ION_TOKEN; fi
-                    docker compose -p "$COMPOSE_PROJECT_NAME" --env-file .env build --pull backend
-                    remove_conflicting_container parapente-backend
-                    BACKEND_DEPLOY_VERSION="$TARGET_VERSION" docker compose -p "$COMPOSE_PROJECT_NAME" --env-file .env up -d --force-recreate --remove-orphans backend redis
+                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" --env-file .env "$@"; }
                   else
-                    if [ -z "$VITE_CESIUM_ION_TOKEN" ]; then
-                      echo "Missing VITE_CESIUM_ION_TOKEN secret and no stack.env/.env fallback"
-                      exit 1
-                    fi
-                    export VITE_CESIUM_ION_TOKEN
-                    docker compose -p "$COMPOSE_PROJECT_NAME" build --pull backend
-                    remove_conflicting_container parapente-backend
-                    BACKEND_DEPLOY_VERSION="$TARGET_VERSION" docker compose -p "$COMPOSE_PROJECT_NAME" up -d --force-recreate --remove-orphans backend redis
+                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" "$@"; }
                   fi
+
+                  printf "%s" "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+
+                  export BACKEND_IMAGE
+                  export BACKEND_DEPLOY_VERSION="$TARGET_VERSION"
+
+                  compose_cmd pull backend backend-worker redis
+                  compose_cmd up -d --force-recreate --remove-orphans backend backend-worker redis
                 '
-                exit 0
-              fi
+            }
+
+            if [ -n "$DEPLOY_PATH" ] && [ -d "$DEPLOY_PATH" ]; then
+              echo "Deploying from configured compose path: $DEPLOY_PATH"
+              deploy_from_compose_path "$DEPLOY_PATH"
+              exit 0
+            fi
+
+            if [ -n "$DEPLOY_PATH" ]; then
+              echo "Configured deploy path not found: $DEPLOY_PATH"
+            fi
+
+            if resolve_from_portainer_volume; then
+              echo "Configured host path unavailable, deploying compose from Portainer volume $PORTAINER_VOLUME (stack $STACK_ID)"
+              deploy_from_portainer_volume
+              exit 0
+            fi
 
             echo "Deploy path does not exist: $DEPLOY_PATH"
             if [ -n "$REQUESTED_DEPLOY_PATH" ]; then
               echo "Configured SSH_DEPLOY_PATH: $REQUESTED_DEPLOY_PATH"
-            fi
-            if [ -n "$INSPECT_PATH" ]; then
-              echo "Detected stack working_dir: $INSPECT_PATH"
             fi
             echo "Unable to access deploy path on host and no Portainer volume fallback available"
             exit 1
@@ -701,21 +632,81 @@ jobs:
               }
             }
 
-      - name: Label current PR as non deployed when deployment fails
-        if: (steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success') && github.event_name == 'pull_request'
+      - name: Label merged PRs as non deployed when deployment fails
+        if: steps.build_image.outcome != 'success' || steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success'
         uses: actions/github-script@v9
         env:
           UNDEPLOYED_LABEL: non déployé
-          CURRENT_PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+          PREVIOUS_DEPLOY_SHA: ${{ steps.version.outputs.previous_deploy_sha }}
+          CURRENT_SHA: ${{ github.sha }}
         with:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const undeployedLabel = process.env.UNDEPLOYED_LABEL;
-            const currentPrNumber = process.env.CURRENT_PR_NUMBER;
+            const previousDeploySha = process.env.PREVIOUS_DEPLOY_SHA;
+            const currentSha = process.env.CURRENT_SHA;
+            const prNumbers = new Set();
 
-            if (!currentPrNumber) {
-              core.info('No pull request number found for failed deployment label');
+            if (!previousDeploySha || previousDeploySha === currentSha) {
+              core.info('No previous successful deployment range found for failed deployment label');
+              return;
+            }
+
+            const compareCommits = await github.paginate(
+              'GET /repos/{owner}/{repo}/compare/{basehead}',
+              {
+                owner,
+                repo,
+                basehead: `${previousDeploySha}...${currentSha}`,
+                per_page: 100,
+              },
+              (response) => response.data.commits || []
+            );
+
+            const commitsNeedingLookup = [];
+            const prNumberPattern = /\(#(\d+)\)|^Merge pull request #(\d+)/;
+
+            for (const commit of compareCommits) {
+              const message = commit.commit?.message || '';
+              const match = message.match(prNumberPattern);
+              const parsedPr = Number(match?.[1] || match?.[2] || 0);
+
+              if (Number.isInteger(parsedPr) && parsedPr > 0) {
+                prNumbers.add(parsedPr);
+              } else {
+                commitsNeedingLookup.push(commit.sha);
+              }
+            }
+
+            const chunkSize = 10;
+            for (let index = 0; index < commitsNeedingLookup.length; index += chunkSize) {
+              const chunk = commitsNeedingLookup.slice(index, index + chunkSize);
+              const responses = await Promise.all(
+                chunk.map((commitSha) =>
+                  github.request('GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls', {
+                    owner,
+                    repo,
+                    commit_sha: commitSha,
+                  })
+                )
+              );
+
+              for (const commitPrs of responses) {
+                for (const pr of commitPrs.data) {
+                  if (pr.base?.ref === 'main' && pr.merged_at) {
+                    prNumbers.add(pr.number);
+                  }
+                }
+              }
+
+              if (index + chunkSize < commitsNeedingLookup.length) {
+                await new Promise((resolve) => setTimeout(resolve, 200));
+              }
+            }
+
+            if (prNumbers.size === 0) {
+              core.info('No merged pull requests found to label as non deployed');
               return;
             }
 
@@ -739,25 +730,32 @@ jobs:
               }
             }
 
-            await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/labels', {
-              owner,
-              repo,
-              issue_number: Number(currentPrNumber),
-              labels: [undeployedLabel],
-            });
+            for (const issue_number of prNumbers) {
+              await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/labels', {
+                owner,
+                repo,
+                issue_number,
+                labels: [undeployedLabel],
+              });
+            }
 
-            core.info(`Applied label ${undeployedLabel} to PR #${currentPrNumber}`);
+            core.info(
+              `Applied label ${undeployedLabel} to PRs: ${Array.from(prNumbers)
+                .sort((a, b) => a - b)
+                .join(', ')}`
+            );
 
       - name: Confirm
         if: always()
         run: |
+          echo "Image build outcome: ${{ steps.build_image.outcome }}"
           echo "Deployment step conclusion: ${{ steps.trigger_deploy.conclusion }}"
           echo "Verification step conclusion: ${{ steps.verify_deploy.conclusion }}"
           echo "Verification step outcome: ${{ steps.verify_deploy.outcome }}"
           echo "Computed deployment version: ${{ steps.version.outputs.version }}"
 
       - name: Summarize deployment failure
-        if: steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success'
+        if: steps.build_image.outcome != 'success' || steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success'
         run: |
           {
             echo "## Production deployment failed"
@@ -768,6 +766,7 @@ jobs:
             echo "| Branch | ${{ github.ref_name }} |"
             echo "| Commit | ${{ github.sha }} |"
             echo "| Deployment version | ${{ steps.version.outputs.version }} |"
+            echo "| Image build | ${{ steps.build_image.outcome }} |"
             echo "| SSH deployment | ${{ steps.trigger_deploy.conclusion }} |"
             echo "| Version verification | ${{ steps.verify_deploy.outcome }} |"
             echo "| Run | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |"
@@ -776,13 +775,14 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Notify deployment failure
-        if: steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success'
+        if: steps.build_image.outcome != 'success' || steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success'
         continue-on-error: true
         uses: actions/github-script@v9
         env:
           NOTIFY_USERS: ${{ vars.DEPLOY_FAILURE_NOTIFY_USERS || github.repository_owner }}
           FAILURE_LABEL: deployment failed
           DEPLOYMENT_VERSION: ${{ steps.version.outputs.version }}
+          IMAGE_BUILD: ${{ steps.build_image.outcome }}
           SSH_DEPLOYMENT: ${{ steps.trigger_deploy.conclusion }}
           VERSION_VERIFICATION: ${{ steps.verify_deploy.outcome }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -808,6 +808,7 @@ jobs:
               `| Branch | ${context.ref.replace('refs/heads/', '')} |`,
               `| Commit | ${context.sha} |`,
               `| Deployment version | ${process.env.DEPLOYMENT_VERSION} |`,
+              `| Image build | ${process.env.IMAGE_BUILD} |`,
               `| SSH deployment | ${process.env.SSH_DEPLOYMENT} |`,
               `| Version verification | ${process.env.VERSION_VERIFICATION} |`,
               `| Run | ${runUrl} |`,
@@ -844,7 +845,7 @@ jobs:
             core.info(`Created deployment failure notification issue: ${issue.data.html_url}`);
 
       - name: Fail job when deployment failed
-        if: steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success'
+        if: steps.build_image.outcome != 'success' || steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success'
         run: |
           echo "Deployment or version verification failed"
           exit 1
