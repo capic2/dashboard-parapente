@@ -23,7 +23,7 @@ export const Route = createFileRoute('/weather')({
           : undefined,
     };
   },
-  loader: async () => {
-    await queryClient.ensureQueryData(sitesQueryOptions());
+  loader: () => {
+    void queryClient.prefetchQuery(sitesQueryOptions());
   },
 });

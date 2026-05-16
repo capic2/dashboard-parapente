@@ -14,12 +14,10 @@ export const Route = createFileRoute('/flights/$flightId')({
   }),
   beforeLoad: requireAuth,
   loaderDeps: ({ search }) => ({ siteId: search.siteId }),
-  loader: async ({ deps }) => {
-    await Promise.all([
-      queryClient.ensureQueryData(
-        flightsQueryOptions({ limit: 50, siteId: deps.siteId })
-      ),
-      queryClient.ensureQueryData(sitesQueryOptions()),
-    ]);
+  loader: ({ deps }) => {
+    void queryClient.prefetchQuery(
+      flightsQueryOptions({ limit: 50, siteId: deps.siteId })
+    );
+    void queryClient.prefetchQuery(sitesQueryOptions());
   },
 });

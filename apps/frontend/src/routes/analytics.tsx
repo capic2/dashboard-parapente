@@ -25,11 +25,9 @@ export const Route = createFileRoute('/analytics')({
       dateTo: isISODate(search.dateTo) ? search.dateTo : undefined,
     };
   },
-  loader: async () => {
-    await Promise.all([
-      queryClient.ensureQueryData(flightStatsQueryOptions()),
-      queryClient.ensureQueryData(flightRecordsQueryOptions()),
-      queryClient.ensureQueryData(sitesQueryOptions()),
-    ]);
+  loader: () => {
+    void queryClient.prefetchQuery(flightStatsQueryOptions());
+    void queryClient.prefetchQuery(flightRecordsQueryOptions());
+    void queryClient.prefetchQuery(sitesQueryOptions());
   },
 });

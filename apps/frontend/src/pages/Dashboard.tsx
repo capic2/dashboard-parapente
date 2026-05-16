@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useSuspenseQuery, useQueries } from '@tanstack/react-query';
+import { useQuery, useQueries } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { CalendarDays, CloudSun, MapPinned, Video } from 'lucide-react';
 import StatsPanel from '../components/dashboard/StatsPanel';
@@ -19,7 +19,12 @@ import type { SiteWeatherEntry } from '../components/dashboard/AllSitesCondition
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const { data: sites } = useSuspenseQuery(sitesQueryOptions());
+  const {
+    data: sites = [],
+    isLoading: areSitesLoading,
+    isError: sitesLoadFailed,
+    refetch: refetchSites,
+  } = useQuery(sitesQueryOptions());
   const { data: bestSpot } = useBestSpotAPI(0);
   const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(0);
   const todayLabel = new Intl.DateTimeFormat(
@@ -49,6 +54,28 @@ export default function Dashboard() {
     isLoading: weatherQueries[index]?.isLoading ?? true,
     isError: weatherQueries[index]?.isError ?? false,
   }));
+
+  if (areSitesLoading) {
+    return <DashboardLoadingState label={t('common.loading')} />;
+  }
+
+  if (sitesLoadFailed) {
+    return (
+      <div className="py-8">
+        <div className="mx-auto max-w-md rounded-2xl border border-red-200 bg-white/90 p-8 text-center shadow-lg shadow-red-100/70 dark:border-red-900/60 dark:bg-slate-900/90 dark:shadow-black/20">
+          <h2 className="mb-3 text-xl font-bold text-slate-950 dark:text-white">
+            {t('weather.loadError')}
+          </h2>
+          <Button
+            onPress={() => void refetchSites()}
+            className="rounded-lg bg-sky-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-sky-700"
+          >
+            {t('common.retry')}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (sites.length === 0) {
     return (
@@ -133,6 +160,29 @@ export default function Dashboard() {
 
         <AllSitesConditions entries={siteWeatherEntries} />
       </div>
+    </div>
+  );
+}
+
+function DashboardLoadingState({ label }: { label: string }) {
+  return (
+    <div className="space-y-5" aria-busy="true" aria-label={label}>
+      <section className="overflow-hidden rounded-3xl border border-sky-100 bg-white/90 p-5 shadow-lg shadow-sky-100/70 dark:border-slate-700/80 dark:bg-slate-900/90 dark:shadow-black/30 md:p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-6 w-32 rounded-full bg-slate-200 dark:bg-slate-700" />
+          <div className="h-9 w-2/3 rounded bg-slate-200 dark:bg-slate-700" />
+          <div className="h-5 w-full max-w-2xl rounded bg-slate-200 dark:bg-slate-700" />
+        </div>
+      </section>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {['site-1', 'site-2', 'site-3', 'site-4'].map((placeholderId) => (
+          <div
+            key={placeholderId}
+            className="h-40 animate-pulse rounded-2xl border border-slate-200 bg-white/90 shadow-md shadow-slate-200/50 dark:border-slate-700 dark:bg-slate-900/90 dark:shadow-black/20"
+          />
+        ))}
+      </div>
+      <span className="sr-only">{label}</span>
     </div>
   );
 }
