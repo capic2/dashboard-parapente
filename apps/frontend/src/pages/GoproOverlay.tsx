@@ -1,6 +1,6 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Button } from '@dashboard-parapente/design-system';
-import { api } from '../lib/api';
+import { api, getApiErrorMessage } from '../lib/api';
 import { useToast } from '../hooks/useToast';
 import {
   type GoproOverlayJob,
@@ -140,8 +140,13 @@ export default function GoproOverlayPage() {
       const created = await createJob.mutateAsync(formData);
       setJobId(created.job_id);
       toast.success('Génération GoPro lancée');
-    } catch {
-      toast.error('Impossible de lancer la génération GoPro');
+    } catch (error) {
+      toast.error(
+        await getApiErrorMessage(
+          error,
+          'Impossible de lancer la génération GoPro'
+        )
+      );
     }
   }
 
