@@ -13,6 +13,8 @@ import config
 import gopro_overlay_export
 import routes
 from gopro_overlay_export import _prepare_layout_file
+from gopro_overlay_export import _progress_from_output_chunk
+from gopro_overlay_export import _read_process_updates
 from gopro_overlay_export import cancel_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job_from_paths
@@ -617,6 +619,34 @@ def test_prepare_layout_file_removes_pip_without_video(tmp_path):
     _prepare_layout_file(source, destination, has_pip=False)
 
     assert 'type="video"' not in destination.read_text()
+
+
+def test_gopro_overlay_progress_is_parsed_from_render_output():
+    assert _progress_from_output_chunk("Render: 42 [42%] [1.2/s] ETA: 00:10") == 42
+
+
+def test_gopro_overlay_progress_is_clamped_until_output_is_ready():
+    assert _progress_from_output_chunk("Render: 100 [100%]") == 99
+
+
+def test_gopro_overlay_process_updates_split_carriage_returns():
+    class Stream:
+        def __init__(self, value: str):
+            self.value = value
+            self.index = 0
+
+        def read(self, size: int) -> str:
+            if self.index >= len(self.value):
+                return ""
+            chunk = self.value[self.index : self.index + size]
+            self.index += size
+            return chunk
+
+    assert list(_read_process_updates(Stream("Render: 1%\rRender: 2%\nDone"))) == [
+        "Render: 1%",
+        "Render: 2%",
+        "Done",
+    ]
 
 
 @pytest.mark.asyncio
