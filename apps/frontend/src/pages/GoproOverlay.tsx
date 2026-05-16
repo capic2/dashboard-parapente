@@ -81,6 +81,7 @@ export default function GoproOverlayPage() {
   const [selectedLayoutId, setSelectedLayoutId] = useState('');
   const [outputFilename, setOutputFilename] = useState('');
   const [jobId, setJobId] = useState<string | null>(null);
+  const [jobToken, setJobToken] = useState<string | null>(null);
 
   const layoutsQuery = useGoproOverlayLayouts(
     resolution?.width,
@@ -88,7 +89,7 @@ export default function GoproOverlayPage() {
   );
   const createJob = useCreateGoproOverlayJob();
   const cancelJob = useCancelGoproOverlayJob();
-  const { job } = useGoproOverlayJobStream(jobId);
+  const { job } = useGoproOverlayJobStream(jobId, jobToken);
   const activeJob = job ?? createJob.data ?? null;
   const isRunning =
     activeJob?.status === 'queued' || activeJob?.status === 'running';
@@ -139,6 +140,7 @@ export default function GoproOverlayPage() {
     try {
       const created = await createJob.mutateAsync(formData);
       setJobId(created.job_id);
+      setJobToken(created.job_token ?? null);
       toast.success('Génération GoPro lancée');
     } catch (error) {
       toast.error(
@@ -156,8 +158,12 @@ export default function GoproOverlayPage() {
     }
 
     try {
+      const downloadPath = jobToken
+        ? `job-access/gopro-overlays/jobs/${activeJob.job_id}/download`
+        : `gopro-overlays/jobs/${activeJob.job_id}/download`;
       const blob = await api
-        .get(`gopro-overlays/jobs/${activeJob.job_id}/download`, {
+        .get(downloadPath, {
+          searchParams: jobToken ? { access_token: jobToken } : undefined,
           timeout: false,
         })
         .blob();
@@ -177,7 +183,7 @@ export default function GoproOverlayPage() {
       return;
     }
     try {
-      await cancelJob.mutateAsync(activeJob.job_id);
+      await cancelJob.mutateAsync({ jobId: activeJob.job_id, jobToken });
       toast.success('Génération annulée');
     } catch {
       toast.error("Impossible d'annuler la génération");

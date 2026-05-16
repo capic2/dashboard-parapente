@@ -9,13 +9,35 @@ import {
 const isExportInProgress = (status?: string | null) =>
   status ? VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(status) : false;
 
+type ExportViewerAccess = {
+  exportJobId?: string | null;
+  exportToken?: string | null;
+};
+
 /**
  * Fetch flight details including video export status
  */
-export const useFlight = (flightId: string) => {
+export const useFlight = (
+  flightId: string,
+  access: ExportViewerAccess = {}
+) => {
+  const hasExportAccess = Boolean(access.exportJobId && access.exportToken);
+
   return useQuery<Flight>({
-    queryKey: ['flights', flightId],
+    queryKey: [
+      'flights',
+      flightId,
+      hasExportAccess ? 'export-viewer' : 'user',
+      access.exportJobId ?? null,
+    ],
     queryFn: async () => {
+      if (hasExportAccess) {
+        return await api
+          .get(`export-viewer/jobs/${access.exportJobId}/flight`, {
+            searchParams: { access_token: access.exportToken ?? '' },
+          })
+          .json();
+      }
       return await api.get(`flights/${flightId}`).json();
     },
     enabled: !!flightId,
