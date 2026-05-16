@@ -419,6 +419,79 @@ def _acquire_next_job() -> str | None:
         return job.id
 
 
+def _acquire_job(job_id: str) -> str | None:
+    with SessionLocal() as db:
+        job = db.query(VideoExportJob).filter(VideoExportJob.id == job_id).first()
+        if not job or job.status != _STATUS_QUEUED:
+            return None
+
+        job.status = _STATUS_RUNNING
+        job.message = "Starting manual export"
+        job.updated_at = datetime.utcnow()
+        job.started_at = datetime.utcnow()
+        db.commit()
+        _set_memory_snapshot(job.id, _snapshot_from_job(job))
+        return job.id
+
+
+def _queued_job_ids() -> list[str]:
+    with SessionLocal() as db:
+        jobs = (
+            db.query(VideoExportJob.id)
+            .filter(VideoExportJob.status == _STATUS_QUEUED)
+            .order_by(VideoExportJob.created_at)
+            .all()
+        )
+    return [str(job_id) for (job_id,) in jobs]
+
+
+def _rq_job_id(job_id: str) -> str:
+    return f"video-export:{job_id}"
+
+
+def _enqueue_video_export_job_in_rq(job_id: str) -> None:
+    from job_queue import enqueue_once
+
+    enqueue_once(
+        "video_export_manual.process_video_export_job",
+        job_id,
+        job_id=_rq_job_id(job_id),
+        timeout=config.JOB_QUEUE_TIMEOUT_SECONDS,
+    )
+
+
+def _enqueue_existing_video_export_job(job_id: str) -> None:
+    from job_queue import is_rq_enabled
+
+    if is_rq_enabled():
+        _enqueue_video_export_job_in_rq(job_id)
+    else:
+        start_video_export_worker()
+
+
+def enqueue_pending_video_export_jobs() -> int:
+    """Enqueue queued DB jobs into RQ after an API or worker restart."""
+    from job_queue import is_rq_enabled
+
+    if not is_rq_enabled():
+        return 0
+
+    _mark_stale_jobs_as_queued()
+    job_ids = _queued_job_ids()
+    for job_id in job_ids:
+        _enqueue_video_export_job_in_rq(job_id)
+    return len(job_ids)
+
+
+def process_video_export_job(job_id: str) -> None:
+    """RQ job target for a single manual video export."""
+    acquired_job_id = _acquire_job(job_id)
+    if not acquired_job_id:
+        return
+
+    asyncio.run(_export_video_manual_render(acquired_job_id))
+
+
 def _cleanup_temp_dir(temp_dir: Path | None) -> None:
     if temp_dir is not None:
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -780,6 +853,12 @@ def _worker_loop():
 
 def start_video_export_worker():
     """Start the singleton background worker for manual exports."""
+    from job_queue import is_rq_enabled
+
+    if is_rq_enabled():
+        enqueue_pending_video_export_jobs()
+        return
+
     global _WORKER_THREAD
     with _WORKER_LOCK:
         if _WORKER_THREAD and _WORKER_THREAD.is_alive():
@@ -813,7 +892,7 @@ def _enqueue_video_export_job(
     update_db: bool = True,
     auth_token: str | None = None,
 ):
-    """Create a new export job and enqueue it for the singleton worker."""
+    """Create a new export job and enqueue it for the configured queue backend."""
     if not _dependencies_ok:
         raise RuntimeError("Missing dependencies for video export")
 
@@ -856,7 +935,7 @@ def _enqueue_video_export_job(
 
     _set_job_auth_token(job_id, auth_token)
 
-    start_video_export_worker()
+    _enqueue_existing_video_export_job(job_id)
     return job_id
 
 
@@ -1523,7 +1602,7 @@ def resume_video_export(job_id: str, auth_token: str | None = None) -> bool:
         frames_captured=int(resume_info["frames_captured"]),
         eta_seconds=None,
     )
-    start_video_export_worker()
+    _enqueue_existing_video_export_job(job_id)
     print(f"▶️  Video export {job_id} resumed")
     return True
 
