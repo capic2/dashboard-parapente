@@ -263,6 +263,108 @@ def test_job_frames_dir_uses_configured_temp_dir(tmp_path, monkeypatch):
     assert frames_dir == tmp_path / "temp-images" / "job-123" / "frames"
 
 
+def test_start_video_export_manual_enqueues_rq_job(test_db, monkeypatch):
+    enqueued_job_ids: list[str] = []
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    monkeypatch.setattr(video_export_manual, "_dependencies_ok", True)
+    monkeypatch.setattr(video_export_manual.uuid, "uuid4", lambda: "job-rq")
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(
+        video_export_manual,
+        "_enqueue_video_export_job_in_rq",
+        lambda job_id: enqueued_job_ids.append(job_id),
+    )
+
+    job_id = video_export_manual.start_video_export_manual(
+        flight_id="flight-test-001",
+        frontend_url="http://frontend.test",
+        auth_token="token-rq",
+    )
+
+    db_session = test_db()
+    job = db_session.query(VideoExportJob).filter(VideoExportJob.id == job_id).one()
+    db_session.close()
+
+    assert job_id == "job-rq"
+    assert job.status == "queued"
+    assert job.auth_token == "token-rq"
+    assert enqueued_job_ids == ["job-rq"]
+
+
+def test_start_video_export_worker_enqueues_pending_jobs_with_rq(test_db, monkeypatch):
+    enqueued_job_ids: list[str] = []
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(
+        video_export_manual,
+        "_enqueue_video_export_job_in_rq",
+        lambda job_id: enqueued_job_ids.append(job_id),
+    )
+
+    db_session = test_db()
+    db_session.add(
+        VideoExportJob(
+            id="job-pending-rq",
+            flight_id="flight-test-001",
+            status="queued",
+            mode="manual",
+            quality="1080p",
+            fps=15,
+            speed=1,
+            progress=0,
+            message="queued",
+            frontend_url="http://localhost:5173",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+    )
+    db_session.commit()
+    db_session.close()
+
+    video_export_manual.start_video_export_worker()
+
+    assert enqueued_job_ids == ["job-pending-rq"]
+
+
+def test_process_video_export_job_runs_only_requested_queued_job(test_db, monkeypatch):
+    processed_job_ids: list[str] = []
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+
+    async def fake_export(job_id: str):
+        processed_job_ids.append(job_id)
+
+    monkeypatch.setattr(video_export_manual, "_export_video_manual_render", fake_export)
+
+    db_session = test_db()
+    db_session.add(
+        VideoExportJob(
+            id="job-process-rq",
+            flight_id="flight-test-001",
+            status="queued",
+            mode="manual",
+            quality="1080p",
+            fps=15,
+            speed=1,
+            progress=0,
+            message="queued",
+            frontend_url="http://localhost:5173",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+    )
+    db_session.commit()
+    db_session.close()
+
+    video_export_manual.process_video_export_job("job-process-rq")
+
+    db_session = test_db()
+    job = db_session.query(VideoExportJob).filter(VideoExportJob.id == "job-process-rq").one()
+    db_session.close()
+
+    assert processed_job_ids == ["job-process-rq"]
+    assert job.status == "running"
+
+
 def test_first_missing_frame_index_returns_resume_point(tmp_path):
     frames_dir = tmp_path / "frames"
     frames_dir.mkdir()
