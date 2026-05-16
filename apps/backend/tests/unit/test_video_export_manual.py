@@ -4,6 +4,8 @@ import os
 import time
 from datetime import datetime
 
+import pytest
+
 from models import VideoExportJob
 
 import video_export
@@ -147,6 +149,46 @@ def test_ffmpeg_timeout_is_not_limited_to_thirty_minutes():
 def test_ffmpeg_timeout_scales_for_long_videos():
     duration_seconds = 7 * 60 * 60
     assert video_export_manual._ffmpeg_timeout_seconds(duration_seconds) == duration_seconds * 20
+
+
+class _FakeTerrainPage:
+    def __init__(self, tile_states: list[bool]):
+        self.tile_states = tile_states
+        self.evaluate_calls = 0
+
+    async def evaluate(self, _script: str) -> bool:
+        self.evaluate_calls += 1
+        if self.tile_states:
+            return self.tile_states.pop(0)
+        return False
+
+
+@pytest.mark.asyncio
+async def test_wait_for_export_frame_terrain_waits_until_tiles_loaded():
+    page = _FakeTerrainPage([False, False, True])
+
+    tiles_loaded = await video_export_manual._wait_for_export_frame_terrain(
+        page,
+        timeout_seconds=1,
+        poll_seconds=0,
+    )
+
+    assert tiles_loaded is True
+    assert page.evaluate_calls == 3
+
+
+@pytest.mark.asyncio
+async def test_wait_for_export_frame_terrain_returns_false_after_timeout():
+    page = _FakeTerrainPage([False, False, False])
+
+    tiles_loaded = await video_export_manual._wait_for_export_frame_terrain(
+        page,
+        timeout_seconds=0,
+        poll_seconds=0,
+    )
+
+    assert tiles_loaded is False
+    assert page.evaluate_calls == 1
 
 
 def test_ffmpeg_output_file_activity_tracks_size_and_mtime(tmp_path):

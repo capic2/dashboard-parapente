@@ -69,6 +69,8 @@ _JOB_CANCEL_REQUESTS: set[str] = set()
 _CANCEL_CHECK_INTERVAL = 10
 _FFMPEG_STALL_TIMEOUT_SECONDS = 10 * 60
 _ORPHAN_TEMP_CLEANUP_GRACE_SECONDS = 30
+_EXPORT_FRAME_TERRAIN_TIMEOUT_SECONDS = 10.0
+_EXPORT_FRAME_TERRAIN_POLL_SECONDS = 0.1
 
 
 def check_dependencies():
@@ -691,6 +693,45 @@ def _ffmpeg_timeout_seconds(video_duration_seconds: float) -> int:
     return max(6 * 60 * 60, dynamic_timeout)
 
 
+async def _wait_for_export_frame_terrain(
+    page: Any,
+    timeout_seconds: float = _EXPORT_FRAME_TERRAIN_TIMEOUT_SECONDS,
+    poll_seconds: float = _EXPORT_FRAME_TERRAIN_POLL_SECONDS,
+) -> bool:
+    deadline = time.monotonic() + timeout_seconds
+
+    while True:
+        tiles_loaded = await page.evaluate("""
+            () => {
+                const viewer = window._cesiumViewer;
+                const scene = viewer?.scene;
+                const globe = scene?.globe;
+
+                if (!viewer || !scene || !globe) {
+                    return false;
+                }
+
+                try {
+                    scene.requestRender?.();
+                    viewer.render?.();
+                } catch {
+                    return false;
+                }
+
+                return Boolean(globe.tilesLoaded);
+            }
+        """)
+
+        if tiles_loaded:
+            return True
+
+        remaining_seconds = deadline - time.monotonic()
+        if remaining_seconds <= 0:
+            return False
+
+        await asyncio.sleep(min(poll_seconds, remaining_seconds))
+
+
 def _ffmpeg_output_file_activity(
     output_file: Path, last_size: int, last_mtime_ns: int
 ) -> tuple[bool, int, int]:
@@ -1034,28 +1075,14 @@ async def _export_video_manual_render(job_id: str):
             print("✅ Cesium manual render mode configured")
 
             _update_job(job_id, message="Waiting for terrain")
-            try:
-                await asyncio.wait_for(
-                    page.evaluate("""
-                        () => {
-                            return new Promise((resolve) => {
-                                const viewer = window._cesiumViewer;
-                                const checkTerrain = () => {
-                                    if (viewer.scene.globe.tilesLoaded) {
-                                        console.log('✅ Terrain tiles loaded');
-                                        resolve(true);
-                                    } else {
-                                        setTimeout(checkTerrain, 500);
-                                    }
-                                };
-                                setTimeout(checkTerrain, 1000);
-                            });
-                        }
-                    """),
-                    timeout=60.0,
-                )
+            terrain_ready = await _wait_for_export_frame_terrain(
+                page,
+                timeout_seconds=60.0,
+                poll_seconds=0.5,
+            )
+            if terrain_ready:
                 print("✅ Initial terrain loaded")
-            except TimeoutError:
+            else:
                 print("⚠️  Terrain timeout - continuing anyway")
 
             await asyncio.sleep(2)
@@ -1188,17 +1215,12 @@ async def _export_video_manual_render(job_id: str):
                     )
                     tiles_loaded = bool(frame_state and frame_state.get("tilesLoaded"))
                 else:
-                    tiles_loaded = await page.evaluate("""
-                        () => {
-                            const viewer = window._cesiumViewer;
-                            viewer.scene.requestRender();
-                            viewer.render();
-                            return viewer.scene.globe.tilesLoaded;
-                        }
-                    """)
+                    tiles_loaded = False
 
                 if not tiles_loaded:
-                    await asyncio.sleep(0.1)
+                    tiles_loaded = await _wait_for_export_frame_terrain(page)
+                    if not tiles_loaded:
+                        print(f"⚠️  Terrain still loading for frame {i} after timeout")
 
                 frame_path = frames_dir / f"frame{i:05d}.png"
                 await page.screenshot(path=str(frame_path), timeout=60000)
