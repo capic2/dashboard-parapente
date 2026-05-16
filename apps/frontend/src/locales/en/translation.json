@@ -642,6 +642,8 @@
     "goproOverlayOutputDir": "Optional output folder",
     "goproOverlayOutputDirFallback": "If empty, writes parapente/YYYYMMDD/N/final.mp4.",
     "goproOverlayOutputFilename": "Output file name",
+    "goproOverlayEditField": "Edit {{field}}",
+    "goproOverlayAutoValue": "Automatic value",
     "goproOverlayStatus": {
       "queued": "Queued",
       "running": "Running",

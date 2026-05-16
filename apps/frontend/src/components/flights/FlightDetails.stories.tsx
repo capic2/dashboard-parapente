@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import preview from '../../../.storybook/preview';
-import { expect, fn, userEvent } from 'storybook/test';
+import { expect, fn, screen, userEvent } from 'storybook/test';
 import { FlightDetails } from './FlightDetails';
 import { ToastContainer } from '@dashboard-parapente/design-system';
 import { useToastStore } from '../../hooks/useToast';
@@ -199,6 +199,58 @@ Default.test('The GPX can be downloaded', async ({ canvas, step }) => {
     ).toBeInTheDocument();
   });
 });
+
+Default.test(
+  'The GoPro overlay settings use edit in place fields',
+  async ({ canvas, userEvent, step }) => {
+    await step('open the GoPro overlay modal', async () => {
+      await userEvent.click(
+        await canvas.findByRole('button', {
+          name: i18n.t('flights.goproOverlayGenerate'),
+        })
+      );
+      await expect(
+        await screen.findByRole('dialog', {
+          name: i18n.t('flights.goproOverlayFormTitle'),
+        })
+      ).toBeInTheDocument();
+    });
+
+    await step('show values as text before editing', async () => {
+      await expect(
+        screen.queryByRole('textbox', {
+          name: i18n.t('flights.goproOverlayCameraVideo'),
+        })
+      ).not.toBeInTheDocument();
+      await expect(
+        screen.getAllByText(i18n.t('flights.goproOverlayAutoValue')).length
+      ).toBeGreaterThan(0);
+    });
+
+    await step('edit one field from its pencil action', async () => {
+      await userEvent.click(
+        screen.getByRole('button', {
+          name: i18n.t('flights.goproOverlayEditField', {
+            field: i18n.t('flights.goproOverlayCameraVideo'),
+          }),
+        })
+      );
+      const cameraInput = await screen.findByRole('textbox', {
+        name: i18n.t('flights.goproOverlayCameraVideo'),
+      });
+      await userEvent.type(cameraInput, 'parapente/20260315/1/camera.mp4');
+      await userEvent.keyboard('{Enter}');
+      await expect(
+        screen.queryByRole('textbox', {
+          name: i18n.t('flights.goproOverlayCameraVideo'),
+        })
+      ).not.toBeInTheDocument();
+      await expect(
+        screen.getByText('parapente/20260315/1/camera.mp4')
+      ).toBeInTheDocument();
+    });
+  }
+);
 
 export const WithoutGpx = meta.story({
   name: 'Without GPX',
