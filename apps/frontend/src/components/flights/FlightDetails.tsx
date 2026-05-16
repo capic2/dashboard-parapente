@@ -1,8 +1,9 @@
-import type { ChangeEvent, FormEvent } from 'react';
+import type { ChangeEvent, FormEvent, KeyboardEvent } from 'react';
 import { useState, useRef, lazy, Suspense, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { TextField, TextArea } from 'react-aria-components';
+import { Pencil } from 'lucide-react';
 import {
   Button,
   Modal,
@@ -48,6 +49,12 @@ interface FlightDetailsProps {
 }
 
 type FlightDetailsTab = 'infos' | 'replay';
+type GoproOverlayFieldId =
+  | 'videoPath'
+  | 'gpxPath'
+  | 'pipPath'
+  | 'outputDir'
+  | 'outputFilename';
 
 const labelClass = 'text-xs text-gray-600 dark:text-gray-300';
 const valueClass =
@@ -88,6 +95,9 @@ export function FlightDetails({
   const [goproOverlayOutputDir, setGoproOverlayOutputDir] = useState('');
   const [goproOverlayOutputFilename, setGoproOverlayOutputFilename] =
     useState('');
+  const [editingGoproOverlayField, setEditingGoproOverlayField] =
+    useState<GoproOverlayFieldId | null>(null);
+  const goproOverlayEditInputRef = useRef<HTMLInputElement>(null);
 
   const hasGpx = Boolean(flight.gpx_file_path);
   const hasVideo = Boolean(flight.video_file_path);
@@ -121,12 +131,17 @@ export function FlightDetails({
     setGoproOverlayPipPath('');
     setGoproOverlayOutputDir('');
     setGoproOverlayOutputFilename('');
+    setEditingGoproOverlayField(null);
     resetGoproOverlayJob();
   }, [flight.id, resetGoproOverlayJob]);
 
   useEffect(() => {
     setNotesText(flight.notes ?? '');
   }, [flight.notes]);
+
+  useEffect(() => {
+    goproOverlayEditInputRef.current?.focus();
+  }, [editingGoproOverlayField]);
 
   const handleSubmitEdit = async (values: FlightFormData) => {
     await updateFlight.mutateAsync(values);
@@ -199,6 +214,24 @@ export function FlightDetails({
   const handleStartGoproOverlay = () => {
     if (isGoproOverlayRunning) return;
     setShowGoproOverlayForm(true);
+  };
+
+  const handleCloseGoproOverlayForm = () => {
+    setShowGoproOverlayForm(false);
+    setEditingGoproOverlayField(null);
+  };
+
+  const handleGoproOverlayFieldKeyDown = (
+    event: KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      setEditingGoproOverlayField(null);
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setEditingGoproOverlayField(null);
+    }
   };
 
   const handleSubmitGoproOverlay = async (
@@ -289,102 +322,157 @@ export function FlightDetails({
     goproOverlayTitle = t('flights.goproOverlayCanProvideGpx');
   }
 
+  const goproOverlayFields: {
+    id: GoproOverlayFieldId;
+    label: string;
+    value: string;
+    placeholder: string;
+    help?: string;
+    onChange: (value: string) => void;
+  }[] = [
+    {
+      id: 'videoPath',
+      label: t('flights.goproOverlayCameraVideo'),
+      value: goproOverlayVideoPath,
+      placeholder: 'parapente/YYYYMMDD/N/camera.mp4',
+      help: t('flights.goproOverlayPathHelp'),
+      onChange: setGoproOverlayVideoPath,
+    },
+    {
+      id: 'gpxPath',
+      label: t('flights.goproOverlayGpxFile'),
+      value: goproOverlayGpxPath,
+      placeholder: 'parapente/YYYYMMDD/N/Zepp*.gpx',
+      help: hasGpx
+        ? t('flights.goproOverlayGpxFallback')
+        : t('flights.goproOverlayAutoPathHelp'),
+      onChange: setGoproOverlayGpxPath,
+    },
+    {
+      id: 'pipPath',
+      label: t('flights.goproOverlayOsvVideo'),
+      value: goproOverlayPipPath,
+      placeholder: 'flight-pip.mp4',
+      help: hasVideo
+        ? t('flights.goproOverlayPipFallback')
+        : t('flights.goproOverlayPipAutoPathHelp'),
+      onChange: setGoproOverlayPipPath,
+    },
+    {
+      id: 'outputDir',
+      label: t('flights.goproOverlayOutputDir'),
+      value: goproOverlayOutputDir,
+      placeholder: 'parapente/YYYYMMDD/N',
+      help: t('flights.goproOverlayOutputDirFallback'),
+      onChange: setGoproOverlayOutputDir,
+    },
+    {
+      id: 'outputFilename',
+      label: t('flights.goproOverlayOutputFilename'),
+      value: goproOverlayOutputFilename,
+      placeholder: 'final.mp4',
+      onChange: setGoproOverlayOutputFilename,
+    },
+  ];
+
+  const goproOverlayFormFields = (
+    <div className="grid gap-3 md:grid-cols-2">
+      {goproOverlayFields.map((field) => {
+        const isEditing = editingGoproOverlayField === field.id;
+        const trimmedValue = field.value.trim();
+
+        return (
+          <div
+            key={field.id}
+            className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-colors dark:border-slate-700 dark:bg-slate-900"
+          >
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <label
+                htmlFor={`gopro-overlay-${field.id}`}
+                className="text-sm font-medium text-gray-700 dark:text-gray-200"
+              >
+                {field.label}
+              </label>
+              <Button
+                type="button"
+                className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-700 transition-colors hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 dark:focus:ring-offset-slate-900"
+                onPress={() => setEditingGoproOverlayField(field.id)}
+                aria-label={t('flights.goproOverlayEditField', {
+                  field: field.label,
+                })}
+              >
+                <Pencil className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            </div>
+            {isEditing ? (
+              <input
+                id={`gopro-overlay-${field.id}`}
+                className="block w-full rounded-md border border-sky-400 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500 dark:border-sky-500 dark:bg-gray-800 dark:text-white"
+                type="text"
+                value={field.value}
+                placeholder={field.placeholder}
+                onChange={(event) => field.onChange(event.target.value)}
+                onBlur={() => setEditingGoproOverlayField(null)}
+                onKeyDown={handleGoproOverlayFieldKeyDown}
+                ref={goproOverlayEditInputRef}
+              />
+            ) : (
+              <button
+                type="button"
+                className="block w-full cursor-pointer rounded-md border border-transparent bg-slate-50 px-3 py-2 text-left text-sm font-medium text-slate-900 transition-colors hover:border-slate-300 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-600 dark:hover:bg-slate-700 dark:focus:ring-offset-slate-900"
+                onClick={() => setEditingGoproOverlayField(field.id)}
+              >
+                {trimmedValue ? (
+                  trimmedValue
+                ) : (
+                  <span className="font-normal italic text-slate-500 dark:text-slate-400">
+                    {t('flights.goproOverlayAutoValue')}
+                  </span>
+                )}
+              </button>
+            )}
+            {field.help && (
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                {field.help}
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const goproOverlayFormActions = (
+    <div className="flex flex-wrap justify-end gap-2">
+      <Button
+        type="button"
+        className="cursor-pointer rounded-md bg-gray-200 px-4 py-2 text-sm text-gray-900 transition-colors hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 dark:focus:ring-offset-slate-900"
+        onPress={handleCloseGoproOverlayForm}
+      >
+        {t('common.cancel')}
+      </Button>
+      <Button
+        type="submit"
+        className="cursor-pointer rounded-md bg-slate-900 px-4 py-2 text-sm text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-400 dark:bg-cyan-700 dark:hover:bg-cyan-600 dark:focus:ring-offset-slate-900"
+        isDisabled={createGoproOverlayJob.isPending}
+      >
+        {createGoproOverlayJob.isPending
+          ? t('flights.goproOverlayStarting')
+          : t('flights.goproOverlayLaunch')}
+      </Button>
+    </div>
+  );
+
   const goproOverlayModal = (
     <Modal
       isOpen={showGoproOverlayForm && !goproOverlayJob}
-      onClose={() => setShowGoproOverlayForm(false)}
+      onClose={handleCloseGoproOverlayForm}
       title={t('flights.goproOverlayFormTitle')}
       size="lg"
     >
       <form className="space-y-4" onSubmit={handleSubmitGoproOverlay}>
-        <div className="grid gap-3 md:grid-cols-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-            {t('flights.goproOverlayCameraVideo')}
-            <input
-              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              type="text"
-              value={goproOverlayVideoPath}
-              placeholder="parapente/YYYYMMDD/N/camera.mp4"
-              onChange={(event) => setGoproOverlayVideoPath(event.target.value)}
-            />
-            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
-              {t('flights.goproOverlayPathHelp')}
-            </span>
-          </label>
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-            {t('flights.goproOverlayGpxFile')}
-            <input
-              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              type="text"
-              value={goproOverlayGpxPath}
-              placeholder="parapente/YYYYMMDD/N/Zepp*.gpx"
-              onChange={(event) => setGoproOverlayGpxPath(event.target.value)}
-            />
-            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
-              {hasGpx
-                ? t('flights.goproOverlayGpxFallback')
-                : t('flights.goproOverlayAutoPathHelp')}
-            </span>
-          </label>
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-            {t('flights.goproOverlayOsvVideo')}
-            <input
-              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              type="text"
-              value={goproOverlayPipPath}
-              placeholder="flight-pip.mp4"
-              onChange={(event) => setGoproOverlayPipPath(event.target.value)}
-            />
-            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
-              {hasVideo
-                ? t('flights.goproOverlayPipFallback')
-                : t('flights.goproOverlayPipAutoPathHelp')}
-            </span>
-          </label>
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-            {t('flights.goproOverlayOutputDir')}
-            <input
-              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              type="text"
-              value={goproOverlayOutputDir}
-              placeholder="parapente/YYYYMMDD/N"
-              onChange={(event) => setGoproOverlayOutputDir(event.target.value)}
-            />
-            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
-              {t('flights.goproOverlayOutputDirFallback')}
-            </span>
-          </label>
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-            {t('flights.goproOverlayOutputFilename')}
-            <input
-              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              type="text"
-              value={goproOverlayOutputFilename}
-              placeholder="final.mp4"
-              onChange={(event) =>
-                setGoproOverlayOutputFilename(event.target.value)
-              }
-            />
-          </label>
-        </div>
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button
-            type="button"
-            className="px-4 py-2 text-sm bg-gray-200 text-gray-900 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
-            onPress={() => setShowGoproOverlayForm(false)}
-          >
-            {t('common.cancel')}
-          </Button>
-          <Button
-            type="submit"
-            className="px-4 py-2 text-sm bg-slate-900 text-white rounded-md hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-gray-400 dark:bg-cyan-700 dark:hover:bg-cyan-600"
-            isDisabled={createGoproOverlayJob.isPending}
-          >
-            {createGoproOverlayJob.isPending
-              ? t('flights.goproOverlayStarting')
-              : t('flights.goproOverlayLaunch')}
-          </Button>
-        </div>
+        {goproOverlayFormFields}
+        {goproOverlayFormActions}
       </form>
     </Modal>
   );
@@ -499,6 +587,21 @@ export function FlightDetails({
               className="hidden"
             />
           </div>
+
+          {(hasGpx || hasVideo) && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {hasGpx && (
+                <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800 dark:bg-green-900/30 dark:text-green-200">
+                  {t('flights.gpxBadge')}
+                </span>
+              )}
+              {hasVideo && (
+                <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-200">
+                  {t('flights.videoBadge')}
+                </span>
+              )}
+            </div>
+          )}
 
           {goproOverlayJob && (
             <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
