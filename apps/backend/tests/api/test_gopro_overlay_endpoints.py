@@ -820,6 +820,42 @@ def test_cancelled_queued_job_does_not_start_process():
         gopro_overlay_export._PROCESSES.pop(job_id, None)
 
 
+def test_run_job_passes_configured_font(monkeypatch):
+    job_id = "font-job"
+    gopro_overlay_export._JOBS[job_id] = {
+        "job_id": job_id,
+        "status": "queued",
+        "progress": 0,
+        "message": "Overlay queued",
+        "gpx_path": "track.gpx",
+        "layout_path": "layout.xml",
+        "video_path": "flight.mp4",
+        "output_path": "overlay.mp4",
+        "pip_path": None,
+        "video_width": None,
+        "video_height": None,
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_FONT", "/fonts/LiberationSans-Regular.ttf")
+
+    class FailedProcess:
+        stdout: list[str] = []
+
+        def wait(self) -> int:
+            return 1
+
+    try:
+        with patch("gopro_overlay_export.subprocess.Popen", return_value=FailedProcess()) as popen:
+            gopro_overlay_export._run_job(job_id)
+
+        command = popen.call_args.args[0]
+        assert "--font" in command
+        assert command[command.index("--font") + 1] == "/fonts/LiberationSans-Regular.ttf"
+    finally:
+        gopro_overlay_export._JOBS.pop(job_id, None)
+        gopro_overlay_export._PROCESSES.pop(job_id, None)
+
+
 def test_run_job_marks_unexpected_start_error_failed(caplog):
     job_id = "start-error-job"
     gopro_overlay_export._JOBS[job_id] = {

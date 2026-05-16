@@ -155,6 +155,10 @@ GOPRO_OVERLAY_LAYOUT_DIR = GOPRO_OVERLAY_ROOT
 GOPRO_OVERLAY_PARAGLIDING_ROOT = PARAGLIDING_DATA_ROOT
 GOPRO_OVERLAY_OUTPUT_DIR = PARAGLIDING_DATA_ROOT
 GOPRO_OVERLAY_UPLOAD_DIR = str(Path(PARAGLIDING_DATA_ROOT) / ".tmp" / "gopro-uploads")
+GOPRO_OVERLAY_FONT = os.getenv(
+    "BACKEND_GOPRO_OVERLAY_FONT",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+)
 
 # ============================================================================
 # VALIDATION
