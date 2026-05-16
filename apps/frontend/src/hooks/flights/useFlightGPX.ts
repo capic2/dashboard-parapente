@@ -13,16 +13,39 @@ interface GPXData {
   flight_duration_seconds: number;
 }
 
+type ExportViewerAccess = {
+  exportJobId?: string | null;
+  exportToken?: string | null;
+};
+
 /**
  * Fetch GPX data for a specific flight
  * Returns parsed coordinates and elevation profile
  */
-export const useFlightGPX = (flightId: string) => {
+export const useFlightGPX = (
+  flightId: string,
+  access: ExportViewerAccess = {}
+) => {
+  const hasExportAccess = Boolean(access.exportJobId && access.exportToken);
+
   return useQuery<GPXData>({
-    queryKey: ['flights', flightId, 'gpx'],
+    queryKey: [
+      'flights',
+      flightId,
+      'gpx',
+      hasExportAccess ? 'export-viewer' : 'user',
+      access.exportJobId ?? null,
+    ],
     queryFn: async () => {
       const data = await api
-        .get(`flights/${flightId}/gpx-data`)
+        .get(
+          hasExportAccess
+            ? `export-viewer/jobs/${access.exportJobId}/gpx-data`
+            : `flights/${flightId}/gpx-data`,
+          hasExportAccess
+            ? { searchParams: { access_token: access.exportToken ?? '' } }
+            : undefined
+        )
         .json<{ data: GPXData }>();
       console.log('🔍 DEBUG useFlightGPX - Raw API response:', data);
       console.log(

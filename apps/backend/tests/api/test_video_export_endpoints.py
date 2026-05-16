@@ -11,6 +11,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from auth import create_job_token
+
 API_PREFIX = "/api"
 
 
@@ -378,6 +380,33 @@ class TestExportStatusAndCancel:
 
         assert response.status_code == 404
         assert response.json()["detail"] == "Export job not found"
+
+    def test_job_access_export_viewer_returns_flight_with_job_token(
+        self, client: TestClient, sample_flight
+    ):
+        token = create_job_token(
+            purpose="video_export",
+            job_id="job-export-viewer",
+            flight_id=sample_flight.id,
+        )
+
+        response = client.get(
+            f"{API_PREFIX}/export-viewer/jobs/job-export-viewer/flight",
+            params={"access_token": token},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["id"] == sample_flight.id
+
+    def test_job_access_export_viewer_rejects_wrong_job_token(self, client: TestClient):
+        token = create_job_token(purpose="video_export", job_id="other-job")
+
+        response = client.get(
+            f"{API_PREFIX}/export-viewer/jobs/job-export-viewer/flight",
+            params={"access_token": token},
+        )
+
+        assert response.status_code == 401
 
 
 class TestVideoExportJobsEndpoint:

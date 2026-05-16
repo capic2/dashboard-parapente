@@ -78,6 +78,9 @@ export function FlightVideoExportControls({
   const [videoExportMode, setVideoExportMode] =
     useState<VideoExportMode>('manual_fast');
   const [isStartingVideoExport, setIsStartingVideoExport] = useState(false);
+  const [videoExportJobToken, setVideoExportJobToken] = useState<string | null>(
+    null
+  );
   const isExportActive = hasActiveVideoExport(flight);
   const shouldReadExportStatus = Boolean(
     flight.video_export_job_id &&
@@ -87,7 +90,8 @@ export function FlightVideoExportControls({
   );
   const { status: exportStatus } = useVideoExportStatus(
     flight.video_export_job_id,
-    shouldReadExportStatus
+    shouldReadExportStatus,
+    videoExportJobToken
   );
   const exportProgress = Math.min(
     100,
@@ -117,9 +121,12 @@ export function FlightVideoExportControls({
 
     setIsStartingVideoExport(true);
     try {
-      await api.post(`flights/${flight.id}/export-video`, {
-        searchParams: { mode: videoExportMode },
-      });
+      const payload = await api
+        .post(`flights/${flight.id}/export-video`, {
+          searchParams: { mode: videoExportMode },
+        })
+        .json<{ job_token?: string | null }>();
+      setVideoExportJobToken(payload.job_token ?? null);
       await queryClient.invalidateQueries({ queryKey: ['flights', flight.id] });
     } finally {
       setIsStartingVideoExport(false);
@@ -131,7 +138,10 @@ export function FlightVideoExportControls({
 
     setIsStartingVideoExport(true);
     try {
-      await api.post(`exports/${flight.video_export_job_id}/resume`);
+      const payload = await api
+        .post(`exports/${flight.video_export_job_id}/resume`)
+        .json<{ job_token?: string | null }>();
+      setVideoExportJobToken(payload.job_token ?? null);
       await queryClient.invalidateQueries({ queryKey: ['flights', flight.id] });
     } finally {
       setIsStartingVideoExport(false);

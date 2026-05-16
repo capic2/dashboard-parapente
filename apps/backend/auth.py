@@ -19,6 +19,9 @@ from models import User
 logger = logging.getLogger(__name__)
 
 ALGORITHM = "HS256"
+ACCESS_TOKEN_PURPOSE = "access"
+JOB_TOKEN_PURPOSES = {"video_export", "gopro_overlay"}
+JOB_TOKEN_EXPIRE_HOURS = 12
 
 
 def _extract_access_token(request: Request) -> str | None:
@@ -55,7 +58,43 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(email: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(hours=config.JWT_EXPIRE_HOURS)
-    return jwt.encode({"sub": email, "exp": expire}, config.JWT_SECRET, algorithm=ALGORITHM)
+    return jwt.encode(
+        {"sub": email, "purpose": ACCESS_TOKEN_PURPOSE, "exp": expire},
+        config.JWT_SECRET,
+        algorithm=ALGORITHM,
+    )
+
+
+def create_job_token(
+    *,
+    purpose: str,
+    job_id: str,
+    flight_id: str | None = None,
+) -> str:
+    if purpose not in JOB_TOKEN_PURPOSES:
+        raise ValueError("Unsupported job token purpose")
+
+    expire = datetime.now(timezone.utc) + timedelta(hours=JOB_TOKEN_EXPIRE_HOURS)
+    payload = {"purpose": purpose, "job_id": job_id, "exp": expire}
+    if flight_id:
+        payload["flight_id"] = flight_id
+    return jwt.encode(payload, config.JWT_SECRET, algorithm=ALGORITHM)
+
+
+def decode_job_token(token: str, *, purpose: str, job_id: str) -> dict:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or expired job token",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, config.JWT_SECRET, algorithms=[ALGORITHM])
+    except JWTError as e:
+        raise credentials_exception from e
+
+    if payload.get("purpose") != purpose or payload.get("job_id") != job_id:
+        raise credentials_exception
+    return payload
 
 
 def get_current_user(
@@ -75,7 +114,7 @@ def get_current_user(
     try:
         payload = jwt.decode(token, config.JWT_SECRET, algorithms=[ALGORITHM])
         email: str | None = payload.get("sub")
-        if email is None:
+        if payload.get("purpose", ACCESS_TOKEN_PURPOSE) != ACCESS_TOKEN_PURPOSE or email is None:
             raise credentials_exception
     except JWTError as e:
         raise credentials_exception from e
