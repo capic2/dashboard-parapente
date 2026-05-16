@@ -542,6 +542,13 @@ def get_gopro_overlay_job(job_id: str, include_command: bool = False) -> dict[st
     return payload
 
 
+def list_gopro_overlay_jobs() -> list[dict[str, Any]]:
+    with _LOCK:
+        return [
+            {key: value for key, value in job.items() if key != "command"} for job in _JOBS.values()
+        ]
+
+
 def cancel_gopro_overlay_job(job_id: str) -> bool:
     with _LOCK:
         process = _PROCESSES.get(job_id)

@@ -84,6 +84,9 @@
     "cleanupError": "Impossible de supprimer les fichiers temporaires",
     "loadError": "Impossible de charger les générations vidéo",
     "empty": "Aucune génération vidéo pour le moment.",
+    "mode": {
+      "goproOverlay": "Overlay GoPro"
+    },
     "status": {
       "queued": "En attente",
       "running": "Démarrage",

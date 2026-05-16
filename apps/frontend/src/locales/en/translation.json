@@ -84,6 +84,9 @@
     "cleanupError": "Unable to delete temporary files",
     "loadError": "Unable to load video generations",
     "empty": "No video generation yet.",
+    "mode": {
+      "goproOverlay": "GoPro overlay"
+    },
     "status": {
       "queued": "Queued",
       "running": "Starting",
