@@ -358,6 +358,20 @@ export default function GoproOverlayPage() {
             max={100}
             aria-label="Avancement de la génération overlay GoPro"
           />
+          {activeJob.status === 'completed' && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-800 dark:bg-emerald-950/30">
+              <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
+                Overlay prêt : {activeJob.output_filename}
+              </p>
+              <Button
+                type="button"
+                onClick={handleDownload}
+                className="cursor-pointer rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+              >
+                Télécharger overlay
+              </Button>
+            </div>
+          )}
           {activeJob.error && (
             <pre className="mt-3 max-h-56 overflow-auto rounded-lg bg-red-950 p-3 text-xs text-red-50">
               {activeJob.error}
