@@ -545,6 +545,27 @@ def schedule_strava_token_refresh_job():
     )
 
 
+async def initial_strava_token_refresh() -> None:
+    """Refresh the Strava token once at startup before the interval job runs."""
+
+    from strava import refresh_access_token
+
+    try:
+        token = await refresh_access_token(force=True)
+        if token:
+            logger.info("🔑 Initial Strava token refresh completed")
+        else:
+            logger.warning("⚠️ Initial Strava token refresh failed")
+    except Exception:
+        logger.warning("⚠️ Initial Strava token refresh failed", exc_info=True)
+
+
+def trigger_initial_strava_token_refresh() -> None:
+    """Start the initial Strava token refresh without blocking startup."""
+
+    asyncio.create_task(initial_strava_token_refresh())
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -586,6 +607,7 @@ async def lifespan(app: FastAPI):
         # Strava token refresh every 4 hours
         schedule_strava_token_refresh_job()
         logger.info("🔑 Strava token refresh scheduled (every 4h)")
+        trigger_initial_strava_token_refresh()
 
         # Initial cache warmup (non-blocking)
         logger.info("🔥 Triggering initial cache warmup...")
