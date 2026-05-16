@@ -57,6 +57,16 @@ REDIS_PORT = int(os.getenv("BACKEND_REDIS_PORT", "6379"))
 USE_FAKE_REDIS = os.getenv("BACKEND_USE_FAKE_REDIS", "true").lower() == "true"
 
 # ============================================================================
+# JOB QUEUE
+# ============================================================================
+JOB_QUEUE_BACKEND = os.getenv(
+    "BACKEND_JOB_QUEUE_BACKEND",
+    "thread" if IS_TEST_ENV else "rq",
+).lower()
+JOB_QUEUE_NAME = os.getenv("BACKEND_JOB_QUEUE_NAME", "video_exports")
+JOB_QUEUE_TIMEOUT_SECONDS = int(os.getenv("BACKEND_JOB_QUEUE_TIMEOUT_SECONDS", "21600"))
+
+# ============================================================================
 # API
 # ============================================================================
 API_HOST = os.getenv("BACKEND_API_HOST", "0.0.0.0")
