@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 import re
 import shutil
@@ -16,6 +17,8 @@ from typing import Any
 from fastapi import UploadFile
 
 import config
+
+logger = logging.getLogger(__name__)
 
 _STATUS_QUEUED = "queued"
 _STATUS_RUNNING = "running"
@@ -452,6 +455,13 @@ def _create_gopro_overlay_job_from_paths(
     with _LOCK:
         _JOBS[job_id] = job
 
+    logger.info(
+        "Queued GoPro overlay job %s with layout %s and output %s",
+        job_id,
+        selected_layout.id,
+        output_path,
+    )
+
     thread = threading.Thread(target=_run_job, args=(job_id,), daemon=True)
     thread.start()
     return job.copy()
@@ -480,6 +490,7 @@ def _run_job(job_id: str) -> None:
 
     if not _transition_job_to_running(job_id, command):
         return
+    logger.info("Starting GoPro overlay job %s", job_id)
     try:
         process = subprocess.Popen(
             command,
@@ -489,12 +500,24 @@ def _run_job(job_id: str) -> None:
             text=True,
         )
     except FileNotFoundError as exc:
+        logger.exception("GoPro overlay binary not found for job %s", job_id)
         _finish_job(
             job_id,
             status=_STATUS_FAILED,
             progress=100,
             message="gopro-dashboard.py not found",
             error=str(exc),
+            completed_at=_utc_now(),
+        )
+        return
+    except Exception as exc:
+        logger.exception("Failed to start GoPro overlay job %s", job_id)
+        _finish_job(
+            job_id,
+            status=_STATUS_FAILED,
+            progress=100,
+            message="Overlay rendering failed to start",
+            error=str(exc) or exc.__class__.__name__,
             completed_at=_utc_now(),
         )
         return
@@ -528,17 +551,27 @@ def _run_job(job_id: str) -> None:
             return
 
         if return_code != 0:
+            error = "\n".join(output_lines[-20:]) or f"Process exited with {return_code}"
+            logger.error(
+                "GoPro overlay job %s failed with exit code %s: %s",
+                job_id,
+                return_code,
+                error,
+            )
             _finish_job(
                 job_id,
                 status=_STATUS_FAILED,
                 progress=100,
                 message="Overlay rendering failed",
-                error="\n".join(output_lines[-20:]) or f"Process exited with {return_code}",
+                error=error,
                 completed_at=_utc_now(),
             )
             return
 
         if not Path(job["output_path"]).exists():
+            logger.error(
+                "GoPro overlay job %s did not create output %s", job_id, job["output_path"]
+            )
             _finish_job(
                 job_id,
                 status=_STATUS_FAILED,
@@ -554,6 +587,17 @@ def _run_job(job_id: str) -> None:
             status=_STATUS_COMPLETED,
             progress=100,
             message="Overlay ready",
+            completed_at=_utc_now(),
+        )
+        logger.info("Completed GoPro overlay job %s", job_id)
+    except Exception as exc:
+        logger.exception("GoPro overlay job %s failed unexpectedly", job_id)
+        _finish_job(
+            job_id,
+            status=_STATUS_FAILED,
+            progress=100,
+            message="Overlay rendering failed unexpectedly",
+            error=str(exc) or exc.__class__.__name__,
             completed_at=_utc_now(),
         )
     finally:

@@ -22,7 +22,7 @@ import {
   useGoproOverlayJobStream,
 } from '../../hooks/gopro/useGoproOverlay';
 import { useToast } from '../../hooks/useToast';
-import { api } from '../../lib/api';
+import { api, getApiErrorMessage } from '../../lib/api';
 import type { Flight, FlightFormData, Site } from '../../types';
 import { FlightEditForm } from './FlightEditForm';
 import {
@@ -281,8 +281,10 @@ export function FlightDetails({
       setGoproOverlayJobId(job.job_id);
       setShowGoproOverlayForm(false);
       toast.success(t('flights.goproOverlayStarted'));
-    } catch {
-      toast.error(t('flights.goproOverlayStartError'));
+    } catch (error) {
+      toast.error(
+        await getApiErrorMessage(error, t('flights.goproOverlayStartError'))
+      );
     }
   };
 
