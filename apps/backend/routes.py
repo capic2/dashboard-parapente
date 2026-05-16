@@ -4727,7 +4727,8 @@ async def create_flight_gopro_overlay_job(
                     status_code=400,
                     detail="Generate the flight video before creating the GoPro overlay",
                 )
-            return create_gopro_overlay_job_from_paths(
+            return await asyncio.to_thread(
+                create_gopro_overlay_job_from_paths,
                 video_path=resolved_video_path,
                 gpx_path=fallback_gpx_path,
                 pip_path=fallback_pip_path,
@@ -4787,7 +4788,7 @@ async def probe_gopro_overlay_video(
     temp_path = Path("/tmp/dashboard-parapente/gopro-overlays/probe") / f"{uuid.uuid4()}.mp4"
     try:
         saved_path = await save_uploaded_file(video_file, temp_path, {".mp4", ".mov", ".m4v"})
-        width, height = probe_video_resolution(saved_path)
+        width, height = await asyncio.to_thread(probe_video_resolution, saved_path)
         layouts = list_gopro_overlay_layouts(video_width=width, video_height=height)
         return {"width": width, "height": height, "layouts": layouts}
     except ValueError as exc:
