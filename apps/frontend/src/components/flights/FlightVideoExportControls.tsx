@@ -21,6 +21,7 @@ interface FlightVideoExportControlsProps {
   flight: Flight;
   className?: string;
   buttonClassName?: string;
+  compact?: boolean;
   showModeSelector?: boolean;
 }
 
@@ -66,6 +67,7 @@ export function FlightVideoExportControls({
   flight: initialFlight,
   className = '',
   buttonClassName = '',
+  compact = false,
   showModeSelector = true,
 }: FlightVideoExportControlsProps) {
   const { t } = useTranslation();
@@ -258,7 +260,8 @@ export function FlightVideoExportControls({
   })();
 
   const primaryButtonClassName = [
-    'cursor-pointer rounded-md px-4 py-2.5 text-sm font-semibold text-white transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:cursor-not-allowed disabled:bg-gray-400',
+    'cursor-pointer rounded-md text-sm font-semibold text-white transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:cursor-not-allowed disabled:bg-gray-400',
+    compact ? 'px-3.5 py-2' : 'px-4 py-2.5',
     flight.video_export_status === 'completed'
       ? 'bg-green-600 hover:bg-green-700'
       : isStartingVideoExport || hasActiveVideoExport(flight)
@@ -313,7 +316,11 @@ export function FlightVideoExportControls({
       </Button>
 
       {canResumeVideoExport && !isExportActive && (
-        <p className="mt-2 text-xs text-blue-700 dark:text-blue-300">
+        <p
+          className={`mt-2 text-xs text-blue-700 dark:text-blue-300 ${
+            compact ? 'basis-full text-right' : ''
+          }`}
+        >
           {t('flights.viewer.videoResumeHint', {
             count: exportStatus?.frames_captured ?? 0,
           })}
@@ -321,7 +328,11 @@ export function FlightVideoExportControls({
       )}
 
       {hasActiveVideoExport(flight) && (
-        <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-2 dark:border-blue-700 dark:bg-blue-900/20">
+        <div
+          className={`mt-2 rounded-lg border border-blue-200 bg-blue-50 p-2 dark:border-blue-700 dark:bg-blue-900/20 ${
+            compact ? 'basis-full sm:min-w-72' : ''
+          }`}
+        >
           <div className="mb-1 flex items-center justify-between text-xs font-medium text-blue-900 dark:text-blue-100">
             <span>{t('flights.viewer.videoProgress')}</span>
             <span>{exportProgress}%</span>
@@ -346,7 +357,9 @@ export function FlightVideoExportControls({
       {hasActiveVideoExport(flight) && (
         <Button
           onClick={handleCancelVideoExport}
-          className="mt-2 w-full cursor-pointer rounded-md bg-red-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+          className={`mt-2 cursor-pointer rounded-md bg-red-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+            compact ? 'basis-full sm:w-auto' : 'w-full'
+          }`}
           title={t('flights.viewer.cancelGenerationTitle')}
         >
           {t('flights.viewer.cancelGeneration')}
@@ -357,7 +370,9 @@ export function FlightVideoExportControls({
         <Button
           onClick={handleRegenerateVideo}
           isDisabled={isStartingVideoExport}
-          className="mt-2 w-full cursor-pointer rounded-md bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-400 dark:focus:ring-offset-gray-800"
+          className={`mt-2 cursor-pointer rounded-md bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-400 dark:focus:ring-offset-gray-800 ${
+            compact ? 'basis-full sm:w-auto' : 'w-full'
+          }`}
           title={t('flights.viewer.regenerateTitle')}
         >
           {t('flights.viewer.regenerateVideo')}
