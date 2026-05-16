@@ -223,12 +223,17 @@ jobs:
             COMPOSE_PROJECT_NAME="dashboard-parapente"
             BACKEND_IMAGE="ghcr.io/${{ github.repository }}/backend:${{ steps.version.outputs.version }}"
             GHCR_USERNAME="${{ github.actor }}"
-            GHCR_TOKEN="${{ github.token }}"
+            GHCR_TOKEN="${{ secrets.GHCR_READ_TOKEN }}"
+
+            if [ -z "$GHCR_TOKEN" ]; then
+              echo "Missing GHCR_READ_TOKEN secret for production image pull"
+              exit 1
+            fi
 
             is_forbidden_deploy_path() {
               path="$1"
               case "$path" in
-                */.codenomad|*/.codenomad/*|*/.agents|*/.agents/*|*/.opencode|*/.opencode/*)
+                .codenomad|.codenomad/*|*/.codenomad|*/.codenomad/*|.agents|.agents/*|*/.agents|*/.agents/*|.opencode|.opencode/*|*/.opencode|*/.opencode/*)
                   return 0
                   ;;
               esac
