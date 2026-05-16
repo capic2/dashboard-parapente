@@ -3,7 +3,6 @@ import { useState, useRef, lazy, Suspense, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { TextField, TextArea } from 'react-aria-components';
-import { Pencil } from 'lucide-react';
 import {
   Button,
   Modal,
@@ -12,7 +11,7 @@ import {
   TabPanel,
   Tabs,
 } from '@dashboard-parapente/design-system';
-import { Download, Edit3, FileUp, Video, Wand2 } from 'lucide-react';
+import { Download, Edit3, FileUp, Pencil, Video, Wand2 } from 'lucide-react';
 import {
   useUpdateFlight,
   useUploadGPXToFlight,
@@ -376,66 +375,86 @@ export function FlightDetails({
   ];
 
   const goproOverlayFormFields = (
-    <div className="grid gap-3 md:grid-cols-2">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
       {goproOverlayFields.map((field) => {
         const isEditing = editingGoproOverlayField === field.id;
         const trimmedValue = field.value.trim();
+        const fieldInputId = `gopro-overlay-${field.id}`;
+        const fieldHelpId = `${fieldInputId}-help`;
 
         return (
           <div
             key={field.id}
-            className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-colors dark:border-slate-700 dark:bg-slate-900"
+            className="border-b border-slate-200 p-4 last:border-b-0 dark:border-slate-700"
           >
-            <div className="mb-2 flex items-start justify-between gap-3">
-              <label
-                htmlFor={`gopro-overlay-${field.id}`}
-                className="text-sm font-medium text-gray-700 dark:text-gray-200"
-              >
-                {field.label}
-              </label>
+            <div className="grid gap-3 md:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_auto] md:items-start">
+              <div>
+                <label
+                  htmlFor={fieldInputId}
+                  className="text-sm font-semibold text-slate-800 dark:text-slate-100"
+                >
+                  {field.label}
+                </label>
+                {field.help && (
+                  <p
+                    id={fieldHelpId}
+                    className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400"
+                  >
+                    {field.help}
+                  </p>
+                )}
+              </div>
+
+              <div className="min-w-0">
+                {isEditing ? (
+                  <input
+                    id={fieldInputId}
+                    className="block min-h-11 w-full rounded-xl border border-sky-400 bg-white px-3 py-2 font-mono text-sm text-slate-950 outline-none transition-colors placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-500 dark:border-sky-500 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500"
+                    type="text"
+                    value={field.value}
+                    placeholder={field.placeholder}
+                    aria-describedby={field.help ? fieldHelpId : undefined}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    onBlur={() => setEditingGoproOverlayField(null)}
+                    onKeyDown={handleGoproOverlayFieldKeyDown}
+                    ref={goproOverlayEditInputRef}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="block min-h-11 w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left transition-colors hover:border-sky-300 hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-sky-700 dark:hover:bg-sky-950/30 dark:focus:ring-offset-slate-900"
+                    onClick={() => setEditingGoproOverlayField(field.id)}
+                  >
+                    {trimmedValue ? (
+                      <span className="block truncate font-mono text-sm font-semibold text-slate-950 dark:text-slate-50">
+                        {trimmedValue}
+                      </span>
+                    ) : (
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+                          {t('flights.goproOverlayAutoValue')}
+                        </span>
+                        <span className="block truncate font-mono text-sm text-slate-600 dark:text-slate-300">
+                          {field.placeholder}
+                        </span>
+                      </span>
+                    )}
+                  </button>
+                )}
+              </div>
+
               <Button
                 type="button"
-                className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-700 transition-colors hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 dark:focus:ring-offset-slate-900"
+                className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-sky-700 dark:hover:bg-sky-950/30 dark:hover:text-sky-100 dark:focus:ring-offset-slate-900"
                 onPress={() => setEditingGoproOverlayField(field.id)}
                 aria-label={t('flights.goproOverlayEditField', {
                   field: field.label,
                 })}
               >
                 <Pencil className="h-4 w-4" aria-hidden="true" />
+                <span>{t('common.edit')}</span>
               </Button>
             </div>
-            {isEditing ? (
-              <input
-                id={`gopro-overlay-${field.id}`}
-                className="block w-full rounded-md border border-sky-400 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500 dark:border-sky-500 dark:bg-gray-800 dark:text-white"
-                type="text"
-                value={field.value}
-                placeholder={field.placeholder}
-                onChange={(event) => field.onChange(event.target.value)}
-                onBlur={() => setEditingGoproOverlayField(null)}
-                onKeyDown={handleGoproOverlayFieldKeyDown}
-                ref={goproOverlayEditInputRef}
-              />
-            ) : (
-              <button
-                type="button"
-                className="block w-full cursor-pointer rounded-md border border-transparent bg-slate-50 px-3 py-2 text-left text-sm font-medium text-slate-900 transition-colors hover:border-slate-300 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-600 dark:hover:bg-slate-700 dark:focus:ring-offset-slate-900"
-                onClick={() => setEditingGoproOverlayField(field.id)}
-              >
-                {trimmedValue ? (
-                  trimmedValue
-                ) : (
-                  <span className="font-normal italic text-slate-500 dark:text-slate-400">
-                    {t('flights.goproOverlayAutoValue')}
-                  </span>
-                )}
-              </button>
-            )}
-            {field.help && (
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                {field.help}
-              </p>
-            )}
           </div>
         );
       })}
