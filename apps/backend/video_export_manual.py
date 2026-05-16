@@ -1193,6 +1193,7 @@ async def _export_video_manual_render(job_id: str):
                 )
                 print(f"▶️  Resuming capture from frame {resume_from_frame}/{total_frames}")
 
+            terrain_wait_enabled = True
             for i in range(resume_from_frame, total_frames):
                 if i % _CANCEL_CHECK_INTERVAL == 0 and _is_cancelled(job_id):
                     print("🛑 Export cancelled by user")
@@ -1217,10 +1218,12 @@ async def _export_video_manual_render(job_id: str):
                 else:
                     tiles_loaded = False
 
-                if not tiles_loaded:
+                if not tiles_loaded and terrain_wait_enabled:
                     tiles_loaded = await _wait_for_export_frame_terrain(page)
                     if not tiles_loaded:
                         print(f"⚠️  Terrain still loading for frame {i} after timeout")
+                        terrain_wait_enabled = False
+                        print("⚠️  Disabling per-frame terrain waits after timeout")
 
                 frame_path = frames_dir / f"frame{i:05d}.png"
                 await page.screenshot(path=str(frame_path), timeout=60000)
