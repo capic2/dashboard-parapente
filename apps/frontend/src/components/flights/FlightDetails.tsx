@@ -404,72 +404,69 @@ export function FlightDetails({
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">
               {flightTitle}
             </h2>
-            <div className="grid gap-3 sm:ml-4 sm:min-w-80 sm:max-w-xl sm:grid-cols-2">
-              <div className="rounded-xl border border-sky-100 bg-sky-50 p-3 dark:border-sky-900/60 dark:bg-sky-950/30">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-200">
+            <div className="flex flex-col gap-2 sm:ml-4 sm:items-end">
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <span className="w-full text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300 sm:w-auto">
                   {t('flights.videoProductionActions')}
-                </p>
-                <div className="grid gap-2">
-                  {hasGpx && (
-                    <FlightVideoExportControls
-                      flight={flight}
-                      className="min-w-0"
-                      buttonClassName="w-full"
-                      showModeSelector={false}
-                    />
-                  )}
-                  <Button
-                    className="w-full cursor-pointer rounded-md bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-400 dark:bg-cyan-700 dark:hover:bg-cyan-600 dark:focus:ring-offset-gray-800"
-                    onPress={goproOverlayAction}
-                    isDisabled={
-                      createGoproOverlayJob.isPending ||
-                      cancelGoproOverlayJob.isPending
-                    }
-                    title={goproOverlayTitle}
-                  >
-                    {goproOverlayLabel}
-                  </Button>
-                </div>
+                </span>
+                {hasGpx && (
+                  <FlightVideoExportControls
+                    flight={flight}
+                    className="contents"
+                    buttonClassName="min-h-10"
+                    compact
+                    showModeSelector={false}
+                  />
+                )}
+                <Button
+                  className="min-h-10 cursor-pointer rounded-md bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-400 dark:bg-cyan-700 dark:hover:bg-cyan-600 dark:focus:ring-offset-gray-800"
+                  onPress={goproOverlayAction}
+                  isDisabled={
+                    createGoproOverlayJob.isPending ||
+                    cancelGoproOverlayJob.isPending
+                  }
+                  title={goproOverlayTitle}
+                >
+                  {goproOverlayLabel}
+                </Button>
               </div>
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/30">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
+              <div className="flex flex-wrap items-center gap-2 border-t border-gray-200 pt-2 dark:border-gray-700 sm:justify-end">
+                <span className="w-full text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 sm:w-auto">
                   {t('flights.flightFileActions')}
-                </p>
-                <div className="grid gap-2">
+                </span>
+                <Button
+                  className="min-h-10 cursor-pointer rounded-md bg-sky-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                  onPress={() => setEditingMode(true)}
+                  aria-label={t('flights.editFlight')}
+                >
+                  {t('flights.editButton')}
+                </Button>
+                {hasGpx && (
                   <Button
-                    className="w-full cursor-pointer rounded-md bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-                    onPress={() => setEditingMode(true)}
-                    aria-label={t('flights.editFlight')}
+                    className="min-h-10 cursor-pointer rounded-md bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-400 dark:focus:ring-offset-gray-800"
+                    onPress={handleGPXDownload}
+                    isDisabled={isDownloadingGpx}
                   >
-                    {t('flights.editButton')}
+                    {isDownloadingGpx
+                      ? t('flights.gpxDownloadInProgress')
+                      : t('flights.downloadGpx')}
                   </Button>
-                  {hasGpx && (
-                    <Button
-                      className="w-full cursor-pointer rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-400 dark:focus:ring-offset-gray-800"
-                      onPress={handleGPXDownload}
-                      isDisabled={isDownloadingGpx}
-                    >
-                      {isDownloadingGpx
-                        ? t('flights.gpxDownloadInProgress')
-                        : t('flights.downloadGpx')}
-                    </Button>
-                  )}
-                  <Button
-                    className={`w-full cursor-pointer rounded-md px-4 py-2.5 text-sm font-semibold text-white transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-400 dark:focus:ring-offset-gray-800 ${
-                      flight.gpx_file_path
-                        ? 'bg-green-600 hover:bg-green-700'
-                        : 'bg-orange-600 hover:bg-orange-700'
-                    }`}
-                    onPress={() => fileInputRef.current?.click()}
-                    isDisabled={uploadGPXMutation.isPending}
-                  >
-                    {uploadGPXMutation.isPending
-                      ? t('flights.uploadInProgress')
-                      : flight.gpx_file_path
-                        ? t('flights.replaceGpx')
-                        : t('flights.addGpx')}
-                  </Button>
-                </div>
+                )}
+                <Button
+                  className={`min-h-10 cursor-pointer rounded-md px-3.5 py-2 text-sm font-semibold text-white transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-400 dark:focus:ring-offset-gray-800 ${
+                    flight.gpx_file_path
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : 'bg-orange-600 hover:bg-orange-700'
+                  }`}
+                  onPress={() => fileInputRef.current?.click()}
+                  isDisabled={uploadGPXMutation.isPending}
+                >
+                  {uploadGPXMutation.isPending
+                    ? t('flights.uploadInProgress')
+                    : flight.gpx_file_path
+                      ? t('flights.replaceGpx')
+                      : t('flights.addGpx')}
+                </Button>
               </div>
             </div>
             <input
