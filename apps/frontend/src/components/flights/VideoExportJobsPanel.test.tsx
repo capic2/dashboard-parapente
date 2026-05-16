@@ -119,12 +119,22 @@ describe('VideoExportJobsPanel', () => {
     render(<VideoExportJobsPanel />);
 
     expect(screen.getByText('Générations vidéo')).toBeInTheDocument();
-    expect(screen.getByText('Vol test')).toBeInTheDocument();
-    expect(screen.getByText('Vol terminé')).toBeInTheDocument();
-    expect(screen.getByText('vol-overlay.mp4')).toBeInTheDocument();
-    expect(screen.getByText('Overlay GoPro')).toBeInTheDocument();
-    expect(screen.getByText('42%')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Stopper' })).toHaveLength(2);
+    expect(screen.getAllByText('Vol test').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Vol terminé').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('vol-overlay.mp4').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Overlay GoPro').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('42%').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: 'Stopper' })).toHaveLength(4);
+  });
+
+  it('filters jobs by status', () => {
+    render(<VideoExportJobsPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Terminés' }));
+
+    expect(screen.getAllByText('Vol terminé').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Vol test')).not.toBeInTheDocument();
+    expect(screen.queryByText('vol-overlay.mp4')).not.toBeInTheDocument();
   });
 
   it('cancels a running job after confirmation', async () => {
