@@ -83,7 +83,7 @@ export function useFlightsTable({
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     initialState: {
-      pagination: { pageIndex: 0, pageSize: 20 },
+      pagination: { pageIndex: 0, pageSize: 10 },
     },
   });
 
