@@ -261,7 +261,8 @@ export function FlightsTable({
       emptyMessage={t('flights.noFlights')}
       ariaLabel={t('flights.listAriaLabel')}
       isVirtualized
-      itemsClassName="max-h-[min(640px,calc(100vh-22rem))] min-h-72 overflow-y-auto pr-1"
+      className="flex h-full flex-col lg:min-h-[calc(100vh-22rem)]"
+      itemsClassName="min-h-72 flex-1 overflow-y-auto pr-1"
       virtualizedLayoutOptions={{ estimatedRowSize: 136, gap: 8 }}
       selectionMode={selectionMode ? 'multiple' : 'none'}
       selectedKeys={selectedKeys}

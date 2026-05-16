@@ -357,7 +357,7 @@ export default function FlightHistory() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Flight List */}
         {(!isMobile || !showMobileDetail) && (
-          <div className={isMobile ? '' : 'lg:col-span-1'}>
+          <div className={isMobile ? '' : 'lg:col-span-1 lg:h-full'}>
             <FlightsTable
               flights={filteredFlights}
               selectedFlightId={selectedFlightId}
