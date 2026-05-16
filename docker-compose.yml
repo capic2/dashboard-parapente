@@ -23,6 +23,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      additional_contexts:
+        gopro-overlay-src: ${GOPRO_OVERLAY_HOST_DIR:?GOPRO_OVERLAY_HOST_DIR is required}
       args:
         - VITE_CESIUM_ION_TOKEN=${VITE_CESIUM_ION_TOKEN:?required}
     image: parapente-backend:nx-latest
@@ -112,7 +114,6 @@ services:
     volumes:
       - /home/capic/docker-data/dashboard-parapente/db:/app/db
       - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
-      - ${GOPRO_OVERLAY_HOST_DIR:?GOPRO_OVERLAY_HOST_DIR is required}:/app/gopro-overlay:ro
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8001/']
       interval: 30s
