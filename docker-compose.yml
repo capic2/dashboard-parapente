@@ -97,6 +97,12 @@ services:
       # Backend - Frontend URL
       - BACKEND_FRONTEND_URL=${BACKEND_FRONTEND_URL}
 
+      # Backend - GoPro overlay toolchain
+      - BACKEND_GOPRO_OVERLAY_ROOT=/app/gopro-overlay
+      - BACKEND_GOPRO_OVERLAY_BIN=/app/gopro-overlay/venv/bin/gopro-dashboard.py
+      - BACKEND_GOPRO_OVERLAY_LAYOUT_DIR=/app/gopro-overlay
+      - BACKEND_GOPRO_OVERLAY_PARAGLIDING_ROOT=/app/parapente
+
       # Backend - Deployment metadata
       - BACKEND_DEPLOY_VERSION=${BACKEND_DEPLOY_VERSION}
       - BACKEND_VERSION_STATE_FILE=${BACKEND_VERSION_STATE_FILE:?BACKEND_VERSION_STATE_FILE is required}
