@@ -97,8 +97,6 @@ services:
       # Backend - Frontend URL
       - BACKEND_FRONTEND_URL=${BACKEND_FRONTEND_URL}
 
-      # Backend - Video export storage
-
       # Backend - Deployment metadata
       - BACKEND_DEPLOY_VERSION=${BACKEND_DEPLOY_VERSION}
       - BACKEND_VERSION_STATE_FILE=${BACKEND_VERSION_STATE_FILE:?BACKEND_VERSION_STATE_FILE is required}
@@ -107,10 +105,8 @@ services:
         condition: service_healthy
     volumes:
       - /home/capic/docker-data/dashboard-parapente/db:/app/db
-      - "/media/nas/DS211_Synology_1/DJI shoots/parapente/:/app/video-exports"
-      - "/media/nas/DS211_Synology_1/DJI shoots/parapente/img_tmp/:/app/video-temp-images"
+      - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
       - ${GOPRO_OVERLAY_HOST_DIR:?GOPRO_OVERLAY_HOST_DIR is required}:/app/gopro-overlay:ro
-      - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/gopro-overlays/parapente
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8001/']
       interval: 30s

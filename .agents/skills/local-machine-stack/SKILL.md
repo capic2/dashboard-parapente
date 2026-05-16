@@ -59,7 +59,7 @@ NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx run-many -t lint --all
 NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx run-many -t test --all
 ```
 
-Use direct project targets such as `nx affected lint frontend` or `nx affected test backend` only as follow-up diagnostics after an affected run identifies a failing project, or when explicitly requested.
+Use direct project targets such as `nx affected -t lint frontend` or `nx affected -t test backend` only as follow-up diagnostics after an affected run identifies a failing project, or when explicitly requested.
 
 For direct Oxlint checks on frontend/design-system:
 

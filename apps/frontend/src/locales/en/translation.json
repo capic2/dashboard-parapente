@@ -636,7 +636,11 @@
     "goproOverlayGpxFallback": "If no path is entered, the flight GPX will be used.",
     "goproOverlayOsvVideo": "Optional PIP video path",
     "goproOverlayPipFallback": "If no path is entered, the generated flight video will be used.",
-    "goproOverlayPathHelp": "Path relative to GOPRO_OVERLAY_PARAGLIDING_ROOT or absolute.",
+    "goproOverlayPathHelp": "If empty, uses parapente/YYYYMMDD/N/camera.mp4.",
+    "goproOverlayAutoPathHelp": "If empty, uses the first Zepp*.gpx from the flight folder.",
+    "goproOverlayPipAutoPathHelp": "If empty, uses the generated flight video or a flight*.mp4 from the folder.",
+    "goproOverlayOutputDir": "Optional output folder",
+    "goproOverlayOutputDirFallback": "If empty, writes parapente/YYYYMMDD/N/final.mp4.",
     "goproOverlayOutputFilename": "Output file name",
     "goproOverlayStatus": {
       "queued": "Queued",
@@ -645,6 +649,8 @@
       "failed": "Error",
       "cancelled": "Cancelled"
     },
+    "videoProductionActions": "Video production",
+    "flightFileActions": "Flight & files",
     "loading3dViewer": "Loading 3D viewer...",
     "flightOf": "Flight on {{date}}",
     "selectFlightHint": "Select a flight to view details and 3D trajectory",

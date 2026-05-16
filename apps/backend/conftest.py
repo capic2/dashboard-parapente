@@ -13,8 +13,6 @@ os.environ["TESTING"] = "true"
 os.environ["BACKEND_USE_FAKE_REDIS"] = "true"
 os.environ["BACKEND_DATABASE_URL"] = "sqlite:///./test.db"
 os.environ["BACKEND_LOG_FILE"] = "logs/test-dashboard.log"
-os.environ["BACKEND_GOPRO_OVERLAY_ROOT"] = "/tmp/dashboard-parapente-test/gopro-overlay"
-os.environ["BACKEND_GOPRO_OVERLAY_DATA_ROOT"] = "/tmp/dashboard-parapente-test/paragliding"
 os.environ["BACKEND_VERSION_STATE_FILE"] = "/tmp/dashboard-parapente-test/version_state.json"
 
 # Set dummy API keys for tests

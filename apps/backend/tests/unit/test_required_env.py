@@ -26,15 +26,15 @@ def test_required_env_accepts_non_empty_variable(monkeypatch):
 
 
 def test_video_export_paths_are_fixed():
-    assert config.VIDEO_EXPORT_DIR == str(config.BACKEND_ROOT / "exports" / "videos")
-    assert config.VIDEO_TEMP_IMAGES_DIR == str(
-        config.BACKEND_ROOT / "exports" / "video-temp-images"
-    )
+    data_root = Path(config.PARAGLIDING_DATA_ROOT)
+
+    assert Path(config.VIDEO_EXPORT_DIR) == data_root
+    assert Path(config.VIDEO_TEMP_IMAGES_DIR) == data_root / ".tmp" / "video-frames"
 
 
-def test_gopro_overlay_paths_are_derived_from_data_root():
-    data_root = Path(config.GOPRO_OVERLAY_DATA_ROOT)
+def test_gopro_overlay_paths_are_derived_from_paragliding_root():
+    data_root = Path(config.PARAGLIDING_DATA_ROOT)
 
     assert Path(config.GOPRO_OVERLAY_PARAGLIDING_ROOT) == data_root
-    assert Path(config.GOPRO_OVERLAY_OUTPUT_DIR) == data_root / "input-overlay"
-    assert Path(config.GOPRO_OVERLAY_UPLOAD_DIR) == data_root / "input-overlay" / "uploads"
+    assert Path(config.GOPRO_OVERLAY_OUTPUT_DIR) == data_root
+    assert Path(config.GOPRO_OVERLAY_UPLOAD_DIR) == data_root / ".tmp" / "gopro-uploads"

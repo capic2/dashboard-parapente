@@ -3,6 +3,7 @@ import json
 import logging
 import math
 import os
+import subprocess
 import uuid
 import xml.etree.ElementTree as ET
 from typing import Any
@@ -32,6 +33,8 @@ from auth import authenticate_user, create_access_token, get_current_user
 from database import get_db
 from emagram_freshness import get_emagram_cutoff_utc
 from flight_backfill import calculate_and_persist_missing_max_speed
+from flight_storage import flight_sequence_number
+from flight_storage import write_flight_text_file
 from gopro_overlay_export import cancel_gopro_overlay_job
 from gopro_overlay_export import check_gopro_overlay_dependencies
 from gopro_overlay_export import create_gopro_overlay_job
@@ -189,12 +192,85 @@ def _resolve_gopro_paragliding_path(file_path: str | None) -> Path | None:
     path = Path(file_path.strip()).expanduser()
     root = config.GOPRO_OVERLAY_PARAGLIDING_ROOT.strip()
     if not root:
-        raise ValueError("GoPro overlay paragliding root is not configured")
+        raise HTTPException(
+            status_code=400,
+            detail="GoPro overlay paragliding root is not configured",
+        )
     root_path = Path(root).expanduser().resolve()
     resolved = path.resolve() if path.is_absolute() else (root_path / path).resolve()
     if resolved != root_path and root_path not in resolved.parents:
         raise ValueError("GoPro overlay path must be inside the paragliding root")
     return resolved
+
+
+def _latest_matching_file(directory: Path, pattern: str) -> Path | None:
+    matches = [path for path in directory.glob(pattern) if path.is_file()]
+    if not matches:
+        return None
+    return max(matches, key=lambda path: path.stat().st_mtime)
+
+
+def _first_matching_file(directory: Path, pattern: str) -> Path | None:
+    matches = sorted(path for path in directory.glob(pattern) if path.is_file())
+    return matches[0] if matches else None
+
+
+def _matching_files_by_mtime(directory: Path, pattern: str) -> list[Path]:
+    matches = [path for path in directory.glob(pattern) if path.is_file()]
+    return sorted(matches, key=lambda path: (path.stat().st_mtime, path.name))
+
+
+def _gopro_overlay_flight_directory(db: Session, flight: Flight) -> Path:
+    root = config.GOPRO_OVERLAY_PARAGLIDING_ROOT.strip()
+    if not root:
+        raise HTTPException(
+            status_code=400,
+            detail="GoPro overlay paragliding root is not configured",
+        )
+    date_dir = flight.flight_date.strftime("%Y%m%d")
+    sequence = flight_sequence_number(db, flight)
+    directory = Path(root).expanduser().resolve() / "parapente" / date_dir / str(sequence)
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: Path) -> Path:
+    if not osv_paths:
+        return gpx_path
+
+    merge_script = Path(config.GOPRO_OVERLAY_ROOT) / "osv_merge.py"
+    if not merge_script.exists():
+        raise ValueError(f"OSV merge script not found: {merge_script}")
+
+    work_dir = input_dir / ".gopro-overlay-work"
+    work_dir.mkdir(parents=True, exist_ok=True)
+    merged_gpx_path = work_dir / f"merged-{uuid.uuid4()}.gpx"
+    command = [
+        "python3",
+        str(merge_script),
+        *(str(path) for path in osv_paths),
+        str(gpx_path),
+        str(merged_gpx_path),
+    ]
+
+    try:
+        result = subprocess.run(
+            command,
+            cwd=config.GOPRO_OVERLAY_ROOT or None,
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired as exc:
+        detail = exc.stderr or exc.stdout or "OSV merge timed out"
+        raise ValueError(detail) from exc
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "OSV merge failed"
+        raise ValueError(detail)
+    if not merged_gpx_path.exists():
+        raise ValueError("OSV merge did not create a GPX file")
+    return merged_gpx_path
 
 
 def _resolve_export_status(job_id: str) -> dict[str, Any] | None:
@@ -3290,7 +3366,6 @@ async def sync_strava_activities(request: dict, db: Session = Depends(get_db)):
         download_gpx,
         get_activities_by_period,
         match_site_by_coordinates,
-        save_gpx_file,
     )
 
     date_from = request.get("date_from")
@@ -3331,14 +3406,7 @@ async def sync_strava_activities(request: dict, db: Session = Depends(get_db)):
                 # 4. Télécharger GPX
                 gpx_content = await download_gpx(strava_id)
 
-                gpx_path = None
-                if gpx_content:
-                    # 5. Sauvegarder GPX
-                    gpx_path = save_gpx_file(gpx_content, strava_id)
-
-                    if not gpx_path:
-                        logger.warning(f"Failed to save GPX for activity {strava_id}")
-                else:
+                if not gpx_content:
                     logger.warning(f"No GPX available for activity {strava_id}")
 
                 # 6. Détecter le site depuis les coordonnées GPX
@@ -3395,13 +3463,17 @@ async def sync_strava_activities(request: dict, db: Session = Depends(get_db)):
                         if activity.get("total_elevation_gain")
                         else None
                     ),
-                    gpx_file_path=gpx_path,
                     external_url=f"https://www.strava.com/activities/{strava_id}",
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow(),
                 )
 
                 db.add(flight)
+                db.flush()
+                if gpx_content:
+                    gpx_path = write_flight_text_file(db, flight, "strava.gpx", gpx_content)
+                    flight.gpx_file_path = str(gpx_path)
+
                 imported_flights.append(
                     {
                         "id": flight.id,
@@ -3452,23 +3524,11 @@ async def upload_gpx_to_flight(
         gpx_content = await gpx_file.read()
         gpx_str = gpx_content.decode("utf-8")
 
-        # 3. Sauvegarder fichier
-        gpx_dir = Path(__file__).parent / "db" / "gpx"
-        gpx_dir.mkdir(parents=True, exist_ok=True)
-
-        # Utiliser strava_id si disponible, sinon flight_id
-        if flight.strava_id:
-            file_name = f"strava_{flight.strava_id}.gpx"
-        else:
-            file_name = f"manual_{flight_id}.gpx"
-
-        file_path = gpx_dir / file_name
-
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(gpx_str)
+        file_name = "strava.gpx" if flight.strava_id else "watch.gpx"
+        file_path = write_flight_text_file(db, flight, file_name, gpx_str)
 
         # 4. Mettre à jour SEULEMENT le chemin du fichier (pas les stats!)
-        flight.gpx_file_path = f"db/gpx/{file_name}"
+        flight.gpx_file_path = str(file_path)
         flight.updated_at = datetime.utcnow()
 
         db.commit()
@@ -3608,20 +3668,15 @@ async def create_flight_from_gpx(
             updated_at=datetime.utcnow(),
         )
 
-        # 6. Sauvegarder le fichier (GPX ou IGC)
-        gpx_dir = Path(__file__).parent / "db" / "gpx"
-        gpx_dir.mkdir(parents=True, exist_ok=True)
+        db.add(flight)
+        db.flush()
 
-        file_name = f"manual_{flight_id}.{file_type}"
-        file_path = gpx_dir / file_name
-
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(file_str)
-
-        flight.gpx_file_path = f"db/gpx/{file_name}"
+        # 6. Sauvegarder le fichier dans le dossier du vol.
+        file_name = f"watch.{file_type}"
+        file_path = write_flight_text_file(db, flight, file_name, file_str)
+        flight.gpx_file_path = str(file_path)
 
         # 7. Enregistrer en base
-        db.add(flight)
         db.commit()
         db.refresh(flight)
 
@@ -4581,6 +4636,7 @@ async def create_flight_gopro_overlay_job(
     video_path: str | None = Form(None),
     gpx_path: str | None = Form(None),
     pip_path: str | None = Form(None),
+    output_dir: str | None = Form(None),
     layout_id: str | None = Form(None),
     output_filename: str | None = Form(None),
     db: Session = Depends(get_db),
@@ -4599,14 +4655,40 @@ async def create_flight_gopro_overlay_job(
         raise HTTPException(status_code=404, detail="Flight not found")
 
     title = flight.title or flight.name or flight.id
-    resolved_output_filename = output_filename or f"{title}-overlay.mp4"
+    input_dir = _gopro_overlay_flight_directory(db, flight)
+    use_input_output_dir = not output_dir or not output_dir.strip()
+    resolved_output_filename = (
+        "final.mp4" if use_input_output_dir else output_filename or f"{title}-overlay.mp4"
+    )
 
     try:
+        resolved_output_dir = (
+            str(input_dir)
+            if use_input_output_dir
+            else str(_resolve_gopro_paragliding_path(output_dir))
+        )
         resolved_video_path = _resolve_gopro_paragliding_path(video_path)
         resolved_gpx_path = _resolve_gopro_paragliding_path(gpx_path)
         resolved_pip_path = _resolve_gopro_paragliding_path(pip_path)
-        fallback_gpx_path = resolved_gpx_path or _resolve_flight_file_path(flight.gpx_file_path)
-        fallback_pip_path = resolved_pip_path or _resolve_flight_file_path(flight.video_file_path)
+        auto_video_path = input_dir / "camera.mp4"
+        auto_gpx_path = _first_matching_file(input_dir, "Zepp*.gpx")
+        auto_pip_path = _latest_matching_file(input_dir, "flight*.mp4")
+        auto_osv_paths = _matching_files_by_mtime(input_dir, "*.osv")
+        if not resolved_video_path and auto_video_path.exists():
+            resolved_video_path = auto_video_path
+        fallback_gpx_path = (
+            resolved_gpx_path or auto_gpx_path or _resolve_flight_file_path(flight.gpx_file_path)
+        )
+        fallback_pip_path = (
+            resolved_pip_path or auto_pip_path or _resolve_flight_file_path(flight.video_file_path)
+        )
+        if fallback_gpx_path and fallback_gpx_path.exists() and auto_osv_paths:
+            fallback_gpx_path = await asyncio.to_thread(
+                _merge_osv_files_with_gpx,
+                auto_osv_paths,
+                fallback_gpx_path,
+                input_dir,
+            )
 
         if resolved_video_path:
             if not resolved_video_path.exists():
@@ -4624,6 +4706,7 @@ async def create_flight_gopro_overlay_job(
                 pip_path=fallback_pip_path,
                 layout_id=layout_id,
                 output_filename=resolved_output_filename,
+                output_dir=resolved_output_dir,
             )
 
         if not video_file or not video_file.filename:
@@ -4648,6 +4731,7 @@ async def create_flight_gopro_overlay_job(
             pip_file=osv_video_file,
             layout_id=layout_id,
             output_filename=resolved_output_filename,
+            output_dir=resolved_output_dir,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
