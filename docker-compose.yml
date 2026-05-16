@@ -20,14 +20,7 @@ services:
       - parapente-network
 
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      additional_contexts:
-        gopro-overlay-src: ${GOPRO_OVERLAY_HOST_DIR:?GOPRO_OVERLAY_HOST_DIR is required}
-      args:
-        - VITE_CESIUM_ION_TOKEN=${VITE_CESIUM_ION_TOKEN:?required}
-    image: parapente-backend:nx-latest
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}
     container_name: parapente-backend
     restart: unless-stopped
     ports:
@@ -127,7 +120,7 @@ services:
       - parapente-network
 
   backend-worker:
-    image: parapente-backend:nx-latest
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}
     container_name: parapente-backend-worker
     restart: unless-stopped
     command: ['python', 'job_worker.py']
