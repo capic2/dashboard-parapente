@@ -104,6 +104,7 @@ services:
       - BACKEND_GOPRO_OVERLAY_BIN=/app/gopro-overlay/venv/bin/gopro-dashboard.py
       - BACKEND_GOPRO_OVERLAY_LAYOUT_DIR=/app/gopro-overlay
       - BACKEND_GOPRO_OVERLAY_PARAGLIDING_ROOT=/app/parapente
+      - BACKEND_GOPRO_OVERLAY_FONT=/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf
 
       # Backend - Deployment metadata
       - BACKEND_DEPLOY_VERSION=${BACKEND_DEPLOY_VERSION}

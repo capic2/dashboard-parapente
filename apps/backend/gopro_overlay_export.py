@@ -482,6 +482,8 @@ def _run_job(job_id: str) -> None:
         "--layout-xml",
         job["layout_path"],
     ]
+    if config.GOPRO_OVERLAY_FONT:
+        command.extend(["--font", config.GOPRO_OVERLAY_FONT])
     if job.get("video_width") and job.get("video_height"):
         command.extend(["--overlay-size", f"{job['video_width']}x{job['video_height']}"])
     if job.get("pip_path"):
