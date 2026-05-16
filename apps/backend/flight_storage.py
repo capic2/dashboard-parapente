@@ -33,7 +33,7 @@ def flight_sequence_number(db: Session, flight: Flight) -> int:
 
 def flight_directory(db: Session, flight: Flight) -> Path:
     day_dir = flight_storage_root() / flight.flight_date.strftime("%Y%m%d")
-    return day_dir / str(flight_sequence_number(db, flight))
+    return day_dir / f"{flight_sequence_number(db, flight):02d}"
 
 
 def ensure_flight_directory(db: Session, flight: Flight) -> Path:
