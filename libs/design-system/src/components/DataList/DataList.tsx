@@ -1,22 +1,16 @@
-import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import type { Table, Row } from '@tanstack/react-table';
-import { Button, type Selection } from 'react-aria-components';
+import {
+  Button,
+  ListBox,
+  ListBoxItem,
+  ListLayout,
+  Virtualizer,
+  type ListLayoutOptions,
+  type Selection,
+} from 'react-aria-components';
 import { useTranslation } from 'react-i18next';
 import { tv } from 'tailwind-variants';
-
-const interactiveSelector = [
-  'a[href]',
-  'button',
-  'input',
-  'select',
-  'textarea',
-  '[role="button"]',
-  '[role="checkbox"]',
-  '[role="link"]',
-  '[role="menuitem"]',
-  '[role="switch"]',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',');
 
 const dataList = tv({
   slots: {
@@ -94,18 +88,6 @@ function ChevronIcon({ direction }: { direction: 'previous' | 'next' }) {
   );
 }
 
-function isFromInteractiveChild(
-  event: MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>
-) {
-  const target = event.target;
-  if (!(target instanceof Element)) {
-    return false;
-  }
-
-  const interactiveElement = target.closest(interactiveSelector);
-  return !!interactiveElement && interactiveElement !== event.currentTarget;
-}
-
 export interface SortableColumn {
   id: string;
   label: string;
@@ -120,10 +102,22 @@ export interface DataListProps<TData> {
   itemsClassName?: string;
   ariaLabel?: string;
   layout?: 'stack' | 'grid';
+  isVirtualized?: boolean;
+  virtualizedLayoutOptions?: ListLayoutOptions;
   selectionMode?: 'none' | 'single' | 'multiple';
   selectedKeys?: Selection;
   onSelectionChange?: (keys: Selection) => void;
   getTextValue?: (row: Row<TData>) => string;
+}
+
+function EmptyState({ label }: { label: string }) {
+  return (
+    <output aria-label={label}>
+      <div className="col-span-full bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center">
+        <p className="text-gray-700 dark:text-gray-300 font-medium">{label}</p>
+      </div>
+    </output>
+  );
 }
 
 export function DataList<TData>({
@@ -135,56 +129,35 @@ export function DataList<TData>({
   itemsClassName,
   ariaLabel = 'Liste',
   layout = 'stack',
+  isVirtualized = false,
+  virtualizedLayoutOptions,
   selectionMode = 'none',
   selectedKeys,
   onSelectionChange,
   getTextValue,
 }: DataListProps<TData>) {
   const { t } = useTranslation();
+  const emptyLabel = emptyMessage ?? t('dataList.noItems');
   const { pageIndex, pageSize } = table.getState().pagination;
   const startIndex = pageIndex * pageSize;
-  const rows = table
-    .getSortedRowModel()
-    .rows.slice(startIndex, startIndex + pageSize);
+  const sortedRows = table.getSortedRowModel().rows;
+  const rows = isVirtualized
+    ? sortedRows
+    : sortedRows.slice(startIndex, startIndex + pageSize);
   const sorting = table.getState().sorting;
   const pageCount = table.getPageCount();
   const isSelectable = selectionMode !== 'none';
-  const allRows = table.getCoreRowModel().rows;
 
   const isRowSelected = (rowId: string) => {
     return selectedKeys === 'all' || selectedKeys?.has(rowId) || false;
-  };
-
-  const toggleSelection = (rowId: string) => {
-    if (!isSelectable) {
-      return;
-    }
-
-    if (selectionMode === 'single') {
-      onSelectionChange?.(new Set([rowId]));
-      return;
-    }
-
-    const nextKeys = new Set(
-      selectedKeys === 'all' ? allRows.map((row) => row.id) : selectedKeys
-    );
-    if (nextKeys.has(rowId)) {
-      nextKeys.delete(rowId);
-    } else {
-      nextKeys.add(rowId);
-    }
-    onSelectionChange?.(nextKeys);
   };
 
   return (
     <div className={className}>
       {/* Sort bar */}
       {sortableColumns && sortableColumns.length > 0 && (
-        <div
-          role="group"
-          aria-label={t('dataList.sortOptions')}
-          className="flex flex-wrap gap-1.5 mb-3"
-        >
+        <fieldset className="flex flex-wrap gap-1.5 mb-3">
+          <legend className="sr-only">{t('dataList.sortOptions')}</legend>
           {sortableColumns.map((col) => {
             const currentSort = sorting.find((s) => s.id === col.id);
             const isActive = !!currentSort;
@@ -220,63 +193,75 @@ export function DataList<TData>({
               </Button>
             );
           })}
-        </div>
+        </fieldset>
       )}
 
       {/* Items */}
-      <div
-        role="listbox"
-        aria-label={ariaLabel}
-        aria-multiselectable={selectionMode === 'multiple' ? true : undefined}
-        className={itemsClassName || 'space-y-2'}
-        data-layout={layout}
-      >
-        {rows.length === 0 ? (
-          <div role="status" aria-label={emptyMessage ?? t('dataList.noItems')}>
-            <div className="col-span-full bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center">
-              <p className="text-gray-700 dark:text-gray-300 font-medium">
-                {emptyMessage ?? t('dataList.noItems')}
-              </p>
-            </div>
-          </div>
-        ) : (
-          rows.map((row) => {
+      {isVirtualized ? (
+        <Virtualizer
+          layout={ListLayout}
+          layoutOptions={{
+            gap: 8,
+            estimatedRowSize: 132,
+            ...virtualizedLayoutOptions,
+          }}
+        >
+          <ListBox
+            aria-label={ariaLabel}
+            items={rows}
+            layout={layout}
+            selectionMode={isSelectable ? selectionMode : undefined}
+            selectedKeys={isSelectable ? selectedKeys : undefined}
+            onSelectionChange={isSelectable ? onSelectionChange : undefined}
+            className={itemsClassName || 'h-96 overflow-y-auto'}
+            renderEmptyState={() => <EmptyState label={emptyLabel} />}
+          >
+            {(row) => {
+              const textValue = getTextValue?.(row) || row.id;
+              const isSelected = isRowSelected(row.id);
+
+              return (
+                <ListBoxItem
+                  id={row.id}
+                  textValue={textValue}
+                  className="outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 rounded-lg"
+                >
+                  {renderItem(row, { isSelected })}
+                </ListBoxItem>
+              );
+            }}
+          </ListBox>
+        </Virtualizer>
+      ) : (
+        <ListBox
+          aria-label={ariaLabel}
+          items={rows}
+          layout={layout}
+          selectionMode={isSelectable ? selectionMode : undefined}
+          selectedKeys={isSelectable ? selectedKeys : undefined}
+          onSelectionChange={isSelectable ? onSelectionChange : undefined}
+          className={itemsClassName || 'space-y-2'}
+          renderEmptyState={() => <EmptyState label={emptyLabel} />}
+        >
+          {(row) => {
             const textValue = getTextValue?.(row) || row.id;
             const isSelected = isRowSelected(row.id);
 
             return (
-              <div
-                key={row.id}
-                role="option"
-                aria-label={textValue}
-                aria-selected={isSelectable ? isSelected : undefined}
-                tabIndex={isSelectable ? 0 : undefined}
+              <ListBoxItem
+                id={row.id}
+                textValue={textValue}
                 className="outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 rounded-lg h-full"
-                onClick={(event) => {
-                  if (!isFromInteractiveChild(event)) {
-                    toggleSelection(row.id);
-                  }
-                }}
-                onKeyDown={(event) => {
-                  if (isFromInteractiveChild(event)) {
-                    return;
-                  }
-
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    toggleSelection(row.id);
-                  }
-                }}
               >
                 {renderItem(row, { isSelected })}
-              </div>
+              </ListBoxItem>
             );
-          })
-        )}
-      </div>
+          }}
+        </ListBox>
+      )}
 
       {/* Pagination */}
-      {pageCount > 1 && (
+      {!isVirtualized && pageCount > 1 && (
         <nav
           aria-label={t('dataList.pagination')}
           className="flex items-center justify-between mt-3 px-1"
