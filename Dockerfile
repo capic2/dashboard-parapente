@@ -77,6 +77,13 @@ COPY apps/backend/requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt
 
+# Installer GoPro Dashboard Overlay dans un venv créé dans l'image.
+COPY --from=gopro-overlay-src / /app/gopro-overlay
+RUN rm -rf /app/gopro-overlay/venv && \
+    python -m venv /app/gopro-overlay/venv && \
+    /app/gopro-overlay/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    /app/gopro-overlay/venv/bin/pip install --no-cache-dir -e /app/gopro-overlay
+
 # Installer Chromium pour Playwright
 RUN playwright install chromium
 
