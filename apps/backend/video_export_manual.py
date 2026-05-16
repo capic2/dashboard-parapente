@@ -1559,9 +1559,9 @@ def trigger_auto_export(
         )
         return None
 
-    print(f"🚀 Auto-triggering video export for flight {flight_id}")
+    print(f"🚀 Auto-triggering fast video export for flight {flight_id}")
     try:
-        job_id = start_video_export_manual(
+        job_id = start_video_export_manual_fast(
             flight_id=flight_id,
             quality="1080p",
             fps=15,
@@ -1569,10 +1569,10 @@ def trigger_auto_export(
             frontend_url=frontend_url,
             update_db=True,
         )
-        print(f"✅ Manual auto export job {job_id} started for flight {flight_id}")
+        print(f"✅ Manual fast auto export job {job_id} started for flight {flight_id}")
         return job_id
     except Exception as e:
-        print(f"⚠️ Manual auto-export failed for flight {flight_id}, fallback stream: {e}")
+        print(f"⚠️ Manual fast auto-export failed for flight {flight_id}, fallback stream: {e}")
         from video_export import start_video_export_background
 
         job_id = start_video_export_background(
