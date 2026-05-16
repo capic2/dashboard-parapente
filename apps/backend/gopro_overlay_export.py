@@ -1,12 +1,13 @@
 import asyncio
 import json
 import os
+import re
 import shutil
 import subprocess
 import threading
 import uuid
 import xml.etree.ElementTree as ET
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +28,7 @@ _VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v"}
 _GPX_EXTENSIONS = {".gpx", ".fit"}
 _UPLOAD_WORK_ROOT = Path("/tmp/dashboard-parapente/gopro-overlays")
 _PATH_WORK_DIR_NAME = ".gopro-overlay-work"
+_PROGRESS_PERCENT_RE = re.compile(r"(?P<percent>\d{1,3})\s*%")
 
 
 @dataclass(frozen=True)
@@ -154,6 +156,27 @@ def _update_job(job_id: str, **changes: Any) -> dict[str, Any]:
         job.update(changes)
         job["updated_at"] = _utc_now()
         return job.copy()
+
+
+def _progress_from_output_chunk(chunk: str) -> int | None:
+    matches = list(_PROGRESS_PERCENT_RE.finditer(chunk))
+    if not matches:
+        return None
+    percent = int(matches[-1].group("percent"))
+    return max(5, min(percent, 99))
+
+
+def _read_process_updates(stream: Any) -> Iterator[str]:
+    current = ""
+    while char := stream.read(1):
+        if char in {"\n", "\r"}:
+            if current.strip():
+                yield current.strip()
+            current = ""
+            continue
+        current += char
+    if current.strip():
+        yield current.strip()
 
 
 def _transition_job_to_running(job_id: str, command: list[str]) -> dict[str, Any] | None:
@@ -484,11 +507,17 @@ def _run_job(job_id: str) -> None:
     output_lines: list[str] = []
     try:
         if process.stdout:
-            for line in process.stdout:
-                output_lines.append(line.rstrip())
+            for line in _read_process_updates(process.stdout):
+                output_lines.append(line)
                 if len(output_lines) > 50:
                     output_lines = output_lines[-50:]
-                _update_job(job_id, progress=50, message=line.strip() or "Rendering overlay")
+                progress = _progress_from_output_chunk(line)
+                if progress is None:
+                    _update_job(job_id, message=line or "Rendering overlay")
+                else:
+                    _update_job(
+                        job_id, progress=progress, message=f"Rendering overlay: {progress}%"
+                    )
 
         return_code = process.wait()
         with _LOCK:
