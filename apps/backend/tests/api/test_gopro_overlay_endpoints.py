@@ -188,6 +188,10 @@ def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
             "routes.check_gopro_overlay_dependencies",
             return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
         ),
+        patch(
+            "routes.asyncio.to_thread",
+            AsyncMock(side_effect=lambda func, *args, **kwargs: func(*args, **kwargs)),
+        ) as to_thread,
         patch("routes.create_gopro_overlay_job_from_paths", return_value=expected) as create_job,
     ):
         response = client.post(
@@ -202,6 +206,7 @@ def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
         )
 
     assert response.status_code == 200
+    assert to_thread.call_args.args[0] is create_job
     assert create_job.call_args.kwargs["video_path"] == video_path
     assert create_job.call_args.kwargs["gpx_path"] == gpx_path
     assert create_job.call_args.kwargs["pip_path"] == pip_path
@@ -681,7 +686,13 @@ async def test_create_gopro_overlay_job_uses_job_unique_output_paths(tmp_path, m
     monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
     monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
 
-    with patch("gopro_overlay_export.threading.Thread") as thread:
+    with (
+        patch(
+            "gopro_overlay_export.asyncio.to_thread",
+            AsyncMock(side_effect=lambda func, *args, **kwargs: func(*args, **kwargs)),
+        ) as to_thread,
+        patch("gopro_overlay_export.threading.Thread") as thread,
+    ):
         first = await create_gopro_overlay_job(
             video_file=_upload("flight.mp4", b"video"),
             gpx_file=_upload("flight.gpx", b"<gpx />"),
@@ -702,6 +713,8 @@ async def test_create_gopro_overlay_job_uses_job_unique_output_paths(tmp_path, m
     assert first["output_path"] != second["output_path"]
     assert Path(first["output_path"]).parent.name == first["job_id"]
     assert Path(second["output_path"]).parent.name == second["job_id"]
+    assert to_thread.call_count == 2
+    assert to_thread.call_args.args[0] is gopro_overlay_export._create_gopro_overlay_job_from_paths
     assert thread.call_count == 2
 
 

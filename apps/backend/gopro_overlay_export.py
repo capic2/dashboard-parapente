@@ -330,7 +330,8 @@ async def create_gopro_overlay_job(
             _validate_file_extension(fallback_pip_path, _VIDEO_EXTENSIONS)
             pip_path = fallback_pip_path
 
-        return _create_gopro_overlay_job_from_paths(
+        return await asyncio.to_thread(
+            _create_gopro_overlay_job_from_paths,
             job_id=job_id,
             video_path=video_path,
             gpx_path=gpx_path,
