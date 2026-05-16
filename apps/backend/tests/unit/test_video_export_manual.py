@@ -335,6 +335,29 @@ def test_resume_video_export_waits_for_running_cancel_to_finish(test_db, tmp_pat
         video_export_manual._clear_job_cancel_requested(job_id)
 
 
+def test_trigger_auto_export_uses_manual_fast(db_session, sample_flight, monkeypatch):
+    sample_flight.gpx_file_path = "db/gpx/sample.gpx"
+    db_session.commit()
+
+    def fail_manual_export(**_kwargs):
+        raise AssertionError("classic manual export should not be used")
+
+    monkeypatch.setattr(video_export_manual, "start_video_export_manual", fail_manual_export)
+    monkeypatch.setattr(
+        video_export_manual,
+        "start_video_export_manual_fast",
+        lambda **_kwargs: "job-manual-fast",
+    )
+
+    job_id = video_export_manual.trigger_auto_export(
+        sample_flight.id,
+        db_session,
+        frontend_url="http://frontend.test",
+    )
+
+    assert job_id == "job-manual-fast"
+
+
 def test_cleanup_temp_dir_removes_nested_files(tmp_path):
     temp_dir = tmp_path / "temp-images" / "job-123"
     frames_dir = temp_dir / "frames"
