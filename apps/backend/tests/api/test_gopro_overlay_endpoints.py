@@ -12,6 +12,7 @@ from starlette.datastructures import UploadFile
 
 import config
 import gopro_overlay_export
+from auth import create_job_token
 import routes
 from gopro_overlay_export import _prepare_layout_file
 from gopro_overlay_export import _progress_from_output_chunk
@@ -84,9 +85,34 @@ def test_create_gopro_overlay_job_passes_uploaded_files(client: TestClient):
 
     assert response.status_code == 200
     assert response.json()["job_id"] == "job-gopro"
+    assert response.json()["job_token"]
     assert create_job.call_args.kwargs["layout_id"] == "parapente-1080"
     assert create_job.call_args.kwargs["output_filename"] == "flight-overlay.mp4"
     assert create_job.call_args.kwargs["pip_file"] is not None
+
+
+def test_gopro_overlay_job_access_status_accepts_job_token(client: TestClient):
+    token = create_job_token(purpose="gopro_overlay", job_id="job-gopro")
+    expected = {
+        "job_id": "job-gopro",
+        "status": "completed",
+        "progress": 100,
+        "message": "ready",
+        "layout_id": "parapente-1080",
+        "layout_label": "Parapente 1920x1080",
+        "output_filename": "flight-overlay.mp4",
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
+
+    with patch("routes.get_gopro_overlay_job", return_value=expected):
+        response = client.get(
+            f"{API_PREFIX}/job-access/gopro-overlays/jobs/job-gopro/status",
+            params={"access_token": token},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["job_id"] == "job-gopro"
 
 
 def test_create_flight_gopro_overlay_job_uses_flight_files(

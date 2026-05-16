@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 from sqlalchemy.orm import Session
 
 import config
+from auth import create_job_token
 from database import SessionLocal
 from flight_storage import get_video_output_path
 from models import Flight, VideoExportJob
@@ -269,6 +270,10 @@ def _get_job_auth_token(job_id: str) -> str | None:
         return job.auth_token
 
 
+def get_video_export_job_token(job_id: str) -> str | None:
+    return _get_job_auth_token(job_id)
+
+
 def _clear_job_auth_token(job_id: str):
     _set_job_auth_token(job_id, None)
 
@@ -288,6 +293,10 @@ def _build_playwright_init_script(auth_token: str | None) -> str:
             }}
         }})();
     """
+
+
+def _create_video_export_job_token(job_id: str, flight_id: str) -> str:
+    return create_job_token(purpose="video_export", job_id=job_id, flight_id=flight_id)
 
 
 def _get_job(job_id: str, db: Session | None = None) -> VideoExportJob | None:
@@ -854,7 +863,7 @@ def _enqueue_video_export_job(
         _set_memory_snapshot(job_id, _snapshot_from_job(job))
         _set_job_runtime(job_id, phase=_STATUS_QUEUED)
 
-    _set_job_auth_token(job_id, auth_token)
+    _set_job_auth_token(job_id, auth_token or _create_video_export_job_token(job_id, flight_id))
 
     start_video_export_worker()
     return job_id
@@ -966,8 +975,12 @@ async def _export_video_manual_render(job_id: str):
             page.on("console", lambda msg: print(f"🖥️  [{msg.type}]: {msg.text}"))
             page.on("pageerror", lambda err: print(f"❌ Browser error: {err}"))
 
-            url = f"{frontend_url}/export-viewer?flightId={flight_id}"
-            print(f"📺 Opening {url}")
+            url = f"{frontend_url}/export-viewer?flightId={flight_id}&jobId={job_id}"
+            log_url = url
+            if auth_token:
+                url = f"{url}&exportToken={auth_token}"
+                log_url = f"{log_url}&exportToken=<redacted>"
+            print(f"📺 Opening {log_url}")
 
             _update_job(job_id, message="Loading export viewer")
             response = await page.goto(url, wait_until="networkidle", timeout=60000)
@@ -1516,7 +1529,7 @@ def resume_video_export(job_id: str, auth_token: str | None = None) -> bool:
         completed_at=None,
         cancelled_at=None,
     )
-    _set_job_auth_token(job_id, auth_token)
+    _set_job_auth_token(job_id, auth_token or _create_video_export_job_token(job_id, job.flight_id))
     _set_job_runtime(
         job_id,
         phase=_STATUS_QUEUED,

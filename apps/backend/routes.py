@@ -29,7 +29,13 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 import config
-from auth import authenticate_user, create_access_token, get_current_user
+from auth import (
+    authenticate_user,
+    create_access_token,
+    create_job_token,
+    decode_job_token,
+    get_current_user,
+)
 from database import get_db
 from emagram_freshness import get_emagram_cutoff_utc
 from flight_backfill import calculate_and_persist_missing_max_speed
@@ -95,6 +101,7 @@ from video_export import start_video_export_background
 from video_export_manual import cancel_video_export as cancel_video_export_manual
 from video_export_manual import cleanup_video_export_temp_files
 from video_export_manual import get_export_status as get_export_status_manual
+from video_export_manual import get_video_export_job_token
 from video_export_manual import list_exports as list_exports_manual
 from video_export_manual import resolve_frontend_url
 from video_export_manual import resume_video_export
@@ -4268,6 +4275,40 @@ def _extract_bearer_token(request: Request) -> str | None:
     return token or None
 
 
+def _extract_job_access_token(request: Request) -> str | None:
+    query_token = request.query_params.get("access_token")
+    if query_token:
+        return query_token.strip() or None
+    token = _extract_bearer_token(request)
+    if token:
+        return token
+    return None
+
+
+def _require_job_token(request: Request, *, purpose: str, job_id: str) -> dict[str, Any]:
+    token = _extract_job_access_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing job token")
+    return decode_job_token(token, purpose=purpose, job_id=job_id)
+
+
+def _with_video_export_job_token(payload: dict[str, Any], job_id: str) -> dict[str, Any]:
+    try:
+        token = get_video_export_job_token(job_id)
+    except Exception:
+        logger.debug("Unable to attach video export job token for %s", job_id, exc_info=True)
+        token = None
+    return {**payload, "job_token": token} if token else payload
+
+
+def _with_gopro_overlay_job_token(payload: dict[str, Any]) -> dict[str, Any]:
+    job_id = payload["job_id"]
+    return {
+        **payload,
+        "job_token": create_job_token(purpose="gopro_overlay", job_id=job_id),
+    }
+
+
 @router.post("/flights/{flight_id}/export-video")
 def start_flight_video_export(
     request: Request,
@@ -4392,12 +4433,15 @@ def start_flight_video_export(
         effective_mode = "stream"
         _mark_flight_export_processing(db=db, flight=flight, job_id=job_id)
 
-    return {
-        "job_id": job_id,
-        "message": f"Video export started ({_video_export_mode_label(effective_mode)})",
-        "mode": effective_mode,
-        "status_url": f"/api/exports/{job_id}/status",
-    }
+    return _with_video_export_job_token(
+        {
+            "job_id": job_id,
+            "message": f"Video export started ({_video_export_mode_label(effective_mode)})",
+            "mode": effective_mode,
+            "status_url": f"/api/exports/{job_id}/status",
+        },
+        job_id,
+    )
 
 
 @router.post("/flights/{flight_id}/generate-video")
@@ -4461,11 +4505,14 @@ def generate_flight_video(
 
     logger.info(f" Video generation started: job_id={job_id}")
 
-    return {
-        "job_id": job_id,
-        "message": started_message,
-        "status_url": f"/api/exports/{job_id}/status",
-    }
+    return _with_video_export_job_token(
+        {
+            "job_id": job_id,
+            "message": started_message,
+            "status_url": f"/api/exports/{job_id}/status",
+        },
+        job_id,
+    )
 
 
 @router.get("/exports/{job_id}/status")
@@ -4598,7 +4645,10 @@ def resume_cancelled_video_export(request: Request, job_id: str):
             detail="Export job not found or cannot be resumed",
         )
 
-    return {"message": "Export resume enqueued", "job_id": job_id}
+    return _with_video_export_job_token(
+        {"message": "Export resume enqueued", "job_id": job_id},
+        job_id,
+    )
 
 
 @router.get("/exports/{job_id}/download")
@@ -4623,6 +4673,43 @@ def download_exported_video(job_id: str):
 
     filename = os.path.basename(video_path)
     return FileResponse(path=video_path, media_type="video/mp4", filename=filename)
+
+
+@public_router.get("/job-access/exports/{job_id}/stream")
+async def stream_video_export_status_with_job_token(
+    job_id: str,
+    request: Request,
+) -> StreamingResponse:
+    """Stream video export status with a scoped job token."""
+    _require_job_token(request, purpose="video_export", job_id=job_id)
+    return await stream_video_export_status(job_id, request)
+
+
+@public_router.get("/job-access/exports/{job_id}/status")
+def get_video_export_status_with_job_token(job_id: str, request: Request):
+    """Get video export status with a scoped job token."""
+    _require_job_token(request, purpose="video_export", job_id=job_id)
+    return get_video_export_status(job_id)
+
+
+@public_router.get("/export-viewer/jobs/{job_id}/flight")
+def get_export_viewer_flight(job_id: str, request: Request, db: Session = Depends(get_db)):
+    """Return flight data for the headless export viewer using a scoped job token."""
+    payload = _require_job_token(request, purpose="video_export", job_id=job_id)
+    flight_id = payload.get("flight_id")
+    if not isinstance(flight_id, str):
+        raise HTTPException(status_code=401, detail="Invalid job token")
+    return get_flight(flight_id, db)
+
+
+@public_router.get("/export-viewer/jobs/{job_id}/gpx-data")
+def get_export_viewer_gpx_data(job_id: str, request: Request, db: Session = Depends(get_db)):
+    """Return GPX data for the headless export viewer using a scoped job token."""
+    payload = _require_job_token(request, purpose="video_export", job_id=job_id)
+    flight_id = payload.get("flight_id")
+    if not isinstance(flight_id, str):
+        raise HTTPException(status_code=401, detail="Invalid job token")
+    return get_flight_gpx_data(flight_id, db)
 
 
 @router.get("/flights/{flight_id}/exports")
@@ -4727,7 +4814,7 @@ async def create_flight_gopro_overlay_job(
                     status_code=400,
                     detail="Generate the flight video before creating the GoPro overlay",
                 )
-            return await asyncio.to_thread(
+            job = await asyncio.to_thread(
                 create_gopro_overlay_job_from_paths,
                 video_path=resolved_video_path,
                 gpx_path=fallback_gpx_path,
@@ -4736,6 +4823,7 @@ async def create_flight_gopro_overlay_job(
                 output_filename=resolved_output_filename,
                 output_dir=resolved_output_dir,
             )
+            return _with_gopro_overlay_job_token(job)
 
         if not video_file or not video_file.filename:
             raise HTTPException(status_code=400, detail="GoPro camera video is required")
@@ -4751,7 +4839,7 @@ async def create_flight_gopro_overlay_job(
                 detail="Generate the flight video before creating the GoPro overlay",
             )
 
-        return await create_gopro_overlay_job(
+        job = await create_gopro_overlay_job(
             video_file=video_file,
             gpx_file=gpx_file,
             fallback_gpx_path=fallback_gpx_path,
@@ -4761,6 +4849,7 @@ async def create_flight_gopro_overlay_job(
             output_filename=resolved_output_filename,
             output_dir=resolved_output_dir,
         )
+        return _with_gopro_overlay_job_token(job)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -4819,13 +4908,14 @@ async def create_gopro_overlay_render_job(
         )
 
     try:
-        return await create_gopro_overlay_job(
+        job = await create_gopro_overlay_job(
             video_file=video_file,
             gpx_file=gpx_file,
             pip_file=pip_file,
             layout_id=layout_id,
             output_filename=output_filename,
         )
+        return _with_gopro_overlay_job_token(job)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -4880,6 +4970,46 @@ def download_gopro_overlay_render_job(job_id: str) -> FileResponse:
         raise HTTPException(status_code=400, detail="GoPro overlay video is not ready")
 
     return FileResponse(path=output_path, media_type="video/mp4", filename=output_path.name)
+
+
+@public_router.get(
+    "/job-access/gopro-overlays/jobs/{job_id}/status",
+    response_model=GoproOverlayJob,
+)
+def get_gopro_overlay_status_with_job_token(job_id: str, request: Request) -> GoproOverlayJob:
+    """Get GoPro overlay status with a scoped job token."""
+    _require_job_token(request, purpose="gopro_overlay", job_id=job_id)
+    return get_gopro_overlay_render_job_status(job_id)
+
+
+@public_router.get("/job-access/gopro-overlays/jobs/{job_id}/stream")
+async def stream_gopro_overlay_status_with_job_token(
+    job_id: str,
+    request: Request,
+) -> StreamingResponse:
+    """Stream GoPro overlay status with a scoped job token."""
+    _require_job_token(request, purpose="gopro_overlay", job_id=job_id)
+    return await stream_gopro_overlay_render_job_status(job_id, request)
+
+
+@public_router.get("/job-access/gopro-overlays/jobs/{job_id}/download")
+def download_gopro_overlay_with_job_token(job_id: str, request: Request) -> FileResponse:
+    """Download a completed GoPro overlay with a scoped job token."""
+    _require_job_token(request, purpose="gopro_overlay", job_id=job_id)
+    return download_gopro_overlay_render_job(job_id)
+
+
+@public_router.delete(
+    "/job-access/gopro-overlays/jobs/{job_id}/cancel",
+    response_model=GoproOverlayCancelResponse,
+)
+def cancel_gopro_overlay_with_job_token(
+    job_id: str,
+    request: Request,
+) -> GoproOverlayCancelResponse:
+    """Cancel a GoPro overlay with a scoped job token."""
+    _require_job_token(request, purpose="gopro_overlay", job_id=job_id)
+    return cancel_gopro_overlay_render_job(job_id)
 
 
 # ============================================================================

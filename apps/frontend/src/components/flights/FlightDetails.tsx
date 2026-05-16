@@ -99,6 +99,9 @@ export function FlightDetails({
   const [goproOverlayJobId, setGoproOverlayJobId] = useState<string | null>(
     null
   );
+  const [goproOverlayJobToken, setGoproOverlayJobToken] = useState<
+    string | null
+  >(null);
   const [showGoproOverlayForm, setShowGoproOverlayForm] = useState(false);
   const [goproOverlayVideoPath, setGoproOverlayVideoPath] = useState('');
   const [goproOverlayGpxPath, setGoproOverlayGpxPath] = useState('');
@@ -112,8 +115,10 @@ export function FlightDetails({
 
   const hasGpx = Boolean(flight.gpx_file_path);
   const hasVideo = Boolean(flight.video_file_path);
-  const { job: streamedGoproOverlayJob } =
-    useGoproOverlayJobStream(goproOverlayJobId);
+  const { job: streamedGoproOverlayJob } = useGoproOverlayJobStream(
+    goproOverlayJobId,
+    goproOverlayJobToken
+  );
   const goproOverlayJob = streamedGoproOverlayJob ?? createGoproOverlayJob.data;
   const isGoproOverlayRunning =
     goproOverlayJob?.status === 'queued' ||
@@ -137,6 +142,7 @@ export function FlightDetails({
     setEditingMode(false);
     setEditingNotes(false);
     setGoproOverlayJobId(null);
+    setGoproOverlayJobToken(null);
     setShowGoproOverlayForm(false);
     setGoproOverlayVideoPath('');
     setGoproOverlayGpxPath('');
@@ -279,6 +285,7 @@ export function FlightDetails({
       const job = await createGoproOverlayJob.mutateAsync(formData);
       if (activeFlightIdRef.current !== requestedFlightId) return;
       setGoproOverlayJobId(job.job_id);
+      setGoproOverlayJobToken(job.job_token ?? null);
       setShowGoproOverlayForm(false);
       toast.success(t('flights.goproOverlayStarted'));
     } catch (error) {
@@ -292,7 +299,10 @@ export function FlightDetails({
     if (!goproOverlayJob) return;
 
     try {
-      await cancelGoproOverlayJob.mutateAsync(goproOverlayJob.job_id);
+      await cancelGoproOverlayJob.mutateAsync({
+        jobId: goproOverlayJob.job_id,
+        jobToken: goproOverlayJobToken,
+      });
       toast.success(t('flights.goproOverlayCancelled'));
     } catch {
       toast.error(t('flights.goproOverlayCancelError'));
@@ -303,8 +313,14 @@ export function FlightDetails({
     if (!goproOverlayJob || goproOverlayJob.status !== 'completed') return;
 
     try {
+      const downloadPath = goproOverlayJobToken
+        ? `job-access/gopro-overlays/jobs/${goproOverlayJob.job_id}/download`
+        : `gopro-overlays/jobs/${goproOverlayJob.job_id}/download`;
       const blob = await api
-        .get(`gopro-overlays/jobs/${goproOverlayJob.job_id}/download`, {
+        .get(downloadPath, {
+          searchParams: goproOverlayJobToken
+            ? { access_token: goproOverlayJobToken }
+            : undefined,
           timeout: false,
         })
         .blob();

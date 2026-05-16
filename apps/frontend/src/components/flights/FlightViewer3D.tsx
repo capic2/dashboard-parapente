@@ -82,6 +82,8 @@ interface FlightViewer3DProps {
   flightTitle?: string;
   compact?: boolean;
   exportOnly?: boolean;
+  exportJobId?: string | null;
+  exportToken?: string | null;
 }
 
 interface ScenePositionState {
@@ -273,11 +275,20 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   flightTitle,
   compact = false,
   exportOnly = false,
+  exportJobId,
+  exportToken,
 }) => {
   const { t } = useTranslation();
   const resolvedFlightTitle = flightTitle || t('flights.viewer.defaultTitle');
-  const { data: gpxData, isLoading, error } = useFlightGPX(flightId);
-  const { data: flight } = useFlight(flightId);
+  const {
+    data: gpxData,
+    isLoading,
+    error,
+  } = useFlightGPX(flightId, {
+    exportJobId,
+    exportToken,
+  });
+  const { data: flight } = useFlight(flightId, { exportJobId, exportToken });
   const queryClient = useQueryClient();
   const toast = useToast();
   const containerRef = useRef<HTMLDivElement>(null);
