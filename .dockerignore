@@ -9,7 +9,10 @@ README.md
 docs/
 
 # CI/CD
+.agents/
 .github/
+.husky/
+.opencode/
 .gitlab-ci.yml
 
 # IDE
@@ -43,6 +46,9 @@ ENV/
 .venv
 
 # Node
+.nx/
+.tanstack/
+**/.tanstack/
 node_modules/
 npm-debug.log*
 yarn-debug.log*
@@ -74,6 +80,7 @@ Thumbs.db
 logs/
 
 # Temporary files
+.codenomad/
 tmp/
 temp/
 *.tmp
