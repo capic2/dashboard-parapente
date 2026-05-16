@@ -11,7 +11,7 @@ import {
   TabPanel,
   Tabs,
 } from '@dashboard-parapente/design-system';
-import { Download, Edit3, FileUp, Video, Wand2 } from 'lucide-react';
+import { Download, Edit3, FileUp, Wand2 } from 'lucide-react';
 import {
   useUpdateFlight,
   useUploadGPXToFlight,
@@ -401,20 +401,20 @@ export function FlightDetails({
         />
       ) : (
         <>
-          <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0">
+          <div className="mb-5">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                 {flightTitle}
               </h2>
               {(hasGpx || hasVideo) && (
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="flex shrink-0 flex-wrap gap-1.5 sm:justify-end">
                   {hasGpx && (
-                    <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200">
+                    <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200">
                       {t('flights.gpxBadge')}
                     </span>
                   )}
                   {hasVideo && (
-                    <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+                    <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
                       {t('flights.videoBadge')}
                     </span>
                   )}
@@ -422,24 +422,20 @@ export function FlightDetails({
               )}
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-900/50 xl:max-w-[34rem]">
-              <div className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                <Video className="h-3.5 w-3.5" aria-hidden="true" />
-                {t('flights.videoProductionActions')}
-              </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="mt-3 flex flex-col gap-2 border-t border-gray-200 pt-3 dark:border-gray-700 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex flex-wrap gap-2">
                 {hasGpx && (
                   <FlightVideoExportControls
                     flight={flight}
                     className="contents"
-                    buttonClassName="min-h-11 w-full justify-center rounded-xl bg-blue-600 px-3.5 py-2.5 hover:bg-blue-700"
+                    buttonClassName="min-h-10 rounded-lg bg-sky-600 px-3 py-2 text-sm hover:bg-sky-700"
                     compact
                     showModeSelector={false}
                   />
                 )}
                 <Button
-                  variant="cyan"
-                  className="min-h-11 w-full rounded-xl px-3.5 py-2.5 text-sm"
+                  variant="outline"
+                  className="min-h-10 rounded-lg border-cyan-200 px-3 py-2 text-sm text-cyan-800 hover:bg-cyan-50 dark:border-cyan-800 dark:text-cyan-200 dark:hover:bg-cyan-950/40"
                   onPress={goproOverlayAction}
                   isDisabled={
                     createGoproOverlayJob.isPending ||
@@ -452,10 +448,10 @@ export function FlightDetails({
                 </Button>
               </div>
 
-              <div className="mt-2 grid grid-cols-1 gap-2 border-t border-slate-200 pt-2 dark:border-slate-700 sm:grid-cols-3">
+              <div className="flex flex-wrap gap-2 lg:justify-end">
                 <Button
-                  variant="outline"
-                  className="min-h-10 w-full rounded-xl px-3 py-2 text-sm"
+                  variant="ghost"
+                  className="min-h-10 rounded-lg px-3 py-2 text-sm"
                   onPress={() => setEditingMode(true)}
                   aria-label={t('flights.editFlight')}
                 >
@@ -464,8 +460,8 @@ export function FlightDetails({
                 </Button>
                 {hasGpx && (
                   <Button
-                    variant="outline"
-                    className="min-h-10 w-full rounded-xl px-3 py-2 text-sm"
+                    variant="ghost"
+                    className="min-h-10 rounded-lg px-3 py-2 text-sm"
                     onPress={handleGPXDownload}
                     isDisabled={isDownloadingGpx}
                   >
@@ -476,8 +472,8 @@ export function FlightDetails({
                   </Button>
                 )}
                 <Button
-                  variant={flight.gpx_file_path ? 'success' : 'warning'}
-                  className="min-h-10 w-full rounded-xl px-3 py-2 text-sm"
+                  variant="ghost"
+                  className="min-h-10 rounded-lg px-3 py-2 text-sm"
                   onPress={() => fileInputRef.current?.click()}
                   isDisabled={uploadGPXMutation.isPending}
                 >
