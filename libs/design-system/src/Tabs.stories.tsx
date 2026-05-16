@@ -10,7 +10,7 @@ const meta = preview.meta({
     docs: {
       description: {
         component:
-          'Accessible tabs built on react-aria-components with a visible selected state and dark mode support.',
+          'Accessible tabs built on react-aria-components with a visible selected state, horizontal mobile scrolling, and dark mode support.',
       },
     },
   },
@@ -53,13 +53,13 @@ Default.test('shows selected tab state', async ({ canvas }) => {
 
 export const Responsive = meta.story({
   render: () => (
-    <div className="w-[min(36rem,calc(100vw-2rem))]">
+    <div className="w-[min(24rem,calc(100vw-2rem))]">
       <Tabs defaultSelectedKey="sites">
         <TabList className="grid-cols-2 sm:flex">
           <Tab id="general">General</Tab>
-          <Tab id="sites">Sites</Tab>
-          <Tab id="weather">Weather</Tab>
-          <Tab id="data">Data</Tab>
+          <Tab id="sites">Favorite sites</Tab>
+          <Tab id="weather">Weather sources</Tab>
+          <Tab id="data">Data management</Tab>
         </TabList>
         <TabPanel id="general">General settings</TabPanel>
         <TabPanel id="sites">Favorite sites</TabPanel>
