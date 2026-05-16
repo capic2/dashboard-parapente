@@ -663,6 +663,21 @@ export function FlightDetails({
                 max={100}
                 aria-label={t('flights.goproOverlayJobTitle')}
               />
+              {goproOverlayJob.status === 'completed' && (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 dark:border-emerald-800 dark:bg-emerald-950/30">
+                  <span className="text-xs font-semibold text-emerald-900 dark:text-emerald-100">
+                    {goproOverlayJob.output_filename}
+                  </span>
+                  <Button
+                    type="button"
+                    className="min-h-9 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                    onPress={handleDownloadGoproOverlay}
+                  >
+                    <Download className="h-4 w-4" aria-hidden="true" />
+                    {t('flights.goproOverlayDownload')}
+                  </Button>
+                </div>
+              )}
               {goproOverlayJob.error && (
                 <pre className="mt-2 max-h-36 overflow-auto rounded bg-red-950 p-2 text-xs text-red-50">
                   {goproOverlayJob.error}
