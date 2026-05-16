@@ -264,6 +264,7 @@ export function FlightsTable({
       className="flex h-full flex-col lg:min-h-[calc(100vh-22rem)]"
       itemsClassName="min-h-72 flex-1 overflow-y-auto pr-1"
       virtualizedLayoutOptions={{ estimatedRowSize: 136, gap: 8 }}
+      renderDependencies={[selectedFlightId, selectionMode, rowSelection]}
       selectionMode={selectionMode ? 'multiple' : 'none'}
       selectedKeys={selectedKeys}
       onSelectionChange={handleSelectionChange}
