@@ -1,5 +1,5 @@
 import preview from '../../../.storybook/preview';
-import { fn } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { useState } from 'react';
 import type { RowSelectionState } from '@tanstack/react-table';
 import { FlightsTable } from './FlightsTable';
@@ -124,6 +124,22 @@ const meta = preview.meta({
 export const Default = meta.story({
   name: 'Default',
   render: () => <FlightsTableWrapper flights={mockFlights} />,
+});
+
+export const SelectionUpdatesActiveStyle = meta.story({
+  name: 'Selection updates active style',
+  parameters: {
+    chromatic: { disableSnapshot: true },
+  },
+  render: () => <FlightsTableWrapper flights={mockFlights} />,
+  async play({ canvasElement }) {
+    const canvas = within(canvasElement);
+    const flightRow = canvas.getByTestId('flight-row-flight-1');
+
+    await userEvent.click(flightRow);
+
+    await expect(flightRow).toHaveClass('border-sky-700');
+  },
 });
 
 export const SelectionMode = meta.story({

@@ -104,6 +104,7 @@ export interface DataListProps<TData> {
   layout?: 'stack' | 'grid';
   isVirtualized?: boolean;
   virtualizedLayoutOptions?: ListLayoutOptions;
+  renderDependencies?: readonly unknown[];
   selectionMode?: 'none' | 'single' | 'multiple';
   selectedKeys?: Selection;
   onSelectionChange?: (keys: Selection) => void;
@@ -131,6 +132,7 @@ export function DataList<TData>({
   layout = 'stack',
   isVirtualized = false,
   virtualizedLayoutOptions,
+  renderDependencies,
   selectionMode = 'none',
   selectedKeys,
   onSelectionChange,
@@ -209,6 +211,7 @@ export function DataList<TData>({
           <ListBox
             aria-label={ariaLabel}
             items={rows}
+            dependencies={renderDependencies}
             layout={layout}
             selectionMode={isSelectable ? selectionMode : undefined}
             selectedKeys={isSelectable ? selectedKeys : undefined}
@@ -236,6 +239,7 @@ export function DataList<TData>({
         <ListBox
           aria-label={ariaLabel}
           items={rows}
+          dependencies={renderDependencies}
           layout={layout}
           selectionMode={isSelectable ? selectionMode : undefined}
           selectedKeys={isSelectable ? selectedKeys : undefined}
