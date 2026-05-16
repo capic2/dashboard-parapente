@@ -5,7 +5,7 @@ import { goproOverlayLayoutsQueryOptions } from '../hooks/gopro/useGoproOverlay'
 
 export const Route = createFileRoute('/gopro-overlay')({
   beforeLoad: requireAuth,
-  loader: async () => {
-    await queryClient.ensureQueryData(goproOverlayLayoutsQueryOptions());
+  loader: () => {
+    void queryClient.prefetchQuery(goproOverlayLayoutsQueryOptions());
   },
 });

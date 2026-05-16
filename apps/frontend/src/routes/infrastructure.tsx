@@ -6,10 +6,8 @@ import { requireAuth } from '../lib/authGuard';
 
 export const Route = createFileRoute('/infrastructure')({
   beforeLoad: requireAuth,
-  loader: async () => {
-    await Promise.all([
-      queryClient.ensureQueryData(cacheOverviewQueryOptions()),
-      queryClient.prefetchQuery(videoExportJobsQueryOptions()),
-    ]);
+  loader: () => {
+    void queryClient.prefetchQuery(cacheOverviewQueryOptions());
+    void queryClient.prefetchQuery(videoExportJobsQueryOptions());
   },
 });

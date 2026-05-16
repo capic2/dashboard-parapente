@@ -8,8 +8,8 @@ import { requireAuth } from '../lib/authGuard';
 export const Route = createFileRoute('/')({
   beforeLoad: requireAuth,
   component: Dashboard,
-  loader: async () => {
+  loader: () => {
     void queryClient.prefetchQuery(bestSpotQueryOptions(0));
-    await queryClient.ensureQueryData(sitesQueryOptions());
+    void queryClient.prefetchQuery(sitesQueryOptions());
   },
 });
