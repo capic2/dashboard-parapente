@@ -1,6 +1,10 @@
 import ky from 'ky';
 import { useAuthStore } from '../stores/authStore';
 
+type ApiErrorPayload = {
+  detail?: unknown;
+};
+
 // API logging: enabled in dev, disabled in tests via overrideApi({ logs: false })
 let _apiLogsEnabled = import.meta.env.DEV;
 
@@ -18,7 +22,7 @@ export let api = ky.create({
   },
   hooks: {
     beforeRequest: [
-      ({request}) => {
+      ({ request }) => {
         // Attach JWT token if available
         const token = useAuthStore.getState().token;
         if (token) {
@@ -32,7 +36,7 @@ export let api = ky.create({
       },
     ],
     afterResponse: [
-      async ({request, response}) => {
+      async ({ request, response }) => {
         // On 401, clear auth and redirect to login
         if (response.status === 401) {
           const { isAuthenticated, logout } = useAuthStore.getState();
@@ -64,6 +68,28 @@ export function overrideApi(
     _apiLogsEnabled = logs;
   }
   api = api.extend(kyOptions);
+}
+
+export async function getApiErrorMessage(error: unknown, fallback: string) {
+  if (!(error instanceof Error) || !('response' in error)) {
+    return fallback;
+  }
+
+  const response = error.response;
+  if (!(response instanceof Response)) {
+    return fallback;
+  }
+
+  try {
+    const payload = (await response.clone().json()) as ApiErrorPayload;
+    if (typeof payload.detail === 'string' && payload.detail.trim()) {
+      return payload.detail;
+    }
+  } catch {
+    // Keep the user-facing fallback when the response is not JSON.
+  }
+
+  return fallback;
 }
 
 // Apply persisted timeout on load and react to changes
