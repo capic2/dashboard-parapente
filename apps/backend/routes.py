@@ -4387,7 +4387,7 @@ def generate_flight_video(
     Generate video for a flight (simple endpoint with optimal defaults)
     Used for flights that don't have a video yet.
 
-    Uses optimal settings: 1080p, 15 FPS, Manual Render
+    Uses optimal settings: 1080p, 15 FPS, Manual Fast Render
     """
     logger.info(f"🎥 Manual video generation requested: flight_id={flight_id}")
 
@@ -4408,9 +4408,9 @@ def generate_flight_video(
     # Determine frontend URL
     frontend_url = resolve_frontend_url(config.FRONTEND_URL)
 
-    # Prefer manual render (high quality), fallback to stream if needed
+    # Prefer deterministic manual-fast render, fallback to stream if needed
     try:
-        job_id = start_video_export_manual(
+        job_id = start_video_export_manual_fast(
             flight_id=flight_id,
             quality="1080p",
             fps=15,
@@ -4419,10 +4419,10 @@ def generate_flight_video(
             update_db=True,
             auth_token=_extract_bearer_token(request),
         )
-        started_message = "Video generation started (Manual Render, ~60-90 min)"
+        started_message = "Video generation started (Manual Fast Render)"
     except Exception as e:
         logger.warning(
-            "⚠️ Manual generation failed, falling back to stream for flight %s: %s",
+            "⚠️ Manual fast generation failed, falling back to stream for flight %s: %s",
             flight_id,
             e,
         )

@@ -133,14 +133,16 @@ class TestVideoExportStartEndpoint:
 class TestGenerateVideoEndpoint:
     """Tests for POST /flights/{flight_id}/generate-video"""
 
-    def test_generate_video_uses_manual_by_default(
+    def test_generate_video_uses_manual_fast_by_default(
         self, client: TestClient, sample_flight, db_session
     ):
-        """Generation should default to manual render when available."""
+        """Generation should default to manual fast render when available."""
         sample_flight.gpx_file_path = "db/gpx/sample.gpx"
         db_session.commit()
 
-        with patch("routes.start_video_export_manual", return_value="job-manual") as mock_start:
+        with patch(
+            "routes.start_video_export_manual_fast", return_value="job-manual-fast"
+        ) as mock_start:
             response = client.post(
                 f"{API_PREFIX}/flights/flight-test-001/generate-video",
                 headers={"Authorization": "Bearer token-generate"},
@@ -148,23 +150,24 @@ class TestGenerateVideoEndpoint:
 
         assert response.status_code == 200
         payload = response.json()
-        assert payload["job_id"] == "job-manual"
-        assert payload["message"] == "Video generation started (Manual Render, ~60-90 min)"
+        assert payload["job_id"] == "job-manual-fast"
+        assert payload["message"] == "Video generation started (Manual Fast Render)"
         assert mock_start.call_args.kwargs["auth_token"] == "token-generate"
 
-    def test_generate_video_falls_back_to_stream_on_manual_error(
+    def test_generate_video_falls_back_to_stream_on_manual_fast_error(
         self,
         client: TestClient,
         db_session,
         sample_flight,
     ):
-        """Generation should fallback to stream mode if manual start fails."""
+        """Generation should fallback to stream mode if manual fast start fails."""
         sample_flight.gpx_file_path = "db/gpx/sample.gpx"
         db_session.commit()
 
         with (
             patch(
-                "routes.start_video_export_manual", side_effect=RuntimeError("manual unavailable")
+                "routes.start_video_export_manual_fast",
+                side_effect=RuntimeError("manual fast unavailable"),
             ),
             patch("routes._start_video_export_stream", return_value="job-stream"),
         ):
@@ -203,11 +206,11 @@ class TestGenerateVideoEndpoint:
         sample_flight.gpx_file_path = "db/gpx/sample.gpx"
         db_session.commit()
 
-        with patch("routes.start_video_export_manual", return_value="job-manual"):
+        with patch("routes.start_video_export_manual_fast", return_value="job-manual-fast"):
             response = client.post(f"{API_PREFIX}/flights/flight-test-001/generate-video")
 
         assert response.status_code == 200
-        assert response.json()["job_id"] == "job-manual"
+        assert response.json()["job_id"] == "job-manual-fast"
 
     def test_generate_video_allows_missing_in_progress_job(
         self, client: TestClient, db_session, sample_flight
@@ -220,12 +223,12 @@ class TestGenerateVideoEndpoint:
 
         with (
             patch("routes._resolve_export_status", return_value=None),
-            patch("routes.start_video_export_manual", return_value="job-manual"),
+            patch("routes.start_video_export_manual_fast", return_value="job-manual-fast"),
         ):
             response = client.post(f"{API_PREFIX}/flights/flight-test-001/generate-video")
 
         assert response.status_code == 200
-        assert response.json()["job_id"] == "job-manual"
+        assert response.json()["job_id"] == "job-manual-fast"
 
 
 class TestExportStatusAndCancel:
