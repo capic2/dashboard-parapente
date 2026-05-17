@@ -506,26 +506,31 @@ else:
     logger.info("🧪 Testing mode: Skipping database initialization and migrations")
 
 
-async def initial_cache_warmup():
+async def initial_cache_warmup() -> None:
     """
-    Warm up Redis cache on startup
-    Fetches today's data for all sites (non-blocking)
+    Warm up Redis cache on startup.
+
+    Fetches weather data for the configured default sites and forecast days.
     """
     from scheduler import scheduled_weather_fetch
 
     try:
-        # Wait 3 seconds for app to fully start
-        await asyncio.sleep(3)
-
         logger.info("🔥 Starting cache warmup...")
         await scheduled_weather_fetch()
         logger.info("✅ Cache warmup complete!")
 
-    except Exception as e:
-        logger.error(f"❌ Cache warmup failed: {e}")
+    except Exception:
+        logger.warning("❌ Cache warmup failed", exc_info=True)
         logger.info(
             "⚠️ App will continue, cache will populate on first request or next hourly poll"
         )
+
+
+def trigger_initial_cache_warmup() -> None:
+    """Start the Redis cache warmup without blocking startup."""
+
+    logger.info("🔥 Triggering initial cache warmup...")
+    asyncio.create_task(initial_cache_warmup())
 
 
 def schedule_strava_token_refresh_job():
@@ -609,9 +614,7 @@ async def lifespan(app: FastAPI):
         logger.info("🔑 Strava token refresh scheduled (every 4h)")
         trigger_initial_strava_token_refresh()
 
-        # Initial cache warmup (non-blocking)
-        logger.info("🔥 Triggering initial cache warmup...")
-        asyncio.create_task(initial_cache_warmup())
+        trigger_initial_cache_warmup()
     else:
         logger.info("📅 Scheduler disabled, skipping cache warmup")
 
