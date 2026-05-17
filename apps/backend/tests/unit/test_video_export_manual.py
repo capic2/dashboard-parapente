@@ -22,7 +22,7 @@ def test_resolve_frontend_url_uses_backend_static_in_production(monkeypatch):
 
     resolved = video_export_manual.resolve_frontend_url("http://localhost:5173")
 
-    assert resolved == "http://localhost:8001"
+    assert resolved == "http://127.0.0.1:8001"
 
 
 def test_default_frontend_url_normalizes_configured_vite_url_in_production(monkeypatch):
@@ -35,7 +35,7 @@ def test_default_frontend_url_normalizes_configured_vite_url_in_production(monke
 
     resolved = video_export_manual._default_frontend_url()
 
-    assert resolved == "http://localhost:8001"
+    assert resolved == "http://127.0.0.1:8001"
 
 
 def test_resolve_frontend_url_keeps_dev_vite_url(monkeypatch):
