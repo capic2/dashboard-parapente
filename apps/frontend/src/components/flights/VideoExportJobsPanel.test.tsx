@@ -5,44 +5,76 @@ import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoExportJobsPanel } from './VideoExportJobsPanel';
 
-const { cancelJob, cleanupTempFiles, toastError, toastSuccess, refetch, jobs } =
-  vi.hoisted(() => ({
-    cancelJob: vi.fn(),
-    cleanupTempFiles: vi.fn(),
-    toastError: vi.fn(),
-    toastSuccess: vi.fn(),
-    refetch: vi.fn(),
-    jobs: [
-      {
-        job_id: 'job-active',
-        flight_title: 'Vol test',
-        status: 'processing',
-        internal_status: 'capturing',
-        progress: 42,
-        message: 'Capturing frames',
-        mode: 'manual_fast',
-        can_cancel: true,
-      },
-      {
-        job_id: 'job-done',
-        flight_title: 'Vol terminé',
-        status: 'completed',
-        internal_status: 'completed',
-        progress: 100,
-        can_cancel: false,
-      },
-      {
-        job_id: 'job-overlay',
-        flight_title: 'vol-overlay.mp4',
-        status: 'running',
-        internal_status: 'running',
-        progress: 50,
-        message: 'Rendering overlay',
-        mode: 'gopro_overlay',
-        can_cancel: true,
-      },
-    ],
-  }));
+const {
+  cancelJob,
+  cleanupTempFiles,
+  deleteOutput,
+  resumeJob,
+  toastError,
+  toastSuccess,
+  refetch,
+  jobs,
+} = vi.hoisted(() => ({
+  cancelJob: vi.fn(),
+  cleanupTempFiles: vi.fn(),
+  deleteOutput: vi.fn(),
+  resumeJob: vi.fn(),
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
+  refetch: vi.fn(),
+  jobs: [
+    {
+      job_id: 'job-active',
+      flight_title: 'Vol test',
+      status: 'processing',
+      internal_status: 'capturing',
+      progress: 42,
+      message: 'Capturing frames',
+      mode: 'manual_fast',
+      can_cancel: true,
+    },
+    {
+      job_id: 'job-done',
+      flight_title: 'Vol terminé',
+      status: 'completed',
+      internal_status: 'completed',
+      progress: 100,
+      has_output_file: true,
+      can_cancel: false,
+    },
+    {
+      job_id: 'job-overlay',
+      flight_title: 'vol-overlay.mp4',
+      status: 'running',
+      internal_status: 'running',
+      progress: 50,
+      message: 'Rendering overlay',
+      mode: 'gopro_overlay',
+      can_cancel: true,
+    },
+    {
+      job_id: 'job-resumable',
+      flight_id: 'flight-resumable',
+      flight_title: 'Vol relançable',
+      status: 'cancelled',
+      internal_status: 'cancelled',
+      progress: 30,
+      can_cancel: false,
+      can_resume: true,
+    },
+    {
+      job_id: 'job-overlay-done',
+      flight_title: 'final.mp4',
+      status: 'completed',
+      internal_status: 'completed',
+      progress: 100,
+      message: 'Overlay ready',
+      mode: 'gopro_overlay',
+      has_output_file: true,
+      can_cancel: false,
+    },
+  ],
+}));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -70,6 +102,14 @@ vi.mock('../../hooks/flights/useVideoExportJobs', () => ({
   }),
   useCancelVideoExportJob: () => ({
     mutateAsync: cancelJob,
+    isPending: false,
+  }),
+  useResumeVideoExportJob: () => ({
+    mutateAsync: resumeJob,
+    isPending: false,
+  }),
+  useDeleteVideoExportOutput: () => ({
+    mutateAsync: deleteOutput,
     isPending: false,
   }),
   useCleanupVideoExportTempFiles: () => ({
@@ -100,6 +140,7 @@ describe('VideoExportJobsPanel', () => {
         status: 'completed',
         internal_status: 'completed',
         progress: 100,
+        has_output_file: true,
         can_cancel: false,
       },
       {
@@ -111,6 +152,27 @@ describe('VideoExportJobsPanel', () => {
         message: 'Rendering overlay',
         mode: 'gopro_overlay',
         can_cancel: true,
+      },
+      {
+        job_id: 'job-resumable',
+        flight_id: 'flight-resumable',
+        flight_title: 'Vol relançable',
+        status: 'cancelled',
+        internal_status: 'cancelled',
+        progress: 30,
+        can_cancel: false,
+        can_resume: true,
+      },
+      {
+        job_id: 'job-overlay-done',
+        flight_title: 'final.mp4',
+        status: 'completed',
+        internal_status: 'completed',
+        progress: 100,
+        message: 'Overlay ready',
+        mode: 'gopro_overlay',
+        has_output_file: true,
+        can_cancel: false,
       }
     );
   });
@@ -122,9 +184,22 @@ describe('VideoExportJobsPanel', () => {
     expect(screen.getAllByText('Vol test').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Vol terminé').length).toBeGreaterThan(0);
     expect(screen.getAllByText('vol-overlay.mp4').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('final.mp4').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Overlay GoPro').length).toBeGreaterThan(0);
     expect(screen.getAllByText('42%').length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: 'Stopper' })).toHaveLength(4);
+    expect(
+      screen.getAllByRole('link', { name: 'Voir le vol' })[0]
+    ).toHaveAttribute('href', '/flights/flight-resumable');
+    expect(
+      screen.getAllByRole('button', { name: 'Télécharger' }).length
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole('button', { name: 'Reprendre' }).length
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole('button', { name: 'Supprimer l’overlay' }).length
+    ).toBeGreaterThan(0);
   });
 
   it('filters jobs by status', () => {
@@ -147,6 +222,38 @@ describe('VideoExportJobsPanel', () => {
 
     await waitFor(() => expect(cancelJob).toHaveBeenCalledWith('job-active'));
     expect(toastSuccess).toHaveBeenCalledWith('Génération stoppée');
+  });
+
+  it('resumes a cancelled export', async () => {
+    resumeJob.mockResolvedValue(undefined);
+
+    render(<VideoExportJobsPanel />);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Reprendre' })[0]!);
+
+    await waitFor(() =>
+      expect(resumeJob).toHaveBeenCalledWith('job-resumable')
+    );
+    expect(toastSuccess).toHaveBeenCalledWith('Génération relancée');
+  });
+
+  it('deletes a generated overlay after confirmation', async () => {
+    deleteOutput.mockResolvedValue(undefined);
+
+    render(<VideoExportJobsPanel />);
+    fireEvent.click(
+      screen.getAllByRole('button', { name: 'Supprimer l’overlay' })[0]!
+    );
+    const deleteButtons = screen.getAllByRole('button', {
+      name: 'Supprimer l’overlay',
+    });
+    fireEvent.click(deleteButtons[deleteButtons.length - 1]!);
+
+    await waitFor(() =>
+      expect(deleteOutput).toHaveBeenCalledWith(
+        expect.objectContaining({ job_id: 'job-overlay-done' })
+      )
+    );
+    expect(toastSuccess).toHaveBeenCalledWith('Overlay GoPro supprimé');
   });
 
   it('cleans temporary files after confirmation', async () => {

@@ -679,6 +679,24 @@ def gopro_overlay_output_path(job_id: str) -> Path | None:
     return path if path.exists() else None
 
 
+def delete_gopro_overlay_output(job_id: str) -> dict[str, Any] | None:
+    with _LOCK:
+        job = _JOBS.get(job_id)
+        if not job:
+            return None
+        if job["status"] not in _TERMINAL_STATUSES:
+            return {"job_id": job_id, "deleted": False, "error": "active"}
+        output_path = Path(job["output_path"])
+
+    if not output_path.exists():
+        return {"job_id": job_id, "deleted": False, "path": str(output_path)}
+    if output_path.is_dir():
+        return {"job_id": job_id, "deleted": False, "path": str(output_path), "error": "dir"}
+
+    output_path.unlink()
+    return {"job_id": job_id, "deleted": True, "path": str(output_path)}
+
+
 def check_gopro_overlay_dependencies() -> dict[str, bool]:
     gopro_bin = config.GOPRO_OVERLAY_BIN
     has_gopro_dashboard = (
