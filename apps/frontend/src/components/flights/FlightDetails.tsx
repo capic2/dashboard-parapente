@@ -143,6 +143,7 @@ export function FlightDetails({
   const isGoproOverlayCompleted = goproOverlayJob?.status === 'completed';
   const isGoproOverlayFailed = goproOverlayJob?.status === 'failed';
   const goproOverlayProgress = clampProgress(goproOverlayJob?.progress ?? 0);
+  const isDownloadingAnyMedia = downloadingMedia !== null;
   const normalizedTitle = flight.title?.trim();
   const flightTitle =
     normalizedTitle ||
@@ -312,7 +313,7 @@ export function FlightDetails({
     filename: string,
     media: DownloadableFlightMedia
   ) => {
-    if (downloadingMedia) return;
+    if (isDownloadingAnyMedia) return;
 
     setDownloadingMedia(media);
     try {
@@ -626,7 +627,7 @@ export function FlightDetails({
                       type="button"
                       className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-green-800 transition-colors hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200 dark:hover:bg-green-900/50 dark:focus:ring-offset-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                       onClick={() => void handleDownloadGpx()}
-                      disabled={downloadingMedia === 'gpx'}
+                      disabled={isDownloadingAnyMedia}
                       aria-label={t('flights.downloadGpx')}
                     >
                       <FileText className="h-3 w-3" aria-hidden="true" />
@@ -639,7 +640,7 @@ export function FlightDetails({
                       type="button"
                       className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-800 transition-colors hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200 dark:hover:bg-indigo-900/50 dark:focus:ring-offset-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                       onClick={() => void handleDownloadVideo()}
-                      disabled={downloadingMedia === 'video'}
+                      disabled={isDownloadingAnyMedia}
                       aria-label={t('flights.viewer.downloadVideo')}
                     >
                       <Video className="h-3 w-3" aria-hidden="true" />
@@ -674,7 +675,7 @@ export function FlightDetails({
                       type="button"
                       className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-cyan-800 transition-colors hover:bg-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200 dark:hover:bg-cyan-900/50 dark:focus:ring-offset-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                       onClick={() => void handleDownloadPersistedGoproOverlay()}
-                      disabled={downloadingMedia === 'overlay'}
+                      disabled={isDownloadingAnyMedia}
                       aria-label={t('flights.goproOverlayDownload')}
                     >
                       <Wand2 className="h-3 w-3" aria-hidden="true" />

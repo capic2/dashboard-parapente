@@ -64,7 +64,9 @@ class TestFlightsListEndpoint:
         response = client.get(f"{API_PREFIX}/flights")
 
         assert response.status_code == 200
-        returned = response.json()["flights"][0]
+        returned = next(
+            flight for flight in response.json()["flights"] if flight["id"] == "flight-with-video"
+        )
         assert returned["gpx_file_path"] == "db/gpx/flight-with-video.gpx"
         assert returned["video_file_path"] == "/exports/flight-with-video.mp4"
         assert returned["video_export_job_id"] == "job-video"
@@ -92,7 +94,9 @@ class TestFlightsListEndpoint:
         response = client.get(f"{API_PREFIX}/flights")
 
         assert response.status_code == 200
-        returned = response.json()["flights"][0]
+        returned = next(
+            flight for flight in response.json()["flights"] if flight["id"] == "flight-with-overlay"
+        )
         assert returned["gopro_overlay_file_path"] == str(overlay_path)
 
     def test_download_flight_video(self, client, db_session, tmp_path):
@@ -152,6 +156,25 @@ class TestFlightsListEndpoint:
         assert response.status_code == 200
         assert response.content == b"overlay"
         assert response.headers["content-type"] == "video/mp4"
+
+    def test_download_flight_gopro_overlay_reports_missing_config(
+        self, client, db_session, monkeypatch
+    ):
+        """GET /flights/{id}/gopro-overlay reports configuration errors separately."""
+        monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", "")
+        flight = Flight(
+            id="flight-overlay-missing-config",
+            name="Flight overlay missing config",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/gopro-overlay")
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "GoPro overlay paragliding root is not configured"
 
     def test_get_flights_filter_by_site(self, client, db_session, arguel_site, chalais_site):
         """GET /flights?site_id=X filters by site"""

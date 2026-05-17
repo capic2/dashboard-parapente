@@ -248,16 +248,20 @@ def _gopro_overlay_flight_directory(db: Session, flight: Flight, *, create: bool
     return directory
 
 
-def _flight_gopro_overlay_path(db: Session, flight: Flight) -> Path | None:
+def _flight_gopro_overlay_path(
+    db: Session, flight: Flight, *, suppress_config_error: bool = False
+) -> Path | None:
     try:
         output_path = _gopro_overlay_flight_directory(db, flight, create=False) / "final.mp4"
     except HTTPException:
+        if not suppress_config_error:
+            raise
         return None
     return output_path if output_path.exists() else None
 
 
 def _flight_gopro_overlay_file_path(db: Session, flight: Flight) -> str | None:
-    output_path = _flight_gopro_overlay_path(db, flight)
+    output_path = _flight_gopro_overlay_path(db, flight, suppress_config_error=True)
     return str(output_path) if output_path else None
 
 

@@ -186,10 +186,7 @@ export function FlightsTable({
                           event.stopPropagation();
                           onDownloadGpx(flight);
                         }}
-                        disabled={
-                          downloadingMedia?.flightId === flight.id &&
-                          downloadingMedia.type === 'gpx'
-                        }
+                        disabled={Boolean(downloadingMedia)}
                         aria-label={t('flights.downloadGpx')}
                       >
                         <FileText className="h-3 w-3" aria-hidden="true" />
@@ -204,10 +201,7 @@ export function FlightsTable({
                           event.stopPropagation();
                           onDownloadVideo(flight);
                         }}
-                        disabled={
-                          downloadingMedia?.flightId === flight.id &&
-                          downloadingMedia.type === 'video'
-                        }
+                        disabled={Boolean(downloadingMedia)}
                         aria-label={t('flights.viewer.downloadVideo')}
                       >
                         <Video className="h-3 w-3" aria-hidden="true" />
@@ -222,10 +216,7 @@ export function FlightsTable({
                           event.stopPropagation();
                           onDownloadOverlay(flight);
                         }}
-                        disabled={
-                          downloadingMedia?.flightId === flight.id &&
-                          downloadingMedia.type === 'overlay'
-                        }
+                        disabled={Boolean(downloadingMedia)}
                         aria-label={t('flights.goproOverlayDownload')}
                       >
                         <Wand2 className="h-3 w-3" aria-hidden="true" />
