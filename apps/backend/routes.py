@@ -2067,6 +2067,12 @@ def _resolve_cache_key(
     return None
 
 
+def _normalize_redis_text(value: Any) -> str:
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
 async def _cache_emagram_analysis_marker(
     site: Site,
     analysis: EmagramAnalysis,
@@ -2156,21 +2162,36 @@ async def get_cache_overview(db: Session = Depends(get_db)):
                 if len(keys) >= MAX_CACHE_KEYS:
                     break
 
-        # Batch TTL + strlen via pipeline
+        # Batch TTL + type via pipeline. strlen only works on string values;
+        # Redis may also contain lists, hashes, or sets from unrelated features.
         if keys:
             pipe = redis_client.pipeline()
             for key in keys:
                 pipe.ttl(key)
-                pipe.strlen(key)
+                pipe.type(key)
             results = await pipe.execute()
+
+            string_size_indexes: list[int] = []
+            size_pipe = redis_client.pipeline()
+            for i, key in enumerate(keys):
+                redis_type = _normalize_redis_text(results[i * 2 + 1])
+                if redis_type == "string":
+                    string_size_indexes.append(i)
+                    size_pipe.strlen(key)
+            size_results = await size_pipe.execute() if string_size_indexes else []
+            sizes = [0] * len(keys)
+            for result_index, key_index in enumerate(string_size_indexes):
+                sizes[key_index] = size_results[result_index]
         else:
             results = []
+            sizes = []
 
         # Group by prefix (part before 2nd colon, or full key)
         groups: dict = {}
         for i, key in enumerate(keys):
             ttl = results[i * 2]
-            size = results[i * 2 + 1]
+            redis_type = _normalize_redis_text(results[i * 2 + 1])
+            size = sizes[i]
 
             parts = key.split(":")
             prefix = ":".join(parts[:2]) if len(parts) >= 3 else parts[0]
@@ -2183,6 +2204,7 @@ async def get_cache_overview(db: Session = Depends(get_db)):
                     "key": key,
                     "ttl": ttl,
                     "size": size,
+                    "redis_type": redis_type,
                     "resolved": _resolve_cache_key(key, forecast_signature_map),
                 }
             )
@@ -2218,20 +2240,26 @@ async def get_cache_key_detail(key: str, db: Session = Depends(get_db)):
 
     try:
         redis_client = await get_redis()
-        raw = await redis_client.get(key)
+        redis_type = _normalize_redis_text(await redis_client.type(key))
 
-        if raw is None:
+        if redis_type == "none":
             raise HTTPException(status_code=404, detail=f"Key not found: {key}")
 
         ttl = await redis_client.ttl(key)
-        size = await redis_client.strlen(key)
+        if redis_type == "string":
+            raw = await redis_client.get(key)
+            size = await redis_client.strlen(key)
 
-        # Try to parse as JSON
-        try:
-            value = json.loads(raw)
-            value_type = "json"
-        except (json.JSONDecodeError, TypeError):
-            value = raw
+            # Try to parse as JSON
+            try:
+                value = json.loads(raw)
+                value_type = "json"
+            except (json.JSONDecodeError, TypeError):
+                value = raw
+                value_type = "string"
+        else:
+            size = 0
+            value = None
             value_type = "string"
 
         try:
@@ -2251,6 +2279,7 @@ async def get_cache_key_detail(key: str, db: Session = Depends(get_db)):
             "size": size,
             "value": value,
             "type": value_type,
+            "redis_type": redis_type,
             "resolved": resolved,
         }
 
