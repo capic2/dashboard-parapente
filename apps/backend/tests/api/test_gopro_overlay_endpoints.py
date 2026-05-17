@@ -195,6 +195,7 @@ def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
     video_path.write_bytes(b"camera")
     gpx_path.write_text("<gpx />")
     pip_path.write_bytes(b"pip")
+    sample_flight.video_file_path = str(pip_path)
     sample_flight.title = "Arguel test"
     db_session.commit()
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
@@ -262,6 +263,8 @@ def test_create_flight_gopro_overlay_job_uses_auto_flight_directory_files(
     second_gpx_path.write_text("<gpx>second</gpx>")
     old_pip_path.write_bytes(b"old")
     new_pip_path.write_bytes(b"new")
+    sample_flight.video_file_path = str(new_pip_path)
+    db_session.commit()
     os.utime(first_gpx_path, (2, 2))
     os.utime(second_gpx_path, (1, 1))
     os.utime(old_pip_path, (1, 1))
@@ -308,9 +311,10 @@ def test_create_flight_gopro_overlay_job_requires_auto_zepp_gpx(
     input_dir = paragliding_root / "20260315" / "01"
     input_dir.mkdir(parents=True)
     (input_dir / "camera.mp4").write_bytes(b"camera")
-    (input_dir / "flight-pip.mp4").write_bytes(b"pip")
+    generated_video_path = input_dir / "flight-pip.mp4"
+    generated_video_path.write_bytes(b"pip")
     sample_flight.gpx_file_path = None
-    sample_flight.video_file_path = None
+    sample_flight.video_file_path = str(generated_video_path)
     db_session.commit()
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
 
@@ -347,6 +351,8 @@ def test_create_flight_gopro_overlay_job_uses_daily_departure_index(
     camera_path.write_bytes(b"camera")
     gpx_path.write_text("<gpx />")
     pip_path.write_bytes(b"pip")
+    sample_flight.video_file_path = str(pip_path)
+    db_session.commit()
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
 
     expected = {
@@ -397,6 +403,8 @@ def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
     pip_path.write_bytes(b"pip")
     first_osv.write_bytes(b"first")
     second_osv.write_bytes(b"second")
+    sample_flight.video_file_path = str(pip_path)
+    db_session.commit()
     merged_gpx_path.parent.mkdir(parents=True)
     merged_gpx_path.write_text("<gpx>merged</gpx>")
     os.utime(first_osv, (1, 1))
@@ -439,8 +447,12 @@ def test_create_flight_gopro_overlay_job_rejects_paths_outside_paragliding_root(
 ):
     paragliding_root = tmp_path / "paragliding"
     outside_video = tmp_path / "outside" / "flight.mp4"
+    generated_video = paragliding_root / "generated.mp4"
     outside_video.parent.mkdir(parents=True)
+    generated_video.parent.mkdir(parents=True)
     outside_video.write_bytes(b"camera")
+    generated_video.write_bytes(b"video")
+    sample_flight.video_file_path = str(generated_video)
     db_session.commit()
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
 
@@ -488,7 +500,10 @@ def test_create_flight_gopro_overlay_job_requires_gpx_when_no_upload(
     sample_flight,
     tmp_path,
 ):
+    video_path = tmp_path / "flight.mp4"
+    video_path.write_bytes(b"video")
     sample_flight.gpx_file_path = None
+    sample_flight.video_file_path = str(video_path)
     db_session.commit()
 
     with patch(
@@ -603,7 +618,9 @@ def test_create_flight_gopro_overlay_job_requires_generated_video_for_pip(
     tmp_path,
 ):
     gpx_path = tmp_path / "flight.gpx"
+    pip_path = tmp_path / "flight-pip.mp4"
     gpx_path.write_text("<gpx />")
+    pip_path.write_bytes(b"pip")
     sample_flight.gpx_file_path = str(gpx_path)
     sample_flight.video_file_path = None
     db_session.commit()
@@ -615,6 +632,7 @@ def test_create_flight_gopro_overlay_job_requires_generated_video_for_pip(
         response = client.post(
             f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay",
             files={"video_file": ("camera.mp4", b"camera", "video/mp4")},
+            data={"pip_path": str(pip_path)},
         )
 
     assert response.status_code == 400
