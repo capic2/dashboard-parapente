@@ -34,6 +34,7 @@ const flights: Flight[] = [
     video_export_job_id: 'job-flight-1',
     video_export_status: 'completed',
     video_file_path: '/exports/flight-1.mp4',
+    gopro_overlay_file_path: '/exports/final.mp4',
     notes: null,
   },
   {
@@ -55,9 +56,11 @@ const flights: Flight[] = [
 function FlightsTableHarness({
   onDownloadGpx = () => undefined,
   onDownloadVideo = () => undefined,
+  onDownloadOverlay = () => undefined,
 }: {
   onDownloadGpx?: (flight: Flight) => void;
   onDownloadVideo?: (flight: Flight) => void;
+  onDownloadOverlay?: (flight: Flight) => void;
 }) {
   const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -71,6 +74,7 @@ function FlightsTableHarness({
       onDeleteFlight={() => undefined}
       onDownloadGpx={onDownloadGpx}
       onDownloadVideo={onDownloadVideo}
+      onDownloadOverlay={onDownloadOverlay}
       downloadingMedia={null}
       rowSelection={rowSelection}
       onRowSelectionChange={setRowSelection}
@@ -89,15 +93,32 @@ test('applies the active style when a flight is selected', () => {
   expect(flightRow).toHaveAttribute('aria-selected', 'true');
 });
 
-test('shows media badges without download actions', () => {
-  render(<FlightsTableHarness />);
+test('downloads media from badges without selecting the flight', () => {
+  const onDownloadGpx = vi.fn();
+  const onDownloadVideo = vi.fn();
+  const onDownloadOverlay = vi.fn();
+  render(
+    <FlightsTableHarness
+      onDownloadGpx={onDownloadGpx}
+      onDownloadVideo={onDownloadVideo}
+      onDownloadOverlay={onDownloadOverlay}
+    />
+  );
 
   const flightRow = screen.getByTestId('flight-row-flight-1');
 
   expect(screen.getByText('flights.gpxBadge')).toBeInTheDocument();
-  expect(
-    screen.queryByRole('button', { name: 'flights.downloadGpx' })
-  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'flights.downloadGpx' }));
+  fireEvent.click(
+    screen.getByRole('button', { name: 'flights.viewer.downloadVideo' })
+  );
+  fireEvent.click(
+    screen.getByRole('button', { name: 'flights.goproOverlayDownload' })
+  );
+
+  expect(onDownloadGpx).toHaveBeenCalledWith(flights[0]);
+  expect(onDownloadVideo).toHaveBeenCalledWith(flights[0]);
+  expect(onDownloadOverlay).toHaveBeenCalledWith(flights[0]);
   expect(flightRow).not.toHaveClass('border-sky-700');
   expect(flightRow).toHaveAttribute('aria-selected', 'false');
 });

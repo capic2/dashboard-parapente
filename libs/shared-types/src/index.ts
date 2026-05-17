@@ -96,6 +96,7 @@ export const FlightSchema = z.object({
     ])
     .nullish(),
   video_file_path: z.string().nullish(),
+  gopro_overlay_file_path: z.string().nullish(),
   site: SiteSchema.optional(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
