@@ -187,6 +187,7 @@ describe('VideoExportJobsPanel', () => {
     expect(screen.getAllByText('final.mp4').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Overlay GoPro').length).toBeGreaterThan(0);
     expect(screen.getAllByText('42%').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('En cours').length).toBeGreaterThan(1);
     expect(screen.getAllByRole('button', { name: 'Stopper' })).toHaveLength(4);
     expect(
       screen.getAllByRole('link', { name: 'Voir le vol' })[0]
