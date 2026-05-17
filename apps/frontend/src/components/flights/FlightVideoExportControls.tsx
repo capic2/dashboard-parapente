@@ -7,10 +7,7 @@ import {
   VIDEO_EXPORT_IN_PROGRESS_STATUSES,
   type Flight,
 } from '@dashboard-parapente/shared-types';
-import {
-  formatEta,
-  useVideoExportStatus,
-} from '../../hooks/flights/useVideoExportStatus';
+import { useVideoExportStatus } from '../../hooks/flights/useVideoExportStatus';
 import { useFlight } from '../../hooks/flights/useFlight';
 import { useToast } from '../../hooks/useToast';
 import { api } from '../../lib/api';
@@ -93,11 +90,6 @@ export function FlightVideoExportControls({
     shouldReadExportStatus,
     videoExportJobToken
   );
-  const exportProgress = Math.min(
-    100,
-    Math.max(0, Math.round(exportStatus?.progress ?? 0))
-  );
-  const exportEta = formatEta(exportStatus?.eta_seconds);
   const canResumeVideoExport = Boolean(
     flight.video_export_job_id && exportStatus?.can_resume
   );
@@ -303,33 +295,6 @@ export function FlightVideoExportControls({
             count: exportStatus?.frames_captured ?? 0,
           })}
         </p>
-      )}
-
-      {hasActiveVideoExport(flight) && (
-        <div
-          className={`mt-2 rounded-lg border border-blue-200 bg-blue-50 p-2 dark:border-blue-700 dark:bg-blue-900/20 ${
-            compact ? 'basis-full sm:min-w-72' : ''
-          }`}
-        >
-          <div className="mb-1 flex items-center justify-between text-xs font-medium text-blue-900 dark:text-blue-100">
-            <span>{t('flights.viewer.videoProgress')}</span>
-            <span>{exportProgress}%</span>
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded bg-blue-100 dark:bg-blue-950/40">
-            <div
-              className="h-full rounded bg-blue-600 transition-all duration-500"
-              style={{ width: `${exportProgress}%` }}
-            />
-          </div>
-          <p className="mt-2 text-xs text-blue-900 dark:text-blue-100">
-            {exportStatus?.message || t('flights.viewer.videoGenerating')}
-          </p>
-          {exportEta && (
-            <p className="mt-1 text-xs text-blue-900 dark:text-blue-100">
-              {t('flights.viewer.videoEta', { time: exportEta })}
-            </p>
-          )}
-        </div>
       )}
 
       {hasActiveVideoExport(flight) && (
