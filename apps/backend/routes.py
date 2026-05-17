@@ -233,7 +233,7 @@ def _matching_files_by_mtime(directory: Path, pattern: str) -> list[Path]:
     return sorted(matches, key=lambda path: (path.stat().st_mtime, path.name))
 
 
-def _gopro_overlay_flight_directory(db: Session, flight: Flight) -> Path:
+def _gopro_overlay_flight_directory(db: Session, flight: Flight, *, create: bool = True) -> Path:
     root = config.GOPRO_OVERLAY_PARAGLIDING_ROOT.strip()
     if not root:
         raise HTTPException(
@@ -243,8 +243,26 @@ def _gopro_overlay_flight_directory(db: Session, flight: Flight) -> Path:
     date_dir = flight.flight_date.strftime("%Y%m%d")
     sequence = flight_sequence_number(db, flight)
     directory = Path(root).expanduser().resolve() / date_dir / f"{sequence:02d}"
-    directory.mkdir(parents=True, exist_ok=True)
+    if create:
+        directory.mkdir(parents=True, exist_ok=True)
     return directory
+
+
+def _flight_gopro_overlay_path(
+    db: Session, flight: Flight, *, suppress_config_error: bool = False
+) -> Path | None:
+    try:
+        output_path = _gopro_overlay_flight_directory(db, flight, create=False) / "final.mp4"
+    except HTTPException:
+        if not suppress_config_error:
+            raise
+        return None
+    return output_path if output_path.exists() else None
+
+
+def _flight_gopro_overlay_file_path(db: Session, flight: Flight) -> str | None:
+    output_path = _flight_gopro_overlay_path(db, flight, suppress_config_error=True)
+    return str(output_path) if output_path else None
 
 
 def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: Path) -> Path:
@@ -3033,6 +3051,7 @@ def get_flights(
             "video_export_job_id": flight.video_export_job_id,
             "video_export_status": flight.video_export_status,
             "video_file_path": flight.video_file_path,
+            "gopro_overlay_file_path": _flight_gopro_overlay_file_path(db, flight),
             "external_url": flight.external_url,
             "created_at": flight.created_at.isoformat() if flight.created_at else None,
             "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
@@ -3222,6 +3241,7 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "video_export_job_id": flight.video_export_job_id,
         "video_export_status": flight.video_export_status,
         "video_file_path": flight.video_file_path,
+        "gopro_overlay_file_path": _flight_gopro_overlay_file_path(db, flight),
         "created_at": flight.created_at.isoformat() if flight.created_at else None,
         "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
     }
@@ -3392,6 +3412,36 @@ def download_flight_gpx(flight_id: str, db: Session = Depends(get_db)):
         f"{flight.title.replace(' ', '_') if flight.title else 'flight'}_{flight.flight_date}.gpx"
     )
     return FileResponse(path=gpx_path, media_type="application/gpx+xml", filename=filename)
+
+
+@router.get("/flights/{flight_id}/video")
+def download_flight_video(flight_id: str, db: Session = Depends(get_db)) -> FileResponse:
+    """Download generated video for a flight."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    video_path = _resolve_flight_file_path(flight.video_file_path)
+    if not video_path:
+        raise HTTPException(status_code=404, detail="No video file available for this flight")
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail="Video file not found on disk")
+
+    return FileResponse(path=video_path, media_type="video/mp4", filename=video_path.name)
+
+
+@router.get("/flights/{flight_id}/gopro-overlay")
+def download_flight_gopro_overlay(flight_id: str, db: Session = Depends(get_db)) -> FileResponse:
+    """Download generated GoPro overlay video for a flight."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    overlay_path = _flight_gopro_overlay_path(db, flight)
+    if not overlay_path:
+        raise HTTPException(status_code=404, detail="No GoPro overlay available for this flight")
+
+    return FileResponse(path=overlay_path, media_type="video/mp4", filename=overlay_path.name)
 
 
 @router.post("/flights")

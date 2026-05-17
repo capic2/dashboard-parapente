@@ -259,6 +259,7 @@ class Flight(FlightBase):
     video_export_job_id: str | None = None
     video_export_status: str | None = None  # "processing", "completed", "failed"
     video_file_path: str | None = None
+    gopro_overlay_file_path: str | None = None
     created_at: datetime
     updated_at: datetime
     site: SiteInFlight | None = None  # Include site details with orientation

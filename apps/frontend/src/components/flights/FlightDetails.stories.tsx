@@ -51,6 +51,8 @@ const fullFlight: Flight = {
   site_name: 'Arguel',
   notes: 'Superbe vol thermique, base cumulus 1800m',
   gpx_file_path: '/data/flights/arguel-001.gpx',
+  video_file_path: '/data/flights/arguel-001.mp4',
+  gopro_overlay_file_path: '/data/flights/final.mp4',
 };
 
 const flightWithoutGpx: Flight = {
@@ -100,6 +102,16 @@ const defaultHandlers = [
   http.get('*/api/flights/:id/gpx', () =>
     HttpResponse.text('<gpx></gpx>', {
       headers: { 'Content-Type': 'application/gpx+xml' },
+    })
+  ),
+  http.get('*/api/flights/:id/video', () =>
+    HttpResponse.arrayBuffer(new ArrayBuffer(8), {
+      headers: { 'Content-Type': 'video/mp4' },
+    })
+  ),
+  http.get('*/api/flights/:id/gopro-overlay', () =>
+    HttpResponse.arrayBuffer(new ArrayBuffer(8), {
+      headers: { 'Content-Type': 'video/mp4' },
     })
   ),
   http.get('*/api/flights/:id', () => HttpResponse.json(fullFlight)),

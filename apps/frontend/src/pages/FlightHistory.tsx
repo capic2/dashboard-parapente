@@ -32,7 +32,7 @@ import { useIsMobile } from '../hooks/useIsMobile';
 
 type DownloadingFlightMedia = {
   flightId: string;
-  type: 'gpx' | 'video';
+  type: 'gpx' | 'video' | 'overlay';
 };
 
 function getFlightDownloadName(flight: Flight, extension: string) {
@@ -262,18 +262,14 @@ export default function FlightHistory() {
 
   const handleDownloadFlightVideo = useCallback(
     async (flight: Flight) => {
-      if (
-        !flight.video_file_path ||
-        !flight.video_export_job_id ||
-        downloadingFlightMedia
-      ) {
+      if (!flight.video_file_path || downloadingFlightMedia) {
         return;
       }
 
       setDownloadingFlightMedia({ flightId: flight.id, type: 'video' });
       try {
         const blob = await api
-          .get(`exports/${flight.video_export_job_id}/download`, {
+          .get(`flights/${flight.id}/video`, {
             timeout: false,
           })
           .blob();
@@ -288,6 +284,37 @@ export default function FlightHistory() {
           await getApiErrorMessage(
             error,
             t('flights.viewer.videoDownloadError')
+          )
+        );
+      } finally {
+        setDownloadingFlightMedia(null);
+      }
+    },
+    [downloadingFlightMedia, t, toast]
+  );
+
+  const handleDownloadFlightOverlay = useCallback(
+    async (flight: Flight) => {
+      if (!flight.gopro_overlay_file_path || downloadingFlightMedia) return;
+
+      setDownloadingFlightMedia({ flightId: flight.id, type: 'overlay' });
+      try {
+        const blob = await api
+          .get(`flights/${flight.id}/gopro-overlay`, {
+            timeout: false,
+          })
+          .blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = getFlightDownloadName(flight, 'mp4');
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        toast.error(
+          await getApiErrorMessage(
+            error,
+            t('flights.goproOverlayDownloadError')
           )
         );
       } finally {
@@ -439,6 +466,7 @@ export default function FlightHistory() {
               onDeleteFlight={setFlightToDelete}
               onDownloadGpx={handleDownloadFlightGpx}
               onDownloadVideo={handleDownloadFlightVideo}
+              onDownloadOverlay={handleDownloadFlightOverlay}
               downloadingMedia={downloadingFlightMedia}
               rowSelection={rowSelection}
               onRowSelectionChange={setRowSelection}

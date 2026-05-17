@@ -8,6 +8,7 @@ Coverage: GET, POST, PATCH, DELETE for flights.
 from datetime import date, timedelta
 from pathlib import Path
 
+import config
 from models import Flight
 
 # API prefix for all routes
@@ -63,11 +64,117 @@ class TestFlightsListEndpoint:
         response = client.get(f"{API_PREFIX}/flights")
 
         assert response.status_code == 200
-        returned = response.json()["flights"][0]
+        returned = next(
+            flight for flight in response.json()["flights"] if flight["id"] == "flight-with-video"
+        )
         assert returned["gpx_file_path"] == "db/gpx/flight-with-video.gpx"
         assert returned["video_file_path"] == "/exports/flight-with-video.mp4"
         assert returned["video_export_job_id"] == "job-video"
         assert returned["video_export_status"] == "completed"
+        assert returned["gopro_overlay_file_path"] is None
+
+    def test_get_flights_includes_available_gopro_overlay_path(
+        self, client, db_session, monkeypatch, tmp_path
+    ):
+        """GET /flights includes derived GoPro overlay path when final.mp4 exists."""
+        monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+        overlay_dir = tmp_path / "20260315" / "01"
+        overlay_dir.mkdir(parents=True)
+        overlay_path = overlay_dir / "final.mp4"
+        overlay_path.write_bytes(b"overlay")
+        flight = Flight(
+            id="flight-with-overlay",
+            name="Flight with overlay",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights")
+
+        assert response.status_code == 200
+        returned = next(
+            flight for flight in response.json()["flights"] if flight["id"] == "flight-with-overlay"
+        )
+        assert returned["gopro_overlay_file_path"] == str(overlay_path)
+
+    def test_download_flight_video(self, client, db_session, tmp_path):
+        """GET /flights/{id}/video downloads the generated flight video."""
+        video_path = tmp_path / "flight.mp4"
+        video_path.write_bytes(b"video")
+        flight = Flight(
+            id="flight-video-download",
+            name="Flight video download",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            video_file_path=str(video_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/video")
+
+        assert response.status_code == 200
+        assert response.content == b"video"
+        assert response.headers["content-type"] == "video/mp4"
+
+    def test_download_flight_video_returns_404_without_video(self, client, db_session):
+        """GET /flights/{id}/video rejects flights without video file."""
+        flight = Flight(
+            id="flight-no-video",
+            name="Flight no video",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/video")
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "No video file available for this flight"
+
+    def test_download_flight_gopro_overlay(self, client, db_session, monkeypatch, tmp_path):
+        """GET /flights/{id}/gopro-overlay downloads the generated overlay."""
+        monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+        overlay_dir = tmp_path / "20260315" / "01"
+        overlay_dir.mkdir(parents=True)
+        overlay_path = overlay_dir / "final.mp4"
+        overlay_path.write_bytes(b"overlay")
+        flight = Flight(
+            id="flight-overlay-download",
+            name="Flight overlay download",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/gopro-overlay")
+
+        assert response.status_code == 200
+        assert response.content == b"overlay"
+        assert response.headers["content-type"] == "video/mp4"
+
+    def test_download_flight_gopro_overlay_reports_missing_config(
+        self, client, db_session, monkeypatch
+    ):
+        """GET /flights/{id}/gopro-overlay reports configuration errors separately."""
+        monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", "")
+        flight = Flight(
+            id="flight-overlay-missing-config",
+            name="Flight overlay missing config",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/gopro-overlay")
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "GoPro overlay paragliding root is not configured"
 
     def test_get_flights_filter_by_site(self, client, db_session, arguel_site, chalais_site):
         """GET /flights?site_id=X filters by site"""
