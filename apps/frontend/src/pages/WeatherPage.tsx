@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
@@ -225,7 +225,7 @@ export default function WeatherPage() {
   return (
     <div className="grid w-full min-w-0 gap-4 xl:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]">
       <aside className="min-w-0 space-y-4 xl:sticky xl:top-4 xl:self-start">
-        <section className={`${weatherCardClassName} overflow-hidden`}>
+        <section className={`${weatherCardClassName} overflow-visible`}>
           <div className="border-b border-slate-100 bg-gradient-to-br from-sky-50 via-white to-white p-4 dark:border-slate-800 dark:from-sky-950/40 dark:via-slate-900 dark:to-slate-900 sm:p-5">
             <p className={weatherSectionTitleClassName}>Choix du site</p>
             <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950 dark:text-white">
