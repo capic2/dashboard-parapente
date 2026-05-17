@@ -20,7 +20,16 @@ logger = logging.getLogger(__name__)
 
 # Déterminer le répertoire racine du monorepo
 BACKEND_ROOT = Path(__file__).resolve().parent
-PROJECT_ROOT = BACKEND_ROOT.parents[1]
+
+
+def _resolve_project_root(backend_root: Path) -> Path:
+    if backend_root.parent.name == "apps":
+        return backend_root.parents[1]
+
+    return backend_root
+
+
+PROJECT_ROOT = _resolve_project_root(BACKEND_ROOT)
 
 # Charger les variables d'environnement selon le contexte
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
