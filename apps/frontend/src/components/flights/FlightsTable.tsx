@@ -6,11 +6,14 @@ import { DataList, Button } from '@dashboard-parapente/design-system';
 import {
   Check,
   Clock3,
+  Download,
+  FileText,
   MapPin,
   Mountain,
   Paperclip,
   Ruler,
   Trash2,
+  Video,
 } from 'lucide-react';
 import { useFlightsTable, FLIGHT_SORTABLE_COLUMNS } from './useFlightsTable';
 import type { Flight } from '../../types';
@@ -26,6 +29,9 @@ interface FlightsTableProps {
   selectionMode: boolean;
   onSelectFlight: (flight: Flight) => void;
   onDeleteFlight: (flight: Flight) => void;
+  onDownloadGpx: (flight: Flight) => void;
+  onDownloadVideo: (flight: Flight) => void;
+  downloadingMedia: { flightId: string; type: 'gpx' | 'video' } | null;
   rowSelection: RowSelectionState;
   onRowSelectionChange: OnChangeFn<RowSelectionState>;
 }
@@ -37,6 +43,9 @@ export function FlightsTable({
   selectionMode,
   onSelectFlight,
   onDeleteFlight,
+  onDownloadGpx,
+  onDownloadVideo,
+  downloadingMedia,
   rowSelection,
   onRowSelectionChange,
 }: FlightsTableProps) {
@@ -80,6 +89,12 @@ export function FlightsTable({
     (row: Row<Flight>, { isSelected }: { isSelected: boolean }) => {
       const flight = row.original;
       const isActive = selectedFlightId === flight.id;
+      const isDownloadingGpx =
+        downloadingMedia?.flightId === flight.id &&
+        downloadingMedia.type === 'gpx';
+      const isDownloadingVideo =
+        downloadingMedia?.flightId === flight.id &&
+        downloadingMedia.type === 'video';
       const selectFlight = () => {
         if (!selectionMode) {
           onSelectFlight(flight);
@@ -159,6 +174,59 @@ export function FlightsTable({
               <h3 className={`truncate text-sm font-semibold ${titleColor}`}>
                 {flight.title || t('flights.untitledFlight')}
               </h3>
+              {!selectionMode &&
+                (flight.gpx_file_path || flight.video_file_path) && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {flight.gpx_file_path && (
+                      <button
+                        type="button"
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-green-800 transition-colors hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200 dark:hover:bg-green-900/50 dark:focus:ring-offset-gray-800"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDownloadGpx(flight);
+                        }}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        disabled={Boolean(downloadingMedia)}
+                        aria-label={t('flights.downloadGpx')}
+                      >
+                        <FileText className="h-3 w-3" aria-hidden="true" />
+                        {isDownloadingGpx ? (
+                          t('flights.gpxDownloadInProgress')
+                        ) : (
+                          <>
+                            {t('flights.gpxBadge')}
+                            <Download className="h-3 w-3" aria-hidden="true" />
+                          </>
+                        )}
+                      </button>
+                    )}
+                    {flight.video_file_path && (
+                      <button
+                        type="button"
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-800 transition-colors hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200 dark:hover:bg-indigo-900/50 dark:focus:ring-offset-gray-800"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDownloadVideo(flight);
+                        }}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        disabled={Boolean(
+                          downloadingMedia || !flight.video_export_job_id
+                        )}
+                        aria-label={t('flights.viewer.downloadVideo')}
+                      >
+                        <Video className="h-3 w-3" aria-hidden="true" />
+                        {isDownloadingVideo ? (
+                          t('flights.gpxDownloadInProgress')
+                        ) : (
+                          <>
+                            {t('flights.videoBadge')}
+                            <Download className="h-3 w-3" aria-hidden="true" />
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
             </div>
 
             {/* Badge GPX manquant */}
@@ -247,6 +315,9 @@ export function FlightsTable({
       selectedFlightId,
       onSelectFlight,
       onDeleteFlight,
+      onDownloadGpx,
+      onDownloadVideo,
+      downloadingMedia,
       t,
       i18n,
       units,
