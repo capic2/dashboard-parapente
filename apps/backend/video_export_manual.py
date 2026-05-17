@@ -120,7 +120,7 @@ def _default_frontend_url() -> str:
 
 
 def _backend_base_url() -> str:
-    host = "localhost" if config.API_HOST == "0.0.0.0" else config.API_HOST
+    host = "127.0.0.1" if config.API_HOST == "0.0.0.0" else config.API_HOST
     return f"http://{host}:{config.API_PORT}"
 
 
