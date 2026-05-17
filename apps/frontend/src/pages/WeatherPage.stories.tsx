@@ -642,6 +642,27 @@ const weatherRouteConfig = {
           typeof rawDay === 'string' || typeof rawDay === 'number'
             ? Number(rawDay)
             : Number.NaN;
+        const parseNumber = (value: unknown) => {
+          const parsed =
+            typeof value === 'string' || typeof value === 'number'
+              ? Number(value)
+              : Number.NaN;
+          return Number.isFinite(parsed) ? parsed : undefined;
+        };
+        const parseString = (value: unknown) =>
+          typeof value === 'string' && value.length > 0 ? value : undefined;
+        const target =
+          search.target === 'city' ||
+          search.target === 'takeoff' ||
+          search.target === 'landing'
+            ? search.target
+            : undefined;
+        const spotType =
+          search.spotType === 'takeoff' ||
+          search.spotType === 'landing' ||
+          search.spotType === 'both'
+            ? search.spotType
+            : undefined;
 
         return {
           siteId: typeof search.siteId === 'string' ? search.siteId : undefined,
@@ -649,6 +670,18 @@ const weatherRouteConfig = {
             Number.isInteger(parsedDay) && parsedDay >= 0 && parsedDay <= 6
               ? parsedDay
               : undefined,
+          target,
+          city: parseString(search.city),
+          displayName: parseString(search.displayName),
+          spotId: parseString(search.spotId),
+          spotName: parseString(search.spotName),
+          spotType,
+          lat: parseNumber(search.lat),
+          lon: parseNumber(search.lon),
+          elevation: parseNumber(search.elevation),
+          orientation: parseString(search.orientation),
+          country: parseString(search.country),
+          source: parseString(search.source),
         };
       },
     },
@@ -698,6 +731,50 @@ WithSelectedSite.test(
     await canvas.findAllByText('Chalais');
     await canvas.findAllByText('Arguel');
     await canvas.findByText(/Best spot for|Meilleur spot pour/);
+  }
+);
+
+export const WithCityQueryParam = meta.story({
+  name: 'With City Query Param',
+  parameters: {
+    router: {
+      ...weatherRouteConfig,
+      initialPath:
+        '/weather?target=city&city=Besan%C3%A7on&displayName=Besan%C3%A7on%2C%20Doubs&lat=47.238&lon=6.024&country=FR',
+    },
+    msw: { handlers: defaultHandlers },
+  },
+});
+
+WithCityQueryParam.test(
+  'renders city weather from query params',
+  async ({ canvas }) => {
+    await canvas.findByText('Résultat de recherche sélectionné');
+    await canvas.findAllByText('Besançon');
+    await canvas.findByText('Météo sélectionnée');
+    await canvas.findByText('Prévisions Horaires');
+  }
+);
+
+export const WithSpotQueryParam = meta.story({
+  name: 'With Spot Query Param',
+  parameters: {
+    router: {
+      ...weatherRouteConfig,
+      initialPath:
+        '/weather?target=takeoff&spotId=merged-takeoff-arguel&spotName=Arguel%20d%C3%A9co&spotType=takeoff&lat=47.205&lon=6.005&elevation=427&orientation=SW&country=FR&source=merged',
+    },
+    msw: { handlers: defaultHandlers },
+  },
+});
+
+WithSpotQueryParam.test(
+  'renders searched spot weather from query params',
+  async ({ canvas }) => {
+    await canvas.findByText('Résultat de recherche sélectionné');
+    await canvas.findAllByText('Arguel déco');
+    await canvas.findByText('Météo sélectionnée');
+    await canvas.findByRole('button', { name: /Ajouter aux favoris/u });
   }
 );
 

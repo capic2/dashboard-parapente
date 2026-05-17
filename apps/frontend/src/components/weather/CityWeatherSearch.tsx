@@ -213,7 +213,8 @@ export default function CityWeatherSearch({
   const weatherTitle = getOptionName(selectedOption);
   const activeTargetLabel = getOptionName(selectedTarget);
   const suggestions = locationSearch.data?.locations ?? [];
-  const isSuggestionsOpen = debouncedQuery.length >= 3 && !selectedLocation;
+  const isSuggestionsOpen =
+    debouncedQuery.length >= 3 && !selectedLocation && !selectedOption;
   const activeSuggestion = suggestions[activeSuggestionIndex];
   const activeSuggestionId = activeSuggestion
     ? `${listboxId}-${activeSuggestion.id}`
@@ -311,6 +312,20 @@ export default function CityWeatherSearch({
   useEffect(() => {
     if (!selectedTarget) {
       setSelectedOption(null);
+      setSelectedLocation(null);
+      return;
+    }
+
+    setSelectedOption(selectedTarget);
+    setIsExpanded(true);
+    setFavoriteError(null);
+
+    if (selectedTarget.type === 'city') {
+      setSelectedLocation(selectedTarget.location);
+      setQuery(selectedTarget.location.name);
+    } else {
+      setSelectedLocation(null);
+      setQuery(selectedTarget.spot.name);
     }
   }, [selectedTarget]);
 
