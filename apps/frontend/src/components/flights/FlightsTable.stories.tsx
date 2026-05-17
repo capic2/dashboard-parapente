@@ -23,6 +23,7 @@ const mockFlights: Flight[] = [
     video_export_job_id: 'job-flight-1',
     video_export_status: 'completed',
     video_file_path: '/exports/flight-1.mp4',
+    gopro_overlay_file_path: '/exports/final.mp4',
     notes: 'Super conditions thermiques',
   },
   {
@@ -110,6 +111,7 @@ function FlightsTableWrapper({
         onDeleteFlight={fn()}
         onDownloadGpx={fn()}
         onDownloadVideo={fn()}
+        onDownloadOverlay={fn()}
         downloadingMedia={null}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
