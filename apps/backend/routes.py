@@ -45,6 +45,7 @@ from gopro_overlay_export import cancel_gopro_overlay_job
 from gopro_overlay_export import check_gopro_overlay_dependencies
 from gopro_overlay_export import create_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job_from_paths
+from gopro_overlay_export import delete_gopro_overlay_job
 from gopro_overlay_export import delete_gopro_overlay_output
 from gopro_overlay_export import get_gopro_overlay_job
 from gopro_overlay_export import gopro_overlay_output_path
@@ -99,8 +100,10 @@ from schemas import (
 from video_export import get_export_status as get_export_status_stream
 from video_export import list_exports as list_exports_stream
 from video_export import cancel_video_export as cancel_video_export_stream
+from video_export import delete_export_job as delete_video_export_stream_job
 from video_export import start_video_export_background
 from video_export_manual import cancel_video_export as cancel_video_export_manual
+from video_export_manual import delete_video_export_job as delete_video_export_manual_job
 from video_export_manual import cleanup_video_export_temp_files
 from video_export_manual import get_export_status as get_export_status_manual
 from video_export_manual import get_video_export_job_token
@@ -4562,6 +4565,44 @@ def delete_video_export_temp_files() -> VideoExportTempCleanupResponse:
     return VideoExportTempCleanupResponse.model_validate(
         cleanup_video_export_temp_files(list_exports_manual() + list_exports_stream())
     )
+
+
+@router.delete("/video-export-jobs/{job_id}")
+def delete_video_export_job_row(job_id: str):
+    """Remove an inactive job from the infrastructure list and clean its temp files."""
+    overlay_result = delete_gopro_overlay_job(job_id)
+    if overlay_result is not None:
+        if overlay_result.get("error") == "active":
+            raise HTTPException(status_code=400, detail="Cannot delete an active job")
+        if overlay_result.get("errors"):
+            raise HTTPException(status_code=500, detail=overlay_result["errors"])
+        return overlay_result
+
+    manual_result = delete_video_export_manual_job(job_id)
+    if manual_result is not None:
+        if manual_result.get("error") == "active":
+            raise HTTPException(status_code=400, detail="Cannot delete an active job")
+        if manual_result.get("errors"):
+            raise HTTPException(status_code=500, detail=manual_result["errors"])
+        return manual_result
+
+    stream_status = get_export_status_stream(job_id)
+    if stream_status:
+        if _video_export_can_cancel(stream_status):
+            raise HTTPException(status_code=400, detail="Cannot delete an active job")
+        stream_deleted = delete_video_export_stream_job(job_id)
+        if stream_deleted:
+            return {
+                "job_id": job_id,
+                "deleted": True,
+                "files_deleted": 0,
+                "dirs_deleted": 0,
+                "bytes_deleted": 0,
+                "paths_deleted": [],
+                "errors": [],
+            }
+
+    raise HTTPException(status_code=404, detail="Export job not found")
 
 
 @router.delete("/exports/{job_id}/video")

@@ -90,16 +90,12 @@ export function useResumeVideoExportJob() {
   });
 }
 
-export function useDeleteVideoExportOutput() {
+export function useDeleteVideoExportJobRow() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (job: VideoExportJob) => {
-      const endpoint =
-        job.mode === 'gopro_overlay'
-          ? `gopro-overlays/jobs/${job.job_id}/video`
-          : `exports/${job.job_id}/video`;
-      await api.delete(endpoint).json();
+    mutationFn: async (jobId: string) => {
+      await api.delete(`video-export-jobs/${jobId}`).json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });

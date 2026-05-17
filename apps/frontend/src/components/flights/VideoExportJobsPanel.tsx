@@ -12,7 +12,7 @@ import {
   type VideoExportJob,
   useCancelVideoExportJob,
   useCleanupVideoExportTempFiles,
-  useDeleteVideoExportOutput,
+  useDeleteVideoExportJobRow,
   useResumeVideoExportJob,
   useVideoExportJobs,
 } from '../../hooks/flights/useVideoExportJobs';
@@ -50,6 +50,14 @@ const statusFilters = [
 ] as const;
 
 type StatusFilter = (typeof statusFilters)[number]['id'];
+
+const typeFilters = [
+  { id: 'all', label: 'Tous les types' },
+  { id: 'video', label: 'Exports vidéo' },
+  { id: 'gopro', label: 'Overlay GoPro' },
+] as const;
+
+type TypeFilter = (typeof typeFilters)[number]['id'];
 
 const columnHelper = createColumnHelper<VideoExportJob>();
 
@@ -151,8 +159,8 @@ function canDownloadJob(job: VideoExportJob) {
   return job.status === 'completed' && job.has_output_file !== false;
 }
 
-function canDeleteOutput(job: VideoExportJob) {
-  return !job.can_cancel && job.has_output_file !== false;
+function canDeleteJobRow(job: VideoExportJob) {
+  return !job.can_cancel;
 }
 
 function JobStatusBadge({ job }: { job: VideoExportJob }) {
@@ -206,18 +214,26 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
   const [pendingConfirm, setPendingConfirm] =
     useState<PendingVideoConfirm | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'last_activity', desc: true },
   ]);
   const { data: jobs = [], isLoading, isError, refetch } = useVideoExportJobs();
   const cancelJob = useCancelVideoExportJob();
   const resumeJob = useResumeVideoExportJob();
-  const deleteOutput = useDeleteVideoExportOutput();
+  const deleteJobRow = useDeleteVideoExportJobRow();
   const cleanupTempFiles = useCleanupVideoExportTempFiles();
 
   const filteredJobs = useMemo(
-    () => jobs.filter((job) => isJobInFilter(job, statusFilter)),
-    [jobs, statusFilter]
+    () =>
+      jobs.filter((job) => {
+        const isInTypeFilter =
+          typeFilter === 'all' ||
+          (typeFilter === 'gopro' && isGoproOverlayJob(job)) ||
+          (typeFilter === 'video' && !isGoproOverlayJob(job));
+        return isInTypeFilter && isJobInFilter(job, statusFilter);
+      }),
+    [jobs, statusFilter, typeFilter]
   );
   const visibleJobs =
     typeof limit === 'number' ? filteredJobs.slice(0, limit) : filteredJobs;
@@ -290,47 +306,27 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
     [t, toast]
   );
 
-  const handleDeleteOutput = useCallback(
+  const handleDeleteJobRow = useCallback(
     (job: VideoExportJob) => {
-      const isOverlay = isGoproOverlayJob(job);
       setPendingConfirm({
-        message: isOverlay
-          ? t(
-              'videoJobs.confirmDeleteOverlay',
-              'Supprimer la vidéo overlay GoPro générée ?'
-            )
-          : t(
-              'videoJobs.confirmDeleteVideo',
-              'Supprimer la vidéo générée pour ce traitement ?'
-            ),
-        confirmLabel: isOverlay
-          ? t('videoJobs.deleteOverlay', 'Supprimer l’overlay')
-          : t('videoJobs.deleteVideo', 'Supprimer la vidéo'),
+        message: t(
+          'videoJobs.confirmDeleteRow',
+          'Supprimer cette ligne et ses fichiers temporaires ?'
+        ),
+        confirmLabel: t('videoJobs.deleteRow', 'Supprimer'),
         onConfirm: async () => {
           try {
-            await deleteOutput.mutateAsync(job);
-            toast.success(
-              isOverlay
-                ? t('videoJobs.deleteOverlaySuccess', 'Overlay GoPro supprimé')
-                : t('videoJobs.deleteVideoSuccess', 'Vidéo générée supprimée')
-            );
+            await deleteJobRow.mutateAsync(job.job_id);
+            toast.success(t('videoJobs.deleteRowSuccess', 'Ligne supprimée'));
           } catch {
             toast.error(
-              isOverlay
-                ? t(
-                    'videoJobs.deleteOverlayError',
-                    'Impossible de supprimer l’overlay GoPro'
-                  )
-                : t(
-                    'videoJobs.deleteVideoError',
-                    'Impossible de supprimer la vidéo générée'
-                  )
+              t('videoJobs.deleteRowError', 'Impossible de supprimer la ligne')
             );
           }
         },
       });
     },
-    [deleteOutput, t, toast]
+    [deleteJobRow, t, toast]
   );
 
   const renderJobActions = useCallback(
@@ -374,31 +370,29 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
               : t('videoJobs.stop', 'Stopper')}
           </Button>
         )}
-        {canDeleteOutput(job) && (
+        {canDeleteJobRow(job) && (
           <Button
-            onClick={() => handleDeleteOutput(job)}
-            isDisabled={deleteOutput.isPending}
+            onClick={() => handleDeleteJobRow(job)}
+            isDisabled={deleteJobRow.isPending}
             className={`${actionButtonClassName} bg-gray-100 text-gray-800 hover:bg-gray-200 focus-visible:outline-gray-500 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600`}
           >
-            {isGoproOverlayJob(job)
-              ? t('videoJobs.deleteOverlay', 'Supprimer l’overlay')
-              : t('videoJobs.deleteVideo', 'Supprimer la vidéo')}
+            {t('videoJobs.deleteRow', 'Supprimer')}
           </Button>
         )}
         {!job.flight_id &&
           !canDownloadJob(job) &&
           !job.can_resume &&
           !job.can_cancel &&
-          !canDeleteOutput(job) && (
+          !canDeleteJobRow(job) && (
             <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
           )}
       </div>
     ),
     [
       cancelJob.isPending,
-      deleteOutput.isPending,
+      deleteJobRow.isPending,
       handleCancel,
-      handleDeleteOutput,
+      handleDeleteJobRow,
       handleDownload,
       handleResume,
       resumeJob.isPending,
@@ -632,25 +626,47 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
       )}
 
       {!isLoading && !isError && jobs.length > 0 && (
-        <div className="flex flex-wrap gap-2 border-t border-gray-100 p-3 dark:border-gray-700">
-          {statusFilters.map((filter) => {
-            const isSelected = statusFilter === filter.id;
-            return (
-              <button
-                key={filter.id}
-                type="button"
-                aria-pressed={isSelected}
-                className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 ${
-                  isSelected
-                    ? 'border-sky-600 bg-sky-600 text-white dark:border-sky-300 dark:bg-sky-300 dark:text-sky-950'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-sky-300 hover:bg-sky-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-sky-700 dark:hover:bg-sky-950/40'
-                }`}
-                onClick={() => setStatusFilter(filter.id)}
-              >
-                {t(`videoJobs.filters.${filter.id}`, filter.label)}
-              </button>
-            );
-          })}
+        <div className="space-y-3 border-t border-gray-100 p-3 dark:border-gray-700">
+          <div className="flex flex-wrap gap-2">
+            {typeFilters.map((filter) => {
+              const isSelected = typeFilter === filter.id;
+              return (
+                <button
+                  key={filter.id}
+                  type="button"
+                  aria-pressed={isSelected}
+                  className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 ${
+                    isSelected
+                      ? 'border-sky-600 bg-sky-600 text-white dark:border-sky-300 dark:bg-sky-300 dark:text-sky-950'
+                      : 'border-gray-200 bg-white text-gray-700 hover:border-sky-300 hover:bg-sky-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-sky-700 dark:hover:bg-sky-950/40'
+                  }`}
+                  onClick={() => setTypeFilter(filter.id)}
+                >
+                  {t(`videoJobs.typeFilters.${filter.id}`, filter.label)}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {statusFilters.map((filter) => {
+              const isSelected = statusFilter === filter.id;
+              return (
+                <button
+                  key={filter.id}
+                  type="button"
+                  aria-pressed={isSelected}
+                  className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 ${
+                    isSelected
+                      ? 'border-sky-600 bg-sky-600 text-white dark:border-sky-300 dark:bg-sky-300 dark:text-sky-950'
+                      : 'border-gray-200 bg-white text-gray-700 hover:border-sky-300 hover:bg-sky-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-sky-700 dark:hover:bg-sky-950/40'
+                  }`}
+                  onClick={() => setStatusFilter(filter.id)}
+                >
+                  {t(`videoJobs.filters.${filter.id}`, filter.label)}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
