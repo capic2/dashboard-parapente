@@ -31,6 +31,9 @@ const flights: Flight[] = [
     max_altitude_m: 1465,
     departure_time: '2024-03-15T14:30:00',
     gpx_file_path: '/uploads/flight-1.gpx',
+    video_export_job_id: 'job-flight-1',
+    video_export_status: 'completed',
+    video_file_path: '/exports/flight-1.mp4',
     notes: null,
   },
   {
@@ -49,7 +52,13 @@ const flights: Flight[] = [
   },
 ];
 
-function FlightsTableHarness() {
+function FlightsTableHarness({
+  onDownloadGpx = () => undefined,
+  onDownloadVideo = () => undefined,
+}: {
+  onDownloadGpx?: (flight: Flight) => void;
+  onDownloadVideo?: (flight: Flight) => void;
+}) {
   const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
@@ -60,6 +69,9 @@ function FlightsTableHarness() {
       selectionMode={false}
       onSelectFlight={(flight) => setSelectedFlightId(flight.id)}
       onDeleteFlight={() => undefined}
+      onDownloadGpx={onDownloadGpx}
+      onDownloadVideo={onDownloadVideo}
+      downloadingMedia={null}
       rowSelection={rowSelection}
       onRowSelectionChange={setRowSelection}
     />
@@ -75,4 +87,17 @@ test('applies the active style when a flight is selected', () => {
 
   expect(flightRow).toHaveClass('border-sky-700');
   expect(flightRow).toHaveAttribute('aria-selected', 'true');
+});
+
+test('downloads media from badges without selecting the flight', () => {
+  const onDownloadGpx = vi.fn();
+  render(<FlightsTableHarness onDownloadGpx={onDownloadGpx} />);
+
+  const flightRow = screen.getByTestId('flight-row-flight-1');
+
+  fireEvent.click(screen.getByRole('button', { name: 'flights.downloadGpx' }));
+
+  expect(onDownloadGpx).toHaveBeenCalledWith(flights[0]);
+  expect(flightRow).not.toHaveClass('border-sky-700');
+  expect(flightRow).toHaveAttribute('aria-selected', 'false');
 });

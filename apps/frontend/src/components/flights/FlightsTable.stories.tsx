@@ -20,6 +20,9 @@ const mockFlights: Flight[] = [
     max_speed_kmh: 42,
     departure_time: '2024-03-15T14:30:00',
     gpx_file_path: '/uploads/flight-1.gpx',
+    video_export_job_id: 'job-flight-1',
+    video_export_status: 'completed',
+    video_file_path: '/exports/flight-1.mp4',
     notes: 'Super conditions thermiques',
   },
   {
@@ -105,6 +108,9 @@ function FlightsTableWrapper({
         selectionMode={selectionMode}
         onSelectFlight={(flight) => setSelectedFlightId(flight.id)}
         onDeleteFlight={fn()}
+        onDownloadGpx={fn()}
+        onDownloadVideo={fn()}
+        downloadingMedia={null}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
       />
