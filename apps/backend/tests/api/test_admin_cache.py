@@ -194,6 +194,27 @@ class TestGetCacheOverview:
         entry = data["groups"]["custom:key"]["keys"][0]
         assert entry["resolved"] is None
 
+    @pytest.mark.anyio
+    async def test_cache_overview_ignores_non_string_size(
+        self,
+        client,
+        db_session,
+        seeded_redis,
+    ):
+        """Non-string Redis keys should not fail the cache overview."""
+        await seeded_redis.rpush("custom:list:key", "first", "second")
+
+        response = client.get("/api/admin/cache")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "custom:list" in data["groups"]
+        entry = data["groups"]["custom:list"]["keys"][0]
+        assert entry["key"] == "custom:list:key"
+        assert entry["redis_type"] == "list"
+        assert entry["size"] == 0
+        assert entry["resolved"] is None
+
     def test_cache_overview_has_memory_usage_field(self, client, db_session):
         """Memory usage field is present (may be None with fakeredis)."""
         response = client.get("/api/admin/cache")
@@ -264,6 +285,20 @@ class TestGetCacheKeyDetail:
 
         assert data["type"] == "string"
         assert data["value"] == "just a string value"
+
+    @pytest.mark.anyio
+    async def test_key_detail_non_string_key_does_not_error(self, client, db_session, seeded_redis):
+        """Non-string Redis keys return metadata instead of raising WRONGTYPE."""
+        await seeded_redis.rpush("custom:list:key", "first", "second")
+
+        response = client.get("/api/admin/cache/custom:list:key")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["key"] == "custom:list:key"
+        assert data["redis_type"] == "list"
+        assert data["size"] == 0
+        assert data["value"] is None
 
     @pytest.mark.anyio
     async def test_key_detail_unknown_key_no_resolution(
