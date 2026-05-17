@@ -14,7 +14,7 @@ type AnalyticsSearch = {
 };
 
 const isISODate = (value: unknown): value is string =>
-  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(value);
 
 export const Route = createFileRoute('/analytics')({
   beforeLoad: requireAuth,

@@ -94,7 +94,7 @@ export const defaultHandlers = [
   http.get('*/api/weather-sources/stats', () =>
     HttpResponse.json(mockWeatherStats)
   ),
-  http.patch('*/api/weather-sources/:name', async ({ params }) => {
+  http.patch('*/api/weather-sources/:name',  ({ params }) => {
     const source = mockWeatherSources.find(
       (s) => s.source_name === params.name
     );

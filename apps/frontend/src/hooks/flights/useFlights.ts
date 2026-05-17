@@ -6,14 +6,8 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { api } from '../../lib/api';
-import type {
-  Flight,
-  FlightFilters,
-  FlightFormData,
-  FlightRecords,
-  FlightStats,
-} from '../../types';
+import {api} from '../../lib/api';
+import type {Flight, FlightFilters, FlightFormData, FlightRecords, FlightStats,} from '../../types';
 import {
   ApiResponseSchema,
   FlightRecordsSchema,
@@ -21,8 +15,8 @@ import {
   FlightSchema,
   FlightStatsSchema,
 } from '@dashboard-parapente/shared-types';
-import { isHTTPError } from 'ky';
-import { getStaleTime } from '../../lib/cacheConfig';
+import {isHTTPError} from 'ky';
+import {getStaleTime} from '../../lib/cacheConfig';
 
 export const flightsQueryOptions = (filters: FlightFilters = {}) => {
   const searchParams = Object.entries(filters).reduce(
@@ -181,18 +175,16 @@ export function useCreateFlightFromGPX() {
     mutationFn: async (formData: FormData) => {
       try {
         // Ky supporte FormData directement
-        const data = await api
-          .post('flights/create-from-gpx', {
-            body: formData,
-          })
-          .json<{
-            success: boolean;
-            flight: Flight;
-            message: string;
-          }>();
-        return data;
+        return await api
+            .post('flights/create-from-gpx', {
+              body: formData,
+            })
+            .json<{
+              success: boolean;
+              flight: Flight;
+              message: string;
+            }>();
       } catch (error) {
-        console.log({ error });
         // Handle HTTPError from ky
         if (isHTTPError<{ error: string; message: string }>(error)) {
           let errorMessage = 'Erreur lors de la création du vol';

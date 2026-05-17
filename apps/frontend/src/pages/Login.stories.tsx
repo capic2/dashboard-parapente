@@ -31,9 +31,9 @@ export const Default = meta.story({
 
 Default.test('renders login form', async ({ canvasElement }) => {
   const canvas = within(canvasElement);
-  await canvas.findByLabelText(/email/i);
-  await canvas.findByLabelText(/mot de passe|password/i);
-  await canvas.findByRole('button', { name: /se connecter|sign in/i });
+  await canvas.findByLabelText(/email/iu);
+  await canvas.findByLabelText(/mot de passe|password/iu);
+  await canvas.findByRole('button', { name: /se connecter|sign in/iu });
 });
 
 export const Loading = meta.story({
@@ -56,16 +56,16 @@ export const Loading = meta.story({
 Loading.test('shows pending state after submit', async ({ canvasElement }) => {
   const canvas = within(canvasElement);
 
-  await userEvent.type(await canvas.findByLabelText(/email/i), 'test@test.dev');
+  await userEvent.type(await canvas.findByLabelText(/email/iu), 'test@test.dev');
   await userEvent.type(
-    await canvas.findByLabelText(/mot de passe|password/i),
+    await canvas.findByLabelText(/mot de passe|password/iu),
     'secret123'
   );
   await userEvent.click(
-    await canvas.findByRole('button', { name: /se connecter|sign in/i })
+    await canvas.findByRole('button', { name: /se connecter|sign in/iu })
   );
 
-  await canvas.findByRole('button', { name: /connexion|signing in/i });
+  await canvas.findByRole('button', { name: /connexion|signing in/iu });
 });
 
 export const InvalidCredentials = meta.story({
@@ -91,18 +91,18 @@ InvalidCredentials.test(
     const canvas = within(canvasElement);
 
     await userEvent.type(
-      await canvas.findByLabelText(/email/i),
+      await canvas.findByLabelText(/email/iu),
       'wrong@test.dev'
     );
     await userEvent.type(
-      await canvas.findByLabelText(/mot de passe|password/i),
+      await canvas.findByLabelText(/mot de passe|password/iu),
       'wrong-pass'
     );
     await userEvent.click(
-      await canvas.findByRole('button', { name: /se connecter|sign in/i })
+      await canvas.findByRole('button', { name: /se connecter|sign in/iu })
     );
 
-    await canvas.findByText(/incorrect|invalid/i);
+    await canvas.findByText(/incorrect|invalid/iu);
   }
 );
 
@@ -123,15 +123,15 @@ SubmitSuccess.test('logs user in after submit', async ({ canvasElement }) => {
   const canvas = within(canvasElement);
 
   await userEvent.type(
-    await canvas.findByLabelText(/email/i),
+    await canvas.findByLabelText(/email/iu),
     'pilot@test.dev'
   );
   await userEvent.type(
-    await canvas.findByLabelText(/mot de passe|password/i),
+    await canvas.findByLabelText(/mot de passe|password/iu),
     'very-secret'
   );
   await userEvent.click(
-    await canvas.findByRole('button', { name: /se connecter|sign in/i })
+    await canvas.findByRole('button', { name: /se connecter|sign in/iu })
   );
 
   await waitFor(() => {
