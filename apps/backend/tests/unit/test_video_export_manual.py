@@ -263,6 +263,13 @@ def test_job_frames_dir_uses_configured_temp_dir(tmp_path, monkeypatch):
     assert frames_dir == tmp_path / "temp-images" / "job-123" / "frames"
 
 
+def test_rq_job_id_does_not_use_forbidden_separator():
+    rq_job_id = video_export_manual._rq_job_id("job-rq")
+
+    assert rq_job_id == "video-export-job-rq"
+    assert ":" not in rq_job_id
+
+
 def test_start_video_export_manual_enqueues_rq_job(test_db, monkeypatch):
     enqueued_job_ids: list[str] = []
     monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
@@ -399,13 +406,23 @@ def test_job_resume_info_requires_terminal_status_and_frames(tmp_path, monkeypat
 
 def test_resume_video_export_requeues_cancelled_job_with_frames(test_db, tmp_path, monkeypatch):
     job_id = "job-resume"
+    enqueued_job_ids: list[str] = []
     temp_root = tmp_path / "temp-images"
     frames_dir = temp_root / job_id / "frames"
     frames_dir.mkdir(parents=True)
     (frames_dir / "frame00000.png").write_bytes(b"frame")
     monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
     monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
-    monkeypatch.setattr(video_export_manual, "start_video_export_worker", lambda: None)
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+
+    def enqueue_rq_job(queued_job_id: str) -> None:
+        enqueued_job_ids.append(video_export_manual._rq_job_id(queued_job_id))
+
+    monkeypatch.setattr(
+        video_export_manual,
+        "_enqueue_video_export_job_in_rq",
+        enqueue_rq_job,
+    )
 
     db_session = test_db()
     db_session.add(
@@ -439,6 +456,7 @@ def test_resume_video_export_requeues_cancelled_job_with_frames(test_db, tmp_pat
     assert job.error is None
     assert job.video_path is None
     db_session.close()
+    assert enqueued_job_ids == ["video-export-job-resume"]
 
 
 def test_resume_video_export_waits_for_running_cancel_to_finish(test_db, tmp_path, monkeypatch):
