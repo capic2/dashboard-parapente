@@ -11,6 +11,7 @@ import {
   TabPanel,
   Tabs,
 } from '@dashboard-parapente/design-system';
+import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
 import {
   Download,
   Edit3,
@@ -130,6 +131,13 @@ export function FlightDetails({
   const isGoproOverlayRunning =
     goproOverlayJob?.status === 'queued' ||
     goproOverlayJob?.status === 'running';
+  const isVideoExportRunning = Boolean(
+    flight.video_export_status &&
+    VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.video_export_status)
+  );
+  const isVideoExportFailed = flight.video_export_status === 'failed';
+  const isGoproOverlayCompleted = goproOverlayJob?.status === 'completed';
+  const isGoproOverlayFailed = goproOverlayJob?.status === 'failed';
   const goproOverlayProgress = clampProgress(goproOverlayJob?.progress ?? 0);
   const normalizedTitle = flight.title?.trim();
   const flightTitle =
@@ -529,7 +537,11 @@ export function FlightDetails({
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                 {flightTitle}
               </h2>
-              {(hasGpx || hasVideo) && (
+              {(hasGpx ||
+                hasVideo ||
+                isVideoExportRunning ||
+                isVideoExportFailed ||
+                goproOverlayJob) && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {hasGpx && (
                     <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200">
@@ -541,6 +553,38 @@ export function FlightDetails({
                     <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
                       <Video className="h-3 w-3" aria-hidden="true" />
                       {t('flights.videoBadge')}
+                    </span>
+                  )}
+                  {isVideoExportRunning && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                      {t('flights.videoProcessingBadge')}
+                    </span>
+                  )}
+                  {isVideoExportFailed && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+                      {t('flights.videoErrorBadge')}
+                    </span>
+                  )}
+                  {isGoproOverlayCompleted && (
+                    <button
+                      type="button"
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-cyan-800 transition-colors hover:bg-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200 dark:hover:bg-cyan-900/50 dark:focus:ring-offset-gray-800"
+                      onClick={() => void handleDownloadGoproOverlay()}
+                      aria-label={t('flights.goproOverlayDownload')}
+                    >
+                      <Wand2 className="h-3 w-3" aria-hidden="true" />
+                      {t('flights.goproOverlayBadge')}
+                      <Download className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                  )}
+                  {isGoproOverlayRunning && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                      {t('flights.goproOverlayProcessingBadge')}
+                    </span>
+                  )}
+                  {isGoproOverlayFailed && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+                      {t('flights.goproOverlayErrorBadge')}
                     </span>
                   )}
                 </div>
