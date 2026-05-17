@@ -662,6 +662,49 @@ app.include_router(public_router)
 app.include_router(router)
 app.include_router(webhooks_router)
 
+# Database
+DB_PATH = Path(__file__).parent / "db" / "dashboard.db"
+
+
+@app.get("/health")
+def health_check():
+    """
+    Health check endpoint for monitoring and e2e tests.
+
+    Returns a simple status response to verify the API server is running
+    and ready to accept requests. Used by:
+    - Playwright webServer configuration to wait for backend startup
+    - Monitoring and load balancers for health checks
+    - CI/CD pipelines to verify deployment success
+
+    Returns:
+        dict: A dictionary containing the status key with value "ok"
+
+    Example:
+        >>> response = client.get("/health")
+        >>> response.json()
+        {"status": "ok"}
+    """
+    return {"status": "ok"}
+
+
+@app.get("/")
+def read_root():
+    return {
+        "status": "ok",
+        "message": "Dashboard Parapente API v0.2.0",
+        "features": [
+            "Multi-source weather aggregation (5 sources)",
+            "Para-Index scoring (0-100)",
+            "Hourly scheduler (every hour)",
+            "Strava webhook integration",
+            "Telegram notifications",
+        ],
+        "db_path": str(DB_PATH),
+        "db_exists": DB_PATH.exists(),
+    }
+
+
 # ============================================
 # Serve Static Files (Frontend React SPA)
 # ============================================
@@ -706,48 +749,6 @@ if STATIC_DIR.exists():
 else:
     logger.warning(f"⚠️  Static directory not found: {STATIC_DIR}")
     logger.warning("Frontend will not be served. Build frontend: cd frontend && npm run build")
-
-# Database
-DB_PATH = Path(__file__).parent / "db" / "dashboard.db"
-
-
-@app.get("/health")
-def health_check():
-    """
-    Health check endpoint for monitoring and e2e tests.
-
-    Returns a simple status response to verify the API server is running
-    and ready to accept requests. Used by:
-    - Playwright webServer configuration to wait for backend startup
-    - Monitoring and load balancers for health checks
-    - CI/CD pipelines to verify deployment success
-
-    Returns:
-        dict: A dictionary containing the status key with value "ok"
-
-    Example:
-        >>> response = client.get("/health")
-        >>> response.json()
-        {"status": "ok"}
-    """
-    return {"status": "ok"}
-
-
-@app.get("/")
-def read_root():
-    return {
-        "status": "ok",
-        "message": "Dashboard Parapente API v0.2.0",
-        "features": [
-            "Multi-source weather aggregation (5 sources)",
-            "Para-Index scoring (0-100)",
-            "Hourly scheduler (every hour)",
-            "Strava webhook integration",
-            "Telegram notifications",
-        ],
-        "db_path": str(DB_PATH),
-        "db_exists": DB_PATH.exists(),
-    }
 
 
 if __name__ == "__main__":

@@ -16,7 +16,9 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 from sqlalchemy.orm import Session
 
@@ -108,7 +110,7 @@ def _to_iso(value: datetime | None) -> str | None:
 
 def _default_frontend_url() -> str:
     if config.FRONTEND_URL:
-        return config.FRONTEND_URL.rstrip("/")
+        return _normalize_frontend_url(config.FRONTEND_URL)
 
     static_index = Path(__file__).parent / "static" / "index.html"
     if static_index.exists():
@@ -156,6 +158,30 @@ def _normalize_frontend_url(frontend_url: str) -> str:
         return _backend_base_url()
 
     return candidate.rstrip("/")
+
+
+def _check_url_reachable(url: str, timeout_seconds: float = 5.0) -> None:
+    request = Request(url, headers={"User-Agent": "dashboard-parapente-video-export"})
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            status = response.status
+    except HTTPError as exc:
+        if exc.code >= 500:
+            raise RuntimeError(f"Export viewer returned HTTP {exc.code}: {url}") from exc
+        return
+    except URLError as exc:
+        raise RuntimeError(f"Export viewer is unreachable: {url} ({exc.reason})") from exc
+    except TimeoutError as exc:
+        raise RuntimeError(
+            f"Export viewer did not respond within {timeout_seconds:g}s: {url}"
+        ) from exc
+
+    if status >= 500:
+        raise RuntimeError(f"Export viewer returned HTTP {status}: {url}")
+
+
+async def _ensure_export_viewer_reachable(url: str, timeout_seconds: float = 5.0) -> None:
+    await asyncio.to_thread(_check_url_reachable, url, timeout_seconds)
 
 
 def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
@@ -1066,12 +1092,20 @@ async def _export_video_manual_render(job_id: str):
     temp_root = _video_temp_images_dir()
     temp_dir: Path | None = None
     frames_dir: Path | None = None
+    auth_token = job.auth_token
+    url = f"{frontend_url}/export-viewer?flightId={flight_id}&jobId={job_id}"
+    preflight_url = url
+    log_url = url
+    if auth_token:
+        url = f"{url}&exportToken={auth_token}"
+        log_url = f"{log_url}&exportToken=<redacted>"
 
     try:
         from playwright.async_api import async_playwright
 
         _update_job(job_id, status=_STATUS_INITIALIZING, message="Setting up manual render")
         _set_job_runtime(job_id, phase=_STATUS_INITIALIZING)
+        await _ensure_export_viewer_reachable(preflight_url)
 
         # Resolution mapping
         resolutions = {"720p": (1280, 720), "1080p": (1920, 1080), "4K": (3840, 2160)}
@@ -1106,17 +1140,11 @@ async def _export_video_manual_render(job_id: str):
             )
             page = await context.new_page()
 
-            auth_token = job.auth_token
             await page.add_init_script(_build_playwright_init_script(auth_token))
 
             page.on("console", lambda msg: print(f"🖥️  [{msg.type}]: {msg.text}"))
             page.on("pageerror", lambda err: print(f"❌ Browser error: {err}"))
 
-            url = f"{frontend_url}/export-viewer?flightId={flight_id}&jobId={job_id}"
-            log_url = url
-            if auth_token:
-                url = f"{url}&exportToken={auth_token}"
-                log_url = f"{log_url}&exportToken=<redacted>"
             print(f"📺 Opening {log_url}")
 
             _update_job(job_id, message="Loading export viewer")
