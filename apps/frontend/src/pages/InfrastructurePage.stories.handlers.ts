@@ -564,6 +564,17 @@ export const videoExportHandlers = [
     return HttpResponse.json({ success: true });
   }),
 
+  http.delete('*/api/video-export-jobs/:jobId', ({ params }) => {
+    const index = mockVideoJobs.findIndex(
+      (item) => item.job_id === params.jobId
+    );
+    if (index !== -1) {
+      mockVideoJobs.splice(index, 1);
+    }
+
+    return HttpResponse.json({ success: true, deleted: true });
+  }),
+
   http.delete('*/api/exports/:jobId/video', ({ params }) => {
     const job = mockVideoJobs.find((item) => item.job_id === params.jobId);
     if (job) {

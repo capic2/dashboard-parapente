@@ -597,3 +597,50 @@ class TestVideoExportJobsEndpoint:
         assert response.status_code == 200
         assert response.json() == cleanup_payload
         cleanup.assert_called_once_with(manual_jobs + stream_jobs)
+
+    def test_delete_video_export_job_row_removes_overlay_job(self, client: TestClient):
+        delete_payload = {
+            "job_id": "job-overlay-failed",
+            "deleted": True,
+            "files_deleted": 2,
+            "dirs_deleted": 1,
+            "bytes_deleted": 10,
+            "paths_deleted": ["/tmp/overlay-work"],
+            "errors": [],
+        }
+
+        with patch("routes.delete_gopro_overlay_job", return_value=delete_payload):
+            response = client.delete(f"{API_PREFIX}/video-export-jobs/job-overlay-failed")
+
+        assert response.status_code == 200
+        assert response.json() == delete_payload
+
+    def test_delete_video_export_job_row_rejects_active_overlay(self, client: TestClient):
+        with patch(
+            "routes.delete_gopro_overlay_job",
+            return_value={"job_id": "job-overlay", "deleted": False, "error": "active"},
+        ):
+            response = client.delete(f"{API_PREFIX}/video-export-jobs/job-overlay")
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Cannot delete an active job"
+
+    def test_delete_video_export_job_row_removes_manual_job(self, client: TestClient):
+        delete_payload = {
+            "job_id": "job-failed",
+            "deleted": True,
+            "files_deleted": 1,
+            "dirs_deleted": 1,
+            "bytes_deleted": 5,
+            "paths_deleted": ["/tmp/export-work"],
+            "errors": [],
+        }
+
+        with (
+            patch("routes.delete_gopro_overlay_job", return_value=None),
+            patch("routes.delete_video_export_manual_job", return_value=delete_payload),
+        ):
+            response = client.delete(f"{API_PREFIX}/video-export-jobs/job-failed")
+
+        assert response.status_code == 200
+        assert response.json() == delete_payload

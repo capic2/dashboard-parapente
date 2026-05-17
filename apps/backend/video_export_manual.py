@@ -706,6 +706,64 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
     }
 
 
+def cleanup_video_export_job_temp_files(job_id: str) -> dict[str, Any]:
+    """Delete temporary files for a single inactive video export job."""
+    candidates = [
+        (_job_temp_dir(_video_temp_images_dir(), job_id), _video_temp_images_dir()),
+        (_video_export_dir() / f"frames_{job_id}", _video_export_dir()),
+        (Path("/tmp") / f"playwright-debug-{job_id}.png", Path("/tmp")),
+        (Path("/tmp") / f"playwright-error-{job_id}.png", Path("/tmp")),
+    ]
+
+    deleted_paths: list[str] = []
+    errors: list[dict[str, str]] = []
+    files_deleted = 0
+    dirs_deleted = 0
+    bytes_deleted = 0
+
+    for path, allowed_root in candidates:
+        deletion = _delete_temp_path(path, allowed_root)
+        if deletion["deleted"]:
+            deleted_paths.append(str(deletion["path"]))
+            files_deleted += int(deletion["files_deleted"])
+            dirs_deleted += int(deletion["dirs_deleted"])
+            bytes_deleted += int(deletion["bytes_deleted"])
+        elif deletion["error"]:
+            errors.append({"path": str(deletion["path"]), "error": str(deletion["error"])})
+
+    return {
+        "files_deleted": files_deleted,
+        "dirs_deleted": dirs_deleted,
+        "bytes_deleted": bytes_deleted,
+        "paths_deleted": deleted_paths,
+        "errors": errors,
+    }
+
+
+def delete_video_export_job(job_id: str) -> dict[str, Any] | None:
+    """Delete an inactive video export row and its temporary files."""
+    job = _get_job(job_id)
+    snapshot = _snapshot_from_job(job) if job else _get_memory_snapshot(job_id)
+    if not snapshot:
+        return None
+    if _is_export_active(snapshot):
+        return {"job_id": job_id, "deleted": False, "error": "active"}
+
+    cleanup = cleanup_video_export_job_temp_files(job_id)
+    if job:
+        with SessionLocal() as db:
+            db_job = db.query(VideoExportJob).filter(VideoExportJob.id == job_id).first()
+            if db_job:
+                db.delete(db_job)
+                db.commit()
+
+    _set_memory_snapshot(job_id, None)
+    _clear_job_runtime(job_id)
+    _clear_job_cancel_requested(job_id)
+    _clear_job_auth_token(job_id)
+    return {"job_id": job_id, "deleted": True, **cleanup}
+
+
 def _prepare_export_dirs(export_root: Path, temp_dir: Path, frames_dir: Path) -> None:
     try:
         export_root.mkdir(parents=True, exist_ok=True)

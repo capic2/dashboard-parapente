@@ -639,6 +639,16 @@ def cancel_video_export(job_id: str) -> bool:
     return True
 
 
+def delete_export_job(job_id: str) -> bool | None:
+    job = export_jobs.get(job_id)
+    if not job:
+        return None
+    if job.get("status") not in _TERMINAL_STATUSES:
+        return False
+    export_jobs.pop(job_id, None)
+    return True
+
+
 def list_exports(flight_id: str | None = None) -> list:
     """
     List all export jobs, optionally filtered by flight_id
