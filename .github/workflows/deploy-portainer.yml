@@ -196,6 +196,7 @@ jobs:
             gopro-overlay-src=${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT }}
           tags: |
             ghcr.io/${{ github.repository }}/backend:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository }}/backend:main
             ghcr.io/${{ github.repository }}/backend:sha-${{ github.sha }}
 
       - name: Deploy on production server
