@@ -5,6 +5,10 @@ import pytest
 import config
 
 
+def test_project_root_points_to_monorepo_root():
+    assert (config.PROJECT_ROOT / ".env.example").is_file()
+
+
 def test_required_env_rejects_missing_variable(monkeypatch):
     monkeypatch.delenv("BACKEND_MISSING_PATH", raising=False)
 
