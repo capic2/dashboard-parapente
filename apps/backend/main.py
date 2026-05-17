@@ -18,12 +18,13 @@ import config
 # even in test mode where initialize_database() is not called
 import models  # noqa: F401 - imported for side effects (model registration)
 from database import Base, SessionLocal, engine
+from gopro_overlay_export import start_gopro_overlay_worker, stop_gopro_overlay_worker
 from models import Site  # Needed for database initialization
 from metrics import setup_metrics
 from routes import public_router, router
-from video_export_manual import start_video_export_worker, stop_video_export_worker
 from scheduler import scheduler, start_scheduler, stop_scheduler
 from versioning import initialize_deployment_version
+from video_export_manual import start_video_export_worker, stop_video_export_worker
 from webhooks import router as webhooks_router
 
 # Configure logging
@@ -621,11 +622,13 @@ async def lifespan(app: FastAPI):
     # Start manual video export worker (skip in tests)
     if not config.TESTING:
         start_video_export_worker()
+        start_gopro_overlay_worker()
 
     yield
 
     # Shutdown
     logger.info("⏹️ Shutting down Dashboard Parapente API...")
+    stop_gopro_overlay_worker()
     stop_video_export_worker()
     stop_scheduler()
 
