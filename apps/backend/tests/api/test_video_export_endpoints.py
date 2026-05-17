@@ -345,6 +345,51 @@ class TestExportStatusAndCancel:
         finally:
             Path(video_path).unlink(missing_ok=True)
 
+    def test_export_video_delete_removes_generated_file(
+        self, client: TestClient, db_session, sample_flight, tmp_path
+    ):
+        video_path = tmp_path / "generated.mp4"
+        video_path.write_bytes(b"video")
+        sample_flight.video_file_path = str(video_path)
+        db_session.commit()
+
+        with patch(
+            "routes._resolve_export_status",
+            return_value={
+                "job_id": "job-delete",
+                "flight_id": sample_flight.id,
+                "status": "completed",
+                "internal_status": "completed",
+                "video_path": str(video_path),
+            },
+        ):
+            response = client.delete(f"{API_PREFIX}/exports/job-delete/video")
+
+        assert response.status_code == 200
+        assert response.json()["deleted"] is True
+        assert not video_path.exists()
+        db_session.refresh(sample_flight)
+        assert sample_flight.video_file_path is None
+
+    def test_export_video_delete_rejects_active_job(self, client: TestClient, tmp_path):
+        video_path = tmp_path / "active.mp4"
+        video_path.write_bytes(b"video")
+
+        with patch(
+            "routes._resolve_export_status",
+            return_value={
+                "job_id": "job-active",
+                "status": "processing",
+                "internal_status": "encoding",
+                "video_path": str(video_path),
+            },
+        ):
+            response = client.delete(f"{API_PREFIX}/exports/job-active/video")
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Cannot delete video for an active export"
+        assert video_path.exists()
+
     def test_export_status_stream_sends_sse_status_event(self, client: TestClient):
         """SSE endpoint should emit status events for active jobs."""
         active_status = {

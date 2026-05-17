@@ -45,6 +45,7 @@ from gopro_overlay_export import cancel_gopro_overlay_job
 from gopro_overlay_export import check_gopro_overlay_dependencies
 from gopro_overlay_export import create_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job_from_paths
+from gopro_overlay_export import delete_gopro_overlay_output
 from gopro_overlay_export import get_gopro_overlay_job
 from gopro_overlay_export import gopro_overlay_output_path
 from gopro_overlay_export import list_gopro_overlay_jobs
@@ -58,6 +59,7 @@ from models import (
     Flight,
     Site,
     SiteLandingAssociation,
+    VideoExportJob,
     WeatherForecast,
     WeatherSourceConfig,
 )
@@ -328,6 +330,7 @@ def _video_export_can_cancel(export: dict[str, Any]) -> bool:
 
 
 def _gopro_overlay_export_job_payload(job: dict[str, Any]) -> dict[str, Any]:
+    output_path = job.get("output_path")
     return {
         "job_id": job.get("job_id"),
         "status": job.get("status"),
@@ -343,6 +346,7 @@ def _gopro_overlay_export_job_payload(job: dict[str, Any]) -> dict[str, Any]:
         "completed_at": job.get("completed_at"),
         "output_filename": job.get("output_filename"),
         "layout_label": job.get("layout_label"),
+        "has_output_file": bool(output_path and Path(str(output_path)).exists()),
     }
 
 
@@ -369,6 +373,9 @@ def _build_video_export_jobs_payload(
         job = dict(export)
         job["status"] = _video_export_public_status(job)
         job["can_cancel"] = _video_export_can_cancel(job)
+        if "has_output_file" not in job:
+            video_path = job.get("video_path")
+            job["has_output_file"] = bool(video_path and Path(str(video_path)).exists())
         if flight:
             job["flight_name"] = flight.name or flight.title
             job["flight_title"] = flight.title or flight.name
@@ -4557,6 +4564,46 @@ def delete_video_export_temp_files() -> VideoExportTempCleanupResponse:
     )
 
 
+@router.delete("/exports/{job_id}/video")
+def delete_exported_video_file(job_id: str, db: Session = Depends(get_db)):
+    """Delete the final video file for a completed, failed, or cancelled export."""
+    status = _resolve_export_status(job_id)
+    if not status:
+        raise HTTPException(status_code=404, detail="Export job not found")
+
+    if _video_export_can_cancel(status):
+        raise HTTPException(status_code=400, detail="Cannot delete video for an active export")
+
+    video_path = status.get("video_path")
+    if not video_path:
+        raise HTTPException(status_code=400, detail="Export has no generated video file")
+
+    path = Path(str(video_path))
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Video file not found")
+    if path.is_dir():
+        raise HTTPException(status_code=400, detail="Video path is not a file")
+
+    path.unlink()
+
+    export_job = db.query(VideoExportJob).filter(VideoExportJob.id == job_id).first()
+    if export_job:
+        export_job.video_path = None
+    flight_id = status.get("flight_id")
+    if flight_id:
+        flight = db.query(Flight).filter(Flight.id == flight_id).first()
+        if flight and flight.video_file_path == str(video_path):
+            flight.video_file_path = None
+    db.commit()
+
+    return {
+        "job_id": job_id,
+        "deleted": True,
+        "path": str(path),
+        "message": "Video file deleted",
+    }
+
+
 @router.get("/exports/{job_id}/stream")
 async def stream_video_export_status(job_id: str, request: Request) -> StreamingResponse:
     """Stream export status updates through Server-Sent Events."""
@@ -4970,6 +5017,27 @@ def download_gopro_overlay_render_job(job_id: str) -> FileResponse:
         raise HTTPException(status_code=400, detail="GoPro overlay video is not ready")
 
     return FileResponse(path=output_path, media_type="video/mp4", filename=output_path.name)
+
+
+@router.delete("/gopro-overlays/jobs/{job_id}/video")
+def delete_gopro_overlay_render_output(job_id: str):
+    """Delete the final GoPro overlay video for a terminal job."""
+    result = delete_gopro_overlay_output(job_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="GoPro overlay job not found")
+    if result.get("error") == "active":
+        raise HTTPException(status_code=400, detail="Cannot delete video for an active overlay")
+    if result.get("error") == "dir":
+        raise HTTPException(status_code=400, detail="Overlay output path is not a file")
+    if not result.get("deleted"):
+        raise HTTPException(status_code=404, detail="GoPro overlay video file not found")
+
+    return {
+        "job_id": job_id,
+        "deleted": True,
+        "path": result.get("path"),
+        "message": "GoPro overlay video file deleted",
+    }
 
 
 @public_router.get(

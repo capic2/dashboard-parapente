@@ -27,6 +27,7 @@ export type VideoExportJob = {
   resume_from_frame?: number | null;
   output_filename?: string | null;
   layout_label?: string | null;
+  has_output_file?: boolean;
   can_cancel: boolean;
 };
 
@@ -67,6 +68,38 @@ export function useCancelVideoExportJob() {
   return useMutation({
     mutationFn: async (jobId: string) => {
       await api.delete(`exports/${jobId}/cancel`).json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['flights'] });
+    },
+  });
+}
+
+export function useResumeVideoExportJob() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (jobId: string) => {
+      await api.post(`exports/${jobId}/resume`).json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['flights'] });
+    },
+  });
+}
+
+export function useDeleteVideoExportOutput() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (job: VideoExportJob) => {
+      const endpoint =
+        job.mode === 'gopro_overlay'
+          ? `gopro-overlays/jobs/${job.job_id}/video`
+          : `exports/${job.job_id}/video`;
+      await api.delete(endpoint).json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });

@@ -633,6 +633,33 @@ def test_download_gopro_overlay_rejects_unfinished_job(client: TestClient):
     assert response.json()["detail"] == "GoPro overlay video is not ready"
 
 
+def test_delete_gopro_overlay_video_removes_completed_output(client: TestClient):
+    with patch(
+        "routes.delete_gopro_overlay_output",
+        return_value={"job_id": "job-gopro", "deleted": True, "path": "/tmp/final.mp4"},
+    ):
+        response = client.delete(f"{API_PREFIX}/gopro-overlays/jobs/job-gopro/video")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "job_id": "job-gopro",
+        "deleted": True,
+        "path": "/tmp/final.mp4",
+        "message": "GoPro overlay video file deleted",
+    }
+
+
+def test_delete_gopro_overlay_video_rejects_running_job(client: TestClient):
+    with patch(
+        "routes.delete_gopro_overlay_output",
+        return_value={"job_id": "job-gopro", "deleted": False, "error": "active"},
+    ):
+        response = client.delete(f"{API_PREFIX}/gopro-overlays/jobs/job-gopro/video")
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Cannot delete video for an active overlay"
+
+
 def test_prepare_layout_file_injects_pip_id(tmp_path):
     source = tmp_path / "layout.xml"
     destination = tmp_path / "prepared.xml"

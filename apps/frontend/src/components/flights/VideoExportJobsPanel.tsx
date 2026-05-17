@@ -12,8 +12,11 @@ import {
   type VideoExportJob,
   useCancelVideoExportJob,
   useCleanupVideoExportTempFiles,
+  useDeleteVideoExportOutput,
+  useResumeVideoExportJob,
   useVideoExportJobs,
 } from '../../hooks/flights/useVideoExportJobs';
+import { api } from '../../lib/api';
 import { useToast } from '../../hooks/useToast';
 
 const statusLabelFallbacks: Record<string, string> = {
@@ -49,6 +52,9 @@ const statusFilters = [
 type StatusFilter = (typeof statusFilters)[number]['id'];
 
 const columnHelper = createColumnHelper<VideoExportJob>();
+
+const actionButtonClassName =
+  'cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500';
 
 type PendingVideoConfirm = {
   message: string;
@@ -137,6 +143,18 @@ function isJobInFilter(job: VideoExportJob, filter: StatusFilter) {
   return job.status === filter;
 }
 
+function isGoproOverlayJob(job: VideoExportJob) {
+  return job.mode === 'gopro_overlay';
+}
+
+function canDownloadJob(job: VideoExportJob) {
+  return job.status === 'completed' && job.has_output_file !== false;
+}
+
+function canDeleteOutput(job: VideoExportJob) {
+  return !job.can_cancel && job.has_output_file !== false;
+}
+
 function JobStatusBadge({ job }: { job: VideoExportJob }) {
   const { t } = useTranslation();
   const phase = getJobPhase(job);
@@ -193,6 +211,8 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
   ]);
   const { data: jobs = [], isLoading, isError, refetch } = useVideoExportJobs();
   const cancelJob = useCancelVideoExportJob();
+  const resumeJob = useResumeVideoExportJob();
+  const deleteOutput = useDeleteVideoExportOutput();
   const cleanupTempFiles = useCleanupVideoExportTempFiles();
 
   const filteredJobs = useMemo(
@@ -229,6 +249,161 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
       });
     },
     [cancelJob, t, toast]
+  );
+
+  const handleResume = useCallback(
+    async (job: VideoExportJob) => {
+      try {
+        await resumeJob.mutateAsync(job.job_id);
+        toast.success(t('videoJobs.resumeSuccess', 'Génération relancée'));
+      } catch {
+        toast.error(
+          t('videoJobs.resumeError', 'Impossible de relancer la génération')
+        );
+      }
+    },
+    [resumeJob, t, toast]
+  );
+
+  const handleDownload = useCallback(
+    async (job: VideoExportJob) => {
+      try {
+        const endpoint = isGoproOverlayJob(job)
+          ? `gopro-overlays/jobs/${job.job_id}/download`
+          : `exports/${job.job_id}/download`;
+        const response = await api.get(endpoint, { timeout: false });
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = job.output_filename || `${job.job_id}.mp4`;
+        document.body.append(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } catch {
+        toast.error(
+          t('videoJobs.downloadError', 'Impossible de télécharger la vidéo')
+        );
+      }
+    },
+    [t, toast]
+  );
+
+  const handleDeleteOutput = useCallback(
+    (job: VideoExportJob) => {
+      const isOverlay = isGoproOverlayJob(job);
+      setPendingConfirm({
+        message: isOverlay
+          ? t(
+              'videoJobs.confirmDeleteOverlay',
+              'Supprimer la vidéo overlay GoPro générée ?'
+            )
+          : t(
+              'videoJobs.confirmDeleteVideo',
+              'Supprimer la vidéo générée pour ce traitement ?'
+            ),
+        confirmLabel: isOverlay
+          ? t('videoJobs.deleteOverlay', 'Supprimer l’overlay')
+          : t('videoJobs.deleteVideo', 'Supprimer la vidéo'),
+        onConfirm: async () => {
+          try {
+            await deleteOutput.mutateAsync(job);
+            toast.success(
+              isOverlay
+                ? t('videoJobs.deleteOverlaySuccess', 'Overlay GoPro supprimé')
+                : t('videoJobs.deleteVideoSuccess', 'Vidéo générée supprimée')
+            );
+          } catch {
+            toast.error(
+              isOverlay
+                ? t(
+                    'videoJobs.deleteOverlayError',
+                    'Impossible de supprimer l’overlay GoPro'
+                  )
+                : t(
+                    'videoJobs.deleteVideoError',
+                    'Impossible de supprimer la vidéo générée'
+                  )
+            );
+          }
+        },
+      });
+    },
+    [deleteOutput, t, toast]
+  );
+
+  const renderJobActions = useCallback(
+    (job: VideoExportJob) => (
+      <div className="flex flex-wrap gap-2">
+        {job.flight_id && (
+          <a
+            href={`/flights/${job.flight_id}`}
+            className={`${actionButtonClassName} border border-sky-200 bg-white text-sky-700 hover:bg-sky-50 focus-visible:outline-sky-500 dark:border-sky-800 dark:bg-gray-800 dark:text-sky-300 dark:hover:bg-sky-950/40`}
+          >
+            {t('videoJobs.viewFlight', 'Voir le vol')}
+          </a>
+        )}
+        {canDownloadJob(job) && (
+          <Button
+            onClick={() => void handleDownload(job)}
+            className={`${actionButtonClassName} bg-sky-100 text-sky-800 hover:bg-sky-200 focus-visible:outline-sky-500 dark:bg-sky-900/40 dark:text-sky-200 dark:hover:bg-sky-900/60`}
+          >
+            {t('videoJobs.download', 'Télécharger')}
+          </Button>
+        )}
+        {!isGoproOverlayJob(job) && job.can_resume && (
+          <Button
+            onClick={() => void handleResume(job)}
+            isDisabled={resumeJob.isPending}
+            className={`${actionButtonClassName} bg-green-100 text-green-800 hover:bg-green-200 focus-visible:outline-green-500 dark:bg-green-900/40 dark:text-green-200 dark:hover:bg-green-900/60`}
+          >
+            {resumeJob.isPending
+              ? t('videoJobs.resuming', 'Relance...')
+              : t('videoJobs.resume', 'Reprendre')}
+          </Button>
+        )}
+        {job.can_cancel && (
+          <Button
+            onClick={() => handleCancel(job)}
+            isDisabled={cancelJob.isPending}
+            className={`${actionButtonClassName} bg-red-600 text-white hover:bg-red-700 focus-visible:outline-red-500`}
+          >
+            {cancelJob.isPending
+              ? t('videoJobs.stopping', 'Arrêt...')
+              : t('videoJobs.stop', 'Stopper')}
+          </Button>
+        )}
+        {canDeleteOutput(job) && (
+          <Button
+            onClick={() => handleDeleteOutput(job)}
+            isDisabled={deleteOutput.isPending}
+            className={`${actionButtonClassName} bg-gray-100 text-gray-800 hover:bg-gray-200 focus-visible:outline-gray-500 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600`}
+          >
+            {isGoproOverlayJob(job)
+              ? t('videoJobs.deleteOverlay', 'Supprimer l’overlay')
+              : t('videoJobs.deleteVideo', 'Supprimer la vidéo')}
+          </Button>
+        )}
+        {!job.flight_id &&
+          !canDownloadJob(job) &&
+          !job.can_resume &&
+          !job.can_cancel &&
+          !canDeleteOutput(job) && (
+            <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
+          )}
+      </div>
+    ),
+    [
+      cancelJob.isPending,
+      deleteOutput.isPending,
+      handleCancel,
+      handleDeleteOutput,
+      handleDownload,
+      handleResume,
+      resumeJob.isPending,
+      t,
+    ]
   );
 
   const columns = useMemo(
@@ -318,23 +493,10 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
       columnHelper.display({
         id: 'actions',
         header: t('videoJobs.table.actions', 'Actions'),
-        cell: ({ row }) =>
-          row.original.can_cancel ? (
-            <Button
-              onClick={() => handleCancel(row.original)}
-              isDisabled={cancelJob.isPending}
-              className="cursor-pointer rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 disabled:cursor-not-allowed disabled:bg-gray-300"
-            >
-              {cancelJob.isPending
-                ? t('videoJobs.stopping', 'Arrêt...')
-                : t('videoJobs.stop', 'Stopper')}
-            </Button>
-          ) : (
-            <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
-          ),
+        cell: ({ row }) => renderJobActions(row.original),
       }),
     ],
-    [cancelJob.isPending, handleCancel, t]
+    [renderJobActions, t]
   );
 
   const table = useReactTable({
@@ -554,17 +716,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
                       )}
                     </div>
 
-                    {job.can_cancel && (
-                      <Button
-                        onClick={() => handleCancel(job)}
-                        isDisabled={cancelJob.isPending}
-                        className="cursor-pointer rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 disabled:cursor-not-allowed disabled:bg-gray-300"
-                      >
-                        {cancelJob.isPending
-                          ? t('videoJobs.stopping', 'Arrêt...')
-                          : t('videoJobs.stop', 'Stopper')}
-                      </Button>
-                    )}
+                    {renderJobActions(job)}
                   </div>
 
                   <div className="mt-3">
