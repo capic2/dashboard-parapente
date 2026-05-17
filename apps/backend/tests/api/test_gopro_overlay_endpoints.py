@@ -661,30 +661,84 @@ def test_delete_gopro_overlay_video_rejects_running_job(client: TestClient):
     assert response.json()["detail"] == "Cannot delete video for an active overlay"
 
 
-def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(tmp_path):
+def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(
+    tmp_path,
+    test_db,
+    monkeypatch,
+):
     job_id = "job-gopro-delete"
     work_dir = tmp_path / ".gopro-overlay-work" / job_id
     work_dir.mkdir(parents=True)
     layout_path = work_dir / "layout.xml"
     layout_path.write_text("<layout />")
 
-    gopro_overlay_export._JOBS[job_id] = {
-        "job_id": job_id,
-        "status": "failed",
-        "layout_path": str(layout_path),
-        "output_path": str(tmp_path / "final.mp4"),
-    }
-
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+    session = test_db()
     try:
+        from models import GoproOverlayJob
+
+        session.add(
+            GoproOverlayJob(
+                id=job_id,
+                status="failed",
+                progress=100,
+                message="Overlay rendering failed",
+                error="boom",
+                video_path=str(tmp_path / "flight.mp4"),
+                gpx_path=str(tmp_path / "track.gpx"),
+                layout_id="parapente-1080",
+                layout_label="Parapente 1920x1080",
+                layout_path=str(layout_path),
+                output_path=str(tmp_path / "final.mp4"),
+                temp_output_path=str(tmp_path / "final.part.mp4"),
+                output_filename="final.mp4",
+            )
+        )
+        session.commit()
+
         result = delete_gopro_overlay_job(job_id)
     finally:
-        gopro_overlay_export._JOBS.pop(job_id, None)
+        session.close()
 
     assert result is not None
     assert result["deleted"] is True
     assert result["files_deleted"] == 1
     assert not work_dir.exists()
     assert gopro_overlay_export.get_gopro_overlay_job(job_id) is None
+
+
+def test_mark_running_jobs_interrupted_marks_rows_failed(test_db, monkeypatch):
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+    session = test_db()
+    try:
+        from models import GoproOverlayJob
+
+        session.add(
+            GoproOverlayJob(
+                id="job-running",
+                status="running",
+                progress=55,
+                message="Rendering overlay",
+                video_path="video.mp4",
+                gpx_path="track.gpx",
+                layout_id="parapente-1080",
+                layout_label="Parapente 1920x1080",
+                layout_path="layout.xml",
+                output_path="final.mp4",
+                temp_output_path=".final.job-running.part.mp4",
+                output_filename="final.mp4",
+            )
+        )
+        session.commit()
+
+        gopro_overlay_export._mark_running_jobs_interrupted()
+
+        refreshed = gopro_overlay_export.get_gopro_overlay_job("job-running")
+        assert refreshed is not None
+        assert refreshed["status"] == "failed"
+        assert refreshed["message"] == "Overlay interrupted by backend restart"
+    finally:
+        session.close()
 
 
 def test_prepare_layout_file_injects_pip_id(tmp_path):
@@ -758,7 +812,11 @@ async def test_create_gopro_overlay_job_cleans_uploads_after_validation_failure(
 
 
 @pytest.mark.asyncio
-async def test_create_gopro_overlay_job_uses_job_unique_output_paths(tmp_path, monkeypatch):
+async def test_create_gopro_overlay_job_uses_job_unique_output_paths(
+    tmp_path,
+    monkeypatch,
+    test_db,
+):
     upload_dir = tmp_path / "uploads"
     layout_dir = tmp_path / "layouts"
     layout_dir.mkdir()
@@ -766,13 +824,13 @@ async def test_create_gopro_overlay_job_uses_job_unique_output_paths(tmp_path, m
     monkeypatch.setattr(gopro_overlay_export, "_UPLOAD_WORK_ROOT", upload_dir)
     monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
     monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
 
     with (
         patch(
             "gopro_overlay_export.asyncio.to_thread",
             AsyncMock(side_effect=lambda func, *args, **kwargs: func(*args, **kwargs)),
         ) as to_thread,
-        patch("gopro_overlay_export.threading.Thread") as thread,
     ):
         first = await create_gopro_overlay_job(
             video_file=_upload("flight.mp4", b"video"),
@@ -794,9 +852,10 @@ async def test_create_gopro_overlay_job_uses_job_unique_output_paths(tmp_path, m
     assert first["output_path"] != second["output_path"]
     assert Path(first["output_path"]).parent.name == first["job_id"]
     assert Path(second["output_path"]).parent.name == second["job_id"]
+    assert first["temp_output_path"].endswith(".part.mp4")
+    assert gopro_overlay_export.get_gopro_overlay_job(first["job_id"])["status"] == "queued"
     assert to_thread.call_count == 2
     assert to_thread.call_args.args[0] is gopro_overlay_export._create_gopro_overlay_job_from_paths
-    assert thread.call_count == 2
 
 
 def test_create_gopro_overlay_job_from_paths_rejects_unsupported_input_before_workdir(
@@ -819,6 +878,7 @@ def test_create_gopro_overlay_job_from_paths_rejects_unsupported_input_before_wo
 def test_create_gopro_overlay_job_from_paths_copies_inputs_into_job_dir(
     tmp_path,
     monkeypatch,
+    test_db,
 ):
     layout_dir = tmp_path / "layouts"
     layout_dir.mkdir()
@@ -829,15 +889,15 @@ def test_create_gopro_overlay_job_from_paths_copies_inputs_into_job_dir(
     gpx_path.write_text("<gpx />")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
     monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
 
-    with patch("gopro_overlay_export.threading.Thread"):
-        job = create_gopro_overlay_job_from_paths(
-            video_path=video_path,
-            gpx_path=gpx_path,
-            pip_path=None,
-            layout_id="parapente-1080",
-            output_filename="overlay.mp4",
-        )
+    job = create_gopro_overlay_job_from_paths(
+        video_path=video_path,
+        gpx_path=gpx_path,
+        pip_path=None,
+        layout_id="parapente-1080",
+        output_filename="overlay.mp4",
+    )
 
     work_dir = tmp_path / ".gopro-overlay-work" / job["job_id"]
     assert Path(job["video_path"]).parent == work_dir
@@ -850,6 +910,7 @@ def test_create_gopro_overlay_job_from_paths_copies_inputs_into_job_dir(
 def test_create_gopro_overlay_job_from_paths_sanitizes_output_filename_in_source_dir(
     tmp_path,
     monkeypatch,
+    test_db,
 ):
     layout_dir = tmp_path / "layouts"
     layout_dir.mkdir()
@@ -860,15 +921,15 @@ def test_create_gopro_overlay_job_from_paths_sanitizes_output_filename_in_source
     gpx_path.write_text("<gpx />")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
     monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
 
-    with patch("gopro_overlay_export.threading.Thread"):
-        job = create_gopro_overlay_job_from_paths(
-            video_path=video_path,
-            gpx_path=gpx_path,
-            pip_path=None,
-            layout_id="parapente-1080",
-            output_filename="custom overlay.mov",
-        )
+    job = create_gopro_overlay_job_from_paths(
+        video_path=video_path,
+        gpx_path=gpx_path,
+        pip_path=None,
+        layout_id="parapente-1080",
+        output_filename="custom overlay.mov",
+    )
 
     assert Path(job["output_path"]) == tmp_path / "custom_overlay.mp4"
 

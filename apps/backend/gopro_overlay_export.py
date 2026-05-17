@@ -17,6 +17,9 @@ from typing import Any
 from fastapi import UploadFile
 
 import config
+from database import SessionLocal
+from models import GoproOverlayJob
+from sqlalchemy.exc import OperationalError
 
 logger = logging.getLogger(__name__)
 
@@ -76,11 +79,34 @@ _LAYOUTS = [
 
 _JOBS: dict[str, dict[str, Any]] = {}
 _PROCESSES: dict[str, subprocess.Popen[str]] = {}
+_ACTIVE_THREADS: set[str] = set()
 _LOCK = threading.Lock()
+_WORKER_THREAD: threading.Thread | None = None
+_WORKER_STOP = threading.Event()
+_WORKER_LOCK = threading.Lock()
 
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _utc_now_dt() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _to_iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _coerce_datetime(value: Any) -> Any:
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=None)
+        except ValueError:
+            return value
+    if isinstance(value, datetime) and value.tzinfo is not None:
+        return value.replace(tzinfo=None)
+    return value
 
 
 def _layout_dir() -> Path:
@@ -107,6 +133,14 @@ def _output_path_for_dir(output_dir: str | None, video_path: Path, output_name: 
     if not output_dir or not output_dir.strip():
         return _output_path_for_video(video_path, output_name)
     return Path(output_dir).expanduser().resolve() / output_name
+
+
+def _temp_output_path(output_path: Path, job_id: str) -> Path:
+    suffix = output_path.suffix or ".mp4"
+    stem = (
+        output_path.name[: -len(suffix)] if output_path.name.endswith(suffix) else output_path.name
+    )
+    return output_path.with_name(f".{stem}.{job_id}.part{suffix}")
 
 
 def _prepare_layout_file(layout_path: Path, destination: Path, has_pip: bool) -> Path:
@@ -151,7 +185,101 @@ def _copy_job_input(source: Path, destination: Path, allowed_extensions: set[str
     return destination
 
 
+def _job_to_payload(job: GoproOverlayJob, include_command: bool = False) -> dict[str, Any]:
+    payload = {
+        "job_id": job.id,
+        "status": job.status,
+        "progress": job.progress or 0,
+        "message": job.message or "",
+        "error": job.error,
+        "video_path": job.video_path,
+        "gpx_path": job.gpx_path,
+        "pip_path": job.pip_path,
+        "layout_id": job.layout_id,
+        "layout_label": job.layout_label,
+        "layout_path": job.layout_path,
+        "output_path": job.output_path,
+        "temp_output_path": job.temp_output_path,
+        "output_filename": job.output_filename,
+        "log_path": job.log_path,
+        "video_width": job.video_width,
+        "video_height": job.video_height,
+        "created_at": _to_iso(job.created_at),
+        "updated_at": _to_iso(job.updated_at),
+        "completed_at": _to_iso(job.completed_at),
+    }
+    if include_command:
+        payload["command"] = json.loads(job.command_json) if job.command_json else None
+    return payload
+
+
+def _get_db_job_payload(job_id: str, include_command: bool = False) -> dict[str, Any] | None:
+    try:
+        with SessionLocal() as db:
+            job = db.query(GoproOverlayJob).filter(GoproOverlayJob.id == job_id).first()
+            if not job:
+                return None
+            return _job_to_payload(job, include_command=include_command)
+    except OperationalError as exc:
+        if "no such table: gopro_overlay_jobs" in str(exc):
+            return None
+        raise
+
+
+def _set_memory_snapshot(payload: dict[str, Any]) -> None:
+    with _LOCK:
+        _JOBS[payload["job_id"]] = payload.copy()
+
+
+def _touch_db_job(job_id: str, **changes: Any) -> dict[str, Any] | None:
+    try:
+        with SessionLocal() as db:
+            job = db.query(GoproOverlayJob).filter(GoproOverlayJob.id == job_id).first()
+            if not job:
+                return None
+            if job.status in _TERMINAL_STATUSES:
+                payload = _job_to_payload(job)
+                _set_memory_snapshot(payload)
+                return payload
+
+            for key, value in changes.items():
+                if key == "job_id" or not hasattr(job, key):
+                    continue
+                if key.endswith("_at"):
+                    value = _coerce_datetime(value)
+                setattr(job, key, value)
+            job.updated_at = _utc_now_dt()
+            if job.status == _STATUS_RUNNING and not job.started_at:
+                job.started_at = _utc_now_dt()
+            if job.status in _TERMINAL_STATUSES:
+                if job.status == _STATUS_CANCELLED and not job.cancelled_at:
+                    job.cancelled_at = _utc_now_dt()
+                if job.status in {_STATUS_COMPLETED, _STATUS_FAILED} and not job.completed_at:
+                    job.completed_at = _utc_now_dt()
+            db.commit()
+            payload = _job_to_payload(job)
+            _set_memory_snapshot(payload)
+            return payload
+    except OperationalError as exc:
+        if "no such table: gopro_overlay_jobs" not in str(exc):
+            raise
+
+    with _LOCK:
+        job = _JOBS.get(job_id)
+        if not job:
+            return None
+        if job["status"] in _TERMINAL_STATUSES:
+            return job.copy()
+        job.update(changes)
+        job["updated_at"] = _utc_now()
+        return job.copy()
+
+
 def _update_job(job_id: str, **changes: Any) -> dict[str, Any]:
+    db_payload = _touch_db_job(job_id, **changes)
+    if db_payload is not None:
+        return db_payload
+
     with _LOCK:
         job = _JOBS[job_id]
         if job["status"] in _TERMINAL_STATUSES:
@@ -182,7 +310,67 @@ def _read_process_updates(stream: Any) -> Iterator[str]:
         yield current.strip()
 
 
+def _tail_lines(path: Path, limit: int = 20) -> str:
+    if not path.exists():
+        return ""
+    try:
+        lines = path.read_text(errors="replace").splitlines()
+    except OSError:
+        return ""
+    return "\n".join(lines[-limit:])
+
+
+def _verify_video_output(path: Path) -> tuple[bool, str | None]:
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "json",
+                str(path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError, TimeoutError) as exc:
+        return False, str(exc) or exc.__class__.__name__
+
+    try:
+        duration = float((json.loads(result.stdout or "{}").get("format") or {}).get("duration", 0))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        duration = 0
+    if duration <= 0:
+        return False, "ffprobe did not report a valid duration"
+    return True, None
+
+
 def _transition_job_to_running(job_id: str, command: list[str]) -> dict[str, Any] | None:
+    try:
+        with SessionLocal() as db:
+            db_job = db.query(GoproOverlayJob).filter(GoproOverlayJob.id == job_id).first()
+            if db_job:
+                if db_job.status != _STATUS_QUEUED:
+                    return None
+                db_job.status = _STATUS_RUNNING
+                db_job.progress = 5
+                db_job.message = "Rendering overlay"
+                db_job.command_json = json.dumps(command)
+                db_job.started_at = _utc_now_dt()
+                db_job.updated_at = _utc_now_dt()
+                db.commit()
+                payload = _job_to_payload(db_job, include_command=True)
+                _set_memory_snapshot(payload)
+                return payload
+    except OperationalError as exc:
+        if "no such table: gopro_overlay_jobs" not in str(exc):
+            raise
+
     with _LOCK:
         job = _JOBS.get(job_id)
         if not job or job["status"] != _STATUS_QUEUED:
@@ -198,6 +386,10 @@ def _transition_job_to_running(job_id: str, command: list[str]) -> dict[str, Any
 
 
 def _finish_job(job_id: str, **changes: Any) -> dict[str, Any]:
+    db_payload = _touch_db_job(job_id, **changes)
+    if db_payload is not None:
+        return db_payload
+
     with _LOCK:
         job = _JOBS[job_id]
         if job["status"] in _TERMINAL_STATUSES:
@@ -430,8 +622,68 @@ def _create_gopro_overlay_job_from_paths(
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_output_path = _temp_output_path(output_path, job_id)
+    log_path = work_dir / "overlay.log"
 
-    job = {
+    now = _utc_now_dt()
+    db_job: GoproOverlayJob | None = None
+    try:
+        with SessionLocal() as db:
+            db_job = GoproOverlayJob(
+                id=job_id,
+                status=_STATUS_QUEUED,
+                progress=0,
+                message="Overlay queued",
+                error=None,
+                video_path=str(video_path),
+                gpx_path=str(gpx_path),
+                pip_path=str(pip_path) if pip_path else None,
+                layout_id=selected_layout.id,
+                layout_label=selected_layout.label,
+                layout_path=str(layout_path),
+                output_path=str(output_path),
+                temp_output_path=str(temp_output_path),
+                output_filename=output_path.name,
+                log_path=str(log_path),
+                video_width=width,
+                video_height=height,
+                created_at=now,
+                updated_at=now,
+            )
+            db.add(db_job)
+            db.commit()
+            db.refresh(db_job)
+            job = _job_to_payload(db_job)
+    except OperationalError as exc:
+        if "no such table: gopro_overlay_jobs" not in str(exc):
+            raise
+
+    if db_job is None:
+        job = {
+            "job_id": job_id,
+            "status": _STATUS_QUEUED,
+            "progress": 0,
+            "message": "Overlay queued",
+            "error": None,
+            "video_path": str(video_path),
+            "gpx_path": str(gpx_path),
+            "pip_path": str(pip_path) if pip_path else None,
+            "layout_id": selected_layout.id,
+            "layout_label": selected_layout.label,
+            "layout_path": str(layout_path),
+            "output_path": str(output_path),
+            "temp_output_path": str(temp_output_path),
+            "output_filename": output_path.name,
+            "log_path": str(log_path),
+            "video_width": width,
+            "video_height": height,
+            "created_at": _utc_now(),
+            "updated_at": _utc_now(),
+            "completed_at": None,
+            "command": None,
+        }
+
+    legacy_job = {
         "job_id": job_id,
         "status": _STATUS_QUEUED,
         "progress": 0,
@@ -444,7 +696,9 @@ def _create_gopro_overlay_job_from_paths(
         "layout_label": selected_layout.label,
         "layout_path": str(layout_path),
         "output_path": str(output_path),
+        "temp_output_path": str(temp_output_path),
         "output_filename": output_path.name,
+        "log_path": str(log_path),
         "video_width": width,
         "video_height": height,
         "created_at": _utc_now(),
@@ -453,7 +707,7 @@ def _create_gopro_overlay_job_from_paths(
         "command": None,
     }
     with _LOCK:
-        _JOBS[job_id] = job
+        _JOBS[job_id] = legacy_job
 
     logger.info(
         "Queued GoPro overlay job %s with layout %s and output %s",
@@ -462,8 +716,6 @@ def _create_gopro_overlay_job_from_paths(
         output_path,
     )
 
-    thread = threading.Thread(target=_run_job, args=(job_id,), daemon=True)
-    thread.start()
     return job.copy()
 
 
@@ -488,12 +740,19 @@ def _run_job(job_id: str) -> None:
         command.extend(["--overlay-size", f"{job['video_width']}x{job['video_height']}"])
     if job.get("pip_path"):
         command.extend(["--video", f"pip={job['pip_path']}"])
-    command.extend([job["video_path"], job["output_path"]])
+    output_path = Path(job["output_path"])
+    temp_output_path = Path(job.get("temp_output_path") or _temp_output_path(output_path, job_id))
+    log_path = Path(job.get("log_path") or temp_output_path.with_suffix(".log"))
+    temp_output_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    command.extend([job["video_path"], str(temp_output_path)])
 
     if not _transition_job_to_running(job_id, command):
         return
     logger.info("Starting GoPro overlay job %s", job_id)
     try:
+        if temp_output_path.exists():
+            temp_output_path.unlink()
         process = subprocess.Popen(
             command,
             cwd=config.GOPRO_OVERLAY_ROOT or None,
@@ -532,28 +791,35 @@ def _run_job(job_id: str) -> None:
 
     output_lines: list[str] = []
     try:
-        if process.stdout:
-            for line in _read_process_updates(process.stdout):
-                output_lines.append(line)
-                if len(output_lines) > 50:
-                    output_lines = output_lines[-50:]
-                progress = _progress_from_output_chunk(line)
-                if progress is None:
-                    _update_job(job_id, message=line or "Rendering overlay")
-                else:
-                    _update_job(
-                        job_id, progress=progress, message=f"Rendering overlay: {progress}%"
-                    )
+        with log_path.open("a", encoding="utf-8") as log_file:
+            log_file.write(f"[{_utc_now()}] Starting GoPro overlay job {job_id}\n")
+            log_file.write("Command: " + " ".join(command) + "\n")
+            log_file.flush()
+            if process.stdout:
+                for line in _read_process_updates(process.stdout):
+                    log_file.write(line + "\n")
+                    log_file.flush()
+                    output_lines.append(line)
+                    if len(output_lines) > 50:
+                        output_lines = output_lines[-50:]
+                    progress = _progress_from_output_chunk(line)
+                    if progress is None:
+                        _update_job(job_id, message=line or "Rendering overlay")
+                    else:
+                        _update_job(
+                            job_id, progress=progress, message=f"Rendering overlay: {progress}%"
+                        )
 
         return_code = process.wait()
         with _LOCK:
             _PROCESSES.pop(job_id, None)
 
-        if get_gopro_overlay_job(job_id, include_command=True).get("status") == _STATUS_CANCELLED:
+        current_job = get_gopro_overlay_job(job_id, include_command=True)
+        if current_job and current_job.get("status") == _STATUS_CANCELLED:
             return
 
         if return_code != 0:
-            error = "\n".join(output_lines[-20:]) or f"Process exited with {return_code}"
+            error = _tail_lines(log_path) or f"Process exited with {return_code}"
             logger.error(
                 "GoPro overlay job %s failed with exit code %s: %s",
                 job_id,
@@ -570,19 +836,31 @@ def _run_job(job_id: str) -> None:
             )
             return
 
-        if not Path(job["output_path"]).exists():
-            logger.error(
-                "GoPro overlay job %s did not create output %s", job_id, job["output_path"]
-            )
+        if not temp_output_path.exists():
+            logger.error("GoPro overlay job %s did not create output %s", job_id, temp_output_path)
             _finish_job(
                 job_id,
                 status=_STATUS_FAILED,
                 progress=100,
                 message="Output file was not created",
-                error=f"Missing output: {job['output_path']}",
+                error=f"Missing output: {temp_output_path}",
                 completed_at=_utc_now(),
             )
             return
+
+        is_valid, validation_error = _verify_video_output(temp_output_path)
+        if not is_valid:
+            _finish_job(
+                job_id,
+                status=_STATUS_FAILED,
+                progress=100,
+                message="Overlay output is invalid",
+                error=validation_error or "ffprobe validation failed",
+                completed_at=_utc_now(),
+            )
+            return
+
+        temp_output_path.replace(output_path)
 
         _finish_job(
             job_id,
@@ -608,6 +886,10 @@ def _run_job(job_id: str) -> None:
 
 
 def get_gopro_overlay_job(job_id: str, include_command: bool = False) -> dict[str, Any] | None:
+    db_payload = _get_db_job_payload(job_id, include_command=include_command)
+    if db_payload is not None:
+        return db_payload
+
     with _LOCK:
         job = _JOBS.get(job_id)
         if not job:
@@ -619,6 +901,15 @@ def get_gopro_overlay_job(job_id: str, include_command: bool = False) -> dict[st
 
 
 def list_gopro_overlay_jobs() -> list[dict[str, Any]]:
+    try:
+        with SessionLocal() as db:
+            jobs = db.query(GoproOverlayJob).order_by(GoproOverlayJob.created_at.desc()).all()
+            if jobs:
+                return [_job_to_payload(job) for job in jobs]
+    except OperationalError as exc:
+        if "no such table: gopro_overlay_jobs" not in str(exc):
+            raise
+
     with _LOCK:
         return [
             {key: value for key, value in job.items() if key != "command"} for job in _JOBS.values()
@@ -671,14 +962,100 @@ def _can_delete_work_dir(work_dir: Path) -> bool:
     return work_dir.parent.name == _PATH_WORK_DIR_NAME
 
 
+def _queued_job_ids() -> list[str]:
+    try:
+        with SessionLocal() as db:
+            return [
+                job.id
+                for job in db.query(GoproOverlayJob)
+                .filter(GoproOverlayJob.status == _STATUS_QUEUED)
+                .order_by(GoproOverlayJob.created_at)
+                .all()
+            ]
+    except OperationalError as exc:
+        if "no such table: gopro_overlay_jobs" not in str(exc):
+            raise
+        with _LOCK:
+            return [job_id for job_id, job in _JOBS.items() if job.get("status") == _STATUS_QUEUED]
+
+
+def _mark_running_jobs_interrupted() -> None:
+    try:
+        with SessionLocal() as db:
+            jobs = db.query(GoproOverlayJob).filter(GoproOverlayJob.status == _STATUS_RUNNING).all()
+            for job in jobs:
+                job.status = _STATUS_FAILED
+                job.progress = 100
+                job.message = "Overlay interrupted by backend restart"
+                job.error = "The backend stopped while the overlay process was running"
+                job.completed_at = _utc_now_dt()
+                job.updated_at = _utc_now_dt()
+            db.commit()
+    except OperationalError as exc:
+        if "no such table: gopro_overlay_jobs" not in str(exc):
+            raise
+        with _LOCK:
+            for job in _JOBS.values():
+                if job.get("status") == _STATUS_RUNNING:
+                    job.update(
+                        status=_STATUS_FAILED,
+                        progress=100,
+                        message="Overlay interrupted by backend restart",
+                        error="The backend stopped while the overlay process was running",
+                        completed_at=_utc_now(),
+                        updated_at=_utc_now(),
+                    )
+
+
+def _worker_loop() -> None:
+    logger.info("GoPro overlay worker started")
+    _mark_running_jobs_interrupted()
+    while not _WORKER_STOP.is_set():
+        for job_id in _queued_job_ids():
+            with _LOCK:
+                if job_id in _ACTIVE_THREADS:
+                    continue
+                _ACTIVE_THREADS.add(job_id)
+            thread = threading.Thread(target=_run_job_thread, args=(job_id,), daemon=True)
+            thread.start()
+        _WORKER_STOP.wait(1)
+
+
+def _run_job_thread(job_id: str) -> None:
+    try:
+        _run_job(job_id)
+    finally:
+        with _LOCK:
+            _ACTIVE_THREADS.discard(job_id)
+
+
+def start_gopro_overlay_worker() -> None:
+    global _WORKER_THREAD
+    with _WORKER_LOCK:
+        if _WORKER_THREAD and _WORKER_THREAD.is_alive() is True:
+            return
+        _WORKER_STOP.clear()
+        _WORKER_THREAD = threading.Thread(
+            target=_worker_loop,
+            name="gopro-overlay-worker",
+            daemon=True,
+        )
+        _WORKER_THREAD.start()
+
+
+def stop_gopro_overlay_worker() -> None:
+    _WORKER_STOP.set()
+    if _WORKER_THREAD and _WORKER_THREAD.is_alive():
+        _WORKER_THREAD.join(timeout=5)
+
+
 def delete_gopro_overlay_job(job_id: str) -> dict[str, Any] | None:
-    with _LOCK:
-        job = _JOBS.get(job_id)
-        if not job:
-            return None
-        if job["status"] not in _TERMINAL_STATUSES:
-            return {"job_id": job_id, "deleted": False, "error": "active"}
-        work_dir = _job_work_dir(job)
+    job = get_gopro_overlay_job(job_id)
+    if not job:
+        return None
+    if job["status"] not in _TERMINAL_STATUSES:
+        return {"job_id": job_id, "deleted": False, "error": "active"}
+    work_dir = _job_work_dir(job)
 
     result: dict[str, Any] = {
         "job_id": job_id,
@@ -717,6 +1094,15 @@ def delete_gopro_overlay_job(job_id: str) -> dict[str, Any] | None:
 
     with _LOCK:
         _JOBS.pop(job_id, None)
+    try:
+        with SessionLocal() as db:
+            db_job = db.query(GoproOverlayJob).filter(GoproOverlayJob.id == job_id).first()
+            if db_job:
+                db.delete(db_job)
+                db.commit()
+    except OperationalError as exc:
+        if "no such table: gopro_overlay_jobs" not in str(exc):
+            raise
 
     result["deleted"] = True
     return result
@@ -725,7 +1111,7 @@ def delete_gopro_overlay_job(job_id: str) -> dict[str, Any] | None:
 def cancel_gopro_overlay_job(job_id: str) -> bool:
     with _LOCK:
         process = _PROCESSES.get(job_id)
-        job = _JOBS.get(job_id)
+    job = get_gopro_overlay_job(job_id)
 
     if not job:
         return False
@@ -777,13 +1163,12 @@ def gopro_overlay_output_path(job_id: str) -> Path | None:
 
 
 def delete_gopro_overlay_output(job_id: str) -> dict[str, Any] | None:
-    with _LOCK:
-        job = _JOBS.get(job_id)
-        if not job:
-            return None
-        if job["status"] not in _TERMINAL_STATUSES:
-            return {"job_id": job_id, "deleted": False, "error": "active"}
-        output_path = Path(job["output_path"])
+    job = get_gopro_overlay_job(job_id)
+    if not job:
+        return None
+    if job["status"] not in _TERMINAL_STATUSES:
+        return {"job_id": job_id, "deleted": False, "error": "active"}
+    output_path = Path(job["output_path"])
 
     if not output_path.exists():
         return {"job_id": job_id, "deleted": False, "path": str(output_path)}
