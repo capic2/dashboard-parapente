@@ -92,7 +92,8 @@ services:
       - BACKEND_ADMIN_PASSWORD=${BACKEND_ADMIN_PASSWORD:?required}
 
       # Backend - Frontend URL
-      - BACKEND_FRONTEND_URL=${BACKEND_FRONTEND_URL}
+      # Video export runs in a separate worker container; use Docker DNS by default.
+      - BACKEND_FRONTEND_URL=${BACKEND_FRONTEND_URL:-http://backend:8001}
 
       # Backend - GoPro overlay toolchain
       - BACKEND_GOPRO_OVERLAY_ROOT=/app/gopro-overlay
@@ -146,7 +147,8 @@ services:
       - BACKEND_WEATHERAPI_KEY=${BACKEND_WEATHERAPI_KEY}
       - BACKEND_METEOBLUE_API_KEY=${BACKEND_METEOBLUE_API_KEY}
       - BACKEND_STRAVA_VERIFY_TOKEN=${BACKEND_STRAVA_VERIFY_TOKEN:-PARAPENTE_2025}
-      - BACKEND_FRONTEND_URL=${BACKEND_FRONTEND_URL}
+      # localhost inside this container is not the API container.
+      - BACKEND_FRONTEND_URL=${BACKEND_FRONTEND_URL:-http://backend:8001}
       - BACKEND_GOPRO_OVERLAY_ROOT=/app/gopro-overlay
       - BACKEND_GOPRO_OVERLAY_BIN=/app/gopro-overlay/venv/bin/gopro-dashboard.py
       - BACKEND_GOPRO_OVERLAY_LAYOUT_DIR=/app/gopro-overlay
