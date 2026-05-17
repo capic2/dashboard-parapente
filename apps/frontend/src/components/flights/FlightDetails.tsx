@@ -217,6 +217,10 @@ export function FlightDetails({
 
   const handleStartGoproOverlay = () => {
     if (isGoproOverlayRunning) return;
+    if (!hasVideo) {
+      toast.error(t('flights.goproOverlayNeedsVideo'));
+      return;
+    }
     setShowGoproOverlayForm(true);
   };
 
@@ -243,6 +247,10 @@ export function FlightDetails({
   ) => {
     event.preventDefault();
     if (isGoproOverlayRunning) return;
+    if (!hasVideo) {
+      toast.error(t('flights.goproOverlayNeedsVideo'));
+      return;
+    }
     const videoPath = goproOverlayVideoPath.trim();
     const gpxPath = goproOverlayGpxPath.trim();
     const pipPath = goproOverlayPipPath.trim();
@@ -406,9 +414,15 @@ export function FlightDetails({
   }
 
   let goproOverlayTitle = t('flights.goproOverlayGenerateTitle');
-  if (!hasGpx) {
+  if (!hasVideo) {
+    goproOverlayTitle = t('flights.goproOverlayNeedsVideo');
+  } else if (!hasGpx) {
     goproOverlayTitle = t('flights.goproOverlayCanProvideGpx');
   }
+  const canUseGoproOverlayAction =
+    hasVideo ||
+    isGoproOverlayRunning ||
+    goproOverlayJob?.status === 'completed';
 
   const goproOverlayFields: {
     id: GoproOverlayFieldId;
@@ -443,7 +457,7 @@ export function FlightDetails({
       placeholder: 'flight-pip.mp4',
       help: hasVideo
         ? t('flights.goproOverlayPipFallback')
-        : t('flights.goproOverlayPipAutoPathHelp'),
+        : t('flights.goproOverlayNeedsVideo'),
       onChange: setGoproOverlayPipPath,
     },
     {
@@ -699,6 +713,7 @@ export function FlightDetails({
                 className="min-h-10 rounded-lg border-cyan-200 px-3 py-2 text-sm text-cyan-800 hover:bg-cyan-50 dark:border-cyan-800 dark:text-cyan-200 dark:hover:bg-cyan-950/40"
                 onPress={goproOverlayAction}
                 isDisabled={
+                  !canUseGoproOverlayAction ||
                   createGoproOverlayJob.isPending ||
                   cancelGoproOverlayJob.isPending
                 }

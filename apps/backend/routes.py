@@ -4948,6 +4948,12 @@ async def create_flight_gopro_overlay_job(
             if use_input_output_dir
             else str(_resolve_gopro_paragliding_path(output_dir))
         )
+        generated_video_path = _resolve_flight_file_path(flight.video_file_path)
+        if not generated_video_path or not generated_video_path.exists():
+            raise HTTPException(
+                status_code=400,
+                detail="Generate the flight video before creating the GoPro overlay",
+            )
         resolved_video_path = _resolve_gopro_paragliding_path(video_path)
         resolved_gpx_path = _resolve_gopro_paragliding_path(gpx_path)
         resolved_pip_path = _resolve_gopro_paragliding_path(pip_path)
@@ -4960,9 +4966,7 @@ async def create_flight_gopro_overlay_job(
         fallback_gpx_path = (
             resolved_gpx_path or auto_gpx_path or _resolve_flight_file_path(flight.gpx_file_path)
         )
-        fallback_pip_path = (
-            resolved_pip_path or auto_pip_path or _resolve_flight_file_path(flight.video_file_path)
-        )
+        fallback_pip_path = resolved_pip_path or auto_pip_path or generated_video_path
         if fallback_gpx_path and fallback_gpx_path.exists() and auto_osv_paths:
             fallback_gpx_path = await asyncio.to_thread(
                 _merge_osv_files_with_gpx,
