@@ -3,6 +3,7 @@
 import os
 import time
 from datetime import datetime
+from urllib.error import URLError
 
 import pytest
 
@@ -20,6 +21,19 @@ def test_resolve_frontend_url_uses_backend_static_in_production(monkeypatch):
     monkeypatch.setattr(video_export_manual.config, "API_PORT", 8001)
 
     resolved = video_export_manual.resolve_frontend_url("http://localhost:5173")
+
+    assert resolved == "http://localhost:8001"
+
+
+def test_default_frontend_url_normalizes_configured_vite_url_in_production(monkeypatch):
+    """Production defaults should not point browser workers to absent local Vite."""
+    monkeypatch.setattr(video_export_manual.Path, "exists", lambda _self: True)
+    monkeypatch.setattr(video_export_manual.config, "FRONTEND_URL", "http://localhost:5173")
+    monkeypatch.setattr(video_export_manual.config, "ENVIRONMENT", "production")
+    monkeypatch.setattr(video_export_manual.config, "API_HOST", "0.0.0.0")
+    monkeypatch.setattr(video_export_manual.config, "API_PORT", 8001)
+
+    resolved = video_export_manual._default_frontend_url()
 
     assert resolved == "http://localhost:8001"
 
@@ -44,6 +58,19 @@ def test_resolve_frontend_url_strips_export_viewer_suffix(monkeypatch):
     )
 
     assert resolved == "http://frontend.example"
+
+
+def test_check_url_reachable_reports_connection_failure(monkeypatch):
+    def fail_urlopen(_request, timeout):
+        assert timeout == 5.0
+        raise URLError("connection refused")
+
+    monkeypatch.setattr(video_export_manual, "urlopen", fail_urlopen)
+
+    with pytest.raises(RuntimeError, match="Export viewer is unreachable"):
+        video_export_manual._check_url_reachable(
+            "http://localhost:8001/export-viewer?flightId=flight-1"
+        )
 
 
 def test_build_playwright_init_script_sets_export_mode_and_token():

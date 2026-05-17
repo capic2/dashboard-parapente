@@ -7,6 +7,20 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 
+def test_health_check_route_is_not_intercepted_by_spa_catch_all(client):
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_root_route_is_not_intercepted_by_spa_catch_all(client):
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
 def test_schedule_strava_token_refresh_job_forces_refresh():
     """Strava refresh job should be registered in forced mode."""
 
