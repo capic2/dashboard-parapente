@@ -20,6 +20,7 @@ from gopro_overlay_export import _read_process_updates
 from gopro_overlay_export import cancel_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job_from_paths
+from gopro_overlay_export import delete_gopro_overlay_job
 from models import Flight
 
 API_PREFIX = "/api"
@@ -658,6 +659,32 @@ def test_delete_gopro_overlay_video_rejects_running_job(client: TestClient):
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Cannot delete video for an active overlay"
+
+
+def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(tmp_path):
+    job_id = "job-gopro-delete"
+    work_dir = tmp_path / ".gopro-overlay-work" / job_id
+    work_dir.mkdir(parents=True)
+    layout_path = work_dir / "layout.xml"
+    layout_path.write_text("<layout />")
+
+    gopro_overlay_export._JOBS[job_id] = {
+        "job_id": job_id,
+        "status": "failed",
+        "layout_path": str(layout_path),
+        "output_path": str(tmp_path / "final.mp4"),
+    }
+
+    try:
+        result = delete_gopro_overlay_job(job_id)
+    finally:
+        gopro_overlay_export._JOBS.pop(job_id, None)
+
+    assert result is not None
+    assert result["deleted"] is True
+    assert result["files_deleted"] == 1
+    assert not work_dir.exists()
+    assert gopro_overlay_export.get_gopro_overlay_job(job_id) is None
 
 
 def test_prepare_layout_file_injects_pip_id(tmp_path):

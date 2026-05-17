@@ -84,8 +84,24 @@
     "cleanupError": "Impossible de supprimer les fichiers temporaires",
     "loadError": "Impossible de charger les générations vidéo",
     "empty": "Aucune génération vidéo pour le moment.",
+    "confirmDeleteRow": "Supprimer cette ligne et ses fichiers temporaires ?",
+    "deleteRow": "Supprimer",
+    "deleteRowSuccess": "Ligne supprimée",
+    "deleteRowError": "Impossible de supprimer la ligne",
     "mode": {
       "goproOverlay": "Overlay GoPro"
+    },
+    "typeFilters": {
+      "all": "Tous les types",
+      "video": "Exports vidéo",
+      "gopro": "Overlay GoPro"
+    },
+    "filters": {
+      "all": "Tous",
+      "active": "En cours",
+      "completed": "Terminés",
+      "failed": "Erreurs",
+      "cancelled": "Annulés"
     },
     "status": {
       "queued": "En attente",
