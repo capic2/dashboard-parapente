@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
@@ -56,6 +56,104 @@ const getSearchDayLabel = (day: number, t: (key: string) => string) => {
   return `J+${day}`;
 };
 
+type WeatherSearchParams = {
+  siteId?: string;
+  day?: number;
+  target?: 'city' | 'takeoff' | 'landing';
+  city?: string;
+  displayName?: string;
+  spotId?: string;
+  spotName?: string;
+  spotType?: 'takeoff' | 'landing' | 'both';
+  lat?: number;
+  lon?: number;
+  elevation?: number;
+  orientation?: string;
+  country?: string;
+  source?: string;
+};
+
+const hasCoordinates = (
+  search: WeatherSearchParams
+): search is WeatherSearchParams & { lat: number; lon: number } =>
+  typeof search.lat === 'number' && typeof search.lon === 'number';
+
+const getTargetFromSearch = (
+  search: WeatherSearchParams
+): CityWeatherTarget | null => {
+  if (search.target === 'city' && search.city && hasCoordinates(search)) {
+    return {
+      type: 'city',
+      location: {
+        id: `query-city-${search.lat}-${search.lon}`,
+        name: search.city,
+        display_name: search.displayName ?? search.city,
+        latitude: search.lat,
+        longitude: search.lon,
+        country: search.country ?? 'FR',
+      },
+    };
+  }
+
+  if (
+    (search.target === 'takeoff' || search.target === 'landing') &&
+    search.spotId &&
+    search.spotName &&
+    hasCoordinates(search)
+  ) {
+    return {
+      type: search.target,
+      spot: {
+        id: search.spotId,
+        name: search.spotName,
+        type: search.spotType ?? search.target,
+        latitude: search.lat,
+        longitude: search.lon,
+        elevation_m: search.elevation,
+        orientation: search.orientation,
+        rating: undefined,
+        country: search.country ?? 'FR',
+        source: search.source ?? 'query',
+        distance_km: undefined,
+      },
+    };
+  }
+
+  return null;
+};
+
+const getSearchForTarget = (target: CityWeatherTarget | null, day: number) => {
+  const daySearch = day > 0 ? day : undefined;
+
+  if (!target) return { day: daySearch };
+
+  if (target.type === 'city') {
+    return {
+      target: 'city' as const,
+      city: target.location.name,
+      displayName: target.location.display_name,
+      lat: target.location.latitude,
+      lon: target.location.longitude,
+      country: target.location.country,
+      day: daySearch,
+    };
+  }
+
+  return {
+    target: target.type,
+    spotId: target.spot.id,
+    spotName: target.spot.name,
+    spotType: target.spot.type,
+    lat: target.spot.latitude,
+    lon: target.spot.longitude,
+    elevation: target.spot.elevation_m ?? undefined,
+    orientation: target.spot.orientation ?? undefined,
+    country: target.spot.country,
+    source: target.spot.source,
+    day: daySearch,
+  };
+};
+
 type SelectionTab = 'favorites' | 'search';
 
 export default function WeatherPage() {
@@ -68,11 +166,12 @@ export default function WeatherPage() {
   const search = useSearch({ from: '/weather' });
   const routeSiteId = search ? search.siteId : '';
   const selectedDayIndex = search.day ?? 0;
+  const selectedSearchTarget = getTargetFromSearch(search);
   const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
   const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(selectedDayIndex);
-  const [selectedSearchTarget, setSelectedSearchTarget] =
-    useState<CityWeatherTarget | null>(null);
-  const [selectionTab, setSelectionTab] = useState<SelectionTab>('favorites');
+  const [selectionTab, setSelectionTab] = useState<SelectionTab>(
+    selectedSearchTarget ? 'search' : 'favorites'
+  );
   const favoriteSites = useMemo(() => {
     if (favoriteSiteIds.length === 0) return sites;
 
@@ -142,7 +241,15 @@ export default function WeatherPage() {
               onSelectionChange={(key) => {
                 const nextTab = key as SelectionTab;
                 setSelectionTab(nextTab);
-                if (nextTab === 'favorites') setSelectedSearchTarget(null);
+                if (nextTab === 'favorites') {
+                  void navigate({
+                    to: '/weather',
+                    search: {
+                      siteId: selectedSiteId || undefined,
+                      day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
+                    },
+                  });
+                }
               }}
             >
               <TabList className="grid-cols-2 bg-slate-100 shadow-none dark:bg-slate-950/70">
@@ -154,7 +261,6 @@ export default function WeatherPage() {
                   <SiteSelector
                     selectedSiteId={selectedSearchTarget ? '' : selectedSiteId}
                     onSelectSite={(siteId) => {
-                      setSelectedSearchTarget(null);
                       setSelectionTab('favorites');
                       void navigate({
                         to: '/weather',
@@ -189,11 +295,13 @@ export default function WeatherPage() {
                   favoriteSites={sites}
                   isEmbedded
                   onSelectTarget={(target) => {
-                    setSelectedSearchTarget(target);
                     setSelectionTab('search');
+                    void navigate({
+                      to: '/weather',
+                      search: getSearchForTarget(target, selectedDayIndex),
+                    });
                   }}
                   onFavoriteCreated={(siteId) => {
-                    setSelectedSearchTarget(null);
                     setSelectionTab('favorites');
                     void navigate({
                       to: '/weather',
@@ -215,7 +323,6 @@ export default function WeatherPage() {
           hourlyBestSpots={hourlyBestSpots?.hours ?? []}
           hourlyStartHour={hourlyBestSpots?.startHour}
           onSelectSite={(siteId) => {
-            setSelectedSearchTarget(null);
             setSelectionTab('favorites');
             void navigate({
               to: '/weather',
@@ -308,10 +415,7 @@ export default function WeatherPage() {
                     onClick={() =>
                       void navigate({
                         to: '/weather',
-                        search: {
-                          siteId: selectedSiteId || undefined,
-                          day: day > 0 ? day : undefined,
-                        },
+                        search: getSearchForTarget(selectedSearchTarget, day),
                       })
                     }
                     role="tab"
