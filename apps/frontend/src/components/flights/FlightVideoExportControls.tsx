@@ -154,33 +154,6 @@ export function FlightVideoExportControls({
   ]);
 
   const handlePrimaryAction = async () => {
-    if (flight.video_export_status === 'completed' && flight.video_file_path) {
-      try {
-        const blob = await api
-          .get(`exports/${flight.video_export_job_id}/download`, {
-            timeout: false,
-          })
-          .blob();
-
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `flight-${flight.id}.mp4`;
-        a.click();
-        URL.revokeObjectURL(url);
-      } catch (error) {
-        if (error instanceof HTTPError) {
-          const detail = await getHttpErrorDetail(error);
-          toast.error(detail || t('flights.viewer.videoDownloadError'));
-          return;
-        }
-
-        console.error('Failed to download video:', error);
-        toast.error(t('flights.viewer.videoDownloadError'));
-      }
-      return;
-    }
-
     if (hasActiveVideoExport(flight)) return;
 
     try {
@@ -243,21 +216,16 @@ export function FlightVideoExportControls({
 
   const primaryButtonTitle = hasActiveVideoExport(flight)
     ? t('flights.viewer.videoGeneratingTitle')
-    : flight.video_export_status === 'completed'
-      ? t('flights.viewer.videoDownloadTitle')
-      : flight.video_export_status === 'failed' ||
-          flight.video_export_status === 'cancelled'
-        ? canResumeVideoExport
-          ? t('flights.viewer.videoResumeTitle')
-          : t('flights.viewer.videoRegenerateTitle')
-        : t('flights.viewer.videoGenerateTitle');
+    : flight.video_export_status === 'failed' ||
+        flight.video_export_status === 'cancelled'
+      ? canResumeVideoExport
+        ? t('flights.viewer.videoResumeTitle')
+        : t('flights.viewer.videoRegenerateTitle')
+      : t('flights.viewer.videoGenerateTitle');
 
   const primaryButtonLabel = (() => {
     if (hasActiveVideoExport(flight))
       return t('flights.viewer.videoGenerating');
-    if (flight.video_export_status === 'completed') {
-      return t('flights.viewer.downloadVideo');
-    }
     if (
       flight.video_export_status === 'failed' ||
       flight.video_export_status === 'cancelled'
@@ -272,11 +240,9 @@ export function FlightVideoExportControls({
   const primaryButtonClassName = [
     'cursor-pointer rounded-md text-sm font-semibold text-white transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:cursor-not-allowed disabled:bg-gray-400',
     compact ? 'px-3.5 py-2' : 'px-4 py-2.5',
-    flight.video_export_status === 'completed'
-      ? 'bg-green-600 hover:bg-green-700'
-      : isStartingVideoExport || hasActiveVideoExport(flight)
-        ? 'bg-gray-400'
-        : 'bg-blue-600 hover:bg-blue-700',
+    isStartingVideoExport || hasActiveVideoExport(flight)
+      ? 'bg-gray-400'
+      : 'bg-blue-600 hover:bg-blue-700',
     buttonClassName,
   ]
     .filter(Boolean)
@@ -316,14 +282,16 @@ export function FlightVideoExportControls({
           </div>
         )}
 
-      <Button
-        onClick={handlePrimaryAction}
-        isDisabled={isStartingVideoExport || hasActiveVideoExport(flight)}
-        className={primaryButtonClassName}
-        title={primaryButtonTitle}
-      >
-        {primaryButtonLabel}
-      </Button>
+      {flight.video_export_status !== 'completed' && (
+        <Button
+          onClick={handlePrimaryAction}
+          isDisabled={isStartingVideoExport || hasActiveVideoExport(flight)}
+          className={primaryButtonClassName}
+          title={primaryButtonTitle}
+        >
+          {primaryButtonLabel}
+        </Button>
+      )}
 
       {canResumeVideoExport && !isExportActive && (
         <p

@@ -103,8 +103,6 @@ export function FlightDetails({
   const [notesText, setNotesText] = useState(flight.notes ?? '');
   const [activeTab, setActiveTab] = useState<FlightDetailsTab>('infos');
   const [hasOpenedReplay, setHasOpenedReplay] = useState(false);
-  const [isDownloadingGpx, setIsDownloadingGpx] = useState(false);
-  const [isDownloadingVideo, setIsDownloadingVideo] = useState(false);
   const [goproOverlayJobId, setGoproOverlayJobId] = useState<string | null>(
     null
   );
@@ -213,57 +211,6 @@ export function FlightDetails({
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
-    }
-  };
-
-  const handleGPXDownload = async () => {
-    if (!hasGpx || isDownloadingGpx) return;
-
-    setIsDownloadingGpx(true);
-    try {
-      const blob = await api.get(`flights/${flight.id}/gpx`).blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const filename = flightTitle.replace(/[^a-zA-Z0-9._-]+/gu, '_');
-
-      a.href = url;
-      a.download = `${filename || flight.id}.gpx`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Failed to download GPX:', error);
-      toast.error(t('flights.gpxDownloadError'));
-    } finally {
-      setIsDownloadingGpx(false);
-    }
-  };
-
-  const handleVideoDownload = async () => {
-    if (!hasVideo || !flight.video_export_job_id || isDownloadingVideo) {
-      return;
-    }
-
-    setIsDownloadingVideo(true);
-    try {
-      const blob = await api
-        .get(`exports/${flight.video_export_job_id}/download`, {
-          timeout: false,
-        })
-        .blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const filename = flightTitle.replace(/[^a-zA-Z0-9._-]+/gu, '_');
-
-      a.href = url;
-      a.download = `${filename || flight.id}.mp4`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      toast.error(
-        await getApiErrorMessage(error, t('flights.viewer.videoDownloadError'))
-      );
-    } finally {
-      setIsDownloadingVideo(false);
     }
   };
 
@@ -585,44 +532,16 @@ export function FlightDetails({
               {(hasGpx || hasVideo) && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {hasGpx && (
-                    <button
-                      type="button"
-                      className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-green-800 transition-colors hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200 dark:hover:bg-green-900/50 dark:focus:ring-offset-gray-800"
-                      onClick={() => void handleGPXDownload()}
-                      disabled={isDownloadingGpx}
-                      aria-label={t('flights.downloadGpx')}
-                    >
+                    <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200">
                       <FileText className="h-3 w-3" aria-hidden="true" />
-                      {isDownloadingGpx ? (
-                        t('flights.gpxDownloadInProgress')
-                      ) : (
-                        <>
-                          {t('flights.gpxBadge')}
-                          <Download className="h-3 w-3" aria-hidden="true" />
-                        </>
-                      )}
-                    </button>
+                      {t('flights.gpxBadge')}
+                    </span>
                   )}
                   {hasVideo && (
-                    <button
-                      type="button"
-                      className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-800 transition-colors hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200 dark:hover:bg-indigo-900/50 dark:focus:ring-offset-gray-800"
-                      onClick={() => void handleVideoDownload()}
-                      disabled={
-                        isDownloadingVideo || !flight.video_export_job_id
-                      }
-                      aria-label={t('flights.viewer.downloadVideo')}
-                    >
+                    <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
                       <Video className="h-3 w-3" aria-hidden="true" />
-                      {isDownloadingVideo ? (
-                        t('flights.gpxDownloadInProgress')
-                      ) : (
-                        <>
-                          {t('flights.videoBadge')}
-                          <Download className="h-3 w-3" aria-hidden="true" />
-                        </>
-                      )}
-                    </button>
+                      {t('flights.videoBadge')}
+                    </span>
                   )}
                 </div>
               )}
@@ -664,19 +583,6 @@ export function FlightDetails({
               <Edit3 className="h-4 w-4" aria-hidden="true" />
               {t('flights.editButton')}
             </Button>
-            {hasGpx && (
-              <Button
-                variant="ghost"
-                className="min-h-10 rounded-lg px-3 py-2 text-sm"
-                onPress={handleGPXDownload}
-                isDisabled={isDownloadingGpx}
-              >
-                <Download className="h-4 w-4" aria-hidden="true" />
-                {isDownloadingGpx
-                  ? t('flights.gpxDownloadInProgress')
-                  : t('flights.downloadGpx')}
-              </Button>
-            )}
             <Button
               variant="ghost"
               className="min-h-10 rounded-lg px-3 py-2 text-sm"

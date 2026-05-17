@@ -89,15 +89,15 @@ test('applies the active style when a flight is selected', () => {
   expect(flightRow).toHaveAttribute('aria-selected', 'true');
 });
 
-test('downloads media from badges without selecting the flight', () => {
-  const onDownloadGpx = vi.fn();
-  render(<FlightsTableHarness onDownloadGpx={onDownloadGpx} />);
+test('shows media badges without download actions', () => {
+  render(<FlightsTableHarness />);
 
   const flightRow = screen.getByTestId('flight-row-flight-1');
 
-  fireEvent.click(screen.getByRole('button', { name: 'flights.downloadGpx' }));
-
-  expect(onDownloadGpx).toHaveBeenCalledWith(flights[0]);
+  expect(screen.getByText('flights.gpxBadge')).toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'flights.downloadGpx' })
+  ).not.toBeInTheDocument();
   expect(flightRow).not.toHaveClass('border-sky-700');
   expect(flightRow).toHaveAttribute('aria-selected', 'false');
 });

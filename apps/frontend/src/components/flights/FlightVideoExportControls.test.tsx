@@ -3,23 +3,20 @@ import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Flight } from '@dashboard-parapente/shared-types';
 
-const { apiDelete, apiGet, apiPost, exportStatusMock, mockFlight } = vi.hoisted(
-  () => ({
-    apiDelete: vi.fn(),
-    apiGet: vi.fn(),
-    apiPost: vi.fn(),
-    exportStatusMock: { current: null as unknown },
-    mockFlight: {
-      id: 'flight-1',
-      flight_date: '2026-03-15',
-      title: 'Test flight',
-      gpx_file_path: 'sample.gpx',
-      video_export_status: null as string | null,
-      video_export_job_id: null as string | null,
-      video_file_path: null as string | null,
-    } as Flight,
-  })
-);
+const { apiDelete, apiPost, exportStatusMock, mockFlight } = vi.hoisted(() => ({
+  apiDelete: vi.fn(),
+  apiPost: vi.fn(),
+  exportStatusMock: { current: null as unknown },
+  mockFlight: {
+    id: 'flight-1',
+    flight_date: '2026-03-15',
+    title: 'Test flight',
+    gpx_file_path: 'sample.gpx',
+    video_export_status: null as string | null,
+    video_export_job_id: null as string | null,
+    video_file_path: null as string | null,
+  } as Flight,
+}));
 
 vi.mock('@dashboard-parapente/design-system', () => ({
   Button: ({
@@ -45,7 +42,6 @@ vi.mock('react-i18next', () => ({
         'flights.viewer.videoModeManualFastHint': 'Fast hint',
         'flights.viewer.videoModeManualHint': 'Manual hint',
         'flights.viewer.generateVideo': 'Generate video',
-        'flights.viewer.downloadVideo': 'Download video',
         'flights.viewer.resumeVideo': 'Resume generation',
         'flights.viewer.videoResumeHint': 'frames preserved',
         'flights.viewer.videoGenerating': 'Generating video',
@@ -68,7 +64,6 @@ vi.mock('../../hooks/flights/useVideoExportStatus', () => ({
 vi.mock('../../lib/api', () => ({
   api: {
     delete: apiDelete,
-    get: apiGet,
     post: apiPost,
   },
 }));
@@ -86,7 +81,6 @@ import { FlightVideoExportControls } from './FlightVideoExportControls';
 describe('FlightVideoExportControls', () => {
   beforeEach(() => {
     apiDelete.mockReset();
-    apiGet.mockReset();
     apiPost.mockReset();
     apiPost.mockResolvedValue(undefined);
     mockFlight.video_export_status = null;
@@ -150,30 +144,15 @@ describe('FlightVideoExportControls', () => {
     });
   });
 
-  it('downloads generated videos without applying the API request timeout', async () => {
+  it('does not show the download button for completed videos', () => {
     mockFlight.video_export_status = 'completed';
     mockFlight.video_export_job_id = 'job-video';
     mockFlight.video_file_path = '/exports/job-video.mp4';
-    const blob = vi.fn().mockResolvedValue(new Blob(['video']));
-    apiGet.mockReturnValue({ blob });
-    Object.defineProperty(URL, 'createObjectURL', {
-      configurable: true,
-      value: vi.fn(() => 'blob:video'),
-    });
-    Object.defineProperty(URL, 'revokeObjectURL', {
-      configurable: true,
-      value: vi.fn(),
-    });
 
     render(<FlightVideoExportControls flight={mockFlight} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Download video/u }));
-
-    await waitFor(() => {
-      expect(apiGet).toHaveBeenCalledWith('exports/job-video/download', {
-        timeout: false,
-      });
-      expect(blob).toHaveBeenCalled();
-    });
+    expect(
+      screen.queryByRole('button', { name: /Download video/u })
+    ).not.toBeInTheDocument();
   });
 });
