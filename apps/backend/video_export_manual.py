@@ -455,7 +455,7 @@ def _queued_job_ids() -> list[str]:
 
 
 def _rq_job_id(job_id: str) -> str:
-    return f"video-export:{job_id}"
+    return f"video-export-{job_id}"
 
 
 def _enqueue_video_export_job_in_rq(job_id: str) -> None:
