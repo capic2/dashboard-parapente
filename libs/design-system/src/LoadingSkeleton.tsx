@@ -69,7 +69,7 @@ export default function LoadingSkeleton({
   return (
     <div
       className="space-y-4"
-      output="status"
+      role="status"
       aria-busy="true"
       aria-label={label}
     >
