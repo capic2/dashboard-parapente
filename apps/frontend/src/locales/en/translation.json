@@ -84,8 +84,24 @@
     "cleanupError": "Unable to delete temporary files",
     "loadError": "Unable to load video generations",
     "empty": "No video generation yet.",
+    "confirmDeleteRow": "Delete this row and its temporary files?",
+    "deleteRow": "Delete",
+    "deleteRowSuccess": "Row deleted",
+    "deleteRowError": "Unable to delete row",
     "mode": {
       "goproOverlay": "GoPro overlay"
+    },
+    "typeFilters": {
+      "all": "All types",
+      "video": "Video exports",
+      "gopro": "GoPro overlay"
+    },
+    "filters": {
+      "all": "All",
+      "active": "Running",
+      "completed": "Completed",
+      "failed": "Errors",
+      "cancelled": "Cancelled"
     },
     "status": {
       "queued": "Queued",

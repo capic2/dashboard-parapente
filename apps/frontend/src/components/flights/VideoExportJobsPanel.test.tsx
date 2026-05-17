@@ -8,7 +8,7 @@ import { VideoExportJobsPanel } from './VideoExportJobsPanel';
 const {
   cancelJob,
   cleanupTempFiles,
-  deleteOutput,
+  deleteJobRow,
   resumeJob,
   toastError,
   toastSuccess,
@@ -17,7 +17,7 @@ const {
 } = vi.hoisted(() => ({
   cancelJob: vi.fn(),
   cleanupTempFiles: vi.fn(),
-  deleteOutput: vi.fn(),
+  deleteJobRow: vi.fn(),
   resumeJob: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
@@ -108,8 +108,8 @@ vi.mock('../../hooks/flights/useVideoExportJobs', () => ({
     mutateAsync: resumeJob,
     isPending: false,
   }),
-  useDeleteVideoExportOutput: () => ({
-    mutateAsync: deleteOutput,
+  useDeleteVideoExportJobRow: () => ({
+    mutateAsync: deleteJobRow,
     isPending: false,
   }),
   useCleanupVideoExportTempFiles: () => ({
@@ -198,7 +198,7 @@ describe('VideoExportJobsPanel', () => {
       screen.getAllByRole('button', { name: 'Reprendre' }).length
     ).toBeGreaterThan(0);
     expect(
-      screen.getAllByRole('button', { name: 'Supprimer l’overlay' }).length
+      screen.getAllByRole('button', { name: 'Supprimer' }).length
     ).toBeGreaterThan(0);
   });
 
@@ -236,24 +236,30 @@ describe('VideoExportJobsPanel', () => {
     expect(toastSuccess).toHaveBeenCalledWith('Génération relancée');
   });
 
-  it('deletes a generated overlay after confirmation', async () => {
-    deleteOutput.mockResolvedValue(undefined);
+  it('filters jobs by type', () => {
+    render(<VideoExportJobsPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Overlay GoPro' }));
+
+    expect(screen.getAllByText('vol-overlay.mp4').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('final.mp4').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Vol test')).not.toBeInTheDocument();
+  });
+
+  it('deletes an inactive row after confirmation', async () => {
+    deleteJobRow.mockResolvedValue(undefined);
 
     render(<VideoExportJobsPanel />);
-    fireEvent.click(
-      screen.getAllByRole('button', { name: 'Supprimer l’overlay' })[0]!
-    );
+    fireEvent.click(screen.getAllByRole('button', { name: 'Supprimer' })[0]!);
     const deleteButtons = screen.getAllByRole('button', {
-      name: 'Supprimer l’overlay',
+      name: 'Supprimer',
     });
     fireEvent.click(deleteButtons[deleteButtons.length - 1]!);
 
     await waitFor(() =>
-      expect(deleteOutput).toHaveBeenCalledWith(
-        expect.objectContaining({ job_id: 'job-overlay-done' })
-      )
+      expect(deleteJobRow).toHaveBeenCalledWith(expect.any(String))
     );
-    expect(toastSuccess).toHaveBeenCalledWith('Overlay GoPro supprimé');
+    expect(toastSuccess).toHaveBeenCalledWith('Ligne supprimée');
   });
 
   it('cleans temporary files after confirmation', async () => {

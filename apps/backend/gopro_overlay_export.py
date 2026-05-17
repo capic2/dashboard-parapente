@@ -625,6 +625,103 @@ def list_gopro_overlay_jobs() -> list[dict[str, Any]]:
         ]
 
 
+def _path_usage(path: Path) -> tuple[int, int, int]:
+    if not path.exists():
+        return 0, 0, 0
+
+    if path.is_file() or path.is_symlink():
+        try:
+            return 1, 0, path.stat().st_size
+        except OSError:
+            return 1, 0, 0
+
+    files_count = 0
+    dirs_count = 1
+    bytes_count = 0
+    for item in path.rglob("*"):
+        if item.is_dir() and not item.is_symlink():
+            dirs_count += 1
+            continue
+        files_count += 1
+        try:
+            bytes_count += item.stat().st_size
+        except OSError:
+            pass
+    return files_count, dirs_count, bytes_count
+
+
+def _is_path_inside(path: Path, directory: Path) -> bool:
+    try:
+        path.resolve(strict=False).relative_to(directory.resolve(strict=False))
+    except ValueError:
+        return False
+    return True
+
+
+def _job_work_dir(job: dict[str, Any]) -> Path | None:
+    layout_path = job.get("layout_path")
+    if not layout_path:
+        return None
+    return Path(str(layout_path)).parent
+
+
+def _can_delete_work_dir(work_dir: Path) -> bool:
+    if _is_path_inside(work_dir, _UPLOAD_WORK_ROOT):
+        return True
+    return work_dir.parent.name == _PATH_WORK_DIR_NAME
+
+
+def delete_gopro_overlay_job(job_id: str) -> dict[str, Any] | None:
+    with _LOCK:
+        job = _JOBS.get(job_id)
+        if not job:
+            return None
+        if job["status"] not in _TERMINAL_STATUSES:
+            return {"job_id": job_id, "deleted": False, "error": "active"}
+        work_dir = _job_work_dir(job)
+
+    result: dict[str, Any] = {
+        "job_id": job_id,
+        "deleted": False,
+        "files_deleted": 0,
+        "dirs_deleted": 0,
+        "bytes_deleted": 0,
+        "paths_deleted": [],
+        "errors": [],
+    }
+
+    if work_dir and work_dir.exists():
+        if not _can_delete_work_dir(work_dir):
+            result["errors"].append(
+                {
+                    "path": str(work_dir),
+                    "error": "Refusing to delete outside overlay work directory",
+                }
+            )
+            return result
+
+        files_count, dirs_count, bytes_count = _path_usage(work_dir)
+        try:
+            if work_dir.is_dir() and not work_dir.is_symlink():
+                shutil.rmtree(work_dir)
+            else:
+                work_dir.unlink()
+        except OSError as exc:
+            result["errors"].append({"path": str(work_dir), "error": str(exc)})
+            return result
+
+        result["files_deleted"] = files_count
+        result["dirs_deleted"] = dirs_count
+        result["bytes_deleted"] = bytes_count
+        result["paths_deleted"] = [str(work_dir)]
+
+    with _LOCK:
+        _JOBS.pop(job_id, None)
+
+    result["deleted"] = True
+    return result
+
+
 def cancel_gopro_overlay_job(job_id: str) -> bool:
     with _LOCK:
         process = _PROCESSES.get(job_id)
