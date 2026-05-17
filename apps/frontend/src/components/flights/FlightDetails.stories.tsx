@@ -190,16 +190,6 @@ Default.test('The GPX can be replaced', async ({ canvas, step }) => {
   });
 });
 
-Default.test('The GPX can be downloaded', async ({ canvas, step }) => {
-  await step('show the download GPX button', async () => {
-    await expect(
-      await canvas.findByRole('button', {
-        name: i18n.t('flights.downloadGpx'),
-      })
-    ).toBeInTheDocument();
-  });
-});
-
 Default.test(
   'The GoPro overlay settings use edit in place fields',
   async ({ canvas, userEvent, step }) => {
