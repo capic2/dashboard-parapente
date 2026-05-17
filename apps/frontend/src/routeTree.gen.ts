@@ -21,6 +21,7 @@ import { Route as ExportViewerRouteImport } from './routes/export-viewer'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ViewerFlightIdRouteImport } from './routes/viewer.$flightId'
+import { Route as InfrastructureTabRouteImport } from './routes/infrastructure.$tab'
 import { Route as FlightsFlightIdRouteImport } from './routes/flights.$flightId'
 
 const WeatherRoute = WeatherRouteImport.update({
@@ -87,6 +88,13 @@ const ViewerFlightIdRoute = ViewerFlightIdRouteImport.update({
 } as any).lazy(() =>
   import('./routes/viewer.$flightId.lazy').then((d) => d.Route),
 )
+const InfrastructureTabRoute = InfrastructureTabRouteImport.update({
+  id: '/$tab',
+  path: '/$tab',
+  getParentRoute: () => InfrastructureRoute,
+} as any).lazy(() =>
+  import('./routes/infrastructure.$tab.lazy').then((d) => d.Route),
+)
 const FlightsFlightIdRoute = FlightsFlightIdRouteImport.update({
   id: '/$flightId',
   path: '/$flightId',
@@ -101,13 +109,14 @@ export interface FileRoutesByFullPath {
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRouteWithChildren
   '/gopro-overlay': typeof GoproOverlayRoute
-  '/infrastructure': typeof InfrastructureRoute
+  '/infrastructure': typeof InfrastructureRouteWithChildren
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
   '/weather': typeof WeatherRoute
   '/flights/$flightId': typeof FlightsFlightIdRoute
+  '/infrastructure/$tab': typeof InfrastructureTabRoute
   '/viewer/$flightId': typeof ViewerFlightIdRoute
 }
 export interface FileRoutesByTo {
@@ -116,13 +125,14 @@ export interface FileRoutesByTo {
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRouteWithChildren
   '/gopro-overlay': typeof GoproOverlayRoute
-  '/infrastructure': typeof InfrastructureRoute
+  '/infrastructure': typeof InfrastructureRouteWithChildren
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
   '/weather': typeof WeatherRoute
   '/flights/$flightId': typeof FlightsFlightIdRoute
+  '/infrastructure/$tab': typeof InfrastructureTabRoute
   '/viewer/$flightId': typeof ViewerFlightIdRoute
 }
 export interface FileRoutesById {
@@ -132,13 +142,14 @@ export interface FileRoutesById {
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRouteWithChildren
   '/gopro-overlay': typeof GoproOverlayRoute
-  '/infrastructure': typeof InfrastructureRoute
+  '/infrastructure': typeof InfrastructureRouteWithChildren
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
   '/weather': typeof WeatherRoute
   '/flights/$flightId': typeof FlightsFlightIdRoute
+  '/infrastructure/$tab': typeof InfrastructureTabRoute
   '/viewer/$flightId': typeof ViewerFlightIdRoute
 }
 export interface FileRouteTypes {
@@ -156,6 +167,7 @@ export interface FileRouteTypes {
     | '/thermal'
     | '/weather'
     | '/flights/$flightId'
+    | '/infrastructure/$tab'
     | '/viewer/$flightId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -171,6 +183,7 @@ export interface FileRouteTypes {
     | '/thermal'
     | '/weather'
     | '/flights/$flightId'
+    | '/infrastructure/$tab'
     | '/viewer/$flightId'
   id:
     | '__root__'
@@ -186,6 +199,7 @@ export interface FileRouteTypes {
     | '/thermal'
     | '/weather'
     | '/flights/$flightId'
+    | '/infrastructure/$tab'
     | '/viewer/$flightId'
   fileRoutesById: FileRoutesById
 }
@@ -195,7 +209,7 @@ export interface RootRouteChildren {
   ExportViewerRoute: typeof ExportViewerRoute
   FlightsRoute: typeof FlightsRouteWithChildren
   GoproOverlayRoute: typeof GoproOverlayRoute
-  InfrastructureRoute: typeof InfrastructureRoute
+  InfrastructureRoute: typeof InfrastructureRouteWithChildren
   LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRoute
   SitesRoute: typeof SitesRoute
@@ -290,6 +304,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ViewerFlightIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/infrastructure/$tab': {
+      id: '/infrastructure/$tab'
+      path: '/$tab'
+      fullPath: '/infrastructure/$tab'
+      preLoaderRoute: typeof InfrastructureTabRouteImport
+      parentRoute: typeof InfrastructureRoute
+    }
     '/flights/$flightId': {
       id: '/flights/$flightId'
       path: '/$flightId'
@@ -311,13 +332,25 @@ const FlightsRouteChildren: FlightsRouteChildren = {
 const FlightsRouteWithChildren =
   FlightsRoute._addFileChildren(FlightsRouteChildren)
 
+interface InfrastructureRouteChildren {
+  InfrastructureTabRoute: typeof InfrastructureTabRoute
+}
+
+const InfrastructureRouteChildren: InfrastructureRouteChildren = {
+  InfrastructureTabRoute: InfrastructureTabRoute,
+}
+
+const InfrastructureRouteWithChildren = InfrastructureRoute._addFileChildren(
+  InfrastructureRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnalyticsRoute: AnalyticsRoute,
   ExportViewerRoute: ExportViewerRoute,
   FlightsRoute: FlightsRouteWithChildren,
   GoproOverlayRoute: GoproOverlayRoute,
-  InfrastructureRoute: InfrastructureRoute,
+  InfrastructureRoute: InfrastructureRouteWithChildren,
   LoginRoute: LoginRoute,
   SettingsRoute: SettingsRoute,
   SitesRoute: SitesRoute,

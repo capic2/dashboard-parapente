@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useDeferredValue } from 'react';
+import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, Input, TextField } from 'react-aria-components';
@@ -32,6 +33,11 @@ import {
 } from '../hooks/admin/useStravaToken';
 import { VideoExportJobsPanel } from '../components/flights/VideoExportJobsPanel';
 import { useToastStore } from '../hooks/useToast';
+import {
+  normalizeInfrastructureTab,
+  type InfrastructureSearch,
+  type InfrastructureTab,
+} from '../routes/infrastructure';
 
 // --- Helpers ---
 
@@ -366,10 +372,18 @@ function StravaTokenSection() {
 // =============================================================================
 
 // oxlint-disable-next-line max-lines-per-function
-function CacheSection() {
+function CacheSection({
+  autoRefresh,
+  searchFilter,
+  onAutoRefreshChange,
+  onSearchFilterChange,
+}: {
+  autoRefresh: boolean;
+  searchFilter: string;
+  onAutoRefreshChange: (autoRefresh: boolean) => void;
+  onSearchFilterChange: (searchFilter: string) => void;
+}) {
   const { t } = useTranslation();
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const [searchFilter, setSearchFilter] = useState('');
   const deferredSearchFilter = useDeferredValue(searchFilter);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -495,7 +509,7 @@ function CacheSection() {
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">
         <Checkbox
           isSelected={autoRefresh}
-          onChange={setAutoRefresh}
+          onChange={onAutoRefreshChange}
           className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 group"
         >
           {({ isSelected }: { isSelected: boolean }) => (
@@ -535,7 +549,7 @@ function CacheSection() {
         </Button>
         <TextField
           value={searchFilter}
-          onChange={setSearchFilter}
+          onChange={onSearchFilterChange}
           aria-label={t('cache.searchPlaceholder')}
           className="flex-1 min-w-[200px]"
         >
@@ -803,9 +817,41 @@ function InfrastructureOverview() {
 
 export default function InfrastructurePage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const params = useParams({ strict: false }) as { tab?: string };
+  const search = useSearch({ strict: false }) as InfrastructureSearch;
   const { toasts, removeToast } = useToastStore();
   const { data: stravaStatus } = useStravaTokenStatus();
   const { data: cacheOverview } = useCacheOverview();
+  const activeTab = normalizeInfrastructureTab(params.tab);
+
+  const navigateToInfrastructure = (
+    tab: InfrastructureTab,
+    nextSearch: InfrastructureSearch = search
+  ) => {
+    void navigate({
+      to: '/infrastructure/$tab',
+      params: { tab },
+      search: {
+        cacheSearch: nextSearch.cacheSearch || undefined,
+        cacheAutoRefresh: nextSearch.cacheAutoRefresh ? true : undefined,
+      },
+    });
+  };
+
+  const updateCacheSearch = (cacheSearch: string) => {
+    navigateToInfrastructure(activeTab, {
+      ...search,
+      cacheSearch: cacheSearch || undefined,
+    });
+  };
+
+  const updateCacheAutoRefresh = (cacheAutoRefresh: boolean) => {
+    navigateToInfrastructure(activeTab, {
+      ...search,
+      cacheAutoRefresh: cacheAutoRefresh ? true : undefined,
+    });
+  };
 
   return (
     <div className="py-4 space-y-8">
@@ -813,7 +859,13 @@ export default function InfrastructurePage() {
 
       <InfrastructureOverview />
 
-      <Tabs className="space-y-4">
+      <Tabs
+        className="space-y-4"
+        selectedKey={activeTab}
+        onSelectionChange={(key) =>
+          navigateToInfrastructure(normalizeInfrastructureTab(key))
+        }
+      >
         <TabList className="grid-cols-1 sm:grid-cols-3">
           <Tab id="strava">
             <span className="flex items-center justify-center gap-2">
@@ -831,7 +883,7 @@ export default function InfrastructurePage() {
               </span>
             </span>
           </Tab>
-          <Tab id="videoExports">
+          <Tab id="video-exports">
             <span className="flex items-center justify-center gap-2">
               {t('infrastructure.tabs.videoExports')}
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
@@ -852,11 +904,16 @@ export default function InfrastructurePage() {
         <TabPanel id="strava" className="outline-none">
           <StravaTokenSection />
         </TabPanel>
-        <TabPanel id="videoExports" className="outline-none">
+        <TabPanel id="video-exports" className="outline-none">
           <VideoExportJobsPanel limit={null} />
         </TabPanel>
         <TabPanel id="cache" className="outline-none">
-          <CacheSection />
+          <CacheSection
+            autoRefresh={search.cacheAutoRefresh === true}
+            searchFilter={search.cacheSearch ?? ''}
+            onAutoRefreshChange={updateCacheAutoRefresh}
+            onSearchFilterChange={updateCacheSearch}
+          />
         </TabPanel>
       </Tabs>
     </div>
