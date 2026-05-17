@@ -19,6 +19,13 @@ Before any implementation task:
 Create worktrees in `.codenomad/worktree` with names starting with `wt-`.
 Whenever a worktree is created, immediately name the current AI session with the exact worktree name.
 
+## Analysis Baseline
+
+- Treat `origin/main` as the baseline for implementation analysis before editing.
+- Do not rely on local `main` for conclusions unless it has been verified aligned with `origin/main`.
+- If local `main` is stale, dirty, or ambiguous, create the implementation worktree from `origin/main` and continue analysis there.
+- If the user asks about local uncommitted changes or a specific branch/worktree, analyze that explicit target and say so.
+
 ## Worktree Bootstrap Subagent
 
 After creating a worktree, launch the `worktree-bootstrap` subagent immediately and let it run in parallel with the main implementation work.
