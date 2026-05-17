@@ -18,9 +18,9 @@ from env_utils import required_env
 logger = logging.getLogger(__name__)
 
 
-# Déterminer le répertoire racine du projet
-PROJECT_ROOT = Path(__file__).parent.parent
-BACKEND_ROOT = Path(__file__).parent
+# Déterminer le répertoire racine du monorepo
+BACKEND_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = BACKEND_ROOT.parents[1]
 
 # Charger les variables d'environnement selon le contexte
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
