@@ -45,7 +45,6 @@ vi.mock('react-i18next', () => ({
         'flights.viewer.resumeVideo': 'Resume generation',
         'flights.viewer.videoResumeHint': 'frames preserved',
         'flights.viewer.videoGenerating': 'Generating video',
-        'flights.viewer.videoProgress': 'Progress',
         'flights.viewer.cancelGeneration': 'Cancel generation',
         'flights.viewer.regenerateVideo': 'Restart generation',
       })[key] ?? key,
@@ -57,7 +56,6 @@ vi.mock('../../hooks/flights/useFlight', () => ({
 }));
 
 vi.mock('../../hooks/flights/useVideoExportStatus', () => ({
-  formatEta: () => null,
   useVideoExportStatus: () => ({ status: exportStatusMock.current }),
 }));
 

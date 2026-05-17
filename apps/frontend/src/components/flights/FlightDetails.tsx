@@ -69,18 +69,6 @@ const labelClass = 'text-xs text-gray-600 dark:text-gray-300';
 const valueClass =
   'block text-sm font-medium text-gray-900 dark:text-white mt-1';
 
-function clampProgress(progress: number) {
-  return Math.max(0, Math.min(Math.round(progress), 100));
-}
-
-function goproOverlayProgressClass(status: string) {
-  if (status === 'completed') return 'accent-emerald-500';
-  if (status === 'failed') return 'accent-red-500';
-  if (status === 'cancelled') return 'accent-slate-500';
-  if (status === 'queued') return 'accent-amber-500';
-  return 'accent-cyan-500';
-}
-
 export function FlightDetails({
   flight,
   sites,
@@ -142,7 +130,6 @@ export function FlightDetails({
   const isVideoExportFailed = flight.video_export_status === 'failed';
   const isGoproOverlayCompleted = goproOverlayJob?.status === 'completed';
   const isGoproOverlayFailed = goproOverlayJob?.status === 'failed';
-  const goproOverlayProgress = clampProgress(goproOverlayJob?.progress ?? 0);
   const isDownloadingAnyMedia = downloadingMedia !== null;
   const normalizedTitle = flight.title?.trim();
   const flightTitle =
@@ -773,20 +760,6 @@ export function FlightDetails({
                   {t(`flights.goproOverlayStatus.${goproOverlayJob.status}`)}
                 </span>
               </div>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                  {goproOverlayJob.message}
-                </span>
-                <span className="font-mono text-sm font-bold text-slate-950 dark:text-white">
-                  {goproOverlayProgress}%
-                </span>
-              </div>
-              <progress
-                className={`h-2.5 w-full overflow-hidden rounded-full bg-slate-200 ring-1 ring-slate-300 transition-[accent-color] duration-300 motion-reduce:transition-none dark:bg-slate-800 dark:ring-slate-700 ${goproOverlayProgressClass(goproOverlayJob.status)}`}
-                value={goproOverlayProgress}
-                max={100}
-                aria-label={t('flights.goproOverlayJobTitle')}
-              />
               {goproOverlayJob.status === 'completed' && (
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 dark:border-emerald-800 dark:bg-emerald-950/30">
                   <span className="text-xs font-semibold text-emerald-900 dark:text-emerald-100">
