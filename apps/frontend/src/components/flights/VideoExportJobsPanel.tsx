@@ -59,6 +59,14 @@ const typeFilters = [
 
 type TypeFilter = (typeof typeFilters)[number]['id'];
 
+const activeStatusLabels = new Set([
+  'running',
+  'initializing',
+  'capturing',
+  'encoding',
+  'processing',
+]);
+
 const columnHelper = createColumnHelper<VideoExportJob>();
 
 const actionButtonClassName =
@@ -76,7 +84,11 @@ function getJobPhase(job: VideoExportJob) {
 
 function getStatusLabelParts(job: VideoExportJob) {
   const phase = getJobPhase(job);
-  const status = statusLabelFallbacks[phase] ? phase : job.status;
+  const status = activeStatusLabels.has(phase)
+    ? 'processing'
+    : statusLabelFallbacks[phase]
+      ? phase
+      : job.status;
   const fallback = statusLabelFallbacks[status] || status;
   return { key: `videoJobs.status.${status}`, fallback };
 }
