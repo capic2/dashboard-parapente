@@ -340,11 +340,11 @@ export default function CityWeatherSearch({
       <div
         className={`flex items-start justify-between gap-3 ${isEmbedded ? '' : 'mb-4'}`}
       >
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+        <div className="min-w-0">
+          <p className="text-sm font-bold uppercase tracking-[0.16em] text-sky-700 dark:text-sky-300">
             Recherche météo par ville
           </p>
-          <h2 className="text-xl font-bold text-gray-950 dark:text-white sm:text-2xl">
+          <h2 className="mt-1 text-xl font-black tracking-tight text-gray-950 dark:text-white sm:text-2xl">
             Choisir une ville, un déco ou un atterro proche
           </h2>
           {activeTargetLabel && (
@@ -355,16 +355,16 @@ export default function CityWeatherSearch({
         </div>
         <Button
           onPress={() => setIsExpanded((expanded) => !expanded)}
-          className="shrink-0 rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900 sm:hidden"
+          className="shrink-0 cursor-pointer rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-sky-300 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:text-slate-200 dark:hover:border-sky-700 dark:hover:bg-sky-950/30 sm:hidden"
         >
           {isExpanded ? 'Masquer' : 'Ouvrir'}
         </Button>
       </div>
 
       <div className={`${isExpanded ? 'block' : 'hidden'} sm:block`}>
-        <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-end">
+        <div className="grid gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-950/40 lg:grid-cols-[1fr_auto_auto] lg:items-end">
           <TextField className="relative flex flex-col gap-1">
-            <Label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+            <Label className="text-sm font-semibold text-slate-700 dark:text-slate-200">
               Ville
             </Label>
             <Input
@@ -396,14 +396,14 @@ export default function CityWeatherSearch({
               aria-controls={listboxId}
               aria-activedescendant={activeSuggestionId}
               placeholder="Ex: Besançon, Annecy, Grenoble..."
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-950 outline-none transition-colors placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
             />
             {isSuggestionsOpen && (
               <div
                 id={listboxId}
                 // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
                 role="listbox"
-                className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900"
+                className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
               >
                 {locationSearch.isLoading ? (
                   <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
@@ -420,7 +420,7 @@ export default function CityWeatherSearch({
                       aria-selected={index === activeSuggestionIndex}
                       onMouseEnter={() => setActiveSuggestionIndex(index)}
                       onClick={() => handleSelectLocation(location)}
-                      className={`block w-full border-b border-gray-100 px-3 py-2 text-left last:border-b-0 dark:border-gray-800 ${
+                      className={`block w-full cursor-pointer border-b border-slate-100 px-3 py-2 text-left transition-colors last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 dark:border-slate-800 ${
                         index === activeSuggestionIndex
                           ? 'bg-sky-100 dark:bg-sky-950/60'
                           : 'hover:bg-sky-50 dark:hover:bg-sky-950/40'
@@ -443,12 +443,12 @@ export default function CityWeatherSearch({
             )}
           </TextField>
 
-          <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
+          <label className="flex flex-col gap-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
             Rayon
             <select
               value={radiusKm}
               onChange={(event) => setRadiusKm(Number(event.target.value))}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="cursor-pointer rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-950 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
             >
               {radiusChoices.map((radius) => (
                 <option key={radius} value={radius}>
@@ -458,12 +458,12 @@ export default function CityWeatherSearch({
             </select>
           </label>
 
-          <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
+          <label className="flex flex-col gap-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
             Résultats
             <select
               value={limit}
               onChange={(event) => setLimit(Number(event.target.value))}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="cursor-pointer rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-950 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
             >
               {limitChoices.map((choice) => (
                 <option key={choice} value={choice}>
@@ -487,7 +487,7 @@ export default function CityWeatherSearch({
               </div>
               <Button
                 onPress={() => handleSelectLocation(selectedLocation)}
-                className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+                className="cursor-pointer rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
               >
                 Météo ville
               </Button>

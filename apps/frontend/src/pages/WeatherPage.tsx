@@ -227,13 +227,28 @@ export default function WeatherPage() {
       <aside className="min-w-0 space-y-4 xl:sticky xl:top-4 xl:self-start">
         <section className={`${weatherCardClassName} overflow-visible`}>
           <div className="border-b border-slate-100 bg-gradient-to-br from-sky-50 via-white to-white p-4 dark:border-slate-800 dark:from-sky-950/40 dark:via-slate-900 dark:to-slate-900 sm:p-5">
-            <p className={weatherSectionTitleClassName}>Choix du site</p>
-            <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950 dark:text-white">
-              Sélection météo
-            </h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              Favoris, sites configurés ou recherche par ville.
-            </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className={weatherSectionTitleClassName}>Choix du site</p>
+                <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950 dark:text-white">
+                  Sélection météo
+                </h2>
+                <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-300">
+                  Gardez vos favoris sous la main ou cherchez une ville, un déco
+                  ou un atterro proche.
+                </p>
+              </div>
+              {activeWeatherName && (
+                <div className="min-w-0 rounded-2xl border border-sky-100 bg-white/80 px-3 py-2 text-sm shadow-sm dark:border-sky-900/60 dark:bg-slate-950/50">
+                  <span className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                    Actuel
+                  </span>
+                  <span className="block truncate font-bold text-sky-800 dark:text-sky-200">
+                    {activeWeatherName}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
           <div className="p-3 sm:p-4">
             <Tabs
@@ -252,9 +267,19 @@ export default function WeatherPage() {
                 }
               }}
             >
-              <TabList className="grid-cols-2 bg-slate-100 shadow-none dark:bg-slate-950/70">
-                <Tab id="favorites">Favoris</Tab>
-                <Tab id="search">Recherche</Tab>
+              <TabList className="grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 shadow-none dark:bg-slate-950/70">
+                <Tab id="favorites">
+                  <span className="inline-flex items-center gap-2">
+                    <MapPin className="h-4 w-4" aria-hidden="true" />
+                    Favoris
+                  </span>
+                </Tab>
+                <Tab id="search">
+                  <span className="inline-flex items-center gap-2">
+                    <Search className="h-4 w-4" aria-hidden="true" />
+                    Recherche
+                  </span>
+                </Tab>
               </TabList>
               <TabPanel id="favorites">
                 {sites.length > 0 ? (

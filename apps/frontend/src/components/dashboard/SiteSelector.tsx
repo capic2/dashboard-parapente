@@ -8,6 +8,7 @@ import { createWeatherQueryFn } from '../../hooks/weather/useWeather';
 import type { Site } from '../../types';
 import { Button } from '@dashboard-parapente/design-system';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
+import { Check, MapPin, Mountain, Search } from 'lucide-react';
 
 interface SiteSelectorProps {
   selectedSiteId: string;
@@ -63,6 +64,27 @@ function getSiteMeta(site: Site): string {
   return [site.orientation, site.elevation_m ? `${site.elevation_m}m` : null]
     .filter(Boolean)
     .join(' · ');
+}
+
+function SiteMeta({ site, isActive }: { site: Site; isActive: boolean }) {
+  return (
+    <span
+      className={`mt-1 flex flex-wrap items-center gap-2 text-xs ${
+        isActive ? 'text-sky-100' : 'text-slate-500 dark:text-slate-400'
+      }`}
+    >
+      {site.orientation && (
+        <span className="inline-flex items-center gap-1">
+          <MapPin className="h-3 w-3" aria-hidden="true" />
+          {site.orientation}
+        </span>
+      )}
+      <span className="inline-flex items-center gap-1">
+        <Mountain className="h-3 w-3" aria-hidden="true" />
+        {site.elevation_m ? `${site.elevation_m}m` : 'Altitude N/A'}
+      </span>
+    </span>
+  );
 }
 
 function getSiteSearchText(site: Site): string {
@@ -122,24 +144,16 @@ export default function SiteSelector({
 
   if (isLoading) {
     return (
-      <div className="mb-4">
-        <div className="flex gap-2 flex-wrap bg-white dark:bg-gray-800 rounded-xl p-3 shadow-md">
-          <div className="flex-1 min-w-[120px] p-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 cursor-not-allowed text-gray-400 dark:text-gray-400">
-            {t('common.loading')}
-          </div>
-        </div>
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-400">
+        {t('common.loading')}
       </div>
     );
   }
 
   if (error || !sites) {
     return (
-      <div className="mb-4">
-        <div className="flex gap-2 flex-wrap bg-white dark:bg-gray-800 rounded-xl p-3 shadow-md">
-          <div className="flex-1 min-w-[120px] p-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 cursor-not-allowed text-gray-400 dark:text-gray-400">
-            {t('common.loadingError')}
-          </div>
-        </div>
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+        {t('common.loadingError')}
       </div>
     );
   }
@@ -159,11 +173,12 @@ export default function SiteSelector({
       <div className="md:hidden">
         <Button
           onClick={() => setIsMobileSelectorOpen((isOpen) => !isOpen)}
-          className="flex w-full items-center justify-between gap-3 rounded-xl border border-sky-100 bg-white p-3 text-left shadow-sm dark:border-gray-700 dark:bg-gray-900"
+          className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition-colors hover:border-sky-300 hover:bg-sky-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-sky-700 dark:hover:bg-sky-950/30"
         >
           <div className="min-w-0">
-            <span className="block text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
-              Site favori
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.16em] text-sky-700 dark:text-sky-300">
+              <MapPin className="h-3 w-3" aria-hidden="true" />
+              Site sélectionné
             </span>
             <span className="block truncate text-base font-bold text-gray-950 dark:text-white">
               {selectedSite?.name ?? 'Choisir un site'}
@@ -174,17 +189,18 @@ export default function SiteSelector({
               </span>
             )}
           </div>
-          <span className="shrink-0 rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white">
+          <span className="shrink-0 rounded-xl bg-sky-600 px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-sky-900/20">
             Changer
           </span>
         </Button>
 
         {isMobileSelectorOpen && (
-          <div className="absolute left-0 right-0 top-full z-30 mt-2 rounded-2xl border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-700 dark:bg-gray-800">
+          <div className="absolute left-0 right-0 top-full z-30 mt-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40">
             <label
               htmlFor={searchInputId}
-              className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"
             >
+              <Search className="h-3 w-3" aria-hidden="true" />
               Rechercher
             </label>
             <input
@@ -193,7 +209,7 @@ export default function SiteSelector({
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Nom, orientation, altitude..."
-              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-950 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:ring-sky-900"
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-950 outline-none transition-colors placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-sky-900"
             />
 
             <div className="mt-3 max-h-[55vh] space-y-1 overflow-y-auto overscroll-contain pr-1">
@@ -207,24 +223,21 @@ export default function SiteSelector({
                       key={site.id}
                       onClick={() => handleMobileSelect(site.id)}
                       onMouseEnter={() => handleMouseEnter(site.id)}
-                      className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition-colors ${
+                      className={`flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
                         isActive
-                          ? 'bg-sky-50 text-sky-900 ring-2 ring-sky-200 dark:bg-sky-900/30 dark:text-sky-100 dark:ring-sky-700'
-                          : 'text-gray-900 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-900'
+                          ? 'border-sky-500 bg-sky-600 text-white shadow-sm shadow-sky-900/20 dark:border-sky-400 dark:bg-sky-600'
+                          : 'border-transparent text-slate-900 hover:border-sky-200 hover:bg-sky-50/70 dark:text-slate-100 dark:hover:border-sky-800 dark:hover:bg-sky-950/30'
                       }`}
                     >
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-semibold">
                           {site.name}
                         </span>
-                        {meta && (
-                          <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
-                            {meta}
-                          </span>
-                        )}
+                        {meta && <SiteMeta site={site} isActive={isActive} />}
                       </span>
                       {isActive && (
-                        <span className="shrink-0 rounded-full bg-sky-600 px-2 py-0.5 text-xs font-bold text-white">
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-xs font-bold text-white ring-1 ring-white/20">
+                          <Check className="h-3 w-3" aria-hidden="true" />
                           Actif
                         </span>
                       )}
@@ -241,57 +254,65 @@ export default function SiteSelector({
         )}
       </div>
 
-      <div className="hidden gap-2 flex-wrap rounded-xl bg-white p-3 shadow-md dark:bg-gray-800 md:flex">
-        {Object.entries(siteGroups).map(([baseId, groupSites]) => {
-          // Single site -> regular button
-          if (groupSites.length === 1) {
-            const site = groupSites[0];
-            const isActive = selectedSiteId === site.id;
+      <div className="hidden md:block">
+        <div className="mb-2 flex items-center justify-between gap-3 px-1 text-xs text-slate-500 dark:text-slate-400">
+          <span>{visibleSites.length} sites disponibles</span>
+          {selectedSite && (
+            <span className="truncate font-semibold text-sky-700 dark:text-sky-300">
+              Actuel: {selectedSite.name}
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-100 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-950/40 lg:grid-cols-2">
+          {Object.entries(siteGroups).map(([baseId, groupSites]) => {
+            // Single site -> regular button
+            if (groupSites.length === 1) {
+              const site = groupSites[0];
+              const isActive = selectedSiteId === site.id;
 
-            return (
-              <Button
-                key={site.id}
-                className={`
-                  flex-1 min-w-[120px] sm:min-w-[100px] 
-                  p-3 sm:p-2.5 
-                  border-2 rounded-lg 
-                  transition-all 
-                  flex flex-col items-center gap-1
+              return (
+                <Button
+                  key={site.id}
+                  className={`
+                  min-w-0 rounded-xl border p-3 text-left transition-colors
+                  flex flex-col items-start gap-1 cursor-pointer
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500
                   ${
                     isActive
-                      ? 'border-sky-600 bg-gradient-to-br from-sky-600 to-sky-800 text-white'
-                      : 'border-gray-200 bg-white dark:bg-gray-700 dark:border-gray-600 hover:border-sky-600 hover:shadow-md hover:shadow-sky-100'
+                      ? 'border-sky-500 bg-gradient-to-br from-sky-600 to-sky-800 text-white shadow-md shadow-sky-900/20'
+                      : 'border-slate-200 bg-white text-slate-900 hover:border-sky-300 hover:bg-sky-50/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-sky-700 dark:hover:bg-sky-950/30'
                   }
                 `}
-                onClick={() => onSelectSite(site.id)}
-                onMouseEnter={() => handleMouseEnter(site.id)}
-              >
-                <span
-                  className={`text-sm sm:text-xs font-semibold ${isActive ? '' : 'text-gray-900 dark:text-gray-100'}`}
+                  onClick={() => onSelectSite(site.id)}
+                  onMouseEnter={() => handleMouseEnter(site.id)}
                 >
-                  {site.name}
-                </span>
-                <span
-                  className={`text-xs sm:text-[11px] ${isActive ? 'opacity-90' : 'opacity-80 text-gray-600 dark:text-gray-400'}`}
-                >
-                  {site.elevation_m || '?'}m
-                </span>
-              </Button>
-            );
-          }
+                  <span className="line-clamp-2 text-sm font-bold leading-tight">
+                    {site.name}
+                  </span>
+                  <SiteMeta site={site} isActive={isActive} />
+                  {isActive && (
+                    <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-xs font-bold text-white ring-1 ring-white/20">
+                      <Check className="h-3 w-3" aria-hidden="true" />
+                      Actif
+                    </span>
+                  )}
+                </Button>
+              );
+            }
 
-          // Multiple sites with same base -> dropdown selector
-          return (
-            <MultiOrientationSelector
-              key={baseId}
-              sites={groupSites}
-              selectedSiteId={selectedSiteId}
-              onSelectSite={onSelectSite}
-              weatherData={weatherData}
-              className="flex-1 min-w-[120px] sm:min-w-[100px]"
-            />
-          );
-        })}
+            // Multiple sites with same base -> dropdown selector
+            return (
+              <MultiOrientationSelector
+                key={baseId}
+                sites={groupSites}
+                selectedSiteId={selectedSiteId}
+                onSelectSite={onSelectSite}
+                weatherData={weatherData}
+                className="min-w-0"
+              />
+            );
+          })}
+        </div>
       </div>
     </div>
   );
