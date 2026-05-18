@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { HTTPError } from 'ky';
 import { Button } from '@dashboard-parapente/design-system';
+import { Play, RotateCcw, Square, Video } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import {
   VIDEO_EXPORT_IN_PROGRESS_STATUSES,
   type Flight,
@@ -32,6 +34,9 @@ const hasActiveVideoExport = (
     flight?.video_export_job_id &&
     isVideoExportInProgress(flight.video_export_status)
   );
+
+const needsVideoExportRecovery = (status?: string | null) =>
+  status === 'failed' || status === 'cancelled';
 
 const getHttpErrorDetail = async (error: HTTPError): Promise<string | null> => {
   try {
@@ -206,28 +211,55 @@ export function FlightVideoExportControls({
     }
   };
 
-  const primaryButtonTitle = hasActiveVideoExport(flight)
-    ? t('flights.viewer.videoGeneratingTitle')
-    : flight.video_export_status === 'failed' ||
-        flight.video_export_status === 'cancelled'
-      ? canResumeVideoExport
+  const getPrimaryButtonTitle = () => {
+    if (hasActiveVideoExport(flight)) {
+      return t('flights.viewer.videoGeneratingTitle');
+    }
+
+    if (needsVideoExportRecovery(flight.video_export_status)) {
+      return canResumeVideoExport
         ? t('flights.viewer.videoResumeTitle')
-        : t('flights.viewer.videoRegenerateTitle')
-      : t('flights.viewer.videoGenerateTitle');
+        : t('flights.viewer.videoRegenerateTitle');
+    }
+
+    return t('flights.viewer.videoGenerateTitle');
+  };
 
   const primaryButtonLabel = (() => {
-    if (hasActiveVideoExport(flight))
-      return t('flights.viewer.videoGenerating');
-    if (
-      flight.video_export_status === 'failed' ||
-      flight.video_export_status === 'cancelled'
-    ) {
-      return canResumeVideoExport
-        ? t('flights.viewer.resumeVideo')
+    if (hasActiveVideoExport(flight)) {
+      return compact
+        ? t('flights.viewer.videoGeneratingShort')
+        : t('flights.viewer.videoGenerating');
+    }
+    if (needsVideoExportRecovery(flight.video_export_status)) {
+      if (canResumeVideoExport) {
+        return compact
+          ? t('flights.viewer.resumeVideoShort')
+          : t('flights.viewer.resumeVideo');
+      }
+
+      return compact
+        ? t('flights.viewer.regenerateVideoShort')
         : t('flights.viewer.regenerateVideo');
     }
-    return t('flights.viewer.generateVideo');
+    return compact
+      ? t('flights.viewer.generateVideoShort')
+      : t('flights.viewer.generateVideo');
   })();
+
+  const getPrimaryButtonIcon = (): LucideIcon => {
+    if (hasActiveVideoExport(flight)) {
+      return Square;
+    }
+
+    if (needsVideoExportRecovery(flight.video_export_status)) {
+      return canResumeVideoExport ? Play : RotateCcw;
+    }
+
+    return Video;
+  };
+
+  const PrimaryButtonIcon = getPrimaryButtonIcon();
 
   const primaryButtonClassName = [
     'cursor-pointer rounded-md text-sm font-semibold text-white transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:cursor-not-allowed disabled:bg-gray-400',
@@ -279,8 +311,9 @@ export function FlightVideoExportControls({
           onClick={handlePrimaryAction}
           isDisabled={isStartingVideoExport || hasActiveVideoExport(flight)}
           className={primaryButtonClassName}
-          title={primaryButtonTitle}
+          title={getPrimaryButtonTitle()}
         >
+          <PrimaryButtonIcon className="h-4 w-4" aria-hidden="true" />
           {primaryButtonLabel}
         </Button>
       )}
@@ -305,7 +338,10 @@ export function FlightVideoExportControls({
           }`}
           title={t('flights.viewer.cancelGenerationTitle')}
         >
-          {t('flights.viewer.cancelGeneration')}
+          <Square className="h-3.5 w-3.5" aria-hidden="true" />
+          {compact
+            ? t('flights.viewer.cancelGenerationShort')
+            : t('flights.viewer.cancelGeneration')}
         </Button>
       )}
 
@@ -318,7 +354,10 @@ export function FlightVideoExportControls({
           }`}
           title={t('flights.viewer.regenerateTitle')}
         >
-          {t('flights.viewer.regenerateVideo')}
+          <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+          {compact
+            ? t('flights.viewer.regenerateVideoShort')
+            : t('flights.viewer.regenerateVideo')}
         </Button>
       )}
     </div>
