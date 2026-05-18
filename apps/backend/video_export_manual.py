@@ -120,6 +120,9 @@ def _default_frontend_url() -> str:
 
 
 def _backend_base_url() -> str:
+    if config.ENVIRONMENT == "production" and config.JOB_QUEUE_BACKEND == "rq":
+        return f"http://backend:{config.API_PORT}"
+
     host = "127.0.0.1" if config.API_HOST == "0.0.0.0" else config.API_HOST
     return f"http://{host}:{config.API_PORT}"
 
@@ -128,6 +131,12 @@ def _is_local_vite_url(candidate: str) -> bool:
     parsed = urlparse(candidate)
     hostname = (parsed.hostname or "").lower()
     return hostname in {"localhost", "127.0.0.1", "::1"} and parsed.port == 5173
+
+
+def _is_local_backend_url(candidate: str) -> bool:
+    parsed = urlparse(candidate)
+    hostname = (parsed.hostname or "").lower()
+    return hostname in {"localhost", "127.0.0.1", "::1"} and parsed.port == config.API_PORT
 
 
 def resolve_frontend_url(frontend_url: str | None = None) -> str:
@@ -153,7 +162,7 @@ def _normalize_frontend_url(frontend_url: str) -> str:
     if (
         static_index.exists()
         and config.ENVIRONMENT == "production"
-        and _is_local_vite_url(candidate)
+        and (_is_local_vite_url(candidate) or _is_local_backend_url(candidate))
     ):
         return _backend_base_url()
 
