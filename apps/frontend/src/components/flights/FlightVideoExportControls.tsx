@@ -3,7 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { HTTPError } from 'ky';
 import { Button } from '@dashboard-parapente/design-system';
-import { Play, RotateCcw, Square, Video } from 'lucide-react';
+import {
+  CheckCircle2,
+  Gauge,
+  Play,
+  RotateCcw,
+  Sparkles,
+  Square,
+  Video,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
   VIDEO_EXPORT_IN_PROGRESS_STATUSES,
@@ -15,6 +23,28 @@ import { useToast } from '../../hooks/useToast';
 import { api } from '../../lib/api';
 
 type VideoExportMode = 'manual_fast' | 'manual';
+
+interface VideoExportModeOption {
+  value: VideoExportMode;
+  labelKey: string;
+  hintKey: string;
+  Icon: LucideIcon;
+}
+
+const videoExportModeOptions: VideoExportModeOption[] = [
+  {
+    value: 'manual_fast',
+    labelKey: 'flights.viewer.videoModeManualFast',
+    hintKey: 'flights.viewer.videoModeManualFastHint',
+    Icon: Gauge,
+  },
+  {
+    value: 'manual',
+    labelKey: 'flights.viewer.videoModeManual',
+    hintKey: 'flights.viewer.videoModeManualHint',
+    Icon: Sparkles,
+  },
+];
 
 interface FlightVideoExportControlsProps {
   flight: Flight;
@@ -166,7 +196,6 @@ export function FlightVideoExportControls({
         return;
       }
 
-      console.error('Failed to start video generation:', error);
       toast.error(t('flights.viewer.videoStartGenericError'));
     }
   };
@@ -189,7 +218,6 @@ export function FlightVideoExportControls({
         return;
       }
 
-      console.error('Failed to cancel video generation:', error);
       toast.error(t('flights.viewer.cancelError'));
     }
   };
@@ -206,7 +234,6 @@ export function FlightVideoExportControls({
         return;
       }
 
-      console.error('Failed to regenerate video:', error);
       toast.error(t('flights.viewer.regenerateError'));
     }
   };
@@ -262,11 +289,8 @@ export function FlightVideoExportControls({
   const PrimaryButtonIcon = getPrimaryButtonIcon();
 
   const primaryButtonClassName = [
-    'cursor-pointer rounded-md text-sm font-semibold text-white transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:cursor-not-allowed disabled:bg-gray-400',
-    compact ? 'px-3.5 py-2' : 'px-4 py-2.5',
-    isStartingVideoExport || hasActiveVideoExport(flight)
-      ? 'bg-gray-400'
-      : 'bg-blue-600 hover:bg-blue-700',
+    'rounded-lg font-semibold',
+    compact ? 'px-3.5 py-2 text-sm' : 'w-full px-4 py-2.5 text-sm',
     buttonClassName,
   ]
     .filter(Boolean)
@@ -276,33 +300,66 @@ export function FlightVideoExportControls({
     <div className={className}>
       {showModeSelector &&
         !isVideoExportInProgress(flight.video_export_status) && (
-          <div className="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900/30">
-            <label
-              htmlFor={`video-export-mode-${flight.id}`}
-              className="mb-1 block text-xs font-semibold text-gray-700 dark:text-gray-200"
+          <div className="mb-3 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+            <div
+              id={`video-export-mode-label-${flight.id}`}
+              className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300"
             >
               {t('flights.viewer.videoExportMode')}
-            </label>
-            <select
-              id={`video-export-mode-${flight.id}`}
-              value={videoExportMode}
-              onChange={(event) =>
-                setVideoExportMode(event.target.value as VideoExportMode)
-              }
-              className="w-full cursor-pointer rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-            >
-              <option value="manual_fast">
-                {t('flights.viewer.videoModeManualFast')}
-              </option>
-              <option value="manual">
-                {t('flights.viewer.videoModeManual')}
-              </option>
-            </select>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {videoExportMode === 'manual_fast'
-                ? t('flights.viewer.videoModeManualFastHint')
-                : t('flights.viewer.videoModeManualHint')}
-            </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {videoExportModeOptions.map(
+                ({ value, labelKey, hintKey, Icon }) => {
+                  const isSelected = videoExportMode === value;
+
+                  return (
+                    <label
+                      key={value}
+                      aria-label={t(labelKey)}
+                      className={`cursor-pointer rounded-lg border p-2 text-left transition-colors duration-200 focus-within:outline-none focus-within:ring-2 focus-within:ring-sky-500 focus-within:ring-offset-2 dark:focus-within:ring-offset-slate-900 ${
+                        isSelected
+                          ? 'border-sky-500 bg-sky-50 text-sky-950 shadow-sm dark:border-sky-400 dark:bg-sky-950/50 dark:text-sky-50'
+                          : 'border-slate-200 bg-slate-50 text-slate-800 hover:border-sky-300 hover:bg-sky-50/60 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-100 dark:hover:border-sky-600 dark:hover:bg-sky-950/30'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name={`video-export-mode-${flight.id}`}
+                        value={value}
+                        checked={isSelected}
+                        onChange={() => setVideoExportMode(value)}
+                        className="sr-only"
+                      />
+                      <span className="flex items-start gap-2">
+                        <span
+                          className={`mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${
+                            isSelected
+                              ? 'border-sky-200 bg-white text-sky-700 dark:border-sky-800 dark:bg-sky-900 dark:text-sky-200'
+                              : 'border-slate-200 bg-white text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
+                          }`}
+                        >
+                          <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center justify-between gap-2 text-xs font-semibold">
+                            {t(labelKey)}
+                            {isSelected && (
+                              <CheckCircle2
+                                className="h-3.5 w-3.5 shrink-0 text-sky-600 dark:text-sky-300"
+                                aria-hidden="true"
+                              />
+                            )}
+                          </span>
+                          <span className="mt-1 block text-xs leading-snug text-slate-600 dark:text-slate-300">
+                            {t(hintKey)}
+                          </span>
+                        </span>
+                      </span>
+                    </label>
+                  );
+                }
+              )}
+            </div>
           </div>
         )}
 
@@ -310,6 +367,11 @@ export function FlightVideoExportControls({
         <Button
           onClick={handlePrimaryAction}
           isDisabled={isStartingVideoExport || hasActiveVideoExport(flight)}
+          variant={
+            needsVideoExportRecovery(flight.video_export_status)
+              ? 'warning'
+              : 'primary'
+          }
           className={primaryButtonClassName}
           title={getPrimaryButtonTitle()}
         >
@@ -333,7 +395,8 @@ export function FlightVideoExportControls({
       {hasActiveVideoExport(flight) && (
         <Button
           onClick={handleCancelVideoExport}
-          className={`mt-2 cursor-pointer rounded-md bg-red-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+          variant="danger"
+          className={`mt-2 rounded-lg px-3 py-2 text-xs font-semibold ${
             compact ? 'basis-full sm:w-auto' : 'w-full'
           }`}
           title={t('flights.viewer.cancelGenerationTitle')}
@@ -349,7 +412,8 @@ export function FlightVideoExportControls({
         <Button
           onClick={handleRegenerateVideo}
           isDisabled={isStartingVideoExport}
-          className={`mt-2 cursor-pointer rounded-md bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-400 dark:focus:ring-offset-gray-800 ${
+          variant="warning"
+          className={`mt-2 rounded-lg px-3 py-2 text-xs font-semibold ${
             compact ? 'basis-full sm:w-auto' : 'w-full'
           }`}
           title={t('flights.viewer.regenerateTitle')}
