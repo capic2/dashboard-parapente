@@ -23,7 +23,7 @@ from urllib.request import Request, urlopen
 from sqlalchemy.orm import Session
 
 import config
-from auth import create_job_token
+from auth import create_job_token, decode_job_token
 from database import SessionLocal
 from flight_storage import get_video_output_path
 from models import Flight, VideoExportJob
@@ -352,20 +352,28 @@ def _build_playwright_init_script(auth_token: str | None) -> str:
     return f"""
         (() => {{
             window._exportMode = 'manual_render';
-
-            const token = {token_literal};
-            if (token) {{
-                localStorage.setItem(
-                    'parapente-auth',
-                    JSON.stringify({{ state: {{ token }} }})
-                );
-            }}
+            window._exportToken = {token_literal};
         }})();
     """
 
 
 def _create_video_export_job_token(job_id: str, flight_id: str) -> str:
     return create_job_token(purpose="video_export", job_id=job_id, flight_id=flight_id)
+
+
+def _resolve_video_export_job_token(
+    job_id: str,
+    flight_id: str,
+    auth_token: str | None,
+) -> str:
+    if auth_token:
+        try:
+            payload = decode_job_token(auth_token, purpose="video_export", job_id=job_id)
+            if payload.get("flight_id") == flight_id:
+                return auth_token
+        except Exception:
+            return _create_video_export_job_token(job_id, flight_id)
+    return _create_video_export_job_token(job_id, flight_id)
 
 
 def _get_job(job_id: str, db: Session | None = None) -> VideoExportJob | None:
@@ -1069,7 +1077,7 @@ def _enqueue_video_export_job(
         _set_memory_snapshot(job_id, _snapshot_from_job(job))
         _set_job_runtime(job_id, phase=_STATUS_QUEUED)
 
-    _set_job_auth_token(job_id, auth_token or _create_video_export_job_token(job_id, flight_id))
+    _set_job_auth_token(job_id, _resolve_video_export_job_token(job_id, flight_id, auth_token))
 
     _enqueue_existing_video_export_job(job_id)
     return job_id
@@ -1721,7 +1729,7 @@ def resume_video_export(job_id: str, auth_token: str | None = None) -> bool:
         completed_at=None,
         cancelled_at=None,
     )
-    _set_job_auth_token(job_id, auth_token or _create_video_export_job_token(job_id, job.flight_id))
+    _set_job_auth_token(job_id, _resolve_video_export_job_token(job_id, job.flight_id, auth_token))
     _set_job_runtime(
         job_id,
         phase=_STATUS_QUEUED,

@@ -4461,7 +4461,6 @@ def start_flight_video_export(
                 fps=fps,
                 speed=speed,
                 frontend_url=frontend_url,
-                auth_token=_extract_bearer_token(request),
             )
         except Exception as e:
             fallback_mode = "manual" if selected_mode == "manual_fast" else "stream"
@@ -4480,7 +4479,6 @@ def start_flight_video_export(
                         fps=fps,
                         speed=speed,
                         frontend_url=frontend_url,
-                        auth_token=_extract_bearer_token(request),
                     )
                     effective_mode = "manual"
                 else:
@@ -4573,7 +4571,6 @@ def generate_flight_video(
             speed=1,
             frontend_url=frontend_url,
             update_db=True,
-            auth_token=_extract_bearer_token(request),
         )
         started_message = "Video generation started (Manual Fast Render)"
     except Exception as e:
@@ -4805,7 +4802,7 @@ def cancel_video_export(job_id: str):
 @router.post("/exports/{job_id}/resume")
 def resume_cancelled_video_export(request: Request, job_id: str):
     """Resume a cancelled or failed manual video export from preserved frames."""
-    success = resume_video_export(job_id, auth_token=_extract_bearer_token(request))
+    success = resume_video_export(job_id)
     if not success:
         raise HTTPException(
             status_code=400,
