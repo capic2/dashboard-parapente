@@ -23,6 +23,7 @@ Projects: `frontend` in `apps/frontend`, `backend` in `apps/backend`, `design-sy
 - Use `apply_patch` for manual edits; avoid shell-based file editing.
 - Never use destructive git commands.
 - Use `local-machine-stack` as the source of truth for pnpm paths, dependency readiness, command timeouts, and Nx validation commands.
+- Let specialized skills define their own project-specific commands, while `local-machine-stack` supplies shared machine invariants and generic validation commands.
 
 ## Analysis Source Of Truth
 
