@@ -17,12 +17,13 @@ def test_resolve_frontend_url_uses_backend_static_in_production(monkeypatch):
     """Production should avoid localhost:5173 when static frontend is bundled."""
     monkeypatch.setattr(video_export_manual.Path, "exists", lambda _self: True)
     monkeypatch.setattr(video_export_manual.config, "ENVIRONMENT", "production")
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
     monkeypatch.setattr(video_export_manual.config, "API_HOST", "0.0.0.0")
     monkeypatch.setattr(video_export_manual.config, "API_PORT", 8001)
 
     resolved = video_export_manual.resolve_frontend_url("http://localhost:5173")
 
-    assert resolved == "http://127.0.0.1:8001"
+    assert resolved == "http://backend:8001"
 
 
 def test_default_frontend_url_normalizes_configured_vite_url_in_production(monkeypatch):
@@ -30,10 +31,37 @@ def test_default_frontend_url_normalizes_configured_vite_url_in_production(monke
     monkeypatch.setattr(video_export_manual.Path, "exists", lambda _self: True)
     monkeypatch.setattr(video_export_manual.config, "FRONTEND_URL", "http://localhost:5173")
     monkeypatch.setattr(video_export_manual.config, "ENVIRONMENT", "production")
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
     monkeypatch.setattr(video_export_manual.config, "API_HOST", "0.0.0.0")
     monkeypatch.setattr(video_export_manual.config, "API_PORT", 8001)
 
     resolved = video_export_manual._default_frontend_url()
+
+    assert resolved == "http://backend:8001"
+
+
+def test_resolve_frontend_url_rewrites_local_backend_url_for_rq_worker(monkeypatch):
+    """The worker container must reach the API through Docker DNS, not loopback."""
+    monkeypatch.setattr(video_export_manual.Path, "exists", lambda _self: True)
+    monkeypatch.setattr(video_export_manual.config, "ENVIRONMENT", "production")
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(video_export_manual.config, "API_HOST", "0.0.0.0")
+    monkeypatch.setattr(video_export_manual.config, "API_PORT", 8001)
+
+    resolved = video_export_manual.resolve_frontend_url("http://127.0.0.1:8001")
+
+    assert resolved == "http://backend:8001"
+
+
+def test_resolve_frontend_url_keeps_local_backend_url_without_rq(monkeypatch):
+    """Thread mode runs in the API process, where loopback remains valid."""
+    monkeypatch.setattr(video_export_manual.Path, "exists", lambda _self: True)
+    monkeypatch.setattr(video_export_manual.config, "ENVIRONMENT", "production")
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "thread")
+    monkeypatch.setattr(video_export_manual.config, "API_HOST", "0.0.0.0")
+    monkeypatch.setattr(video_export_manual.config, "API_PORT", 8001)
+
+    resolved = video_export_manual.resolve_frontend_url("http://127.0.0.1:8001")
 
     assert resolved == "http://127.0.0.1:8001"
 
