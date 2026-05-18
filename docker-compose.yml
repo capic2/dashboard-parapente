@@ -163,6 +163,16 @@ services:
     volumes:
       - /home/capic/docker-data/dashboard-parapente/db:/app/db
       - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'python -c "from job_queue import get_redis_connection; get_redis_connection().ping()"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
     networks:
       - parapente-network
 
