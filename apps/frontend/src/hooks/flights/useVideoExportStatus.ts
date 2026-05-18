@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useAuthStore } from '../../stores/authStore';
 
 export type VideoExportPhase =
   | 'queued'
@@ -108,7 +107,6 @@ export function useVideoExportStatus(
   jobToken?: string | null
 ) {
   const [state, setState] = useState<HookState>(initialState);
-  const token = useAuthStore((s) => s.token);
 
   useEffect(() => {
     setState(initialState);
@@ -123,8 +121,6 @@ export function useVideoExportStatus(
     const streamUrl = new URL(path, window.location.origin);
     if (jobToken) {
       streamUrl.searchParams.set('access_token', jobToken);
-    } else if (token) {
-      streamUrl.searchParams.set('access_token', token);
     }
 
     const eventSource = new EventSource(streamUrl.toString());
@@ -165,7 +161,7 @@ export function useVideoExportStatus(
       eventSource.removeEventListener('error', handleError);
       eventSource.close();
     };
-  }, [enabled, jobId, jobToken, token]);
+  }, [enabled, jobId, jobToken]);
 
   return state;
 }
