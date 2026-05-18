@@ -70,10 +70,44 @@ _JOB_RUNTIME: dict[str, dict[str, Any]] = {}
 _JOB_CANCEL_REQUESTS: set[str] = set()
 
 _CANCEL_CHECK_INTERVAL = 10
+_EXPORT_VIEWER_READY_TIMEOUT_SECONDS = 180
 _FFMPEG_STALL_TIMEOUT_SECONDS = 10 * 60
 _ORPHAN_TEMP_CLEANUP_GRACE_SECONDS = 30
 _EXPORT_FRAME_TERRAIN_TIMEOUT_SECONDS = 10.0
 _EXPORT_FRAME_TERRAIN_POLL_SECONDS = 0.1
+
+_EXPORT_VIEWER_STATE_SCRIPT = """
+    () => {
+        const hasCanvas = Boolean(document.querySelector('.cesium-viewer canvas, canvas'));
+        const isLoginPage =
+            window.location.pathname === '/login' ||
+            Boolean(document.querySelector('input[type="password"]'));
+        const errorText = document.body?.innerText || '';
+        const hasCesiumError =
+            errorText.includes("Erreur d'initialisation Cesium") ||
+            errorText.includes('Cesium initialization error') ||
+            errorText.includes('VITE_CESIUM_ION_TOKEN is required') ||
+            errorText.includes('Container has zero dimensions') ||
+            errorText.includes('Cesium scene could not be initialized');
+
+        return {
+            hasCanvas,
+            isLoginPage,
+            path: window.location.pathname,
+            hasCesiumError,
+            missingIonToken: errorText.includes('VITE_CESIUM_ION_TOKEN is required'),
+            missingFlightId: errorText.includes('No flight ID provided'),
+            bodyText: errorText.slice(0, 1000),
+        };
+    }
+"""
+
+_EXPORT_VIEWER_READY_SCRIPT = f"""
+    () => {{
+        const state = ({_EXPORT_VIEWER_STATE_SCRIPT})();
+        return state.hasCanvas || state.isLoginPage || state.hasCesiumError || state.missingFlightId;
+    }}
+"""
 
 
 def check_dependencies():
@@ -1110,6 +1144,7 @@ async def _export_video_manual_render(job_id: str):
         log_url = f"{log_url}&exportToken=<redacted>"
 
     try:
+        from playwright.async_api import TimeoutError as PlaywrightTimeoutError
         from playwright.async_api import async_playwright
 
         _update_job(job_id, status=_STATUS_INITIALIZING, message="Setting up manual render")
@@ -1163,44 +1198,25 @@ async def _export_video_manual_render(job_id: str):
 
             _update_job(job_id, message="Waiting for Cesium viewer")
             await page.wait_for_load_state("domcontentloaded")
-            await page.wait_for_function(
-                """
-                () => {
-                    const hasCanvas = Boolean(document.querySelector('.cesium-viewer canvas, canvas'));
-                    const isLoginPage =
-                        window.location.pathname === '/login' ||
-                        Boolean(document.querySelector('input[type="password"]'));
+            try:
+                await page.wait_for_function(
+                    _EXPORT_VIEWER_READY_SCRIPT,
+                    timeout=_EXPORT_VIEWER_READY_TIMEOUT_SECONDS * 1000,
+                )
+            except PlaywrightTimeoutError as exc:
+                viewer_state = await page.evaluate(_EXPORT_VIEWER_STATE_SCRIPT)
+                body_text = str(viewer_state.get("bodyText") or "").strip()
+                raise Exception(
+                    "Export viewer did not become ready within "
+                    f"{_EXPORT_VIEWER_READY_TIMEOUT_SECONDS}s "
+                    f"(path={viewer_state.get('path', 'unknown')}, "
+                    f"hasCanvas={viewer_state.get('hasCanvas')}, "
+                    f"hasCesiumError={viewer_state.get('hasCesiumError')}, "
+                    f"isLoginPage={viewer_state.get('isLoginPage')}, "
+                    f"body={body_text[:300]!r})"
+                ) from exc
 
-                    const errorText = document.body?.innerText || '';
-                    const hasViewerError =
-                        errorText.includes("Erreur d'initialisation Cesium") ||
-                        errorText.includes('VITE_CESIUM_ION_TOKEN is required') ||
-                        errorText.includes('No flight ID provided');
-
-                    return hasCanvas || isLoginPage || hasViewerError;
-                }
-                """,
-                timeout=60000,
-            )
-
-            viewer_state = await page.evaluate("""
-                () => {
-                    const hasCanvas = Boolean(document.querySelector('.cesium-viewer canvas, canvas'));
-                    const isLoginPage =
-                        window.location.pathname === '/login' ||
-                        Boolean(document.querySelector('input[type="password"]'));
-                    const errorText = document.body?.innerText || '';
-
-                    return {
-                        hasCanvas,
-                        isLoginPage,
-                        path: window.location.pathname,
-                        hasViewerError: errorText.includes("Erreur d'initialisation Cesium"),
-                        missingIonToken: errorText.includes('VITE_CESIUM_ION_TOKEN is required'),
-                        missingFlightId: errorText.includes('No flight ID provided'),
-                    };
-                }
-                """)
+            viewer_state = await page.evaluate(_EXPORT_VIEWER_STATE_SCRIPT)
 
             if viewer_state.get("isLoginPage"):
                 raise Exception(
@@ -1214,8 +1230,10 @@ async def _export_video_manual_render(job_id: str):
                 raise Exception("Export viewer opened without flightId")
 
             if not viewer_state.get("hasCanvas"):
+                body_text = str(viewer_state.get("bodyText") or "").strip()
                 raise Exception(
                     f"Cesium canvas not available (path={viewer_state.get('path', 'unknown')})"
+                    f": {body_text[:300]}"
                 )
 
             await asyncio.sleep(3)
