@@ -7,6 +7,7 @@ from urllib.error import URLError
 
 import pytest
 
+from auth import create_access_token, create_job_token, decode_job_token
 from models import VideoExportJob
 
 import video_export
@@ -105,7 +106,8 @@ def test_build_playwright_init_script_sets_export_mode_and_token():
     script = video_export_manual._build_playwright_init_script("abc123")
 
     assert "window._exportMode = 'manual_render'" in script
-    assert "parapente-auth" in script
+    assert "window._exportToken" in script
+    assert "parapente-auth" not in script
     assert '"abc123"' in script
 
 
@@ -113,7 +115,7 @@ def test_build_playwright_init_script_without_token_still_sets_export_mode():
     script = video_export_manual._build_playwright_init_script(None)
 
     assert "window._exportMode = 'manual_render'" in script
-    assert "const token = null" in script
+    assert "window._exportToken = null" in script
 
 
 def test_job_auth_token_storage_roundtrip(test_db, monkeypatch):
@@ -325,6 +327,36 @@ def test_rq_job_id_does_not_use_forbidden_separator():
     assert ":" not in rq_job_id
 
 
+def test_resolve_video_export_job_token_replaces_access_token():
+    user_token = create_access_token("pilot@example.test")
+
+    job_token = video_export_manual._resolve_video_export_job_token(
+        "job-export",
+        "flight-test-001",
+        user_token,
+    )
+
+    assert job_token != user_token
+    payload = decode_job_token(job_token, purpose="video_export", job_id="job-export")
+    assert payload["flight_id"] == "flight-test-001"
+
+
+def test_resolve_video_export_job_token_keeps_matching_job_token():
+    existing_token = create_job_token(
+        purpose="video_export",
+        job_id="job-export",
+        flight_id="flight-test-001",
+    )
+
+    job_token = video_export_manual._resolve_video_export_job_token(
+        "job-export",
+        "flight-test-001",
+        existing_token,
+    )
+
+    assert job_token == existing_token
+
+
 def test_start_video_export_manual_enqueues_rq_job(test_db, monkeypatch):
     enqueued_job_ids: list[str] = []
     monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
@@ -340,7 +372,6 @@ def test_start_video_export_manual_enqueues_rq_job(test_db, monkeypatch):
     job_id = video_export_manual.start_video_export_manual(
         flight_id="flight-test-001",
         frontend_url="http://frontend.test",
-        auth_token="token-rq",
     )
 
     db_session = test_db()
@@ -349,7 +380,9 @@ def test_start_video_export_manual_enqueues_rq_job(test_db, monkeypatch):
 
     assert job_id == "job-rq"
     assert job.status == "queued"
-    assert job.auth_token == "token-rq"
+    assert job.auth_token is not None
+    payload = decode_job_token(job.auth_token, purpose="video_export", job_id=job_id)
+    assert payload["flight_id"] == "flight-test-001"
     assert enqueued_job_ids == ["job-rq"]
 
 
@@ -506,7 +539,9 @@ def test_resume_video_export_requeues_cancelled_job_with_frames(test_db, tmp_pat
     db_session = test_db()
     job = db_session.query(VideoExportJob).filter(VideoExportJob.id == job_id).one()
     assert job.status == "queued"
-    assert job.auth_token == "resume-token"
+    assert job.auth_token is not None
+    payload = decode_job_token(job.auth_token, purpose="video_export", job_id=job_id)
+    assert payload["flight_id"] == "flight-test-001"
     assert job.cancelled_at is None
     assert job.error is None
     assert job.video_path is None

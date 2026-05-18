@@ -35,7 +35,7 @@ class TestVideoExportStartEndpoint:
         assert payload["mode"] == "manual"
         assert payload["message"] == "Video export started (manual render)"
         assert payload["status_url"] == "/api/exports/job-manual/status"
-        assert mock_start.call_args.kwargs["auth_token"] == "test-token"
+        assert "auth_token" not in mock_start.call_args.kwargs
 
     def test_start_video_export_accepts_manual_fast_mode(self, client: TestClient, sample_flight):
         """Fast manual mode should use the deterministic screenshot exporter."""
@@ -53,7 +53,7 @@ class TestVideoExportStartEndpoint:
         assert payload["job_id"] == "job-manual-fast"
         assert payload["mode"] == "manual_fast"
         assert payload["message"] == "Video export started (manual fast render)"
-        assert mock_start.call_args.kwargs["auth_token"] == "test-token"
+        assert "auth_token" not in mock_start.call_args.kwargs
 
     def test_start_video_export_manual_fast_falls_back_to_manual(
         self, client: TestClient, sample_flight
@@ -154,7 +154,7 @@ class TestGenerateVideoEndpoint:
         payload = response.json()
         assert payload["job_id"] == "job-manual-fast"
         assert payload["message"] == "Video generation started (Manual Fast Render)"
-        assert mock_start.call_args.kwargs["auth_token"] == "token-generate"
+        assert "auth_token" not in mock_start.call_args.kwargs
 
     def test_generate_video_falls_back_to_stream_on_manual_fast_error(
         self,
@@ -305,7 +305,7 @@ class TestExportStatusAndCancel:
             "message": "Export resume enqueued",
             "job_id": "job-cancelled",
         }
-        resume.assert_called_once_with("job-cancelled", auth_token="resume-token")
+        resume.assert_called_once_with("job-cancelled")
 
     def test_export_resume_returns_400_when_job_cannot_resume(self, client: TestClient):
         with patch("routes.resume_video_export", return_value=False):
