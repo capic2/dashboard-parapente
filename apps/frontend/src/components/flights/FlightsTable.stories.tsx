@@ -55,6 +55,7 @@ const mockFlights: Flight[] = [
     max_speed_kmh: 55,
     departure_time: '2024-03-05T12:15:00',
     gpx_file_path: '/uploads/flight-3.gpx',
+    video_export_status: 'processing',
     notes: 'Premier cross de la saison',
   },
   {
@@ -68,6 +69,7 @@ const mockFlights: Flight[] = [
     distance_km: null,
     max_altitude_m: null,
     gpx_file_path: null,
+    video_export_status: 'failed',
     notes: null,
   },
   {
