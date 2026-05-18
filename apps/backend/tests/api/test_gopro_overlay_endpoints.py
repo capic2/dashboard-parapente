@@ -168,6 +168,9 @@ def test_create_flight_gopro_overlay_job_uses_flight_files(
 
     assert response.status_code == 200
     assert response.json()["job_id"] == "job-flight-gopro"
+    db_session.refresh(sample_flight)
+    assert sample_flight.gopro_overlay_job_id == "job-flight-gopro"
+    assert sample_flight.gopro_overlay_status == "queued"
     assert create_job.call_args.kwargs["video_file"] is not None
     assert create_job.call_args.kwargs["gpx_file"] is None
     assert create_job.call_args.kwargs["fallback_gpx_path"] == gpx_path
@@ -235,6 +238,9 @@ def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
         )
 
     assert response.status_code == 200
+    db_session.refresh(sample_flight)
+    assert sample_flight.gopro_overlay_job_id == "job-flight-gopro-paths"
+    assert sample_flight.gopro_overlay_status == "queued"
     assert to_thread.call_args.args[0] is create_job
     assert create_job.call_args.kwargs["video_path"] == video_path
     assert create_job.call_args.kwargs["gpx_path"] == gpx_path

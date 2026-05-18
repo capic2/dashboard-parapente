@@ -52,6 +52,7 @@ interface FlightVideoExportControlsProps {
   buttonClassName?: string;
   compact?: boolean;
   showModeSelector?: boolean;
+  showCancelAction?: boolean;
 }
 
 const isVideoExportInProgress = (status?: string | null) =>
@@ -101,6 +102,7 @@ export function FlightVideoExportControls({
   buttonClassName = '',
   compact = false,
   showModeSelector = true,
+  showCancelAction = true,
 }: FlightVideoExportControlsProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -114,6 +116,9 @@ export function FlightVideoExportControls({
     null
   );
   const isExportActive = hasActiveVideoExport(flight);
+  const hasGeneratedVideo = Boolean(
+    flight.video_file_path && flight.video_file_exists !== false
+  );
   const shouldReadExportStatus = Boolean(
     flight.video_export_job_id &&
     (isExportActive ||
@@ -249,6 +254,14 @@ export function FlightVideoExportControls({
         : t('flights.viewer.videoRegenerateTitle');
     }
 
+    if (flight.video_export_status === 'completed' && !hasGeneratedVideo) {
+      return t('flights.viewer.videoGenerateTitle');
+    }
+
+    if (hasGeneratedVideo) {
+      return t('flights.viewer.regenerateTitle');
+    }
+
     return t('flights.viewer.videoGenerateTitle');
   };
 
@@ -269,6 +282,13 @@ export function FlightVideoExportControls({
         ? t('flights.viewer.regenerateVideoShort')
         : t('flights.viewer.regenerateVideo');
     }
+
+    if (hasGeneratedVideo) {
+      return compact
+        ? t('flights.viewer.regenerateVideoShort')
+        : t('flights.viewer.regenerateVideo');
+    }
+
     return compact
       ? t('flights.viewer.generateVideoShort')
       : t('flights.viewer.generateVideo');
@@ -281,6 +301,10 @@ export function FlightVideoExportControls({
 
     if (needsVideoExportRecovery(flight.video_export_status)) {
       return canResumeVideoExport ? Play : RotateCcw;
+    }
+
+    if (hasGeneratedVideo) {
+      return RotateCcw;
     }
 
     return Video;
@@ -363,7 +387,7 @@ export function FlightVideoExportControls({
           </div>
         )}
 
-      {flight.video_export_status !== 'completed' && (
+      {!hasGeneratedVideo && (
         <Button
           onClick={handlePrimaryAction}
           isDisabled={isStartingVideoExport || hasActiveVideoExport(flight)}
@@ -392,7 +416,7 @@ export function FlightVideoExportControls({
         </p>
       )}
 
-      {hasActiveVideoExport(flight) && (
+      {showCancelAction && hasActiveVideoExport(flight) && (
         <Button
           onClick={handleCancelVideoExport}
           variant="danger"
@@ -408,7 +432,7 @@ export function FlightVideoExportControls({
         </Button>
       )}
 
-      {flight.video_export_status === 'completed' && (
+      {hasGeneratedVideo && (
         <Button
           onClick={handleRegenerateVideo}
           isDisabled={isStartingVideoExport}
