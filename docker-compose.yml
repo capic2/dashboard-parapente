@@ -95,6 +95,10 @@ services:
       # Video export runs in a separate worker container; use Docker DNS by default.
       - BACKEND_FRONTEND_URL=${BACKEND_FRONTEND_URL:-http://backend:8001}
 
+      # Backend - Video export storage
+      - BACKEND_VIDEO_EXPORT_DIR=${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
+      - BACKEND_VIDEO_TEMP_IMAGES_DIR=${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
+
       # Backend - GoPro overlay toolchain
       - BACKEND_GOPRO_OVERLAY_ROOT=/app/gopro-overlay
       - BACKEND_GOPRO_OVERLAY_BIN=/app/gopro-overlay/venv/bin/gopro-dashboard.py
@@ -110,6 +114,8 @@ services:
         condition: service_healthy
     volumes:
       - /home/capic/docker-data/dashboard-parapente/db:/app/db
+      - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
+      - ${VIDEO_TEMP_IMAGES_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/video-temp-images}:${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
       - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8001/health']
@@ -149,6 +155,8 @@ services:
       - BACKEND_STRAVA_VERIFY_TOKEN=${BACKEND_STRAVA_VERIFY_TOKEN:-PARAPENTE_2025}
       # localhost inside this container is not the API container.
       - BACKEND_FRONTEND_URL=${BACKEND_FRONTEND_URL:-http://backend:8001}
+      - BACKEND_VIDEO_EXPORT_DIR=${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
+      - BACKEND_VIDEO_TEMP_IMAGES_DIR=${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
       - BACKEND_GOPRO_OVERLAY_ROOT=/app/gopro-overlay
       - BACKEND_GOPRO_OVERLAY_BIN=/app/gopro-overlay/venv/bin/gopro-dashboard.py
       - BACKEND_GOPRO_OVERLAY_LAYOUT_DIR=/app/gopro-overlay
@@ -162,6 +170,8 @@ services:
         condition: service_healthy
     volumes:
       - /home/capic/docker-data/dashboard-parapente/db:/app/db
+      - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
+      - ${VIDEO_TEMP_IMAGES_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/video-temp-images}:${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
       - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
     healthcheck:
       test:
