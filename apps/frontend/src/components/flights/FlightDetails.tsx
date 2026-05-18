@@ -17,6 +17,7 @@ import {
   Edit3,
   FileText,
   FileUp,
+  Layers,
   Pencil,
   Video,
   Wand2,
@@ -403,14 +404,18 @@ export function FlightDetails({
 
   let goproOverlayAction: () => void | Promise<void> = handleStartGoproOverlay;
   let goproOverlayLabel = t('flights.goproOverlayGenerate');
+  let goproOverlayCompactLabel = t('flights.goproOverlayGenerateShort');
   if (goproOverlayJob?.status === 'completed') {
     goproOverlayAction = handleDownloadGoproOverlay;
     goproOverlayLabel = t('flights.goproOverlayDownload');
+    goproOverlayCompactLabel = t('flights.goproOverlayDownloadShort');
   } else if (isGoproOverlayRunning) {
     goproOverlayAction = handleCancelGoproOverlay;
     goproOverlayLabel = t('flights.goproOverlayCancel');
+    goproOverlayCompactLabel = t('flights.goproOverlayCancelShort');
   } else if (createGoproOverlayJob.isPending) {
     goproOverlayLabel = t('flights.goproOverlayStarting');
+    goproOverlayCompactLabel = t('flights.goproOverlayStarting');
   }
 
   let goproOverlayTitle = t('flights.goproOverlayGenerateTitle');
@@ -698,30 +703,54 @@ export function FlightDetails({
               )}
             </div>
 
-            <div className="flex flex-wrap gap-2 sm:justify-end">
-              {hasGpx && (
-                <FlightVideoExportControls
-                  flight={flight}
-                  className="flex flex-col gap-2"
-                  buttonClassName="min-h-10 rounded-lg bg-sky-600 px-3 py-2 text-sm hover:bg-sky-700"
-                  compact
-                  showModeSelector={false}
-                />
-              )}
-              <Button
-                variant="outline"
-                className="min-h-10 rounded-lg border-cyan-200 px-3 py-2 text-sm text-cyan-800 hover:bg-cyan-50 dark:border-cyan-800 dark:text-cyan-200 dark:hover:bg-cyan-950/40"
-                onPress={goproOverlayAction}
-                isDisabled={
-                  !canUseGoproOverlayAction ||
-                  createGoproOverlayJob.isPending ||
-                  cancelGoproOverlayJob.isPending
-                }
-                title={goproOverlayTitle}
-              >
-                <Wand2 className="h-4 w-4" aria-hidden="true" />
-                {goproOverlayLabel}
-              </Button>
+            <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-900/50 sm:w-auto sm:min-w-80">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                  <Layers className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t('flights.mediaExportActions')}
+                </div>
+                {(isVideoExportRunning || isGoproOverlayRunning) && (
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-800 dark:bg-blue-950/50 dark:text-blue-200">
+                    {t('flights.mediaExportInProgress')}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {hasGpx ? (
+                  <FlightVideoExportControls
+                    flight={flight}
+                    className="min-w-0"
+                    buttonClassName="min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+                    compact
+                    showModeSelector={false}
+                  />
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+                    isDisabled
+                    title={t('flights.replayUnavailable')}
+                  >
+                    <Video className="h-4 w-4" aria-hidden="true" />
+                    {t('flights.viewer.generateVideoShort')}
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  className="min-h-10 w-full rounded-lg border-cyan-200 px-3 py-2 text-sm text-cyan-800 transition-colors hover:bg-cyan-50 dark:border-cyan-800 dark:text-cyan-200 dark:hover:bg-cyan-950/40"
+                  onPress={goproOverlayAction}
+                  isDisabled={
+                    !canUseGoproOverlayAction ||
+                    createGoproOverlayJob.isPending ||
+                    cancelGoproOverlayJob.isPending
+                  }
+                  title={goproOverlayTitle}
+                  aria-label={goproOverlayLabel}
+                >
+                  <Wand2 className="h-4 w-4" aria-hidden="true" />
+                  {goproOverlayCompactLabel}
+                </Button>
+              </div>
             </div>
           </div>
 
