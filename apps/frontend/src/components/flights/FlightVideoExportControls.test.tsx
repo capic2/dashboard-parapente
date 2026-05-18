@@ -80,7 +80,7 @@ describe('FlightVideoExportControls', () => {
   beforeEach(() => {
     apiDelete.mockReset();
     apiPost.mockReset();
-    apiPost.mockResolvedValue(undefined);
+    apiPost.mockReturnValue({ json: vi.fn().mockResolvedValue({}) });
     mockFlight.video_export_status = null;
     mockFlight.video_export_job_id = null;
     mockFlight.video_file_path = null;
@@ -104,9 +104,7 @@ describe('FlightVideoExportControls', () => {
   it('starts max quality export after switching mode', async () => {
     render(<FlightVideoExportControls flight={mockFlight} />);
 
-    fireEvent.change(screen.getByLabelText('Export mode'), {
-      target: { value: 'manual' },
-    });
+    fireEvent.click(screen.getByRole('radio', { name: /Max quality/u }));
 
     expect(screen.getByText('Manual hint')).toBeInTheDocument();
 
