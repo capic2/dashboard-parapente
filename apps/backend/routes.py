@@ -4946,11 +4946,8 @@ async def create_flight_gopro_overlay_job(
             else str(_resolve_gopro_paragliding_path(output_dir))
         )
         generated_video_path = _resolve_flight_file_path(flight.video_file_path)
-        if not generated_video_path or not generated_video_path.exists():
-            raise HTTPException(
-                status_code=400,
-                detail="Generate the flight video before creating the GoPro overlay",
-            )
+        if generated_video_path and not generated_video_path.exists():
+            generated_video_path = None
         resolved_video_path = _resolve_gopro_paragliding_path(video_path)
         resolved_gpx_path = _resolve_gopro_paragliding_path(gpx_path)
         resolved_pip_path = _resolve_gopro_paragliding_path(pip_path)

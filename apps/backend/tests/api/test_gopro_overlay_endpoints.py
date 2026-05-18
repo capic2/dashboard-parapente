@@ -611,23 +611,41 @@ def test_create_flight_gopro_overlay_job_resolves_relative_paths(
     assert create_job.call_args.kwargs["fallback_gpx_path"] == gpx_path
 
 
-def test_create_flight_gopro_overlay_job_requires_generated_video_for_pip(
+def test_create_flight_gopro_overlay_job_accepts_provided_pip_without_generated_video(
     client: TestClient,
     db_session,
     sample_flight,
     tmp_path,
+    monkeypatch,
 ):
+    paragliding_root = tmp_path / "paragliding"
     gpx_path = tmp_path / "flight.gpx"
-    pip_path = tmp_path / "flight-pip.mp4"
+    pip_path = paragliding_root / "flight-pip.mp4"
     gpx_path.write_text("<gpx />")
+    pip_path.parent.mkdir(parents=True)
     pip_path.write_bytes(b"pip")
     sample_flight.gpx_file_path = str(gpx_path)
     sample_flight.video_file_path = None
     db_session.commit()
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
+    expected = {
+        "job_id": "job-flight-gopro-pip-path",
+        "status": "queued",
+        "progress": 0,
+        "message": "queued",
+        "layout_id": "parapente-1080",
+        "layout_label": "Parapente 1920x1080",
+        "output_filename": "flight-overlay.mp4",
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
 
-    with patch(
-        "routes.check_gopro_overlay_dependencies",
-        return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
+    with (
+        patch(
+            "routes.check_gopro_overlay_dependencies",
+            return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
+        ),
+        patch("routes.create_gopro_overlay_job", AsyncMock(return_value=expected)) as create_job,
     ):
         response = client.post(
             f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay",
@@ -635,10 +653,9 @@ def test_create_flight_gopro_overlay_job_requires_generated_video_for_pip(
             data={"pip_path": str(pip_path)},
         )
 
-    assert response.status_code == 400
-    assert (
-        response.json()["detail"] == "Generate the flight video before creating the GoPro overlay"
-    )
+    assert response.status_code == 200
+    assert response.json()["job_id"] == "job-flight-gopro-pip-path"
+    assert create_job.call_args.kwargs["fallback_pip_path"] == pip_path
 
 
 def test_download_gopro_overlay_rejects_unfinished_job(client: TestClient):
