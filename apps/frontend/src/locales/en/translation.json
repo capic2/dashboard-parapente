@@ -51,6 +51,7 @@
     "never": "Never",
     "justNow": "Just now",
     "now": "Now",
+    "time": "Time",
     "minutesAgo": "{{count}}min ago",
     "hoursAgo": "{{count}}h ago",
     "daysAgo": "{{count}}d ago",
