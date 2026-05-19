@@ -72,6 +72,7 @@ class TestFlightsListEndpoint:
         assert returned["video_file_exists"] is False
         assert returned["video_export_job_id"] == "job-video"
         assert returned["video_export_status"] == "completed"
+        assert returned["gopro_camera_file_exists"] is False
         assert returned["gopro_overlay_job_id"] is None
         assert returned["gopro_overlay_status"] is None
         assert returned["gopro_overlay_file_path"] is None
@@ -84,7 +85,9 @@ class TestFlightsListEndpoint:
         monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
         overlay_dir = tmp_path / "20260315" / "01"
         overlay_dir.mkdir(parents=True)
+        camera_path = overlay_dir / "camera.mp4"
         overlay_path = overlay_dir / "final.mp4"
+        camera_path.write_bytes(b"camera")
         overlay_path.write_bytes(b"overlay")
         flight = Flight(
             id="flight-with-overlay",
@@ -101,6 +104,7 @@ class TestFlightsListEndpoint:
         returned = next(
             flight for flight in response.json()["flights"] if flight["id"] == "flight-with-overlay"
         )
+        assert returned["gopro_camera_file_exists"] is True
         assert returned["gopro_overlay_file_path"] == str(overlay_path)
         assert returned["gopro_overlay_file_exists"] is True
 
