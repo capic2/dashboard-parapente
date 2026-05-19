@@ -423,140 +423,154 @@ export const BestSpotSuggestion = ({
               </span>
             </div>
             <div className="flex max-w-full min-w-0 gap-2 overflow-x-auto overscroll-x-contain pb-1 lg:hidden">
-              {hourlyRows.map((row) => (
-                <Button
-                  key={row.key}
-                  onPress={() => {
-                    if (row.spot.site) {
-                      onSelectSite(row.spot.site.id);
-                    }
-                  }}
-                  className="min-w-[176px] cursor-pointer flex-col items-stretch justify-start gap-0 whitespace-normal rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-left shadow-sm transition-colors hover:border-sky-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:border-sky-800 dark:hover:bg-slate-950"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="text-sm font-extrabold text-slate-950 dark:text-white">
-                      {row.hourLabel}
-                    </span>
-                    <div className="text-right">
-                      <span
-                        className={`block text-xl font-black leading-none ${row.scoreColor.text}`}
-                      >
-                        {row.score}
+              {hourlyRows.map((row) => {
+                const rowSite = row.spot.site;
+                const content = (
+                  <>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-sm font-extrabold text-slate-950 dark:text-white">
+                        {row.hourLabel}
                       </span>
-                      <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">
-                        /100
+                      <div className="text-right">
+                        <span
+                          className={`block text-xl font-black leading-none ${row.scoreColor.text}`}
+                        >
+                          {row.score}
+                        </span>
+                        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+                          /100
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-2 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
+                      <div
+                        className={`h-full rounded-full ${row.scoreColor.bg}`}
+                        style={{ width: `${row.score}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 truncate text-base font-black text-slate-950 dark:text-gray-50">
+                      {row.spot.site?.name ?? '—'}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${row.verdict.className}`}
+                      >
+                        {row.verdict.label}
+                      </span>
+                      <span className="truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        {row.orientationLabel}
                       </span>
                     </div>
-                  </div>
-                  <div className="mt-2 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div className="mt-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      {t('common.wind')} {row.windLabel}
+                    </div>
+                  </>
+                );
+
+                if (!rowSite) {
+                  return (
                     <div
-                      className={`h-full rounded-full ${row.scoreColor.bg}`}
-                      style={{ width: `${row.score}%` }}
-                    />
-                  </div>
-                  <div className="mt-2 truncate text-base font-black text-slate-950 dark:text-gray-50">
-                    {row.spot.site?.name ?? '—'}
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${row.verdict.className}`}
+                      key={row.key}
+                      className="min-w-[176px] flex-col items-stretch justify-start gap-0 whitespace-normal rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-left shadow-sm dark:border-slate-700 dark:bg-slate-950/60"
                     >
-                      {row.verdict.label}
-                    </span>
-                    <span className="truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
-                      {row.orientationLabel}
-                    </span>
-                  </div>
-                  <div className="mt-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    {t('common.wind')} {row.windLabel}
-                  </div>
-                </Button>
-              ))}
+                      {content}
+                    </div>
+                  );
+                }
+
+                return (
+                  <Button
+                    key={row.key}
+                    onPress={() => onSelectSite(rowSite.id)}
+                    className="min-w-[176px] cursor-pointer flex-col items-stretch justify-start gap-0 whitespace-normal rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-left shadow-sm transition-colors hover:border-sky-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:border-sky-800 dark:hover:bg-slate-950"
+                  >
+                    {content}
+                  </Button>
+                );
+              })}
             </div>
 
-            <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-950/60 lg:block">
-              <table className="w-full table-fixed text-left text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-                  <tr>
-                    <th scope="col" className="w-20 px-3 py-2.5">
+            <div className="hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-950/60 lg:block">
+              <table className="w-full table-fixed border-separate border-spacing-y-1 text-left text-sm">
+                <thead>
+                  <tr className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    <th scope="col" className="w-[72px] px-3 py-2">
                       {t('common.time')}
                     </th>
-                    <th scope="col" className="px-3 py-2.5">
+                    <th scope="col" className="px-3 py-2">
                       {t('common.site')}
                     </th>
-                    <th scope="col" className="w-28 px-3 py-2.5">
+                    <th scope="col" className="w-[170px] px-3 py-2">
                       {t('weather.score')}
                     </th>
-                    <th scope="col" className="w-28 px-3 py-2.5">
-                      {t('common.conditions')}
-                    </th>
-                    <th scope="col" className="w-32 px-3 py-2.5">
+                    <th scope="col" className="w-[116px] px-3 py-2">
                       {t('common.wind')}
                     </th>
-                    <th scope="col" className="w-28 px-3 py-2.5">
+                    <th scope="col" className="w-[104px] px-3 py-2">
                       {t('sites.orientation', 'Orientation')}
                     </th>
-                    <th scope="col" className="w-28 px-3 py-2.5 text-right">
-                      <span className="sr-only">
-                        {t('weather.viewForecast')}
-                      </span>
+                    <th scope="col" className="w-[104px] px-3 py-2">
+                      {t('common.conditions')}
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {hourlyRows.map((row) => (
-                    <tr
-                      key={row.key}
-                      className="transition-colors hover:bg-sky-50/70 dark:hover:bg-slate-900"
-                    >
-                      <td className="px-3 py-2.5 font-extrabold text-slate-950 dark:text-white">
-                        {row.hourLabel}
-                      </td>
-                      <td className="min-w-0 px-3 py-2.5">
-                        <div className="truncate font-bold text-slate-950 dark:text-white">
-                          {row.spot.site?.name ?? '—'}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-black ${row.scoreColor.text}`}>
-                            {row.score}
-                          </span>
-                          <div className="h-1.5 w-14 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                            <div
-                              className={`h-full rounded-full ${row.scoreColor.bg}`}
-                              style={{ width: `${row.score}%` }}
-                            />
+                <tbody>
+                  {hourlyRows.map((row) => {
+                    const rowSite = row.spot.site;
+
+                    return (
+                      <tr
+                        key={row.key}
+                        className="rounded-xl transition-colors hover:bg-sky-50 dark:hover:bg-slate-900"
+                      >
+                        <td className="rounded-l-xl px-3 py-2.5 font-extrabold text-slate-950 dark:text-white">
+                          {row.hourLabel}
+                        </td>
+                        <td className="min-w-0 px-3 py-2.5">
+                          {rowSite ? (
+                            <Button
+                              onPress={() => onSelectSite(rowSite.id)}
+                              className="max-w-full cursor-pointer justify-start truncate rounded-lg bg-transparent px-0 py-0 text-left font-bold text-slate-950 transition-colors hover:text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white dark:hover:text-sky-300"
+                            >
+                              {rowSite.name}
+                            </Button>
+                          ) : (
+                            <span className="font-bold text-slate-500 dark:text-slate-400">
+                              —
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`w-8 font-black ${row.scoreColor.text}`}
+                            >
+                              {row.score}
+                            </span>
+                            <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                              <div
+                                className={`h-full rounded-full ${row.scoreColor.bg}`}
+                                style={{ width: `${row.score}%` }}
+                              />
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${row.verdict.className}`}
-                        >
-                          {row.verdict.label}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 font-semibold text-slate-600 dark:text-slate-300">
-                        {row.windLabel}
-                      </td>
-                      <td className="px-3 py-2.5 font-semibold text-slate-600 dark:text-slate-300">
-                        {row.orientationLabel}
-                      </td>
-                      <td className="px-3 py-2.5 text-right">
-                        <Button
-                          onPress={() => {
-                            if (row.spot.site) {
-                              onSelectSite(row.spot.site.id);
-                            }
-                          }}
-                          className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition-colors hover:border-sky-300 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-sky-800 dark:hover:bg-slate-800"
-                        >
-                          {t('weather.viewForecast')}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="truncate px-3 py-2.5 font-semibold text-slate-600 dark:text-slate-300">
+                          {row.windLabel}
+                        </td>
+                        <td className="px-3 py-2.5 font-semibold text-slate-600 dark:text-slate-300">
+                          {row.orientationLabel}
+                        </td>
+                        <td className="rounded-r-xl px-3 py-2.5">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${row.verdict.className}`}
+                          >
+                            {row.verdict.label}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
