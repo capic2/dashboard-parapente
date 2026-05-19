@@ -10,6 +10,8 @@ from rq.job import Job
 
 import config
 
+_PENDING_JOB_STATUSES = {"queued", "deferred", "scheduled"}
+
 
 def is_rq_enabled() -> bool:
     return config.JOB_QUEUE_BACKEND == "rq"
@@ -27,6 +29,13 @@ def get_queue(name: str | None = None) -> Queue:
     return Queue(name or config.JOB_QUEUE_NAME, connection=get_redis_connection())
 
 
+def _job_status_value(job: Job) -> str | None:
+    status = job.get_status(refresh=True)
+    if status is None:
+        return None
+    return str(getattr(status, "value", status)).lower()
+
+
 def enqueue_once(
     function_path: str,
     *args: Any,
@@ -38,7 +47,9 @@ def enqueue_once(
     queue = get_queue(queue_name)
     existing_job = queue.fetch_job(job_id)
     if existing_job is not None:
-        return existing_job
+        if _job_status_value(existing_job) in _PENDING_JOB_STATUSES:
+            return existing_job
+        existing_job.delete()
 
     return queue.enqueue(
         function_path,
