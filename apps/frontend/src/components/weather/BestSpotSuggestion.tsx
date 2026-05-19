@@ -474,91 +474,58 @@ export const BestSpotSuggestion = ({
               ))}
             </div>
 
-            <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-950/60 lg:block">
-              <table className="w-full table-fixed text-left text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-                  <tr>
-                    <th scope="col" className="w-20 px-3 py-2.5">
-                      {t('common.time')}
-                    </th>
-                    <th scope="col" className="px-3 py-2.5">
-                      {t('common.site')}
-                    </th>
-                    <th scope="col" className="w-28 px-3 py-2.5">
-                      {t('weather.score')}
-                    </th>
-                    <th scope="col" className="w-28 px-3 py-2.5">
-                      {t('common.conditions')}
-                    </th>
-                    <th scope="col" className="w-32 px-3 py-2.5">
-                      {t('common.wind')}
-                    </th>
-                    <th scope="col" className="w-28 px-3 py-2.5">
-                      {t('sites.orientation', 'Orientation')}
-                    </th>
-                    <th scope="col" className="w-28 px-3 py-2.5 text-right">
-                      <span className="sr-only">
-                        {t('weather.viewForecast')}
+            <div className="hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-950/60 lg:block">
+              <div className="grid grid-cols-[72px_minmax(0,1.7fr)_minmax(130px,0.9fr)_116px_104px_104px] gap-3 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <span>{t('common.time')}</span>
+                <span>{t('common.site')}</span>
+                <span>{t('weather.score')}</span>
+                <span>{t('common.wind')}</span>
+                <span>{t('sites.orientation', 'Orientation')}</span>
+                <span>{t('common.conditions')}</span>
+              </div>
+              <div className="space-y-1">
+                {hourlyRows.map((row) => (
+                  <Button
+                    key={row.key}
+                    onPress={() => {
+                      if (row.spot.site) {
+                        onSelectSite(row.spot.site.id);
+                      }
+                    }}
+                    aria-label={`${row.hourLabel} ${row.spot.site?.name ?? ''} ${t('weather.viewForecast')}`}
+                    className="grid w-full cursor-pointer grid-cols-[72px_minmax(0,1.7fr)_minmax(130px,0.9fr)_116px_104px_104px] items-center gap-3 rounded-xl border border-transparent bg-transparent px-3 py-2.5 text-left transition-colors hover:border-sky-200 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:hover:border-sky-900 dark:hover:bg-slate-900"
+                  >
+                    <span className="font-extrabold text-slate-950 dark:text-white">
+                      {row.hourLabel}
+                    </span>
+                    <span className="min-w-0 truncate font-bold text-slate-950 dark:text-white">
+                      {row.spot.site?.name ?? '—'}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className={`w-8 font-black ${row.scoreColor.text}`}>
+                        {row.score}
                       </span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {hourlyRows.map((row) => (
-                    <tr
-                      key={row.key}
-                      className="transition-colors hover:bg-sky-50/70 dark:hover:bg-slate-900"
-                    >
-                      <td className="px-3 py-2.5 font-extrabold text-slate-950 dark:text-white">
-                        {row.hourLabel}
-                      </td>
-                      <td className="min-w-0 px-3 py-2.5">
-                        <div className="truncate font-bold text-slate-950 dark:text-white">
-                          {row.spot.site?.name ?? '—'}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-black ${row.scoreColor.text}`}>
-                            {row.score}
-                          </span>
-                          <div className="h-1.5 w-14 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                            <div
-                              className={`h-full rounded-full ${row.scoreColor.bg}`}
-                              style={{ width: `${row.score}%` }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5">
+                      <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                         <span
-                          className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${row.verdict.className}`}
-                        >
-                          {row.verdict.label}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 font-semibold text-slate-600 dark:text-slate-300">
-                        {row.windLabel}
-                      </td>
-                      <td className="px-3 py-2.5 font-semibold text-slate-600 dark:text-slate-300">
-                        {row.orientationLabel}
-                      </td>
-                      <td className="px-3 py-2.5 text-right">
-                        <Button
-                          onPress={() => {
-                            if (row.spot.site) {
-                              onSelectSite(row.spot.site.id);
-                            }
-                          }}
-                          className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition-colors hover:border-sky-300 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-sky-800 dark:hover:bg-slate-800"
-                        >
-                          {t('weather.viewForecast')}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          className={`block h-full rounded-full ${row.scoreColor.bg}`}
+                          style={{ width: `${row.score}%` }}
+                        />
+                      </span>
+                    </span>
+                    <span className="truncate font-semibold text-slate-600 dark:text-slate-300">
+                      {row.windLabel}
+                    </span>
+                    <span className="font-semibold text-slate-600 dark:text-slate-300">
+                      {row.orientationLabel}
+                    </span>
+                    <span
+                      className={`justify-self-start rounded-full px-2 py-0.5 text-[11px] font-bold ${row.verdict.className}`}
+                    >
+                      {row.verdict.label}
+                    </span>
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
         )}
