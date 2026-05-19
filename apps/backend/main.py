@@ -690,6 +690,10 @@ def health_check():
 
 @app.get("/")
 def read_root():
+    index_path = STATIC_DIR / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+
     return {
         "status": "ok",
         "message": "Dashboard Parapente API v0.2.0",
