@@ -655,7 +655,7 @@
     "goproOverlayCanProvideGpx": "Provide a GPX in the next step or add one to the flight",
     "goproOverlayNeedsGpx": "Add a GPX to this flight before generating the overlay",
     "goproOverlayNeedsVideo": "Generate the flight video before adding the overlay",
-    "goproOverlayNeedsCameraVideo": "Enter the onboard camera MP4 video path",
+    "goproOverlayNeedsCameraVideo": "Add camera.mp4 to the flight GoPro folder",
     "goproOverlayNeedsPipVideo": "Generate the flight video first",
     "goproOverlayNeedsOutputFilename": "Enter the output file name",
     "goproOverlayStarted": "GoPro overlay generation started",

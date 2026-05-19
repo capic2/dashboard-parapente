@@ -97,6 +97,7 @@ export const FlightSchema = z.object({
     .nullish(),
   video_file_path: z.string().nullish(),
   video_file_exists: z.boolean().nullish(),
+  gopro_camera_file_exists: z.boolean().nullish(),
   gopro_overlay_job_id: z.string().nullish(),
   gopro_overlay_status: z
     .enum(['queued', 'running', 'completed', 'failed', 'cancelled'])
