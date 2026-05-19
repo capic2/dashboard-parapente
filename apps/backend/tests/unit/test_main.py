@@ -14,11 +14,28 @@ def test_health_check_route_is_not_intercepted_by_spa_catch_all(client):
     assert response.json() == {"status": "ok"}
 
 
-def test_root_route_is_not_intercepted_by_spa_catch_all(client):
+def test_root_route_returns_api_status_when_frontend_is_missing(client, tmp_path, monkeypatch):
+    import main
+
+    monkeypatch.setattr(main, "STATIC_DIR", tmp_path)
+
     response = client.get("/")
 
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+
+def test_root_route_serves_frontend_index_when_built(client, tmp_path, monkeypatch):
+    import main
+
+    (tmp_path / "index.html").write_text("<html><body>frontend</body></html>")
+    monkeypatch.setattr(main, "STATIC_DIR", tmp_path)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert "frontend" in response.text
 
 
 def test_schedule_strava_token_refresh_job_forces_refresh():
