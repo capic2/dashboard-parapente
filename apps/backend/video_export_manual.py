@@ -555,6 +555,14 @@ def _enqueue_existing_video_export_job(job_id: str) -> None:
         start_video_export_worker()
 
 
+def _delete_rq_video_export_job(job_id: str) -> bool:
+    from job_queue import delete_job, is_rq_enabled
+
+    if not is_rq_enabled():
+        return False
+    return delete_job(_rq_job_id(job_id))
+
+
 def enqueue_pending_video_export_jobs() -> int:
     """Enqueue queued DB jobs into RQ after an API or worker restart."""
     from job_queue import is_rq_enabled
@@ -818,14 +826,13 @@ def cleanup_video_export_job_temp_files(job_id: str) -> dict[str, Any]:
 
 
 def delete_video_export_job(job_id: str) -> dict[str, Any] | None:
-    """Delete an inactive video export row and its temporary files."""
+    """Delete a video export row, stopping its queued or running RQ job first."""
     job = _get_job(job_id)
     snapshot = _snapshot_from_job(job) if job else _get_memory_snapshot(job_id)
     if not snapshot:
         return None
-    if _is_export_active(snapshot):
-        return {"job_id": job_id, "deleted": False, "error": "active"}
 
+    _delete_rq_video_export_job(job_id)
     cleanup = cleanup_video_export_job_temp_files(job_id)
     if job:
         with SessionLocal() as db:
@@ -1687,6 +1694,8 @@ def cancel_video_export(job_id: str, update_db: bool = True) -> bool:
 
     if job.status != _STATUS_QUEUED:
         _set_job_cancel_requested(job_id)
+    else:
+        _delete_rq_video_export_job(job_id)
 
     _update_job(
         job_id,
