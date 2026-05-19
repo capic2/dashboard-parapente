@@ -333,6 +333,47 @@ def test_resume_video_export_waits_for_running_cancel_to_finish(test_db, tmp_pat
         video_export_manual._clear_job_cancel_requested(job_id)
 
 
+def test_start_video_export_worker_restarts_when_previous_worker_is_stopping(monkeypatch):
+    class StoppingThread:
+        joined = False
+
+        def is_alive(self):
+            return True
+
+        def join(self, timeout=None):
+            self.joined = True
+
+    class StartedThread:
+        def __init__(self, target, name, daemon):
+            self.target = target
+            self.name = name
+            self.daemon = daemon
+            self.started = False
+
+        def start(self):
+            self.started = True
+
+        def is_alive(self):
+            return self.started
+
+    previous_thread = StoppingThread()
+    monkeypatch.setattr(video_export_manual, "_WORKER_THREAD", previous_thread)
+    monkeypatch.setattr(video_export_manual, "_mark_stale_jobs_as_queued", lambda: None)
+    monkeypatch.setattr(video_export_manual.threading, "Thread", StartedThread)
+    video_export_manual._WORKER_STOP.set()
+
+    try:
+        video_export_manual.start_video_export_worker()
+
+        assert previous_thread.joined is True
+        assert video_export_manual._WORKER_STOP.is_set() is False
+        assert isinstance(video_export_manual._WORKER_THREAD, StartedThread)
+        assert video_export_manual._WORKER_THREAD.started is True
+    finally:
+        video_export_manual._WORKER_THREAD = None
+        video_export_manual._WORKER_STOP.clear()
+
+
 def test_cleanup_temp_dir_removes_nested_files(tmp_path):
     temp_dir = tmp_path / "temp-images" / "job-123"
     frames_dir = temp_dir / "frames"

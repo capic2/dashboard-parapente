@@ -740,8 +740,11 @@ def start_video_export_worker():
     """Start the singleton background worker for manual exports."""
     global _WORKER_THREAD
     with _WORKER_LOCK:
-        if _WORKER_THREAD and _WORKER_THREAD.is_alive():
+        if _WORKER_THREAD and _WORKER_THREAD.is_alive() and not _WORKER_STOP.is_set():
             return
+
+        if _WORKER_THREAD and _WORKER_THREAD.is_alive():
+            _WORKER_THREAD.join(timeout=5)
 
         _WORKER_STOP.clear()
         _mark_stale_jobs_as_queued()
@@ -756,9 +759,12 @@ def start_video_export_worker():
 
 def stop_video_export_worker():
     """Stop the manual export worker (used during shutdown)."""
+    global _WORKER_THREAD
     _WORKER_STOP.set()
     if _WORKER_THREAD and _WORKER_THREAD.is_alive():
         _WORKER_THREAD.join(timeout=5)
+    if _WORKER_THREAD and not _WORKER_THREAD.is_alive():
+        _WORKER_THREAD = None
 
 
 def _enqueue_video_export_job(
