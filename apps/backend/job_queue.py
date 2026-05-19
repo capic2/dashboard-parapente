@@ -6,11 +6,18 @@ from typing import Any
 
 import redis
 from rq import Queue
+from rq.command import send_stop_job_command
 from rq.job import Job
 
 import config
 
 _PENDING_JOB_STATUSES = {"queued", "deferred", "scheduled"}
+
+
+def _status_value(status: Any) -> str | None:
+    if status is None:
+        return None
+    return str(getattr(status, "value", status)).lower()
 
 
 def is_rq_enabled() -> bool:
@@ -30,10 +37,18 @@ def get_queue(name: str | None = None) -> Queue:
 
 
 def _job_status_value(job: Job) -> str | None:
-    status = job.get_status(refresh=True)
-    if status is None:
-        return None
-    return str(getattr(status, "value", status)).lower()
+    return _status_value(job.get_status(refresh=True))
+
+
+def delete_job(job_id: str, queue_name: str | None = None) -> bool:
+    queue = get_queue(queue_name)
+    job = queue.fetch_job(job_id)
+    if job is None:
+        return False
+    if _job_status_value(job) == "started":
+        send_stop_job_command(queue.connection, job_id)
+    job.delete()
+    return True
 
 
 def enqueue_once(
