@@ -1,16 +1,6 @@
-import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
-import { api } from '../../lib/api';
 import { useEffect, useState } from 'react';
-
-export type GoproOverlayLayout = {
-  id: string;
-  label: string;
-  filename: string;
-  width: number | null;
-  height: number | null;
-  exists: boolean;
-  recommended: boolean;
-};
+import { useMutation } from '@tanstack/react-query';
+import { api } from '../../lib/api';
 
 export type GoproOverlayJob = {
   job_id: string;
@@ -29,46 +19,6 @@ export type GoproOverlayJob = {
   job_token?: string | null;
 };
 
-type LayoutsResponse = {
-  layouts: GoproOverlayLayout[];
-};
-
-export const goproOverlayLayoutsQueryOptions = (
-  width?: number | null,
-  height?: number | null
-) =>
-  queryOptions<GoproOverlayLayout[]>({
-    queryKey: ['gopro-overlays', 'layouts', width ?? null, height ?? null],
-    queryFn: async () => {
-      const searchParams: Record<string, string> = {};
-      if (width != null && height != null) {
-        searchParams.width = String(width);
-        searchParams.height = String(height);
-      }
-      const data = await api
-        .get('gopro-overlays/layouts', { searchParams })
-        .json<LayoutsResponse>();
-      return data.layouts;
-    },
-  });
-
-export function useGoproOverlayLayouts(
-  width?: number | null,
-  height?: number | null
-) {
-  return useQuery(goproOverlayLayoutsQueryOptions(width, height));
-}
-
-export function useCreateGoproOverlayJob() {
-  return useMutation({
-    mutationFn: async (formData: FormData) => {
-      return await api
-        .post('gopro-overlays/jobs', { body: formData, timeout: false })
-        .json<GoproOverlayJob>();
-    },
-  });
-}
-
 export function useCreateFlightGoproOverlayJob(flightId: string) {
   return useMutation({
     mutationFn: async (formData: FormData) => {
@@ -78,25 +28,6 @@ export function useCreateFlightGoproOverlayJob(flightId: string) {
           timeout: false,
         })
         .json<GoproOverlayJob>();
-    },
-  });
-}
-
-export function useCancelGoproOverlayJob() {
-  return useMutation({
-    mutationFn: async (
-      input: string | { jobId: string; jobToken?: string | null }
-    ) => {
-      const jobId = typeof input === 'string' ? input : input.jobId;
-      const jobToken = typeof input === 'string' ? null : input.jobToken;
-      const path = jobToken
-        ? `job-access/gopro-overlays/jobs/${jobId}/cancel`
-        : `gopro-overlays/jobs/${jobId}/cancel`;
-      await api
-        .delete(path, {
-          searchParams: jobToken ? { access_token: jobToken } : undefined,
-        })
-        .json();
     },
   });
 }
