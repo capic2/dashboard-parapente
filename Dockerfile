@@ -105,7 +105,7 @@ EXPOSE 8001
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8001/ || exit 1
+    CMD curl -f http://localhost:8001/health || exit 1
 
 # Lancer application avec migration automatique
 CMD ["./entrypoint.sh"]
