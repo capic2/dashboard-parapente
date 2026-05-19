@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import preview from '../../../.storybook/preview';
-import { expect, fn, screen, userEvent } from 'storybook/test';
+import { expect, fn, userEvent } from 'storybook/test';
 import { FlightDetails } from './FlightDetails';
 import { ToastContainer } from '@dashboard-parapente/design-system';
 import { useToastStore } from '../../hooks/useToast';
@@ -52,6 +52,8 @@ const fullFlight: Flight = {
   notes: 'Superbe vol thermique, base cumulus 1800m',
   gpx_file_path: '/data/flights/arguel-001.gpx',
   video_file_path: '/data/flights/arguel-001.mp4',
+  video_file_exists: true,
+  gopro_camera_file_exists: true,
   gopro_overlay_file_path: '/data/flights/final.mp4',
 };
 
@@ -125,6 +127,20 @@ const defaultHandlers = [
       flight_id: 'flight-001',
       gpx_file_path: '/data/flights/new.gpx',
       message: 'OK',
+    })
+  ),
+  http.post('*/api/flights/:id/gopro-overlay', () =>
+    HttpResponse.json({
+      job_id: 'job-gopro-overlay',
+      status: 'queued',
+      progress: 0,
+      message: 'queued',
+      layout_id: 'parapente-1080',
+      layout_label: 'Parapente 1920x1080',
+      output_filename: 'final.mp4',
+      created_at: '2026-03-15T14:00:00Z',
+      updated_at: '2026-03-15T14:00:00Z',
+      job_token: 'token-gopro-overlay',
     })
   ),
 ];
@@ -203,52 +219,16 @@ Default.test('The GPX can be replaced', async ({ canvas, step }) => {
 });
 
 Default.test(
-  'The GoPro overlay settings use edit in place fields',
+  'The GoPro overlay action starts with default values',
   async ({ canvas, userEvent, step }) => {
-    await step('open the GoPro overlay modal', async () => {
+    await step('start the GoPro overlay generation', async () => {
       await userEvent.click(
         await canvas.findByRole('button', {
           name: i18n.t('flights.goproOverlayGenerate'),
         })
       );
       await expect(
-        await screen.findByRole('dialog', {
-          name: i18n.t('flights.goproOverlayFormTitle'),
-        })
-      ).toBeInTheDocument();
-    });
-
-    await step('show values as text before editing', async () => {
-      await expect(
-        screen.queryByRole('textbox', {
-          name: i18n.t('flights.goproOverlayCameraVideo'),
-        })
-      ).not.toBeInTheDocument();
-      await expect(
-        screen.getAllByText(i18n.t('flights.goproOverlayAutoValue')).length
-      ).toBeGreaterThan(0);
-    });
-
-    await step('edit one field from its pencil action', async () => {
-      await userEvent.click(
-        screen.getByRole('button', {
-          name: i18n.t('flights.goproOverlayEditField', {
-            field: i18n.t('flights.goproOverlayCameraVideo'),
-          }),
-        })
-      );
-      const cameraInput = await screen.findByRole('textbox', {
-        name: i18n.t('flights.goproOverlayCameraVideo'),
-      });
-      await userEvent.type(cameraInput, 'parapente/20260315/1/camera.mp4');
-      await userEvent.keyboard('{Enter}');
-      await expect(
-        screen.queryByRole('textbox', {
-          name: i18n.t('flights.goproOverlayCameraVideo'),
-        })
-      ).not.toBeInTheDocument();
-      await expect(
-        screen.getByText('parapente/20260315/1/camera.mp4')
+        await canvas.findByText(i18n.t('flights.goproOverlayStarted'))
       ).toBeInTheDocument();
     });
   }

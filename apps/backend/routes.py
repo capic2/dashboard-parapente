@@ -265,6 +265,14 @@ def _flight_gopro_overlay_path(
     return output_path if output_path.exists() else None
 
 
+def _flight_gopro_camera_file_exists(db: Session, flight: Flight) -> bool:
+    try:
+        camera_path = _gopro_overlay_flight_directory(db, flight, create=False) / "camera.mp4"
+    except HTTPException:
+        return False
+    return camera_path.exists()
+
+
 def _flight_gopro_overlay_file_path(db: Session, flight: Flight) -> str | None:
     stored_path = _resolve_flight_file_path(flight.gopro_overlay_file_path)
     if stored_path and stored_path.exists():
@@ -3082,6 +3090,7 @@ def get_flights(
             "video_export_status": flight.video_export_status,
             "video_file_path": flight.video_file_path,
             "video_file_exists": _flight_video_file_exists(flight),
+            "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
             "gopro_overlay_job_id": flight.gopro_overlay_job_id,
             "gopro_overlay_status": _flight_gopro_overlay_status(flight),
             "gopro_overlay_file_path": gopro_overlay_file_path,
@@ -3278,6 +3287,7 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "video_export_status": flight.video_export_status,
         "video_file_path": flight.video_file_path,
         "video_file_exists": _flight_video_file_exists(flight),
+        "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
         "gopro_overlay_job_id": flight.gopro_overlay_job_id,
         "gopro_overlay_status": _flight_gopro_overlay_status(flight),
         "gopro_overlay_file_path": gopro_overlay_file_path,
