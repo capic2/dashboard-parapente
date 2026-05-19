@@ -222,6 +222,23 @@ const initialMockVideoJobs: VideoExportJob[] = [
     mode: 'manual',
     started_at: '2026-01-14T12:20:00Z',
     completed_at: '2026-01-14T13:35:00Z',
+    has_output_file: true,
+    output_filename: 'chalais-export.mp4',
+    can_cancel: false,
+  },
+  {
+    job_id: 'job-gopro-completed',
+    flight_title: 'final.mp4',
+    status: 'completed',
+    internal_status: 'completed',
+    progress: 100,
+    message: 'Overlay ready',
+    mode: 'gopro_overlay',
+    updated_at: '2026-01-14T14:05:00Z',
+    completed_at: '2026-01-14T14:05:00Z',
+    output_filename: 'final.mp4',
+    layout_label: 'Overlay GoPro',
+    has_output_file: true,
     can_cancel: false,
   },
 ];
@@ -532,6 +549,48 @@ export const videoExportHandlers = [
     }
 
     return HttpResponse.json({ success: true });
+  }),
+
+  http.post('*/api/exports/:jobId/resume', ({ params }) => {
+    const job = mockVideoJobs.find((item) => item.job_id === params.jobId);
+    if (job) {
+      job.status = 'processing';
+      job.internal_status = 'queued';
+      job.can_cancel = true;
+      job.can_resume = false;
+      job.message = 'Resume enqueued';
+    }
+
+    return HttpResponse.json({ success: true });
+  }),
+
+  http.delete('*/api/video-export-jobs/:jobId', ({ params }) => {
+    const index = mockVideoJobs.findIndex(
+      (item) => item.job_id === params.jobId
+    );
+    if (index !== -1) {
+      mockVideoJobs.splice(index, 1);
+    }
+
+    return HttpResponse.json({ success: true, deleted: true });
+  }),
+
+  http.delete('*/api/exports/:jobId/video', ({ params }) => {
+    const job = mockVideoJobs.find((item) => item.job_id === params.jobId);
+    if (job) {
+      job.has_output_file = false;
+    }
+
+    return HttpResponse.json({ success: true, deleted: true });
+  }),
+
+  http.delete('*/api/gopro-overlays/jobs/:jobId/video', ({ params }) => {
+    const job = mockVideoJobs.find((item) => item.job_id === params.jobId);
+    if (job) {
+      job.has_output_file = false;
+    }
+
+    return HttpResponse.json({ success: true, deleted: true });
   }),
 ];
 

@@ -149,7 +149,7 @@ describe('Header theme controls', () => {
   it('opens the desktop theme selector and applies dark mode', () => {
     render(<Header />);
     const themeButtons = screen.getAllByRole('button', {
-      name: /Theme : Light/,
+      name: /Theme : Light/u,
     });
     expect(themeButtons).toHaveLength(2);
     const desktopButton = themeButtons[0];
@@ -168,7 +168,7 @@ describe('Header theme controls', () => {
   it('opens the mobile theme selector and applies auto mode', () => {
     render(<Header />);
     const themeButtons = screen.getAllByRole('button', {
-      name: /Theme : Light/,
+      name: /Theme : Light/u,
     });
     expect(themeButtons).toHaveLength(2);
     const mobileButton = themeButtons[1];

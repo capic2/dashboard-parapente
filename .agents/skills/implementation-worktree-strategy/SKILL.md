@@ -19,6 +19,13 @@ Before any implementation task:
 Create worktrees in `.codenomad/worktree` with names starting with `wt-`.
 Whenever a worktree is created, immediately name the current AI session with the exact worktree name.
 
+## Analysis Baseline
+
+- Treat `origin/main` as the baseline for implementation analysis before editing.
+- Do not rely on local `main` for conclusions unless it has been verified aligned with `origin/main`.
+- If local `main` is stale, dirty, or ambiguous, create the implementation worktree from `origin/main` and continue analysis there.
+- If the user asks about local uncommitted changes or a specific branch/worktree, analyze that explicit target and say so.
+
 ## Worktree Bootstrap Subagent
 
 After creating a worktree, launch the `worktree-bootstrap` subagent immediately and let it run in parallel with the main implementation work.
@@ -26,11 +33,10 @@ After creating a worktree, launch the `worktree-bootstrap` subagent immediately 
 Subagent responsibility:
 
 - Work in the new worktree path.
-- Verify that local dependencies are usable before Nx commands run.
-- Check for `node_modules/.bin/nx` and representative required packages such as `typescript`.
-- Run `CI=true /home/capic/.local/share/pnpm/pnpm install --frozen-lockfile` only when dependencies are missing or unusable.
+- Verify dependency readiness using `local-machine-stack` as the source of truth for exact pnpm/Nx commands.
+- Install dependencies only when missing or unusable.
 - Do not rely on pnpm's global virtual store; each worktree must have a workspace-local dependency layout usable by Nx and Knip.
-- Run a lightweight readiness command after install/check, for example `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx --version`.
+- Run a lightweight readiness check after install/check.
 - Return a concise report with status, commands run, failures, and whether any files changed.
 
 The main agent remains responsible for interpreting blockers and making code changes. The `worktree-bootstrap` subagent must not edit source code or commit files.
@@ -79,14 +85,7 @@ Derive the worktree name from the user's implementation request, not from the fu
 
 Use this process:
 
-1. Extract a short task label from the main implementation intent.
-2. Keep 2 to 5 meaningful words.
-3. Convert to lowercase.
-4. Replace spaces with `-`.
-5. Remove accents, punctuation, and special characters.
-6. Prefix with `wt-`.
-
-Examples:
+Extract 2 to 5 meaningful words from the implementation intent, convert to lowercase, remove accents/punctuation/special characters, replace spaces with `-`, and prefix with `wt-`.
 
 - `implémenter le login Google` -> `wt-google-login`
 - `corriger le bug du dashboard` -> `wt-dashboard-bugfix`

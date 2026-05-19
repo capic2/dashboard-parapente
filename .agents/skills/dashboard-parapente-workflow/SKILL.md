@@ -23,6 +23,15 @@ Projects: `frontend` in `apps/frontend`, `backend` in `apps/backend`, `design-sy
 - Use `apply_patch` for manual edits; avoid shell-based file editing.
 - Never use destructive git commands.
 - Use `local-machine-stack` as the source of truth for pnpm paths, dependency readiness, command timeouts, and Nx validation commands.
+- Let specialized skills define their own project-specific commands, while `local-machine-stack` supplies shared machine invariants and generic validation commands.
+
+## Analysis Source Of Truth
+
+- Use `origin/main` as the default source of truth for repository analysis, diagnostics, code review, and behavior checks.
+- Before drawing conclusions from the current checkout, check whether it is aligned with `origin/main`.
+- If the current checkout is stale, dirty, or ambiguous, inspect `origin/main` directly or create/use a clean worktree from `origin/main`.
+- Only analyze local uncommitted changes, a non-main branch, or a specific worktree when the user explicitly asks for that target.
+- State which target is being analyzed when the distinction matters: local checkout, `origin/main`, or a named worktree.
 
 ## Worktrees
 

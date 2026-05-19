@@ -14,6 +14,8 @@ export const Route = createLazyFileRoute('/export-viewer')({
 function ExportViewer() {
   const search = new URLSearchParams(window.location.search);
   const flightId = search.get('flightId') || '';
+  const exportJobId = search.get('jobId') || null;
+  const exportToken = search.get('exportToken') || null;
 
   if (!flightId) {
     return (
@@ -34,7 +36,12 @@ function ExportViewer() {
           </div>
         }
       >
-        <FlightViewer3D flightId={flightId} exportOnly />
+        <FlightViewer3D
+          flightId={flightId}
+          exportOnly
+          exportJobId={exportJobId}
+          exportToken={exportToken}
+        />
       </Suspense>
     </div>
   );

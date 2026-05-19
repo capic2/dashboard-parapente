@@ -96,6 +96,13 @@ export const FlightSchema = z.object({
     ])
     .nullish(),
   video_file_path: z.string().nullish(),
+  video_file_exists: z.boolean().nullish(),
+  gopro_overlay_job_id: z.string().nullish(),
+  gopro_overlay_status: z
+    .enum(['queued', 'running', 'completed', 'failed', 'cancelled'])
+    .nullish(),
+  gopro_overlay_file_path: z.string().nullish(),
+  gopro_overlay_file_exists: z.boolean().nullish(),
   site: SiteSchema.optional(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),

@@ -187,7 +187,9 @@ const createHandlers = (gpxDelayMs = 0) => [
   http.get('*/api/flights', () => HttpResponse.json({ flights: flightsDb })),
   http.get('*/api/flights/:id/gpx-data', async () => {
     if (gpxDelayMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, gpxDelayMs));
+      await new Promise((resolve) => {
+        setTimeout(resolve, gpxDelayMs);
+      });
     }
     gpxRequestCount += 1;
     return HttpResponse.json({ data: mockGPXData });
@@ -235,7 +237,7 @@ Default.test(
     await step('have flights', async () => {
       await waitFor(async () => {
         await expect(
-          within(flightList).getAllByTestId(/^flight-row-/)
+          within(flightList).getAllByTestId(/^flight-row-/u)
         ).toHaveLength(mockFlights.length);
       });
     });
@@ -263,7 +265,7 @@ Default.test(
     await step('the flight is not deleted', async () => {
       await expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
       await expect(
-        within(flightList).getAllByTestId(/^flight-row-/)
+        within(flightList).getAllByTestId(/^flight-row-/u)
       ).toHaveLength(mockFlights.length);
     });
   }
@@ -278,7 +280,7 @@ Default.test(
     await step('have flights', async () => {
       await waitFor(async () => {
         await expect(
-          within(flightList).getAllByTestId(/^flight-row-/)
+          within(flightList).getAllByTestId(/^flight-row-/u)
         ).toHaveLength(mockFlights.length);
       });
     });
@@ -308,7 +310,7 @@ Default.test(
         await expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
 
         await expect(
-          within(flightList).getAllByTestId(/^flight-row-/)
+          within(flightList).getAllByTestId(/^flight-row-/u)
         ).toHaveLength(mockFlights.length - 1);
       });
     });

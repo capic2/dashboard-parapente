@@ -1,5 +1,5 @@
 import preview from '../../../.storybook/preview';
-import { fn } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { useState } from 'react';
 import type { RowSelectionState } from '@tanstack/react-table';
 import { FlightsTable } from './FlightsTable';
@@ -20,6 +20,10 @@ const mockFlights: Flight[] = [
     max_speed_kmh: 42,
     departure_time: '2024-03-15T14:30:00',
     gpx_file_path: '/uploads/flight-1.gpx',
+    video_export_job_id: 'job-flight-1',
+    video_export_status: 'completed',
+    video_file_path: '/exports/flight-1.mp4',
+    gopro_overlay_file_path: '/exports/final.mp4',
     notes: 'Super conditions thermiques',
   },
   {
@@ -51,6 +55,7 @@ const mockFlights: Flight[] = [
     max_speed_kmh: 55,
     departure_time: '2024-03-05T12:15:00',
     gpx_file_path: '/uploads/flight-3.gpx',
+    video_export_status: 'processing',
     notes: 'Premier cross de la saison',
   },
   {
@@ -64,6 +69,7 @@ const mockFlights: Flight[] = [
     distance_km: null,
     max_altitude_m: null,
     gpx_file_path: null,
+    video_export_status: 'failed',
     notes: null,
   },
   {
@@ -105,6 +111,10 @@ function FlightsTableWrapper({
         selectionMode={selectionMode}
         onSelectFlight={(flight) => setSelectedFlightId(flight.id)}
         onDeleteFlight={fn()}
+        onDownloadGpx={fn()}
+        onDownloadVideo={fn()}
+        onDownloadOverlay={fn()}
+        downloadingMedia={null}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
       />
@@ -124,6 +134,22 @@ const meta = preview.meta({
 export const Default = meta.story({
   name: 'Default',
   render: () => <FlightsTableWrapper flights={mockFlights} />,
+});
+
+export const SelectionUpdatesActiveStyle = meta.story({
+  name: 'Selection updates active style',
+  parameters: {
+    chromatic: { disableSnapshot: true },
+  },
+  render: () => <FlightsTableWrapper flights={mockFlights} />,
+  async play({ canvasElement }) {
+    const canvas = within(canvasElement);
+    const flightRow = canvas.getByTestId('flight-row-flight-1');
+
+    await userEvent.click(flightRow);
+
+    await expect(flightRow).toHaveClass('border-sky-700');
+  },
 });
 
 export const SelectionMode = meta.story({

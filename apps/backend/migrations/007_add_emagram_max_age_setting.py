@@ -5,15 +5,17 @@ Description: Seeds emagram_max_age_minutes in app_settings for existing deployme
 """
 
 import logging
-import os
 from datetime import datetime
 
 from sqlalchemy import create_engine, text
 
+from env_utils import required_env
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./db/dashboard.db")
+
+DATABASE_URL = required_env("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 
 SETTING_KEY = "emagram_max_age_minutes"

@@ -27,8 +27,20 @@ import {
 } from '@dashboard-parapente/design-system';
 import { useToast, useToastStore } from '../hooks/useToast';
 import { HTTPError } from 'ky';
-import { api } from '../lib/api';
+import { api, getApiErrorMessage } from '../lib/api';
 import { useIsMobile } from '../hooks/useIsMobile';
+
+type DownloadingFlightMedia = {
+  flightId: string;
+  type: 'gpx' | 'video' | 'overlay';
+};
+
+function getFlightDownloadName(flight: Flight, extension: string) {
+  const rawName = flight.title?.trim() || flight.name?.trim() || flight.id;
+  const filename = rawName.replace(/[^a-zA-Z0-9._-]+/gu, '_');
+
+  return `${filename || flight.id}.${extension}`;
+}
 
 export default function FlightHistory() {
   const { t } = useTranslation();
@@ -52,6 +64,8 @@ export default function FlightHistory() {
   const [showMobileDetail, setShowMobileDetail] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [gpxFilter, setGpxFilter] = useState<'all' | 'with' | 'missing'>('all');
+  const [downloadingFlightMedia, setDownloadingFlightMedia] =
+    useState<DownloadingFlightMedia | null>(null);
 
   const filteredFlights = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -224,6 +238,92 @@ export default function FlightHistory() {
     t,
   ]);
 
+  const handleDownloadFlightGpx = useCallback(
+    async (flight: Flight) => {
+      if (!flight.gpx_file_path || downloadingFlightMedia) return;
+
+      setDownloadingFlightMedia({ flightId: flight.id, type: 'gpx' });
+      try {
+        const blob = await api.get(`flights/${flight.id}/gpx`).blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = getFlightDownloadName(flight, 'gpx');
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch {
+        toast.error(t('flights.gpxDownloadError'));
+      } finally {
+        setDownloadingFlightMedia(null);
+      }
+    },
+    [downloadingFlightMedia, t, toast]
+  );
+
+  const handleDownloadFlightVideo = useCallback(
+    async (flight: Flight) => {
+      if (!flight.video_file_path || downloadingFlightMedia) {
+        return;
+      }
+
+      setDownloadingFlightMedia({ flightId: flight.id, type: 'video' });
+      try {
+        const blob = await api
+          .get(`flights/${flight.id}/video`, {
+            timeout: false,
+          })
+          .blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = getFlightDownloadName(flight, 'mp4');
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        toast.error(
+          await getApiErrorMessage(
+            error,
+            t('flights.viewer.videoDownloadError')
+          )
+        );
+      } finally {
+        setDownloadingFlightMedia(null);
+      }
+    },
+    [downloadingFlightMedia, t, toast]
+  );
+
+  const handleDownloadFlightOverlay = useCallback(
+    async (flight: Flight) => {
+      if (!flight.gopro_overlay_file_path || downloadingFlightMedia) return;
+
+      setDownloadingFlightMedia({ flightId: flight.id, type: 'overlay' });
+      try {
+        const blob = await api
+          .get(`flights/${flight.id}/gopro-overlay`, {
+            timeout: false,
+          })
+          .blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = getFlightDownloadName(flight, 'mp4');
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        toast.error(
+          await getApiErrorMessage(
+            error,
+            t('flights.goproOverlayDownloadError')
+          )
+        );
+      } finally {
+        setDownloadingFlightMedia(null);
+      }
+    },
+    [downloadingFlightMedia, t, toast]
+  );
+
   return (
     <div>
       {/* Toast notifications */}
@@ -357,13 +457,17 @@ export default function FlightHistory() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Flight List */}
         {(!isMobile || !showMobileDetail) && (
-          <div className={isMobile ? '' : 'lg:col-span-1'}>
+          <div className={isMobile ? '' : 'lg:col-span-1 lg:h-full'}>
             <FlightsTable
               flights={filteredFlights}
               selectedFlightId={selectedFlightId}
               selectionMode={selectionMode}
               onSelectFlight={handleSelectFlight}
               onDeleteFlight={setFlightToDelete}
+              onDownloadGpx={handleDownloadFlightGpx}
+              onDownloadVideo={handleDownloadFlightVideo}
+              onDownloadOverlay={handleDownloadFlightOverlay}
+              downloadingMedia={downloadingFlightMedia}
               rowSelection={rowSelection}
               onRowSelectionChange={setRowSelection}
             />

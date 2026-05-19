@@ -19,24 +19,22 @@ The workflow is:
 4. Try reading the PNG so clients that support inline images can display it.
 5. Always provide the PNG path and a Markdown image link for users with workspace access.
 6. If the user is chat-only, provide a short visual diagnosis and explain that a viewable image requires an attachment-capable client or upload target.
-7. Add a short visual assessment with any obvious issues.
-
 ## Project Defaults
 
-- Frontend Storybook: `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx storybook frontend`, port `6006`.
-- Design system Storybook: `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx storybook design-system`, port `6007`.
+- Frontend Storybook target: `nx storybook frontend`, port `6006`.
+- Design system Storybook target: `nx storybook design-system`, port `6007`.
 - Screenshot script: `.agents/skills/storybook-visual-preview/scripts/capture-storybook.mjs`.
 - Default output directory: `.codenomad/storybook-previews` when the user should open the file, or `/tmp/opencode/storybook-visual-preview` for disposable captures.
 - Browser fallback: if Playwright browsers are missing, the script tries `/usr/bin/chromium`.
 
-If a worktree has no `node_modules`, follow `local-machine-stack` and run `CI=true /home/capic/.local/share/pnpm/pnpm install` before capturing.
+Use `local-machine-stack` for the pnpm path, `NX_NO_CLOUD` prefix, dependency readiness, and command timeouts. If dependencies are missing, follow its readiness workflow before capturing.
 
 ## Quick Start
 
 Start Storybook as a background process:
 
 ```bash
-NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx storybook frontend
+NX_NO_CLOUD=true <pnpm-from-local-machine-stack> nx storybook frontend
 ```
 
 Capture a story by id:
@@ -48,7 +46,7 @@ node .agents/skills/storybook-visual-preview/scripts/capture-storybook.mjs \
   --output .codenomad/storybook-previews/button-primary.png
 ```
 
-Then use the Read tool on the PNG path and include this fallback in the response:
+Then use the Read tool on the PNG path and include this fallback:
 
 ```md
 Preview: `.codenomad/storybook-previews/button-primary.png`
@@ -86,19 +84,10 @@ Keep the user-facing report concise:
 
 - Mention which story and viewport were captured.
 - Include the preview file path and Markdown image link.
-- If the image did not render inline, explicitly say the client may not support image attachments from tool output.
-- If the user has no workspace access, do not rely on local paths. Ask for an upload target or suggest creating a PR/check artifact if GitHub is available.
+- If the image did not render inline, say the client may not support image attachments from tool output.
+- If the user has no workspace access, ask for an upload target or suggest creating a PR/check artifact.
 - State obvious visual issues only if visible: clipped content, overlap, empty state, unreadable text, broken spacing, missing assets, horizontal scroll.
 - If capture fails, report the Storybook URL, command, and the first actionable error.
-
-## Chat-Only Users
-
-If the user cannot access the project/workspace and the chat client does not render tool images:
-
-- Be explicit: `I can capture the screenshot, but this client is not rendering image attachments and you cannot open local files, so I cannot directly show the PNG here.`
-- Give a visual text summary from the captured image.
-- Offer one concrete next step: upload to a destination the user can access, attach through a compatible client, or publish as a GitHub PR artifact/comment if allowed.
-- Do not paste large base64 image blobs into the conversation unless the user explicitly asks for that format.
 
 ## Guardrails
 
@@ -106,3 +95,5 @@ If the user cannot access the project/workspace and the chat client does not ren
 - Do not expose secrets from query params, local storage, logs, or environment output.
 - Do not modify stories just to make a screenshot pass unless the user asked for a fix.
 - If the story depends on backend services and renders broken data, report that dependency instead of faking state.
+- For chat-only users who cannot open local files, give a visual text summary and offer one accessible delivery channel.
+- Do not paste large base64 image blobs unless the user explicitly asks for that format.

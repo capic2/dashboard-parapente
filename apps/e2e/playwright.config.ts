@@ -5,6 +5,7 @@ import * as path from 'path';
 const backendDir = path.resolve(__dirname, '..', 'backend');
 const dbPath = path.join(backendDir, 'test.db');
 const absoluteDbUrl = `sqlite:///${dbPath}`;
+const e2eRuntimeDir = path.join(backendDir, 'e2e-runtime');
 
 // Run only Chromium in CI for speed, all browsers locally
 const ciOnly = !!process.env.CI;
@@ -64,7 +65,9 @@ export default defineConfig({
       env: {
         ENVIRONMENT: 'test',
         TESTING: 'false',
-        BACKEND_DATABASE_URL: process.env.BACKEND_DATABASE_URL || absoluteDbUrl,
+        BACKEND_DATABASE_URL: absoluteDbUrl,
+        BACKEND_LOG_FILE: path.join(e2eRuntimeDir, 'dashboard.log'),
+        BACKEND_VERSION_STATE_FILE: path.join(e2eRuntimeDir, 'version_state.json'),
         BACKEND_WEATHERAPI_KEY: process.env.BACKEND_WEATHERAPI_KEY || 'test_key',
         BACKEND_METEOBLUE_API_KEY: process.env.BACKEND_METEOBLUE_API_KEY || 'test_key',
         BACKEND_STRAVA_VERIFY_TOKEN: process.env.BACKEND_STRAVA_VERIFY_TOKEN || 'PARAPENTE_E2E_TEST',

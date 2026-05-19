@@ -1,6 +1,6 @@
 ---
 name: local-machine-stack
-description: Documents the local machine setup for this Nx monorepo, including the absolute pnpm binary path and validated commands for lint, tests, builds, and targeted Nx tasks. Use when working in this repository and the user asks to run local commands, lint/test/build the repo, diagnose command availability, or use pnpm/Nx on this machine.
+description: Documents local machine invariants for this Nx monorepo, including the absolute pnpm binary path, dependency readiness, Nx prefixes, timeouts, and generic validation commands. Use when working in this repository and the user asks to run local commands, lint/test/build the repo, diagnose command availability, or use pnpm/Nx on this machine.
 ---
 
 # Local Machine Stack
@@ -14,6 +14,8 @@ Run repository commands from the active checkout or worktree root. Use this pnpm
 ```
 
 Do not assume `pnpm`, `npm`, `npx`, `yarn`, or `corepack` are available in `PATH`.
+
+Use `NX_NO_CLOUD=true` for Nx commands unless a task explicitly requires Nx Cloud.
 
 Before Nx commands, verify local dependencies exist. If `node_modules/.bin/nx` or required packages such as `typescript` are missing, run:
 
@@ -59,7 +61,9 @@ NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx run-many -t lint --all
 NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx run-many -t test --all
 ```
 
-Use direct project targets such as `nx affected lint frontend` or `nx affected test backend` only as follow-up diagnostics after an affected run identifies a failing project, or when explicitly requested.
+Use direct project targets such as `nx affected -t lint frontend` or `nx affected -t test backend` only as follow-up diagnostics after an affected run identifies a failing project, or when explicitly requested.
+
+Specialized skills may define their own project-specific Nx targets, such as Storybook or code generation. They should still use this skill for the pnpm path, dependency readiness, Nx prefixes, and timeouts.
 
 For direct Oxlint checks on frontend/design-system:
 

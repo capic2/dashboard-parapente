@@ -20,6 +20,13 @@
         }
       }
     },
+    "worker": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "command -v ../../.venv/bin/python >/dev/null 2>&1 && PYTHON=../../.venv/bin/python || PYTHON=python; BACKEND_JOB_QUEUE_BACKEND=rq $PYTHON job_worker.py",
+        "cwd": "apps/backend"
+      }
+    },
     "test": {
       "executor": "nx:run-commands",
       "outputs": ["{workspaceRoot}/coverage/apps/backend"],

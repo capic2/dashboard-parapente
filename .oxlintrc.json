@@ -33,6 +33,7 @@
     "max-lines": "off",
     "max-lines-per-function": "off",
     "max-classes-per-file": "off",
+    "import/max-dependencies": "off",
     "no-shadow": "off",
     "no-underscore-dangle": "off",
     "no-unused-vars": "error",

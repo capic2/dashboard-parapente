@@ -5,5 +5,7 @@ import { requireAuth } from '../lib/authGuard';
 
 export const Route = createFileRoute('/sites')({
   beforeLoad: requireAuth,
-  loader: () => queryClient.ensureQueryData(sitesQueryOptions()),
+  loader: () => {
+    void queryClient.prefetchQuery(sitesQueryOptions());
+  },
 });

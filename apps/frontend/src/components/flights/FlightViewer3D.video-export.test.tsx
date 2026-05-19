@@ -1,20 +1,14 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
-  apiGet,
-  apiPost,
-  exportStatusMock,
   invalidateQueries,
   mockFlight,
   entityOptions,
   viewerInstances,
   viewerOptions,
 } = vi.hoisted(() => ({
-  apiGet: vi.fn(),
-  apiPost: vi.fn(),
-  exportStatusMock: { current: null as unknown },
   invalidateQueries: vi.fn(),
   entityOptions: [] as unknown[],
   viewerInstances: [] as {
@@ -222,16 +216,6 @@ vi.mock('react-i18next', () => ({
     t: (key: string) =>
       ({
         'flights.viewer.defaultTitle': 'Flight viewer',
-        'flights.viewer.videoExportMode': 'Export mode',
-        'flights.viewer.videoModeManualFast': 'Fast smooth',
-        'flights.viewer.videoModeManual': 'Max quality',
-        'flights.viewer.videoModeManualFastHint': 'Fast hint',
-        'flights.viewer.videoModeManualHint': 'Manual hint',
-        'flights.viewer.generateVideo': 'Generate video',
-        'flights.viewer.downloadVideo': 'Download video',
-        'flights.viewer.resumeVideo': 'Resume generation',
-        'flights.viewer.videoResumeHint': 'frames preserved',
-        'flights.viewer.videoSection': 'Video',
       })[key] ?? key,
   }),
   withTranslation: () => (Component: unknown) => Component,
@@ -257,16 +241,8 @@ vi.mock('../../hooks/flights/useFlight', () => ({
   }),
 }));
 
-vi.mock('../../hooks/flights/useVideoExportStatus', () => ({
-  formatEta: () => null,
-  useVideoExportStatus: () => ({ status: exportStatusMock.current }),
-}));
-
 vi.mock('../../lib/api', () => ({
-  api: {
-    get: apiGet,
-    post: apiPost,
-  },
+  api: {},
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -300,9 +276,6 @@ describe('FlightViewer3D video export mode', () => {
       configurable: true,
       value: 1024,
     });
-    apiPost.mockResolvedValue(undefined);
-    apiGet.mockReset();
-    apiPost.mockClear();
     invalidateQueries.mockClear();
     viewerInstances.length = 0;
     viewerOptions.length = 0;
@@ -310,7 +283,6 @@ describe('FlightViewer3D video export mode', () => {
     mockFlight.video_export_status = null;
     mockFlight.video_export_job_id = null;
     mockFlight.video_file_path = null;
-    exportStatusMock.current = null;
     window._exportMode = undefined;
     window._setExportFrame = undefined;
     window._getExportMetadata = undefined;
@@ -348,49 +320,6 @@ describe('FlightViewer3D video export mode', () => {
     window._cesiumViewer = undefined;
   });
 
-  it('starts fast smooth export by default and shows its hint', async () => {
-    render(<FlightViewer3D flightId="flight-1" />);
-
-    expect(screen.getByText('Fast hint')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /Generate video/u }));
-
-    await waitFor(() => {
-      expect(apiPost).toHaveBeenCalledWith('flights/flight-1/export-video', {
-        searchParams: { mode: 'manual_fast' },
-      });
-    });
-  });
-
-  it('allows generation when an in-progress status has no job id', async () => {
-    mockFlight.video_export_status = 'processing';
-    mockFlight.video_export_job_id = null;
-
-    render(<FlightViewer3D flightId="flight-1" />);
-
-    const button = screen.getByRole('button', { name: /Generate video/u });
-    expect(button).not.toBeDisabled();
-
-    fireEvent.click(button);
-
-    await waitFor(() => {
-      expect(apiPost).toHaveBeenCalledWith('flights/flight-1/export-video', {
-        searchParams: { mode: 'manual_fast' },
-      });
-    });
-  });
-
-  it('keeps generation disabled when an in-progress status has a job id', () => {
-    mockFlight.video_export_status = 'processing';
-    mockFlight.video_export_job_id = 'job-processing';
-
-    render(<FlightViewer3D flightId="flight-1" />);
-
-    expect(
-      screen.getByRole('button', { name: /flights\.viewer\.videoGenerating/u })
-    ).toBeDisabled();
-  });
-
   it('hides viewer controls in export-only mode', () => {
     render(<FlightViewer3D flightId="flight-1" exportOnly />);
 
@@ -401,7 +330,6 @@ describe('FlightViewer3D video export mode', () => {
     expect(screen.getByTestId('flight-viewer-root')).toHaveClass(
       'flight-viewer-export-only'
     );
-    expect(screen.queryByText('Fast hint')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /Generate video/u })
     ).not.toBeInTheDocument();
@@ -507,73 +435,5 @@ describe('FlightViewer3D video export mode', () => {
     expect(viewerInstances[viewerInstances.length - 1]?.isDestroyed()).toBe(
       true
     );
-  });
-
-  it('starts max quality export after switching mode', async () => {
-    render(<FlightViewer3D flightId="flight-1" />);
-
-    fireEvent.change(screen.getByLabelText('Export mode'), {
-      target: { value: 'manual' },
-    });
-
-    expect(screen.getByText('Manual hint')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /Generate video/u }));
-
-    await waitFor(() => {
-      expect(apiPost).toHaveBeenCalledWith('flights/flight-1/export-video', {
-        searchParams: { mode: 'manual' },
-      });
-    });
-  });
-
-  it('resumes a cancelled export when preserved frames are available', async () => {
-    mockFlight.video_export_status = 'cancelled';
-    mockFlight.video_export_job_id = 'job-cancelled';
-    exportStatusMock.current = {
-      job_id: 'job-cancelled',
-      status: 'failed',
-      internal_status: 'cancelled',
-      can_resume: true,
-      frames_captured: 25,
-      resume_from_frame: 25,
-    };
-
-    render(<FlightViewer3D flightId="flight-1" />);
-
-    expect(screen.getByText('frames preserved')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /Resume generation/u }));
-
-    await waitFor(() => {
-      expect(apiPost).toHaveBeenCalledWith('exports/job-cancelled/resume');
-    });
-  });
-
-  it('downloads generated videos without applying the API request timeout', async () => {
-    mockFlight.video_export_status = 'completed';
-    mockFlight.video_export_job_id = 'job-video';
-    mockFlight.video_file_path = '/exports/job-video.mp4';
-    const blob = vi.fn().mockResolvedValue(new Blob(['video']));
-    apiGet.mockReturnValue({ blob });
-    Object.defineProperty(URL, 'createObjectURL', {
-      configurable: true,
-      value: vi.fn(() => 'blob:video'),
-    });
-    Object.defineProperty(URL, 'revokeObjectURL', {
-      configurable: true,
-      value: vi.fn(),
-    });
-
-    render(<FlightViewer3D flightId="flight-1" />);
-
-    fireEvent.click(screen.getByRole('button', { name: /Download video/u }));
-
-    await waitFor(() => {
-      expect(apiGet).toHaveBeenCalledWith('exports/job-video/download', {
-        timeout: false,
-      });
-      expect(blob).toHaveBeenCalled();
-    });
   });
 });

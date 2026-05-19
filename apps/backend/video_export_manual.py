@@ -16,12 +16,16 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 from sqlalchemy.orm import Session
 
 import config
+from auth import create_job_token, decode_job_token
 from database import SessionLocal
+from flight_storage import get_video_output_path
 from models import Flight, VideoExportJob
 
 # Storage for export jobs (compatibility snapshot)
@@ -66,8 +70,44 @@ _JOB_RUNTIME: dict[str, dict[str, Any]] = {}
 _JOB_CANCEL_REQUESTS: set[str] = set()
 
 _CANCEL_CHECK_INTERVAL = 10
+_EXPORT_VIEWER_READY_TIMEOUT_SECONDS = 180
 _FFMPEG_STALL_TIMEOUT_SECONDS = 10 * 60
 _ORPHAN_TEMP_CLEANUP_GRACE_SECONDS = 30
+_EXPORT_FRAME_TERRAIN_TIMEOUT_SECONDS = 10.0
+_EXPORT_FRAME_TERRAIN_POLL_SECONDS = 0.1
+
+_EXPORT_VIEWER_STATE_SCRIPT = """
+    () => {
+        const hasCanvas = Boolean(document.querySelector('.cesium-viewer canvas, canvas'));
+        const isLoginPage =
+            window.location.pathname === '/login' ||
+            Boolean(document.querySelector('input[type="password"]'));
+        const errorText = document.body?.innerText || '';
+        const hasCesiumError =
+            errorText.includes("Erreur d'initialisation Cesium") ||
+            errorText.includes('Cesium initialization error') ||
+            errorText.includes('VITE_CESIUM_ION_TOKEN is required') ||
+            errorText.includes('Container has zero dimensions') ||
+            errorText.includes('Cesium scene could not be initialized');
+
+        return {
+            hasCanvas,
+            isLoginPage,
+            path: window.location.pathname,
+            hasCesiumError,
+            missingIonToken: errorText.includes('VITE_CESIUM_ION_TOKEN is required'),
+            missingFlightId: errorText.includes('No flight ID provided'),
+            bodyText: errorText.slice(0, 1000),
+        };
+    }
+"""
+
+_EXPORT_VIEWER_READY_SCRIPT = f"""
+    () => {{
+        const state = ({_EXPORT_VIEWER_STATE_SCRIPT})();
+        return state.hasCanvas || state.isLoginPage || state.hasCesiumError || state.missingFlightId;
+    }}
+"""
 
 
 def check_dependencies():
@@ -104,7 +144,7 @@ def _to_iso(value: datetime | None) -> str | None:
 
 def _default_frontend_url() -> str:
     if config.FRONTEND_URL:
-        return config.FRONTEND_URL.rstrip("/")
+        return _normalize_frontend_url(config.FRONTEND_URL)
 
     static_index = Path(__file__).parent / "static" / "index.html"
     if static_index.exists():
@@ -114,7 +154,10 @@ def _default_frontend_url() -> str:
 
 
 def _backend_base_url() -> str:
-    host = "localhost" if config.API_HOST == "0.0.0.0" else config.API_HOST
+    if config.ENVIRONMENT == "production" and config.JOB_QUEUE_BACKEND == "rq":
+        return f"http://backend:{config.API_PORT}"
+
+    host = "127.0.0.1" if config.API_HOST == "0.0.0.0" else config.API_HOST
     return f"http://{host}:{config.API_PORT}"
 
 
@@ -122,6 +165,12 @@ def _is_local_vite_url(candidate: str) -> bool:
     parsed = urlparse(candidate)
     hostname = (parsed.hostname or "").lower()
     return hostname in {"localhost", "127.0.0.1", "::1"} and parsed.port == 5173
+
+
+def _is_local_backend_url(candidate: str) -> bool:
+    parsed = urlparse(candidate)
+    hostname = (parsed.hostname or "").lower()
+    return hostname in {"localhost", "127.0.0.1", "::1"} and parsed.port == config.API_PORT
 
 
 def resolve_frontend_url(frontend_url: str | None = None) -> str:
@@ -147,11 +196,35 @@ def _normalize_frontend_url(frontend_url: str) -> str:
     if (
         static_index.exists()
         and config.ENVIRONMENT == "production"
-        and _is_local_vite_url(candidate)
+        and (_is_local_vite_url(candidate) or _is_local_backend_url(candidate))
     ):
         return _backend_base_url()
 
     return candidate.rstrip("/")
+
+
+def _check_url_reachable(url: str, timeout_seconds: float = 5.0) -> None:
+    request = Request(url, headers={"User-Agent": "dashboard-parapente-video-export"})
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            status = response.status
+    except HTTPError as exc:
+        if exc.code >= 500:
+            raise RuntimeError(f"Export viewer returned HTTP {exc.code}: {url}") from exc
+        return
+    except URLError as exc:
+        raise RuntimeError(f"Export viewer is unreachable: {url} ({exc.reason})") from exc
+    except TimeoutError as exc:
+        raise RuntimeError(
+            f"Export viewer did not respond within {timeout_seconds:g}s: {url}"
+        ) from exc
+
+    if status >= 500:
+        raise RuntimeError(f"Export viewer returned HTTP {status}: {url}")
+
+
+async def _ensure_export_viewer_reachable(url: str, timeout_seconds: float = 5.0) -> None:
+    await asyncio.to_thread(_check_url_reachable, url, timeout_seconds)
 
 
 def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
@@ -266,6 +339,10 @@ def _get_job_auth_token(job_id: str) -> str | None:
         return job.auth_token
 
 
+def get_video_export_job_token(job_id: str) -> str | None:
+    return _get_job_auth_token(job_id)
+
+
 def _clear_job_auth_token(job_id: str):
     _set_job_auth_token(job_id, None)
 
@@ -275,16 +352,28 @@ def _build_playwright_init_script(auth_token: str | None) -> str:
     return f"""
         (() => {{
             window._exportMode = 'manual_render';
-
-            const token = {token_literal};
-            if (token) {{
-                localStorage.setItem(
-                    'parapente-auth',
-                    JSON.stringify({{ state: {{ token }} }})
-                );
-            }}
+            window._exportToken = {token_literal};
         }})();
     """
+
+
+def _create_video_export_job_token(job_id: str, flight_id: str) -> str:
+    return create_job_token(purpose="video_export", job_id=job_id, flight_id=flight_id)
+
+
+def _resolve_video_export_job_token(
+    job_id: str,
+    flight_id: str,
+    auth_token: str | None,
+) -> str:
+    if auth_token:
+        try:
+            payload = decode_job_token(auth_token, purpose="video_export", job_id=job_id)
+            if payload.get("flight_id") == flight_id:
+                return auth_token
+        except Exception:
+            return _create_video_export_job_token(job_id, flight_id)
+    return _create_video_export_job_token(job_id, flight_id)
 
 
 def _get_job(job_id: str, db: Session | None = None) -> VideoExportJob | None:
@@ -414,6 +503,79 @@ def _acquire_next_job() -> str | None:
         db.commit()
         _set_memory_snapshot(job.id, _snapshot_from_job(job))
         return job.id
+
+
+def _acquire_job(job_id: str) -> str | None:
+    with SessionLocal() as db:
+        job = db.query(VideoExportJob).filter(VideoExportJob.id == job_id).first()
+        if not job or job.status != _STATUS_QUEUED:
+            return None
+
+        job.status = _STATUS_RUNNING
+        job.message = "Starting manual export"
+        job.updated_at = datetime.utcnow()
+        job.started_at = datetime.utcnow()
+        db.commit()
+        _set_memory_snapshot(job.id, _snapshot_from_job(job))
+        return job.id
+
+
+def _queued_job_ids() -> list[str]:
+    with SessionLocal() as db:
+        jobs = (
+            db.query(VideoExportJob.id)
+            .filter(VideoExportJob.status == _STATUS_QUEUED)
+            .order_by(VideoExportJob.created_at)
+            .all()
+        )
+    return [str(job_id) for (job_id,) in jobs]
+
+
+def _rq_job_id(job_id: str) -> str:
+    return f"video-export-{job_id}"
+
+
+def _enqueue_video_export_job_in_rq(job_id: str) -> None:
+    from job_queue import enqueue_once
+
+    enqueue_once(
+        "video_export_manual.process_video_export_job",
+        job_id,
+        job_id=_rq_job_id(job_id),
+        timeout=config.JOB_QUEUE_TIMEOUT_SECONDS,
+    )
+
+
+def _enqueue_existing_video_export_job(job_id: str) -> None:
+    from job_queue import is_rq_enabled
+
+    if is_rq_enabled():
+        _enqueue_video_export_job_in_rq(job_id)
+    else:
+        start_video_export_worker()
+
+
+def enqueue_pending_video_export_jobs() -> int:
+    """Enqueue queued DB jobs into RQ after an API or worker restart."""
+    from job_queue import is_rq_enabled
+
+    if not is_rq_enabled():
+        return 0
+
+    _mark_stale_jobs_as_queued()
+    job_ids = _queued_job_ids()
+    for job_id in job_ids:
+        _enqueue_video_export_job_in_rq(job_id)
+    return len(job_ids)
+
+
+def process_video_export_job(job_id: str) -> None:
+    """RQ job target for a single manual video export."""
+    acquired_job_id = _acquire_job(job_id)
+    if not acquired_job_id:
+        return
+
+    asyncio.run(_export_video_manual_render(acquired_job_id))
 
 
 def _cleanup_temp_dir(temp_dir: Path | None) -> None:
@@ -621,6 +783,64 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
     }
 
 
+def cleanup_video_export_job_temp_files(job_id: str) -> dict[str, Any]:
+    """Delete temporary files for a single inactive video export job."""
+    candidates = [
+        (_job_temp_dir(_video_temp_images_dir(), job_id), _video_temp_images_dir()),
+        (_video_export_dir() / f"frames_{job_id}", _video_export_dir()),
+        (Path("/tmp") / f"playwright-debug-{job_id}.png", Path("/tmp")),
+        (Path("/tmp") / f"playwright-error-{job_id}.png", Path("/tmp")),
+    ]
+
+    deleted_paths: list[str] = []
+    errors: list[dict[str, str]] = []
+    files_deleted = 0
+    dirs_deleted = 0
+    bytes_deleted = 0
+
+    for path, allowed_root in candidates:
+        deletion = _delete_temp_path(path, allowed_root)
+        if deletion["deleted"]:
+            deleted_paths.append(str(deletion["path"]))
+            files_deleted += int(deletion["files_deleted"])
+            dirs_deleted += int(deletion["dirs_deleted"])
+            bytes_deleted += int(deletion["bytes_deleted"])
+        elif deletion["error"]:
+            errors.append({"path": str(deletion["path"]), "error": str(deletion["error"])})
+
+    return {
+        "files_deleted": files_deleted,
+        "dirs_deleted": dirs_deleted,
+        "bytes_deleted": bytes_deleted,
+        "paths_deleted": deleted_paths,
+        "errors": errors,
+    }
+
+
+def delete_video_export_job(job_id: str) -> dict[str, Any] | None:
+    """Delete an inactive video export row and its temporary files."""
+    job = _get_job(job_id)
+    snapshot = _snapshot_from_job(job) if job else _get_memory_snapshot(job_id)
+    if not snapshot:
+        return None
+    if _is_export_active(snapshot):
+        return {"job_id": job_id, "deleted": False, "error": "active"}
+
+    cleanup = cleanup_video_export_job_temp_files(job_id)
+    if job:
+        with SessionLocal() as db:
+            db_job = db.query(VideoExportJob).filter(VideoExportJob.id == job_id).first()
+            if db_job:
+                db.delete(db_job)
+                db.commit()
+
+    _set_memory_snapshot(job_id, None)
+    _clear_job_runtime(job_id)
+    _clear_job_cancel_requested(job_id)
+    _clear_job_auth_token(job_id)
+    return {"job_id": job_id, "deleted": True, **cleanup}
+
+
 def _prepare_export_dirs(export_root: Path, temp_dir: Path, frames_dir: Path) -> None:
     try:
         export_root.mkdir(parents=True, exist_ok=True)
@@ -638,8 +858,8 @@ def _job_frames_dir(temp_root: Path, job_id: str) -> Path:
     return _job_temp_dir(temp_root, job_id) / "frames"
 
 
-def _video_output_path(export_root: Path, flight_id: str, timestamp: str) -> Path:
-    return export_root / f"flight-{flight_id}-{timestamp}.mp4"
+def _video_output_path(flight_id: str, timestamp: str) -> Path:
+    return get_video_output_path(flight_id, timestamp)
 
 
 def _capture_progress_percent(frame_count: int, total_frames: int) -> int:
@@ -690,6 +910,45 @@ def _ffmpeg_timeout_seconds(video_duration_seconds: float) -> int:
     return max(6 * 60 * 60, dynamic_timeout)
 
 
+async def _wait_for_export_frame_terrain(
+    page: Any,
+    timeout_seconds: float = _EXPORT_FRAME_TERRAIN_TIMEOUT_SECONDS,
+    poll_seconds: float = _EXPORT_FRAME_TERRAIN_POLL_SECONDS,
+) -> bool:
+    deadline = time.monotonic() + timeout_seconds
+
+    while True:
+        tiles_loaded = await page.evaluate("""
+            () => {
+                const viewer = window._cesiumViewer;
+                const scene = viewer?.scene;
+                const globe = scene?.globe;
+
+                if (!viewer || !scene || !globe) {
+                    return false;
+                }
+
+                try {
+                    scene.requestRender?.();
+                    viewer.render?.();
+                } catch {
+                    return false;
+                }
+
+                return Boolean(globe.tilesLoaded);
+            }
+        """)
+
+        if tiles_loaded:
+            return True
+
+        remaining_seconds = deadline - time.monotonic()
+        if remaining_seconds <= 0:
+            return False
+
+        await asyncio.sleep(min(poll_seconds, remaining_seconds))
+
+
 def _ffmpeg_output_file_activity(
     output_file: Path, last_size: int, last_mtime_ns: int
 ) -> tuple[bool, int, int]:
@@ -738,6 +997,12 @@ def _worker_loop():
 
 def start_video_export_worker():
     """Start the singleton background worker for manual exports."""
+    from job_queue import is_rq_enabled
+
+    if is_rq_enabled():
+        enqueue_pending_video_export_jobs()
+        return
+
     global _WORKER_THREAD
     with _WORKER_LOCK:
         if _WORKER_THREAD and _WORKER_THREAD.is_alive() and not _WORKER_STOP.is_set():
@@ -777,7 +1042,7 @@ def _enqueue_video_export_job(
     update_db: bool = True,
     auth_token: str | None = None,
 ):
-    """Create a new export job and enqueue it for the singleton worker."""
+    """Create a new export job and enqueue it for the configured queue backend."""
     if not _dependencies_ok:
         raise RuntimeError("Missing dependencies for video export")
 
@@ -818,9 +1083,9 @@ def _enqueue_video_export_job(
         _set_memory_snapshot(job_id, _snapshot_from_job(job))
         _set_job_runtime(job_id, phase=_STATUS_QUEUED)
 
-    _set_job_auth_token(job_id, auth_token)
+    _set_job_auth_token(job_id, _resolve_video_export_job_token(job_id, flight_id, auth_token))
 
-    start_video_export_worker()
+    _enqueue_existing_video_export_job(job_id)
     return job_id
 
 
@@ -884,12 +1149,21 @@ async def _export_video_manual_render(job_id: str):
     temp_root = _video_temp_images_dir()
     temp_dir: Path | None = None
     frames_dir: Path | None = None
+    auth_token = job.auth_token
+    url = f"{frontend_url}/export-viewer?flightId={flight_id}&jobId={job_id}"
+    preflight_url = url
+    log_url = url
+    if auth_token:
+        url = f"{url}&exportToken={auth_token}"
+        log_url = f"{log_url}&exportToken=<redacted>"
 
     try:
+        from playwright.async_api import TimeoutError as PlaywrightTimeoutError
         from playwright.async_api import async_playwright
 
         _update_job(job_id, status=_STATUS_INITIALIZING, message="Setting up manual render")
         _set_job_runtime(job_id, phase=_STATUS_INITIALIZING)
+        await _ensure_export_viewer_reachable(preflight_url)
 
         # Resolution mapping
         resolutions = {"720p": (1280, 720), "1080p": (1920, 1080), "4K": (3840, 2160)}
@@ -924,14 +1198,12 @@ async def _export_video_manual_render(job_id: str):
             )
             page = await context.new_page()
 
-            auth_token = job.auth_token
             await page.add_init_script(_build_playwright_init_script(auth_token))
 
             page.on("console", lambda msg: print(f"🖥️  [{msg.type}]: {msg.text}"))
             page.on("pageerror", lambda err: print(f"❌ Browser error: {err}"))
 
-            url = f"{frontend_url}/export-viewer?flightId={flight_id}"
-            print(f"📺 Opening {url}")
+            print(f"📺 Opening {log_url}")
 
             _update_job(job_id, message="Loading export viewer")
             response = await page.goto(url, wait_until="networkidle", timeout=60000)
@@ -940,44 +1212,25 @@ async def _export_video_manual_render(job_id: str):
 
             _update_job(job_id, message="Waiting for Cesium viewer")
             await page.wait_for_load_state("domcontentloaded")
-            await page.wait_for_function(
-                """
-                () => {
-                    const hasCanvas = Boolean(document.querySelector('.cesium-viewer canvas, canvas'));
-                    const isLoginPage =
-                        window.location.pathname === '/login' ||
-                        Boolean(document.querySelector('input[type="password"]'));
+            try:
+                await page.wait_for_function(
+                    _EXPORT_VIEWER_READY_SCRIPT,
+                    timeout=_EXPORT_VIEWER_READY_TIMEOUT_SECONDS * 1000,
+                )
+            except PlaywrightTimeoutError as exc:
+                viewer_state = await page.evaluate(_EXPORT_VIEWER_STATE_SCRIPT)
+                body_text = str(viewer_state.get("bodyText") or "").strip()
+                raise Exception(
+                    "Export viewer did not become ready within "
+                    f"{_EXPORT_VIEWER_READY_TIMEOUT_SECONDS}s "
+                    f"(path={viewer_state.get('path', 'unknown')}, "
+                    f"hasCanvas={viewer_state.get('hasCanvas')}, "
+                    f"hasCesiumError={viewer_state.get('hasCesiumError')}, "
+                    f"isLoginPage={viewer_state.get('isLoginPage')}, "
+                    f"body={body_text[:300]!r})"
+                ) from exc
 
-                    const errorText = document.body?.innerText || '';
-                    const hasViewerError =
-                        errorText.includes("Erreur d'initialisation Cesium") ||
-                        errorText.includes('VITE_CESIUM_ION_TOKEN is required') ||
-                        errorText.includes('No flight ID provided');
-
-                    return hasCanvas || isLoginPage || hasViewerError;
-                }
-                """,
-                timeout=60000,
-            )
-
-            viewer_state = await page.evaluate("""
-                () => {
-                    const hasCanvas = Boolean(document.querySelector('.cesium-viewer canvas, canvas'));
-                    const isLoginPage =
-                        window.location.pathname === '/login' ||
-                        Boolean(document.querySelector('input[type="password"]'));
-                    const errorText = document.body?.innerText || '';
-
-                    return {
-                        hasCanvas,
-                        isLoginPage,
-                        path: window.location.pathname,
-                        hasViewerError: errorText.includes("Erreur d'initialisation Cesium"),
-                        missingIonToken: errorText.includes('VITE_CESIUM_ION_TOKEN is required'),
-                        missingFlightId: errorText.includes('No flight ID provided'),
-                    };
-                }
-                """)
+            viewer_state = await page.evaluate(_EXPORT_VIEWER_STATE_SCRIPT)
 
             if viewer_state.get("isLoginPage"):
                 raise Exception(
@@ -991,8 +1244,10 @@ async def _export_video_manual_render(job_id: str):
                 raise Exception("Export viewer opened without flightId")
 
             if not viewer_state.get("hasCanvas"):
+                body_text = str(viewer_state.get("bodyText") or "").strip()
                 raise Exception(
                     f"Cesium canvas not available (path={viewer_state.get('path', 'unknown')})"
+                    f": {body_text[:300]}"
                 )
 
             await asyncio.sleep(3)
@@ -1039,28 +1294,14 @@ async def _export_video_manual_render(job_id: str):
             print("✅ Cesium manual render mode configured")
 
             _update_job(job_id, message="Waiting for terrain")
-            try:
-                await asyncio.wait_for(
-                    page.evaluate("""
-                        () => {
-                            return new Promise((resolve) => {
-                                const viewer = window._cesiumViewer;
-                                const checkTerrain = () => {
-                                    if (viewer.scene.globe.tilesLoaded) {
-                                        console.log('✅ Terrain tiles loaded');
-                                        resolve(true);
-                                    } else {
-                                        setTimeout(checkTerrain, 500);
-                                    }
-                                };
-                                setTimeout(checkTerrain, 1000);
-                            });
-                        }
-                    """),
-                    timeout=60.0,
-                )
+            terrain_ready = await _wait_for_export_frame_terrain(
+                page,
+                timeout_seconds=60.0,
+                poll_seconds=0.5,
+            )
+            if terrain_ready:
                 print("✅ Initial terrain loaded")
-            except TimeoutError:
+            else:
                 print("⚠️  Terrain timeout - continuing anyway")
 
             await asyncio.sleep(2)
@@ -1171,6 +1412,7 @@ async def _export_video_manual_render(job_id: str):
                 )
                 print(f"▶️  Resuming capture from frame {resume_from_frame}/{total_frames}")
 
+            terrain_wait_enabled = True
             for i in range(resume_from_frame, total_frames):
                 if i % _CANCEL_CHECK_INTERVAL == 0 and _is_cancelled(job_id):
                     print("🛑 Export cancelled by user")
@@ -1193,17 +1435,14 @@ async def _export_video_manual_render(job_id: str):
                     )
                     tiles_loaded = bool(frame_state and frame_state.get("tilesLoaded"))
                 else:
-                    tiles_loaded = await page.evaluate("""
-                        () => {
-                            const viewer = window._cesiumViewer;
-                            viewer.scene.requestRender();
-                            viewer.render();
-                            return viewer.scene.globe.tilesLoaded;
-                        }
-                    """)
+                    tiles_loaded = False
 
-                if not tiles_loaded:
-                    await asyncio.sleep(0.1)
+                if not tiles_loaded and terrain_wait_enabled:
+                    tiles_loaded = await _wait_for_export_frame_terrain(page)
+                    if not tiles_loaded:
+                        print(f"⚠️  Terrain still loading for frame {i} after timeout")
+                        terrain_wait_enabled = False
+                        print("⚠️  Disabling per-frame terrain waits after timeout")
 
                 frame_path = frames_dir / f"frame{i:05d}.png"
                 await page.screenshot(path=str(frame_path), timeout=60000)
@@ -1262,7 +1501,7 @@ async def _export_video_manual_render(job_id: str):
             _set_job_runtime(job_id, phase=_STATUS_ENCODING, eta_seconds=None)
 
             timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-            output_file = _video_output_path(export_root, flight_id, timestamp)
+            output_file = _video_output_path(flight_id, timestamp)
             ffmpeg_preset, ffmpeg_crf = _ffmpeg_encoding_settings(is_fast_mode)
 
             ffmpeg_cmd = [
@@ -1496,14 +1735,14 @@ def resume_video_export(job_id: str, auth_token: str | None = None) -> bool:
         completed_at=None,
         cancelled_at=None,
     )
-    _set_job_auth_token(job_id, auth_token)
+    _set_job_auth_token(job_id, _resolve_video_export_job_token(job_id, job.flight_id, auth_token))
     _set_job_runtime(
         job_id,
         phase=_STATUS_QUEUED,
         frames_captured=int(resume_info["frames_captured"]),
         eta_seconds=None,
     )
-    start_video_export_worker()
+    _enqueue_existing_video_export_job(job_id)
     print(f"▶️  Video export {job_id} resumed")
     return True
 
@@ -1564,9 +1803,9 @@ def trigger_auto_export(
         )
         return None
 
-    print(f"🚀 Auto-triggering video export for flight {flight_id}")
+    print(f"🚀 Auto-triggering fast video export for flight {flight_id}")
     try:
-        job_id = start_video_export_manual(
+        job_id = start_video_export_manual_fast(
             flight_id=flight_id,
             quality="1080p",
             fps=15,
@@ -1574,10 +1813,10 @@ def trigger_auto_export(
             frontend_url=frontend_url,
             update_db=True,
         )
-        print(f"✅ Manual auto export job {job_id} started for flight {flight_id}")
+        print(f"✅ Manual fast auto export job {job_id} started for flight {flight_id}")
         return job_id
     except Exception as e:
-        print(f"⚠️ Manual auto-export failed for flight {flight_id}, fallback stream: {e}")
+        print(f"⚠️ Manual fast auto-export failed for flight {flight_id}, fallback stream: {e}")
         from video_export import start_video_export_background
 
         job_id = start_video_export_background(

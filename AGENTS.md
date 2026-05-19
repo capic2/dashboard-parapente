@@ -18,6 +18,13 @@ This file defines global rules for the entire monorepo.
 - Always limit changes to what is required by the task.
 - Follow existing conventions before introducing a new pattern.
 - Never modify out-of-scope files without an explicit reason.
+- Treat `origin/main` as the default source of truth for code analysis,
+  diagnostics, reviews, and functional behavior checks. Do not conclude from a
+  local `main` checkout until its alignment with `origin/main` has been checked.
+- If the local checkout is stale, dirty, or otherwise ambiguous, analyze
+  `origin/main` directly or use a clean worktree created from `origin/main`,
+  unless the user explicitly asks to inspect local uncommitted changes or a
+  specific branch/worktree.
 
 ## Git
 

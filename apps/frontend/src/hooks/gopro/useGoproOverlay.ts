@@ -26,6 +26,7 @@ export type GoproOverlayJob = {
   created_at: string;
   updated_at: string;
   completed_at?: string | null;
+  job_token?: string | null;
 };
 
 type LayoutsResponse = {
@@ -83,8 +84,19 @@ export function useCreateFlightGoproOverlayJob(flightId: string) {
 
 export function useCancelGoproOverlayJob() {
   return useMutation({
-    mutationFn: async (jobId: string) => {
-      await api.delete(`gopro-overlays/jobs/${jobId}/cancel`).json();
+    mutationFn: async (
+      input: string | { jobId: string; jobToken?: string | null }
+    ) => {
+      const jobId = typeof input === 'string' ? input : input.jobId;
+      const jobToken = typeof input === 'string' ? null : input.jobToken;
+      const path = jobToken
+        ? `job-access/gopro-overlays/jobs/${jobId}/cancel`
+        : `gopro-overlays/jobs/${jobId}/cancel`;
+      await api
+        .delete(path, {
+          searchParams: jobToken ? { access_token: jobToken } : undefined,
+        })
+        .json();
     },
   });
 }
@@ -94,7 +106,10 @@ const initialState = {
   isConnected: false,
 };
 
-export function useGoproOverlayJobStream(jobId?: string | null) {
+export function useGoproOverlayJobStream(
+  jobId?: string | null,
+  jobToken?: string | null
+) {
   const [state, setState] = useState(initialState);
 
   useEffect(() => {
@@ -103,10 +118,13 @@ export function useGoproOverlayJobStream(jobId?: string | null) {
       return;
     }
 
-    const url = new URL(
-      `/api/gopro-overlays/jobs/${jobId}/stream`,
-      window.location.origin
-    );
+    const path = jobToken
+      ? `/api/job-access/gopro-overlays/jobs/${jobId}/stream`
+      : `/api/gopro-overlays/jobs/${jobId}/stream`;
+    const url = new URL(path, window.location.origin);
+    if (jobToken) {
+      url.searchParams.set('access_token', jobToken);
+    }
     const eventSource = new EventSource(url.toString(), {
       withCredentials: true,
     });
@@ -132,7 +150,7 @@ export function useGoproOverlayJobStream(jobId?: string | null) {
       eventSource.removeEventListener('error', onError);
       eventSource.close();
     };
-  }, [jobId]);
+  }, [jobId, jobToken]);
 
   return state;
 }

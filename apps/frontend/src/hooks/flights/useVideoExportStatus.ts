@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useAuthStore } from '../../stores/authStore';
 
 export type VideoExportPhase =
   | 'queued'
@@ -102,9 +101,12 @@ export function formatEta(etaSeconds?: number): string | null {
   return `${hours} h ${minutes.toString().padStart(2, '0')} min`;
 }
 
-export function useVideoExportStatus(jobId?: string | null, enabled = true) {
+export function useVideoExportStatus(
+  jobId?: string | null,
+  enabled = true,
+  jobToken?: string | null
+) {
   const [state, setState] = useState<HookState>(initialState);
-  const token = useAuthStore((s) => s.token);
 
   useEffect(() => {
     setState(initialState);
@@ -113,9 +115,12 @@ export function useVideoExportStatus(jobId?: string | null, enabled = true) {
       return;
     }
 
-    const streamUrl = new URL(`/api/exports/${jobId}/stream`, window.location.origin);
-    if (token) {
-      streamUrl.searchParams.set('access_token', token);
+    const path = jobToken
+      ? `/api/job-access/exports/${jobId}/stream`
+      : `/api/exports/${jobId}/stream`;
+    const streamUrl = new URL(path, window.location.origin);
+    if (jobToken) {
+      streamUrl.searchParams.set('access_token', jobToken);
     }
 
     const eventSource = new EventSource(streamUrl.toString());
@@ -156,7 +161,7 @@ export function useVideoExportStatus(jobId?: string | null, enabled = true) {
       eventSource.removeEventListener('error', handleError);
       eventSource.close();
     };
-  }, [enabled, jobId, token]);
+  }, [enabled, jobId, jobToken]);
 
   return state;
 }

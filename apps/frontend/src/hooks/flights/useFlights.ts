@@ -181,7 +181,7 @@ export function useCreateFlightFromGPX() {
     mutationFn: async (formData: FormData) => {
       try {
         // Ky supporte FormData directement
-        const data = await api
+        return await api
           .post('flights/create-from-gpx', {
             body: formData,
           })
@@ -190,9 +190,7 @@ export function useCreateFlightFromGPX() {
             flight: Flight;
             message: string;
           }>();
-        return data;
       } catch (error) {
-        console.log({ error });
         // Handle HTTPError from ky
         if (isHTTPError<{ error: string; message: string }>(error)) {
           let errorMessage = 'Erreur lors de la création du vol';

@@ -43,6 +43,7 @@ class GoproOverlayJob(BaseModel):
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None = None
+    job_token: str | None = None
 
 
 class GoproOverlayCancelResponse(BaseModel):
@@ -258,6 +259,11 @@ class Flight(FlightBase):
     video_export_job_id: str | None = None
     video_export_status: str | None = None  # "processing", "completed", "failed"
     video_file_path: str | None = None
+    video_file_exists: bool = False
+    gopro_overlay_job_id: str | None = None
+    gopro_overlay_status: str | None = None
+    gopro_overlay_file_path: str | None = None
+    gopro_overlay_file_exists: bool = False
     created_at: datetime
     updated_at: datetime
     site: SiteInFlight | None = None  # Include site details with orientation

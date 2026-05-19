@@ -18,12 +18,13 @@ import config
 # even in test mode where initialize_database() is not called
 import models  # noqa: F401 - imported for side effects (model registration)
 from database import Base, SessionLocal, engine
+from gopro_overlay_export import start_gopro_overlay_worker, stop_gopro_overlay_worker
 from models import Site  # Needed for database initialization
 from metrics import setup_metrics
 from routes import public_router, router
-from video_export_manual import start_video_export_worker, stop_video_export_worker
 from scheduler import scheduler, start_scheduler, stop_scheduler
 from versioning import initialize_deployment_version
+from video_export_manual import start_video_export_worker, stop_video_export_worker
 from webhooks import router as webhooks_router
 
 # Configure logging
@@ -506,26 +507,31 @@ else:
     logger.info("🧪 Testing mode: Skipping database initialization and migrations")
 
 
-async def initial_cache_warmup():
+async def initial_cache_warmup() -> None:
     """
-    Warm up Redis cache on startup
-    Fetches today's data for all sites (non-blocking)
+    Warm up Redis cache on startup.
+
+    Fetches weather data for the configured default sites and forecast days.
     """
     from scheduler import scheduled_weather_fetch
 
     try:
-        # Wait 3 seconds for app to fully start
-        await asyncio.sleep(3)
-
         logger.info("🔥 Starting cache warmup...")
         await scheduled_weather_fetch()
         logger.info("✅ Cache warmup complete!")
 
-    except Exception as e:
-        logger.error(f"❌ Cache warmup failed: {e}")
+    except Exception:
+        logger.warning("❌ Cache warmup failed", exc_info=True)
         logger.info(
             "⚠️ App will continue, cache will populate on first request or next hourly poll"
         )
+
+
+def trigger_initial_cache_warmup() -> None:
+    """Start the Redis cache warmup without blocking startup."""
+
+    logger.info("🔥 Triggering initial cache warmup...")
+    asyncio.create_task(initial_cache_warmup())
 
 
 def schedule_strava_token_refresh_job():
@@ -543,6 +549,27 @@ def schedule_strava_token_refresh_job():
         replace_existing=True,
         kwargs={"force": True},
     )
+
+
+async def initial_strava_token_refresh() -> None:
+    """Refresh the Strava token once at startup before the interval job runs."""
+
+    from strava import refresh_access_token
+
+    try:
+        token = await refresh_access_token(force=True)
+        if token:
+            logger.info("🔑 Initial Strava token refresh completed")
+        else:
+            logger.warning("⚠️ Initial Strava token refresh failed")
+    except Exception:
+        logger.warning("⚠️ Initial Strava token refresh failed", exc_info=True)
+
+
+def trigger_initial_strava_token_refresh() -> None:
+    """Start the initial Strava token refresh without blocking startup."""
+
+    asyncio.create_task(initial_strava_token_refresh())
 
 
 @asynccontextmanager
@@ -586,21 +613,22 @@ async def lifespan(app: FastAPI):
         # Strava token refresh every 4 hours
         schedule_strava_token_refresh_job()
         logger.info("🔑 Strava token refresh scheduled (every 4h)")
+        trigger_initial_strava_token_refresh()
 
-        # Initial cache warmup (non-blocking)
-        logger.info("🔥 Triggering initial cache warmup...")
-        asyncio.create_task(initial_cache_warmup())
+        trigger_initial_cache_warmup()
     else:
         logger.info("📅 Scheduler disabled, skipping cache warmup")
 
     # Start manual video export worker (skip in tests)
     if not config.TESTING:
         start_video_export_worker()
+        start_gopro_overlay_worker()
 
     yield
 
     # Shutdown
     logger.info("⏹️ Shutting down Dashboard Parapente API...")
+    stop_gopro_overlay_worker()
     stop_video_export_worker()
     stop_scheduler()
 
@@ -633,6 +661,53 @@ app.add_middleware(
 app.include_router(public_router)
 app.include_router(router)
 app.include_router(webhooks_router)
+
+# Database
+DB_PATH = Path(__file__).parent / "db" / "dashboard.db"
+
+
+@app.get("/health")
+def health_check():
+    """
+    Health check endpoint for monitoring and e2e tests.
+
+    Returns a simple status response to verify the API server is running
+    and ready to accept requests. Used by:
+    - Playwright webServer configuration to wait for backend startup
+    - Monitoring and load balancers for health checks
+    - CI/CD pipelines to verify deployment success
+
+    Returns:
+        dict: A dictionary containing the status key with value "ok"
+
+    Example:
+        >>> response = client.get("/health")
+        >>> response.json()
+        {"status": "ok"}
+    """
+    return {"status": "ok"}
+
+
+@app.get("/")
+def read_root():
+    index_path = STATIC_DIR / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+
+    return {
+        "status": "ok",
+        "message": "Dashboard Parapente API v0.2.0",
+        "features": [
+            "Multi-source weather aggregation (5 sources)",
+            "Para-Index scoring (0-100)",
+            "Hourly scheduler (every hour)",
+            "Strava webhook integration",
+            "Telegram notifications",
+        ],
+        "db_path": str(DB_PATH),
+        "db_exists": DB_PATH.exists(),
+    }
+
 
 # ============================================
 # Serve Static Files (Frontend React SPA)
@@ -678,48 +753,6 @@ if STATIC_DIR.exists():
 else:
     logger.warning(f"⚠️  Static directory not found: {STATIC_DIR}")
     logger.warning("Frontend will not be served. Build frontend: cd frontend && npm run build")
-
-# Database
-DB_PATH = Path(__file__).parent / "db" / "dashboard.db"
-
-
-@app.get("/health")
-def health_check():
-    """
-    Health check endpoint for monitoring and e2e tests.
-
-    Returns a simple status response to verify the API server is running
-    and ready to accept requests. Used by:
-    - Playwright webServer configuration to wait for backend startup
-    - Monitoring and load balancers for health checks
-    - CI/CD pipelines to verify deployment success
-
-    Returns:
-        dict: A dictionary containing the status key with value "ok"
-
-    Example:
-        >>> response = client.get("/health")
-        >>> response.json()
-        {"status": "ok"}
-    """
-    return {"status": "ok"}
-
-
-@app.get("/")
-def read_root():
-    return {
-        "status": "ok",
-        "message": "Dashboard Parapente API v0.2.0",
-        "features": [
-            "Multi-source weather aggregation (5 sources)",
-            "Para-Index scoring (0-100)",
-            "Hourly scheduler (every hour)",
-            "Strava webhook integration",
-            "Telegram notifications",
-        ],
-        "db_path": str(DB_PATH),
-        "db_exists": DB_PATH.exists(),
-    }
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ type AnalyticsSearch = {
 };
 
 const isISODate = (value: unknown): value is string =>
-  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(value);
 
 export const Route = createFileRoute('/analytics')({
   beforeLoad: requireAuth,
@@ -25,11 +25,9 @@ export const Route = createFileRoute('/analytics')({
       dateTo: isISODate(search.dateTo) ? search.dateTo : undefined,
     };
   },
-  loader: async () => {
-    await Promise.all([
-      queryClient.ensureQueryData(flightStatsQueryOptions()),
-      queryClient.ensureQueryData(flightRecordsQueryOptions()),
-      queryClient.ensureQueryData(sitesQueryOptions()),
-    ]);
+  loader: () => {
+    void queryClient.prefetchQuery(flightStatsQueryOptions());
+    void queryClient.prefetchQuery(flightRecordsQueryOptions());
+    void queryClient.prefetchQuery(sitesQueryOptions());
   },
 });

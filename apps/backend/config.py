@@ -13,15 +13,28 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from env_utils import required_env
+
 logger = logging.getLogger(__name__)
 
-# Déterminer le répertoire racine du projet
-PROJECT_ROOT = Path(__file__).parent.parent
-BACKEND_ROOT = Path(__file__).parent
+
+# Déterminer le répertoire racine du monorepo
+BACKEND_ROOT = Path(__file__).resolve().parent
+
+
+def _resolve_project_root(backend_root: Path) -> Path:
+    if backend_root.parent.name == "apps":
+        return backend_root.parents[1]
+
+    return backend_root
+
+
+PROJECT_ROOT = _resolve_project_root(BACKEND_ROOT)
 
 # Charger les variables d'environnement selon le contexte
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 TESTING = os.getenv("TESTING", "false").lower() == "true"
+IS_TEST_ENV = TESTING or ENVIRONMENT == "test"
 
 if ENVIRONMENT != "production":
     # En développement : chercher .env.development puis .env
@@ -43,7 +56,7 @@ else:
 # ============================================================================
 # DATABASE
 # ============================================================================
-DATABASE_URL = os.getenv("BACKEND_DATABASE_URL", "sqlite:///./db/dashboard.db")
+DATABASE_URL = required_env("BACKEND_DATABASE_URL")
 
 # ============================================================================
 # REDIS
@@ -51,6 +64,16 @@ DATABASE_URL = os.getenv("BACKEND_DATABASE_URL", "sqlite:///./db/dashboard.db")
 REDIS_HOST = os.getenv("BACKEND_REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("BACKEND_REDIS_PORT", "6379"))
 USE_FAKE_REDIS = os.getenv("BACKEND_USE_FAKE_REDIS", "true").lower() == "true"
+
+# ============================================================================
+# JOB QUEUE
+# ============================================================================
+JOB_QUEUE_BACKEND = os.getenv(
+    "BACKEND_JOB_QUEUE_BACKEND",
+    "thread" if IS_TEST_ENV else "rq",
+).lower()
+JOB_QUEUE_NAME = os.getenv("BACKEND_JOB_QUEUE_NAME", "video_exports")
+JOB_QUEUE_TIMEOUT_SECONDS = int(os.getenv("BACKEND_JOB_QUEUE_TIMEOUT_SECONDS", "21600"))
 
 # ============================================================================
 # API
@@ -117,7 +140,7 @@ ADMIN_PASSWORD = os.getenv("BACKEND_ADMIN_PASSWORD")
 # LOGGING
 # ============================================================================
 LOG_LEVEL = os.getenv("BACKEND_LOG_LEVEL", "INFO")
-LOG_FILE = os.getenv("BACKEND_LOG_FILE", "logs/dashboard.log")
+LOG_FILE = required_env("BACKEND_LOG_FILE")
 
 # Monitoring
 METRICS_TOKEN = os.getenv("BACKEND_METRICS_TOKEN")
@@ -134,57 +157,26 @@ TELEGRAM_CHAT_ID = os.getenv("BACKEND_TELEGRAM_CHAT_ID")
 FRONTEND_URL = os.getenv("BACKEND_FRONTEND_URL")
 
 # ============================================================================
-# VIDEO EXPORT
+# FLIGHT FILE STORAGE
 # ============================================================================
-_USE_CONTAINER_VIDEO_PATHS = ENVIRONMENT == "production"
-VIDEO_EXPORT_DIR = os.getenv(
-    "BACKEND_VIDEO_EXPORT_DIR",
-    (
-        "/app/video-exports"
-        if _USE_CONTAINER_VIDEO_PATHS
-        else str(BACKEND_ROOT / "exports" / "videos")
-    ),
+PARAGLIDING_DATA_ROOT = (
+    "/tmp/dashboard-parapente-test/parapente" if IS_TEST_ENV else "/app/parapente"
 )
-VIDEO_TEMP_IMAGES_DIR = os.getenv(
-    "BACKEND_VIDEO_TEMP_IMAGES_DIR",
-    (
-        "/app/video-temp-images"
-        if _USE_CONTAINER_VIDEO_PATHS
-        else str(BACKEND_ROOT / "exports" / "video-temp-images")
-    ),
-)
+VIDEO_EXPORT_DIR = PARAGLIDING_DATA_ROOT
+VIDEO_TEMP_IMAGES_DIR = str(Path(PARAGLIDING_DATA_ROOT) / ".tmp" / "video-frames")
 
 # ============================================================================
 # GOPRO OVERLAY EXPORT
 # ============================================================================
-_GOPRO_OVERLAY_ROOT_DEFAULT = ""
-GOPRO_OVERLAY_ROOT = os.getenv(
-    "BACKEND_GOPRO_OVERLAY_ROOT",
-    _GOPRO_OVERLAY_ROOT_DEFAULT,
-)
-GOPRO_OVERLAY_BIN = os.getenv(
-    "BACKEND_GOPRO_OVERLAY_BIN",
-    (
-        str(Path(GOPRO_OVERLAY_ROOT) / "venv" / "bin" / "gopro-dashboard.py")
-        if GOPRO_OVERLAY_ROOT
-        else "gopro-dashboard.py"
-    ),
-)
-GOPRO_OVERLAY_UPLOAD_DIR = os.getenv(
-    "BACKEND_GOPRO_OVERLAY_UPLOAD_DIR",
-    str(BACKEND_ROOT / "exports" / "gopro-overlays" / "uploads"),
-)
-GOPRO_OVERLAY_OUTPUT_DIR = os.getenv(
-    "BACKEND_GOPRO_OVERLAY_OUTPUT_DIR",
-    str(BACKEND_ROOT / "exports" / "gopro-overlays" / "outputs"),
-)
-GOPRO_OVERLAY_PARAGLIDING_ROOT = os.getenv(
-    "BACKEND_GOPRO_OVERLAY_PARAGLIDING_ROOT",
-    "",
-)
-GOPRO_OVERLAY_LAYOUT_DIR = os.getenv(
-    "BACKEND_GOPRO_OVERLAY_LAYOUT_DIR",
-    GOPRO_OVERLAY_ROOT or str(BACKEND_ROOT / "gopro-overlay-layouts"),
+GOPRO_OVERLAY_ROOT = "/app/gopro-overlay"
+GOPRO_OVERLAY_BIN = str(Path(GOPRO_OVERLAY_ROOT) / "venv" / "bin" / "gopro-dashboard.py")
+GOPRO_OVERLAY_LAYOUT_DIR = GOPRO_OVERLAY_ROOT
+GOPRO_OVERLAY_PARAGLIDING_ROOT = PARAGLIDING_DATA_ROOT
+GOPRO_OVERLAY_OUTPUT_DIR = PARAGLIDING_DATA_ROOT
+GOPRO_OVERLAY_UPLOAD_DIR = str(Path(PARAGLIDING_DATA_ROOT) / ".tmp" / "gopro-uploads")
+GOPRO_OVERLAY_FONT = os.getenv(
+    "BACKEND_GOPRO_OVERLAY_FONT",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
 )
 
 # ============================================================================
@@ -192,7 +184,7 @@ GOPRO_OVERLAY_LAYOUT_DIR = os.getenv(
 # ============================================================================
 
 # Valider les variables critiques (sauf en mode test)
-if not TESTING:
+if not IS_TEST_ENV:
     if not JWT_SECRET:
         logger.error("❌ BACKEND_JWT_SECRET is required")
         raise ValueError("BACKEND_JWT_SECRET environment variable is required")

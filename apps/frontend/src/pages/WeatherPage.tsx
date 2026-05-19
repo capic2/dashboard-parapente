@@ -56,6 +56,104 @@ const getSearchDayLabel = (day: number, t: (key: string) => string) => {
   return `J+${day}`;
 };
 
+type WeatherSearchParams = {
+  siteId?: string;
+  day?: number;
+  target?: 'city' | 'takeoff' | 'landing';
+  city?: string;
+  displayName?: string;
+  spotId?: string;
+  spotName?: string;
+  spotType?: 'takeoff' | 'landing' | 'both';
+  lat?: number;
+  lon?: number;
+  elevation?: number;
+  orientation?: string;
+  country?: string;
+  source?: string;
+};
+
+const hasCoordinates = (
+  search: WeatherSearchParams
+): search is WeatherSearchParams & { lat: number; lon: number } =>
+  typeof search.lat === 'number' && typeof search.lon === 'number';
+
+const getTargetFromSearch = (
+  search: WeatherSearchParams
+): CityWeatherTarget | null => {
+  if (search.target === 'city' && search.city && hasCoordinates(search)) {
+    return {
+      type: 'city',
+      location: {
+        id: `query-city-${search.lat}-${search.lon}`,
+        name: search.city,
+        display_name: search.displayName ?? search.city,
+        latitude: search.lat,
+        longitude: search.lon,
+        country: search.country ?? 'FR',
+      },
+    };
+  }
+
+  if (
+    (search.target === 'takeoff' || search.target === 'landing') &&
+    search.spotId &&
+    search.spotName &&
+    hasCoordinates(search)
+  ) {
+    return {
+      type: search.target,
+      spot: {
+        id: search.spotId,
+        name: search.spotName,
+        type: search.spotType ?? search.target,
+        latitude: search.lat,
+        longitude: search.lon,
+        elevation_m: search.elevation,
+        orientation: search.orientation,
+        rating: undefined,
+        country: search.country ?? 'FR',
+        source: search.source ?? 'query',
+        distance_km: undefined,
+      },
+    };
+  }
+
+  return null;
+};
+
+const getSearchForTarget = (target: CityWeatherTarget | null, day: number) => {
+  const daySearch = day > 0 ? day : undefined;
+
+  if (!target) return { day: daySearch };
+
+  if (target.type === 'city') {
+    return {
+      target: 'city' as const,
+      city: target.location.name,
+      displayName: target.location.display_name,
+      lat: target.location.latitude,
+      lon: target.location.longitude,
+      country: target.location.country,
+      day: daySearch,
+    };
+  }
+
+  return {
+    target: target.type,
+    spotId: target.spot.id,
+    spotName: target.spot.name,
+    spotType: target.spot.type,
+    lat: target.spot.latitude,
+    lon: target.spot.longitude,
+    elevation: target.spot.elevation_m ?? undefined,
+    orientation: target.spot.orientation ?? undefined,
+    country: target.spot.country,
+    source: target.spot.source,
+    day: daySearch,
+  };
+};
+
 type SelectionTab = 'favorites' | 'search';
 
 export default function WeatherPage() {
@@ -68,11 +166,12 @@ export default function WeatherPage() {
   const search = useSearch({ from: '/weather' });
   const routeSiteId = search ? search.siteId : '';
   const selectedDayIndex = search.day ?? 0;
+  const selectedSearchTarget = getTargetFromSearch(search);
   const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
   const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(selectedDayIndex);
-  const [selectedSearchTarget, setSelectedSearchTarget] =
-    useState<CityWeatherTarget | null>(null);
-  const [selectionTab, setSelectionTab] = useState<SelectionTab>('favorites');
+  const [selectionTab, setSelectionTab] = useState<SelectionTab>(
+    selectedSearchTarget ? 'search' : 'favorites'
+  );
   const favoriteSites = useMemo(() => {
     if (favoriteSiteIds.length === 0) return sites;
 
@@ -126,15 +225,30 @@ export default function WeatherPage() {
   return (
     <div className="grid w-full min-w-0 gap-4 xl:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]">
       <aside className="min-w-0 space-y-4 xl:sticky xl:top-4 xl:self-start">
-        <section className={`${weatherCardClassName} overflow-hidden`}>
+        <section className={`${weatherCardClassName} overflow-visible`}>
           <div className="border-b border-slate-100 bg-gradient-to-br from-sky-50 via-white to-white p-4 dark:border-slate-800 dark:from-sky-950/40 dark:via-slate-900 dark:to-slate-900 sm:p-5">
-            <p className={weatherSectionTitleClassName}>Choix du site</p>
-            <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950 dark:text-white">
-              Sélection météo
-            </h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              Favoris, sites configurés ou recherche par ville.
-            </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className={weatherSectionTitleClassName}>Choix du site</p>
+                <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950 dark:text-white">
+                  Sélection météo
+                </h2>
+                <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-300">
+                  Gardez vos favoris sous la main ou cherchez une ville, un déco
+                  ou un atterro proche.
+                </p>
+              </div>
+              {activeWeatherName && (
+                <div className="min-w-0 rounded-2xl border border-sky-100 bg-white/80 px-3 py-2 text-sm shadow-sm dark:border-sky-900/60 dark:bg-slate-950/50">
+                  <span className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                    Actuel
+                  </span>
+                  <span className="block truncate font-bold text-sky-800 dark:text-sky-200">
+                    {activeWeatherName}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
           <div className="p-3 sm:p-4">
             <Tabs
@@ -142,19 +256,36 @@ export default function WeatherPage() {
               onSelectionChange={(key) => {
                 const nextTab = key as SelectionTab;
                 setSelectionTab(nextTab);
-                if (nextTab === 'favorites') setSelectedSearchTarget(null);
+                if (nextTab === 'favorites') {
+                  void navigate({
+                    to: '/weather',
+                    search: {
+                      siteId: selectedSiteId || undefined,
+                      day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
+                    },
+                  });
+                }
               }}
             >
-              <TabList className="grid-cols-2 bg-slate-100 shadow-none dark:bg-slate-950/70">
-                <Tab id="favorites">Favoris</Tab>
-                <Tab id="search">Recherche</Tab>
+              <TabList className="grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 shadow-none dark:bg-slate-950/70">
+                <Tab id="favorites">
+                  <span className="inline-flex items-center gap-2">
+                    <MapPin className="h-4 w-4" aria-hidden="true" />
+                    Favoris
+                  </span>
+                </Tab>
+                <Tab id="search">
+                  <span className="inline-flex items-center gap-2">
+                    <Search className="h-4 w-4" aria-hidden="true" />
+                    Recherche
+                  </span>
+                </Tab>
               </TabList>
               <TabPanel id="favorites">
                 {sites.length > 0 ? (
                   <SiteSelector
                     selectedSiteId={selectedSearchTarget ? '' : selectedSiteId}
                     onSelectSite={(siteId) => {
-                      setSelectedSearchTarget(null);
                       setSelectionTab('favorites');
                       void navigate({
                         to: '/weather',
@@ -189,11 +320,13 @@ export default function WeatherPage() {
                   favoriteSites={sites}
                   isEmbedded
                   onSelectTarget={(target) => {
-                    setSelectedSearchTarget(target);
                     setSelectionTab('search');
+                    void navigate({
+                      to: '/weather',
+                      search: getSearchForTarget(target, selectedDayIndex),
+                    });
                   }}
                   onFavoriteCreated={(siteId) => {
-                    setSelectedSearchTarget(null);
                     setSelectionTab('favorites');
                     void navigate({
                       to: '/weather',
@@ -215,7 +348,6 @@ export default function WeatherPage() {
           hourlyBestSpots={hourlyBestSpots?.hours ?? []}
           hourlyStartHour={hourlyBestSpots?.startHour}
           onSelectSite={(siteId) => {
-            setSelectedSearchTarget(null);
             setSelectionTab('favorites');
             void navigate({
               to: '/weather',
@@ -308,10 +440,7 @@ export default function WeatherPage() {
                     onClick={() =>
                       void navigate({
                         to: '/weather',
-                        search: {
-                          siteId: selectedSiteId || undefined,
-                          day: day > 0 ? day : undefined,
-                        },
+                        search: getSearchForTarget(selectedSearchTarget, day),
                       })
                     }
                     role="tab"
