@@ -152,7 +152,7 @@ def test_get_video_output_path_uses_flight_directory(db_session, monkeypatch, tm
 
     output_path = get_video_output_path("flight-video", "20260517-120000")
 
-    assert output_path == tmp_path / "20260517" / "01" / "history-20260517-120000.mp4"
+    assert output_path == tmp_path / "20260517" / "01" / "flight-20260517-120000.mp4"
 
 
 def test_get_video_output_path_falls_back_to_export_root(monkeypatch, tmp_path, test_db):

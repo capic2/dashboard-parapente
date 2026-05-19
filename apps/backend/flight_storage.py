@@ -53,7 +53,7 @@ def get_video_output_path(flight_id: str, timestamp: str) -> Path:
         with SessionLocal() as db:
             flight = db.query(Flight).filter(Flight.id == flight_id).first()
             if flight:
-                return ensure_flight_directory(db, flight) / f"history-{timestamp}.mp4"
+                return ensure_flight_directory(db, flight) / f"flight-{timestamp}.mp4"
     except Exception as exc:
         print(f"⚠️ Could not resolve flight storage directory: {exc}")
 
