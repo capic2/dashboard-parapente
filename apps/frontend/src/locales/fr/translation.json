@@ -51,6 +51,7 @@
     "never": "Jamais",
     "justNow": "À l'instant",
     "now": "Maintenant",
+    "time": "Heure",
     "minutesAgo": "Il y a {{count}}min",
     "hoursAgo": "Il y a {{count}}h",
     "daysAgo": "Il y a {{count}}j",
