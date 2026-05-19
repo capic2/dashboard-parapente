@@ -78,10 +78,16 @@ const {
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (_key: string, fallback: string, values?: Record<string, unknown>) =>
-      values?.count
-        ? fallback.replace('{{count}}', String(values.count))
-        : fallback,
+    t: (_key: string, fallback: string, values?: Record<string, unknown>) => {
+      if (!values) {
+        return fallback;
+      }
+
+      return Object.entries(values).reduce(
+        (label, [key, value]) => label.replace(`{{${key}}}`, String(value)),
+        fallback
+      );
+    },
   }),
   withTranslation: () => (Component: React.ComponentType) => Component,
 }));
@@ -206,7 +212,7 @@ describe('VideoExportJobsPanel', () => {
   it('filters jobs by status', () => {
     render(<VideoExportJobsPanel />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Terminés' }));
+    fireEvent.click(screen.getByRole('button', { name: /Terminés/u }));
 
     expect(screen.getAllByText('Vol terminé').length).toBeGreaterThan(0);
     expect(screen.queryByText('Vol test')).not.toBeInTheDocument();
@@ -240,11 +246,23 @@ describe('VideoExportJobsPanel', () => {
   it('filters jobs by type', () => {
     render(<VideoExportJobsPanel />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Overlay GoPro' }));
+    fireEvent.click(screen.getByRole('button', { name: /Overlay GoPro/u }));
 
     expect(screen.getAllByText('vol-overlay.mp4').length).toBeGreaterThan(0);
     expect(screen.getAllByText('final.mp4').length).toBeGreaterThan(0);
     expect(screen.queryByText('Vol test')).not.toBeInTheDocument();
+  });
+
+  it('resets active filters', () => {
+    render(<VideoExportJobsPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Overlay GoPro/u }));
+    expect(screen.queryByText('Vol test')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Réinitialiser' }));
+
+    expect(screen.getAllByText('Vol test').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('vol-overlay.mp4').length).toBeGreaterThan(0);
   });
 
   it('deletes an inactive row after confirmation', async () => {

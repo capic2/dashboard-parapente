@@ -88,6 +88,13 @@
     "deleteRow": "Supprimer",
     "deleteRowSuccess": "Ligne supprimée",
     "deleteRowError": "Impossible de supprimer la ligne",
+    "resetFilters": "Réinitialiser",
+    "visibleSummary": "{{visible}} génération(s) affichée(s)",
+    "filteredSummary": "{{visible}} génération(s) affichée(s) sur {{total}}",
+    "filterLabels": {
+      "type": "Type",
+      "status": "Statut"
+    },
     "mode": {
       "goproOverlay": "Overlay GoPro"
     },

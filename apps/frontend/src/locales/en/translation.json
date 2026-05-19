@@ -88,6 +88,13 @@
     "deleteRow": "Delete",
     "deleteRowSuccess": "Row deleted",
     "deleteRowError": "Unable to delete row",
+    "resetFilters": "Reset",
+    "visibleSummary": "{{visible}} generation(s) shown",
+    "filteredSummary": "{{visible}} generation(s) shown out of {{total}}",
+    "filterLabels": {
+      "type": "Type",
+      "status": "Status"
+    },
     "mode": {
       "goproOverlay": "GoPro overlay"
     },
