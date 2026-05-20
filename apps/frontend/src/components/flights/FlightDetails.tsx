@@ -148,6 +148,16 @@ export function FlightDetails({
     setNotesText(flight.notes ?? '');
   }, [flight.notes]);
 
+  useEffect(() => {
+    if (
+      streamedGoproOverlayJob?.status === 'completed' ||
+      streamedGoproOverlayJob?.status === 'failed' ||
+      streamedGoproOverlayJob?.status === 'cancelled'
+    ) {
+      void queryClient.invalidateQueries({ queryKey: ['flights'] });
+    }
+  }, [queryClient, streamedGoproOverlayJob?.status]);
+
   const handleSubmitEdit = async (values: FlightFormData) => {
     await updateFlight.mutateAsync(values);
     toast.success(t('flights.updateSuccess'));
@@ -213,6 +223,7 @@ export function FlightDetails({
       if (activeFlightIdRef.current !== requestedFlightId) return;
       setGoproOverlayJobId(job.job_id);
       setGoproOverlayJobToken(job.job_token ?? null);
+      void queryClient.invalidateQueries({ queryKey: ['flights'] });
       toast.success(t('flights.goproOverlayStarted'));
     } catch (error) {
       toast.error(
