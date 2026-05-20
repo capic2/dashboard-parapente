@@ -413,7 +413,7 @@ export const BestSpotSuggestion = ({
         </p>
 
         {hourlyBestSpots.length > 0 && (
-          <div className="mb-4 min-w-0 border-t border-slate-100 pt-3 dark:border-slate-700">
+          <div className="@container/best-spot-timeline mb-4 min-w-0 border-t border-slate-100 pt-3 dark:border-slate-700">
             <div className="flex items-center justify-between gap-2 mb-2">
               <span className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 {t('weather.bestSpotTimeline')}
@@ -422,7 +422,7 @@ export const BestSpotSuggestion = ({
                 {t('weather.byHour')}
               </span>
             </div>
-            <div className="flex max-w-full min-w-0 gap-2 overflow-x-auto overscroll-x-contain pb-1 lg:hidden">
+            <div className="flex max-w-full min-w-0 gap-2 overflow-x-auto overscroll-x-contain pb-1 @min-[760px]/best-spot-timeline:hidden">
               {hourlyRows.map((row) => {
                 const rowSite = row.spot.site;
                 const content = (
@@ -490,7 +490,7 @@ export const BestSpotSuggestion = ({
               })}
             </div>
 
-            <div className="hidden overflow-x-auto overscroll-x-contain rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-950/60 lg:block">
+            <div className="hidden overflow-x-auto overscroll-x-contain rounded-2xl border border-slate-200 bg-white p-2 shadow-sm @min-[760px]/best-spot-timeline:block dark:border-slate-700 dark:bg-slate-950/60">
               <table className="w-full min-w-[760px] table-auto border-separate border-spacing-y-1 text-left text-sm">
                 <thead>
                   <tr className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
