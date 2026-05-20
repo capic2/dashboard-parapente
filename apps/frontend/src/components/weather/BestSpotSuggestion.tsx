@@ -530,7 +530,7 @@ export const BestSpotSuggestion = ({
                           {rowSite ? (
                             <Button
                               onPress={() => onSelectSite(rowSite.id)}
-                              className="max-w-full cursor-pointer justify-start whitespace-normal break-normal rounded-lg bg-transparent px-0 py-0 text-left font-bold leading-tight text-slate-950 transition-colors hover:text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white dark:hover:text-sky-300"
+                              className="min-h-0 max-w-full cursor-pointer justify-start whitespace-normal break-normal rounded-none bg-transparent px-0 py-0 text-left font-bold leading-tight text-slate-950 shadow-none transition-colors hover:bg-transparent hover:text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white dark:hover:bg-transparent dark:hover:text-sky-300 [&[data-pressed]]:bg-transparent"
                             >
                               {rowSite.name}
                             </Button>
