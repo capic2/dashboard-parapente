@@ -118,7 +118,7 @@ function getProgress(job: VideoExportJob) {
 }
 
 function getFlightLabel(job: VideoExportJob) {
-  return job.flight_title || job.flight_name || job.flight_id || job.job_id;
+  return job.flight_name || job.flight_title || job.flight_id || job.job_id;
 }
 
 function getLastActivityTime(job: VideoExportJob) {

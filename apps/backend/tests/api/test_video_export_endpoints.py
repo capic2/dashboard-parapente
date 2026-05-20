@@ -458,8 +458,11 @@ class TestVideoExportJobsEndpoint:
     """Tests for GET /video-export-jobs."""
 
     def test_video_export_jobs_lists_jobs_with_cancel_state(
-        self, client: TestClient, sample_flight
+        self, client: TestClient, db_session, sample_flight
     ):
+        sample_flight.title = "Legacy flight title"
+        db_session.commit()
+
         manual_jobs = [
             {
                 "job_id": "job-running",
@@ -513,6 +516,7 @@ class TestVideoExportJobsEndpoint:
         assert jobs[1]["status"] == "processing"
         assert jobs[1]["can_cancel"] is True
         assert jobs[1]["flight_name"] == sample_flight.name
+        assert jobs[1]["flight_title"] == sample_flight.name
         assert jobs[2]["job_id"] == "job-cancelled"
         assert jobs[2]["status"] == "cancelled"
         assert jobs[2]["can_cancel"] is False

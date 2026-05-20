@@ -436,7 +436,7 @@ def _build_video_export_jobs_payload(
             job["has_output_file"] = bool(video_path and Path(str(video_path)).exists())
         if flight:
             job["flight_name"] = flight.name or flight.title
-            job["flight_title"] = flight.title or flight.name
+            job["flight_title"] = flight.name or flight.title
         jobs.append(job)
 
     return sorted(jobs, key=_video_export_sort_value, reverse=True)
