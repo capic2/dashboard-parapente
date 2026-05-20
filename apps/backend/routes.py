@@ -412,10 +412,23 @@ def _build_video_export_jobs_payload(
     exports: list[dict[str, Any]], db: Session
 ) -> list[dict[str, Any]]:
     flight_ids = {export.get("flight_id") for export in exports if export.get("flight_id")}
+    overlay_job_ids = {
+        export.get("job_id")
+        for export in exports
+        if export.get("mode") == "gopro_overlay" and export.get("job_id")
+    }
     flights_by_id = {}
     if flight_ids:
         flights_by_id = {
             flight.id: flight for flight in db.query(Flight).filter(Flight.id.in_(flight_ids)).all()
+        }
+    overlay_flights_by_job_id = {}
+    if overlay_job_ids:
+        overlay_flights_by_job_id = {
+            flight.gopro_overlay_job_id: flight
+            for flight in db.query(Flight)
+            .filter(Flight.gopro_overlay_job_id.in_(overlay_job_ids))
+            .all()
         }
 
     jobs: list[dict[str, Any]] = []
@@ -427,7 +440,7 @@ def _build_video_export_jobs_payload(
         if job_id:
             seen_job_ids.add(job_id)
 
-        flight = flights_by_id.get(export.get("flight_id"))
+        flight = flights_by_id.get(export.get("flight_id")) or overlay_flights_by_job_id.get(job_id)
         job = dict(export)
         job["status"] = _video_export_public_status(job)
         job["can_cancel"] = _video_export_can_cancel(job)
@@ -435,6 +448,7 @@ def _build_video_export_jobs_payload(
             video_path = job.get("video_path")
             job["has_output_file"] = bool(video_path and Path(str(video_path)).exists())
         if flight:
+            job["flight_id"] = flight.id
             job["flight_name"] = flight.name or flight.title
             job["flight_title"] = flight.name or flight.title
         jobs.append(job)

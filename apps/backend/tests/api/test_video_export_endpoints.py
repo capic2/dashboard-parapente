@@ -461,6 +461,7 @@ class TestVideoExportJobsEndpoint:
         self, client: TestClient, db_session, sample_flight
     ):
         sample_flight.title = "Legacy flight title"
+        sample_flight.gopro_overlay_job_id = "job-overlay"
         db_session.commit()
 
         manual_jobs = [
@@ -512,6 +513,9 @@ class TestVideoExportJobsEndpoint:
         assert jobs[0]["status"] == "running"
         assert jobs[0]["mode"] == "gopro_overlay"
         assert jobs[0]["can_cancel"] is True
+        assert jobs[0]["flight_id"] == sample_flight.id
+        assert jobs[0]["flight_name"] == sample_flight.name
+        assert jobs[0]["flight_title"] == sample_flight.name
         assert jobs[1]["job_id"] == "job-running"
         assert jobs[1]["status"] == "processing"
         assert jobs[1]["can_cancel"] is True
