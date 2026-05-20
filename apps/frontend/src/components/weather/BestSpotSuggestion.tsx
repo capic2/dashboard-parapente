@@ -448,7 +448,7 @@ export const BestSpotSuggestion = ({
                         style={{ width: `${row.score}%` }}
                       />
                     </div>
-                    <div className="mt-2 truncate text-base font-black text-slate-950 dark:text-gray-50">
+                    <div className="mt-2 min-h-10 whitespace-normal break-normal text-base font-black leading-tight text-slate-950 dark:text-gray-50">
                       {row.spot.site?.name ?? '—'}
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2">
@@ -471,7 +471,7 @@ export const BestSpotSuggestion = ({
                   return (
                     <div
                       key={row.key}
-                      className="min-w-[176px] flex-col items-stretch justify-start gap-0 whitespace-normal rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-left shadow-sm dark:border-slate-700 dark:bg-slate-950/60"
+                      className="min-w-[216px] flex-col items-stretch justify-start gap-0 whitespace-normal rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-left shadow-sm dark:border-slate-700 dark:bg-slate-950/60"
                     >
                       {content}
                     </div>
@@ -482,7 +482,7 @@ export const BestSpotSuggestion = ({
                   <Button
                     key={row.key}
                     onPress={() => onSelectSite(rowSite.id)}
-                    className="min-w-[176px] cursor-pointer flex-col items-stretch justify-start gap-0 whitespace-normal rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-left shadow-sm transition-colors hover:border-sky-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:border-sky-800 dark:hover:bg-slate-950"
+                    className="min-w-[216px] cursor-pointer flex-col items-stretch justify-start gap-0 whitespace-normal rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-left shadow-sm transition-colors hover:border-sky-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:border-sky-800 dark:hover:bg-slate-950"
                   >
                     {content}
                   </Button>
@@ -490,8 +490,8 @@ export const BestSpotSuggestion = ({
               })}
             </div>
 
-            <div className="hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-950/60 lg:block">
-              <table className="w-full table-fixed border-separate border-spacing-y-1 text-left text-sm">
+            <div className="hidden overflow-x-auto overscroll-x-contain rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-950/60 lg:block">
+              <table className="w-full min-w-[760px] table-auto border-separate border-spacing-y-1 text-left text-sm">
                 <thead>
                   <tr className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     <th scope="col" className="w-[72px] px-3 py-2">
@@ -530,7 +530,7 @@ export const BestSpotSuggestion = ({
                           {rowSite ? (
                             <Button
                               onPress={() => onSelectSite(rowSite.id)}
-                              className="max-w-full cursor-pointer justify-start truncate rounded-lg bg-transparent px-0 py-0 text-left font-bold text-slate-950 transition-colors hover:text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white dark:hover:text-sky-300"
+                              className="max-w-full cursor-pointer justify-start whitespace-normal break-normal rounded-lg bg-transparent px-0 py-0 text-left font-bold leading-tight text-slate-950 transition-colors hover:text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white dark:hover:text-sky-300"
                             >
                               {rowSite.name}
                             </Button>
