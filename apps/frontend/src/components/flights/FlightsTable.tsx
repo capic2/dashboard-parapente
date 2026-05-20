@@ -98,6 +98,10 @@ export function FlightsTable({
       const hasGpx = Boolean(flight.gpx_file_path);
       const hasVideo = Boolean(flight.video_file_path);
       const hasPersistedGoproOverlay = Boolean(flight.gopro_overlay_file_path);
+      const isGoproOverlayRunning =
+        flight.gopro_overlay_status === 'queued' ||
+        flight.gopro_overlay_status === 'running';
+      const isGoproOverlayFailed = flight.gopro_overlay_status === 'failed';
       const isVideoExportRunning = Boolean(
         flight.video_export_status &&
         VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.video_export_status)
@@ -187,7 +191,9 @@ export function FlightsTable({
                   hasVideo ||
                   isVideoExportRunning ||
                   isVideoExportFailed ||
-                  hasPersistedGoproOverlay) && (
+                  hasPersistedGoproOverlay ||
+                  isGoproOverlayRunning ||
+                  isGoproOverlayFailed) && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {hasGpx && (
                       <button
@@ -246,6 +252,16 @@ export function FlightsTable({
                         {t('flights.goproOverlayBadge')}
                         <Download className="h-3 w-3" aria-hidden="true" />
                       </button>
+                    )}
+                    {isGoproOverlayRunning && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                        {t('flights.goproOverlayProcessingBadge')}
+                      </span>
+                    )}
+                    {isGoproOverlayFailed && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+                        {t('flights.goproOverlayErrorBadge')}
+                      </span>
                     )}
                   </div>
                 )}
