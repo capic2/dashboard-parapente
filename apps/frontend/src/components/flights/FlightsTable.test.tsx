@@ -54,10 +54,12 @@ const flights: Flight[] = [
 ];
 
 function FlightsTableHarness({
+  tableFlights = flights,
   onDownloadGpx = () => undefined,
   onDownloadVideo = () => undefined,
   onDownloadOverlay = () => undefined,
 }: {
+  tableFlights?: Flight[];
   onDownloadGpx?: (flight: Flight) => void;
   onDownloadVideo?: (flight: Flight) => void;
   onDownloadOverlay?: (flight: Flight) => void;
@@ -67,7 +69,7 @@ function FlightsTableHarness({
 
   return (
     <FlightsTable
-      flights={flights}
+      flights={tableFlights}
       selectedFlightId={selectedFlightId}
       selectionMode={false}
       onSelectFlight={(flight) => setSelectedFlightId(flight.id)}
@@ -121,4 +123,38 @@ test('downloads media from badges without selecting the flight', () => {
   expect(onDownloadOverlay).toHaveBeenCalledWith(flights[0]);
   expect(flightRow).not.toHaveClass('border-sky-700');
   expect(flightRow).toHaveAttribute('aria-selected', 'false');
+});
+
+test('shows GoPro overlay status badges like video badges', () => {
+  const { rerender } = render(
+    <FlightsTableHarness
+      tableFlights={[
+        {
+          ...flights[1],
+          id: 'flight-overlay-running',
+          gopro_overlay_status: 'running',
+        },
+      ]}
+    />
+  );
+
+  expect(
+    screen.getByText('flights.goproOverlayProcessingBadge')
+  ).toBeInTheDocument();
+
+  rerender(
+    <FlightsTableHarness
+      tableFlights={[
+        {
+          ...flights[1],
+          id: 'flight-overlay-failed',
+          gopro_overlay_status: 'failed',
+        },
+      ]}
+    />
+  );
+
+  expect(
+    screen.getByText('flights.goproOverlayErrorBadge')
+  ).toBeInTheDocument();
 });
