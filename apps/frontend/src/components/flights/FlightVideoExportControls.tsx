@@ -144,7 +144,7 @@ export function FlightVideoExportControls({
       exportStatus.internal_status === 'failed' ||
       exportStatus.internal_status === 'cancelled'
     ) {
-      queryClient.invalidateQueries({ queryKey: ['flights', flight.id] });
+      queryClient.invalidateQueries({ queryKey: ['flights'] });
     }
   }, [exportStatus?.internal_status, flight.id, queryClient]);
 
@@ -159,7 +159,7 @@ export function FlightVideoExportControls({
         })
         .json<{ job_token?: string | null }>();
       setVideoExportJobToken(payload.job_token ?? null);
-      await queryClient.invalidateQueries({ queryKey: ['flights', flight.id] });
+      await queryClient.invalidateQueries({ queryKey: ['flights'] });
     } finally {
       setIsStartingVideoExport(false);
     }
@@ -174,16 +174,11 @@ export function FlightVideoExportControls({
         .post(`exports/${flight.video_export_job_id}/resume`)
         .json<{ job_token?: string | null }>();
       setVideoExportJobToken(payload.job_token ?? null);
-      await queryClient.invalidateQueries({ queryKey: ['flights', flight.id] });
+      await queryClient.invalidateQueries({ queryKey: ['flights'] });
     } finally {
       setIsStartingVideoExport(false);
     }
-  }, [
-    flight.id,
-    flight.video_export_job_id,
-    isStartingVideoExport,
-    queryClient,
-  ]);
+  }, [flight.video_export_job_id, isStartingVideoExport, queryClient]);
 
   const handlePrimaryAction = async () => {
     if (hasActiveVideoExport(flight)) return;
@@ -215,7 +210,7 @@ export function FlightVideoExportControls({
 
     try {
       await api.delete(`exports/${flight.video_export_job_id}/cancel`);
-      queryClient.invalidateQueries({ queryKey: ['flights', flight.id] });
+      queryClient.invalidateQueries({ queryKey: ['flights'] });
     } catch (error) {
       if (error instanceof HTTPError) {
         const detail = await getHttpErrorDetail(error);
