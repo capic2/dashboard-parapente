@@ -243,6 +243,19 @@ export const HourlyTimeline = meta.story({
   ),
 });
 
+export const HourlyTimelineSidebarWidth = meta.story({
+  name: 'Hourly Timeline Sidebar Width',
+  render: () => (
+    <div className="w-[420px] max-w-full">
+      <BestSpotSuggestion
+        bestSpot={mockBestSpotExcellent}
+        hourlyBestSpots={mockHourlyBestSpots}
+        onSelectSite={fn()}
+      />
+    </div>
+  ),
+});
+
 // Null data (renders nothing)
 export const NullData = meta.story({
   name: 'Null Data',
