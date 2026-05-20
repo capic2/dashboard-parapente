@@ -102,6 +102,10 @@ export function FlightsTable({
         flight.gopro_overlay_status === 'queued' ||
         flight.gopro_overlay_status === 'running';
       const isGoproOverlayFailed = flight.gopro_overlay_status === 'failed';
+      const canDownloadGoproOverlay =
+        hasPersistedGoproOverlay &&
+        !isGoproOverlayRunning &&
+        !isGoproOverlayFailed;
       const isVideoExportRunning = Boolean(
         flight.video_export_status &&
         VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.video_export_status)
@@ -237,7 +241,7 @@ export function FlightsTable({
                         {t('flights.videoErrorBadge')}
                       </span>
                     )}
-                    {hasPersistedGoproOverlay && (
+                    {canDownloadGoproOverlay && (
                       <button
                         type="button"
                         className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-cyan-800 transition-colors hover:bg-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200 dark:hover:bg-cyan-900/50 dark:focus:ring-offset-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
