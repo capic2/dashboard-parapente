@@ -45,6 +45,7 @@ const {
     },
     {
       job_id: 'job-overlay',
+      flight_name: 'Nom du vol overlay',
       flight_title: 'vol-overlay.mp4',
       status: 'running',
       internal_status: 'running',
@@ -65,6 +66,7 @@ const {
     },
     {
       job_id: 'job-overlay-done',
+      flight_name: 'Nom du vol overlay terminé',
       flight_title: 'final.mp4',
       status: 'completed',
       internal_status: 'completed',
@@ -153,6 +155,7 @@ describe('VideoExportJobsPanel', () => {
       },
       {
         job_id: 'job-overlay',
+        flight_name: 'Nom du vol overlay',
         flight_title: 'vol-overlay.mp4',
         status: 'running',
         internal_status: 'running',
@@ -173,6 +176,7 @@ describe('VideoExportJobsPanel', () => {
       },
       {
         job_id: 'job-overlay-done',
+        flight_name: 'Nom du vol overlay terminé',
         flight_title: 'final.mp4',
         status: 'completed',
         internal_status: 'completed',
@@ -192,8 +196,12 @@ describe('VideoExportJobsPanel', () => {
     expect(screen.getAllByText('Nom du vol test').length).toBeGreaterThan(0);
     expect(screen.queryByText('Vol test')).not.toBeInTheDocument();
     expect(screen.getAllByText('Vol terminé').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('vol-overlay.mp4').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('final.mp4').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Nom du vol overlay').length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText('Nom du vol overlay terminé').length
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText('vol-overlay.mp4')).not.toBeInTheDocument();
+    expect(screen.queryByText('final.mp4')).not.toBeInTheDocument();
     expect(screen.getAllByText('Overlay GoPro').length).toBeGreaterThan(0);
     expect(screen.getAllByText('42%').length).toBeGreaterThan(0);
     expect(screen.getAllByText('En cours').length).toBeGreaterThan(1);
@@ -219,7 +227,7 @@ describe('VideoExportJobsPanel', () => {
 
     expect(screen.getAllByText('Vol terminé').length).toBeGreaterThan(0);
     expect(screen.queryByText('Nom du vol test')).not.toBeInTheDocument();
-    expect(screen.queryByText('vol-overlay.mp4')).not.toBeInTheDocument();
+    expect(screen.queryByText('Nom du vol overlay')).not.toBeInTheDocument();
   });
 
   it('cancels a running job after confirmation', async () => {
@@ -251,8 +259,10 @@ describe('VideoExportJobsPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Overlay GoPro/u }));
 
-    expect(screen.getAllByText('vol-overlay.mp4').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('final.mp4').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Nom du vol overlay').length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText('Nom du vol overlay terminé').length
+    ).toBeGreaterThan(0);
     expect(screen.queryByText('Nom du vol test')).not.toBeInTheDocument();
   });
 
@@ -265,7 +275,7 @@ describe('VideoExportJobsPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Réinitialiser' }));
 
     expect(screen.getAllByText('Nom du vol test').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('vol-overlay.mp4').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Nom du vol overlay').length).toBeGreaterThan(0);
   });
 
   it('deletes an inactive row after confirmation', async () => {
