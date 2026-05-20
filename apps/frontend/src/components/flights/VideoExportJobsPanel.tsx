@@ -109,6 +109,14 @@ function getModeLabelParts(mode: string) {
   return { key: `videoJobs.mode.${mode}`, fallback: mode };
 }
 
+function getJobTypeLabelParts(job: VideoExportJob) {
+  if (isGoproOverlayJob(job)) {
+    return { key: 'videoJobs.type.goproOverlay', fallback: 'GoPro overlay' };
+  }
+
+  return { key: 'videoJobs.type.video', fallback: 'Video' };
+}
+
 function getProgress(job: VideoExportJob) {
   if (typeof job.progress !== 'number' || !Number.isFinite(job.progress)) {
     return 0;
@@ -283,6 +291,17 @@ function JobModeBadge({ mode }: { mode: string }) {
   return (
     <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-200">
       {t(modeLabel.key, modeLabel.fallback)}
+    </span>
+  );
+}
+
+function JobTypeBadge({ job }: { job: VideoExportJob }) {
+  const { t } = useTranslation();
+  const typeLabel = getJobTypeLabelParts(job);
+
+  return (
+    <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-200">
+      {t(typeLabel.key, typeLabel.fallback)}
     </span>
   );
 }
@@ -529,6 +548,12 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
             )}
           </div>
         ),
+        sortingFn: 'alphanumeric',
+      }),
+      columnHelper.accessor((job) => getJobTypeLabelParts(job).fallback, {
+        id: 'type',
+        header: t('videoJobs.table.type', 'Type'),
+        cell: ({ row }) => <JobTypeBadge job={row.original} />,
         sortingFn: 'alphanumeric',
       }),
       columnHelper.accessor('mode', {
@@ -806,6 +831,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <JobStatusBadge job={job} />
+                        <JobTypeBadge job={job} />
                         {modeLabel && (
                           <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-200">
                             {t(modeLabel.key, modeLabel.fallback)}
