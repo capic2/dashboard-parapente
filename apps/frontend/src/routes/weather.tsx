@@ -3,6 +3,7 @@ import { queryClient } from '../lib/queryClient';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 
 type WeatherSearch = {
+  variant?: 'A' | 'B' | 'C';
   siteId?: string;
   day?: number;
   target?: 'city' | 'takeoff' | 'landing';
@@ -51,6 +52,12 @@ export const Route = createFileRoute('/weather')({
         : undefined;
 
     return {
+      variant:
+        search.variant === 'A' ||
+        search.variant === 'B' ||
+        search.variant === 'C'
+          ? search.variant
+          : undefined,
       siteId: typeof search.siteId === 'string' ? search.siteId : undefined,
       day:
         Number.isInteger(parsedDay) && parsedDay >= 0 && parsedDay <= 6
