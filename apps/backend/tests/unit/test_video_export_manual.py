@@ -587,6 +587,85 @@ def test_resume_video_export_waits_for_running_cancel_to_finish(test_db, tmp_pat
         video_export_manual._clear_job_cancel_requested(job_id)
 
 
+def test_cancel_queued_video_export_removes_rq_job(test_db, monkeypatch):
+    deleted_rq_jobs: list[str] = []
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    monkeypatch.setattr(
+        video_export_manual,
+        "_delete_rq_video_export_job",
+        lambda job_id: deleted_rq_jobs.append(job_id) or True,
+    )
+
+    db_session = test_db()
+    db_session.add(
+        VideoExportJob(
+            id="job-queued-cancel",
+            flight_id="flight-test-001",
+            status="queued",
+            mode="manual",
+            quality="1080p",
+            fps=15,
+            speed=1,
+            progress=0,
+            message="queued",
+            frontend_url="http://localhost:5173",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+    )
+    db_session.commit()
+    db_session.close()
+
+    assert video_export_manual.cancel_video_export("job-queued-cancel") is True
+
+    assert deleted_rq_jobs == ["job-queued-cancel"]
+
+
+def test_delete_video_export_job_removes_started_rq_job(test_db, monkeypatch):
+    deleted_rq_jobs: list[str] = []
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    monkeypatch.setattr(
+        video_export_manual,
+        "_delete_rq_video_export_job",
+        lambda job_id: deleted_rq_jobs.append(job_id) or True,
+    )
+
+    db_session = test_db()
+    db_session.add(
+        VideoExportJob(
+            id="job-running-started-rq",
+            flight_id="flight-test-001",
+            status="running",
+            mode="manual",
+            quality="1080p",
+            fps=15,
+            speed=1,
+            progress=10,
+            message="capturing",
+            frontend_url="http://localhost:5173",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+    )
+    db_session.commit()
+    db_session.close()
+
+    result = video_export_manual.delete_video_export_job("job-running-started-rq")
+
+    assert result is not None
+    assert result["deleted"] is True
+    assert deleted_rq_jobs == ["job-running-started-rq"]
+
+    db_session = test_db()
+    assert (
+        db_session.query(VideoExportJob)
+        .filter(VideoExportJob.id == "job-running-started-rq")
+        .first()
+        is None
+    )
+    db_session.close()
+
+
 def test_trigger_auto_export_uses_manual_fast(db_session, sample_flight, monkeypatch):
     sample_flight.gpx_file_path = "db/gpx/sample.gpx"
     db_session.commit()
@@ -608,6 +687,48 @@ def test_trigger_auto_export_uses_manual_fast(db_session, sample_flight, monkeyp
     )
 
     assert job_id == "job-manual-fast"
+
+
+def test_start_video_export_worker_restarts_when_previous_worker_is_stopping(monkeypatch):
+    class StoppingThread:
+        joined = False
+
+        def is_alive(self):
+            return True
+
+        def join(self, timeout=None):
+            self.joined = True
+
+    class StartedThread:
+        def __init__(self, target, name, daemon):
+            self.target = target
+            self.name = name
+            self.daemon = daemon
+            self.started = False
+
+        def start(self):
+            self.started = True
+
+        def is_alive(self):
+            return self.started
+
+    previous_thread = StoppingThread()
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "thread")
+    monkeypatch.setattr(video_export_manual, "_WORKER_THREAD", previous_thread)
+    monkeypatch.setattr(video_export_manual, "_mark_stale_jobs_as_queued", lambda: None)
+    monkeypatch.setattr(video_export_manual.threading, "Thread", StartedThread)
+    video_export_manual._WORKER_STOP.set()
+
+    try:
+        video_export_manual.start_video_export_worker()
+
+        assert previous_thread.joined is True
+        assert video_export_manual._WORKER_STOP.is_set() is False
+        assert isinstance(video_export_manual._WORKER_THREAD, StartedThread)
+        assert video_export_manual._WORKER_THREAD.started is True
+    finally:
+        video_export_manual._WORKER_THREAD = None
+        video_export_manual._WORKER_STOP.clear()
 
 
 def test_cleanup_temp_dir_removes_nested_files(tmp_path):

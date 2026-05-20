@@ -13,6 +13,7 @@ import {
   CompactExcellent,
   CompactNoWind,
   CompactNullData,
+  HourlyTimeline,
   Today,
   Tomorrow,
   Day3,
@@ -70,6 +71,9 @@ export const BestSpotSuggestionChromatic = meta.story({
       </FigureWrapper>
       <FigureWrapper title={CompactNullData.composed.name}>
         <CompactNullData.Component />
+      </FigureWrapper>
+      <FigureWrapper title={HourlyTimeline.composed.name}>
+        <HourlyTimeline.Component />
       </FigureWrapper>
       <FigureWrapper title={Today.composed.name}>
         <Today.Component />

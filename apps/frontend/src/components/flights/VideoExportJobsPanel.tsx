@@ -59,6 +59,12 @@ const typeFilters = [
 
 type TypeFilter = (typeof typeFilters)[number]['id'];
 
+type FilterOption<T extends string> = {
+  id: T;
+  label: string;
+  count: number;
+};
+
 const activeStatusLabels = new Set([
   'running',
   'initializing',
@@ -84,11 +90,14 @@ function getJobPhase(job: VideoExportJob) {
 
 function getStatusLabelParts(job: VideoExportJob) {
   const phase = getJobPhase(job);
-  const status = activeStatusLabels.has(phase)
-    ? 'processing'
-    : statusLabelFallbacks[phase]
-      ? phase
-      : job.status;
+  let status = job.status;
+
+  if (activeStatusLabels.has(phase)) {
+    status = 'processing';
+  } else if (statusLabelFallbacks[phase]) {
+    status = phase;
+  }
+
   const fallback = statusLabelFallbacks[status] || status;
   return { key: `videoJobs.status.${status}`, fallback };
 }
@@ -100,6 +109,14 @@ function getModeLabelParts(mode: string) {
   return { key: `videoJobs.mode.${mode}`, fallback: mode };
 }
 
+function getJobTypeLabelParts(job: VideoExportJob) {
+  if (isGoproOverlayJob(job)) {
+    return { key: 'videoJobs.type.goproOverlay', fallback: 'GoPro overlay' };
+  }
+
+  return { key: 'videoJobs.type.video', fallback: 'Video' };
+}
+
 function getProgress(job: VideoExportJob) {
   if (typeof job.progress !== 'number' || !Number.isFinite(job.progress)) {
     return 0;
@@ -109,7 +126,7 @@ function getProgress(job: VideoExportJob) {
 }
 
 function getFlightLabel(job: VideoExportJob) {
-  return job.flight_title || job.flight_name || job.flight_id || job.job_id;
+  return job.flight_name || job.flight_title || job.flight_id || job.job_id;
 }
 
 function getLastActivityTime(job: VideoExportJob) {
@@ -167,6 +184,64 @@ function isGoproOverlayJob(job: VideoExportJob) {
   return job.mode === 'gopro_overlay';
 }
 
+function isJobInTypeFilter(job: VideoExportJob, filter: TypeFilter) {
+  return (
+    filter === 'all' ||
+    (filter === 'gopro' && isGoproOverlayJob(job)) ||
+    (filter === 'video' && !isGoproOverlayJob(job))
+  );
+}
+
+function SegmentedFilter<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: FilterOption<T>[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div className="min-w-0 flex-1 space-y-2">
+      <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        {label}
+      </div>
+      <div className="grid overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-900/50 sm:flex">
+        {options.map((option) => {
+          const isSelected = value === option.id;
+
+          return (
+            <button
+              key={option.id}
+              type="button"
+              aria-pressed={isSelected}
+              className={`flex min-h-10 cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 sm:flex-1 sm:justify-center ${
+                isSelected
+                  ? 'bg-white text-sky-700 shadow-sm ring-1 ring-sky-200 dark:bg-sky-950/70 dark:text-sky-200 dark:ring-sky-800'
+                  : 'text-gray-600 hover:bg-white/80 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white'
+              }`}
+              onClick={() => onChange(option.id)}
+            >
+              <span className="truncate">{option.label}</span>
+              <span
+                className={`rounded-md px-1.5 py-0.5 text-xs font-semibold ${
+                  isSelected
+                    ? 'bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-200'
+                    : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                }`}
+              >
+                {option.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function canDownloadJob(job: VideoExportJob) {
   return job.status === 'completed' && job.has_output_file !== false;
 }
@@ -220,6 +295,17 @@ function JobModeBadge({ mode }: { mode: string }) {
   );
 }
 
+function JobTypeBadge({ job }: { job: VideoExportJob }) {
+  const { t } = useTranslation();
+  const typeLabel = getJobTypeLabelParts(job);
+
+  return (
+    <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-200">
+      {t(typeLabel.key, typeLabel.fallback)}
+    </span>
+  );
+}
+
 export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -239,16 +325,15 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
   const filteredJobs = useMemo(
     () =>
       jobs.filter((job) => {
-        const isInTypeFilter =
-          typeFilter === 'all' ||
-          (typeFilter === 'gopro' && isGoproOverlayJob(job)) ||
-          (typeFilter === 'video' && !isGoproOverlayJob(job));
-        return isInTypeFilter && isJobInFilter(job, statusFilter);
+        return (
+          isJobInTypeFilter(job, typeFilter) && isJobInFilter(job, statusFilter)
+        );
       }),
     [jobs, statusFilter, typeFilter]
   );
   const visibleJobs =
     typeof limit === 'number' ? filteredJobs.slice(0, limit) : filteredJobs;
+  const isFiltering = statusFilter !== 'all' || typeFilter !== 'all';
 
   const activeCount = jobs.filter((job) => job.can_cancel).length;
   const completedCount = jobs.filter(
@@ -258,6 +343,29 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
   const cancelledCount = jobs.filter(
     (job) => job.status === 'cancelled'
   ).length;
+  const jobsInSelectedType = useMemo(
+    () => jobs.filter((job) => isJobInTypeFilter(job, typeFilter)),
+    [jobs, typeFilter]
+  );
+  const typeFilterOptions = useMemo<FilterOption<TypeFilter>[]>(
+    () =>
+      typeFilters.map((filter) => ({
+        id: filter.id,
+        label: t(`videoJobs.typeFilters.${filter.id}`, filter.label),
+        count: jobs.filter((job) => isJobInTypeFilter(job, filter.id)).length,
+      })),
+    [jobs, t]
+  );
+  const statusFilterOptions = useMemo<FilterOption<StatusFilter>[]>(
+    () =>
+      statusFilters.map((filter) => ({
+        id: filter.id,
+        label: t(`videoJobs.filters.${filter.id}`, filter.label),
+        count: jobsInSelectedType.filter((job) => isJobInFilter(job, filter.id))
+          .length,
+      })),
+    [jobsInSelectedType, t]
+  );
 
   const handleCancel = useCallback(
     (job: VideoExportJob) => {
@@ -440,6 +548,12 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
             )}
           </div>
         ),
+        sortingFn: 'alphanumeric',
+      }),
+      columnHelper.accessor((job) => getJobTypeLabelParts(job).fallback, {
+        id: 'type',
+        header: t('videoJobs.table.type', 'Type'),
+        cell: ({ row }) => <JobTypeBadge job={row.original} />,
         sortingFn: 'alphanumeric',
       }),
       columnHelper.accessor('mode', {
@@ -638,46 +752,46 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
       )}
 
       {!isLoading && !isError && jobs.length > 0 && (
-        <div className="space-y-3 border-t border-gray-100 p-3 dark:border-gray-700">
-          <div className="flex flex-wrap gap-2">
-            {typeFilters.map((filter) => {
-              const isSelected = typeFilter === filter.id;
-              return (
-                <button
-                  key={filter.id}
-                  type="button"
-                  aria-pressed={isSelected}
-                  className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 ${
-                    isSelected
-                      ? 'border-sky-600 bg-sky-600 text-white dark:border-sky-300 dark:bg-sky-300 dark:text-sky-950'
-                      : 'border-gray-200 bg-white text-gray-700 hover:border-sky-300 hover:bg-sky-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-sky-700 dark:hover:bg-sky-950/40'
-                  }`}
-                  onClick={() => setTypeFilter(filter.id)}
-                >
-                  {t(`videoJobs.typeFilters.${filter.id}`, filter.label)}
-                </button>
-              );
-            })}
+        <div className="space-y-4 border-t border-gray-100 bg-gray-50/70 p-4 dark:border-gray-700 dark:bg-gray-900/20">
+          <div className="flex flex-col gap-4 xl:flex-row">
+            <SegmentedFilter
+              label={t('videoJobs.filterLabels.type', 'Type')}
+              options={typeFilterOptions}
+              value={typeFilter}
+              onChange={setTypeFilter}
+            />
+            <SegmentedFilter
+              label={t('videoJobs.filterLabels.status', 'Statut')}
+              options={statusFilterOptions}
+              value={statusFilter}
+              onChange={setStatusFilter}
+            />
           </div>
-          <div className="flex flex-wrap gap-2">
-            {statusFilters.map((filter) => {
-              const isSelected = statusFilter === filter.id;
-              return (
-                <button
-                  key={filter.id}
-                  type="button"
-                  aria-pressed={isSelected}
-                  className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 ${
-                    isSelected
-                      ? 'border-sky-600 bg-sky-600 text-white dark:border-sky-300 dark:bg-sky-300 dark:text-sky-950'
-                      : 'border-gray-200 bg-white text-gray-700 hover:border-sky-300 hover:bg-sky-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-sky-700 dark:hover:bg-sky-950/40'
-                  }`}
-                  onClick={() => setStatusFilter(filter.id)}
-                >
-                  {t(`videoJobs.filters.${filter.id}`, filter.label)}
-                </button>
-              );
-            })}
+          <div className="flex flex-col gap-2 text-sm text-gray-600 dark:text-gray-300 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              {isFiltering || visibleJobs.length !== jobs.length
+                ? t(
+                    'videoJobs.filteredSummary',
+                    '{{visible}} génération(s) affichée(s) sur {{total}}',
+                    { visible: visibleJobs.length, total: jobs.length }
+                  )
+                : t(
+                    'videoJobs.visibleSummary',
+                    '{{visible}} génération(s) affichée(s)',
+                    { visible: visibleJobs.length }
+                  )}
+            </span>
+            {isFiltering && (
+              <Button
+                onClick={() => {
+                  setTypeFilter('all');
+                  setStatusFilter('all');
+                }}
+                className="cursor-pointer self-start rounded-lg px-3 py-1.5 text-sm font-semibold text-sky-700 transition-colors hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300 dark:hover:bg-sky-950/40 sm:self-auto"
+              >
+                {t('videoJobs.resetFilters', 'Réinitialiser')}
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -717,6 +831,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <JobStatusBadge job={job} />
+                        <JobTypeBadge job={job} />
                         {modeLabel && (
                           <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-200">
                             {t(modeLabel.key, modeLabel.fallback)}

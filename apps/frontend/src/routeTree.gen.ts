@@ -15,7 +15,6 @@ import { Route as SitesRouteImport } from './routes/sites'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as InfrastructureRouteImport } from './routes/infrastructure'
-import { Route as GoproOverlayRouteImport } from './routes/gopro-overlay'
 import { Route as FlightsRouteImport } from './routes/flights'
 import { Route as ExportViewerRouteImport } from './routes/export-viewer'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
@@ -56,11 +55,6 @@ const InfrastructureRoute = InfrastructureRouteImport.update({
 } as any).lazy(() =>
   import('./routes/infrastructure.lazy').then((d) => d.Route),
 )
-const GoproOverlayRoute = GoproOverlayRouteImport.update({
-  id: '/gopro-overlay',
-  path: '/gopro-overlay',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/gopro-overlay.lazy').then((d) => d.Route))
 const FlightsRoute = FlightsRouteImport.update({
   id: '/flights',
   path: '/flights',
@@ -108,7 +102,6 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof AnalyticsRoute
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRouteWithChildren
-  '/gopro-overlay': typeof GoproOverlayRoute
   '/infrastructure': typeof InfrastructureRouteWithChildren
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
@@ -124,7 +117,6 @@ export interface FileRoutesByTo {
   '/analytics': typeof AnalyticsRoute
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRouteWithChildren
-  '/gopro-overlay': typeof GoproOverlayRoute
   '/infrastructure': typeof InfrastructureRouteWithChildren
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
@@ -141,7 +133,6 @@ export interface FileRoutesById {
   '/analytics': typeof AnalyticsRoute
   '/export-viewer': typeof ExportViewerRoute
   '/flights': typeof FlightsRouteWithChildren
-  '/gopro-overlay': typeof GoproOverlayRoute
   '/infrastructure': typeof InfrastructureRouteWithChildren
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
@@ -159,7 +150,6 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/export-viewer'
     | '/flights'
-    | '/gopro-overlay'
     | '/infrastructure'
     | '/login'
     | '/settings'
@@ -175,7 +165,6 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/export-viewer'
     | '/flights'
-    | '/gopro-overlay'
     | '/infrastructure'
     | '/login'
     | '/settings'
@@ -191,7 +180,6 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/export-viewer'
     | '/flights'
-    | '/gopro-overlay'
     | '/infrastructure'
     | '/login'
     | '/settings'
@@ -208,7 +196,6 @@ export interface RootRouteChildren {
   AnalyticsRoute: typeof AnalyticsRoute
   ExportViewerRoute: typeof ExportViewerRoute
   FlightsRoute: typeof FlightsRouteWithChildren
-  GoproOverlayRoute: typeof GoproOverlayRoute
   InfrastructureRoute: typeof InfrastructureRouteWithChildren
   LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRoute
@@ -260,13 +247,6 @@ declare module '@tanstack/react-router' {
       path: '/infrastructure'
       fullPath: '/infrastructure'
       preLoaderRoute: typeof InfrastructureRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/gopro-overlay': {
-      id: '/gopro-overlay'
-      path: '/gopro-overlay'
-      fullPath: '/gopro-overlay'
-      preLoaderRoute: typeof GoproOverlayRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/flights': {
@@ -349,7 +329,6 @@ const rootRouteChildren: RootRouteChildren = {
   AnalyticsRoute: AnalyticsRoute,
   ExportViewerRoute: ExportViewerRoute,
   FlightsRoute: FlightsRouteWithChildren,
-  GoproOverlayRoute: GoproOverlayRoute,
   InfrastructureRoute: InfrastructureRouteWithChildren,
   LoginRoute: LoginRoute,
   SettingsRoute: SettingsRoute,

@@ -42,11 +42,16 @@ vi.mock('react-i18next', () => ({
         'flights.viewer.videoModeManualFastHint': 'Fast hint',
         'flights.viewer.videoModeManualHint': 'Manual hint',
         'flights.viewer.generateVideo': 'Generate video',
+        'flights.viewer.generateVideoShort': 'Generate video',
         'flights.viewer.resumeVideo': 'Resume generation',
+        'flights.viewer.resumeVideoShort': 'Resume generation',
         'flights.viewer.videoResumeHint': 'frames preserved',
         'flights.viewer.videoGenerating': 'Generating video',
+        'flights.viewer.videoGeneratingShort': 'Video in progress',
         'flights.viewer.cancelGeneration': 'Cancel generation',
+        'flights.viewer.cancelGenerationShort': 'Cancel generation',
         'flights.viewer.regenerateVideo': 'Restart generation',
+        'flights.viewer.regenerateVideoShort': 'Regenerate video',
       })[key] ?? key,
   }),
 }));
@@ -84,6 +89,7 @@ describe('FlightVideoExportControls', () => {
     mockFlight.video_export_status = null;
     mockFlight.video_export_job_id = null;
     mockFlight.video_file_path = null;
+    mockFlight.video_file_exists = undefined;
     exportStatusMock.current = null;
   });
 
@@ -144,11 +150,25 @@ describe('FlightVideoExportControls', () => {
     mockFlight.video_export_status = 'completed';
     mockFlight.video_export_job_id = 'job-video';
     mockFlight.video_file_path = '/exports/job-video.mp4';
+    mockFlight.video_file_exists = true;
 
     render(<FlightVideoExportControls flight={mockFlight} />);
 
     expect(
       screen.queryByRole('button', { name: /Download video/u })
     ).not.toBeInTheDocument();
+  });
+
+  it('generates again when database references a missing completed video file', () => {
+    mockFlight.video_export_status = 'completed';
+    mockFlight.video_export_job_id = 'job-video';
+    mockFlight.video_file_path = '/exports/missing.mp4';
+    mockFlight.video_file_exists = false;
+
+    render(<FlightVideoExportControls flight={mockFlight} compact />);
+
+    expect(
+      screen.getByRole('button', { name: /Generate video/u })
+    ).toBeEnabled();
   });
 });

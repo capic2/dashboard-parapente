@@ -228,6 +228,8 @@ const initialMockVideoJobs: VideoExportJob[] = [
   },
   {
     job_id: 'job-gopro-completed',
+    flight_id: 'flight-chalais',
+    flight_name: 'Chalais - thermique bleu',
     flight_title: 'final.mp4',
     status: 'completed',
     internal_status: 'completed',

@@ -233,6 +233,33 @@ export const BestSpotSuggestion = ({
   );
   const scoreColor = getScoreColor(adjustedScore);
   const verdictInfo = getVerdict(adjustedScore, verdict ?? undefined);
+  const hourlyRows = hourlyBestSpots.map((hourlySpot) => {
+    const hourlyScore = Math.min(
+      100,
+      Math.max(0, Math.round(hourlySpot.score ?? hourlySpot.paraIndex))
+    );
+    const roundedWindSpeed =
+      typeof hourlySpot.windSpeed === 'number'
+        ? Math.round(hourlySpot.windSpeed)
+        : null;
+
+    return {
+      spot: hourlySpot,
+      key: `${hourlySpot.hour}-${hourlySpot.site?.id ?? 'none'}`,
+      hourLabel:
+        selectedDayIndex === 0 && hourlySpot.hour === hourlyStartHour
+          ? t('common.now')
+          : `${hourlySpot.hour}h`,
+      score: hourlyScore,
+      scoreColor: getScoreColor(hourlyScore),
+      verdict: getVerdict(hourlyScore, hourlySpot.verdict ?? undefined),
+      windLabel:
+        hourlySpot.windDirection && roundedWindSpeed != null
+          ? `${hourlySpot.windDirection} ${roundedWindSpeed} km/h`
+          : '—',
+      orientationLabel: hourlySpot.site?.orientation ?? '—',
+    };
+  });
 
   return (
     <div
@@ -395,55 +422,20 @@ export const BestSpotSuggestion = ({
                 {t('weather.byHour')}
               </span>
             </div>
-            <div className="flex max-w-full min-w-0 gap-2 overflow-x-auto overscroll-x-contain pb-1">
-              {hourlyBestSpots.map((hourlySpot) => {
-                const hourlyScore = Math.min(
-                  100,
-                  Math.max(
-                    0,
-                    Math.round(hourlySpot.score ?? hourlySpot.paraIndex)
-                  )
-                );
-                const hourlyScoreColor = getScoreColor(hourlyScore);
-                const hourlyVerdict = getVerdict(
-                  hourlyScore,
-                  hourlySpot.verdict ?? undefined
-                );
-                const hourLabel =
-                  selectedDayIndex === 0 && hourlySpot.hour === hourlyStartHour
-                    ? t('common.now')
-                    : `${hourlySpot.hour}h`;
-                const roundedWindSpeed =
-                  typeof hourlySpot.windSpeed === 'number'
-                    ? Math.round(hourlySpot.windSpeed)
-                    : null;
-                const windLabel =
-                  hourlySpot.windDirection && roundedWindSpeed != null
-                    ? `${t('common.wind')} ${hourlySpot.windDirection} ${roundedWindSpeed} km/h`
-                    : '—';
-                const orientationLabel = hourlySpot.site?.orientation
-                  ? `${t('sites.orientation')} ${hourlySpot.site.orientation}`
-                  : null;
-
-                return (
-                  <Button
-                    key={`${hourlySpot.hour}-${hourlySpot.site?.id ?? 'none'}`}
-                    onPress={() => {
-                      if (hourlySpot.site) {
-                        onSelectSite(hourlySpot.site.id);
-                      }
-                    }}
-                    className="min-w-[176px] cursor-pointer flex-col items-stretch justify-start gap-0 whitespace-normal rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-left shadow-sm transition-colors hover:border-sky-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:border-sky-800 dark:hover:bg-slate-950"
-                  >
+            <div className="flex max-w-full min-w-0 gap-2 overflow-x-auto overscroll-x-contain pb-1 lg:hidden">
+              {hourlyRows.map((row) => {
+                const rowSite = row.spot.site;
+                const content = (
+                  <>
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-sm font-extrabold text-slate-950 dark:text-white">
-                        {hourLabel}
+                        {row.hourLabel}
                       </span>
                       <div className="text-right">
                         <span
-                          className={`block text-xl font-black leading-none ${hourlyScoreColor.text}`}
+                          className={`block text-xl font-black leading-none ${row.scoreColor.text}`}
                         >
-                          {hourlyScore}
+                          {row.score}
                         </span>
                         <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">
                           /100
@@ -452,31 +444,135 @@ export const BestSpotSuggestion = ({
                     </div>
                     <div className="mt-2 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
                       <div
-                        className={`h-full rounded-full ${hourlyScoreColor.bg}`}
-                        style={{ width: `${hourlyScore}%` }}
+                        className={`h-full rounded-full ${row.scoreColor.bg}`}
+                        style={{ width: `${row.score}%` }}
                       />
                     </div>
-                    <div className="mt-2 truncate text-base font-black text-slate-950 dark:text-gray-50">
-                      {hourlySpot.site?.name ?? '—'}
+                    <div className="mt-2 min-h-10 whitespace-normal break-normal text-base font-black leading-tight text-slate-950 dark:text-gray-50">
+                      {row.spot.site?.name ?? '—'}
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${hourlyVerdict.className}`}
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${row.verdict.className}`}
                       >
-                        {hourlyVerdict.label}
+                        {row.verdict.label}
                       </span>
-                      {orientationLabel && (
-                        <span className="truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
-                          {orientationLabel}
-                        </span>
-                      )}
+                      <span className="truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        {row.orientationLabel}
+                      </span>
                     </div>
                     <div className="mt-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                      {windLabel}
+                      {t('common.wind')} {row.windLabel}
                     </div>
+                  </>
+                );
+
+                if (!rowSite) {
+                  return (
+                    <div
+                      key={row.key}
+                      className="min-w-[216px] flex-col items-stretch justify-start gap-0 whitespace-normal rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-left shadow-sm dark:border-slate-700 dark:bg-slate-950/60"
+                    >
+                      {content}
+                    </div>
+                  );
+                }
+
+                return (
+                  <Button
+                    key={row.key}
+                    onPress={() => onSelectSite(rowSite.id)}
+                    className="min-w-[216px] cursor-pointer flex-col items-stretch justify-start gap-0 whitespace-normal rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-left shadow-sm transition-colors hover:border-sky-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:border-sky-800 dark:hover:bg-slate-950"
+                  >
+                    {content}
                   </Button>
                 );
               })}
+            </div>
+
+            <div className="hidden overflow-x-auto overscroll-x-contain rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-950/60 lg:block">
+              <table className="w-full min-w-[760px] table-auto border-separate border-spacing-y-1 text-left text-sm">
+                <thead>
+                  <tr className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    <th scope="col" className="w-[72px] px-3 py-2">
+                      {t('common.time')}
+                    </th>
+                    <th scope="col" className="px-3 py-2">
+                      {t('common.site')}
+                    </th>
+                    <th scope="col" className="w-[170px] px-3 py-2">
+                      {t('weather.score')}
+                    </th>
+                    <th scope="col" className="w-[116px] px-3 py-2">
+                      {t('common.wind')}
+                    </th>
+                    <th scope="col" className="w-[104px] px-3 py-2">
+                      {t('sites.orientation', 'Orientation')}
+                    </th>
+                    <th scope="col" className="w-[104px] px-3 py-2">
+                      {t('common.conditions')}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {hourlyRows.map((row) => {
+                    const rowSite = row.spot.site;
+
+                    return (
+                      <tr
+                        key={row.key}
+                        className="rounded-xl transition-colors hover:bg-sky-50 dark:hover:bg-slate-900"
+                      >
+                        <td className="rounded-l-xl px-3 py-2.5 font-extrabold text-slate-950 dark:text-white">
+                          {row.hourLabel}
+                        </td>
+                        <td className="min-w-0 px-3 py-2.5">
+                          {rowSite ? (
+                            <Button
+                              onPress={() => onSelectSite(rowSite.id)}
+                              className="max-w-full cursor-pointer justify-start whitespace-normal break-normal rounded-lg bg-transparent px-0 py-0 text-left font-bold leading-tight text-slate-950 transition-colors hover:text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white dark:hover:text-sky-300"
+                            >
+                              {rowSite.name}
+                            </Button>
+                          ) : (
+                            <span className="font-bold text-slate-500 dark:text-slate-400">
+                              —
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`w-8 font-black ${row.scoreColor.text}`}
+                            >
+                              {row.score}
+                            </span>
+                            <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                              <div
+                                className={`h-full rounded-full ${row.scoreColor.bg}`}
+                                style={{ width: `${row.score}%` }}
+                              />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="truncate px-3 py-2.5 font-semibold text-slate-600 dark:text-slate-300">
+                          {row.windLabel}
+                        </td>
+                        <td className="px-3 py-2.5 font-semibold text-slate-600 dark:text-slate-300">
+                          {row.orientationLabel}
+                        </td>
+                        <td className="rounded-r-xl px-3 py-2.5">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${row.verdict.className}`}
+                          >
+                            {row.verdict.label}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

@@ -187,7 +187,9 @@ const createHandlers = (gpxDelayMs = 0) => [
   http.get('*/api/flights', () => HttpResponse.json({ flights: flightsDb })),
   http.get('*/api/flights/:id/gpx-data', async () => {
     if (gpxDelayMs > 0) {
-      await new Promise((resolve) => { setTimeout(resolve, gpxDelayMs) });
+      await new Promise((resolve) => {
+        setTimeout(resolve, gpxDelayMs);
+      });
     }
     gpxRequestCount += 1;
     return HttpResponse.json({ data: mockGPXData });

@@ -166,6 +166,10 @@ class Flight(Base):
     video_export_job_id = Column(String, nullable=True)  # Background job ID for video conversion
     video_export_status = Column(String, nullable=True)  # "processing", "completed", "failed"
     video_file_path = Column(String, nullable=True)  # Path to generated MP4 file
+    # GoPro overlay export fields
+    gopro_overlay_job_id = Column(String, nullable=True)
+    gopro_overlay_status = Column(String, nullable=True)
+    gopro_overlay_file_path = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

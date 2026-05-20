@@ -458,8 +458,12 @@ class TestVideoExportJobsEndpoint:
     """Tests for GET /video-export-jobs."""
 
     def test_video_export_jobs_lists_jobs_with_cancel_state(
-        self, client: TestClient, sample_flight
+        self, client: TestClient, db_session, sample_flight
     ):
+        sample_flight.title = "Legacy flight title"
+        sample_flight.gopro_overlay_job_id = "job-overlay"
+        db_session.commit()
+
         manual_jobs = [
             {
                 "job_id": "job-running",
@@ -509,10 +513,14 @@ class TestVideoExportJobsEndpoint:
         assert jobs[0]["status"] == "running"
         assert jobs[0]["mode"] == "gopro_overlay"
         assert jobs[0]["can_cancel"] is True
+        assert jobs[0]["flight_id"] == sample_flight.id
+        assert jobs[0]["flight_name"] == sample_flight.name
+        assert jobs[0]["flight_title"] == sample_flight.name
         assert jobs[1]["job_id"] == "job-running"
         assert jobs[1]["status"] == "processing"
         assert jobs[1]["can_cancel"] is True
         assert jobs[1]["flight_name"] == sample_flight.name
+        assert jobs[1]["flight_title"] == sample_flight.name
         assert jobs[2]["job_id"] == "job-cancelled"
         assert jobs[2]["status"] == "cancelled"
         assert jobs[2]["can_cancel"] is False

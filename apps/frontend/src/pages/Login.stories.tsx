@@ -56,7 +56,10 @@ export const Loading = meta.story({
 Loading.test('shows pending state after submit', async ({ canvasElement }) => {
   const canvas = within(canvasElement);
 
-  await userEvent.type(await canvas.findByLabelText(/email/iu), 'test@test.dev');
+  await userEvent.type(
+    await canvas.findByLabelText(/email/iu),
+    'test@test.dev'
+  );
   await userEvent.type(
     await canvas.findByLabelText(/mot de passe|password/iu),
     'secret123'
