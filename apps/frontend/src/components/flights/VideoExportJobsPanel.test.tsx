@@ -25,6 +25,7 @@ const {
   jobs: [
     {
       job_id: 'job-active',
+      flight_name: 'Nom du vol test',
       flight_title: 'Vol test',
       status: 'processing',
       internal_status: 'capturing',
@@ -132,6 +133,7 @@ describe('VideoExportJobsPanel', () => {
       jobs.length,
       {
         job_id: 'job-active',
+        flight_name: 'Nom du vol test',
         flight_title: 'Vol test',
         status: 'processing',
         internal_status: 'capturing',
@@ -187,7 +189,8 @@ describe('VideoExportJobsPanel', () => {
     render(<VideoExportJobsPanel />);
 
     expect(screen.getByText('Générations vidéo')).toBeInTheDocument();
-    expect(screen.getAllByText('Vol test').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Nom du vol test').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Vol test')).not.toBeInTheDocument();
     expect(screen.getAllByText('Vol terminé').length).toBeGreaterThan(0);
     expect(screen.getAllByText('vol-overlay.mp4').length).toBeGreaterThan(0);
     expect(screen.getAllByText('final.mp4').length).toBeGreaterThan(0);
@@ -215,7 +218,7 @@ describe('VideoExportJobsPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /Terminés/u }));
 
     expect(screen.getAllByText('Vol terminé').length).toBeGreaterThan(0);
-    expect(screen.queryByText('Vol test')).not.toBeInTheDocument();
+    expect(screen.queryByText('Nom du vol test')).not.toBeInTheDocument();
     expect(screen.queryByText('vol-overlay.mp4')).not.toBeInTheDocument();
   });
 
@@ -250,7 +253,7 @@ describe('VideoExportJobsPanel', () => {
 
     expect(screen.getAllByText('vol-overlay.mp4').length).toBeGreaterThan(0);
     expect(screen.getAllByText('final.mp4').length).toBeGreaterThan(0);
-    expect(screen.queryByText('Vol test')).not.toBeInTheDocument();
+    expect(screen.queryByText('Nom du vol test')).not.toBeInTheDocument();
   });
 
   it('resets active filters', () => {
@@ -261,7 +264,7 @@ describe('VideoExportJobsPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Réinitialiser' }));
 
-    expect(screen.getAllByText('Vol test').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Nom du vol test').length).toBeGreaterThan(0);
     expect(screen.getAllByText('vol-overlay.mp4').length).toBeGreaterThan(0);
   });
 
