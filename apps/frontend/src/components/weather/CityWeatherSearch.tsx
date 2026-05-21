@@ -344,7 +344,7 @@ export default function CityWeatherSearch({
           <p className="text-sm font-bold uppercase tracking-[0.16em] text-sky-700 dark:text-sky-300">
             Recherche météo par ville
           </p>
-          <h2 className="mt-1 text-xl font-black tracking-tight text-gray-950 dark:text-white sm:text-2xl">
+          <h2 className="mt-1 text-base font-bold tracking-tight text-gray-950 dark:text-white sm:text-lg">
             Choisir une ville, un déco ou un atterro proche
           </h2>
           {activeTargetLabel && (

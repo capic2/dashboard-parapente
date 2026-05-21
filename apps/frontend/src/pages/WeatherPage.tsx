@@ -59,6 +59,7 @@ const getSearchDayLabel = (day: number, t: (key: string) => string) => {
 };
 
 type WeatherSearchParams = {
+  variant?: WeatherMobilePrototypeVariant;
   siteId?: string;
   day?: number;
   target?: 'city' | 'takeoff' | 'landing';
