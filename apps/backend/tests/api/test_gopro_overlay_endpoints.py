@@ -916,7 +916,7 @@ def test_create_gopro_overlay_job_from_paths_rejects_unsupported_input_before_wo
     assert not work_root.exists()
 
 
-def test_create_gopro_overlay_job_from_paths_copies_inputs_into_job_dir(
+def test_create_gopro_overlay_job_from_paths_defers_input_copy_to_worker_preparation(
     tmp_path,
     monkeypatch,
     test_db,
@@ -929,7 +929,11 @@ def test_create_gopro_overlay_job_from_paths_copies_inputs_into_job_dir(
     video_path.write_bytes(b"video")
     gpx_path.write_text("<gpx />")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
-    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_resolution",
+        lambda _: pytest.fail("video probing should be deferred to worker preparation"),
+    )
     monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
 
     job = create_gopro_overlay_job_from_paths(
@@ -941,11 +945,24 @@ def test_create_gopro_overlay_job_from_paths_copies_inputs_into_job_dir(
     )
 
     work_dir = tmp_path / ".gopro-overlay-work" / job["job_id"]
-    assert Path(job["video_path"]).parent == work_dir
-    assert Path(job["gpx_path"]).parent == work_dir
-    assert Path(job["video_path"]).read_bytes() == b"video"
-    assert Path(job["gpx_path"]).read_text() == "<gpx />"
+    assert Path(job["video_path"]) == video_path
+    assert Path(job["gpx_path"]) == gpx_path
     assert Path(job["output_path"]) == tmp_path / "overlay.mp4"
+
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    queued_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
+    assert queued_job is not None
+
+    prepared = gopro_overlay_export._prepare_queued_job(job["job_id"], queued_job)
+
+    assert prepared is not None
+    assert prepared["status"] == "queued"
+    assert Path(prepared["video_path"]).parent == work_dir
+    assert Path(prepared["gpx_path"]).parent == work_dir
+    assert Path(prepared["video_path"]).read_bytes() == b"video"
+    assert Path(prepared["gpx_path"]).read_text() == "<gpx />"
+    assert prepared["video_width"] == 1920
+    assert prepared["video_height"] == 1080
 
 
 def test_create_gopro_overlay_job_from_paths_sanitizes_output_filename_in_source_dir(
