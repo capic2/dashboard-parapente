@@ -965,6 +965,58 @@ def test_create_gopro_overlay_job_from_paths_defers_input_copy_to_worker_prepara
     assert prepared["video_height"] == 1080
 
 
+def test_run_job_prepares_inputs_before_starting_process(
+    tmp_path,
+    monkeypatch,
+    test_db,
+):
+    layout_dir = tmp_path / "layouts"
+    layout_dir.mkdir()
+    (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
+    video_path = tmp_path / "source.mp4"
+    gpx_path = tmp_path / "source.gpx"
+    video_path.write_bytes(b"video")
+    gpx_path.write_text("<gpx />")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_BIN", "gopro-dashboard.py")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(tmp_path / "runner-root"))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+    monkeypatch.setattr(gopro_overlay_export, "_verify_video_output", lambda _: (True, None))
+
+    job = create_gopro_overlay_job_from_paths(
+        video_path=video_path,
+        gpx_path=gpx_path,
+        pip_path=None,
+        layout_id="parapente-1080",
+        output_filename="overlay.mp4",
+    )
+    work_dir = tmp_path / ".gopro-overlay-work" / job["job_id"]
+
+    class FakeProcess:
+        def __init__(self, command: list[str]):
+            self.command = command
+            self.stdout = None
+
+        def wait(self) -> int:
+            Path(self.command[-1]).write_bytes(b"video")
+            return 0
+
+    with patch(
+        "gopro_overlay_export.subprocess.Popen",
+        side_effect=lambda command, **kwargs: FakeProcess(command),
+    ) as popen:
+        gopro_overlay_export._run_job(job["job_id"])
+
+    assert popen.called
+    command = popen.call_args.args[0]
+    assert popen.call_args.kwargs["cwd"] == str(tmp_path / "runner-root")
+    assert Path(command[command.index("--layout-xml") + 1]).parent == work_dir
+    assert Path(command[-2]).parent == work_dir
+    assert Path(command[-1]) == Path(job["temp_output_path"])
+    assert gopro_overlay_export.get_gopro_overlay_job(job["job_id"])["status"] == "completed"
+
+
 def test_create_gopro_overlay_job_from_paths_sanitizes_output_filename_in_source_dir(
     tmp_path,
     monkeypatch,

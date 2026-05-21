@@ -24,6 +24,7 @@ from sqlalchemy.exc import OperationalError
 logger = logging.getLogger(__name__)
 
 _STATUS_QUEUED = "queued"
+_STATUS_PREPARING = "preparing"
 _STATUS_RUNNING = "running"
 _STATUS_COMPLETED = "completed"
 _STATUS_FAILED = "failed"
@@ -399,8 +400,12 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         return job
 
     try:
-        current_job = _update_job(job_id, message="Preparing overlay files")
-        if current_job.get("status") != _STATUS_QUEUED:
+        current_job = _update_job(
+            job_id,
+            status=_STATUS_PREPARING,
+            message="Preparing overlay files",
+        )
+        if not current_job or current_job.get("status") != _STATUS_PREPARING:
             return None
         work_dir = Path(str(job["layout_path"])).parent
         video_path = Path(str(job["video_path"]))
@@ -443,8 +448,9 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
             has_pip=pip_path is not None,
         )
 
-        return _update_job(
+        prepared_job = _update_job(
             job_id,
+            status=_STATUS_QUEUED,
             video_path=str(video_path),
             gpx_path=str(gpx_path),
             pip_path=str(pip_path) if pip_path else None,
@@ -456,6 +462,9 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
             command_json=None,
             message="Overlay queued",
         )
+        if not prepared_job or prepared_job.get("status") != _STATUS_QUEUED:
+            return None
+        return prepared_job
     except Exception as exc:
         logger.exception("Failed to prepare GoPro overlay job %s", job_id)
         _finish_job(
@@ -790,7 +799,7 @@ def _run_job(job_id: str) -> None:
     if not job:
         return
     job = _prepare_queued_job(job_id, job)
-    if not job:
+    if not job or job.get("status") != _STATUS_QUEUED:
         return
 
     command = [
