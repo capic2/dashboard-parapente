@@ -95,6 +95,7 @@ export const FlightSchema = z.object({
       'cancelled',
     ])
     .nullish(),
+  video_export_progress: z.number().nullish(),
   video_file_path: z.string().nullish(),
   video_file_exists: z.boolean().nullish(),
   gopro_camera_file_exists: z.boolean().nullish(),
@@ -102,6 +103,7 @@ export const FlightSchema = z.object({
   gopro_overlay_status: z
     .enum(['queued', 'running', 'completed', 'failed', 'cancelled'])
     .nullish(),
+  gopro_overlay_progress: z.number().nullish(),
   gopro_overlay_file_path: z.string().nullish(),
   gopro_overlay_file_exists: z.boolean().nullish(),
   site: SiteSchema.optional(),
