@@ -289,6 +289,31 @@ def _flight_gopro_overlay_status(flight: Flight) -> str | None:
     return str(job["status"]) if job else flight.gopro_overlay_status
 
 
+def _job_progress(job: dict[str, Any] | None) -> int | None:
+    if not job:
+        return None
+
+    progress = job.get("progress")
+    if not isinstance(progress, int | float) or not math.isfinite(progress):
+        return None
+    return max(0, min(100, round(progress)))
+
+
+def _flight_video_export_progress(flight: Flight) -> int | None:
+    if (
+        not flight.video_export_job_id
+        or flight.video_export_status not in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
+    ):
+        return None
+    return _job_progress(_resolve_export_status(flight.video_export_job_id))
+
+
+def _flight_gopro_overlay_progress(flight: Flight) -> int | None:
+    if not flight.gopro_overlay_job_id or flight.gopro_overlay_status not in {"queued", "running"}:
+        return None
+    return _job_progress(get_gopro_overlay_job(flight.gopro_overlay_job_id))
+
+
 def _flight_gopro_overlay_file_exists(db: Session, flight: Flight) -> bool:
     overlay_path = _flight_gopro_overlay_file_path(db, flight)
     return bool(overlay_path)
@@ -3102,11 +3127,13 @@ def get_flights(
             "gpx_file_path": flight.gpx_file_path,
             "video_export_job_id": flight.video_export_job_id,
             "video_export_status": flight.video_export_status,
+            "video_export_progress": _flight_video_export_progress(flight),
             "video_file_path": flight.video_file_path,
             "video_file_exists": _flight_video_file_exists(flight),
             "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
             "gopro_overlay_job_id": flight.gopro_overlay_job_id,
             "gopro_overlay_status": _flight_gopro_overlay_status(flight),
+            "gopro_overlay_progress": _flight_gopro_overlay_progress(flight),
             "gopro_overlay_file_path": gopro_overlay_file_path,
             "gopro_overlay_file_exists": bool(gopro_overlay_file_path),
             "external_url": flight.external_url,
@@ -3299,11 +3326,13 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "external_url": flight.external_url,
         "video_export_job_id": flight.video_export_job_id,
         "video_export_status": flight.video_export_status,
+        "video_export_progress": _flight_video_export_progress(flight),
         "video_file_path": flight.video_file_path,
         "video_file_exists": _flight_video_file_exists(flight),
         "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
         "gopro_overlay_job_id": flight.gopro_overlay_job_id,
         "gopro_overlay_status": _flight_gopro_overlay_status(flight),
+        "gopro_overlay_progress": _flight_gopro_overlay_progress(flight),
         "gopro_overlay_file_path": gopro_overlay_file_path,
         "gopro_overlay_file_exists": bool(gopro_overlay_file_path),
         "created_at": flight.created_at.isoformat() if flight.created_at else None,

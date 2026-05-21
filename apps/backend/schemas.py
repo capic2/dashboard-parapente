@@ -258,11 +258,13 @@ class Flight(FlightBase):
     external_url: str | None = None
     video_export_job_id: str | None = None
     video_export_status: str | None = None  # "processing", "completed", "failed"
+    video_export_progress: int | None = None
     video_file_path: str | None = None
     video_file_exists: bool = False
     gopro_camera_file_exists: bool = False
     gopro_overlay_job_id: str | None = None
     gopro_overlay_status: str | None = None
+    gopro_overlay_progress: int | None = None
     gopro_overlay_file_path: str | None = None
     gopro_overlay_file_exists: bool = False
     created_at: datetime
