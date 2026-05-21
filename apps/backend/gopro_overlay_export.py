@@ -24,6 +24,7 @@ from sqlalchemy.exc import OperationalError
 logger = logging.getLogger(__name__)
 
 _STATUS_QUEUED = "queued"
+_STATUS_PREPARING = "preparing"
 _STATUS_RUNNING = "running"
 _STATUS_COMPLETED = "completed"
 _STATUS_FAILED = "failed"
@@ -183,6 +184,14 @@ def _copy_job_input(source: Path, destination: Path, allowed_extensions: set[str
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, destination)
     return destination
+
+
+def _job_preparation_metadata(pin_inputs: bool, requested_layout_id: str | None) -> dict[str, Any]:
+    return {
+        "prepare_overlay_inputs": True,
+        "pin_inputs": pin_inputs,
+        "requested_layout_id": requested_layout_id,
+    }
 
 
 def _job_to_payload(job: GoproOverlayJob, include_command: bool = False) -> dict[str, Any]:
@@ -383,6 +392,90 @@ def _transition_job_to_running(job_id: str, command: list[str]) -> dict[str, Any
             updated_at=_utc_now(),
         )
         return job.copy()
+
+
+def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | None:
+    metadata = job.get("command")
+    if not isinstance(metadata, dict) or not metadata.get("prepare_overlay_inputs"):
+        return job
+
+    try:
+        current_job = _update_job(
+            job_id,
+            status=_STATUS_PREPARING,
+            message="Preparing overlay files",
+        )
+        if not current_job or current_job.get("status") != _STATUS_PREPARING:
+            return None
+        work_dir = Path(str(job["layout_path"])).parent
+        video_path = Path(str(job["video_path"]))
+        gpx_path = Path(str(job["gpx_path"]))
+        pip_path = Path(str(job["pip_path"])) if job.get("pip_path") else None
+
+        if metadata.get("pin_inputs"):
+            video_path = _copy_job_input(
+                video_path,
+                work_dir / f"input{video_path.suffix.lower()}",
+                _VIDEO_EXTENSIONS,
+            )
+            gpx_path = _copy_job_input(
+                gpx_path,
+                work_dir / f"track{gpx_path.suffix.lower()}",
+                _GPX_EXTENSIONS,
+            )
+            if pip_path:
+                pip_path = _copy_job_input(
+                    pip_path,
+                    work_dir / f"pip{pip_path.suffix.lower()}",
+                    _VIDEO_EXTENSIONS,
+                )
+
+        width, height = probe_video_resolution(video_path)
+        requested_layout_id = metadata.get("requested_layout_id")
+        selected_layout = (
+            _find_layout(str(requested_layout_id))
+            if requested_layout_id
+            else _nearest_layout(width, height)
+        )
+        if not selected_layout:
+            raise ValueError("Unknown layout")
+        source_layout_path = _layout_path(selected_layout)
+        if not source_layout_path.exists():
+            raise ValueError(f"Layout file not found: {source_layout_path}")
+        layout_path = _prepare_layout_file(
+            source_layout_path,
+            work_dir / source_layout_path.name,
+            has_pip=pip_path is not None,
+        )
+
+        prepared_job = _update_job(
+            job_id,
+            status=_STATUS_QUEUED,
+            video_path=str(video_path),
+            gpx_path=str(gpx_path),
+            pip_path=str(pip_path) if pip_path else None,
+            layout_id=selected_layout.id,
+            layout_label=selected_layout.label,
+            layout_path=str(layout_path),
+            video_width=width,
+            video_height=height,
+            command_json=None,
+            message="Overlay queued",
+        )
+        if not prepared_job or prepared_job.get("status") != _STATUS_QUEUED:
+            return None
+        return prepared_job
+    except Exception as exc:
+        logger.exception("Failed to prepare GoPro overlay job %s", job_id)
+        _finish_job(
+            job_id,
+            status=_STATUS_FAILED,
+            progress=100,
+            message="Overlay preparation failed",
+            error=str(exc) or exc.__class__.__name__,
+            completed_at=_utc_now(),
+        )
+        return None
 
 
 def _finish_job(job_id: str, **changes: Any) -> dict[str, Any]:
@@ -590,40 +683,21 @@ def _create_gopro_overlay_job_from_paths(
         output_name = f"{Path(output_name).stem}.mp4"
     output_path = _output_path_for_dir(output_dir, video_path, output_name)
 
-    if pin_inputs:
-        video_path = _copy_job_input(
-            video_path,
-            work_dir / f"input{video_path.suffix.lower()}",
-            _VIDEO_EXTENSIONS,
-        )
-        gpx_path = _copy_job_input(
-            gpx_path,
-            work_dir / f"track{gpx_path.suffix.lower()}",
-            _GPX_EXTENSIONS,
-        )
-        if pip_path:
-            pip_path = _copy_job_input(
-                pip_path,
-                work_dir / f"pip{pip_path.suffix.lower()}",
-                _VIDEO_EXTENSIONS,
-            )
-
-    width, height = probe_video_resolution(video_path)
-    selected_layout = _find_layout(layout_id) if layout_id else _nearest_layout(width, height)
+    selected_layout = _find_layout(layout_id) if layout_id else _LAYOUTS[0]
     if not selected_layout:
         raise ValueError("Unknown layout")
     source_layout_path = _layout_path(selected_layout)
     if not source_layout_path.exists():
         raise ValueError(f"Layout file not found: {source_layout_path}")
-    layout_path = _prepare_layout_file(
-        source_layout_path,
-        work_dir / source_layout_path.name,
-        has_pip=pip_path is not None,
-    )
+    layout_path = work_dir / source_layout_path.name
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temp_output_path = _temp_output_path(output_path, job_id)
     log_path = work_dir / "overlay.log"
+    preparation_metadata = _job_preparation_metadata(
+        pin_inputs=pin_inputs,
+        requested_layout_id=layout_id,
+    )
 
     now = _utc_now_dt()
     db_job: GoproOverlayJob | None = None
@@ -645,8 +719,9 @@ def _create_gopro_overlay_job_from_paths(
                 temp_output_path=str(temp_output_path),
                 output_filename=output_path.name,
                 log_path=str(log_path),
-                video_width=width,
-                video_height=height,
+                command_json=json.dumps(preparation_metadata),
+                video_width=None,
+                video_height=None,
                 created_at=now,
                 updated_at=now,
             )
@@ -675,12 +750,12 @@ def _create_gopro_overlay_job_from_paths(
             "temp_output_path": str(temp_output_path),
             "output_filename": output_path.name,
             "log_path": str(log_path),
-            "video_width": width,
-            "video_height": height,
+            "video_width": None,
+            "video_height": None,
             "created_at": _utc_now(),
             "updated_at": _utc_now(),
             "completed_at": None,
-            "command": None,
+            "command": preparation_metadata,
         }
 
     legacy_job = {
@@ -699,12 +774,12 @@ def _create_gopro_overlay_job_from_paths(
         "temp_output_path": str(temp_output_path),
         "output_filename": output_path.name,
         "log_path": str(log_path),
-        "video_width": width,
-        "video_height": height,
+        "video_width": None,
+        "video_height": None,
         "created_at": _utc_now(),
         "updated_at": _utc_now(),
         "completed_at": None,
-        "command": None,
+        "command": preparation_metadata,
     }
     with _LOCK:
         _JOBS[job_id] = legacy_job
@@ -720,8 +795,11 @@ def _create_gopro_overlay_job_from_paths(
 
 
 def _run_job(job_id: str) -> None:
-    job = get_gopro_overlay_job(job_id)
+    job = get_gopro_overlay_job(job_id, include_command=True)
     if not job:
+        return
+    job = _prepare_queued_job(job_id, job)
+    if not job or job.get("status") != _STATUS_QUEUED:
         return
 
     command = [

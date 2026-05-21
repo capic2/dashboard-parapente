@@ -4,7 +4,13 @@ import { api } from '../../lib/api';
 
 export type GoproOverlayJob = {
   job_id: string;
-  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+  status:
+    | 'queued'
+    | 'preparing'
+    | 'running'
+    | 'completed'
+    | 'failed'
+    | 'cancelled';
   progress: number;
   message: string;
   error?: string | null;

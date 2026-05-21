@@ -31,7 +31,7 @@ class GoproOverlayProbeResponse(GoproOverlayLayoutsResponse):
 
 class GoproOverlayJob(BaseModel):
     job_id: str
-    status: Literal["queued", "running", "completed", "failed", "cancelled"]
+    status: Literal["queued", "preparing", "running", "completed", "failed", "cancelled"]
     progress: int
     message: str
     error: str | None = None
