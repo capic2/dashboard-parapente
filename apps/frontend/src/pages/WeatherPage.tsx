@@ -28,14 +28,13 @@ import {
 import { useCoordinateWeather } from '../hooks/weather/useCityWeather';
 import { transformWeatherResponse } from '../hooks/weather/useWeather';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { CalendarDays, MapPin, Search, Wind } from 'lucide-react';
 import {
   weatherCardClassName,
   weatherSectionTitleClassName,
 } from '../components/weather/weatherUi';
-import WeatherMobilePrototype, {
-  type WeatherMobilePrototypeVariant,
-} from './WeatherPage.mobile-prototype';
+import WeatherPageMobileLayout from './WeatherPage.mobile';
 
 const isSpotSearchTarget = (
   target: CityWeatherTarget | null
@@ -167,6 +166,7 @@ export default function WeatherPage() {
   const favoriteSiteIds = useAppSettingsStore(
     (state) => state.settings.favoriteSites
   );
+  const isMobile = useIsMobile();
   const search = useSearch({ from: '/weather' });
   const routeSiteId = search ? search.siteId : '';
   const selectedDayIndex = search.day ?? 0;
@@ -227,7 +227,7 @@ export default function WeatherPage() {
     : selectedSite?.name;
   const sourceLabel = selectedSearchTarget ? 'Recherche' : 'Site favori';
 
-  const prototypeSelectionPanel = (
+  const mobileSelectionPanel = (
     <div className="space-y-4">
       <section className={`${weatherCardClassName} overflow-visible`}>
         <div className="border-b border-slate-100 bg-gradient-to-br from-sky-50 via-white to-white p-4 dark:border-slate-800 dark:from-sky-950/40 dark:via-slate-900 dark:to-slate-900 sm:p-5">
@@ -266,7 +266,6 @@ export default function WeatherPage() {
                   search: {
                     siteId: selectedSiteId || undefined,
                     day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
-                    variant: search.variant,
                   },
                 });
               }
@@ -298,7 +297,6 @@ export default function WeatherPage() {
                         siteId,
                         day:
                           selectedDayIndex > 0 ? selectedDayIndex : undefined,
-                        variant: search.variant,
                       },
                     });
                   }}
@@ -331,7 +329,6 @@ export default function WeatherPage() {
                     to: '/weather',
                     search: {
                       ...getSearchForTarget(target, selectedDayIndex),
-                      variant: search.variant,
                     },
                   });
                 }}
@@ -342,7 +339,6 @@ export default function WeatherPage() {
                     search: {
                       siteId,
                       day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
-                      variant: search.variant,
                     },
                   });
                 }}
@@ -363,7 +359,6 @@ export default function WeatherPage() {
             search: {
               siteId,
               day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
-              variant: search.variant,
             },
           });
         }}
@@ -372,7 +367,7 @@ export default function WeatherPage() {
     </div>
   );
 
-  const prototypeEmptyPanel =
+  const mobileEmptyPanel =
     !selectedSearchTarget && !selectedSiteId ? (
       <section className={`${weatherCardClassName} p-6 text-center`}>
         <h2 className="text-xl font-bold text-gray-950 dark:text-white">
@@ -385,7 +380,7 @@ export default function WeatherPage() {
       </section>
     ) : undefined;
 
-  const prototypeSearchResultPanel = selectedSearchTarget ? (
+  const mobileSearchResultPanel = selectedSearchTarget ? (
     <section className={`${weatherCardClassName} p-4`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -411,7 +406,6 @@ export default function WeatherPage() {
                   to: '/weather',
                   search: {
                     ...getSearchForTarget(selectedSearchTarget, day),
-                    variant: search.variant,
                   },
                 })
               }
@@ -430,7 +424,7 @@ export default function WeatherPage() {
     </section>
   ) : undefined;
 
-  const prototypeCurrentConditions =
+  const mobileCurrentConditions =
     selectedSearchTarget || selectedSiteId ? (
       <CurrentConditions
         spotId={selectedSearchTarget ? undefined : selectedSiteId}
@@ -446,7 +440,7 @@ export default function WeatherPage() {
       />
     ) : undefined;
 
-  const prototypeLiveWindPanel =
+  const mobileLiveWindPanel =
     !selectedSearchTarget && selectedSiteId ? (
       <section
         className={`${weatherCardClassName} border-l-4 border-l-cyan-500 p-4 sm:p-5`}
@@ -472,7 +466,7 @@ export default function WeatherPage() {
       </section>
     ) : undefined;
 
-  const prototypeLandingPanel =
+  const mobileLandingPanel =
     !selectedSearchTarget && selectedSiteId ? (
       <WeatherMultiLanding
         spotId={selectedSiteId}
@@ -480,7 +474,7 @@ export default function WeatherPage() {
       />
     ) : undefined;
 
-  const prototypeForecastPanel =
+  const mobileForecastPanel =
     !selectedSearchTarget && selectedSiteId ? (
       <Forecast7Day
         spotId={selectedSiteId}
@@ -491,19 +485,18 @@ export default function WeatherPage() {
             search: {
               ...weatherSearch,
               day: day > 0 ? day : undefined,
-              variant: search.variant,
             },
           })
         }
       />
     ) : undefined;
 
-  const prototypeEmagramPanel =
+  const mobileEmagramPanel =
     isAuthenticated && !selectedSearchTarget && selectedSiteId ? (
       <EmagramWidget siteId={selectedSiteId} dayIndex={selectedDayIndex} />
     ) : undefined;
 
-  const prototypeHourlyPanel =
+  const mobileHourlyPanel =
     selectedSearchTarget || selectedSiteId ? (
       <HourlyForecast
         spotId={selectedSearchTarget ? undefined : selectedSiteId}
@@ -514,34 +507,24 @@ export default function WeatherPage() {
       />
     ) : undefined;
 
-  if (search.variant) {
+  if (isMobile) {
     return (
-      <WeatherMobilePrototype
-        variant={search.variant}
+      <WeatherPageMobileLayout
         activeWeatherName={activeWeatherName}
         selectedDayLabel={selectedDayLabel}
         sourceLabel={sourceLabel}
         selectedSiteId={selectedSiteId}
         isSearchMode={Boolean(selectedSearchTarget)}
         isAuthenticated={isAuthenticated}
-        selectionPanel={prototypeSelectionPanel}
-        searchResultPanel={prototypeSearchResultPanel}
-        emptyPanel={prototypeEmptyPanel}
-        currentConditions={prototypeCurrentConditions}
-        liveWindPanel={prototypeLiveWindPanel}
-        landingPanel={prototypeLandingPanel}
-        forecastPanel={prototypeForecastPanel}
-        emagramPanel={prototypeEmagramPanel}
-        hourlyPanel={prototypeHourlyPanel}
-        onVariantChange={(variant) =>
-          void navigate({
-            to: '/weather',
-            search: {
-              ...search,
-              variant,
-            },
-          })
-        }
+        selectionPanel={mobileSelectionPanel}
+        searchResultPanel={mobileSearchResultPanel}
+        emptyPanel={mobileEmptyPanel}
+        currentConditions={mobileCurrentConditions}
+        liveWindPanel={mobileLiveWindPanel}
+        landingPanel={mobileLandingPanel}
+        forecastPanel={mobileForecastPanel}
+        emagramPanel={mobileEmagramPanel}
+        hourlyPanel={mobileHourlyPanel}
       />
     );
   }
