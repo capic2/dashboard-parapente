@@ -342,7 +342,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const gpxStartTimeRef = useRef<number>(0);
 
   const trackEntityRef = useRef<Entity | null>(null);
-  const trackFallbackEntityRef = useRef<Entity | null>(null);
   const trackCurtainEntityRef = useRef<Entity | null>(null);
   const trackPositionCountRef = useRef(0);
   const cursorEntityRef = useRef<Entity | null>(null);
@@ -411,7 +410,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const removeTrackEntity = useCallback((viewer: CesiumViewer) => {
     if (!getViewerScene(viewer)) {
       trackEntityRef.current = null;
-      trackFallbackEntityRef.current = null;
       trackCurtainEntityRef.current = null;
       trackPositionCountRef.current = 0;
       return;
@@ -424,19 +422,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       viewer.entities.remove(trackEntityRef.current);
     }
     if (
-      trackFallbackEntityRef.current &&
-      viewer.entities.contains(trackFallbackEntityRef.current)
-    ) {
-      viewer.entities.remove(trackFallbackEntityRef.current);
-    }
-    if (
       trackCurtainEntityRef.current &&
       viewer.entities.contains(trackCurtainEntityRef.current)
     ) {
       viewer.entities.remove(trackCurtainEntityRef.current);
     }
     trackEntityRef.current = null;
-    trackFallbackEntityRef.current = null;
     trackCurtainEntityRef.current = null;
     trackPositionCountRef.current = 0;
   }, []);
@@ -455,8 +446,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       }
 
       if (
-        !trackFallbackEntityRef.current ||
-        !viewer.entities.contains(trackFallbackEntityRef.current)
+        !trackCurtainEntityRef.current ||
+        !viewer.entities.contains(trackCurtainEntityRef.current)
       ) {
         const curtainImage = createReplayTrackCurtainImage();
 
@@ -485,22 +476,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   transparent: true,
                 })
               : Color.fromCssColorString('#ff5a1f').withAlpha(0.16),
-            shadows: ShadowMode.DISABLED,
-          },
-        });
-        trackFallbackEntityRef.current = viewer.entities.add({
-          polyline: {
-            positions: new CallbackProperty(
-              () =>
-                isActiveViewer(viewer)
-                  ? getRenderableTrackPositions(visiblePositionsRef.current)
-                  : [],
-              false
-            ),
-            width: 3,
-            material: Color.fromCssColorString('#ff5a1f').withAlpha(0.95),
-            depthFailMaterial:
-              Color.fromCssColorString('#ff5a1f').withAlpha(0.5),
             shadows: ShadowMode.DISABLED,
           },
         });
