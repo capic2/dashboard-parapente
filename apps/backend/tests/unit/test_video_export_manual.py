@@ -557,6 +557,7 @@ def test_resume_video_export_waits_for_running_cancel_to_finish(test_db, tmp_pat
     (frames_dir / "frame00000.png").write_bytes(b"frame")
     monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
     monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "thread")
 
     db_session = test_db()
     db_session.add(
@@ -585,6 +586,60 @@ def test_resume_video_export_waits_for_running_cancel_to_finish(test_db, tmp_pat
         assert video_export_manual.resume_video_export(job_id, auth_token="resume-token") is False
     finally:
         video_export_manual._clear_job_cancel_requested(job_id)
+
+
+def test_resume_video_export_clears_stale_api_cancel_flag_for_finished_rq_job(
+    test_db, tmp_path, monkeypatch
+):
+    job_id = "job-stale-cancel-flag"
+    enqueued_job_ids: list[str] = []
+    temp_root = tmp_path / "temp-images"
+    frames_dir = temp_root / job_id / "frames"
+    frames_dir.mkdir(parents=True)
+    (frames_dir / "frame00000.png").write_bytes(b"frame")
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(
+        video_export_manual, "_is_rq_video_export_job_started", lambda _job_id: False
+    )
+
+    def enqueue_rq_job(queued_job_id: str) -> None:
+        enqueued_job_ids.append(video_export_manual._rq_job_id(queued_job_id))
+
+    monkeypatch.setattr(
+        video_export_manual,
+        "_enqueue_video_export_job_in_rq",
+        enqueue_rq_job,
+    )
+
+    db_session = test_db()
+    db_session.add(
+        VideoExportJob(
+            id=job_id,
+            flight_id="flight-test-001",
+            status="cancelled",
+            mode="manual_fast",
+            quality="1080p",
+            fps=15,
+            speed=1,
+            progress=70,
+            total_frames=10,
+            message="cancelled",
+            frontend_url="http://backend:8001",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+            cancelled_at=datetime.utcnow(),
+        )
+    )
+    db_session.commit()
+    db_session.close()
+
+    video_export_manual._set_job_cancel_requested(job_id)
+    assert video_export_manual.resume_video_export(job_id, auth_token="resume-token") is True
+
+    assert video_export_manual._is_job_cancel_requested(job_id) is False
+    assert enqueued_job_ids == ["video-export-job-stale-cancel-flag"]
 
 
 def test_cancel_queued_video_export_removes_rq_job(test_db, monkeypatch):

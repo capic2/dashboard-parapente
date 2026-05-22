@@ -7,6 +7,7 @@ Coverage: GET, POST, PATCH, DELETE for flights.
 
 from datetime import date, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 import config
 from models import Flight
@@ -77,6 +78,43 @@ class TestFlightsListEndpoint:
         assert returned["gopro_overlay_status"] is None
         assert returned["gopro_overlay_file_path"] is None
         assert returned["gopro_overlay_file_exists"] is False
+
+    def test_get_flights_includes_media_export_progress(self, client, db_session, arguel_site):
+        """GET /flights includes active video and GoPro overlay progress."""
+        flight = Flight(
+            id="flight-with-progress",
+            name="Flight with progress",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            video_export_job_id="job-video-progress",
+            video_export_status="running",
+            gopro_overlay_job_id="job-overlay-progress",
+            gopro_overlay_status="running",
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        with (
+            patch(
+                "routes.get_export_status_manual",
+                return_value={"status": "running", "progress": 42.4},
+            ),
+            patch("routes.get_export_status_stream", return_value=None),
+            patch(
+                "routes.get_gopro_overlay_job",
+                return_value={"status": "running", "progress": 55.1},
+            ),
+        ):
+            response = client.get(f"{API_PREFIX}/flights")
+
+        assert response.status_code == 200
+        returned = next(
+            flight
+            for flight in response.json()["flights"]
+            if flight["id"] == "flight-with-progress"
+        )
+        assert returned["video_export_progress"] == 42
+        assert returned["gopro_overlay_progress"] == 55
 
     def test_get_flights_includes_available_gopro_overlay_path(
         self, client, db_session, monkeypatch, tmp_path

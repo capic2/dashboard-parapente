@@ -20,9 +20,18 @@ import {
   FlightsApiResponseSchema,
   FlightSchema,
   FlightStatsSchema,
+  VIDEO_EXPORT_IN_PROGRESS_STATUSES,
 } from '@dashboard-parapente/shared-types';
 import { isHTTPError } from 'ky';
 import { getStaleTime } from '../../lib/cacheConfig';
+
+const isMediaExportInProgress = (flight: Flight) =>
+  Boolean(
+    (flight.video_export_status &&
+      VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.video_export_status)) ||
+    flight.gopro_overlay_status === 'queued' ||
+    flight.gopro_overlay_status === 'running'
+  );
 
 export const flightsQueryOptions = (filters: FlightFilters = {}) => {
   const searchParams = Object.entries(filters).reduce(
@@ -46,6 +55,10 @@ export const flightsQueryOptions = (filters: FlightFilters = {}) => {
       return validation.data.flights;
     },
     staleTime: getStaleTime(1000 * 60 * 10),
+    refetchInterval: (query) => {
+      const data = query.state.data as Flight[] | undefined;
+      return data?.some(isMediaExportInProgress) ? 10000 : false;
+    },
   });
 };
 

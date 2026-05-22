@@ -32,6 +32,7 @@ import { useToast } from '../../hooks/useToast';
 import { api, getApiErrorMessage } from '../../lib/api';
 import type { Flight, FlightFormData, Site } from '../../types';
 import { FlightEditForm } from './FlightEditForm';
+import { formatMediaProgressLabel } from './mediaProgress';
 import {
   formatAltitudeMeters,
   formatDistanceKm,
@@ -121,6 +122,14 @@ export function FlightDetails({
     goproOverlayStatus === 'completed' && hasPersistedGoproOverlay;
   const isGoproOverlayFailed = goproOverlayStatus === 'failed';
   const isDownloadingAnyMedia = downloadingMedia !== null;
+  const videoProcessingLabel = formatMediaProgressLabel(
+    t('flights.videoProcessingBadge'),
+    flight.video_export_progress
+  );
+  const goproOverlayProcessingLabel = formatMediaProgressLabel(
+    t('flights.goproOverlayProcessingBadge'),
+    goproOverlayJob?.progress ?? flight.gopro_overlay_progress
+  );
   const normalizedTitle = flight.title?.trim();
   const flightTitle =
     normalizedTitle ||
@@ -404,7 +413,7 @@ export function FlightDetails({
                   )}
                   {isVideoExportRunning && (
                     <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
-                      {t('flights.videoProcessingBadge')}
+                      {videoProcessingLabel}
                     </span>
                   )}
                   {isVideoExportFailed && (
@@ -444,7 +453,7 @@ export function FlightDetails({
                     )}
                   {isGoproOverlayRunning && (
                     <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
-                      {t('flights.goproOverlayProcessingBadge')}
+                      {goproOverlayProcessingLabel}
                     </span>
                   )}
                   {isGoproOverlayFailed && (

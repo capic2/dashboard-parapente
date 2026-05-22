@@ -9,6 +9,9 @@ import {
 const isExportInProgress = (status?: string | null) =>
   status ? VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(status) : false;
 
+const isOverlayInProgress = (status?: string | null) =>
+  status === 'queued' || status === 'running';
+
 type ExportViewerAccess = {
   exportJobId?: string | null;
   exportToken?: string | null;
@@ -41,11 +44,13 @@ export const useFlight = (
       return await api.get(`flights/${flightId}`).json();
     },
     enabled: !!flightId,
-    staleTime: getStaleTime(1000 * 10), // 10 seconds - refresh frequently to check video status
+    staleTime: getStaleTime(1000 * 10), // 10 seconds - refresh frequently to check media status
     refetchInterval: (query) => {
-      // Auto-refresh every 10 seconds if video is processing
       const data = query.state.data as Flight | undefined;
-      return isExportInProgress(data?.video_export_status) ? 10000 : false;
+      return isExportInProgress(data?.video_export_status) ||
+        isOverlayInProgress(data?.gopro_overlay_status)
+        ? 10000
+        : false;
     },
   });
 };

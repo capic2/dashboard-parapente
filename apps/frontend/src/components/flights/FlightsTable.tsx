@@ -17,6 +17,7 @@ import {
   Wand2,
 } from 'lucide-react';
 import { useFlightsTable, FLIGHT_SORTABLE_COLUMNS } from './useFlightsTable';
+import { formatMediaProgressLabel } from './mediaProgress';
 import type { Flight } from '../../types';
 import {
   formatAltitudeMeters,
@@ -111,6 +112,14 @@ export function FlightsTable({
         VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.video_export_status)
       );
       const isVideoExportFailed = flight.video_export_status === 'failed';
+      const videoProcessingLabel = formatMediaProgressLabel(
+        t('flights.videoProcessingBadge'),
+        flight.video_export_progress
+      );
+      const goproOverlayProcessingLabel = formatMediaProgressLabel(
+        t('flights.goproOverlayProcessingBadge'),
+        flight.gopro_overlay_progress
+      );
       const selectFlight = () => {
         if (!selectionMode) {
           onSelectFlight(flight);
@@ -233,7 +242,7 @@ export function FlightsTable({
                     )}
                     {isVideoExportRunning && (
                       <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
-                        {t('flights.videoProcessingBadge')}
+                        {videoProcessingLabel}
                       </span>
                     )}
                     {isVideoExportFailed && (
@@ -259,7 +268,7 @@ export function FlightsTable({
                     )}
                     {isGoproOverlayRunning && (
                       <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
-                        {t('flights.goproOverlayProcessingBadge')}
+                        {goproOverlayProcessingLabel}
                       </span>
                     )}
                     {isGoproOverlayFailed && (

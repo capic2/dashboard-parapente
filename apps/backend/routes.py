@@ -289,6 +289,31 @@ def _flight_gopro_overlay_status(flight: Flight) -> str | None:
     return str(job["status"]) if job else flight.gopro_overlay_status
 
 
+def _job_progress(job: dict[str, Any] | None) -> int | None:
+    if not job:
+        return None
+
+    progress = job.get("progress")
+    if not isinstance(progress, int | float) or not math.isfinite(progress):
+        return None
+    return max(0, min(100, round(progress)))
+
+
+def _flight_video_export_progress(flight: Flight) -> int | None:
+    if (
+        not flight.video_export_job_id
+        or flight.video_export_status not in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
+    ):
+        return None
+    return _job_progress(_resolve_export_status(flight.video_export_job_id))
+
+
+def _flight_gopro_overlay_progress(flight: Flight) -> int | None:
+    if not flight.gopro_overlay_job_id or flight.gopro_overlay_status not in {"queued", "running"}:
+        return None
+    return _job_progress(get_gopro_overlay_job(flight.gopro_overlay_job_id))
+
+
 def _flight_gopro_overlay_file_exists(db: Session, flight: Flight) -> bool:
     overlay_path = _flight_gopro_overlay_file_path(db, flight)
     return bool(overlay_path)
@@ -3102,11 +3127,13 @@ def get_flights(
             "gpx_file_path": flight.gpx_file_path,
             "video_export_job_id": flight.video_export_job_id,
             "video_export_status": flight.video_export_status,
+            "video_export_progress": _flight_video_export_progress(flight),
             "video_file_path": flight.video_file_path,
             "video_file_exists": _flight_video_file_exists(flight),
             "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
             "gopro_overlay_job_id": flight.gopro_overlay_job_id,
             "gopro_overlay_status": _flight_gopro_overlay_status(flight),
+            "gopro_overlay_progress": _flight_gopro_overlay_progress(flight),
             "gopro_overlay_file_path": gopro_overlay_file_path,
             "gopro_overlay_file_exists": bool(gopro_overlay_file_path),
             "external_url": flight.external_url,
@@ -3299,11 +3326,13 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "external_url": flight.external_url,
         "video_export_job_id": flight.video_export_job_id,
         "video_export_status": flight.video_export_status,
+        "video_export_progress": _flight_video_export_progress(flight),
         "video_file_path": flight.video_file_path,
         "video_file_exists": _flight_video_file_exists(flight),
         "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
         "gopro_overlay_job_id": flight.gopro_overlay_job_id,
         "gopro_overlay_status": _flight_gopro_overlay_status(flight),
+        "gopro_overlay_progress": _flight_gopro_overlay_progress(flight),
         "gopro_overlay_file_path": gopro_overlay_file_path,
         "gopro_overlay_file_exists": bool(gopro_overlay_file_path),
         "created_at": flight.created_at.isoformat() if flight.created_at else None,
@@ -5025,7 +5054,23 @@ async def create_flight_gopro_overlay_job(
             resolved_gpx_path or auto_gpx_path or _resolve_flight_file_path(flight.gpx_file_path)
         )
         fallback_pip_path = resolved_pip_path or auto_pip_path or generated_video_path
-        if fallback_gpx_path and fallback_gpx_path.exists() and auto_osv_paths:
+        gpx_file_for_job = gpx_file
+        if gpx_file and gpx_file.filename and auto_osv_paths:
+            uploaded_gpx_path = await save_uploaded_file(
+                gpx_file,
+                input_dir
+                / ".gopro-overlay-work"
+                / f"uploaded-{uuid.uuid4()}{Path(gpx_file.filename).suffix.lower()}",
+                {".gpx", ".fit"},
+            )
+            fallback_gpx_path = await asyncio.to_thread(
+                _merge_osv_files_with_gpx,
+                auto_osv_paths,
+                uploaded_gpx_path,
+                input_dir,
+            )
+            gpx_file_for_job = None
+        elif fallback_gpx_path and fallback_gpx_path.exists() and auto_osv_paths:
             fallback_gpx_path = await asyncio.to_thread(
                 _merge_osv_files_with_gpx,
                 auto_osv_paths,
@@ -5071,7 +5116,7 @@ async def create_flight_gopro_overlay_job(
 
         job = await create_gopro_overlay_job(
             video_file=video_file,
-            gpx_file=gpx_file,
+            gpx_file=gpx_file_for_job,
             fallback_gpx_path=fallback_gpx_path,
             fallback_pip_path=fallback_pip_path,
             pip_file=osv_video_file,

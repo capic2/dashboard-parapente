@@ -134,13 +134,14 @@ test('shows GoPro overlay status badges like video badges', () => {
           id: 'flight-overlay-running',
           gopro_overlay_file_path: '/exports/final.mp4',
           gopro_overlay_status: 'running',
+          gopro_overlay_progress: 55,
         },
       ]}
     />
   );
 
   expect(
-    screen.getByText('flights.goproOverlayProcessingBadge')
+    screen.getByText('flights.goproOverlayProcessingBadge 55%')
   ).toBeInTheDocument();
   expect(
     screen.queryByRole('button', { name: 'flights.goproOverlayDownload' })
@@ -165,4 +166,23 @@ test('shows GoPro overlay status badges like video badges', () => {
   expect(
     screen.queryByRole('button', { name: 'flights.goproOverlayDownload' })
   ).not.toBeInTheDocument();
+});
+
+test('shows video progress in processing badge', () => {
+  render(
+    <FlightsTableHarness
+      tableFlights={[
+        {
+          ...flights[1],
+          id: 'flight-video-running',
+          video_export_status: 'running',
+          video_export_progress: 42,
+        },
+      ]}
+    />
+  );
+
+  expect(
+    screen.getByText('flights.videoProcessingBadge 42%')
+  ).toBeInTheDocument();
 });

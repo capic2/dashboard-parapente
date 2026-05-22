@@ -563,6 +563,20 @@ def _delete_rq_video_export_job(job_id: str) -> bool:
     return delete_job(_rq_job_id(job_id))
 
 
+def _is_rq_video_export_job_started(job_id: str) -> bool:
+    from job_queue import get_queue, is_rq_enabled
+
+    if not is_rq_enabled():
+        return False
+
+    job = get_queue().fetch_job(_rq_job_id(job_id))
+    if job is None:
+        return False
+
+    status = job.get_status(refresh=True)
+    return str(getattr(status, "value", status)).lower() == "started"
+
+
 def enqueue_pending_video_export_jobs() -> int:
     """Enqueue queued DB jobs into RQ after an API or worker restart."""
     from job_queue import is_rq_enabled
@@ -1720,7 +1734,9 @@ def resume_video_export(job_id: str, auth_token: str | None = None) -> bool:
         return False
 
     if _is_job_cancel_requested(job_id):
-        return False
+        if config.JOB_QUEUE_BACKEND != "rq" or _is_rq_video_export_job_started(job_id):
+            return False
+        _clear_job_cancel_requested(job_id)
 
     resume_info = _job_resume_info(job)
     if not resume_info["can_resume"]:

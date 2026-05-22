@@ -28,11 +28,13 @@ import {
 import { useCoordinateWeather } from '../hooks/weather/useCityWeather';
 import { transformWeatherResponse } from '../hooks/weather/useWeather';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { CalendarDays, MapPin, Search, Wind } from 'lucide-react';
 import {
   weatherCardClassName,
   weatherSectionTitleClassName,
 } from '../components/weather/weatherUi';
+import WeatherPageMobileLayout from './WeatherPage.mobile';
 
 const isSpotSearchTarget = (
   target: CityWeatherTarget | null
@@ -163,6 +165,7 @@ export default function WeatherPage() {
   const favoriteSiteIds = useAppSettingsStore(
     (state) => state.settings.favoriteSites
   );
+  const isMobile = useIsMobile();
   const search = useSearch({ from: '/weather' });
   const routeSiteId = search ? search.siteId : '';
   const selectedDayIndex = search.day ?? 0;
@@ -221,6 +224,314 @@ export default function WeatherPage() {
   const activeWeatherName = selectedSearchTarget
     ? selectedSearchTitle
     : selectedSite?.name;
+  const sourceLabel = selectedSearchTarget ? 'Recherche' : 'Site favori';
+
+  const mobileSelectionPanel = (
+    <div className="space-y-4">
+      <section className={`${weatherCardClassName} overflow-visible`}>
+        <div className="border-b border-slate-100 bg-gradient-to-br from-sky-50 via-white to-white p-4 dark:border-slate-800 dark:from-sky-950/40 dark:via-slate-900 dark:to-slate-900 sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className={weatherSectionTitleClassName}>Choix du site</p>
+              <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950 dark:text-white">
+                Sélection météo
+              </h2>
+              <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-300">
+                Gardez vos favoris sous la main ou cherchez une ville, un déco
+                ou un atterro proche.
+              </p>
+            </div>
+            {activeWeatherName && (
+              <div className="min-w-0 rounded-2xl border border-sky-100 bg-white/80 px-3 py-2 text-sm shadow-sm dark:border-sky-900/60 dark:bg-slate-950/50">
+                <span className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                  Actuel
+                </span>
+                <span className="block truncate font-bold text-sky-800 dark:text-sky-200">
+                  {activeWeatherName}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="p-3 sm:p-4">
+          <Tabs
+            selectedKey={selectionTab}
+            onSelectionChange={(key) => {
+              const nextTab = key as SelectionTab;
+              setSelectionTab(nextTab);
+              if (nextTab === 'favorites') {
+                void navigate({
+                  to: '/weather',
+                  search: {
+                    siteId: selectedSiteId || undefined,
+                    day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
+                  },
+                });
+              }
+            }}
+          >
+            <TabList className="grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 shadow-none dark:bg-slate-950/70">
+              <Tab id="favorites">
+                <span className="inline-flex items-center gap-2">
+                  <MapPin className="h-4 w-4" aria-hidden="true" />
+                  Favoris
+                </span>
+              </Tab>
+              <Tab id="search">
+                <span className="inline-flex items-center gap-2">
+                  <Search className="h-4 w-4" aria-hidden="true" />
+                  Recherche
+                </span>
+              </Tab>
+            </TabList>
+            <TabPanel id="favorites">
+              {sites.length > 0 ? (
+                <SiteSelector
+                  selectedSiteId={selectedSearchTarget ? '' : selectedSiteId}
+                  onSelectSite={(siteId) => {
+                    setSelectionTab('favorites');
+                    void navigate({
+                      to: '/weather',
+                      search: {
+                        siteId,
+                        day:
+                          selectedDayIndex > 0 ? selectedDayIndex : undefined,
+                      },
+                    });
+                  }}
+                  weatherData={weatherDataMap}
+                />
+              ) : (
+                <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-600 dark:bg-gray-900/60 dark:text-gray-300">
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {t('dashboard.noSites')}
+                  </p>
+                  <p className="mt-1">{t('dashboard.noSitesDescription')}</p>
+                  <Button
+                    onPress={() => void navigate({ to: '/sites' })}
+                    className="mt-3 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+                  >
+                    {t('dashboard.addSite')}
+                  </Button>
+                </div>
+              )}
+            </TabPanel>
+            <TabPanel id="search">
+              <CityWeatherSearch
+                dayIndex={selectedDayIndex}
+                selectedTarget={selectedSearchTarget}
+                favoriteSites={sites}
+                isEmbedded
+                onSelectTarget={(target) => {
+                  setSelectionTab('search');
+                  void navigate({
+                    to: '/weather',
+                    search: {
+                      ...getSearchForTarget(target, selectedDayIndex),
+                    },
+                  });
+                }}
+                onFavoriteCreated={(siteId) => {
+                  setSelectionTab('favorites');
+                  void navigate({
+                    to: '/weather',
+                    search: {
+                      siteId,
+                      day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
+                    },
+                  });
+                }}
+              />
+            </TabPanel>
+          </Tabs>
+        </div>
+      </section>
+
+      <BestSpotSuggestion
+        bestSpot={bestSpot ?? null}
+        hourlyBestSpots={hourlyBestSpots?.hours ?? []}
+        hourlyStartHour={hourlyBestSpots?.startHour}
+        onSelectSite={(siteId) => {
+          setSelectionTab('favorites');
+          void navigate({
+            to: '/weather',
+            search: {
+              siteId,
+              day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
+            },
+          });
+        }}
+        selectedDayIndex={selectedDayIndex}
+      />
+    </div>
+  );
+
+  const mobileEmptyPanel =
+    !selectedSearchTarget && !selectedSiteId ? (
+      <section className={`${weatherCardClassName} p-6 text-center`}>
+        <h2 className="text-xl font-bold text-gray-950 dark:text-white">
+          Choisissez une météo
+        </h2>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+          Ajoutez un site favori ou recherchez une ville pour afficher le détail
+          heure par heure.
+        </p>
+      </section>
+    ) : undefined;
+
+  const mobileSearchResultPanel = selectedSearchTarget ? (
+    <section className={`${weatherCardClassName} p-4`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+            Résultat de recherche sélectionné
+          </p>
+          <h2 className="text-xl font-bold text-gray-950 dark:text-white">
+            {selectedSearchTitle}
+          </h2>
+        </div>
+        <div
+          aria-label={t('weather.forecast7Days')}
+          className="flex flex-wrap gap-2"
+          role="tablist"
+        >
+          {Array.from({ length: 7 }, (_, day) => (
+            <button
+              key={day}
+              aria-selected={day === selectedDayIndex}
+              type="button"
+              onClick={() =>
+                void navigate({
+                  to: '/weather',
+                  search: {
+                    ...getSearchForTarget(selectedSearchTarget, day),
+                  },
+                })
+              }
+              role="tab"
+              className={`cursor-pointer rounded-xl px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
+                day === selectedDayIndex
+                  ? 'bg-sky-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              {getSearchDayLabel(day, t)}
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  ) : undefined;
+
+  const mobileCurrentConditions =
+    selectedSearchTarget || selectedSiteId ? (
+      <CurrentConditions
+        spotId={selectedSearchTarget ? undefined : selectedSiteId}
+        dayIndex={selectedDayIndex}
+        weatherData={selectedSearchWeatherData}
+        isLoading={selectedSearchTarget ? isSearchWeatherLoading : undefined}
+        isError={selectedSearchTarget ? isSearchWeatherError : undefined}
+        siteOrientation={
+          isSpotSearchTarget(selectedSearchTarget)
+            ? selectedSearchTarget.spot.orientation
+            : undefined
+        }
+      />
+    ) : undefined;
+
+  const mobileLiveWindPanel =
+    !selectedSearchTarget && selectedSiteId ? (
+      <section
+        className={`${weatherCardClassName} border-l-4 border-l-cyan-500 p-4 sm:p-5`}
+      >
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t('weather.liveWindTitle')}
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              {t('weather.liveWindExternalInfo')}
+            </p>
+          </div>
+          <a
+            href="https://www.spotair.mobi/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex cursor-pointer items-center justify-center rounded-xl bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"
+          >
+            {t('weather.liveWindOpenSpotair')}
+          </a>
+        </div>
+      </section>
+    ) : undefined;
+
+  const mobileLandingPanel =
+    !selectedSearchTarget && selectedSiteId ? (
+      <WeatherMultiLanding
+        spotId={selectedSiteId}
+        dayIndex={selectedDayIndex}
+      />
+    ) : undefined;
+
+  const mobileForecastPanel =
+    !selectedSearchTarget && selectedSiteId ? (
+      <Forecast7Day
+        spotId={selectedSiteId}
+        selectedDayIndex={selectedDayIndex}
+        onSelectDay={(day) =>
+          void navigate({
+            to: '/weather',
+            search: {
+              ...weatherSearch,
+              day: day > 0 ? day : undefined,
+            },
+          })
+        }
+      />
+    ) : undefined;
+
+  const mobileEmagramPanel =
+    isAuthenticated && !selectedSearchTarget && selectedSiteId ? (
+      <EmagramWidget
+        siteId={selectedSiteId}
+        dayIndex={selectedDayIndex}
+        siteName={selectedSite?.name}
+      />
+    ) : undefined;
+
+  const mobileHourlyPanel =
+    selectedSearchTarget || selectedSiteId ? (
+      <HourlyForecast
+        spotId={selectedSearchTarget ? undefined : selectedSiteId}
+        dayIndex={selectedDayIndex}
+        weatherData={selectedSearchWeatherData}
+        isLoading={selectedSearchTarget ? isSearchWeatherLoading : undefined}
+        isError={selectedSearchTarget ? isSearchWeatherError : undefined}
+        siteName={activeWeatherName}
+      />
+    ) : undefined;
+
+  if (isMobile) {
+    return (
+      <WeatherPageMobileLayout
+        activeWeatherName={activeWeatherName}
+        selectedDayLabel={selectedDayLabel}
+        sourceLabel={sourceLabel}
+        selectedSiteId={selectedSiteId}
+        isSearchMode={Boolean(selectedSearchTarget)}
+        isAuthenticated={isAuthenticated}
+        selectionPanel={mobileSelectionPanel}
+        searchResultPanel={mobileSearchResultPanel}
+        emptyPanel={mobileEmptyPanel}
+        currentConditions={mobileCurrentConditions}
+        liveWindPanel={mobileLiveWindPanel}
+        landingPanel={mobileLandingPanel}
+        forecastPanel={mobileForecastPanel}
+        emagramPanel={mobileEmagramPanel}
+        hourlyPanel={mobileHourlyPanel}
+      />
+    );
+  }
 
   return (
     <div className="grid w-full min-w-0 gap-4 xl:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]">
@@ -527,7 +838,11 @@ export default function WeatherPage() {
 
         {/* Emagram Analysis (authenticated only) */}
         {isAuthenticated && !selectedSearchTarget && selectedSiteId && (
-          <EmagramWidget siteId={selectedSiteId} dayIndex={selectedDayIndex} />
+          <EmagramWidget
+            siteId={selectedSiteId}
+            dayIndex={selectedDayIndex}
+            siteName={selectedSite?.name}
+          />
         )}
 
         {/* Hourly Forecast */}
@@ -540,6 +855,7 @@ export default function WeatherPage() {
               selectedSearchTarget ? isSearchWeatherLoading : undefined
             }
             isError={selectedSearchTarget ? isSearchWeatherError : undefined}
+            siteName={activeWeatherName}
           />
         )}
       </div>

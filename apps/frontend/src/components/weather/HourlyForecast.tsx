@@ -30,6 +30,7 @@ interface HourlyForecastProps {
   weatherData?: WeatherData;
   isLoading?: boolean;
   isError?: boolean;
+  siteName?: string;
 }
 
 // ============================================================================
@@ -564,6 +565,7 @@ export default function HourlyForecast({
   weatherData,
   isLoading: isOverrideLoading,
   isError: isOverrideError,
+  siteName,
 }: HourlyForecastProps) {
   const { t } = useTranslation();
   const {
@@ -624,9 +626,16 @@ export default function HourlyForecast({
   if (isLoading) {
     return (
       <div className={`${weatherCardClassName} p-4`} aria-live="polite">
-        <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
-          Prévisions Horaires
-        </h2>
+        <div className="mb-3">
+          <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
+            Prévisions Horaires
+          </h2>
+          {siteName && (
+            <p className="mt-1 truncate text-sm font-bold text-gray-900 dark:text-white">
+              Site : {siteName}
+            </p>
+          )}
+        </div>
         <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
           Chargement...
         </div>
@@ -637,9 +646,16 @@ export default function HourlyForecast({
   if (hasError || !weather || !weather.hourly_forecast) {
     return (
       <div className={`${weatherCardClassName} p-4`} role="alert">
-        <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3 font-semibold">
-          Prévisions Horaires
-        </h2>
+        <div className="mb-3">
+          <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
+            Prévisions Horaires
+          </h2>
+          {siteName && (
+            <p className="mt-1 truncate text-sm font-bold text-gray-900 dark:text-white">
+              Site : {siteName}
+            </p>
+          )}
+        </div>
         <div className="py-5 text-center text-red-500 dark:text-red-400 text-sm">
           Données non disponibles
         </div>
@@ -782,6 +798,11 @@ export default function HourlyForecast({
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h2 className={weatherSectionTitleClassName}>Prévisions Horaires</h2>
+          {siteName && (
+            <p className="mt-1 truncate text-sm font-bold text-slate-950 dark:text-white">
+              Site : {siteName}
+            </p>
+          )}
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
             Créneaux de vol, consensus des sources et points de vigilance.
           </p>
