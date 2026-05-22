@@ -5054,7 +5054,23 @@ async def create_flight_gopro_overlay_job(
             resolved_gpx_path or auto_gpx_path or _resolve_flight_file_path(flight.gpx_file_path)
         )
         fallback_pip_path = resolved_pip_path or auto_pip_path or generated_video_path
-        if fallback_gpx_path and fallback_gpx_path.exists() and auto_osv_paths:
+        gpx_file_for_job = gpx_file
+        if gpx_file and gpx_file.filename and auto_osv_paths:
+            uploaded_gpx_path = await save_uploaded_file(
+                gpx_file,
+                input_dir
+                / ".gopro-overlay-work"
+                / f"uploaded-{uuid.uuid4()}{Path(gpx_file.filename).suffix.lower()}",
+                {".gpx", ".fit"},
+            )
+            fallback_gpx_path = await asyncio.to_thread(
+                _merge_osv_files_with_gpx,
+                auto_osv_paths,
+                uploaded_gpx_path,
+                input_dir,
+            )
+            gpx_file_for_job = None
+        elif fallback_gpx_path and fallback_gpx_path.exists() and auto_osv_paths:
             fallback_gpx_path = await asyncio.to_thread(
                 _merge_osv_files_with_gpx,
                 auto_osv_paths,
@@ -5100,7 +5116,7 @@ async def create_flight_gopro_overlay_job(
 
         job = await create_gopro_overlay_job(
             video_file=video_file,
-            gpx_file=gpx_file,
+            gpx_file=gpx_file_for_job,
             fallback_gpx_path=fallback_gpx_path,
             fallback_pip_path=fallback_pip_path,
             pip_file=osv_video_file,

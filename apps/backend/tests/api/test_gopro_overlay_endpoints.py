@@ -444,6 +444,67 @@ def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
     assert create_job.call_args.kwargs["gpx_path"] == merged_gpx_path
 
 
+def test_create_flight_gopro_overlay_job_uses_merged_uploaded_gpx_when_osv_exists(
+    client: TestClient,
+    db_session,
+    sample_flight,
+    tmp_path,
+    monkeypatch,
+):
+    paragliding_root = tmp_path / "gopro-root"
+    input_dir = paragliding_root / "20260315" / "01"
+    input_dir.mkdir(parents=True)
+    pip_path = input_dir / "flight-pip.mp4"
+    osv_path = input_dir / "flight.osv"
+    merged_gpx_path = input_dir / ".gopro-overlay-work" / "merged.gpx"
+    pip_path.write_bytes(b"pip")
+    osv_path.write_bytes(b"osv")
+    sample_flight.gpx_file_path = None
+    sample_flight.video_file_path = str(pip_path)
+    db_session.commit()
+    merged_gpx_path.parent.mkdir(parents=True)
+    merged_gpx_path.write_text("<gpx>merged</gpx>")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
+
+    expected = {
+        "job_id": "job-flight-gopro-uploaded-osv",
+        "status": "queued",
+        "progress": 0,
+        "message": "queued",
+        "layout_id": "parapente-1080",
+        "layout_label": "Parapente 1920x1080",
+        "output_filename": "final.mp4",
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
+
+    with (
+        patch(
+            "routes.check_gopro_overlay_dependencies",
+            return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
+        ),
+        patch("routes._merge_osv_files_with_gpx", return_value=merged_gpx_path) as merge_osv,
+        patch("routes.create_gopro_overlay_job", AsyncMock(return_value=expected)) as create_job,
+    ):
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay",
+            files={
+                "video_file": ("camera.mp4", b"camera", "video/mp4"),
+                "gpx_file": ("uploaded.gpx", b"<gpx>uploaded</gpx>", "application/gpx+xml"),
+            },
+        )
+
+    assert response.status_code == 200
+    uploaded_gpx_path = merge_osv.call_args.args[1]
+    assert merge_osv.call_args.args[0] == [osv_path]
+    assert uploaded_gpx_path.parent == input_dir / ".gopro-overlay-work"
+    assert uploaded_gpx_path.name.startswith("uploaded-")
+    assert uploaded_gpx_path.read_text() == "<gpx>uploaded</gpx>"
+    assert merge_osv.call_args.args[2] == input_dir
+    assert create_job.call_args.kwargs["gpx_file"] is None
+    assert create_job.call_args.kwargs["fallback_gpx_path"] == merged_gpx_path
+
+
 def test_create_flight_gopro_overlay_job_rejects_paths_outside_paragliding_root(
     client: TestClient,
     db_session,
