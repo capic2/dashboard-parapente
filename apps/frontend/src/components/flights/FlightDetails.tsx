@@ -91,6 +91,8 @@ export function FlightDetails({
   const [goproOverlayJobToken, setGoproOverlayJobToken] = useState<
     string | null
   >(null);
+  const [isCancellingGoproOverlay, setIsCancellingGoproOverlay] =
+    useState(false);
   const [downloadingMedia, setDownloadingMedia] =
     useState<DownloadableFlightMedia | null>(null);
 
@@ -121,6 +123,9 @@ export function FlightDetails({
   const isGoproOverlayCompleted =
     goproOverlayStatus === 'completed' && hasPersistedGoproOverlay;
   const isGoproOverlayFailed = goproOverlayStatus === 'failed';
+  const isGoproOverlayCancelled = goproOverlayStatus === 'cancelled';
+  const canRegenerateGoproOverlay =
+    hasPersistedGoproOverlay || isGoproOverlayCancelled;
   const isDownloadingAnyMedia = downloadingMedia !== null;
   const videoProcessingLabel = formatMediaProgressLabel(
     t('flights.videoProcessingBadge'),
@@ -149,6 +154,7 @@ export function FlightDetails({
     setEditingNotes(false);
     setGoproOverlayJobId(null);
     setGoproOverlayJobToken(null);
+    setIsCancellingGoproOverlay(false);
     setDownloadingMedia(null);
     resetGoproOverlayJob();
   }, [flight.id, resetGoproOverlayJob]);
@@ -188,6 +194,35 @@ export function FlightDetails({
       setEditingNotes(false);
     } catch (err) {
       console.error('Failed to update notes:', err);
+    }
+  };
+
+  const handleCancelGoproOverlay = async () => {
+    if (
+      !effectiveGoproOverlayJobId ||
+      !confirm(t('flights.goproOverlayConfirmCancel'))
+    ) {
+      return;
+    }
+
+    setIsCancellingGoproOverlay(true);
+    try {
+      const cancelPath = goproOverlayJobToken
+        ? `job-access/gopro-overlays/jobs/${effectiveGoproOverlayJobId}/cancel`
+        : `gopro-overlays/jobs/${effectiveGoproOverlayJobId}/cancel`;
+      await api.delete(cancelPath, {
+        searchParams: goproOverlayJobToken
+          ? { access_token: goproOverlayJobToken }
+          : undefined,
+      });
+      void queryClient.invalidateQueries({ queryKey: ['flights'] });
+      toast.success(t('flights.goproOverlayCancelled'));
+    } catch (error) {
+      toast.error(
+        await getApiErrorMessage(error, t('flights.goproOverlayCancelError'))
+      );
+    } finally {
+      setIsCancellingGoproOverlay(false);
     }
   };
 
@@ -339,27 +374,35 @@ export function FlightDetails({
     }
   };
 
-  const goproOverlayAction = handleStartGoproOverlay;
+  const goproOverlayAction = isGoproOverlayRunning
+    ? handleCancelGoproOverlay
+    : handleStartGoproOverlay;
   let goproOverlayLabel = t('flights.goproOverlayGenerate');
   let goproOverlayCompactLabel = t('flights.goproOverlayGenerateShort');
-  if (isGoproOverlayRunning || createGoproOverlayJob.isPending) {
+  if (isGoproOverlayRunning) {
+    goproOverlayLabel = t('flights.goproOverlayCancel');
+    goproOverlayCompactLabel = t('flights.goproOverlayCancelShort');
+  } else if (createGoproOverlayJob.isPending) {
     goproOverlayLabel = t('flights.goproOverlayInProgress');
     goproOverlayCompactLabel = t('flights.goproOverlayInProgressShort');
-  } else if (isGoproOverlayCompleted) {
+  } else if (canRegenerateGoproOverlay) {
     goproOverlayLabel = t('flights.goproOverlayRegenerate');
     goproOverlayCompactLabel = t('flights.goproOverlayRegenerateShort');
   }
 
-  let goproOverlayTitle = isGoproOverlayCompleted
+  let goproOverlayTitle = canRegenerateGoproOverlay
     ? t('flights.goproOverlayRegenerate')
     : t('flights.goproOverlayGenerateTitle');
-  if (!hasGoproCameraVideo) {
+  if (isGoproOverlayRunning) {
+    goproOverlayTitle = t('flights.goproOverlayCancel');
+  } else if (!hasGoproCameraVideo) {
     goproOverlayTitle = t('flights.goproOverlayNeedsCameraVideo');
   } else if (!hasVideo) {
     goproOverlayTitle = t('flights.goproOverlayNeedsVideo');
   }
   const canUseGoproOverlayAction =
-    hasGoproCameraVideo && hasVideo && !isGoproOverlayRunning;
+    (isGoproOverlayRunning && Boolean(effectiveGoproOverlayJobId)) ||
+    (hasGoproCameraVideo && hasVideo && !isGoproOverlayRunning);
 
   const infoCard = (
     <div className="rounded-xl bg-white p-4 shadow-md dark:bg-gray-800">
@@ -499,11 +542,23 @@ export function FlightDetails({
                   </Button>
                 )}
                 <Button
-                  variant="outline"
-                  className="min-h-10 w-full rounded-lg border-cyan-200 px-3 py-2 text-sm text-cyan-800 transition-colors hover:bg-cyan-50 dark:border-cyan-800 dark:text-cyan-200 dark:hover:bg-cyan-950/40"
+                  variant={
+                    isGoproOverlayRunning
+                      ? 'danger'
+                      : canRegenerateGoproOverlay
+                        ? 'warning'
+                        : 'outline'
+                  }
+                  className={`min-h-10 w-full rounded-lg px-3 py-2 text-sm ${
+                    isGoproOverlayRunning || canRegenerateGoproOverlay
+                      ? ''
+                      : 'border-cyan-200 text-cyan-800 transition-colors hover:bg-cyan-50 dark:border-cyan-800 dark:text-cyan-200 dark:hover:bg-cyan-950/40'
+                  }`}
                   onPress={goproOverlayAction}
                   isDisabled={
-                    !canUseGoproOverlayAction || createGoproOverlayJob.isPending
+                    !canUseGoproOverlayAction ||
+                    createGoproOverlayJob.isPending ||
+                    isCancellingGoproOverlay
                   }
                   title={goproOverlayTitle}
                   aria-label={goproOverlayLabel}
