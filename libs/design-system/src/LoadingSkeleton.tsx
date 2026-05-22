@@ -67,16 +67,11 @@ export default function LoadingSkeleton({
   };
 
   return (
-    <div
-      className="space-y-4"
-      role="status"
-      aria-busy="true"
-      aria-label={label}
-    >
+    <output className="space-y-4" aria-busy="true" aria-label={label}>
       <span className="sr-only">{label}</span>
       {Array.from({ length: count }).map((_, index) => (
         <div key={index}>{renderSkeleton()}</div>
       ))}
-    </div>
+    </output>
   );
 }
