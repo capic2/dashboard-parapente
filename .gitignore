@@ -96,5 +96,6 @@ cache/
 storybook-static
 PORTAINER_MIGRATION.md
 .env.portainer
+.opencode/portainer.env
 .codenomad/
 apps/backend/db
