@@ -59,7 +59,6 @@ const getSearchDayLabel = (day: number, t: (key: string) => string) => {
 };
 
 type WeatherSearchParams = {
-  variant?: WeatherMobilePrototypeVariant;
   siteId?: string;
   day?: number;
   target?: 'city' | 'takeoff' | 'landing';
@@ -493,7 +492,11 @@ export default function WeatherPage() {
 
   const mobileEmagramPanel =
     isAuthenticated && !selectedSearchTarget && selectedSiteId ? (
-      <EmagramWidget siteId={selectedSiteId} dayIndex={selectedDayIndex} />
+      <EmagramWidget
+        siteId={selectedSiteId}
+        dayIndex={selectedDayIndex}
+        siteName={selectedSite?.name}
+      />
     ) : undefined;
 
   const mobileHourlyPanel =
@@ -504,6 +507,7 @@ export default function WeatherPage() {
         weatherData={selectedSearchWeatherData}
         isLoading={selectedSearchTarget ? isSearchWeatherLoading : undefined}
         isError={selectedSearchTarget ? isSearchWeatherError : undefined}
+        siteName={activeWeatherName}
       />
     ) : undefined;
 
@@ -834,7 +838,11 @@ export default function WeatherPage() {
 
         {/* Emagram Analysis (authenticated only) */}
         {isAuthenticated && !selectedSearchTarget && selectedSiteId && (
-          <EmagramWidget siteId={selectedSiteId} dayIndex={selectedDayIndex} />
+          <EmagramWidget
+            siteId={selectedSiteId}
+            dayIndex={selectedDayIndex}
+            siteName={selectedSite?.name}
+          />
         )}
 
         {/* Hourly Forecast */}
@@ -847,6 +855,7 @@ export default function WeatherPage() {
               selectedSearchTarget ? isSearchWeatherLoading : undefined
             }
             isError={selectedSearchTarget ? isSearchWeatherError : undefined}
+            siteName={activeWeatherName}
           />
         )}
       </div>

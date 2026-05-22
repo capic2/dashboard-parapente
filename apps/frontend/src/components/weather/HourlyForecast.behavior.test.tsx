@@ -133,7 +133,9 @@ describe('HourlyForecast tooltip behavior', () => {
   });
 
   it('shows para-index tooltip content on hover', () => {
-    render(<HourlyForecast spotId="site-1" dayIndex={0} />);
+    render(<HourlyForecast spotId="site-1" dayIndex={0} siteName="Arguel" />);
+
+    expect(screen.getByText('Site : Arguel')).toBeTruthy();
 
     fireEvent.mouseOver(
       screen.getByRole('button', { name: 'Para-Index 10:00' })
