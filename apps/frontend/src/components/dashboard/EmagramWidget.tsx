@@ -32,6 +32,22 @@ import {
 interface EmagramWidgetProps {
   siteId: string;
   dayIndex?: number;
+  siteName?: string;
+}
+
+function EmagramHeaderTitle({ siteName }: { siteName?: string }) {
+  return (
+    <div className="min-w-0">
+      <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
+        🌡️ Analyse Thermique (Émagramme)
+      </h2>
+      {siteName && (
+        <p className="mt-1 truncate text-sm font-bold text-gray-900 dark:text-white">
+          {siteName}
+        </p>
+      )}
+    </div>
+  );
 }
 
 const getStabilityEmoji = (stabilite: string | null): string => {
@@ -176,6 +192,7 @@ function HourSlider({
 export default function EmagramWidget({
   siteId,
   dayIndex = 0,
+  siteName,
 }: EmagramWidgetProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -295,9 +312,7 @@ export default function EmagramWidget({
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-purple-600">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
-            🌡️ Analyse Thermique (Émagramme)
-          </h2>
+          <EmagramHeaderTitle siteName={siteName} />
         </div>
         <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
           Cliquez pour afficher l&apos;émagramme de ce jour.
@@ -318,9 +333,9 @@ export default function EmagramWidget({
   if (isLoading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-purple-600">
-        <h2 className="text-sm text-gray-600 dark:text-gray-300 mb-3.5 font-semibold">
-          🌡️ Analyse Thermique (Émagramme)
-        </h2>
+        <div className="mb-3.5">
+          <EmagramHeaderTitle siteName={siteName} />
+        </div>
         {hourSlider}
         <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
           Chargement...
@@ -333,9 +348,7 @@ export default function EmagramWidget({
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-red-500">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
-            🌡️ Analyse Thermique (Émagramme)
-          </h2>
+          <EmagramHeaderTitle siteName={siteName} />
           <Button
             onPress={handleRefresh}
             isDisabled={isRefreshing || !siteId}
@@ -363,9 +376,7 @@ export default function EmagramWidget({
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-purple-600">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
-            🌡️ Analyse Thermique (Émagramme)
-          </h2>
+          <EmagramHeaderTitle siteName={siteName} />
           <Button
             onPress={handleRefresh}
             isDisabled={isRefreshing || !siteId}
@@ -400,9 +411,7 @@ export default function EmagramWidget({
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-orange-500">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
-            🌡️ Analyse Thermique (Émagramme)
-          </h2>
+          <EmagramHeaderTitle siteName={siteName} />
           <Button
             onPress={handleRefresh}
             isDisabled={isRefreshing}
@@ -472,9 +481,7 @@ export default function EmagramWidget({
     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-l-4 border-purple-600 flex-1 flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
-          🌡️ Analyse Thermique (Émagramme)
-        </h2>
+        <EmagramHeaderTitle siteName={siteName} />
         <div className="flex items-center gap-2">
           <EmagramExplanationTooltip emagram={emagram} compact />
           <Button
