@@ -76,6 +76,14 @@ export default function WeatherPageMobileLayout({
 }: WeatherPageMobileProps) {
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-3 pb-24 sm:max-w-lg lg:max-w-xl">
+      <ExpandableSection
+        title="Choix du site"
+        summary="Changer de site ou chercher une ville"
+        defaultOpen
+      >
+        {selectionPanel}
+      </ExpandableSection>
+
       <section className="overflow-hidden rounded-3xl border border-sky-900/20 bg-gradient-to-br from-slate-950 via-sky-900 to-cyan-800 p-4 text-white shadow-xl shadow-sky-950/20">
         <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-sky-100">
           <Wind className="h-3.5 w-3.5" aria-hidden="true" />
@@ -102,12 +110,6 @@ export default function WeatherPageMobileLayout({
 
       {emptyPanel}
       {currentConditions}
-      <ExpandableSection
-        title="Choix du site"
-        summary="Changer de site ou chercher une ville"
-      >
-        {selectionPanel}
-      </ExpandableSection>
       {searchResultPanel}
       <ExpandableSection title="Vent live" summary="Source externe Spotair">
         {liveWindPanel}
