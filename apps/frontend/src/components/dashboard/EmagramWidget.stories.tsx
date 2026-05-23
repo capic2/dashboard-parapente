@@ -224,6 +224,18 @@ export const DifferentDay = meta.story({
   parameters: { msw: { handlers: defaultHandlers } },
 });
 
+DifferentDay.test(
+  'asks to choose an hour before analysis',
+  async ({ canvas }) => {
+    await canvas.findByText(/Choisissez une heure/);
+    await expect(canvas.getByText(/11h/)).toBeInTheDocument();
+    await expect(canvas.getByText(/14h/)).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole('button', { name: /Afficher l'émagramme/ })
+    ).not.toBeInTheDocument();
+  }
+);
+
 export const NoSite = meta.story({
   name: 'No Site',
   args: { siteId: '', dayIndex: 0 },
