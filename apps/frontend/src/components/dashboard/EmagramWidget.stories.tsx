@@ -70,12 +70,12 @@ const mockEmagramData = {
       ],
       par_source: {
         'meteo-parapente': [
-          "Courbe observee: temperature bien décroissante sous 2500 m | Comment la reconnaitre: courbe principale inclinée sans cassure nette | Interpretation: couche convective profonde | Consequence parapente: créneau favorable après 11h.",
-          "Courbe observee: point de rosée éloigné de la température | Comment la reconnaitre: grand espace entre les deux courbes | Interpretation: air assez sec | Consequence parapente: plafond correct mais nuages peu nombreux.",
+          'Courbe observee: temperature bien décroissante sous 2500 m | Comment la reconnaitre: courbe principale inclinée sans cassure nette | Interpretation: couche convective profonde | Consequence parapente: créneau favorable après 11h.',
+          'Courbe observee: point de rosée éloigné de la température | Comment la reconnaitre: grand espace entre les deux courbes | Interpretation: air assez sec | Consequence parapente: plafond correct mais nuages peu nombreux.',
         ],
         meteociel: [
-          "Courbe observee: inversion faible vers 2600 m | Comment la reconnaitre: la température devient presque verticale | Interpretation: frein en haut de convection | Consequence parapente: plafond exploitable mais transitions au-dessus plus limitées.",
-          "Courbe observee: vent en altitude modéré | Comment la reconnaitre: barbules plus longues au-dessus de 2000 m | Interpretation: dérive en hausse | Consequence parapente: surveiller le retour au terrain.",
+          'Courbe observee: inversion faible vers 2600 m | Comment la reconnaitre: la température devient presque verticale | Interpretation: frein en haut de convection | Consequence parapente: plafond exploitable mais transitions au-dessus plus limitées.',
+          'Courbe observee: vent en altitude modéré | Comment la reconnaitre: barbules plus longues au-dessus de 2000 m | Interpretation: dérive en hausse | Consequence parapente: surveiller le retour au terrain.',
         ],
       },
     },
@@ -218,6 +218,18 @@ export const DifferentDay = meta.story({
   args: { siteId: 'site-arguel', dayIndex: 2 },
   parameters: { msw: { handlers: defaultHandlers } },
 });
+
+DifferentDay.test(
+  'asks to choose an hour before analysis',
+  async ({ canvas }) => {
+    await canvas.findByText(/Choisissez une heure/);
+    await expect(canvas.getByText(/11h/)).toBeInTheDocument();
+    await expect(canvas.getByText(/14h/)).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole('button', { name: /Afficher l'émagramme/ })
+    ).not.toBeInTheDocument();
+  }
+);
 
 export const NoSite = meta.story({
   name: 'No Site',

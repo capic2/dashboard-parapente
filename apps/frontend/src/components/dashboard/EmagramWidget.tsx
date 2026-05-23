@@ -79,6 +79,7 @@ function HourSlider({
 }) {
   if (hours.length === 0) return null;
 
+  const hasSelectedHour = selectedHour !== null;
   const foundIndex = hours.findIndex((h) => h.hour === selectedHour);
   const currentIndex = foundIndex >= 0 ? foundIndex : 0;
   const effectiveHour = hours[currentIndex].hour;
@@ -94,7 +95,7 @@ function HourSlider({
         aria-label="Sélection de l'heure"
       >
         <SliderOutput className="text-xs text-purple-700 dark:text-purple-300 font-semibold mb-1 block text-center">
-          {effectiveHour}h
+          {hasSelectedHour ? `${effectiveHour}h` : 'Choisir une heure'}
         </SliderOutput>
         <SliderTrack className="relative w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full">
           {({ state }) => (
@@ -111,7 +112,7 @@ function HourSlider({
       </Slider>
       <div className="relative mt-1 h-7">
         {hours.map((h, idx) => {
-          const isActive = h.hour === effectiveHour;
+          const isActive = hasSelectedHour && h.hour === effectiveHour;
           const isFailed = h.status === 'failed';
           const isPending = h.status === 'pending';
           const errorText =
@@ -198,21 +199,18 @@ export default function EmagramWidget({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
-  const [hasRequestedDisplay, setHasRequestedDisplay] = useState(
-    dayIndex === 0
-  );
 
   useEffect(() => {
     setSelectedHour(null);
-    setHasRequestedDisplay(dayIndex === 0);
   }, [dayIndex, siteId]);
 
-  const shouldFetchEmagram =
-    !!siteId && (dayIndex === 0 || hasRequestedDisplay);
-
-  const { data: hoursData } = useEmagramHours(siteId, dayIndex, {
-    enabled: shouldFetchEmagram,
-  });
+  const { data: hoursData, isLoading: isLoadingHours } = useEmagramHours(
+    siteId,
+    dayIndex,
+    {
+      enabled: !!siteId,
+    }
+  );
 
   const availableHours = useMemo(
     () => [...(hoursData?.hours ?? [])].sort((a, b) => a.hour - b.hour),
@@ -227,8 +225,8 @@ export default function EmagramWidget({
     ) {
       return selectedHour;
     }
-    if (!availableHours.length) return selectedHour;
-    const targetHour = dayIndex > 0 ? 14 : new Date().getHours();
+    if (!availableHours.length || dayIndex > 0) return selectedHour;
+    const targetHour = new Date().getHours();
     const hours = availableHours.map((h) => h.hour);
 
     if (hours.includes(targetHour)) return targetHour;
@@ -237,6 +235,9 @@ export default function EmagramWidget({
       Math.abs(curr - targetHour) < Math.abs(prev - targetHour) ? curr : prev
     );
   }, [selectedHour, availableHours, dayIndex]);
+
+  const shouldFetchEmagram =
+    !!siteId && (dayIndex === 0 || activeHour !== null);
 
   const {
     data: emagram,
@@ -314,17 +315,15 @@ export default function EmagramWidget({
         <div className="flex items-center justify-between mb-3">
           <EmagramHeaderTitle siteName={siteName} />
         </div>
+        {hourSlider}
         <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
-          Cliquez pour afficher l&apos;émagramme de ce jour.
-        </div>
-        <div className="flex justify-center">
-          <Button
-            onPress={() => setHasRequestedDisplay(true)}
-            isDisabled={!siteId}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
-          >
-            Afficher l&apos;émagramme
-          </Button>
+          {!siteId
+            ? 'Aucun site selectionne'
+            : isLoadingHours
+              ? 'Chargement des heures...'
+              : hasHourlyData
+                ? 'Choisissez une heure pour lancer l’analyse.'
+                : 'Aucun créneau horaire disponible.'}
         </div>
       </div>
     );
