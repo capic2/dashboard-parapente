@@ -70,12 +70,12 @@ const mockEmagramData = {
       ],
       par_source: {
         'meteo-parapente': [
-          "Courbe observee: temperature bien décroissante sous 2500 m | Comment la reconnaitre: courbe principale inclinée sans cassure nette | Interpretation: couche convective profonde | Consequence parapente: créneau favorable après 11h.",
-          "Courbe observee: point de rosée éloigné de la température | Comment la reconnaitre: grand espace entre les deux courbes | Interpretation: air assez sec | Consequence parapente: plafond correct mais nuages peu nombreux.",
+          'Courbe observee: temperature bien décroissante sous 2500 m | Comment la reconnaitre: courbe principale inclinée sans cassure nette | Interpretation: couche convective profonde | Consequence parapente: créneau favorable après 11h.',
+          'Courbe observee: point de rosée éloigné de la température | Comment la reconnaitre: grand espace entre les deux courbes | Interpretation: air assez sec | Consequence parapente: plafond correct mais nuages peu nombreux.',
         ],
         meteociel: [
-          "Courbe observee: inversion faible vers 2600 m | Comment la reconnaitre: la température devient presque verticale | Interpretation: frein en haut de convection | Consequence parapente: plafond exploitable mais transitions au-dessus plus limitées.",
-          "Courbe observee: vent en altitude modéré | Comment la reconnaitre: barbules plus longues au-dessus de 2000 m | Interpretation: dérive en hausse | Consequence parapente: surveiller le retour au terrain.",
+          'Courbe observee: inversion faible vers 2600 m | Comment la reconnaitre: la température devient presque verticale | Interpretation: frein en haut de convection | Consequence parapente: plafond exploitable mais transitions au-dessus plus limitées.',
+          'Courbe observee: vent en altitude modéré | Comment la reconnaitre: barbules plus longues au-dessus de 2000 m | Interpretation: dérive en hausse | Consequence parapente: surveiller le retour au terrain.',
         ],
       },
     },
@@ -150,8 +150,13 @@ export const Default = meta.story({
 Default.test('displays emagram score and metrics', async ({ canvas }) => {
   await canvas.findByText(/75/);
   await expect(canvas.getByText(/Arguel/)).toBeInTheDocument();
+  const explanationButton = canvas.getByLabelText(/Comment l'IA a analysé/);
+  await expect(explanationButton).toBeInTheDocument();
+
+  await userEvent.click(explanationButton);
+
   await expect(
-    canvas.getByLabelText(/Comment l'IA a analysé/)
+    await within(document.body).findByText(/Lecture par émagramme/)
   ).toBeInTheDocument();
 });
 
