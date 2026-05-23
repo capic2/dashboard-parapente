@@ -1,6 +1,7 @@
 import preview from '../../../.storybook/preview';
 import { Flight } from './Flight';
 import type { Flight as FlightRecord } from '../../types';
+import {fn} from 'storybook/test'
 
 const mockFlight: FlightRecord = {
   id: 'flight-1',
@@ -68,8 +69,90 @@ export const Active = meta.story({
   ),
 });
 
-export const Processing = meta.story({
-  name: 'Processing',
+export const NoFile = meta.story({
+    name: "No File",
+    render: () => (
+        <div className="max-w-sm">
+            <Flight
+            flight={{...mockFlight, gpx_file_path: null, video_file_path:null, gopro_overlay_file_path:null}}
+            isActive={false}
+            isSelected={false}
+            selectionMode={false}
+            downloadingMedia={null}
+            onSelectFlight={fn()}
+            onDeleteFlight={fn()}
+            onDownloadGpx={fn()}
+            onDownloadOverlay={fn()}
+            onDownloadVideo={fn()}
+            />
+        </div>
+    )
+})
+
+export const WithGpx = meta.story({
+    name: "With Gpx",
+    render: () => (
+        <div className="max-w-sm">
+            <Flight
+                flight={{...mockFlight, video_file_path:null, gopro_overlay_file_path:null}}
+                isActive={false}
+                isSelected={false}
+                selectionMode={false}
+                downloadingMedia={null}
+                onSelectFlight={fn()}
+                onDeleteFlight={fn()}
+                onDownloadGpx={fn()}
+                onDownloadOverlay={fn()}
+                onDownloadVideo={fn()}
+            />
+        </div>
+    )
+})
+
+export const WithGpxVideo = meta.story({
+    name: "With Gpx And Video",
+    render: () => (
+        <div className="max-w-sm">
+            <Flight
+                flight={{...mockFlight, gopro_overlay_file_path:null}}
+                isActive={false}
+                isSelected={false}
+                selectionMode={false}
+                downloadingMedia={null}
+                onSelectFlight={fn()}
+                onDeleteFlight={fn()}
+                onDownloadGpx={fn()}
+                onDownloadOverlay={fn()}
+                onDownloadVideo={fn()}
+            />
+        </div>
+    )
+})
+
+export const WithOverlay = meta.story({
+    name: "With Gpx, Video and Overlay",
+    render: () => (
+        <div className="max-w-sm">
+            <Flight
+                flight={mockFlight}
+                isActive={false}
+                isSelected={false}
+                selectionMode={false}
+                downloadingMedia={null}
+                onSelectFlight={fn()}
+                onDeleteFlight={fn()}
+                onDownloadGpx={fn()}
+                onDownloadOverlay={fn()}
+                onDownloadVideo={fn()}
+            />
+        </div>
+    )
+})
+
+
+
+export const VideoProcessing = meta.story({
+  name: 'Video Processing',
   render: () => (
     <div className="max-w-sm">
       <Flight
@@ -79,6 +162,7 @@ export const Processing = meta.story({
           video_file_path: null,
           video_export_status: 'running',
           video_export_progress: 42,
+            gopro_overlay_file_path:null
         }}
         isActive={false}
         isSelected={false}
@@ -92,4 +176,82 @@ export const Processing = meta.story({
       />
     </div>
   ),
+});
+
+export const OverlayProcessing = meta.story({
+    name: 'Overlay Processing',
+    render: () => (
+        <div className="max-w-sm">
+            <Flight
+                flight={{
+                    ...mockFlight,
+                    id: 'flight-processing',
+                    gopro_overlay_status: 'running',
+                    gopro_overlay_progress: 42,
+                }}
+                isActive={false}
+                isSelected={false}
+                selectionMode={false}
+                downloadingMedia={null}
+                onSelectFlight={() => undefined}
+                onDeleteFlight={() => undefined}
+                onDownloadGpx={() => undefined}
+                onDownloadVideo={() => undefined}
+                onDownloadOverlay={() => undefined}
+            />
+        </div>
+    ),
+});
+
+export const VideoError = meta.story({
+    name: 'Video Error',
+    render: () => (
+        <div className="max-w-sm">
+            <Flight
+                flight={{
+                    ...mockFlight,
+                    id: 'flight-processing',
+                    video_file_path: null,
+                    video_export_status: 'failed',
+                    video_export_progress: 42,
+                    gopro_overlay_file_path:null
+                }}
+                isActive={false}
+                isSelected={false}
+                selectionMode={false}
+                downloadingMedia={null}
+                onSelectFlight={() => undefined}
+                onDeleteFlight={() => undefined}
+                onDownloadGpx={() => undefined}
+                onDownloadVideo={() => undefined}
+                onDownloadOverlay={() => undefined}
+            />
+        </div>
+    ),
+});
+
+export const OverlayError = meta.story({
+    name: 'Overlay Error',
+    render: () => (
+        <div className="max-w-sm">
+            <Flight
+                flight={{
+                    ...mockFlight,
+                    id: 'flight-processing',
+                    gopro_overlay_status: 'failed',
+                    gopro_overlay_progress: 42,
+                    gopro_overlay_file_path:null
+                }}
+                isActive={false}
+                isSelected={false}
+                selectionMode={false}
+                downloadingMedia={null}
+                onSelectFlight={() => undefined}
+                onDeleteFlight={() => undefined}
+                onDownloadGpx={() => undefined}
+                onDownloadVideo={() => undefined}
+                onDownloadOverlay={() => undefined}
+            />
+        </div>
+    ),
 });
