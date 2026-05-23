@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { flexRender, type Table } from '@tanstack/react-table';
+import { flexRender, type RowData, type Table } from '@tanstack/react-table';
 import { useTranslation } from 'react-i18next';
 import { tv } from 'tailwind-variants';
 
@@ -28,6 +28,18 @@ const dataTable = tv({
     hoverable: true,
   },
 });
+
+declare module '@tanstack/react-table' {
+  interface ColumnMeta<TData extends RowData, TValue> {
+    className?: string;
+    headerClassName?: string;
+    cellClassName?: string;
+  }
+}
+
+function classNames(...classes: (string | undefined)[]) {
+  return classes.filter(Boolean).join(' ');
+}
 
 interface DataTableProps<TData> {
   table: Table<TData>;
@@ -96,6 +108,7 @@ export function DataTable<TData>({
                 {headerGroup.headers.map((header) => {
                   const canSort = header.column.getCanSort();
                   const sorted = header.column.getIsSorted();
+                  const meta = header.column.columnDef.meta;
                   const headerContent = flexRender(
                     header.column.columnDef.header,
                     header.getContext()
@@ -105,7 +118,11 @@ export function DataTable<TData>({
                     <th
                       key={header.id}
                       colSpan={header.colSpan}
-                      className={dataTable({ sortable: canSort }).headerCell()}
+                      className={classNames(
+                        dataTable({ sortable: canSort }).headerCell(),
+                        meta?.className,
+                        meta?.headerClassName
+                      )}
                       aria-sort={getAriaSort(sorted, canSort)}
                     >
                       {!header.isPlaceholder && canSort && (
@@ -131,16 +148,27 @@ export function DataTable<TData>({
                 key={tableRow.id}
                 className={dataTable({ hoverable: true }).row()}
               >
-                {tableRow.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="py-2 px-2">
-                    {cell.column.columnDef.cell
-                      ? flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )
-                      : (cell.getValue() as ReactNode)}
-                  </td>
-                ))}
+                {tableRow.getVisibleCells().map((cell) => {
+                  const meta = cell.column.columnDef.meta;
+
+                  return (
+                    <td
+                      key={cell.id}
+                      className={classNames(
+                        'py-2 px-2',
+                        meta?.className,
+                        meta?.cellClassName
+                      )}
+                    >
+                      {cell.column.columnDef.cell
+                        ? flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )
+                        : (cell.getValue() as ReactNode)}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
             {rows.length === 0 && (

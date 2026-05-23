@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useIsMobile } from '../../hooks/useIsMobile';
 import {
   PieChart,
   Pie,
@@ -69,11 +68,13 @@ const columns = [
   }),
   columnHelper.accessor('avgAltitude', {
     header: 'Alt. moy.',
+    meta: { className: 'hidden sm:table-cell' },
     cell: (info) => `${info.getValue()} m`,
   }),
   columnHelper.display({
     id: 'totalTime',
     header: 'Temps total',
+    meta: { className: 'hidden sm:table-cell' },
     cell: (info) => {
       const row = info.row.original;
       return `${row.totalHours}h${row.totalMinutes}m`;
@@ -88,7 +89,6 @@ const columns = [
 ];
 
 export default function SiteStats({ flights }: SiteStatsProps) {
-  const isMobile = useIsMobile();
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'count', desc: true },
   ]);
@@ -148,14 +148,10 @@ export default function SiteStats({ flights }: SiteStatsProps) {
     return { siteData: pieData, siteDetails: details };
   }, [flights]);
 
-  const columnVisibility: Record<string, boolean> = isMobile
-    ? { avgAltitude: false, totalTime: false }
-    : {};
-
   const table = useReactTable({
     data: siteDetails,
     columns,
-    state: { sorting, columnVisibility },
+    state: { sorting },
     onSortingChange: setSorting,
     getRowId: (row) => row.siteId,
     getCoreRowModel: getCoreRowModel(),

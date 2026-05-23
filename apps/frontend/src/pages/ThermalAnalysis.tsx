@@ -4,7 +4,6 @@
 
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useIsMobile } from '../hooks/useIsMobile';
 import {
   useReactTable,
   getCoreRowModel,
@@ -41,7 +40,6 @@ function formatSourceName(source: string): string {
 
 function ThermalHistoryTable({ history }: { history: EmagramListItem[] }) {
   const { t } = useTranslation();
-  const isMobile = useIsMobile();
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'created_at', desc: true },
   ]);
@@ -89,6 +87,7 @@ function ThermalHistoryTable({ history }: { history: EmagramListItem[] }) {
       }),
       historyColumnHelper.accessor('force_thermique_ms', {
         header: t('thermal.tableStrength'),
+        meta: { className: 'hidden sm:table-cell' },
         cell: (info) => {
           const val = info.getValue();
           return val == null ? '-' : `${val.toFixed(1)} m/s`;
@@ -101,6 +100,7 @@ function ThermalHistoryTable({ history }: { history: EmagramListItem[] }) {
       }),
       historyColumnHelper.accessor('analysis_method', {
         header: t('thermal.tableMethod'),
+        meta: { className: 'hidden sm:table-cell' },
         cell: (info) => (
           <span className="text-xs text-gray-500 dark:text-gray-400">
             {info.getValue() === 'llm_vision'
@@ -113,14 +113,10 @@ function ThermalHistoryTable({ history }: { history: EmagramListItem[] }) {
     [t]
   );
 
-  const columnVisibility: Record<string, boolean> = isMobile
-    ? { force_thermique_ms: false, analysis_method: false }
-    : {};
-
   const table = useReactTable({
     data: history,
     columns: historyColumns,
-    state: { sorting, columnVisibility },
+    state: { sorting },
     onSortingChange: setSorting,
     getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
@@ -357,7 +353,8 @@ export default function ThermalAnalysis() {
                       alt={image.alt}
                       className="h-52 w-full object-cover object-top transition group-hover:scale-[1.02]"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = skewtUnavailableSvg;
+                        (e.target as HTMLImageElement).src =
+                          skewtUnavailableSvg;
                       }}
                     />
                     <span className="flex items-center justify-between gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200">
