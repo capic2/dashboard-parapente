@@ -372,6 +372,34 @@ describe('FlightViewer3D video export mode', () => {
     expect(viewer.render).toHaveBeenCalled();
   });
 
+  it('draws the replay track only as a volume plus curtain', async () => {
+    window._exportMode = 'manual_render';
+
+    render(<FlightViewer3D flightId="flight-1" exportOnly />);
+
+    await waitFor(() => {
+      expect(window._setExportFrame).toBeTypeOf('function');
+    });
+
+    window._setExportFrame?.(1, 2);
+
+    expect(
+      entityOptions.some((options) =>
+        Boolean((options as { polyline?: unknown }).polyline)
+      )
+    ).toBe(false);
+    expect(
+      entityOptions.some((options) =>
+        Boolean((options as { polylineVolume?: unknown }).polylineVolume)
+      )
+    ).toBe(true);
+    expect(
+      entityOptions.some((options) =>
+        Boolean((options as { wall?: unknown }).wall)
+      )
+    ).toBe(true);
+  });
+
   it('ignores stale track callbacks after switching flights', async () => {
     window._exportMode = 'manual_render';
 
