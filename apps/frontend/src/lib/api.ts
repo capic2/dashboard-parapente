@@ -9,11 +9,17 @@ type ApiErrorPayload = {
 let _apiLogsEnabled = import.meta.env.DEV;
 
 const apiBaseUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
+const apiPrefix = apiBaseUrl ? `${apiBaseUrl}/api` : '/api';
+
+export function getApiUrl(path: string) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${apiPrefix}${normalizedPath}`;
+}
 
 // Instance Ky configurée pour l'API backend
 // eslint-disable-next-line import/no-mutable-exports
 export let api = ky.create({
-  prefix: apiBaseUrl ? `${apiBaseUrl}/api` : '/api',
+  prefix: apiPrefix,
   timeout: 30000, // 30 secondes
   retry: {
     limit: 2, // Retry 2 fois en cas d'échec

@@ -416,7 +416,7 @@ async def fetch_all_emagram_screenshots(
 def cleanup_old_screenshots(max_age_hours: int = 1, cache_dir: Path | None = None):
     """
     Delete screenshot images that are no longer needed.
-    Protects screenshots referenced by the latest completed analysis per site.
+    Protects screenshots referenced by fresh completed analyses.
     Files younger than max_age_hours are never deleted (race-condition guard).
 
     Args:
@@ -431,39 +431,28 @@ def cleanup_old_screenshots(max_age_hours: int = 1, cache_dir: Path | None = Non
 
     target_dir = cache_dir or EMAGRAM_CACHE_DIR
 
-    # Build set of protected file paths from latest analysis per site
+    # Build set of protected file paths from analyses the UI can still display.
     protected_paths: set[str] = set()
     try:
         with get_db_context() as db:
-            from sqlalchemy import func
+            from emagram_freshness import get_emagram_cutoff_utc
 
-            latest_subq = (
-                db.query(
-                    EmagramAnalysis.station_code,
-                    func.max(EmagramAnalysis.analysis_datetime).label("max_dt"),
-                )
-                .filter(EmagramAnalysis.analysis_status == "completed")
-                .group_by(EmagramAnalysis.station_code)
-                .subquery()
-            )
-
-            latest_analyses = (
+            fresh_analyses = (
                 db.query(EmagramAnalysis)
-                .join(
-                    latest_subq,
-                    (EmagramAnalysis.station_code == latest_subq.c.station_code)
-                    & (EmagramAnalysis.analysis_datetime == latest_subq.c.max_dt),
+                .filter(
+                    EmagramAnalysis.analysis_status == "completed",
+                    EmagramAnalysis.analysis_datetime >= get_emagram_cutoff_utc(db=db),
+                    EmagramAnalysis.screenshot_paths.isnot(None),
                 )
                 .all()
             )
 
-            for analysis in latest_analyses:
-                if analysis.screenshot_paths:
-                    try:
-                        paths = json.loads(analysis.screenshot_paths)
-                        protected_paths.update(paths.values())
-                    except (json.JSONDecodeError, AttributeError):
-                        pass
+            for analysis in fresh_analyses:
+                try:
+                    paths = json.loads(analysis.screenshot_paths)
+                    protected_paths.update(paths.values())
+                except (json.JSONDecodeError, AttributeError, TypeError):
+                    pass
     except Exception as e:
         logger.warning(f"Could not query DB for protected paths, skipping cleanup: {e}")
         return 0
