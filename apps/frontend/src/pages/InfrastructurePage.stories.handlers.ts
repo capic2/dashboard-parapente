@@ -210,6 +210,7 @@ const initialMockVideoJobs: VideoExportJob[] = [
     started_at: '2026-01-15T09:15:00Z',
     updated_at: '2026-01-15T10:05:00Z',
     can_cancel: true,
+    can_delete: true,
   },
   {
     job_id: 'job-chalais-completed',
@@ -225,6 +226,7 @@ const initialMockVideoJobs: VideoExportJob[] = [
     has_output_file: true,
     output_filename: 'chalais-export.mp4',
     can_cancel: false,
+    can_delete: true,
   },
   {
     job_id: 'job-gopro-completed',
@@ -242,6 +244,7 @@ const initialMockVideoJobs: VideoExportJob[] = [
     layout_label: 'Overlay GoPro',
     has_output_file: true,
     can_cancel: false,
+    can_delete: true,
   },
 ];
 

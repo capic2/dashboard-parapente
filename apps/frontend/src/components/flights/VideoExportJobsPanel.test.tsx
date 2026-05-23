@@ -33,6 +33,7 @@ const {
       message: 'Capturing frames',
       mode: 'manual_fast',
       can_cancel: true,
+      can_delete: true,
     },
     {
       job_id: 'job-done',
@@ -42,6 +43,7 @@ const {
       progress: 100,
       has_output_file: true,
       can_cancel: false,
+      can_delete: true,
     },
     {
       job_id: 'job-overlay',
@@ -53,6 +55,7 @@ const {
       message: 'Rendering overlay',
       mode: 'gopro_overlay',
       can_cancel: true,
+      can_delete: false,
     },
     {
       job_id: 'job-resumable',
@@ -62,6 +65,7 @@ const {
       internal_status: 'cancelled',
       progress: 30,
       can_cancel: false,
+      can_delete: true,
       can_resume: true,
     },
     {
@@ -75,6 +79,7 @@ const {
       mode: 'gopro_overlay',
       has_output_file: true,
       can_cancel: false,
+      can_delete: true,
     },
   ],
 }));
@@ -143,6 +148,7 @@ describe('VideoExportJobsPanel', () => {
         message: 'Capturing frames',
         mode: 'manual_fast',
         can_cancel: true,
+        can_delete: true,
       },
       {
         job_id: 'job-done',
@@ -152,6 +158,7 @@ describe('VideoExportJobsPanel', () => {
         progress: 100,
         has_output_file: true,
         can_cancel: false,
+        can_delete: true,
       },
       {
         job_id: 'job-overlay',
@@ -163,6 +170,7 @@ describe('VideoExportJobsPanel', () => {
         message: 'Rendering overlay',
         mode: 'gopro_overlay',
         can_cancel: true,
+        can_delete: false,
       },
       {
         job_id: 'job-resumable',
@@ -172,6 +180,7 @@ describe('VideoExportJobsPanel', () => {
         internal_status: 'cancelled',
         progress: 30,
         can_cancel: false,
+        can_delete: true,
         can_resume: true,
       },
       {
@@ -185,6 +194,7 @@ describe('VideoExportJobsPanel', () => {
         mode: 'gopro_overlay',
         has_output_file: true,
         can_cancel: false,
+        can_delete: true,
       }
     );
   });
@@ -292,6 +302,34 @@ describe('VideoExportJobsPanel', () => {
       expect(deleteJobRow).toHaveBeenCalledWith(expect.any(String))
     );
     expect(toastSuccess).toHaveBeenCalledWith('Ligne supprimée');
+  });
+
+  it('uses the API delete permission instead of inferring from cancel state', async () => {
+    deleteJobRow.mockResolvedValue(undefined);
+    jobs.splice(0, jobs.length, {
+      job_id: 'job-running-manual',
+      flight_name: 'Export manuel en cours',
+      flight_title: 'Export manuel en cours',
+      status: 'processing',
+      internal_status: 'capturing',
+      progress: 12,
+      message: 'Capturing frames',
+      mode: 'manual_fast',
+      can_cancel: true,
+      can_delete: true,
+    });
+
+    render(<VideoExportJobsPanel />);
+    const deleteButtons = screen.getAllByRole('button', {
+      name: 'Supprimer',
+    });
+    fireEvent.click(deleteButtons[0]!);
+    const confirmButtons = screen.getAllByRole('button', { name: 'Supprimer' });
+    fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
+
+    await waitFor(() =>
+      expect(deleteJobRow).toHaveBeenCalledWith('job-running-manual')
+    );
   });
 
   it('cleans temporary files after confirmation', async () => {
