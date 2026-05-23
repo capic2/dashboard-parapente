@@ -106,11 +106,11 @@ export interface FlightFormData {
   site_id: string | null;
   flight_date: string;
   departure_time?: string | null;
-  duration_minutes: number;
-  max_altitude_m: number;
-  max_speed_kmh?: number;
-  distance_km: number;
-  elevation_gain_m: number;
+  duration_minutes: number | null;
+  max_altitude_m: number | null;
+  max_speed_kmh?: number | null;
+  distance_km: number | null;
+  elevation_gain_m: number | null;
   notes?: string;
   description?: string;
   external_url?: string;

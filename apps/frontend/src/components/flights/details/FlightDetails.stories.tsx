@@ -1,10 +1,10 @@
 import { http, HttpResponse } from 'msw';
-import preview from '../../../.storybook/preview';
+import preview from '../../../../.storybook/preview';
 import { expect, fn, userEvent } from 'storybook/test';
 import { FlightDetails } from './FlightDetails';
 import { ToastContainer } from '@dashboard-parapente/design-system';
-import { useToastStore } from '../../hooks/useToast';
-import type { Flight, Site } from '../../types';
+import { useToastStore } from '../../../hooks/useToast';
+import type { Flight, Site } from '../../../types';
 import i18n from 'i18next';
 
 const mockSites: Site[] = [

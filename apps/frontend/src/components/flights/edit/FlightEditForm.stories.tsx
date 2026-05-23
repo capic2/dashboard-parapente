@@ -1,7 +1,7 @@
 import { expect, fn } from 'storybook/test';
-import preview from '../../../.storybook/preview';
+import preview from '../../../../.storybook/preview';
 import { FlightEditForm } from './FlightEditForm';
-import type { Flight, Site } from '../../types';
+import type { Flight, Site } from '../../../types';
 import i18n from 'i18next';
 
 const mockSites: Site[] = [

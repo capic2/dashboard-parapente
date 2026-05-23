@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Flight, Site } from '../../types';
+import type { Flight, Site } from '../../../types';
 
 const {
   apiDelete,
@@ -96,12 +96,12 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
-vi.mock('../../hooks/flights/useFlights', () => ({
+vi.mock('../../../hooks/flights/useFlights', () => ({
   useUpdateFlight: () => ({ mutateAsync: vi.fn() }),
   useUploadGPXToFlight: () => ({ isPending: false, mutate: vi.fn() }),
 }));
 
-vi.mock('../../hooks/gopro/useGoproOverlay', () => ({
+vi.mock('../../../hooks/gopro/useGoproOverlay', () => ({
   useCreateFlightGoproOverlayJob: () => ({
     data: null,
     isPending: false,
@@ -111,18 +111,18 @@ vi.mock('../../hooks/gopro/useGoproOverlay', () => ({
   useGoproOverlayJobStream: () => ({ job: overlayJobStreamMock.current }),
 }));
 
-vi.mock('../../hooks/useToast', () => ({
+vi.mock('../../../hooks/useToast', () => ({
   useToast: () => ({ error: vi.fn(), success: vi.fn() }),
 }));
 
-vi.mock('../../lib/api', () => ({
+vi.mock('../../../lib/api', () => ({
   api: {
     delete: apiDelete,
   },
   getApiErrorMessage: async (_error: unknown, fallback: string) => fallback,
 }));
 
-vi.mock('../../stores/appSettingsStore', () => ({
+vi.mock('../../../stores/appSettingsStore', () => ({
   formatAltitudeMeters: (value: number) => `${value} m`,
   formatDistanceKm: (value: number) => `${value} km`,
   formatSpeedKmh: (value: number) => `${value} km/h`,
@@ -133,7 +133,7 @@ vi.mock('../../stores/appSettingsStore', () => ({
   }),
 }));
 
-vi.mock('./FlightVideoExportControls', () => ({
+vi.mock('../FlightVideoExportControls', () => ({
   FlightVideoExportControls: () => <button type="button">Video action</button>,
 }));
 

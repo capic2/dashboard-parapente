@@ -11,7 +11,7 @@ import {
 } from 'react-aria-components';
 import { Select, Button } from '@dashboard-parapente/design-system';
 import type { Key } from 'react-aria-components';
-import type { Flight, FlightFormData, Site } from '../../types';
+import type { Flight, FlightFormData, Site } from '../../../types';
 
 interface FlightEditFormProps {
   flight: Flight;
