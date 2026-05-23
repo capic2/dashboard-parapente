@@ -5,11 +5,13 @@ import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
 
 interface GoproOverlayJobCardProps {
   job: GoproOverlayJob;
+  isDownloadingAnyMedia: boolean;
   onDownload: () => void;
 }
 
 export function GoproOverlayJobCard({
   job,
+  isDownloadingAnyMedia,
   onDownload,
 }: GoproOverlayJobCardProps) {
   const { t } = useTranslation();
@@ -38,6 +40,7 @@ export function GoproOverlayJobCard({
             type="button"
             className="min-h-9 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
             onPress={onDownload}
+            isDisabled={isDownloadingAnyMedia}
           >
             <Download className="h-4 w-4" aria-hidden="true" />
             {t('flights.goproOverlayDownload')}

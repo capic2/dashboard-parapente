@@ -7,7 +7,6 @@ interface FlightMediaBadgesProps {
   hasPersistedGoproOverlay: boolean;
   isVideoExportRunning: boolean;
   isVideoExportFailed: boolean;
-  isGoproOverlayCompleted: boolean;
   isGoproOverlayRunning: boolean;
   isGoproOverlayFailed: boolean;
   isDownloadingAnyMedia: boolean;
@@ -24,7 +23,6 @@ export function FlightMediaBadges({
   hasPersistedGoproOverlay,
   isVideoExportRunning,
   isVideoExportFailed,
-  isGoproOverlayCompleted,
   isGoproOverlayRunning,
   isGoproOverlayFailed,
   isDownloadingAnyMedia,
@@ -93,7 +91,7 @@ export function FlightMediaBadges({
           type="button"
           className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-cyan-800 transition-colors hover:bg-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200 dark:hover:bg-cyan-900/50 dark:focus:ring-offset-gray-800"
           onClick={onDownloadPersistedGoproOverlay}
-          disabled={!isGoproOverlayCompleted && isDownloadingAnyMedia}
+          disabled={isDownloadingAnyMedia}
           aria-label={t('flights.goproOverlayDownload')}
         >
           <Wand2 className="h-3 w-3" aria-hidden="true" />

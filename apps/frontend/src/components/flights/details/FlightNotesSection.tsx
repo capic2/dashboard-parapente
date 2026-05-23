@@ -8,6 +8,7 @@ interface FlightNotesSectionProps {
   notesText: string;
   isSaving: boolean;
   onNotesTextChange: (value: string) => void;
+  onStartEdit: () => void;
   onSave: () => void;
   onCancel: () => void;
 }
@@ -18,6 +19,7 @@ export function FlightNotesSection({
   notesText,
   isSaving,
   onNotesTextChange,
+  onStartEdit,
   onSave,
   onCancel,
 }: FlightNotesSectionProps) {
@@ -25,12 +27,23 @@ export function FlightNotesSection({
 
   return (
     <div>
-      <label
-        htmlFor="flight-notes"
-        className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-      >
-        {t('flights.notesLabel')}
-      </label>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <label
+          htmlFor="flight-notes"
+          className="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+        >
+          {t('flights.notesLabel')}
+        </label>
+        {!editingNotes && (
+          <Button
+            variant="ghost"
+            className="min-h-8 cursor-pointer rounded-md px-2 py-1 text-xs"
+            onPress={onStartEdit}
+          >
+            {t('flights.editButton')}
+          </Button>
+        )}
+      </div>
       {editingNotes ? (
         <div className="space-y-2">
           <TextField value={notesText} onChange={onNotesTextChange}>

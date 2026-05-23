@@ -99,8 +99,6 @@ export function FlightDetails({
     VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.video_export_status)
   );
   const isVideoExportFailed = flight.video_export_status === 'failed';
-  const isGoproOverlayCompleted =
-    goproOverlayStatus === 'completed' && hasPersistedGoproOverlay;
   const isGoproOverlayFailed = goproOverlayStatus === 'failed';
   const isGoproOverlayCancelled = goproOverlayStatus === 'cancelled';
   const canRegenerateGoproOverlay =
@@ -164,10 +162,11 @@ export function FlightDetails({
         title: normalizedTitle ?? '',
         site_id: flight.site_id ?? null,
         flight_date: flight.flight_date,
-        duration_minutes: flight.duration_minutes ?? 0,
-        max_altitude_m: flight.max_altitude_m ?? 0,
-        distance_km: flight.distance_km ?? 0,
-        elevation_gain_m: flight.elevation_gain_m ?? 0,
+        duration_minutes: flight.duration_minutes ?? null,
+        max_altitude_m: flight.max_altitude_m ?? null,
+        distance_km: flight.distance_km ?? null,
+        elevation_gain_m: flight.elevation_gain_m ?? null,
+        max_speed_kmh: flight.max_speed_kmh ?? null,
         notes: notesText,
       });
       setEditingNotes(false);
@@ -329,7 +328,9 @@ export function FlightDetails({
 
   const handleDownloadGoproOverlay = async () => {
     if (!goproOverlayJob || goproOverlayJob.status !== 'completed') return;
+    if (isDownloadingAnyMedia) return;
 
+    setDownloadingMedia('overlay');
     try {
       const downloadPath = goproOverlayJobToken
         ? `job-access/gopro-overlays/jobs/${goproOverlayJob.job_id}/download`
@@ -350,6 +351,8 @@ export function FlightDetails({
       URL.revokeObjectURL(url);
     } catch {
       toast.error(t('flights.goproOverlayDownloadError'));
+    } finally {
+      setDownloadingMedia(null);
     }
   };
 
@@ -406,7 +409,6 @@ export function FlightDetails({
                 hasPersistedGoproOverlay={hasPersistedGoproOverlay}
                 isVideoExportRunning={isVideoExportRunning}
                 isVideoExportFailed={isVideoExportFailed}
-                isGoproOverlayCompleted={isGoproOverlayCompleted}
                 isGoproOverlayRunning={isGoproOverlayRunning}
                 isGoproOverlayFailed={isGoproOverlayFailed}
                 isDownloadingAnyMedia={isDownloadingAnyMedia}
@@ -472,6 +474,7 @@ export function FlightDetails({
           {goproOverlayJob && (
             <GoproOverlayJobCard
               job={goproOverlayJob}
+              isDownloadingAnyMedia={isDownloadingAnyMedia}
               onDownload={handleDownloadGoproOverlay}
             />
           )}
@@ -482,6 +485,7 @@ export function FlightDetails({
             notesText={notesText}
             isSaving={updateFlight.isPending}
             onNotesTextChange={setNotesText}
+            onStartEdit={() => setEditingNotes(true)}
             onSave={handleSaveNotes}
             onCancel={() => {
               setNotesText(flight.notes ?? '');
