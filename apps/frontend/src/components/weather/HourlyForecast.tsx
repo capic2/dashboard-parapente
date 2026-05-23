@@ -92,6 +92,30 @@ export interface UiThresholds {
   reasonWindModerateMin: number;
 }
 
+type FlyabilityReasonLabels = {
+  rain: string;
+  strongWind: string;
+  strongGusts: string;
+  insufficientWind: string;
+  weakWind: string;
+  acceptableWind: string;
+  veryCloudy: string;
+  moderateWind: string;
+  averageConditions: string;
+};
+
+const DEFAULT_FLYABILITY_REASON_LABELS: FlyabilityReasonLabels = {
+  rain: 'Pluie',
+  strongWind: 'Vent fort',
+  strongGusts: 'Rafales importantes',
+  insufficientWind: 'Vent insuffisant',
+  weakWind: 'Vent faible',
+  acceptableWind: 'Vent acceptable',
+  veryCloudy: 'Très nuageux',
+  moderateWind: 'Vent modéré',
+  averageConditions: 'Conditions moyennes',
+};
+
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
@@ -122,7 +146,8 @@ const getSourceUrl = (sourceKey: string): string | null => {
  */
 export const getFlyabilityDisplay = (
   hour: HourlyForecastItem,
-  thresholds: UiThresholds
+  thresholds: UiThresholds,
+  reasonLabels: FlyabilityReasonLabels = DEFAULT_FLYABILITY_REASON_LABELS
 ): {
   text: string;
   color: string;
@@ -158,24 +183,24 @@ export const getFlyabilityDisplay = (
 
   // Priority order for reason
   if (precipitation > thresholds.slotPrecipitationMax) {
-    reason = 'Pluie';
+    reason = reasonLabels.rain;
   } else if (wind > thresholds.reasonWindVeryStrongMin) {
-    reason = 'Vent fort';
+    reason = reasonLabels.strongWind;
   } else if (gust > thresholds.reasonGustHighMin) {
-    reason = 'Rafales importantes';
+    reason = reasonLabels.strongGusts;
   } else if (wind < thresholds.windLowMax) {
-    reason = 'Vent insuffisant';
+    reason = reasonLabels.insufficientWind;
   } else if (wind < thresholds.windWeakMax) {
-    reason = 'Vent faible';
+    reason = reasonLabels.weakWind;
   } else if (wind < thresholds.windOptimalMax) {
-    reason = 'Vent acceptable';
+    reason = reasonLabels.acceptableWind;
   } else if (cloudCover > thresholds.reasonCloudVeryCloudyMin) {
-    reason = 'Très nuageux';
+    reason = reasonLabels.veryCloudy;
   } else if (wind > thresholds.reasonWindModerateMin) {
-    reason = 'Vent modéré';
+    reason = reasonLabels.moderateWind;
   } else {
     // Generic reason based on para-index
-    reason = 'Conditions moyennes';
+    reason = reasonLabels.averageConditions;
   }
 
   return {
@@ -464,7 +489,7 @@ const SourceDataTooltip = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-xs flex-shrink-0"
-                    title={`Ouvrir ${sourceName}`}
+                    title={t('weather.openSource', { source: sourceName })}
                   >
                     ↗
                   </a>
@@ -495,7 +520,7 @@ const SourceDataTooltip = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-xs flex-shrink-0"
-                    title={`Ouvrir ${sourceName}`}
+                    title={t('weather.openSource', { source: sourceName })}
                   >
                     ↗
                   </a>
@@ -511,8 +536,8 @@ const SourceDataTooltip = ({
                 key={sourceKey}
                 className="text-xs text-gray-400 dark:text-gray-400"
               >
-                <span className="font-semibold">{sourceName}:</span> (non
-                dispo.)
+                <span className="font-semibold">{sourceName}:</span> (
+                {t('weather.notAvailable')})
               </div>
             );
           }
@@ -535,7 +560,7 @@ const SourceDataTooltip = ({
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-xs"
-                  title={`Ouvrir ${sourceName}`}
+                  title={t('weather.openSource', { source: sourceName })}
                 >
                   ↗
                 </a>
@@ -546,7 +571,7 @@ const SourceDataTooltip = ({
 
         <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
           <div className="text-xs font-bold text-gray-800 dark:text-gray-100">
-            Consensus : {formatConsensusValue(consensus)}{' '}
+            {t('weather.consensus')}: {formatConsensusValue(consensus)}{' '}
             {consensus === null ? '' : unit}
           </div>
         </div>
@@ -622,22 +647,33 @@ export default function HourlyForecast({
     }),
     [appSettings]
   );
+  const flyabilityReasonLabels: FlyabilityReasonLabels = {
+    rain: t('weather.hourly.reasons.rain'),
+    strongWind: t('weather.hourly.reasons.strongWind'),
+    strongGusts: t('weather.hourly.reasons.strongGusts'),
+    insufficientWind: t('weather.hourly.reasons.insufficientWind'),
+    weakWind: t('weather.hourly.reasons.weakWind'),
+    acceptableWind: t('weather.hourly.reasons.acceptableWind'),
+    veryCloudy: t('weather.hourly.reasons.veryCloudy'),
+    moderateWind: t('weather.hourly.reasons.moderateWind'),
+    averageConditions: t('weather.hourly.reasons.averageConditions'),
+  };
 
   if (isLoading) {
     return (
       <div className={`${weatherCardClassName} p-4`} aria-live="polite">
         <div className="mb-3">
           <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
-            Prévisions Horaires
+            {t('weather.hourly.title')}
           </h2>
           {siteName && (
             <p className="mt-1 truncate text-sm font-bold text-gray-900 dark:text-white">
-              Site : {siteName}
+              {t('weather.hourly.site', { siteName })}
             </p>
           )}
         </div>
         <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
-          Chargement...
+          {t('common.loading')}
         </div>
       </div>
     );
@@ -648,16 +684,16 @@ export default function HourlyForecast({
       <div className={`${weatherCardClassName} p-4`} role="alert">
         <div className="mb-3">
           <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
-            Prévisions Horaires
+            {t('weather.hourly.title')}
           </h2>
           {siteName && (
             <p className="mt-1 truncate text-sm font-bold text-gray-900 dark:text-white">
-              Site : {siteName}
+              {t('weather.hourly.site', { siteName })}
             </p>
           )}
         </div>
         <div className="py-5 text-center text-red-500 dark:text-red-400 text-sm">
-          Données non disponibles
+          {t('common.dataUnavailable')}
         </div>
       </div>
     );
@@ -710,7 +746,7 @@ export default function HourlyForecast({
             consensus={data.temperature}
             unit="°C"
             fieldName="temperature"
-            label="Température"
+            label={t('common.temperature')}
             color="#dc2626"
           />
         );
@@ -723,7 +759,7 @@ export default function HourlyForecast({
             consensus={data.wind_speed}
             unit="km/h"
             fieldName="wind_speed"
-            label="Vent"
+            label={t('common.wind')}
             color="#2563eb"
           />
         );
@@ -736,7 +772,7 @@ export default function HourlyForecast({
             consensus={data.wind_gust ?? null}
             unit="km/h"
             fieldName="wind_gust"
-            label="Rafales"
+            label={t('common.gusts')}
             color="#dc2626"
           />
         );
@@ -753,7 +789,7 @@ export default function HourlyForecast({
             )}
             unit=""
             fieldName="wind_direction"
-            label="Direction"
+            label={t('weather.hourly.direction')}
             color="#7c3aed"
           />
         );
@@ -766,7 +802,7 @@ export default function HourlyForecast({
             consensus={data.precipitation}
             unit="mm"
             fieldName="precipitation"
-            label="Précipitations"
+            label={t('weather.precipitationLabel')}
             color="#0891b2"
           />
         );
@@ -783,7 +819,7 @@ export default function HourlyForecast({
             }
             unit="%"
             fieldName="cloud_cover"
-            label="Couverture nuageuse"
+            label={t('weather.hourly.cloudCover')}
             color="#64748b"
           />
         );
@@ -797,14 +833,16 @@ export default function HourlyForecast({
     <div className={`${weatherCardClassName} min-w-0 p-4 sm:p-5`}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h2 className={weatherSectionTitleClassName}>Prévisions Horaires</h2>
+          <h2 className={weatherSectionTitleClassName}>
+            {t('weather.hourly.title')}
+          </h2>
           {siteName && (
             <p className="mt-1 truncate text-sm font-bold text-slate-950 dark:text-white">
-              Site : {siteName}
+              {t('weather.hourly.site', { siteName })}
             </p>
           )}
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            Créneaux de vol, consensus des sources et points de vigilance.
+            {t('weather.hourly.description')}
           </p>
         </div>
         <CacheTimestamp cachedAt={weather.cached_at} />
@@ -822,7 +860,11 @@ export default function HourlyForecast({
               hour.sources?.['open-meteo']?.wind_gust ??
               hour.sources?.['weatherapi']?.wind_gust ??
               null;
-            const display = getFlyabilityDisplay(hour, uiThresholds);
+            const display = getFlyabilityDisplay(
+              hour,
+              uiThresholds,
+              flyabilityReasonLabels
+            );
             const FlyabilityIcon = display.Icon;
 
             return (
@@ -863,7 +905,7 @@ export default function HourlyForecast({
                         className="h-3.5 w-3.5 text-sky-500"
                         aria-hidden="true"
                       />
-                      Vent
+                      {t('common.wind')}
                     </span>
                     <div className="font-bold text-slate-950 dark:text-white">
                       {hour.wind}
@@ -875,7 +917,7 @@ export default function HourlyForecast({
                         className="h-3.5 w-3.5 text-orange-500"
                         aria-hidden="true"
                       />
-                      Rafales
+                      {t('common.gusts')}
                     </span>
                     <div className="font-bold text-slate-950 dark:text-white">
                       {gustValue !== null && gustValue !== undefined
@@ -889,7 +931,7 @@ export default function HourlyForecast({
                         className="h-3.5 w-3.5 text-cyan-500"
                         aria-hidden="true"
                       />
-                      Pluie
+                      {t('weather.rain')}
                     </span>
                     <div className="font-bold text-slate-950 dark:text-white">
                       {hour.precipitation !== null &&
@@ -904,7 +946,7 @@ export default function HourlyForecast({
                         className="h-3.5 w-3.5 text-slate-500"
                         aria-hidden="true"
                       />
-                      Nuages
+                      {t('weather.hourly.clouds')}
                     </span>
                     <div className="font-bold text-slate-950 dark:text-white">
                       {cloudCover !== null && cloudCover !== undefined
@@ -918,7 +960,7 @@ export default function HourlyForecast({
           })
         ) : (
           <div className="rounded-xl border border-slate-200 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-            Aucune donnée horaire disponible
+            {t('weather.hourly.noData')}
           </div>
         )}
       </div>
@@ -929,7 +971,7 @@ export default function HourlyForecast({
             <tr className="border-b border-gray-200 dark:border-gray-700">
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Clock size={14} /> Heure
+                  <Clock size={14} /> {t('common.time')}
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
@@ -939,32 +981,33 @@ export default function HourlyForecast({
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Wind size={14} /> Vent (km/h)
+                  <Wind size={14} /> {t('weather.hourly.windWithUnit')}
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Zap size={14} /> Rafales (km/h)
+                  <Zap size={14} /> {t('weather.hourly.gustsWithUnit')}
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Compass size={14} /> Direction
+                  <Compass size={14} /> {t('weather.hourly.direction')}
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Thermometer size={14} /> Temp (°C)
+                  <Thermometer size={14} /> {t('weather.hourly.tempWithUnit')}
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <CloudRain size={14} /> Précip. (mm)
+                  <CloudRain size={14} />{' '}
+                  {t('weather.hourly.precipitationWithUnit')}
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Cloud size={14} /> Nuages (%)
+                  <Cloud size={14} /> {t('weather.hourly.cloudsWithUnit')}
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
@@ -974,12 +1017,12 @@ export default function HourlyForecast({
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Flame size={14} /> Thermiques
+                  <Flame size={14} /> {t('weather.hourly.thermals')}
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <CircleCheck size={14} /> Volabilité
+                  <CircleCheck size={14} /> {t('weather.hourly.flyability')}
                 </span>
               </th>
             </tr>
@@ -1013,7 +1056,9 @@ export default function HourlyForecast({
                     <td className="py-2.5 px-2 text-center">
                       <TooltipTrigger delay={150} closeDelay={100}>
                         <Button
-                          aria-label={`${t('weather.paraIndex')} ${hour.hour}`}
+                          aria-label={t('weather.hourly.paraIndexAt', {
+                            hour: hour.hour,
+                          })}
                           className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-sky-100 dark:hover:bg-sky-900/30 transition-colors"
                         >
                           <strong className="text-sky-600 dark:text-sky-400">
@@ -1029,7 +1074,9 @@ export default function HourlyForecast({
                     <td className="py-2.5 px-2 text-center">
                       <TooltipTrigger delay={150} closeDelay={100}>
                         <Button
-                          aria-label={`Vent ${hour.hour}`}
+                          aria-label={t('weather.hourly.windAt', {
+                            hour: hour.hour,
+                          })}
                           className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                         >
                           {hour.wind}
@@ -1043,7 +1090,9 @@ export default function HourlyForecast({
                     <td className="py-2.5 px-2 text-center">
                       <TooltipTrigger delay={150} closeDelay={100}>
                         <Button
-                          aria-label={`Rafales ${hour.hour}`}
+                          aria-label={t('weather.hourly.gustsAt', {
+                            hour: hour.hour,
+                          })}
                           className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                         >
                           {gustValue !== null && gustValue !== undefined
@@ -1059,7 +1108,9 @@ export default function HourlyForecast({
                     <td className="py-2.5 px-2 text-center">
                       <TooltipTrigger delay={150} closeDelay={100}>
                         <Button
-                          aria-label={`Direction ${hour.hour}`}
+                          aria-label={t('weather.hourly.directionAt', {
+                            hour: hour.hour,
+                          })}
                           className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors flex justify-center"
                         >
                           {hour.wind_direction_deg == null ? (
@@ -1080,7 +1131,9 @@ export default function HourlyForecast({
                     <td className="py-2.5 px-2 text-center">
                       <TooltipTrigger delay={150} closeDelay={100}>
                         <Button
-                          aria-label={`Temperature ${hour.hour}`}
+                          aria-label={t('weather.hourly.temperatureAt', {
+                            hour: hour.hour,
+                          })}
                           className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                         >
                           {hour.temp}
@@ -1094,7 +1147,9 @@ export default function HourlyForecast({
                     <td className="py-2.5 px-2 text-center">
                       <TooltipTrigger delay={150} closeDelay={100}>
                         <Button
-                          aria-label={`Precipitations ${hour.hour}`}
+                          aria-label={t('weather.hourly.precipitationAt', {
+                            hour: hour.hour,
+                          })}
                           className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-cyan-50 dark:hover:bg-cyan-900/20 transition-colors"
                         >
                           {hour.precipitation !== null &&
@@ -1111,7 +1166,9 @@ export default function HourlyForecast({
                     <td className="py-2.5 px-2 text-center">
                       <TooltipTrigger delay={150} closeDelay={100}>
                         <Button
-                          aria-label={`Nuages ${hour.hour}`}
+                          aria-label={t('weather.hourly.cloudsAt', {
+                            hour: hour.hour,
+                          })}
                           className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors"
                         >
                           {cloudCover !== null && cloudCover !== undefined
@@ -1131,20 +1188,23 @@ export default function HourlyForecast({
                     </td>
 
                     <td className="py-2.5 px-2 text-center">
-                      {hour.thermal_strength || 'faible'}
+                      {hour.thermal_strength || t('weather.hourly.weak')}
                     </td>
 
                     <td className="py-2.5 px-2 text-center">
                       {(() => {
                         const display = getFlyabilityDisplay(
                           hour,
-                          uiThresholds
+                          uiThresholds,
+                          flyabilityReasonLabels
                         );
                         const FlyabilityIcon = display.Icon;
                         return (
                           <TooltipTrigger delay={150} closeDelay={100}>
                             <Button
-                              aria-label={`Verdict ${hour.hour}`}
+                              aria-label={t('weather.hourly.verdictAt', {
+                                hour: hour.hour,
+                              })}
                               className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
                             >
                               <span
@@ -1173,7 +1233,7 @@ export default function HourlyForecast({
                   colSpan={11}
                   className="py-8 text-center text-gray-500 dark:text-gray-400"
                 >
-                  Aucune donnée horaire disponible
+                  {t('weather.hourly.noData')}
                 </td>
               </tr>
             )}

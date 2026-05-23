@@ -224,7 +224,9 @@ export default function WeatherPage() {
   const activeWeatherName = selectedSearchTarget
     ? selectedSearchTitle
     : selectedSite?.name;
-  const sourceLabel = selectedSearchTarget ? 'Recherche' : 'Site favori';
+  const sourceLabel = selectedSearchTarget
+    ? t('weather.source.search')
+    : t('weather.source.favoriteSite');
 
   const mobileSelectionPanel = (
     <div className="space-y-4">
@@ -232,19 +234,20 @@ export default function WeatherPage() {
         <div className="border-b border-slate-100 bg-gradient-to-br from-sky-50 via-white to-white p-4 dark:border-slate-800 dark:from-sky-950/40 dark:via-slate-900 dark:to-slate-900 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <p className={weatherSectionTitleClassName}>Choix du site</p>
+              <p className={weatherSectionTitleClassName}>
+                {t('weather.selection.title')}
+              </p>
               <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950 dark:text-white">
-                Sélection météo
+                {t('weather.selection.heading')}
               </h2>
               <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-300">
-                Gardez vos favoris sous la main ou cherchez une ville, un déco
-                ou un atterro proche.
+                {t('weather.selection.description')}
               </p>
             </div>
             {activeWeatherName && (
               <div className="min-w-0 rounded-2xl border border-sky-100 bg-white/80 px-3 py-2 text-sm shadow-sm dark:border-sky-900/60 dark:bg-slate-950/50">
                 <span className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                  Actuel
+                  {t('weather.selection.current')}
                 </span>
                 <span className="block truncate font-bold text-sky-800 dark:text-sky-200">
                   {activeWeatherName}
@@ -274,13 +277,13 @@ export default function WeatherPage() {
               <Tab id="favorites">
                 <span className="inline-flex items-center gap-2">
                   <MapPin className="h-4 w-4" aria-hidden="true" />
-                  Favoris
+                  {t('weather.selection.favorites')}
                 </span>
               </Tab>
               <Tab id="search">
                 <span className="inline-flex items-center gap-2">
                   <Search className="h-4 w-4" aria-hidden="true" />
-                  Recherche
+                  {t('weather.selection.search')}
                 </span>
               </Tab>
             </TabList>
@@ -370,11 +373,10 @@ export default function WeatherPage() {
     !selectedSearchTarget && !selectedSiteId ? (
       <section className={`${weatherCardClassName} p-6 text-center`}>
         <h2 className="text-xl font-bold text-gray-950 dark:text-white">
-          Choisissez une météo
+          {t('weather.page.emptyTitle')}
         </h2>
         <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-          Ajoutez un site favori ou recherchez une ville pour afficher le détail
-          heure par heure.
+          {t('weather.page.emptyDescription')}
         </p>
       </section>
     ) : undefined;
@@ -384,7 +386,7 @@ export default function WeatherPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
-            Résultat de recherche sélectionné
+            {t('weather.page.selectedSearchResult')}
           </p>
           <h2 className="text-xl font-bold text-gray-950 dark:text-white">
             {selectedSearchTitle}
@@ -540,19 +542,20 @@ export default function WeatherPage() {
           <div className="border-b border-slate-100 bg-gradient-to-br from-sky-50 via-white to-white p-4 dark:border-slate-800 dark:from-sky-950/40 dark:via-slate-900 dark:to-slate-900 sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <p className={weatherSectionTitleClassName}>Choix du site</p>
+                <p className={weatherSectionTitleClassName}>
+                  {t('weather.selection.title')}
+                </p>
                 <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950 dark:text-white">
-                  Sélection météo
+                  {t('weather.selection.heading')}
                 </h2>
                 <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-300">
-                  Gardez vos favoris sous la main ou cherchez une ville, un déco
-                  ou un atterro proche.
+                  {t('weather.selection.description')}
                 </p>
               </div>
               {activeWeatherName && (
                 <div className="min-w-0 rounded-2xl border border-sky-100 bg-white/80 px-3 py-2 text-sm shadow-sm dark:border-sky-900/60 dark:bg-slate-950/50">
                   <span className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                    Actuel
+                    {t('weather.selection.current')}
                   </span>
                   <span className="block truncate font-bold text-sky-800 dark:text-sky-200">
                     {activeWeatherName}
@@ -582,13 +585,13 @@ export default function WeatherPage() {
                 <Tab id="favorites">
                   <span className="inline-flex items-center gap-2">
                     <MapPin className="h-4 w-4" aria-hidden="true" />
-                    Favoris
+                    {t('weather.selection.favorites')}
                   </span>
                 </Tab>
                 <Tab id="search">
                   <span className="inline-flex items-center gap-2">
                     <Search className="h-4 w-4" aria-hidden="true" />
-                    Recherche
+                    {t('weather.selection.search')}
                   </span>
                 </Tab>
               </TabList>
@@ -678,21 +681,20 @@ export default function WeatherPage() {
             <div className="min-w-0">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-sky-100">
                 <Wind className="h-3.5 w-3.5" aria-hidden="true" />
-                Météo de vol
+                {t('weather.page.badge')}
               </div>
               <h1 className="mt-3 truncate text-2xl font-black tracking-tight sm:text-3xl">
-                {activeWeatherName ?? 'Prévisions météo'}
+                {activeWeatherName ?? t('weather.page.defaultTitle')}
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-sky-100 sm:text-base">
-                Vue consolidée des conditions, du meilleur créneau et des
-                risques météo pour préparer le vol.
+                {t('weather.page.description')}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
               <div className="rounded-2xl border border-white/15 bg-white/10 px-3 py-2 backdrop-blur">
                 <span className="flex items-center gap-1.5 text-xs font-semibold text-sky-100">
                   <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
-                  Jour
+                  {t('weather.page.day')}
                 </span>
                 <strong className="mt-1 block text-sm">
                   {selectedDayLabel}
@@ -705,10 +707,10 @@ export default function WeatherPage() {
                   ) : (
                     <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
                   )}
-                  Source
+                  {t('weather.page.source')}
                 </span>
                 <strong className="mt-1 block truncate text-sm">
-                  {selectedSearchTarget ? 'Recherche' : 'Site favori'}
+                  {sourceLabel}
                 </strong>
               </div>
             </div>
@@ -718,11 +720,10 @@ export default function WeatherPage() {
         {!selectedSearchTarget && !selectedSiteId && (
           <section className={`${weatherCardClassName} p-6 text-center`}>
             <h2 className="text-xl font-bold text-gray-950 dark:text-white">
-              Choisissez une météo
+              {t('weather.page.emptyTitle')}
             </h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-              Ajoutez un site favori ou recherchez une ville pour afficher le
-              détail heure par heure.
+              {t('weather.page.emptyDescription')}
             </p>
           </section>
         )}
@@ -732,7 +733,7 @@ export default function WeatherPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
-                  Résultat de recherche sélectionné
+                  {t('weather.page.selectedSearchResult')}
                 </p>
                 <h2 className="text-xl font-bold text-gray-950 dark:text-white">
                   {selectedSearchTitle}

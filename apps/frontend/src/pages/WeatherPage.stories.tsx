@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import i18n from 'i18next';
 import preview from '../../.storybook/preview';
 import { expect, waitFor } from 'storybook/test';
 import WeatherPage from './WeatherPage';
@@ -749,10 +750,10 @@ export const WithCityQueryParam = meta.story({
 WithCityQueryParam.test(
   'renders city weather from query params',
   async ({ canvas }) => {
-    await canvas.findByText('Résultat de recherche sélectionné');
+    await canvas.findByText(i18n.t('weather.page.selectedSearchResult'));
     await canvas.findAllByText('Besançon');
-    await canvas.findByText('Météo sélectionnée');
-    await canvas.findByText('Prévisions Horaires');
+    await canvas.findByText(i18n.t('weather.search.selectedWeather'));
+    await canvas.findByText(i18n.t('weather.hourly.title'));
   }
 );
 
@@ -771,10 +772,12 @@ export const WithSpotQueryParam = meta.story({
 WithSpotQueryParam.test(
   'renders searched spot weather from query params',
   async ({ canvas }) => {
-    await canvas.findByText('Résultat de recherche sélectionné');
+    await canvas.findByText(i18n.t('weather.page.selectedSearchResult'));
     await canvas.findAllByText('Arguel déco');
-    await canvas.findByText('Météo sélectionnée');
-    await canvas.findByRole('button', { name: /Ajouter aux favoris/u });
+    await canvas.findByText(i18n.t('weather.search.selectedWeather'));
+    await canvas.findByRole('button', {
+      name: i18n.t('weather.search.addToFavorites'),
+    });
   }
 );
 
@@ -789,7 +792,9 @@ export const WithCitySearch = meta.story({
 WithCitySearch.test(
   'selects a searched spot, displays hourly details, and adds it to favorites',
   async ({ canvas, userEvent }) => {
-    const searchTab = await canvas.findByRole('tab', { name: 'Recherche' });
+    const searchTab = await canvas.findByRole('tab', {
+      name: i18n.t('weather.selection.search'),
+    });
     await userEvent.click(searchTab);
     const input = await canvas.findByPlaceholderText(/Besançon/);
     await userEvent.type(input, 'Besan');
@@ -801,20 +806,22 @@ WithCitySearch.test(
     await canvas.findByRole('button', { name: /Plaine d'Arguel/ });
 
     await userEvent.click(searchedSpotButton);
-    await canvas.findByText('Résultat de recherche sélectionné');
-    await canvas.findByText('Météo sélectionnée');
+    await canvas.findByText(i18n.t('weather.page.selectedSearchResult'));
+    await canvas.findByText(i18n.t('weather.search.selectedWeather'));
     expect(
       canvas.queryByText(/Impossible de charger la météo/u)
     ).not.toBeInTheDocument();
-    await canvas.findByText('Prévisions Horaires');
+    await canvas.findByText(i18n.t('weather.hourly.title'));
 
     const addFavoriteButton = await canvas.findByRole('button', {
-      name: /Ajouter aux favoris/,
+      name: i18n.t('weather.search.addToFavorites'),
     });
     await userEvent.click(addFavoriteButton);
     await waitFor(() => {
       expect(
-        canvas.queryByRole('button', { name: /Ajouter aux favoris/ })
+        canvas.queryByRole('button', {
+          name: i18n.t('weather.search.addToFavorites'),
+        })
       ).not.toBeInTheDocument();
     });
   }
