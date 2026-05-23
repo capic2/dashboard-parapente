@@ -135,6 +135,8 @@ _VIDEO_EXPORT_CANCELLABLE_STATUSES = {
     "encoding",
 }
 
+_VIDEO_EXPORT_TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
+
 
 def _start_video_export_stream(
     flight_id: str, quality: str, fps: int, speed: int, frontend_url: str
@@ -386,7 +388,7 @@ def _video_export_sort_value(export: dict[str, Any]) -> str:
 
 def _video_export_public_status(export: dict[str, Any]) -> str:
     internal_status = export.get("internal_status")
-    if internal_status in {"completed", "failed", "cancelled"}:
+    if internal_status in _VIDEO_EXPORT_TERMINAL_STATUSES:
         return str(internal_status)
 
     status = export.get("status")
@@ -419,7 +421,7 @@ def _video_export_can_delete(export: dict[str, Any]) -> bool:
     if export.get("mode") in {"manual", "manual_fast"}:
         return True
 
-    return export.get("status") in {"completed", "failed", "cancelled"}
+    return export.get("status") in _VIDEO_EXPORT_TERMINAL_STATUSES
 
 
 def _gopro_overlay_export_job_payload(job: dict[str, Any]) -> dict[str, Any]:
@@ -4846,7 +4848,7 @@ async def stream_video_export_status(job_id: str, request: Request) -> Streaming
                 yield serialize_sse_event("status", status)
                 last_serialized = serialized
 
-            if status.get("internal_status") in {"completed", "failed", "cancelled"}:
+            if status.get("internal_status") in _VIDEO_EXPORT_TERMINAL_STATUSES:
                 break
 
             try:
