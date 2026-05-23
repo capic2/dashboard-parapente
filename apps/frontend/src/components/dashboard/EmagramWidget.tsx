@@ -17,7 +17,8 @@ import {
 } from '../../types/emagram';
 import { useState, useMemo, useEffect } from 'react';
 import { parseApiUtcDate } from '../../lib/date';
-import { getApiUrl } from '../../lib/api';
+import { getApiUrlWithSearchParams } from '../../lib/api';
+import { useAuthStore } from '../../stores/authStore';
 import { Lightbox } from '@dashboard-parapente/design-system';
 import { EmagramExplanationTooltip } from './EmagramExplanationTooltip';
 import {
@@ -200,6 +201,7 @@ export default function EmagramWidget({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
+  const authToken = useAuthStore((s) => s.token);
 
   useEffect(() => {
     setSelectedHour(null);
@@ -649,7 +651,10 @@ export default function EmagramWidget({
                   })
                 : '';
               const lightboxImages = sourceKeys.map((source) => ({
-                src: getApiUrl(`/emagram/screenshot/${emagram.id}/${source}`),
+                src: getApiUrlWithSearchParams(
+                  `/emagram/screenshot/${emagram.id}/${source}`,
+                  { access_token: authToken }
+                ),
                 alt: [
                   source
                     .replace('-', ' ')
