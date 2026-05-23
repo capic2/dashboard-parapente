@@ -17,6 +17,7 @@ import {
 } from '../../types/emagram';
 import { useState, useMemo, useEffect } from 'react';
 import { parseApiUtcDate } from '../../lib/date';
+import { getApiUrl } from '../../lib/api';
 import { Lightbox } from '@dashboard-parapente/design-system';
 import { EmagramExplanationTooltip } from './EmagramExplanationTooltip';
 import {
@@ -648,7 +649,7 @@ export default function EmagramWidget({
                   })
                 : '';
               const lightboxImages = sourceKeys.map((source) => ({
-                src: `/api/emagram/screenshot/${emagram.id}/${source}`,
+                src: getApiUrl(`/emagram/screenshot/${emagram.id}/${source}`),
                 alt: [
                   source
                     .replace('-', ' ')
