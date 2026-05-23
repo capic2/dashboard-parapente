@@ -25,7 +25,8 @@ import {
   Lightbox,
 } from '@dashboard-parapente/design-system';
 import { parseApiUtcDate } from '../lib/date';
-import { getApiUrl } from '../lib/api';
+import { getApiUrlWithSearchParams } from '../lib/api';
+import { useAuthStore } from '../stores/authStore';
 import { EmagramExplanationTooltip } from '../components/dashboard/EmagramExplanationTooltip';
 
 const historyColumnHelper = createColumnHelper<EmagramListItem>();
@@ -145,6 +146,7 @@ export default function ThermalAnalysis() {
   const triggerMutation = useTriggerEmagram();
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const authToken = useAuthStore((s) => s.token);
 
   const screenshotImages = useMemo(() => {
     if (!latest?.screenshot_paths) return [];
@@ -160,13 +162,16 @@ export default function ThermalAnalysis() {
       }
 
       return Object.keys(screenshots).map((source) => ({
-        src: getApiUrl(`/emagram/screenshot/${latest.id}/${source}`),
+        src: getApiUrlWithSearchParams(
+          `/emagram/screenshot/${latest.id}/${source}`,
+          { access_token: authToken }
+        ),
         alt: formatSourceName(source),
       }));
     } catch {
       return [];
     }
-  }, [latest?.id, latest?.screenshot_paths]);
+  }, [authToken, latest?.id, latest?.screenshot_paths]);
 
   const handleRefresh = async () => {
     if (!selectedSiteId) return;

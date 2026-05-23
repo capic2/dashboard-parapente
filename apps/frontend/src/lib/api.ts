@@ -16,6 +16,26 @@ export function getApiUrl(path: string) {
   return `${apiPrefix}${normalizedPath}`;
 }
 
+export function getApiUrlWithSearchParams(
+  path: string,
+  searchParams: Record<string, string | null | undefined>
+) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (value) {
+      params.set(key, value);
+    }
+  }
+
+  const queryString = params.toString();
+  if (!queryString) {
+    return getApiUrl(path);
+  }
+
+  const url = getApiUrl(path);
+  return `${url}${url.includes('?') ? '&' : '?'}${queryString}`;
+}
+
 // Instance Ky configurée pour l'API backend
 // eslint-disable-next-line import/no-mutable-exports
 export let api = ky.create({
