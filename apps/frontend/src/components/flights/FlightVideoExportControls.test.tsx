@@ -3,20 +3,22 @@ import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Flight } from '@dashboard-parapente/shared-types';
 
-const { apiDelete, apiPost, exportStatusMock, mockFlight } = vi.hoisted(() => ({
-  apiDelete: vi.fn(),
-  apiPost: vi.fn(),
-  exportStatusMock: { current: null as unknown },
-  mockFlight: {
-    id: 'flight-1',
-    flight_date: '2026-03-15',
-    title: 'Test flight',
-    gpx_file_path: 'sample.gpx',
-    video_export_status: null as string | null,
-    video_export_job_id: null as string | null,
-    video_file_path: null as string | null,
-  } as Flight,
-}));
+const { apiDelete, apiPost, confirmMock, exportStatusMock, mockFlight } =
+  vi.hoisted(() => ({
+    apiDelete: vi.fn(),
+    apiPost: vi.fn(),
+    confirmMock: vi.fn(),
+    exportStatusMock: { current: null as unknown },
+    mockFlight: {
+      id: 'flight-1',
+      flight_date: '2026-03-15',
+      title: 'Test flight',
+      gpx_file_path: 'sample.gpx',
+      video_export_status: null as string | null,
+      video_export_job_id: null as string | null,
+      video_file_path: null as string | null,
+    } as Flight,
+  }));
 
 vi.mock('@dashboard-parapente/design-system', () => ({
   Button: ({
@@ -86,6 +88,9 @@ describe('FlightVideoExportControls', () => {
     apiDelete.mockReset();
     apiPost.mockReset();
     apiPost.mockReturnValue({ json: vi.fn().mockResolvedValue({}) });
+    confirmMock.mockReset();
+    confirmMock.mockReturnValue(true);
+    vi.stubGlobal('confirm', confirmMock);
     mockFlight.video_export_status = null;
     mockFlight.video_export_job_id = null;
     mockFlight.video_file_path = null;
@@ -123,7 +128,7 @@ describe('FlightVideoExportControls', () => {
     });
   });
 
-  it('resumes a cancelled export when preserved frames are available', async () => {
+  it('regenerates a cancelled export even when preserved frames are available', async () => {
     mockFlight.video_export_status = 'cancelled';
     mockFlight.video_export_job_id = 'job-cancelled';
     exportStatusMock.current = {
@@ -137,12 +142,29 @@ describe('FlightVideoExportControls', () => {
 
     render(<FlightVideoExportControls flight={mockFlight} />);
 
-    expect(screen.getByText('frames preserved')).toBeInTheDocument();
+    expect(screen.queryByText('frames preserved')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Resume generation/u }));
+    fireEvent.click(
+      screen.getByRole('button', { name: /Restart generation/u })
+    );
 
     await waitFor(() => {
-      expect(apiPost).toHaveBeenCalledWith('exports/job-cancelled/resume');
+      expect(apiPost).toHaveBeenCalledWith('flights/flight-1/export-video', {
+        searchParams: { mode: 'manual_fast' },
+      });
+    });
+  });
+
+  it('turns the primary button into cancel while export is active', async () => {
+    mockFlight.video_export_status = 'running';
+    mockFlight.video_export_job_id = 'job-running';
+
+    render(<FlightVideoExportControls flight={mockFlight} compact />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Cancel generation/u }));
+
+    await waitFor(() => {
+      expect(apiDelete).toHaveBeenCalledWith('exports/job-running/cancel');
     });
   });
 
@@ -157,6 +179,19 @@ describe('FlightVideoExportControls', () => {
     expect(
       screen.queryByRole('button', { name: /Download video/u })
     ).not.toBeInTheDocument();
+  });
+
+  it('shows regenerate when a video already exists', () => {
+    mockFlight.video_export_status = 'completed';
+    mockFlight.video_export_job_id = 'job-video';
+    mockFlight.video_file_path = '/exports/job-video.mp4';
+    mockFlight.video_file_exists = true;
+
+    render(<FlightVideoExportControls flight={mockFlight} compact />);
+
+    expect(
+      screen.getByRole('button', { name: /Regenerate video/u })
+    ).toBeEnabled();
   });
 
   it('generates again when database references a missing completed video file', () => {
