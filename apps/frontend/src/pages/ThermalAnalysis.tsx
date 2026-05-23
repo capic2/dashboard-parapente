@@ -25,6 +25,7 @@ import {
   Lightbox,
 } from '@dashboard-parapente/design-system';
 import { parseApiUtcDate } from '../lib/date';
+import { getApiUrl } from '../lib/api';
 import { EmagramExplanationTooltip } from '../components/dashboard/EmagramExplanationTooltip';
 
 const historyColumnHelper = createColumnHelper<EmagramListItem>();
@@ -159,7 +160,7 @@ export default function ThermalAnalysis() {
       }
 
       return Object.keys(screenshots).map((source) => ({
-        src: `/api/emagram/screenshot/${latest.id}/${source}`,
+        src: getApiUrl(`/emagram/screenshot/${latest.id}/${source}`),
         alt: formatSourceName(source),
       }));
     } catch {

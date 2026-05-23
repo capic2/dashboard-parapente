@@ -319,6 +319,76 @@ class TestCleanupOldScreenshots:
         assert not old_file.exists(), "Old analysis screenshot should be deleted"
         assert new_file.exists(), "Latest analysis screenshot should be preserved"
 
+    def test_cleanup_preserves_fresh_hourly_analysis_screenshots(self, db_session, tmp_path):
+        """Fresh hourly analyses remain viewable even when they are not latest per site"""
+        import json
+        import os
+        from datetime import datetime, timedelta
+        from unittest.mock import patch
+
+        from models import EmagramAnalysis
+
+        morning_file = tmp_path / "Arguel_meteo-parapente_h9.png"
+        morning_file.write_bytes(b"morning")
+        noon_file = tmp_path / "Arguel_meteo-parapente_h12.png"
+        noon_file.write_bytes(b"noon")
+        stale_file = tmp_path / "Arguel_meteo-parapente_stale.png"
+        stale_file.write_bytes(b"stale")
+
+        old_mtime = (datetime.now() - timedelta(hours=2)).timestamp()
+        os.utime(morning_file, (old_mtime, old_mtime))
+        os.utime(noon_file, (old_mtime, old_mtime))
+        os.utime(stale_file, (old_mtime, old_mtime))
+
+        common = {
+            "analysis_date": datetime.now().date(),
+            "analysis_time": datetime.now().time(),
+            "station_code": "site-arguel",
+            "station_name": "Arguel",
+            "station_latitude": 47.2,
+            "station_longitude": 6.0,
+            "distance_km": 0.0,
+            "data_source": "test",
+            "sounding_time": "12Z",
+            "analysis_method": "llm_vision",
+            "analysis_status": "completed",
+        }
+        morning_analysis = EmagramAnalysis(
+            id="fresh-hour-9",
+            analysis_datetime=datetime.utcnow() - timedelta(hours=2),
+            forecast_hour=9,
+            screenshot_paths=json.dumps({"meteo-parapente": str(morning_file)}),
+            **common,
+        )
+        noon_analysis = EmagramAnalysis(
+            id="fresh-hour-12",
+            analysis_datetime=datetime.utcnow() - timedelta(hours=1),
+            forecast_hour=12,
+            screenshot_paths=json.dumps({"meteo-parapente": str(noon_file)}),
+            **common,
+        )
+        stale_analysis = EmagramAnalysis(
+            id="stale-hour-15",
+            analysis_datetime=datetime.utcnow() - timedelta(hours=4),
+            forecast_hour=15,
+            screenshot_paths=json.dumps({"meteo-parapente": str(stale_file)}),
+            **common,
+        )
+        db_session.add_all([morning_analysis, noon_analysis, stale_analysis])
+        db_session.commit()
+
+        from scrapers.emagram_screenshots import cleanup_old_screenshots
+
+        with patch("database.get_db_context") as mock_ctx:
+            mock_ctx.return_value.__enter__ = lambda s: db_session
+            mock_ctx.return_value.__exit__ = lambda s, *a: None
+            deleted = cleanup_old_screenshots(max_age_hours=1, cache_dir=tmp_path)
+
+        assert deleted == 1
+        assert morning_file.exists(), "Fresh non-latest hourly screenshot should be preserved"
+        assert noon_file.exists(), "Latest hourly screenshot should be preserved"
+        assert not stale_file.exists(), "Stale screenshot should be deleted"
+
     def test_cleanup_deletes_orphan_files(self, db_session, tmp_path):
         """PNG files not referenced by any analysis are deleted if old enough"""
         from datetime import datetime, timedelta
