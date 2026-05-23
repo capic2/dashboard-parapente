@@ -513,17 +513,20 @@ class TestVideoExportJobsEndpoint:
         assert jobs[0]["status"] == "running"
         assert jobs[0]["mode"] == "gopro_overlay"
         assert jobs[0]["can_cancel"] is True
+        assert jobs[0]["can_delete"] is False
         assert jobs[0]["flight_id"] == sample_flight.id
         assert jobs[0]["flight_name"] == sample_flight.name
         assert jobs[0]["flight_title"] == sample_flight.name
         assert jobs[1]["job_id"] == "job-running"
         assert jobs[1]["status"] == "processing"
         assert jobs[1]["can_cancel"] is True
+        assert jobs[1]["can_delete"] is True
         assert jobs[1]["flight_name"] == sample_flight.name
         assert jobs[1]["flight_title"] == sample_flight.name
         assert jobs[2]["job_id"] == "job-cancelled"
         assert jobs[2]["status"] == "cancelled"
         assert jobs[2]["can_cancel"] is False
+        assert jobs[2]["can_delete"] is True
 
     def test_video_export_jobs_can_filter_active_jobs(self, client: TestClient):
         with (
@@ -580,6 +583,31 @@ class TestVideoExportJobsEndpoint:
             "job-overlay-running",
         }
         assert all(job["can_cancel"] is True for job in jobs)
+
+    def test_video_export_jobs_marks_terminal_stream_and_overlay_deletable(
+        self, client: TestClient
+    ):
+        with (
+            patch("routes.list_exports_manual", return_value=[]),
+            patch(
+                "routes.list_exports_stream",
+                return_value=[{"job_id": "job-stream-done", "status": "completed"}],
+            ),
+            patch(
+                "routes.list_gopro_overlay_jobs",
+                return_value=[
+                    {"job_id": "job-overlay-running", "status": "running"},
+                    {"job_id": "job-overlay-failed", "status": "failed"},
+                ],
+            ),
+        ):
+            response = client.get(f"{API_PREFIX}/video-export-jobs")
+
+        assert response.status_code == 200
+        jobs = {job["job_id"]: job for job in response.json()["jobs"]}
+        assert jobs["job-stream-done"]["can_delete"] is True
+        assert jobs["job-overlay-running"]["can_delete"] is False
+        assert jobs["job-overlay-failed"]["can_delete"] is True
 
     def test_video_export_jobs_temp_files_endpoint_cleans_known_exports(self, client: TestClient):
         manual_jobs = [{"job_id": "job-failed", "internal_status": "failed"}]

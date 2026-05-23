@@ -29,6 +29,7 @@ export type VideoExportJob = {
   layout_label?: string | null;
   has_output_file?: boolean;
   can_cancel: boolean;
+  can_delete: boolean;
 };
 
 type VideoExportJobsResponse = {

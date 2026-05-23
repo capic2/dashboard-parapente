@@ -412,6 +412,16 @@ def _video_export_can_cancel(export: dict[str, Any]) -> bool:
     } and bool(export.get("job_id"))
 
 
+def _video_export_can_delete(export: dict[str, Any]) -> bool:
+    if not export.get("job_id"):
+        return False
+
+    if export.get("mode") in {"manual", "manual_fast"}:
+        return True
+
+    return export.get("status") in {"completed", "failed", "cancelled"}
+
+
 def _gopro_overlay_export_job_payload(job: dict[str, Any]) -> dict[str, Any]:
     output_path = job.get("output_path")
     return {
@@ -469,6 +479,7 @@ def _build_video_export_jobs_payload(
         job = dict(export)
         job["status"] = _video_export_public_status(job)
         job["can_cancel"] = _video_export_can_cancel(job)
+        job["can_delete"] = _video_export_can_delete(job)
         if "has_output_file" not in job:
             video_path = job.get("video_path")
             job["has_output_file"] = bool(video_path and Path(str(video_path)).exists())
