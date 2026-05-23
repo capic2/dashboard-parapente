@@ -247,7 +247,7 @@ function canDownloadJob(job: VideoExportJob) {
 }
 
 function canDeleteJobRow(job: VideoExportJob) {
-  return !job.can_cancel;
+  return job.can_delete;
 }
 
 function JobStatusBadge({ job }: { job: VideoExportJob }) {
