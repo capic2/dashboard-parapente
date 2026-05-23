@@ -40,6 +40,15 @@ def _job_status_value(job: Job) -> str | None:
     return _status_value(job.get_status(refresh=True))
 
 
+def _delete_stale_job(job: Job) -> None:
+    try:
+        job.delete()
+    except ValueError as error:
+        message = str(error)
+        if "Execution" not in message or "not found in Redis" not in message:
+            raise
+
+
 def delete_job(job_id: str, queue_name: str | None = None) -> bool:
     queue = get_queue(queue_name)
     job = queue.fetch_job(job_id)
@@ -47,7 +56,7 @@ def delete_job(job_id: str, queue_name: str | None = None) -> bool:
         return False
     if _job_status_value(job) == "started":
         send_stop_job_command(queue.connection, job_id)
-    job.delete()
+    _delete_stale_job(job)
     return True
 
 
@@ -64,7 +73,7 @@ def enqueue_once(
     if existing_job is not None:
         if _job_status_value(existing_job) in _PENDING_JOB_STATUSES:
             return existing_job
-        existing_job.delete()
+        _delete_stale_job(existing_job)
 
     return queue.enqueue(
         function_path,

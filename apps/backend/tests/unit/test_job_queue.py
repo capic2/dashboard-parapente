@@ -4,14 +4,17 @@ import job_queue
 
 
 class FakeJob:
-    def __init__(self, status: str):
+    def __init__(self, status: str, delete_error: Exception | None = None):
         self.status = status
+        self.delete_error = delete_error
         self.deleted = False
 
     def get_status(self, refresh: bool = True) -> str:
         return self.status
 
     def delete(self) -> None:
+        if self.delete_error:
+            raise self.delete_error
         self.deleted = True
 
 
@@ -74,3 +77,21 @@ def test_enqueue_once_replaces_terminal_existing_job(monkeypatch):
 
     assert existing_job.deleted is True
     assert len(queue.enqueued) == 1
+
+
+def test_enqueue_once_ignores_stale_rq_execution_metadata(monkeypatch):
+    existing_job = FakeJob(
+        "failed",
+        delete_error=ValueError("Execution stale-execution-id not found in Redis"),
+    )
+    queue = FakeQueue(existing_job)
+    monkeypatch.setattr(job_queue, "get_queue", lambda _name=None: queue)
+
+    result = job_queue.enqueue_once(
+        "video_export_manual.process_video_export_job",
+        "job-recovered",
+        job_id="video-export-job-recovered",
+    )
+
+    assert result == queue.enqueued[0]
+    assert queue.enqueued[0]["kwargs"]["job_id"] == "video-export-job-recovered"
