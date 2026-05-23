@@ -318,7 +318,7 @@ export default function EmagramWidget({
         {hourSlider}
         <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
           {!siteId
-            ? 'Aucun site selectionne'
+            ? 'Aucun site sélectionné'
             : isLoadingHours
               ? 'Chargement des heures...'
               : hasHourlyData
