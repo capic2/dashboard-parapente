@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback, useDeferredValue } from 'react';
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
-import { useIsMobile } from '../hooks/useIsMobile';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, Input, TextField } from 'react-aria-components';
 import {
@@ -946,12 +945,7 @@ function GroupSection({
   isPending: boolean;
 }) {
   const { t } = useTranslation();
-  const isMobile = useIsMobile();
   const [sorting, setSorting] = useState<SortingState>([]);
-
-  const columnVisibility: Record<string, boolean> = isMobile
-    ? { ttl: false, size: false }
-    : {};
 
   const columns = useMemo(
     () => [
@@ -973,6 +967,7 @@ function GroupSection({
       }),
       columnHelper.accessor('ttl', {
         header: t('cache.ttl'),
+        meta: { className: 'hidden sm:table-cell' },
         cell: (info) => (
           <span className="text-xs text-gray-600 dark:text-gray-400">
             {formatTtl(info.getValue())}
@@ -981,6 +976,7 @@ function GroupSection({
       }),
       columnHelper.accessor('size', {
         header: t('cache.size'),
+        meta: { className: 'hidden sm:table-cell' },
         cell: (info) => (
           <span className="text-xs text-gray-600 dark:text-gray-400">
             {formatSize(info.getValue())}
@@ -1015,7 +1011,7 @@ function GroupSection({
   const table = useReactTable({
     data: group.keys,
     columns,
-    state: { sorting, columnVisibility },
+    state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
