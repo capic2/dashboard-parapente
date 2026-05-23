@@ -666,6 +666,7 @@
     "goproOverlayNeedsOutputFilename": "Enter the output file name",
     "goproOverlayStarted": "GoPro overlay generation started",
     "goproOverlayStartError": "Unable to start GoPro overlay",
+    "goproOverlayConfirmCancel": "Are you sure you want to cancel this overlay generation?",
     "goproOverlayCancelled": "GoPro overlay generation cancelled",
     "goproOverlayCancelError": "Unable to cancel GoPro overlay",
     "goproOverlayDownloadError": "Unable to download GoPro overlay",

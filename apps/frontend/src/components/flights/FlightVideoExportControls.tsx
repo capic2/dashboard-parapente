@@ -69,6 +69,9 @@ const hasActiveVideoExport = (
 const needsVideoExportRecovery = (status?: string | null) =>
   status === 'failed' || status === 'cancelled';
 
+const isCancelledVideoExport = (status?: string | null) =>
+  status === 'cancelled';
+
 const getHttpErrorDetail = async (error: HTTPError): Promise<string | null> => {
   try {
     const body = (await error.response.json()) as {
@@ -102,7 +105,6 @@ export function FlightVideoExportControls({
   buttonClassName = '',
   compact = false,
   showModeSelector = true,
-  showCancelAction = true,
 }: FlightVideoExportControlsProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -132,6 +134,9 @@ export function FlightVideoExportControls({
   );
   const canResumeVideoExport = Boolean(
     flight.video_export_job_id && exportStatus?.can_resume
+  );
+  const canResumeFailedVideoExport = Boolean(
+    flight.video_export_status === 'failed' && canResumeVideoExport
   );
 
   useEffect(() => {
@@ -181,10 +186,21 @@ export function FlightVideoExportControls({
   }, [flight.video_export_job_id, isStartingVideoExport, queryClient]);
 
   const handlePrimaryAction = async () => {
-    if (hasActiveVideoExport(flight)) return;
+    if (hasActiveVideoExport(flight)) {
+      await handleCancelVideoExport();
+      return;
+    }
+
+    if (
+      hasGeneratedVideo ||
+      isCancelledVideoExport(flight.video_export_status)
+    ) {
+      await handleRegenerateVideo();
+      return;
+    }
 
     try {
-      if (canResumeVideoExport) {
+      if (canResumeFailedVideoExport) {
         await resumeVideoExport();
       } else {
         await startVideoExport();
@@ -240,11 +256,15 @@ export function FlightVideoExportControls({
 
   const getPrimaryButtonTitle = () => {
     if (hasActiveVideoExport(flight)) {
-      return t('flights.viewer.videoGeneratingTitle');
+      return t('flights.viewer.cancelGenerationTitle');
+    }
+
+    if (isCancelledVideoExport(flight.video_export_status)) {
+      return t('flights.viewer.videoRegenerateTitle');
     }
 
     if (needsVideoExportRecovery(flight.video_export_status)) {
-      return canResumeVideoExport
+      return canResumeFailedVideoExport
         ? t('flights.viewer.videoResumeTitle')
         : t('flights.viewer.videoRegenerateTitle');
     }
@@ -263,11 +283,17 @@ export function FlightVideoExportControls({
   const primaryButtonLabel = (() => {
     if (hasActiveVideoExport(flight)) {
       return compact
-        ? t('flights.viewer.videoGeneratingShort')
-        : t('flights.viewer.videoGenerating');
+        ? t('flights.viewer.cancelGenerationShort')
+        : t('flights.viewer.cancelGeneration');
     }
+    if (isCancelledVideoExport(flight.video_export_status)) {
+      return compact
+        ? t('flights.viewer.regenerateVideoShort')
+        : t('flights.viewer.regenerateVideo');
+    }
+
     if (needsVideoExportRecovery(flight.video_export_status)) {
-      if (canResumeVideoExport) {
+      if (canResumeFailedVideoExport) {
         return compact
           ? t('flights.viewer.resumeVideoShort')
           : t('flights.viewer.resumeVideo');
@@ -295,7 +321,7 @@ export function FlightVideoExportControls({
     }
 
     if (needsVideoExportRecovery(flight.video_export_status)) {
-      return canResumeVideoExport ? Play : RotateCcw;
+      return canResumeFailedVideoExport ? Play : RotateCcw;
     }
 
     if (hasGeneratedVideo) {
@@ -382,24 +408,25 @@ export function FlightVideoExportControls({
           </div>
         )}
 
-      {!hasGeneratedVideo && (
-        <Button
-          onClick={handlePrimaryAction}
-          isDisabled={isStartingVideoExport || hasActiveVideoExport(flight)}
-          variant={
-            needsVideoExportRecovery(flight.video_export_status)
+      <Button
+        onClick={handlePrimaryAction}
+        isDisabled={isStartingVideoExport}
+        variant={
+          hasActiveVideoExport(flight)
+            ? 'danger'
+            : needsVideoExportRecovery(flight.video_export_status) ||
+                hasGeneratedVideo
               ? 'warning'
               : 'primary'
-          }
-          className={primaryButtonClassName}
-          title={getPrimaryButtonTitle()}
-        >
-          <PrimaryButtonIcon className="h-4 w-4" aria-hidden="true" />
-          {primaryButtonLabel}
-        </Button>
-      )}
+        }
+        className={primaryButtonClassName}
+        title={getPrimaryButtonTitle()}
+      >
+        <PrimaryButtonIcon className="h-4 w-4" aria-hidden="true" />
+        {primaryButtonLabel}
+      </Button>
 
-      {canResumeVideoExport && !isExportActive && (
+      {canResumeFailedVideoExport && !isExportActive && (
         <p
           className={`mt-2 text-xs text-blue-700 dark:text-blue-300 ${
             compact ? 'basis-full text-right' : ''
@@ -409,39 +436,6 @@ export function FlightVideoExportControls({
             count: exportStatus?.frames_captured ?? 0,
           })}
         </p>
-      )}
-
-      {showCancelAction && hasActiveVideoExport(flight) && (
-        <Button
-          onClick={handleCancelVideoExport}
-          variant="danger"
-          className={`mt-2 rounded-lg px-3 py-2 text-xs font-semibold ${
-            compact ? 'basis-full sm:w-auto' : 'w-full'
-          }`}
-          title={t('flights.viewer.cancelGenerationTitle')}
-        >
-          <Square className="h-3.5 w-3.5" aria-hidden="true" />
-          {compact
-            ? t('flights.viewer.cancelGenerationShort')
-            : t('flights.viewer.cancelGeneration')}
-        </Button>
-      )}
-
-      {hasGeneratedVideo && (
-        <Button
-          onClick={handleRegenerateVideo}
-          isDisabled={isStartingVideoExport}
-          variant="warning"
-          className={`mt-2 rounded-lg px-3 py-2 text-xs font-semibold ${
-            compact ? 'basis-full sm:w-auto' : 'w-full'
-          }`}
-          title={t('flights.viewer.regenerateTitle')}
-        >
-          <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-          {compact
-            ? t('flights.viewer.regenerateVideoShort')
-            : t('flights.viewer.regenerateVideo')}
-        </Button>
       )}
     </div>
   );
