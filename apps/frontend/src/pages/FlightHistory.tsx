@@ -18,7 +18,7 @@ import { StravaSyncModal } from '../components/flights/StravaSyncModal';
 import { CreateFlightModal } from '../components/flights/CreateFlightModal';
 import { CreateSiteModal } from '../components/flights/CreateSiteModal';
 import { FlightsTable } from '../components/flights/FlightsTable';
-import { FlightDetails } from '../components/flights/FlightDetails';
+import { FlightDetails } from '../components/flights/details/FlightDetails';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import {
   ToastContainer,
