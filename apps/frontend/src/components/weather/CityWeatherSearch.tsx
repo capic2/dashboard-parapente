@@ -5,6 +5,7 @@ import {
   useId,
   useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Input, Label, TextField } from 'react-aria-components';
 import { Button } from '@dashboard-parapente/design-system';
 import type {
@@ -48,10 +49,12 @@ function WeatherSummaryCard({
   weather?: BackendWeatherResponse | SpotWeatherResponse;
   isLoading: boolean;
 }) {
+  const { t } = useTranslation();
+
   if (isLoading) {
     return (
       <div className="rounded-xl border border-sky-100 bg-sky-50 p-4 text-sm text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100">
-        Chargement météo pour {title}...
+        {t('weather.search.loadingWeatherFor', { title })}
       </div>
     );
   }
@@ -65,7 +68,7 @@ function WeatherSummaryCard({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-            Météo sélectionnée
+            {t('weather.search.selectedWeather')}
           </p>
           <h3 className="text-lg font-bold text-gray-950 dark:text-white">
             {title}
@@ -73,7 +76,7 @@ function WeatherSummaryCard({
           <p className="text-sm text-gray-700 dark:text-gray-300">
             {weather.slots_summary ||
               weather.explanation ||
-              'Prévision disponible'}
+              t('weather.search.forecastAvailable')}
           </p>
         </div>
         <div className="rounded-lg bg-white px-4 py-3 text-center shadow-sm dark:bg-gray-900">
@@ -88,25 +91,33 @@ function WeatherSummaryCard({
 
       <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
         <div className="rounded-lg bg-white/80 p-3 dark:bg-gray-900/70">
-          <div className="text-gray-500 dark:text-gray-400">Verdict</div>
+          <div className="text-gray-500 dark:text-gray-400">
+            {t('weather.verdictLabel')}
+          </div>
           <div className="font-semibold text-gray-950 dark:text-white">
             {weather.verdict || 'N/A'}
           </div>
         </div>
         <div className="rounded-lg bg-white/80 p-3 dark:bg-gray-900/70">
-          <div className="text-gray-500 dark:text-gray-400">Vent moy.</div>
+          <div className="text-gray-500 dark:text-gray-400">
+            {t('weather.avgWindShort')}
+          </div>
           <div className="font-semibold text-gray-950 dark:text-white">
             {Math.round(metrics?.avg_wind_kmh ?? 0)} km/h
           </div>
         </div>
         <div className="rounded-lg bg-white/80 p-3 dark:bg-gray-900/70">
-          <div className="text-gray-500 dark:text-gray-400">Rafales</div>
+          <div className="text-gray-500 dark:text-gray-400">
+            {t('common.gusts')}
+          </div>
           <div className="font-semibold text-gray-950 dark:text-white">
             {Math.round(metrics?.max_gust_kmh ?? 0)} km/h
           </div>
         </div>
         <div className="rounded-lg bg-white/80 p-3 dark:bg-gray-900/70">
-          <div className="text-gray-500 dark:text-gray-400">Pluie</div>
+          <div className="text-gray-500 dark:text-gray-400">
+            {t('weather.rain')}
+          </div>
           <div className="font-semibold text-gray-950 dark:text-white">
             {(metrics?.total_rain_mm ?? 0).toFixed(1)} mm
           </div>
@@ -146,10 +157,13 @@ function OptionButton({
   );
 }
 
-function spotDescription(spot: ParaglidingSpotSearchResult) {
+function spotDescription(
+  spot: ParaglidingSpotSearchResult,
+  orientationLabel: string
+) {
   const parts = [`${spot.distance_km?.toFixed(1) ?? '?'} km`];
   if (spot.elevation_m) parts.push(`${spot.elevation_m} m`);
-  if (spot.orientation) parts.push(`Orientation ${spot.orientation}`);
+  if (spot.orientation) parts.push(`${orientationLabel} ${spot.orientation}`);
   return parts.join(' · ');
 }
 
@@ -177,6 +191,7 @@ export default function CityWeatherSearch({
   onSelectTarget,
   onFavoriteCreated,
 }: CityWeatherSearchProps) {
+  const { t } = useTranslation();
   const listboxId = useId();
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -270,11 +285,11 @@ export default function CityWeatherSearch({
     ? createdSpotIds.has(selectedSpot.id) ||
       favoriteSites.some(isSameFavoriteSite)
     : false;
-  let favoriteButtonLabel = 'Ajouter aux favoris';
+  let favoriteButtonLabel = t('weather.search.addToFavorites');
   if (isSelectedSpotFavorite) {
-    favoriteButtonLabel = 'Déjà dans les favoris';
+    favoriteButtonLabel = t('weather.search.alreadyFavorite');
   } else if (createSite.isPending) {
-    favoriteButtonLabel = 'Ajout...';
+    favoriteButtonLabel = t('weather.search.addingFavorite');
   }
 
   const handleCreateFavorite = async () => {
@@ -300,7 +315,7 @@ export default function CityWeatherSearch({
       setFavoriteError(
         error instanceof Error
           ? error.message
-          : "Impossible d'ajouter ce site aux favoris."
+          : t('weather.search.addFavoriteError')
       );
     }
   };
@@ -342,14 +357,14 @@ export default function CityWeatherSearch({
       >
         <div className="min-w-0">
           <p className="text-sm font-bold uppercase tracking-[0.16em] text-sky-700 dark:text-sky-300">
-            Recherche météo par ville
+            {t('weather.search.title')}
           </p>
           <h2 className="mt-1 text-base font-bold tracking-tight text-gray-950 dark:text-white sm:text-lg">
-            Choisir une ville, un déco ou un atterro proche
+            {t('weather.search.heading')}
           </h2>
           {activeTargetLabel && (
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-              Détail météo affiché pour {activeTargetLabel}
+              {t('weather.search.activeDetail', { target: activeTargetLabel })}
             </p>
           )}
         </div>
@@ -357,7 +372,7 @@ export default function CityWeatherSearch({
           onPress={() => setIsExpanded((expanded) => !expanded)}
           className="shrink-0 cursor-pointer rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-sky-300 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:text-slate-200 dark:hover:border-sky-700 dark:hover:bg-sky-950/30 sm:hidden"
         >
-          {isExpanded ? 'Masquer' : 'Ouvrir'}
+          {isExpanded ? t('common.hide') : t('common.open')}
         </Button>
       </div>
 
@@ -365,7 +380,7 @@ export default function CityWeatherSearch({
         <div className="grid gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-950/40 lg:grid-cols-[1fr_auto_auto] lg:items-end">
           <TextField className="relative flex flex-col gap-1">
             <Label className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-              Ville
+              {t('weather.search.city')}
             </Label>
             <Input
               value={query}
@@ -395,7 +410,7 @@ export default function CityWeatherSearch({
               aria-autocomplete="list"
               aria-controls={listboxId}
               aria-activedescendant={activeSuggestionId}
-              placeholder="Ex: Besançon, Annecy, Grenoble..."
+              placeholder={t('weather.search.cityPlaceholder')}
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-950 outline-none transition-colors placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
             />
             {isSuggestionsOpen && (
@@ -407,7 +422,7 @@ export default function CityWeatherSearch({
               >
                 {locationSearch.isLoading ? (
                   <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
-                    Recherche des villes...
+                    {t('weather.search.loadingCities')}
                   </div>
                 ) : suggestions.length ? (
                   suggestions.map((location, index) => (
@@ -436,7 +451,7 @@ export default function CityWeatherSearch({
                   ))
                 ) : (
                   <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
-                    Aucune ville trouvée.
+                    {t('weather.search.noCityFound')}
                   </div>
                 )}
               </div>
@@ -444,7 +459,7 @@ export default function CityWeatherSearch({
           </TextField>
 
           <label className="flex flex-col gap-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
-            Rayon
+            {t('weather.search.radius')}
             <select
               value={radiusKm}
               onChange={(event) => setRadiusKm(Number(event.target.value))}
@@ -459,7 +474,7 @@ export default function CityWeatherSearch({
           </label>
 
           <label className="flex flex-col gap-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
-            Résultats
+            {t('weather.search.results')}
             <select
               value={limit}
               onChange={(event) => setLimit(Number(event.target.value))}
@@ -489,7 +504,7 @@ export default function CityWeatherSearch({
                 onPress={() => handleSelectLocation(selectedLocation)}
                 className="cursor-pointer rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
               >
-                Météo ville
+                {t('weather.search.cityWeather')}
               </Button>
             </div>
 
@@ -498,20 +513,20 @@ export default function CityWeatherSearch({
                 className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
                 role="alert"
               >
-                Impossible de charger les décollages et atterrissages proches.
+                {t('weather.search.nearbyLoadError')}
               </div>
             ) : nearbyOptions.isLoading ? (
               <div
                 className="rounded-xl border border-gray-200 p-4 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300"
                 aria-live="polite"
               >
-                Recherche des décollages et atterrissages proches...
+                {t('weather.search.loadingNearby')}
               </div>
             ) : (
               <div className="grid gap-4 lg:grid-cols-2">
                 <div>
                   <h3 className="mb-2 font-semibold text-gray-950 dark:text-white">
-                    Décollages proches
+                    {t('weather.search.nearbyTakeoffs')}
                   </h3>
                   <div className="grid gap-2">
                     {nearbyOptions.data?.takeoffs.length ? (
@@ -519,7 +534,10 @@ export default function CityWeatherSearch({
                         <OptionButton
                           key={spot.id}
                           label={spot.name}
-                          description={spotDescription(spot)}
+                          description={spotDescription(
+                            spot,
+                            t('sites.orientation')
+                          )}
                           isSelected={
                             selectedOption?.type === 'takeoff' &&
                             selectedOption.spot.id === spot.id
@@ -529,7 +547,7 @@ export default function CityWeatherSearch({
                       ))
                     ) : (
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Aucun décollage dans ce rayon.
+                        {t('weather.search.noTakeoffInRadius')}
                       </p>
                     )}
                   </div>
@@ -537,7 +555,7 @@ export default function CityWeatherSearch({
 
                 <div>
                   <h3 className="mb-2 font-semibold text-gray-950 dark:text-white">
-                    Atterrissages proches
+                    {t('weather.search.nearbyLandings')}
                   </h3>
                   <div className="grid gap-2">
                     {nearbyOptions.data?.landings.length ? (
@@ -545,7 +563,10 @@ export default function CityWeatherSearch({
                         <OptionButton
                           key={spot.id}
                           label={spot.name}
-                          description={spotDescription(spot)}
+                          description={spotDescription(
+                            spot,
+                            t('sites.orientation')
+                          )}
                           isSelected={
                             selectedOption?.type === 'landing' &&
                             selectedOption.spot.id === spot.id
@@ -555,7 +576,7 @@ export default function CityWeatherSearch({
                       ))
                     ) : (
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Aucun atterrissage dans ce rayon.
+                        {t('weather.search.noLandingInRadius')}
                       </p>
                     )}
                   </div>
@@ -568,7 +589,7 @@ export default function CityWeatherSearch({
                 className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
                 role="alert"
               >
-                Impossible de charger la météo pour {weatherTitle}.
+                {t('weather.search.weatherLoadError', { title: weatherTitle })}
               </div>
             ) : weatherTitle ? (
               <div className="space-y-3">
@@ -581,8 +602,7 @@ export default function CityWeatherSearch({
                   <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-sm text-gray-600 dark:text-gray-300">
-                        Enregistrer ce site dans vos favoris météo pour le
-                        retrouver directement dans la page.
+                        {t('weather.search.saveFavoriteHelp')}
                       </p>
                       <Button
                         onPress={() => void handleCreateFavorite()}
