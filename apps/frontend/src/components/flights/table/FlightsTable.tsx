@@ -5,7 +5,7 @@ import type { Selection } from 'react-aria-components';
 import { DataList } from '@dashboard-parapente/design-system';
 import { Flight, type DownloadingMedia } from './Flight';
 import { useFlightsTable, FLIGHT_SORTABLE_COLUMNS } from './useFlightsTable';
-import type { Flight as FlightRecord } from '../../types';
+import type { Flight as FlightRecord } from '../../../types';
 
 interface FlightsTableProps {
   flights: FlightRecord[];

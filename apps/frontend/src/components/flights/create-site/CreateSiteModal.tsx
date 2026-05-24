@@ -3,9 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { Label, Input, TextField } from 'react-aria-components';
 import { Button } from '@dashboard-parapente/design-system';
 import { Modal } from '@dashboard-parapente/design-system';
-import { useCreateSite, useGeocode } from '../../hooks/sites/useSites';
-import { useFlightGPX } from '../../hooks/flights/useFlightGPX';
-import type { Site } from '../../types';
+import { useCreateSite, useGeocode } from '../../../hooks/sites/useSites';
+import { useFlightGPX } from '../../../hooks/flights/useFlightGPX';
+import type { Site } from '../../../types';
 
 interface CreateSiteModalProps {
   isOpen: boolean;

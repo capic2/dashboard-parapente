@@ -17,10 +17,10 @@ import {
   VIDEO_EXPORT_IN_PROGRESS_STATUSES,
   type Flight,
 } from '@dashboard-parapente/shared-types';
-import { useVideoExportStatus } from '../../hooks/flights/useVideoExportStatus';
-import { useFlight } from '../../hooks/flights/useFlight';
-import { useToast } from '../../hooks/useToast';
-import { api } from '../../lib/api';
+import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
+import { useFlight } from '../../../hooks/flights/useFlight';
+import { useToast } from '../../../hooks/useToast';
+import { api } from '../../../lib/api';
 
 type VideoExportMode = 'manual_fast' | 'manual';
 

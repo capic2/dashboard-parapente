@@ -221,7 +221,7 @@ vi.mock('react-i18next', () => ({
   withTranslation: () => (Component: unknown) => Component,
 }));
 
-vi.mock('../../hooks/flights/useFlightGPX', () => ({
+vi.mock('../../../hooks/flights/useFlightGPX', () => ({
   useFlightGPX: () => ({
     data: {
       coordinates: [
@@ -235,13 +235,13 @@ vi.mock('../../hooks/flights/useFlightGPX', () => ({
   }),
 }));
 
-vi.mock('../../hooks/flights/useFlight', () => ({
+vi.mock('../../../hooks/flights/useFlight', () => ({
   useFlight: () => ({
     data: mockFlight,
   }),
 }));
 
-vi.mock('../../lib/api', () => ({
+vi.mock('../../../lib/api', () => ({
   api: {},
 }));
 
@@ -249,7 +249,7 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries }),
 }));
 
-vi.mock('../../hooks/useToast', () => ({
+vi.mock('../../../hooks/useToast', () => ({
   useToast: () => ({ error: vi.fn(), success: vi.fn() }),
 }));
 

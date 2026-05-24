@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Modal, Button } from '@dashboard-parapente/design-system';
-import { useCreateFlightFromGPX } from '../../hooks/flights/useFlights';
-import { useToast } from '../../hooks/useToast';
+import { useCreateFlightFromGPX } from '../../../hooks/flights/useFlights';
+import { useToast } from '../../../hooks/useToast';
 
 interface CreateFlightModalProps {
   isOpen: boolean;

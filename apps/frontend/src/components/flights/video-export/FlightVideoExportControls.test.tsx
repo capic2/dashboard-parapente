@@ -58,15 +58,15 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-vi.mock('../../hooks/flights/useFlight', () => ({
+vi.mock('../../../hooks/flights/useFlight', () => ({
   useFlight: () => ({ data: mockFlight }),
 }));
 
-vi.mock('../../hooks/flights/useVideoExportStatus', () => ({
+vi.mock('../../../hooks/flights/useVideoExportStatus', () => ({
   useVideoExportStatus: () => ({ status: exportStatusMock.current }),
 }));
 
-vi.mock('../../lib/api', () => ({
+vi.mock('../../../lib/api', () => ({
   api: {
     delete: apiDelete,
     post: apiPost,
@@ -77,7 +77,7 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
-vi.mock('../../hooks/useToast', () => ({
+vi.mock('../../../hooks/useToast', () => ({
   useToast: () => ({ error: vi.fn(), success: vi.fn() }),
 }));
 

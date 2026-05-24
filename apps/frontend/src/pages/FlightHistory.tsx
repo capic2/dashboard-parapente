@@ -14,10 +14,10 @@ import {
   X,
   RefreshCw,
 } from 'lucide-react';
-import { StravaSyncModal } from '../components/flights/StravaSyncModal';
-import { CreateFlightModal } from '../components/flights/CreateFlightModal';
-import { CreateSiteModal } from '../components/flights/CreateSiteModal';
-import { FlightsTable } from '../components/flights/FlightsTable';
+import { StravaSyncModal } from '../components/flights/strava-sync/StravaSyncModal';
+import { CreateFlightModal } from '../components/flights/create-flight/CreateFlightModal';
+import { CreateSiteModal } from '../components/flights/create-site/CreateSiteModal';
+import { FlightsTable } from '../components/flights/table/FlightsTable';
 import { FlightDetails } from '../components/flights/details/FlightDetails';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import {

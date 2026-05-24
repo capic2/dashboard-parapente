@@ -1,9 +1,9 @@
-import preview from '../../../.storybook/preview';
+import preview from '../../../../.storybook/preview';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { useState } from 'react';
 import type { RowSelectionState } from '@tanstack/react-table';
 import { FlightsTable } from './FlightsTable';
-import type { Flight } from '../../types';
+import type { Flight } from '../../../types';
 
 const mockFlights: Flight[] = [
   {

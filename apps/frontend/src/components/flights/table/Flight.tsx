@@ -14,12 +14,12 @@ import {
   Wand2,
 } from 'lucide-react';
 import { formatMediaProgressLabel } from './mediaProgress';
-import type { Flight as FlightRecord } from '../../types';
+import type { Flight as FlightRecord } from '../../../types';
 import {
   formatAltitudeMeters,
   formatDistanceKm,
   useAppSettingsStore,
-} from '../../stores/appSettingsStore';
+} from '../../../stores/appSettingsStore';
 
 export interface DownloadingMedia {
   flightId: string;

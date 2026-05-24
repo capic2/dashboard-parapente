@@ -133,7 +133,7 @@ vi.mock('../../../stores/appSettingsStore', () => ({
   }),
 }));
 
-vi.mock('../FlightVideoExportControls', () => ({
+vi.mock('../video-export/FlightVideoExportControls', () => ({
   FlightVideoExportControls: () => <button type="button">Video action</button>,
 }));
 

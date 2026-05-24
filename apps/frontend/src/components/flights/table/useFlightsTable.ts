@@ -9,7 +9,7 @@ import {
   type RowSelectionState,
   type OnChangeFn,
 } from '@tanstack/react-table';
-import type { Flight } from '../../types';
+import type { Flight } from '../../../types';
 
 const columnHelper = createColumnHelper<Flight>();
 
