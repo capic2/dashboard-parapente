@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
@@ -161,9 +161,14 @@ export default function WeatherPage() {
   const selectedSearchTarget = getTargetFromSearch(search);
   const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
   const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(selectedDayIndex);
-  const [selectionTab, setSelectionTab] = useState<WeatherSelectionTab>(
-    selectedSearchTarget ? 'search' : 'favorites'
-  );
+  const routeSelectionTab: WeatherSelectionTab = selectedSearchTarget
+    ? 'search'
+    : 'favorites';
+  const [selectionTab, setSelectionTab] =
+    useState<WeatherSelectionTab>(routeSelectionTab);
+  useEffect(() => {
+    setSelectionTab(routeSelectionTab);
+  }, [routeSelectionTab]);
   const favoriteSites = useMemo(() => {
     if (favoriteSiteIds.length === 0) return sites;
 
