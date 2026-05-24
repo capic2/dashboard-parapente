@@ -30,7 +30,7 @@ import {
   useStravaTokenLogs,
   useStravaRefreshToken,
 } from '../hooks/admin/useStravaToken';
-import { VideoExportJobsPanel } from '../components/flights/VideoExportJobsPanel';
+import { VideoExportJobsPanel } from '../components/flights/video-export/VideoExportJobsPanel';
 import { useToastStore } from '../hooks/useToast';
 import {
   normalizeInfrastructureTab,

@@ -23,7 +23,7 @@ import { useToast } from '../../../hooks/useToast';
 import { api, getApiErrorMessage } from '../../../lib/api';
 import type { Flight, FlightFormData, Site } from '../../../types';
 import { FlightEditForm } from '../edit/FlightEditForm';
-import { formatMediaProgressLabel } from '../mediaProgress';
+import { formatMediaProgressLabel } from '../table/mediaProgress';
 import type { DownloadableFlightMedia } from './FlightDetails.types';
 import { FlightMediaBadges } from './FlightMediaBadges';
 import { FlightMediaExportActions } from './FlightMediaExportActions';

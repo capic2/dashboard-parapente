@@ -2,7 +2,7 @@ import { useEffect, lazy, Suspense } from 'react';
 import { useSearch } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 const FlightViewer3D = lazy(() =>
-  import('../components/flights/FlightViewer3D').then((m) => ({
+  import('../components/flights/viewer/FlightViewer3D').then((m) => ({
     default: m.FlightViewer3D,
   }))
 );

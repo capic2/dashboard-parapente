@@ -22,7 +22,8 @@ describe('flightViewerTelemetry', () => {
 
   it('reads units from local storage adapter', () => {
     const storage = {
-      getItem: () => JSON.stringify({ units: { altitude: 'ft', speed: 'mph' } }),
+      getItem: () =>
+        JSON.stringify({ units: { altitude: 'ft', speed: 'mph' } }),
     };
 
     expect(getViewerUnitsFromStorage(storage)).toEqual({

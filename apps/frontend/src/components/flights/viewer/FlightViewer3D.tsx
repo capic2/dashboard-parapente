@@ -28,22 +28,22 @@ import {
   VerticalOrigin,
   Viewer as CesiumViewer,
 } from 'cesium';
-import { useFlightGPX } from '../../hooks/flights/useFlightGPX';
-import { useFlight } from '../../hooks/flights/useFlight';
+import { useFlightGPX } from '../../../hooks/flights/useFlightGPX';
+import { useFlight } from '../../../hooks/flights/useFlight';
 import {
   getHeadingFromOrientation,
   getOrientationLabel,
   getOrientationOptions,
-} from '../../utils/cameraOrientation';
+} from '../../../utils/cameraOrientation';
 import {
   DEFAULT_CAMERA_CLOSE_ZOOM_PERCENT,
   DEFAULT_CAMERA_TRANSITION_PERCENT,
   getFlightCameraDistance,
-} from '../../utils/cameraDistanceProfile';
-import { getExportFrameTarget } from '../../utils/videoExportFrame';
-import { api } from '../../lib/api';
+} from '../../../utils/cameraDistanceProfile';
+import { getExportFrameTarget } from '../../../utils/videoExportFrame';
+import { api } from '../../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
-import { useToast } from '../../hooks/useToast';
+import { useToast } from '../../../hooks/useToast';
 import { Button } from '@dashboard-parapente/design-system';
 import { Disclosure, DisclosurePanel } from 'react-aria-components';
 import { useTranslation } from 'react-i18next';
@@ -54,7 +54,7 @@ import {
   computeCursorTelemetryLabel,
   type ViewerUnits,
 } from './flightViewerTelemetry';
-import { useAppSettingsStore } from '../../stores/appSettingsStore';
+import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 
 declare global {
   interface Window {

@@ -1,5 +1,5 @@
-import { FigureWrapper } from '../../../.storybook/FigureWrapper.tsx';
-import preview from '../../../.storybook/preview.tsx';
+import { FigureWrapper } from '../../../../.storybook/FigureWrapper.tsx';
+import preview from '../../../../.storybook/preview.tsx';
 import { FlightModal } from './CreateFlightModal.stories.tsx';
 
 const meta = preview.meta({

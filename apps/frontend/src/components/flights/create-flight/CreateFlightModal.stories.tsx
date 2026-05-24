@@ -1,4 +1,4 @@
-import preview from '../../../.storybook/preview';
+import preview from '../../../../.storybook/preview';
 import { expect, userEvent, waitFor, screen } from 'storybook/test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse, delay } from 'msw';

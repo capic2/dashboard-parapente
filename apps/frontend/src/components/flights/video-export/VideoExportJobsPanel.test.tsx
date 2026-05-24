@@ -100,14 +100,14 @@ vi.mock('react-i18next', () => ({
   withTranslation: () => (Component: React.ComponentType) => Component,
 }));
 
-vi.mock('../../hooks/useToast', () => ({
+vi.mock('../../../hooks/useToast', () => ({
   useToast: () => ({
     error: toastError,
     success: toastSuccess,
   }),
 }));
 
-vi.mock('../../hooks/flights/useVideoExportJobs', () => ({
+vi.mock('../../../hooks/flights/useVideoExportJobs', () => ({
   useVideoExportJobs: () => ({
     data: jobs,
     isLoading: false,
