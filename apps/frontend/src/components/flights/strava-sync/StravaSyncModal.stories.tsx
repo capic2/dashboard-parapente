@@ -1,4 +1,4 @@
-import preview from '../../../.storybook/preview';
+import preview from '../../../../.storybook/preview';
 import { fn } from 'storybook/test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
@@ -32,8 +32,6 @@ const meta = preview.meta({
   },
   tags: ['autodocs'],
 });
-
-
 
 // Mock sync results
 const mockSyncResult = {

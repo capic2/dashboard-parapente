@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, DatePicker, Button } from '@dashboard-parapente/design-system';
-import { useStravaSyncMutation } from '../../hooks/flights/useFlights';
-import { useToast } from '../../hooks/useToast';
+import { useStravaSyncMutation } from '../../../hooks/flights/useFlights';
+import { useToast } from '../../../hooks/useToast';
 
 interface StravaSyncModalProps {
   isOpen: boolean;

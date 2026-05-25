@@ -77,6 +77,8 @@ Use `gh` for all GitHub interactions: issues, PRs, checks, releases, comments, A
 
 Before creating or updating a PR, check branch status, review commits and diff against the base branch, run impacted checks, and fix failures.
 
+Run the `coderabbit-cli` skill at the end of implementation, after relevant validation and before marking the work ready to ship, unless the user explicitly skips it. Do not defer CodeRabbit to the push step.
+
 For CodeRabbit comments, delegate discovery and triage to a subagent. It should inspect only relevant PR conversations through `gh` and return requested changes, affected files/lines, priority, and conversations to reply to or close. When fixed, reply to each resolved conversation and close it.
 
 ## Git

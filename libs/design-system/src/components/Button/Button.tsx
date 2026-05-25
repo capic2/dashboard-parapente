@@ -58,6 +58,7 @@ export interface ButtonProps extends AriaButtonProps {
     | 'outline';
   size?: 'sm' | 'md' | 'lg' | 'icon';
   fullWidth?: boolean;
+  initialFocus?: boolean;
   className?: string;
   isDisabled?: boolean;
   title?: string;
@@ -68,6 +69,7 @@ export function Button({
   variant,
   size,
   fullWidth,
+  initialFocus,
   isDisabled,
   ...props
 }: ButtonProps) {
@@ -76,6 +78,7 @@ export function Button({
   return (
     <AriaButton
       {...props}
+      {...(initialFocus ? { autoFocus: true } : {})}
       type={type}
       isDisabled={isDisabled}
       className={twMerge(

@@ -114,6 +114,147 @@ class TestEmagramEndpoints:
         assert data["station_code"] == "site-arguel"
         assert data["score_volabilite"] == 72
 
+    def test_get_emagram_screenshot_regenerates_missing_file(self, client, db_session, tmp_path):
+        """Missing screenshot files are regenerated instead of returning 404"""
+        from models import EmagramAnalysis
+
+        missing_file = tmp_path / "missing.png"
+        regenerated_file = tmp_path / "regenerated.png"
+
+        site = Site(
+            id="site-arguel",
+            code="ARG",
+            name="Arguel",
+            latitude=47.2,
+            longitude=6.0,
+            elevation_m=427,
+        )
+        db_session.add(site)
+
+        analysis = EmagramAnalysis(
+            id="screenshot-analysis",
+            station_code="site-arguel",
+            station_name="Arguel",
+            station_latitude=47.2,
+            station_longitude=6.0,
+            analysis_date=datetime.utcnow().date(),
+            analysis_time=datetime.utcnow().time(),
+            analysis_datetime=datetime.utcnow(),
+            forecast_date=datetime.utcnow().date(),
+            forecast_hour=12,
+            distance_km=0.0,
+            data_source="multi-source-vision",
+            sounding_time="12Z",
+            analysis_method="llm_vision",
+            analysis_status="completed",
+            screenshot_paths=json.dumps({"meteo-parapente": str(missing_file)}),
+        )
+        db_session.add(analysis)
+        db_session.commit()
+
+        async def _regenerate(*args, **kwargs):
+            regenerated_file.write_bytes(b"png")
+            return {
+                "success": True,
+                "source": "meteo-parapente",
+                "image_path": str(regenerated_file),
+                "external_url": "https://example.test",
+                "timestamp": datetime.now().isoformat(),
+            }
+
+        with patch("scrapers.emagram_screenshots.screenshot_meteo_parapente", new=_regenerate):
+            response = client.get("/api/emagram/screenshot/screenshot-analysis/meteo-parapente")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content == b"png"
+
+        refreshed = db_session.get(EmagramAnalysis, "screenshot-analysis")
+        assert refreshed is not None
+        assert json.loads(refreshed.screenshot_paths)["meteo-parapente"] == str(regenerated_file)
+        assert regenerated_file.exists()
+        assert not missing_file.exists()
+
+    def test_get_emagram_screenshot_does_not_store_missing_regenerated_file(
+        self, client, db_session, tmp_path
+    ):
+        """Regeneration results must point to an existing file before DB update."""
+        missing_file = tmp_path / "missing.png"
+        regenerated_file = tmp_path / "not-written.png"
+        original_paths = json.dumps({"meteo-parapente": str(missing_file)})
+        analysis = EmagramAnalysis(
+            id="screenshot-missing-regenerated",
+            station_code="site-arguel",
+            station_name="Arguel",
+            station_latitude=47.2,
+            station_longitude=6.0,
+            analysis_date=datetime.utcnow().date(),
+            analysis_time=datetime.utcnow().time(),
+            analysis_datetime=datetime.utcnow(),
+            forecast_date=datetime.utcnow().date(),
+            forecast_hour=12,
+            distance_km=0.0,
+            data_source="multi-source-vision",
+            sounding_time="12Z",
+            analysis_method="llm_vision",
+            analysis_status="completed",
+            screenshot_paths=original_paths,
+        )
+        db_session.add(analysis)
+        db_session.commit()
+
+        async def _regenerate(*args, **kwargs):
+            return {
+                "success": True,
+                "source": "meteo-parapente",
+                "image_path": str(regenerated_file),
+            }
+
+        with patch("scrapers.emagram_screenshots.screenshot_meteo_parapente", new=_regenerate):
+            response = client.get(
+                "/api/emagram/screenshot/screenshot-missing-regenerated/meteo-parapente"
+            )
+
+        assert response.status_code == 404
+        refreshed = db_session.get(EmagramAnalysis, "screenshot-missing-regenerated")
+        assert refreshed is not None
+        assert refreshed.screenshot_paths == original_paths
+
+    def test_get_emagram_screenshot_does_not_regenerate_past_forecast(
+        self, client, db_session, tmp_path
+    ):
+        """Past forecasts should not trigger invalid screenshot regeneration calls."""
+        missing_file = tmp_path / "missing.png"
+        analysis = EmagramAnalysis(
+            id="screenshot-past-forecast",
+            station_code="site-arguel",
+            station_name="Arguel",
+            station_latitude=47.2,
+            station_longitude=6.0,
+            analysis_date=datetime.utcnow().date(),
+            analysis_time=datetime.utcnow().time(),
+            analysis_datetime=datetime.utcnow(),
+            forecast_date=(datetime.utcnow() - timedelta(days=1)).date(),
+            forecast_hour=12,
+            distance_km=0.0,
+            data_source="multi-source-vision",
+            sounding_time="12Z",
+            analysis_method="llm_vision",
+            analysis_status="completed",
+            screenshot_paths=json.dumps({"meteo-parapente": str(missing_file)}),
+        )
+        db_session.add(analysis)
+        db_session.commit()
+
+        regenerate = AsyncMock()
+        with patch("scrapers.emagram_screenshots.screenshot_meteo_parapente", regenerate):
+            response = client.get(
+                "/api/emagram/screenshot/screenshot-past-forecast/meteo-parapente"
+            )
+
+        assert response.status_code == 404
+        regenerate.assert_not_called()
+
     def test_get_latest_with_site_id_not_found(self, client, db_session):
         """Get latest emagram with non-existent site_id returns 404"""
         response = client.get("/api/emagram/latest?site_id=nonexistent")

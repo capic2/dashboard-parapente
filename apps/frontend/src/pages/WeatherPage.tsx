@@ -20,7 +20,6 @@ import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { useIsMobile } from '../hooks/useIsMobile';
 import WeatherEmptyState from '../components/weather/WeatherEmptyState';
 import WeatherLiveWindPanel from '../components/weather/WeatherLiveWindPanel';
-import WeatherPageHero from '../components/weather/WeatherPageHero';
 import WeatherSearchResultPanel from '../components/weather/WeatherSearchResultPanel';
 import WeatherSelectionPanel, {
   type WeatherSelectionTab,
@@ -278,7 +277,6 @@ export default function WeatherPage() {
 
   const selectionPanel = (
     <WeatherSelectionPanel
-      activeWeatherName={activeWeatherName}
       selectionTab={selectionTab}
       sites={sites}
       selectedSearchTarget={selectedSearchTarget}
@@ -398,13 +396,6 @@ export default function WeatherPage() {
       </aside>
 
       <div className="min-w-0 space-y-4">
-        <WeatherPageHero
-          activeWeatherName={activeWeatherName}
-          selectedDayLabel={selectedDayLabel}
-          sourceLabel={sourceLabel}
-          isSearchMode={Boolean(selectedSearchTarget)}
-        />
-
         {!selectedSearchTarget && !selectedSiteId && <WeatherEmptyState />}
 
         {selectedSearchTarget && (

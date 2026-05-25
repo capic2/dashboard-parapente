@@ -21,9 +21,14 @@ import {
 } from '../../../hooks/gopro/useGoproOverlay';
 import { useToast } from '../../../hooks/useToast';
 import { api, getApiErrorMessage } from '../../../lib/api';
+import {
+  hasFlightGoproOverlay,
+  hasFlightVideo,
+  isGoproOverlayInProgress,
+} from '../../../lib/flightMediaState';
 import type { Flight, FlightFormData, Site } from '../../../types';
 import { FlightEditForm } from '../edit/FlightEditForm';
-import { formatMediaProgressLabel } from '../mediaProgress';
+import { formatMediaProgressLabel } from '../table/mediaProgress';
 import type { DownloadableFlightMedia } from './FlightDetails.types';
 import { FlightMediaBadges } from './FlightMediaBadges';
 import { FlightMediaExportActions } from './FlightMediaExportActions';
@@ -76,13 +81,9 @@ export function FlightDetails({
     useState<DownloadableFlightMedia | null>(null);
 
   const hasGpx = Boolean(flight.gpx_file_path);
-  const hasVideo = Boolean(
-    flight.video_file_path && flight.video_file_exists === true
-  );
+  const hasVideo = hasFlightVideo(flight);
   const hasGoproCameraVideo = flight.gopro_camera_file_exists === true;
-  const hasPersistedGoproOverlay = Boolean(
-    flight.gopro_overlay_file_path && flight.gopro_overlay_file_exists !== false
-  );
+  const hasPersistedGoproOverlay = hasFlightGoproOverlay(flight);
   const effectiveGoproOverlayJobId =
     goproOverlayJobId ?? flight.gopro_overlay_job_id ?? null;
   const { job: streamedGoproOverlayJob } = useGoproOverlayJobStream(
@@ -92,8 +93,7 @@ export function FlightDetails({
   const goproOverlayJob = streamedGoproOverlayJob ?? createGoproOverlayJob.data;
   const goproOverlayStatus =
     goproOverlayJob?.status ?? flight.gopro_overlay_status ?? null;
-  const isGoproOverlayRunning =
-    goproOverlayStatus === 'queued' || goproOverlayStatus === 'running';
+  const isGoproOverlayRunning = isGoproOverlayInProgress(goproOverlayStatus);
   const isVideoExportRunning = Boolean(
     flight.video_export_status &&
     VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.video_export_status)

@@ -75,6 +75,7 @@ _FFMPEG_STALL_TIMEOUT_SECONDS = 10 * 60
 _ORPHAN_TEMP_CLEANUP_GRACE_SECONDS = 30
 _EXPORT_FRAME_TERRAIN_TIMEOUT_SECONDS = 10.0
 _EXPORT_FRAME_TERRAIN_POLL_SECONDS = 0.1
+_EXPORT_FRAME_TERRAIN_EVALUATE_TIMEOUT_SECONDS = 2.0
 
 _EXPORT_VIEWER_STATE_SCRIPT = """
     () => {
@@ -935,30 +936,44 @@ async def _wait_for_export_frame_terrain(
     page: Any,
     timeout_seconds: float = _EXPORT_FRAME_TERRAIN_TIMEOUT_SECONDS,
     poll_seconds: float = _EXPORT_FRAME_TERRAIN_POLL_SECONDS,
+    evaluate_timeout_seconds: float = _EXPORT_FRAME_TERRAIN_EVALUATE_TIMEOUT_SECONDS,
 ) -> bool:
     deadline = time.monotonic() + timeout_seconds
 
     while True:
-        tiles_loaded = await page.evaluate("""
-            () => {
-                const viewer = window._cesiumViewer;
-                const scene = viewer?.scene;
-                const globe = scene?.globe;
+        remaining_seconds = deadline - time.monotonic()
+        evaluate_timeout = evaluate_timeout_seconds
+        if timeout_seconds <= 0:
+            evaluate_timeout = min(evaluate_timeout, 0.1)
+        else:
+            evaluate_timeout = min(evaluate_timeout, max(remaining_seconds, 0.001))
 
-                if (!viewer || !scene || !globe) {
-                    return false;
-                }
+        try:
+            tiles_loaded = await asyncio.wait_for(
+                page.evaluate("""
+                    () => {
+                        const viewer = window._cesiumViewer;
+                        const scene = viewer?.scene;
+                        const globe = scene?.globe;
 
-                try {
-                    scene.requestRender?.();
-                    viewer.render?.();
-                } catch {
-                    return false;
-                }
+                        if (!viewer || !scene || !globe) {
+                            return false;
+                        }
 
-                return Boolean(globe.tilesLoaded);
-            }
-        """)
+                        try {
+                            scene.requestRender?.();
+                            viewer.render?.();
+                        } catch {
+                            return false;
+                        }
+
+                        return Boolean(globe.tilesLoaded);
+                    }
+                """),
+                timeout=evaluate_timeout,
+            )
+        except TimeoutError:
+            return False
 
         if tiles_loaded:
             return True

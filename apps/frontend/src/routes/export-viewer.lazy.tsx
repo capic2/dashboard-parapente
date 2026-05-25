@@ -2,7 +2,7 @@ import { createLazyFileRoute } from '@tanstack/react-router';
 import { lazy, Suspense } from 'react';
 
 const FlightViewer3D = lazy(() =>
-  import('../components/flights/FlightViewer3D').then((m) => ({
+  import('../components/flights/viewer/FlightViewer3D').then((m) => ({
     default: m.FlightViewer3D,
   }))
 );

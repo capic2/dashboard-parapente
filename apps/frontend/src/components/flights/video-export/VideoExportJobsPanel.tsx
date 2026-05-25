@@ -15,9 +15,9 @@ import {
   useDeleteVideoExportJobRow,
   useResumeVideoExportJob,
   useVideoExportJobs,
-} from '../../hooks/flights/useVideoExportJobs';
-import { api } from '../../lib/api';
-import { useToast } from '../../hooks/useToast';
+} from '../../../hooks/flights/useVideoExportJobs';
+import { api } from '../../../lib/api';
+import { useToast } from '../../../hooks/useToast';
 
 const statusLabelFallbacks: Record<string, string> = {
   queued: 'En attente',
@@ -896,6 +896,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
             </p>
             <div className="flex justify-end gap-3">
               <Button
+                initialFocus
                 variant="secondary"
                 onPress={() => setPendingConfirm(null)}
               >

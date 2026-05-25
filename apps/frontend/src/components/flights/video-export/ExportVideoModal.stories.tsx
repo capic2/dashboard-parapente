@@ -1,4 +1,4 @@
-import preview from '../../../.storybook/preview';
+import preview from '../../../../.storybook/preview';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fn } from 'storybook/test';
 import { ExportVideoModal } from './ExportVideoModal';
@@ -31,8 +31,6 @@ const meta = preview.meta({
   },
   tags: ['autodocs'],
 });
-
-
 
 export const Closed = meta.story({
   name: 'Closed',

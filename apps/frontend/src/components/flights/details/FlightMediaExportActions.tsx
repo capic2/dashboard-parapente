@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
 import { Layers, Video, Wand2 } from 'lucide-react';
 import type { Flight } from '../../../types';
-import { FlightVideoExportControls } from '../FlightVideoExportControls';
+import { FlightVideoExportControls } from '../video-export/FlightVideoExportControls';
 
 interface FlightMediaExportActionsProps {
   flight: Flight;
