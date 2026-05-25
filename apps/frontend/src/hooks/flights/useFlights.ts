@@ -24,13 +24,13 @@ import {
 } from '@dashboard-parapente/shared-types';
 import { isHTTPError } from 'ky';
 import { getStaleTime } from '../../lib/cacheConfig';
+import { isGoproOverlayInProgress } from '../../lib/flightMediaState';
 
 const isMediaExportInProgress = (flight: Flight) =>
   Boolean(
     (flight.video_export_status &&
       VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.video_export_status)) ||
-    flight.gopro_overlay_status === 'queued' ||
-    flight.gopro_overlay_status === 'running'
+    isGoproOverlayInProgress(flight.gopro_overlay_status)
   );
 
 export const flightsQueryOptions = (filters: FlightFilters = {}) => {

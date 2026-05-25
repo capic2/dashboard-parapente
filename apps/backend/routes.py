@@ -275,19 +275,28 @@ def _flight_gopro_camera_file_exists(db: Session, flight: Flight) -> bool:
     return camera_path.exists()
 
 
-def _flight_gopro_overlay_file_path(db: Session, flight: Flight) -> str | None:
+_GOPRO_OVERLAY_IN_PROGRESS_STATUSES = {"queued", "preparing", "running"}
+
+
+def _flight_gopro_overlay_file_path(
+    db: Session, flight: Flight, job: dict[str, Any] | None = None
+) -> str | None:
     stored_path = _resolve_flight_file_path(flight.gopro_overlay_file_path)
     if stored_path and stored_path.exists():
         return str(stored_path)
+
+    if job:
+        job_output_path = _resolve_flight_file_path(job.get("output_path"))
+        if job_output_path and job_output_path.exists():
+            return str(job_output_path)
 
     output_path = _flight_gopro_overlay_path(db, flight, suppress_config_error=True)
     return str(output_path) if output_path else None
 
 
-def _flight_gopro_overlay_status(flight: Flight) -> str | None:
+def _flight_gopro_overlay_status(flight: Flight, job: dict[str, Any] | None = None) -> str | None:
     if not flight.gopro_overlay_job_id:
         return flight.gopro_overlay_status
-    job = get_gopro_overlay_job(flight.gopro_overlay_job_id)
     return str(job["status"]) if job else flight.gopro_overlay_status
 
 
@@ -310,15 +319,31 @@ def _flight_video_export_progress(flight: Flight) -> int | None:
     return _job_progress(_resolve_export_status(flight.video_export_job_id))
 
 
-def _flight_gopro_overlay_progress(flight: Flight) -> int | None:
-    if not flight.gopro_overlay_job_id or flight.gopro_overlay_status not in {"queued", "running"}:
+def _flight_gopro_overlay_progress(flight: Flight, job: dict[str, Any] | None = None) -> int | None:
+    status = _flight_gopro_overlay_status(flight, job)
+    if not flight.gopro_overlay_job_id or status not in _GOPRO_OVERLAY_IN_PROGRESS_STATUSES:
         return None
-    return _job_progress(get_gopro_overlay_job(flight.gopro_overlay_job_id))
+    if job is None:
+        job = get_gopro_overlay_job(flight.gopro_overlay_job_id)
+    return _job_progress(job)
 
 
 def _flight_gopro_overlay_file_exists(db: Session, flight: Flight) -> bool:
     overlay_path = _flight_gopro_overlay_file_path(db, flight)
     return bool(overlay_path)
+
+
+def _flight_gopro_overlay_state(db: Session, flight: Flight) -> dict[str, Any]:
+    job = (
+        get_gopro_overlay_job(flight.gopro_overlay_job_id) if flight.gopro_overlay_job_id else None
+    )
+    overlay_path = _flight_gopro_overlay_file_path(db, flight, job)
+    return {
+        "status": _flight_gopro_overlay_status(flight, job),
+        "progress": _flight_gopro_overlay_progress(flight, job),
+        "file_path": overlay_path,
+        "file_exists": bool(overlay_path),
+    }
 
 
 def _mark_flight_gopro_overlay_job(db: Session, flight: Flight, job: dict[str, Any]) -> None:
@@ -3120,7 +3145,7 @@ def get_flights(
     # Convert to dict (user_id removed - not needed for single-user app)
     flights_data = []
     for flight in flights:
-        gopro_overlay_file_path = _flight_gopro_overlay_file_path(db, flight)
+        gopro_overlay = _flight_gopro_overlay_state(db, flight)
         flight_dict = {
             "id": flight.id,
             "strava_id": flight.strava_id,
@@ -3145,10 +3170,10 @@ def get_flights(
             "video_file_exists": _flight_video_file_exists(flight),
             "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
             "gopro_overlay_job_id": flight.gopro_overlay_job_id,
-            "gopro_overlay_status": _flight_gopro_overlay_status(flight),
-            "gopro_overlay_progress": _flight_gopro_overlay_progress(flight),
-            "gopro_overlay_file_path": gopro_overlay_file_path,
-            "gopro_overlay_file_exists": bool(gopro_overlay_file_path),
+            "gopro_overlay_status": gopro_overlay["status"],
+            "gopro_overlay_progress": gopro_overlay["progress"],
+            "gopro_overlay_file_path": gopro_overlay["file_path"],
+            "gopro_overlay_file_exists": gopro_overlay["file_exists"],
             "external_url": flight.external_url,
             "created_at": flight.created_at.isoformat() if flight.created_at else None,
             "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
@@ -3315,7 +3340,7 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
                 "Failed to persist calculated max speed for flight %s: %s", flight_id, exc
             )
 
-    gopro_overlay_file_path = _flight_gopro_overlay_file_path(db, flight)
+    gopro_overlay = _flight_gopro_overlay_state(db, flight)
 
     # Build response with flight data
     flight_dict = {
@@ -3344,10 +3369,10 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "video_file_exists": _flight_video_file_exists(flight),
         "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
         "gopro_overlay_job_id": flight.gopro_overlay_job_id,
-        "gopro_overlay_status": _flight_gopro_overlay_status(flight),
-        "gopro_overlay_progress": _flight_gopro_overlay_progress(flight),
-        "gopro_overlay_file_path": gopro_overlay_file_path,
-        "gopro_overlay_file_exists": bool(gopro_overlay_file_path),
+        "gopro_overlay_status": gopro_overlay["status"],
+        "gopro_overlay_progress": gopro_overlay["progress"],
+        "gopro_overlay_file_path": gopro_overlay["file_path"],
+        "gopro_overlay_file_exists": gopro_overlay["file_exists"],
         "created_at": flight.created_at.isoformat() if flight.created_at else None,
         "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
     }
