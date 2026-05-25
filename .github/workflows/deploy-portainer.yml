@@ -444,6 +444,40 @@ jobs:
           command_timeout: 5m
           script: |
             set -u
+            cleanup_old_backend_images() {
+              backend_repo="ghcr.io/${{ github.repository }}/backend"
+              current_backend_image="$backend_repo:${{ steps.version.outputs.version }}"
+
+              if ! current_image_id=$(docker image inspect --format '{{.Id}}' "$current_backend_image" 2>/dev/null); then
+                echo "Current backend image not found locally, skipping old backend image cleanup: $current_backend_image"
+                return 0
+              fi
+
+              docker image ls --format '{{.Repository}}:{{.Tag}}' "$backend_repo" | while read -r image_ref; do
+                [ -n "$image_ref" ] || continue
+                case "$image_ref" in
+                  *:\<none\>) continue ;;
+                esac
+
+                if ! image_id=$(docker image inspect --format '{{.Id}}' "$image_ref" 2>/dev/null); then
+                  echo "Unable to inspect backend image $image_ref, skipping"
+                  continue
+                fi
+
+                if [ "$image_id" = "$current_image_id" ]; then
+                  echo "Keeping current backend image tag: $image_ref"
+                  continue
+                fi
+
+                echo "Removing old backend image tag: $image_ref"
+                if ! docker image rm "$image_ref"; then
+                  echo "Old backend image cleanup failed for $image_ref; deployment remains successful"
+                fi
+              done
+            }
+
+            cleanup_old_backend_images
+
             if ! docker image prune -f; then
               echo "Docker image cleanup failed; deployment remains successful"
             fi
