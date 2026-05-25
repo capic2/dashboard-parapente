@@ -278,7 +278,6 @@ export default function WeatherPage() {
 
   const selectionPanel = (
     <WeatherSelectionPanel
-      activeWeatherName={activeWeatherName}
       selectionTab={selectionTab}
       sites={sites}
       selectedSearchTarget={selectedSearchTarget}

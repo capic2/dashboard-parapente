@@ -23,7 +23,6 @@ import {
 export type WeatherSelectionTab = 'favorites' | 'search';
 
 type WeatherSelectionPanelProps = {
-  activeWeatherName?: string;
   selectionTab: WeatherSelectionTab;
   sites: Site[];
   selectedSearchTarget: CityWeatherTarget | null;
@@ -41,7 +40,6 @@ type WeatherSelectionPanelProps = {
 };
 
 export default function WeatherSelectionPanel({
-  activeWeatherName,
   selectionTab,
   sites,
   selectedSearchTarget,
@@ -75,16 +73,6 @@ export default function WeatherSelectionPanel({
                 {t('weather.selection.description')}
               </p>
             </div>
-            {activeWeatherName && (
-              <div className="min-w-0 rounded-2xl border border-sky-100 bg-white/80 px-3 py-2 text-sm shadow-sm dark:border-sky-900/60 dark:bg-slate-950/50">
-                <span className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                  {t('weather.selection.current')}
-                </span>
-                <span className="block truncate font-bold text-sky-800 dark:text-sky-200">
-                  {activeWeatherName}
-                </span>
-              </div>
-            )}
           </div>
         </div>
         <div className="p-3 sm:p-4">
