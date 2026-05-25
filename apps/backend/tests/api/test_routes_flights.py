@@ -116,6 +116,36 @@ class TestFlightsListEndpoint:
         assert returned["video_export_progress"] == 42
         assert returned["gopro_overlay_progress"] == 55
 
+    def test_get_flights_includes_preparing_gopro_overlay_progress(
+        self, client, db_session, arguel_site
+    ):
+        """GET /flights treats preparing GoPro overlay jobs as active."""
+        flight = Flight(
+            id="flight-overlay-preparing",
+            name="Flight overlay preparing",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            gopro_overlay_job_id="job-overlay-preparing",
+            gopro_overlay_status="queued",
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        with patch(
+            "routes.get_gopro_overlay_job",
+            return_value={"status": "preparing", "progress": 12.4},
+        ):
+            response = client.get(f"{API_PREFIX}/flights")
+
+        assert response.status_code == 200
+        returned = next(
+            flight
+            for flight in response.json()["flights"]
+            if flight["id"] == "flight-overlay-preparing"
+        )
+        assert returned["gopro_overlay_status"] == "preparing"
+        assert returned["gopro_overlay_progress"] == 12
+
     def test_get_flights_includes_available_gopro_overlay_path(
         self, client, db_session, monkeypatch, tmp_path
     ):
@@ -173,6 +203,39 @@ class TestFlightsListEndpoint:
         assert returned["gopro_overlay_job_id"] == "job-overlay"
         assert returned["gopro_overlay_status"] == "completed"
         assert returned["gopro_overlay_file_path"] == str(overlay_path)
+        assert returned["gopro_overlay_file_exists"] is True
+
+    def test_get_flights_uses_completed_gopro_overlay_job_output_path(
+        self, client, db_session, arguel_site, tmp_path
+    ):
+        """GET /flights exposes an existing completed job output as downloadable."""
+        output_path = tmp_path / "job-final.mp4"
+        output_path.write_bytes(b"overlay")
+        flight = Flight(
+            id="flight-with-job-overlay",
+            name="Flight with job overlay",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            gopro_overlay_job_id="job-overlay-output",
+            gopro_overlay_status="running",
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        with patch(
+            "routes.get_gopro_overlay_job",
+            return_value={"status": "completed", "output_path": str(output_path)},
+        ):
+            response = client.get(f"{API_PREFIX}/flights")
+
+        assert response.status_code == 200
+        returned = next(
+            flight
+            for flight in response.json()["flights"]
+            if flight["id"] == "flight-with-job-overlay"
+        )
+        assert returned["gopro_overlay_status"] == "completed"
+        assert returned["gopro_overlay_file_path"] == str(output_path)
         assert returned["gopro_overlay_file_exists"] is True
 
     def test_download_flight_video(self, client, db_session, tmp_path):
