@@ -1,5 +1,6 @@
 """Unit tests for video export helpers."""
 
+import asyncio
 import os
 import time
 from datetime import datetime
@@ -220,6 +221,16 @@ class _FakeTerrainPage:
         return False
 
 
+class _HangingTerrainPage:
+    def __init__(self):
+        self.evaluate_calls = 0
+
+    async def evaluate(self, _script: str) -> bool:
+        self.evaluate_calls += 1
+        await asyncio.sleep(60)
+        return True
+
+
 @pytest.mark.asyncio
 async def test_wait_for_export_frame_terrain_waits_until_tiles_loaded():
     page = _FakeTerrainPage([False, False, True])
@@ -242,6 +253,21 @@ async def test_wait_for_export_frame_terrain_returns_false_after_timeout():
         page,
         timeout_seconds=0,
         poll_seconds=0,
+    )
+
+    assert tiles_loaded is False
+    assert page.evaluate_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_wait_for_export_frame_terrain_returns_false_when_evaluate_hangs():
+    page = _HangingTerrainPage()
+
+    tiles_loaded = await video_export_manual._wait_for_export_frame_terrain(
+        page,
+        timeout_seconds=1,
+        poll_seconds=0,
+        evaluate_timeout_seconds=0.01,
     )
 
     assert tiles_loaded is False

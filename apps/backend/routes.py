@@ -6578,6 +6578,8 @@ async def _regenerate_emagram_screenshot(
 
     day_index = (emagram.forecast_date - datetime.utcnow().date()).days
     hour = emagram.forecast_hour
+    if day_index < 0:
+        return None
 
     if source == "meteo-parapente":
         screenshot_result = await screenshot_meteo_parapente(
@@ -6610,17 +6612,26 @@ async def _regenerate_emagram_screenshot(
     image_path = screenshot_result.get("image_path")
     if not image_path:
         return None
+    regenerated_path = Path(image_path)
+    if not regenerated_path.exists():
+        logger.warning(
+            "Regenerated emagram screenshot missing on disk (analysis=%s, source=%s, path=%s)",
+            emagram.id,
+            source,
+            image_path,
+        )
+        return None
 
     try:
         screenshot_paths = json.loads(emagram.screenshot_paths or "{}")
     except json.JSONDecodeError:
         screenshot_paths = {}
-    screenshot_paths[source] = image_path
+    screenshot_paths[source] = str(regenerated_path)
     emagram.screenshot_paths = json.dumps(screenshot_paths, ensure_ascii=False)
     db.commit()
     db.refresh(emagram)
 
-    return Path(image_path)
+    return regenerated_path
 
 
 # ============================================================================
