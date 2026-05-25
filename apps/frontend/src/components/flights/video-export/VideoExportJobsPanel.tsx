@@ -896,6 +896,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
             </p>
             <div className="flex justify-end gap-3">
               <Button
+                initialFocus
                 variant="secondary"
                 onPress={() => setPendingConfirm(null)}
               >

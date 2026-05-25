@@ -303,6 +303,7 @@ export const Sites: React.FC = () => {
         </p>
         <div className="flex flex-col sm:flex-row gap-3 pt-4">
           <Button
+            initialFocus
             onPress={() => setSiteToDelete(null)}
             isDisabled={deleteSite.isPending}
             className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 rounded hover:bg-gray-300 dark:hover:bg-gray-500 cursor-pointer disabled:opacity-50 transition-colors"

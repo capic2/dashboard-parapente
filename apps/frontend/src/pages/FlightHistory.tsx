@@ -566,6 +566,7 @@ export default function FlightHistory() {
         </p>
         <div className="flex gap-3 justify-end">
           <Button
+            initialFocus
             onClick={() => setFlightToDelete(null)}
             className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-all"
           >
@@ -594,6 +595,7 @@ export default function FlightHistory() {
         </p>
         <div className="flex gap-3 justify-end">
           <Button
+            initialFocus
             onClick={() => setShowMultiDeleteConfirm(false)}
             className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-all"
           >
