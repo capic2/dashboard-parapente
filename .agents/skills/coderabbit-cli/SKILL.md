@@ -1,13 +1,13 @@
 ---
 name: coderabbit-cli
-description: Runs CodeRabbit CLI reviews and turns findings into an interactive correction workflow. Use when a shipping, commit, or review workflow needs CodeRabbit checks, when preparing a commit with `cr review`, or when the user mentions CodeRabbit CLI, CodeRabbit review, `cr review`, or skipping CodeRabbit review.
+description: Runs CodeRabbit CLI reviews and turns findings into an interactive correction workflow. Use when a shipping, commit, push, or review workflow needs CodeRabbit checks, when preparing a commit or push with `cr review`, or when the user mentions CodeRabbit CLI, CodeRabbit review, `cr review`, or skipping CodeRabbit review.
 ---
 
 # CodeRabbit CLI
 
 ## Quick Start
 
-Use this skill before committing when a workflow requires CodeRabbit review.
+Use this skill before committing or pushing when a workflow requires CodeRabbit review.
 
 Skip the review only when the user explicitly asks with phrases like:
 
@@ -78,7 +78,7 @@ What would you like to do?
 
 ## Shipping Integration
 
-Shipping or commit workflows should run this skill before committing unless the user explicitly asks to skip CodeRabbit review.
+Shipping, commit, or push workflows should run this skill before committing or pushing unless the user explicitly asks to skip CodeRabbit review.
 
 Recognize skip phrases such as `skip coderabbit`, `skip cr review`, `sans review coderabbit`, and `no coderabbit`.
 
