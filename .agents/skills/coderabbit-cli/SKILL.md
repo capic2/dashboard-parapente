@@ -1,13 +1,15 @@
 ---
 name: coderabbit-cli
-description: Runs CodeRabbit CLI reviews and turns findings into an interactive correction workflow. Use when a shipping, commit, push, or review workflow needs CodeRabbit checks, when preparing a commit or push with `cr review`, or when the user mentions CodeRabbit CLI, CodeRabbit review, `cr review`, or skipping CodeRabbit review.
+description: Runs CodeRabbit CLI reviews and turns findings into an interactive correction workflow. Use at the end of an implementation, before shipping readiness, when a review workflow needs CodeRabbit checks, or when the user mentions CodeRabbit CLI, CodeRabbit review, `cr review`, or skipping CodeRabbit review.
 ---
 
 # CodeRabbit CLI
 
 ## Quick Start
 
-Use this skill before committing or pushing when a workflow requires CodeRabbit review.
+Use this skill at the end of an implementation, after code changes and relevant validation, before considering the work ready to ship.
+
+Do not trigger this skill as a push-time step. A push should only happen after the implementation review state is already known.
 
 Skip the review only when the user explicitly asks with phrases like:
 
@@ -76,13 +78,15 @@ What would you like to do?
 
 11. Do not commit while unresolved CodeRabbit findings remain.
 
-## Shipping Integration
+## Implementation Integration
 
-Shipping, commit, or push workflows should run this skill before committing or pushing unless the user explicitly asks to skip CodeRabbit review.
+Implementation workflows should run this skill once the code changes are complete and relevant validation has run, unless the user explicitly asks to skip CodeRabbit review.
 
 Recognize skip phrases such as `skip coderabbit`, `skip cr review`, `sans review coderabbit`, and `no coderabbit`.
 
-If CodeRabbit returns findings, pause the shipping flow. Present each finding one by one and ask whether to correct it, ignore it, or follow custom instructions. Resume commit only once all findings are fixed, explicitly ignored, or accepted by the user.
+If CodeRabbit returns findings, pause the implementation handoff. Present each finding one by one and ask whether to correct it, ignore it, or follow custom instructions. Consider the implementation complete only once all findings are fixed, explicitly ignored, or accepted by the user.
+
+Shipping workflows may check whether CodeRabbit was already run for the completed implementation, but they must not treat CodeRabbit as part of the push step.
 
 ## Reporting Rules
 
