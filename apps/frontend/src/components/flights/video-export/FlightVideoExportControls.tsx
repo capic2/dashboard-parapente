@@ -21,6 +21,7 @@ import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatu
 import { useFlight } from '../../../hooks/flights/useFlight';
 import { useToast } from '../../../hooks/useToast';
 import { api } from '../../../lib/api';
+import { hasFlightVideo } from '../../../lib/flightMediaState';
 
 type VideoExportMode = 'manual_fast' | 'manual';
 
@@ -118,9 +119,7 @@ export function FlightVideoExportControls({
     null
   );
   const isExportActive = hasActiveVideoExport(flight);
-  const hasGeneratedVideo = Boolean(
-    flight.video_file_path && flight.video_file_exists !== false
-  );
+  const hasGeneratedVideo = hasFlightVideo(flight);
   const shouldReadExportStatus = Boolean(
     flight.video_export_job_id &&
     (isExportActive ||

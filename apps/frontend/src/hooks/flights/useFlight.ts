@@ -5,12 +5,10 @@ import {
   type Flight,
   VIDEO_EXPORT_IN_PROGRESS_STATUSES,
 } from '@dashboard-parapente/shared-types';
+import { isGoproOverlayInProgress } from '../../lib/flightMediaState';
 
 const isExportInProgress = (status?: string | null) =>
   status ? VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(status) : false;
-
-const isOverlayInProgress = (status?: string | null) =>
-  status === 'queued' || status === 'running';
 
 type ExportViewerAccess = {
   exportJobId?: string | null;
@@ -48,7 +46,7 @@ export const useFlight = (
     refetchInterval: (query) => {
       const data = query.state.data as Flight | undefined;
       return isExportInProgress(data?.video_export_status) ||
-        isOverlayInProgress(data?.gopro_overlay_status)
+        isGoproOverlayInProgress(data?.gopro_overlay_status)
         ? 10000
         : false;
     },

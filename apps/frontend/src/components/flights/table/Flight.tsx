@@ -20,6 +20,11 @@ import {
   formatDistanceKm,
   useAppSettingsStore,
 } from '../../../stores/appSettingsStore';
+import {
+  hasFlightGoproOverlay,
+  hasFlightVideo,
+  isGoproOverlayInProgress,
+} from '../../../lib/flightMediaState';
 
 export interface DownloadingMedia {
   flightId: string;
@@ -74,11 +79,11 @@ export function Flight({
   const units = useAppSettingsStore((state) => state.settings.units);
   const isHighlighted = isActive || isSelected;
   const hasGpx = Boolean(flight.gpx_file_path);
-  const hasVideo = Boolean(flight.video_file_path);
-  const hasPersistedGoproOverlay = Boolean(flight.gopro_overlay_file_path);
-  const isGoproOverlayRunning =
-    flight.gopro_overlay_status === 'queued' ||
-    flight.gopro_overlay_status === 'running';
+  const hasVideo = hasFlightVideo(flight);
+  const hasPersistedGoproOverlay = hasFlightGoproOverlay(flight);
+  const isGoproOverlayRunning = isGoproOverlayInProgress(
+    flight.gopro_overlay_status
+  );
   const isGoproOverlayFailed = flight.gopro_overlay_status === 'failed';
   const canDownloadGoproOverlay =
     hasPersistedGoproOverlay && !isGoproOverlayRunning && !isGoproOverlayFailed;

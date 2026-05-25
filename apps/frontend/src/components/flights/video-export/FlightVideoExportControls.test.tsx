@@ -206,4 +206,17 @@ describe('FlightVideoExportControls', () => {
       screen.getByRole('button', { name: /Generate video/u })
     ).toBeEnabled();
   });
+
+  it('does not trust a video path without confirmed file existence', () => {
+    mockFlight.video_export_status = 'completed';
+    mockFlight.video_export_job_id = 'job-video';
+    mockFlight.video_file_path = '/exports/unknown.mp4';
+    mockFlight.video_file_exists = undefined;
+
+    render(<FlightVideoExportControls flight={mockFlight} compact />);
+
+    expect(
+      screen.getByRole('button', { name: /Generate video/u })
+    ).toBeEnabled();
+  });
 });
