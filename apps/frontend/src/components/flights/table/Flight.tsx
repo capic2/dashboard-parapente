@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { Button, Card } from '@dashboard-parapente/design-system';
 import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
 import {
-  Check,
   Clock3,
   Download,
   FileText,
@@ -162,12 +161,6 @@ export function Flight({
       )}
       <div className="flex justify-between items-start mb-2 gap-2 pl-1.5">
         <div className="min-w-0 flex-1">
-          {isHighlighted && (
-            <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-sky-700 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white dark:bg-sky-300 dark:text-sky-950">
-              <Check className="h-3 w-3" aria-hidden="true" />
-              {t('flights.activeFlight')}
-            </span>
-          )}
           <h3 className={`truncate text-sm font-semibold ${titleColor}`}>
             {flight.title || t('flights.untitledFlight')}
           </h3>
