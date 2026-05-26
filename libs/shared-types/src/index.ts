@@ -399,8 +399,24 @@ export const FlightRecordSchema = z.object({
   value: z.number(),
   flight_id: z.string(),
   flight_name: z.string(),
-  flight_date: z.string(),
+  flight_date: z.string().nullish(),
   site_name: z.string().nullish(),
+  site_id: z.string().nullish(),
+  departure_time: z.string().nullish(),
+  partial: z.boolean().optional().default(false),
+});
+
+export const TakeoffUsageRecordSchema = z.object({
+  value: z.number(),
+  site_id: z.string(),
+  site_name: z.string(),
+  partial: z.boolean().optional().default(false),
+});
+
+export const MonthActivityRecordSchema = z.object({
+  value: z.number(),
+  month: z.string(),
+  partial: z.boolean().optional().default(false),
 });
 
 export const FlightRecordsSchema = z.object({
@@ -408,6 +424,11 @@ export const FlightRecordsSchema = z.object({
   highest_altitude: FlightRecordSchema.nullish(),
   longest_distance: FlightRecordSchema.nullish(),
   max_speed: FlightRecordSchema.nullish(),
+  takeoff_elevation_gain: FlightRecordSchema.nullish(),
+  earliest_takeoff: FlightRecordSchema.nullish(),
+  latest_takeoff: FlightRecordSchema.nullish(),
+  most_used_takeoff: TakeoffUsageRecordSchema.nullish(),
+  most_active_month: MonthActivityRecordSchema.nullish(),
 });
 
 // ============================================================================

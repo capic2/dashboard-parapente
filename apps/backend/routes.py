@@ -74,6 +74,7 @@ from schemas import GoproOverlayProbeResponse
 from schemas import (
     EmagramAnalysisListItem,
     EmagramTriggerRequest,
+    FlightRecordsResponse,
     FlightUpdate,
 )
 from schemas import LandingAssociation as LandingAssociationSchema
@@ -3251,7 +3252,7 @@ def get_flight_stats(db: Session = Depends(get_db)):
     }
 
 
-@router.get("/flights/records")
+@router.get("/flights/records", response_model=FlightRecordsResponse)
 def get_flight_records(db: Session = Depends(get_db)):
     """
     Get personal flight records (longest duration, highest altitude, longest distance, max speed)
@@ -3266,19 +3267,33 @@ def get_flight_records(db: Session = Depends(get_db)):
     """
     flights = db.query(Flight).all()
 
+    empty_records = {
+        "longest_duration": None,
+        "highest_altitude": None,
+        "longest_distance": None,
+        "max_speed": None,
+        "takeoff_elevation_gain": None,
+        "earliest_takeoff": None,
+        "latest_takeoff": None,
+        "most_used_takeoff": None,
+        "most_active_month": None,
+    }
+
     if not flights:
-        return {
-            "longest_duration": None,
-            "highest_altitude": None,
-            "longest_distance": None,
-            "max_speed": None,
-        }
+        return empty_records
 
     # Filter out None values and find records
     flights_with_duration = [f for f in flights if f.duration_minutes is not None]
     flights_with_altitude = [f for f in flights if f.max_altitude_m is not None]
     flights_with_distance = [f for f in flights if f.distance_km is not None]
     flights_with_speed = [f for f in flights if f.max_speed_kmh is not None and f.max_speed_kmh > 0]
+    flights_with_takeoff_elevation_gain = [
+        f
+        for f in flights
+        if f.max_altitude_m is not None and f.site is not None and f.site.elevation_m is not None
+    ]
+    flights_with_departure_time = [f for f in flights if f.departure_time is not None]
+    flights_with_site = [f for f in flights if f.site_id is not None and f.site is not None]
 
     # Find records
     longest = (
@@ -3295,25 +3310,143 @@ def get_flight_records(db: Session = Depends(get_db)):
         max(flights_with_distance, key=lambda f: f.distance_km) if flights_with_distance else None
     )
     fastest = max(flights_with_speed, key=lambda f: f.max_speed_kmh) if flights_with_speed else None
+    greatest_takeoff_gain = (
+        max(
+            flights_with_takeoff_elevation_gain,
+            key=lambda f: f.max_altitude_m - f.site.elevation_m,
+        )
+        if flights_with_takeoff_elevation_gain
+        else None
+    )
+    earliest_takeoff = (
+        min(
+            flights_with_departure_time,
+            key=lambda f: (
+                f.departure_time.hour,
+                f.departure_time.minute,
+                f.departure_time.second,
+                -(f.flight_date.toordinal() if f.flight_date else date.min.toordinal()),
+                f.id,
+            ),
+        )
+        if flights_with_departure_time
+        else None
+    )
+    latest_takeoff = (
+        max(
+            flights_with_departure_time,
+            key=lambda f: (
+                f.departure_time.hour,
+                f.departure_time.minute,
+                f.departure_time.second,
+                f.flight_date.toordinal() if f.flight_date else date.min.toordinal(),
+                f.id,
+            ),
+        )
+        if flights_with_departure_time
+        else None
+    )
 
-    def format_record(flight, value_key):
+    def format_record(
+        flight: Flight | None, value_key: str, valid_flights: list[Flight]
+    ) -> dict[str, Any] | None:
         """Helper to format a record entry"""
         if not flight:
             return None
         return {
             "value": getattr(flight, value_key),
             "flight_id": flight.id,
-            "flight_name": flight.name or flight.title,
+            "flight_name": flight.name or flight.title or "Vol sans titre",
             "flight_date": flight.flight_date.isoformat() if flight.flight_date else None,
             "site_name": flight.site.name if flight.site else None,
             "site_id": flight.site_id,
+            "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
+            "partial": len(valid_flights) < len(flights),
         }
 
+    def format_computed_flight_record(
+        flight: Flight | None, value: int | float | None, valid_flights: list[Flight]
+    ) -> dict[str, Any] | None:
+        if not flight:
+            return None
+        return {
+            "value": value,
+            "flight_id": flight.id,
+            "flight_name": flight.name or flight.title or "Vol sans titre",
+            "flight_date": flight.flight_date.isoformat() if flight.flight_date else None,
+            "site_name": flight.site.name if flight.site else None,
+            "site_id": flight.site_id,
+            "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
+            "partial": len(valid_flights) < len(flights),
+        }
+
+    def format_time_record(
+        flight: Flight | None, valid_flights: list[Flight]
+    ) -> dict[str, Any] | None:
+        if not flight:
+            return None
+        minutes_since_midnight = flight.departure_time.hour * 60 + flight.departure_time.minute
+        return format_computed_flight_record(flight, minutes_since_midnight, valid_flights)
+
+    site_records = []
+    for site_id in {f.site_id for f in flights_with_site}:
+        site_flights = [f for f in flights_with_site if f.site_id == site_id]
+        latest_site_date = max(
+            (f.flight_date or date.min for f in site_flights),
+            default=date.min,
+        )
+        site_records.append((site_flights[0].site, len(site_flights), latest_site_date))
+
+    most_used_takeoff = (
+        max(site_records, key=lambda item: (item[1], item[2], item[0].id)) if site_records else None
+    )
+
+    month_records = []
+    for month in {f.flight_date.strftime("%Y-%m") for f in flights if f.flight_date is not None}:
+        month_flights = [
+            f for f in flights if f.flight_date and f.flight_date.strftime("%Y-%m") == month
+        ]
+        month_records.append((month, len(month_flights)))
+
+    most_active_month = (
+        max(month_records, key=lambda item: (item[1], item[0])) if month_records else None
+    )
+
     return {
-        "longest_duration": format_record(longest, "duration_minutes"),
-        "highest_altitude": format_record(highest, "max_altitude_m"),
-        "longest_distance": format_record(farthest, "distance_km"),
-        "max_speed": format_record(fastest, "max_speed_kmh"),
+        "longest_duration": format_record(longest, "duration_minutes", flights_with_duration),
+        "highest_altitude": format_record(highest, "max_altitude_m", flights_with_altitude),
+        "longest_distance": format_record(farthest, "distance_km", flights_with_distance),
+        "max_speed": format_record(fastest, "max_speed_kmh", flights_with_speed),
+        "takeoff_elevation_gain": format_computed_flight_record(
+            greatest_takeoff_gain,
+            (
+                greatest_takeoff_gain.max_altitude_m - greatest_takeoff_gain.site.elevation_m
+                if greatest_takeoff_gain
+                else None
+            ),
+            flights_with_takeoff_elevation_gain,
+        ),
+        "earliest_takeoff": format_time_record(earliest_takeoff, flights_with_departure_time),
+        "latest_takeoff": format_time_record(latest_takeoff, flights_with_departure_time),
+        "most_used_takeoff": (
+            {
+                "value": most_used_takeoff[1],
+                "site_id": most_used_takeoff[0].id,
+                "site_name": most_used_takeoff[0].name,
+                "partial": len(flights_with_site) < len(flights),
+            }
+            if most_used_takeoff
+            else None
+        ),
+        "most_active_month": (
+            {
+                "value": most_active_month[1],
+                "month": most_active_month[0],
+                "partial": any(f.flight_date is None for f in flights),
+            }
+            if most_active_month
+            else None
+        ),
     }
 
 

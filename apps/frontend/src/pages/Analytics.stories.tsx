@@ -30,6 +30,9 @@ const mockRecords = {
     flight_name: 'Arguel 05-03',
     flight_date: '2026-03-05',
     site_name: 'Arguel',
+    site_id: 'site-arguel',
+    departure_time: '2026-03-05T11:45:00',
+    partial: false,
   },
   highest_altitude: {
     value: 2150,
@@ -37,6 +40,9 @@ const mockRecords = {
     flight_name: 'Arguel 15-03',
     flight_date: '2026-03-15',
     site_name: 'Arguel',
+    site_id: 'site-arguel',
+    departure_time: '2026-03-15T14:00:00',
+    partial: false,
   },
   longest_distance: {
     value: 25.0,
@@ -44,8 +50,52 @@ const mockRecords = {
     flight_name: 'Arguel 05-03',
     flight_date: '2026-03-05',
     site_name: 'Arguel',
+    site_id: 'site-arguel',
+    departure_time: '2026-03-05T11:45:00',
+    partial: false,
   },
   max_speed: null,
+  takeoff_elevation_gain: {
+    value: 1220,
+    flight_id: 'flight-001',
+    flight_name: 'Arguel 15-03',
+    flight_date: '2026-03-15',
+    site_name: 'Arguel',
+    site_id: 'site-arguel',
+    departure_time: '2026-03-15T14:00:00',
+    partial: false,
+  },
+  earliest_takeoff: {
+    value: 11 * 60,
+    flight_id: 'flight-002',
+    flight_name: 'Chalais 20-02',
+    flight_date: '2026-02-20',
+    site_name: 'Chalais',
+    site_id: 'site-chalais',
+    departure_time: '2026-02-20T11:00:00',
+    partial: false,
+  },
+  latest_takeoff: {
+    value: 14 * 60,
+    flight_id: 'flight-001',
+    flight_name: 'Arguel 15-03',
+    flight_date: '2026-03-15',
+    site_name: 'Arguel',
+    site_id: 'site-arguel',
+    departure_time: '2026-03-15T14:00:00',
+    partial: false,
+  },
+  most_used_takeoff: {
+    value: 2,
+    site_id: 'site-arguel',
+    site_name: 'Arguel',
+    partial: false,
+  },
+  most_active_month: {
+    value: 2,
+    month: '2026-03',
+    partial: false,
+  },
 };
 
 const mockFlights = [
@@ -122,7 +172,7 @@ export const Default = meta.story({
 });
 
 Default.test('renders analytics page with title', async ({ canvas }) => {
-  await canvas.findByText(/Analyses et Statistiques/);
+  await canvas.findByText(/Analyses et Statistiques/u);
 });
 
 export const Loading = meta.story({

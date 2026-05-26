@@ -607,10 +607,32 @@
   },
   "records": {
     "title": "Personal Records",
-    "longestFlight": "Longest flight",
-    "highestAltitude": "Highest altitude",
-    "longestDistance": "Longest distance",
-    "maxSpeed": "Top speed"
+    "personalTitle": "Your records",
+    "activityTitle": "Activity records",
+    "longestFlight": "Your longest flight",
+    "highestAltitude": "Your highest ceiling",
+    "longestDistance": "Your longest distance",
+    "maxSpeed": "Your top speed",
+    "takeoffElevationGain": "Your biggest takeoff gain",
+    "earliestTakeoff": "Your earliest takeoff",
+    "latestTakeoff": "Your latest takeoff",
+    "mostUsedTakeoff": "Most used takeoff",
+    "mostActiveMonth": "Most active month",
+    "flightCount_one": "{{count}} flight",
+    "flightCount_other": "{{count}} flights",
+    "unavailableLabel": "Unavailable",
+    "unknownDate": "Unknown date",
+    "partialCalculation": "Calculated from complete flights only",
+    "unavailable": {
+      "duration": "No flight with a duration",
+      "altitude": "Missing max altitude",
+      "distance": "Distance not calculated",
+      "speed": "Missing top speed",
+      "takeoffElevationGain": "Missing max altitude or takeoff elevation",
+      "departureTime": "Missing takeoff time",
+      "takeoff": "No takeoff linked to flights",
+      "month": "No flight recorded"
+    }
   },
   "achievements": {
     "firstFlight": "First Flight",

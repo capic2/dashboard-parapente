@@ -611,10 +611,32 @@
   },
   "records": {
     "title": "Records Personnels",
-    "longestFlight": "Vol le plus long",
-    "highestAltitude": "Plus haute altitude",
-    "longestDistance": "Plus longue distance",
-    "maxSpeed": "Vitesse maximale"
+    "personalTitle": "Tes records",
+    "activityTitle": "Records d'activité",
+    "longestFlight": "Ton plus long vol",
+    "highestAltitude": "Ton plus haut plafond",
+    "longestDistance": "Ta plus grande distance",
+    "maxSpeed": "Ta vitesse maximale",
+    "takeoffElevationGain": "Ton plus gros dénivelé",
+    "earliestTakeoff": "Ton décollage le plus matinal",
+    "latestTakeoff": "Ton décollage le plus tardif",
+    "mostUsedTakeoff": "Le décollage le plus utilisé",
+    "mostActiveMonth": "Le mois le plus actif",
+    "flightCount_one": "{{count}} vol",
+    "flightCount_other": "{{count}} vols",
+    "unavailableLabel": "Indisponible",
+    "unknownDate": "Date inconnue",
+    "partialCalculation": "Calculé sur les vols complets uniquement",
+    "unavailable": {
+      "duration": "Aucun vol avec durée renseignée",
+      "altitude": "Altitude max manquante",
+      "distance": "Distance non calculée",
+      "speed": "Vitesse max manquante",
+      "takeoffElevationGain": "Altitude max ou altitude du décollage manquante",
+      "departureTime": "Heure de décollage manquante",
+      "takeoff": "Aucun décollage associé aux vols",
+      "month": "Aucun vol enregistré"
+    }
   },
   "achievements": {
     "firstFlight": "Premier Vol",
