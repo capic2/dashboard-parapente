@@ -3388,14 +3388,22 @@ def get_flight_records(db: Session = Depends(get_db)):
         minutes_since_midnight = flight.departure_time.hour * 60 + flight.departure_time.minute
         return format_computed_flight_record(flight, minutes_since_midnight, valid_flights)
 
+    def site_recency_key(flight: Flight) -> tuple[int, int, int, int, str]:
+        return (
+            (flight.flight_date or date.min).toordinal(),
+            flight.departure_time.hour if flight.departure_time else -1,
+            flight.departure_time.minute if flight.departure_time else -1,
+            flight.departure_time.second if flight.departure_time else -1,
+            flight.id,
+        )
+
     site_records = []
     for site_id in {f.site_id for f in flights_with_site}:
         site_flights = [f for f in flights_with_site if f.site_id == site_id]
-        latest_site_date = max(
-            (f.flight_date or date.min for f in site_flights),
-            default=date.min,
+        latest_site_flight = max(site_flights, key=site_recency_key)
+        site_records.append(
+            (site_flights[0].site, len(site_flights), site_recency_key(latest_site_flight))
         )
-        site_records.append((site_flights[0].site, len(site_flights), latest_site_date))
 
     most_used_takeoff = (
         max(site_records, key=lambda item: (item[1], item[2], item[0].id)) if site_records else None
