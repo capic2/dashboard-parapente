@@ -275,6 +275,42 @@ class Flight(FlightBase):
         from_attributes = True
 
 
+class FlightRecord(BaseModel):
+    value: int | float
+    flight_id: str
+    flight_name: str
+    flight_date: str | None = None
+    site_name: str | None = None
+    site_id: str | None = None
+    departure_time: str | None = None
+    partial: bool = False
+
+
+class TakeoffUsageRecord(BaseModel):
+    value: int
+    site_id: str
+    site_name: str
+    partial: bool = False
+
+
+class MonthActivityRecord(BaseModel):
+    value: int
+    month: str
+    partial: bool = False
+
+
+class FlightRecordsResponse(BaseModel):
+    longest_duration: FlightRecord | None = None
+    highest_altitude: FlightRecord | None = None
+    longest_distance: FlightRecord | None = None
+    max_speed: FlightRecord | None = None
+    takeoff_elevation_gain: FlightRecord | None = None
+    earliest_takeoff: FlightRecord | None = None
+    latest_takeoff: FlightRecord | None = None
+    most_used_takeoff: TakeoffUsageRecord | None = None
+    most_active_month: MonthActivityRecord | None = None
+
+
 # Weather
 class WeatherForecastBase(BaseModel):
     forecast_date: date

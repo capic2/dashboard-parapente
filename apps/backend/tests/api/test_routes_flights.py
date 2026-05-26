@@ -5,7 +5,7 @@ Tests HTTP endpoints in routes.py related to flight management.
 Coverage: GET, POST, PATCH, DELETE for flights.
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -617,6 +617,11 @@ class TestFlightRecordsEndpoint:
         assert data["highest_altitude"] is None
         assert data["longest_distance"] is None
         assert data["max_speed"] is None
+        assert data["takeoff_elevation_gain"] is None
+        assert data["earliest_takeoff"] is None
+        assert data["latest_takeoff"] is None
+        assert data["most_used_takeoff"] is None
+        assert data["most_active_month"] is None
 
     def test_get_flight_records_finds_records(self, client, db_session, arguel_site):
         """GET /flights/records finds max duration, distance, altitude, speed"""
@@ -666,6 +671,143 @@ class TestFlightRecordsEndpoint:
 
         assert data["max_speed"]["flight_id"] == "flight-3"
         assert data["max_speed"]["value"] == 55.0
+
+    def test_get_flight_records_finds_takeoff_elevation_gain(self, client, db_session, arguel_site):
+        """GET /flights/records finds max altitude above takeoff elevation"""
+        low_gain = Flight(
+            id="flight-1",
+            name="Low gain",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            max_altitude_m=1200,
+        )
+        high_gain = Flight(
+            id="flight-2",
+            name="High gain",
+            flight_date=date(2026, 3, 16),
+            site_id="site-arguel",
+            max_altitude_m=1800,
+        )
+        incomplete = Flight(
+            id="flight-3",
+            name="Missing altitude",
+            flight_date=date(2026, 3, 17),
+            site_id="site-arguel",
+            max_altitude_m=None,
+        )
+        db_session.add_all([low_gain, high_gain, incomplete])
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/records")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["takeoff_elevation_gain"]["flight_id"] == "flight-2"
+        assert data["takeoff_elevation_gain"]["value"] == 1800 - arguel_site.elevation_m
+        assert data["takeoff_elevation_gain"]["partial"] is True
+
+    def test_get_flight_records_finds_earliest_and_latest_takeoff(
+        self, client, db_session, arguel_site
+    ):
+        """GET /flights/records compares departure_time by stored time of day"""
+        early = Flight(
+            id="flight-early",
+            name="Early",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            departure_time=datetime(2026, 3, 15, 8, 30),
+        )
+        late = Flight(
+            id="flight-late",
+            name="Late",
+            flight_date=date(2026, 3, 16),
+            site_id="site-arguel",
+            departure_time=datetime(2026, 3, 16, 18, 45),
+        )
+        missing_time = Flight(
+            id="flight-missing-time",
+            name="Missing time",
+            flight_date=date(2026, 3, 17),
+            site_id="site-arguel",
+            departure_time=None,
+        )
+        db_session.add_all([early, late, missing_time])
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/records")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["earliest_takeoff"]["flight_id"] == "flight-early"
+        assert data["earliest_takeoff"]["value"] == 8 * 60 + 30
+        assert data["earliest_takeoff"]["partial"] is True
+        assert data["latest_takeoff"]["flight_id"] == "flight-late"
+        assert data["latest_takeoff"]["value"] == 18 * 60 + 45
+        assert data["latest_takeoff"]["partial"] is True
+
+    def test_get_flight_records_finds_most_used_takeoff_with_recent_tie_break(
+        self, client, db_session, arguel_site, chalais_site
+    ):
+        """GET /flights/records breaks most-used takeoff ties by recent use"""
+        flights = [
+            Flight(
+                id="arguel-1",
+                name="Arguel 1",
+                flight_date=date(2026, 3, 15),
+                site_id="site-arguel",
+            ),
+            Flight(
+                id="arguel-2",
+                name="Arguel 2",
+                flight_date=date(2026, 3, 16),
+                site_id="site-arguel",
+            ),
+            Flight(
+                id="chalais-1",
+                name="Chalais 1",
+                flight_date=date(2026, 3, 17),
+                site_id="site-chalais",
+            ),
+            Flight(
+                id="chalais-2",
+                name="Chalais 2",
+                flight_date=date(2026, 3, 18),
+                site_id="site-chalais",
+            ),
+            Flight(id="missing-site", name="No site", flight_date=date(2026, 3, 19)),
+        ]
+        db_session.add_all(flights)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/records")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["most_used_takeoff"]["site_id"] == chalais_site.id
+        assert data["most_used_takeoff"]["site_name"] == chalais_site.name
+        assert data["most_used_takeoff"]["value"] == 2
+        assert data["most_used_takeoff"]["partial"] is True
+
+    def test_get_flight_records_finds_most_active_month_with_recent_tie_break(
+        self, client, db_session, arguel_site
+    ):
+        """GET /flights/records breaks most-active month ties by recent month"""
+        flights = [
+            Flight(id="jan-1", name="Jan 1", flight_date=date(2026, 1, 3), site_id="site-arguel"),
+            Flight(id="jan-2", name="Jan 2", flight_date=date(2026, 1, 4), site_id="site-arguel"),
+            Flight(id="mar-1", name="Mar 1", flight_date=date(2026, 3, 3), site_id="site-arguel"),
+            Flight(id="mar-2", name="Mar 2", flight_date=date(2026, 3, 4), site_id="site-arguel"),
+        ]
+        db_session.add_all(flights)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/records")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["most_active_month"]["month"] == "2026-03"
+        assert data["most_active_month"]["value"] == 2
+        assert data["most_active_month"]["partial"] is False
 
 
 class TestFlightDetailEndpoint:
