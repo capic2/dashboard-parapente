@@ -1021,7 +1021,51 @@
     "openImage": "Open",
     "summaryTitle": "📊 Conditions Summary",
     "tipsTitle": "💡 Flight Tips",
-    "safetyAlertsTitle": "⚠️ Safety Alerts"
+    "safetyAlertsTitle": "⚠️ Safety Alerts",
+    "annotations": {
+      "source": "Source",
+      "hideAnnotations": "Hide explanations",
+      "showAnnotations": "Show explanations",
+      "summaryAndMore": "Summary and other explanations",
+      "zoomIn": "Zoom +",
+      "reset": "Reset",
+      "previous": "Previous",
+      "next": "Next",
+      "help": "Click an info point to understand this part of the emagram.",
+      "hidden": "Explanations hidden.",
+      "groupLabel": "{{count}} explanations",
+      "confidence": "Confidence: {{value}}",
+      "termToRemember": "Word to remember",
+      "visualCue": "Visual cue",
+      "weatherReading": "Weather reading",
+      "flightImpact": "Flight impact",
+      "globalSummary": "Summary",
+      "flightTakeaways": "Flight takeaways",
+      "otherExplanations": "Other explanations",
+      "noExplanation": "No explanation available for this image.",
+      "priority": {
+        "important": "Important",
+        "watch": "Watch",
+        "educational": "Educational"
+      },
+      "category": {
+        "thermal": "Thermals",
+        "ceiling": "Ceiling",
+        "stability": "Stability",
+        "humidity": "Humidity",
+        "wind": "Wind",
+        "risk": "Risk"
+      },
+      "reason": {
+        "invalid_metadata": "Not placed precisely: incomplete metadata.",
+        "missing_confidence": "Not placed precisely: confidence was not provided.",
+        "invalid_coordinates": "Not placed precisely: invalid coordinates.",
+        "invalid_zone": "Not placed precisely: zone is too large or invalid.",
+        "low_confidence": "Not placed precisely: confidence is too low.",
+        "missing_text": "Not placed precisely: text is incomplete.",
+        "overflow": "Useful explanation, not shown on the image to keep it readable."
+      }
+    }
   },
   "landings": {
     "loading": "Loading landings...",
