@@ -3253,7 +3253,7 @@ def get_flight_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/flights/records", response_model=FlightRecordsResponse)
-def get_flight_records(db: Session = Depends(get_db)):
+def get_flight_records(db: Session = Depends(get_db)) -> FlightRecordsResponse:
     """
     Get personal flight records (longest duration, highest altitude, longest distance, max speed)
 
@@ -3280,7 +3280,7 @@ def get_flight_records(db: Session = Depends(get_db)):
     }
 
     if not flights:
-        return empty_records
+        return FlightRecordsResponse(**empty_records)
 
     # Filter out None values and find records
     flights_with_duration = [f for f in flights if f.duration_minutes is not None]
@@ -3420,12 +3420,12 @@ def get_flight_records(db: Session = Depends(get_db)):
         max(month_records, key=lambda item: (item[1], item[0])) if month_records else None
     )
 
-    return {
-        "longest_duration": format_record(longest, "duration_minutes", flights_with_duration),
-        "highest_altitude": format_record(highest, "max_altitude_m", flights_with_altitude),
-        "longest_distance": format_record(farthest, "distance_km", flights_with_distance),
-        "max_speed": format_record(fastest, "max_speed_kmh", flights_with_speed),
-        "takeoff_elevation_gain": format_computed_flight_record(
+    return FlightRecordsResponse(
+        longest_duration=format_record(longest, "duration_minutes", flights_with_duration),
+        highest_altitude=format_record(highest, "max_altitude_m", flights_with_altitude),
+        longest_distance=format_record(farthest, "distance_km", flights_with_distance),
+        max_speed=format_record(fastest, "max_speed_kmh", flights_with_speed),
+        takeoff_elevation_gain=format_computed_flight_record(
             greatest_takeoff_gain,
             (
                 greatest_takeoff_gain.max_altitude_m - greatest_takeoff_gain.site.elevation_m
@@ -3434,9 +3434,9 @@ def get_flight_records(db: Session = Depends(get_db)):
             ),
             flights_with_takeoff_elevation_gain,
         ),
-        "earliest_takeoff": format_time_record(earliest_takeoff, flights_with_departure_time),
-        "latest_takeoff": format_time_record(latest_takeoff, flights_with_departure_time),
-        "most_used_takeoff": (
+        earliest_takeoff=format_time_record(earliest_takeoff, flights_with_departure_time),
+        latest_takeoff=format_time_record(latest_takeoff, flights_with_departure_time),
+        most_used_takeoff=(
             {
                 "value": most_used_takeoff[1],
                 "site_id": most_used_takeoff[0].id,
@@ -3446,7 +3446,7 @@ def get_flight_records(db: Session = Depends(get_db)):
             if most_used_takeoff
             else None
         ),
-        "most_active_month": (
+        most_active_month=(
             {
                 "value": most_active_month[1],
                 "month": most_active_month[0],
@@ -3455,7 +3455,7 @@ def get_flight_records(db: Session = Depends(get_db)):
             if most_active_month
             else None
         ),
-    }
+    )
 
 
 @router.get("/flights/{flight_id}")
@@ -5833,7 +5833,9 @@ async def test_weather_source(
 _pending_emagram_analyses: set[str] = set()
 
 
-def _auto_emagram_analysis(site_id: str, day_index: int = 0, hour: int | None = None):
+def _auto_emagram_analysis(
+    site_id: str, day_index: int = 0, hour: int | None = None, locale: str | None = None
+):
     """Background task: auto-trigger emagram analysis for a site."""
     import asyncio
 
@@ -5852,6 +5854,7 @@ def _auto_emagram_analysis(site_id: str, day_index: int = 0, hour: int | None = 
                     db=db,
                     day_index=day_index,
                     hour=hour,
+                    locale=locale,
                 )
             )
     except Exception as e:
@@ -5869,6 +5872,7 @@ async def get_latest_emagram(
     user_lon: float | None = Query(None, description="User longitude"),
     day_index: int = Query(0, description="Day index (0=today, 1=tomorrow, ...)"),
     hour: int | None = Query(None, description="Specific hour (0-23) for hourly analysis"),
+    locale: str | None = Query(None, description="Analysis language: fr or en"),
     max_distance_km: float = Query(200, description="Maximum station distance in km"),
     auto_analyze: bool = Query(False, description="Auto-trigger analysis if none found"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
@@ -5992,7 +5996,7 @@ async def get_latest_emagram(
 
         # Auto-trigger analysis in background if no data found
         if result is None and auto_analyze and site_id:
-            background_tasks.add_task(_auto_emagram_analysis, site_id, day_index, hour)
+            background_tasks.add_task(_auto_emagram_analysis, site_id, day_index, hour, locale)
 
         return result
 
@@ -6441,6 +6445,7 @@ async def trigger_emagram_analysis(
             force_refresh=request.force_refresh,
             day_index=request.day_index,
             hour=request.hour,
+            locale=request.locale,
         )
 
         if not result.get("success"):

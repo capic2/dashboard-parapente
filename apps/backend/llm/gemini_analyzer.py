@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from llm.emagram_prompt import build_emagram_analysis_prompt, normalize_analysis_locale
 from llm.screenshot_inputs import ScreenshotInput, normalize_screenshot_inputs
 
 try:
@@ -34,6 +35,7 @@ def analyze_emagram_with_gemini(
     model_name: str = "gemini-2.5-flash",
     max_retries: int = 3,
     retry_delay: float = 2.0,
+    locale: str | None = None,
 ) -> dict:
     """
     Analyze emagram screenshots using Google Gemini Vision API.
@@ -70,7 +72,7 @@ def analyze_emagram_with_gemini(
     genai.configure(api_key=api_key)
 
     # Build prompt with images
-    prompt_parts = _build_analysis_prompt(screenshot_paths, spot_name, coordinates)
+    prompt_parts = _build_analysis_prompt(screenshot_paths, spot_name, coordinates, locale)
 
     # Retry loop
     last_error = None
@@ -115,6 +117,10 @@ def analyze_emagram_with_gemini(
 
             # Parse response
             analysis = _parse_gemini_response(response_text)
+            if isinstance(analysis.get("explication_analyse"), dict):
+                analysis["explication_analyse"].setdefault(
+                    "locale", normalize_analysis_locale(locale)
+                )
 
             usage = getattr(response, "usage_metadata", None)
             prompt_tokens = getattr(usage, "prompt_token_count", 0) or 0
@@ -156,7 +162,10 @@ def analyze_emagram_with_gemini(
 
 
 def _build_analysis_prompt(
-    screenshot_paths: list[ScreenshotInput], spot_name: str, coordinates: tuple
+    screenshot_paths: list[ScreenshotInput],
+    spot_name: str,
+    coordinates: tuple,
+    locale: str | None = None,
 ) -> list[Any]:
     """
     Build the analysis prompt with embedded images.
@@ -172,42 +181,14 @@ def _build_analysis_prompt(
         for index, screenshot in enumerate(screenshots, start=1)
     )
 
-    # Text prompt - CONCIS pour économiser les tokens
-    text_prompt = f"""Analyse ces {len(screenshots)} emagrammes pour {spot_name} ({lat:.4f}, {lon:.4f}).
-
-Correspondance des images:
-{source_lines}
-
-Réponds UNIQUEMENT avec ce JSON (sans markdown):
-
-{{
-  "plafond_thermique_m": <altitude plafond en mètres>,
-  "force_thermique_ms": <force thermiques en m/s>,
-  "heures_volables": "<ex: 12h-18h>",
-  "score_volabilite": <0-100>,
-  "conseils_vol": "<conseils courts MAX 50 mots>",
-  "alertes_securite": [<liste ou []>],
-  "details_analyse": "<analyse courte MAX 100 mots>",
-  "explication_analyse": {{
-    "resume": "<pourquoi ce score en 1 phrase>",
-    "indices": [
-      "<indice global observe -> interpretation parapente>",
-      "<indice global observe -> interpretation parapente>"
-    ],
-    "par_source": {{
-      "<source exacte ci-dessus>": [
-        "Courbe observee: <nom/couleur/position> | Comment la reconnaitre: <repere visuel> | Interpretation: <sens meteo> | Consequence parapente: <impact concret>",
-        "Courbe observee: <nom/couleur/position> | Comment la reconnaitre: <repere visuel> | Interpretation: <sens meteo> | Consequence parapente: <impact concret>"
-      ]
-    }}
-  }}
-}}
-
-Pour chaque image/source, remplis obligatoirement explication_analyse.par_source avec la cle source exacte indiquee plus haut.
-Explique les courbes visibles: temperature, point de rosee, ecart temperature/point de rosee, parcelle/thermique si visible, base nuageuse/LCL, inversions/couches stables et vent altitude si visible.
-
-IMPORTANT: Réponds UNIQUEMENT le JSON complet, rien d'autre.
-"""
+    text_prompt = build_emagram_analysis_prompt(
+        spot_name=spot_name,
+        lat=lat,
+        lon=lon,
+        source_lines=source_lines,
+        image_count=len(screenshots),
+        locale=locale,
+    )
 
     # Build parts list: [text, image1, image2, ...]
     parts = [text_prompt]

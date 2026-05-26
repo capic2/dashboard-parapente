@@ -15,44 +15,13 @@ from typing import Any
 import httpx
 
 import config
+from llm.emagram_prompt import build_emagram_analysis_prompt, normalize_analysis_locale
 from llm.exceptions import QuotaExhaustedError
 from llm.screenshot_inputs import ScreenshotInput, normalize_screenshot_inputs
 
 logger = logging.getLogger(__name__)
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
-
-ANALYSIS_PROMPT = """Tu es un expert météorologue spécialisé en parapente. Analyse ces emagrammes pour le spot "{spot_name}" ({lat}, {lon}).
-
-Correspondance des images:
-{source_lines}
-
-Réponds UNIQUEMENT en JSON valide avec cette structure exacte :
-{{
-  "plafond_thermique_m": <altitude en metres du sommet des thermiques>,
-  "force_thermique_ms": <vitesse ascendante moyenne en m/s>,
-  "heures_volables": "<heure debut>-<heure fin>",
-  "score_volabilite": <score 0-100>,
-  "conseils_vol": "<conseils pratiques pour le pilote>",
-  "alertes_securite": ["<alerte 1>", "<alerte 2>"],
-  "details_analyse": "<resume technique de l'analyse>",
-  "explication_analyse": {{
-    "resume": "<pourquoi ce score en 1 phrase>",
-    "indices": [
-      "<indice global observe -> interpretation parapente>",
-      "<indice global observe -> interpretation parapente>"
-    ],
-    "par_source": {{
-      "<source exacte ci-dessus>": [
-        "Courbe observee: <nom/couleur/position> | Comment la reconnaitre: <repere visuel> | Interpretation: <sens meteo> | Consequence parapente: <impact concret>",
-        "Courbe observee: <nom/couleur/position> | Comment la reconnaitre: <repere visuel> | Interpretation: <sens meteo> | Consequence parapente: <impact concret>"
-      ]
-    }}
-  }}
-}}
-
-Pour chaque image/source, remplis obligatoirement explication_analyse.par_source avec la cle source exacte indiquee plus haut.
-Explique les courbes visibles: temperature, point de rosee, ecart temperature/point de rosee, parcelle/thermique si visible, base nuageuse/LCL, inversions/couches stables et vent altitude si visible."""
 
 
 def analyze_emagram_with_openrouter(
@@ -61,6 +30,7 @@ def analyze_emagram_with_openrouter(
     coordinates: tuple[float, float],
     model_name: str = "qwen/qwen2.5-vl-72b-instruct:free",
     max_retries: int = 2,
+    locale: str | None = None,
 ) -> dict[str, Any]:
     """Analyze emagram screenshots using OpenRouter vision models."""
     api_key = config.OPENROUTER_API_KEY
@@ -69,7 +39,7 @@ def analyze_emagram_with_openrouter(
 
     logger.info(f"Analyzing emagram for {spot_name} using OpenRouter {model_name}")
 
-    content = _build_message_content(screenshot_paths, spot_name, coordinates)
+    content = _build_message_content(screenshot_paths, spot_name, coordinates, locale)
     last_error = None
 
     headers = {
@@ -102,6 +72,10 @@ def analyze_emagram_with_openrouter(
             data = response.json()
             raw_text = data["choices"][0]["message"].get("content") or ""
             result = _parse_openrouter_response(raw_text)
+            if isinstance(result.get("explication_analyse"), dict):
+                result["explication_analyse"].setdefault(
+                    "locale", normalize_analysis_locale(locale)
+                )
 
             usage = data.get("usage") or {}
             prompt_tokens = usage.get("prompt_tokens") or 0
@@ -129,7 +103,10 @@ def analyze_emagram_with_openrouter(
 
 
 def _build_message_content(
-    screenshot_paths: list[ScreenshotInput], spot_name: str, coordinates: tuple[float, float]
+    screenshot_paths: list[ScreenshotInput],
+    spot_name: str,
+    coordinates: tuple[float, float],
+    locale: str | None = None,
 ) -> list[dict[str, Any]]:
     content: list[dict[str, Any]] = []
     screenshots = normalize_screenshot_inputs(screenshot_paths)
@@ -141,8 +118,13 @@ def _build_message_content(
     content.append(
         {
             "type": "text",
-            "text": ANALYSIS_PROMPT.format(
-                spot_name=spot_name, lat=lat, lon=lon, source_lines=source_lines
+            "text": build_emagram_analysis_prompt(
+                spot_name=spot_name,
+                lat=lat,
+                lon=lon,
+                source_lines=source_lines,
+                image_count=len(screenshots),
+                locale=locale,
             ),
         }
     )

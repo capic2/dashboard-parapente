@@ -19,21 +19,18 @@ import {
 import { useSite } from '../hooks/sites/useSites';
 import { parseAlerts, getScoreColor } from '../types/emagram';
 import type { EmagramListItem } from '../types/emagram';
-import {
-  DataTable,
-  Button,
-  Lightbox,
-} from '@dashboard-parapente/design-system';
+import { DataTable, Button } from '@dashboard-parapente/design-system';
 import { parseApiUtcDate } from '../lib/date';
 import { getApiUrlWithSearchParams } from '../lib/api';
 import { useAuthStore } from '../stores/authStore';
+import { AnnotatedEmagramLightbox } from '../components/dashboard/AnnotatedEmagramLightbox';
 import { EmagramExplanationTooltip } from '../components/dashboard/EmagramExplanationTooltip';
 
 const historyColumnHelper = createColumnHelper<EmagramListItem>();
 
 function formatSourceName(source: string): string {
   return source
-    .replace(/-/g, ' ')
+    .replace(/-/gu, ' ')
     .split(' ')
     .filter(Boolean)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -167,6 +164,7 @@ export default function ThermalAnalysis() {
           { access_token: authToken }
         ),
         alt: formatSourceName(source),
+        source,
       }));
     } catch {
       return [];
@@ -224,6 +222,75 @@ export default function ThermalAnalysis() {
   const skewtUnavailableSvg = `data:image/svg+xml,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="#f3f4f6"/><text x="50%" y="50%" text-anchor="middle" fill="#9ca3af" font-size="16">${t('thermal.imageUnavailable')}</text></svg>`
   )}`;
+  const imageTimestamp = (
+    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+      {latest.station_name} • {latest.sounding_time} •{' '}
+      {parseApiUtcDate(latest.analysis_datetime).toLocaleDateString()}
+    </p>
+  );
+
+  let emagramImageContent = (
+    <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-8 text-center text-gray-500 dark:text-gray-400">
+      {t('thermal.skewtUnavailable')}
+    </div>
+  );
+
+  if (screenshotImages.length > 0) {
+    emagramImageContent = (
+      <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {screenshotImages.map((image, idx) => (
+            <button
+              key={image.src}
+              type="button"
+              onClick={() => {
+                setLightboxIndex(idx);
+                setLightboxOpen(true);
+              }}
+              className="group overflow-hidden rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-left shadow-sm transition hover:border-purple-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <img
+                src={image.src}
+                alt={image.alt}
+                className="h-52 w-full object-cover object-top transition group-hover:scale-[1.02]"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = skewtUnavailableSvg;
+                }}
+              />
+              <span className="flex items-center justify-between gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+                <span>{image.alt}</span>
+                <span className="text-purple-600 dark:text-purple-300">
+                  {t('thermal.openImage')}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+        {imageTimestamp}
+        <AnnotatedEmagramLightbox
+          isOpen={lightboxOpen}
+          onClose={() => setLightboxOpen(false)}
+          images={screenshotImages}
+          aiRawResponse={latest.ai_raw_response}
+          initialIndex={lightboxIndex}
+        />
+      </div>
+    );
+  } else if (latest.skewt_image_path) {
+    emagramImageContent = (
+      <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
+        <img
+          src={`/api/files${latest.skewt_image_path}`}
+          alt={t('thermal.skewtAlt')}
+          className="w-full h-auto rounded"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = skewtUnavailableSvg;
+          }}
+        />
+        {imageTimestamp}
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 max-w-7xl mx-auto">
@@ -341,68 +408,7 @@ export default function ThermalAnalysis() {
               : t('thermal.skewtTitle')}
           </h2>
 
-          {screenshotImages.length > 0 ? (
-            <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {screenshotImages.map((image, idx) => (
-                  <button
-                    key={image.src}
-                    type="button"
-                    onClick={() => {
-                      setLightboxIndex(idx);
-                      setLightboxOpen(true);
-                    }}
-                    className="group overflow-hidden rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-left shadow-sm transition hover:border-purple-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <img
-                      src={image.src}
-                      alt={image.alt}
-                      className="h-52 w-full object-cover object-top transition group-hover:scale-[1.02]"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          skewtUnavailableSvg;
-                      }}
-                    />
-                    <span className="flex items-center justify-between gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-                      <span>{image.alt}</span>
-                      <span className="text-purple-600 dark:text-purple-300">
-                        {t('thermal.openImage')}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-                {latest.station_name} • {latest.sounding_time} •{' '}
-                {parseApiUtcDate(latest.analysis_datetime).toLocaleDateString()}
-              </p>
-              <Lightbox
-                isOpen={lightboxOpen}
-                onClose={() => setLightboxOpen(false)}
-                images={screenshotImages}
-                initialIndex={lightboxIndex}
-              />
-            </div>
-          ) : latest.skewt_image_path ? (
-            <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
-              <img
-                src={`/api/files${latest.skewt_image_path}`}
-                alt={t('thermal.skewtAlt')}
-                className="w-full h-auto rounded"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = skewtUnavailableSvg;
-                }}
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-                {latest.station_name} • {latest.sounding_time} •{' '}
-                {parseApiUtcDate(latest.analysis_datetime).toLocaleDateString()}
-              </p>
-            </div>
-          ) : (
-            <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-8 text-center text-gray-500 dark:text-gray-400">
-              {t('thermal.skewtUnavailable')}
-            </div>
-          )}
+          {emagramImageContent}
         </div>
       </div>
 

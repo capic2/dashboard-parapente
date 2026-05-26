@@ -16,41 +16,10 @@ except ImportError:
     GROQ_AVAILABLE = False
 
 import config
+from llm.emagram_prompt import build_emagram_analysis_prompt, normalize_analysis_locale
 from llm.screenshot_inputs import ScreenshotInput, normalize_screenshot_inputs
 
 logger = logging.getLogger(__name__)
-
-ANALYSIS_PROMPT = """Tu es un expert météorologue spécialisé en parapente. Analyse ces emagrammes pour le spot "{spot_name}" ({lat}, {lon}).
-
-Correspondance des images:
-{source_lines}
-
-Réponds UNIQUEMENT en JSON valide avec cette structure exacte :
-{{
-  "plafond_thermique_m": <altitude en metres du sommet des thermiques>,
-  "force_thermique_ms": <vitesse ascendante moyenne en m/s>,
-  "heures_volables": "<heure debut>-<heure fin>",
-  "score_volabilite": <score 0-100>,
-  "conseils_vol": "<conseils pratiques pour le pilote>",
-  "alertes_securite": ["<alerte 1>", "<alerte 2>"],
-  "details_analyse": "<resume technique de l'analyse>",
-  "explication_analyse": {{
-    "resume": "<pourquoi ce score en 1 phrase>",
-    "indices": [
-      "<indice global observe -> interpretation parapente>",
-      "<indice global observe -> interpretation parapente>"
-    ],
-    "par_source": {{
-      "<source exacte ci-dessus>": [
-        "Courbe observee: <nom/couleur/position> | Comment la reconnaitre: <repere visuel> | Interpretation: <sens meteo> | Consequence parapente: <impact concret>",
-        "Courbe observee: <nom/couleur/position> | Comment la reconnaitre: <repere visuel> | Interpretation: <sens meteo> | Consequence parapente: <impact concret>"
-      ]
-    }}
-  }}
-}}
-
-Pour chaque image/source, remplis obligatoirement explication_analyse.par_source avec la cle source exacte indiquee plus haut.
-Explique les courbes visibles: temperature, point de rosee, ecart temperature/point de rosee, parcelle/thermique si visible, base nuageuse/LCL, inversions/couches stables et vent altitude si visible."""
 
 
 def analyze_emagram_with_groq(
@@ -59,6 +28,7 @@ def analyze_emagram_with_groq(
     coordinates: tuple,
     model_name: str = "meta-llama/llama-4-scout-17b-16e-instruct",
     max_retries: int = 2,
+    locale: str | None = None,
 ) -> dict:
     """
     Analyze emagram screenshots using Groq API (Llama Vision).
@@ -87,8 +57,13 @@ def analyze_emagram_with_groq(
     content.append(
         {
             "type": "text",
-            "text": ANALYSIS_PROMPT.format(
-                spot_name=spot_name, lat=lat, lon=lon, source_lines=source_lines
+            "text": build_emagram_analysis_prompt(
+                spot_name=spot_name,
+                lat=lat,
+                lon=lon,
+                source_lines=source_lines,
+                image_count=len(screenshots),
+                locale=locale,
             ),
         }
     )
@@ -148,6 +123,10 @@ def analyze_emagram_with_groq(
             result.setdefault("alertes_securite", [])
             result.setdefault("details_analyse", "Analyse par Groq Llama Vision")
             result.setdefault("explication_analyse", None)
+            if isinstance(result["explication_analyse"], dict):
+                result["explication_analyse"].setdefault(
+                    "locale", normalize_analysis_locale(locale)
+                )
             usage = getattr(response, "usage", None)
             prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
             completion_tokens = getattr(usage, "completion_tokens", 0) or 0
