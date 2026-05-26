@@ -285,39 +285,47 @@ async def screenshot_meteociel_emagram(
             browser = await p.chromium.launch(headless=True)
             page = await browser.new_page(viewport={"width": 1600, "height": 1200})
 
-            logger.info(f"Meteociel emagram: Loading {url}")
-            await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
-
-            # Wait for emagram image to load
-            await page.wait_for_timeout(5000)
-
-            # Meteociel shows emagram as an image - capture with surrounding context (title/date)
             try:
-                emagram_img = page.locator("img[src*='sondage'], img[src*='emagram']").first
-                if await emagram_img.count() > 0:
-                    # Try to capture parent container to include the title with the date
-                    parent = emagram_img.locator("xpath=ancestor::td").first
-                    if await parent.count() > 0:
-                        await parent.screenshot(path=str(image_path))
-                        logger.info("Captured emagram with parent container (includes date)")
-                    else:
-                        # Fallback: try broader container
-                        parent_table = emagram_img.locator("xpath=ancestor::table").first
-                        if await parent_table.count() > 0:
-                            await parent_table.screenshot(path=str(image_path))
-                            logger.info("Captured emagram with table container (includes date)")
-                        else:
-                            await emagram_img.screenshot(path=str(image_path))
-                            logger.info("Captured emagram image directly (no parent found)")
-                else:
-                    await page.screenshot(path=str(image_path), full_page=False)
-                    logger.warning("Emagram image not found, took full screenshot")
-            except Exception as e:
-                logger.warning(f"Could not find emagram element: {e}, taking full screenshot")
-                await page.screenshot(path=str(image_path), full_page=False)
+                logger.info(f"Meteociel emagram: Loading {url}")
+                await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
 
-            logger.info(f"Meteociel emagram screenshot saved: {image_path}")
-            await browser.close()
+                image_selector = "img[src*='sondagegfs'], img[src*='sondage'], img[src*='emagram']"
+                await page.wait_for_selector(image_selector, state="visible", timeout=timeout)
+                await page.wait_for_function(
+                    """
+                    selector => {
+                        const img = document.querySelector(selector);
+                        return img instanceof HTMLImageElement
+                            && img.complete
+                            && img.naturalWidth > 0
+                            && img.naturalHeight > 0;
+                    }
+                    """,
+                    arg=image_selector,
+                    timeout=timeout,
+                )
+
+                # Meteociel shows emagram as an image; fail instead of storing a blank fallback.
+                emagram_img = page.locator(image_selector).first
+                parent = emagram_img.locator("xpath=ancestor::td").first
+                if await parent.count() > 0:
+                    await parent.screenshot(path=str(image_path))
+                    logger.info("Captured emagram with parent container (includes date)")
+                else:
+                    parent_table = emagram_img.locator("xpath=ancestor::table").first
+                    if await parent_table.count() > 0:
+                        await parent_table.screenshot(path=str(image_path))
+                        logger.info("Captured emagram with table container (includes date)")
+                    else:
+                        await emagram_img.screenshot(path=str(image_path))
+                        logger.info("Captured emagram image directly (no parent found)")
+
+                if not image_path.exists() or image_path.stat().st_size == 0:
+                    raise RuntimeError("Meteociel emagram screenshot was not written")
+
+                logger.info(f"Meteociel emagram screenshot saved: {image_path}")
+            finally:
+                await browser.close()
 
         return {
             "success": True,
