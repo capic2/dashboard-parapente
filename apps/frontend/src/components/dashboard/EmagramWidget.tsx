@@ -19,7 +19,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { parseApiUtcDate } from '../../lib/date';
 import { getApiUrlWithSearchParams } from '../../lib/api';
 import { useAuthStore } from '../../stores/authStore';
-import { Lightbox } from '@dashboard-parapente/design-system';
+import { AnnotatedEmagramLightbox } from './AnnotatedEmagramLightbox';
 import { EmagramExplanationTooltip } from './EmagramExplanationTooltip';
 import {
   Slider,
@@ -657,7 +657,7 @@ export default function EmagramWidget({
                 ),
                 alt: [
                   source
-                    .replace('-', ' ')
+                    .replace(/-/gu, ' ')
                     .split(' ')
                     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
                     .join(' '),
@@ -665,6 +665,7 @@ export default function EmagramWidget({
                 ]
                   .filter(Boolean)
                   .join(' — '),
+                source,
               }));
               return (
                 <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
@@ -713,7 +714,7 @@ export default function EmagramWidget({
                             <span className="flex-shrink-0">⚠️</span>
                             <span>
                               <span className="font-medium capitalize">
-                                {source.replace('-', ' ')}
+                                {source.replace(/-/gu, ' ')}
                               </span>{' '}
                               — {errMsg}
                             </span>
@@ -722,10 +723,11 @@ export default function EmagramWidget({
                       </div>
                     );
                   })()}
-                  <Lightbox
+                  <AnnotatedEmagramLightbox
                     isOpen={lightboxOpen}
                     onClose={() => setLightboxOpen(false)}
                     images={lightboxImages}
+                    aiRawResponse={emagram.ai_raw_response}
                     initialIndex={lightboxIndex}
                   />
                 </div>
