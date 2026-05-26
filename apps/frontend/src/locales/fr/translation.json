@@ -1025,7 +1025,51 @@
     "openImage": "Ouvrir",
     "summaryTitle": "📊 Résumé des Conditions",
     "tipsTitle": "💡 Conseils de Vol",
-    "safetyAlertsTitle": "⚠️ Alertes de Sécurité"
+    "safetyAlertsTitle": "⚠️ Alertes de Sécurité",
+    "annotations": {
+      "source": "Source",
+      "hideAnnotations": "Masquer les explications",
+      "showAnnotations": "Afficher les explications",
+      "summaryAndMore": "Résumé et autres explications",
+      "zoomIn": "Zoom +",
+      "reset": "Réinitialiser",
+      "previous": "Précédent",
+      "next": "Suivant",
+      "help": "Clique sur un point d'info pour comprendre cette partie de l'émagramme.",
+      "hidden": "Explications masquées.",
+      "groupLabel": "{{count}} explications",
+      "confidence": "Confiance : {{value}}",
+      "termToRemember": "Mot à retenir",
+      "visualCue": "Repère visuel",
+      "weatherReading": "Lecture météo",
+      "flightImpact": "Impact vol",
+      "globalSummary": "Résumé",
+      "flightTakeaways": "À retenir pour voler",
+      "otherExplanations": "Autres explications",
+      "noExplanation": "Aucune explication disponible pour cette image.",
+      "priority": {
+        "important": "Important",
+        "watch": "À surveiller",
+        "educational": "Pédagogique"
+      },
+      "category": {
+        "thermal": "Thermiques",
+        "ceiling": "Plafond",
+        "stability": "Stabilité",
+        "humidity": "Humidité",
+        "wind": "Vent",
+        "risk": "Risque"
+      },
+      "reason": {
+        "invalid_metadata": "Explication non placée précisément : métadonnées incomplètes.",
+        "missing_confidence": "Explication non placée précisément : confiance non fournie.",
+        "invalid_coordinates": "Explication non placée précisément : coordonnées invalides.",
+        "invalid_zone": "Explication non placée précisément : zone trop large ou invalide.",
+        "low_confidence": "Explication non placée précisément : confiance insuffisante.",
+        "missing_text": "Explication non placée précisément : texte incomplet.",
+        "overflow": "Explication utile, mais non affichée sur l'image pour garder la lecture simple."
+      }
+    }
   },
   "landings": {
     "loading": "Chargement des atterrissages...",

@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 import config
 from emagram_freshness import get_emagram_cutoff_utc, get_emagram_next_update_utc
 from llm.exceptions import QuotaExhaustedError
+from llm.emagram_prompt import normalize_analysis_locale
 from llm.gemini_analyzer import analyze_emagram_with_gemini
 from llm.groq_analyzer import analyze_emagram_with_groq
 from llm.openrouter_analyzer import analyze_emagram_with_openrouter
@@ -35,7 +36,8 @@ PROVIDER_ENV_VARS = {
 }
 
 
-def _configured_llm_providers() -> list[dict[str, Any]]:
+def _configured_llm_providers(locale: str | None = None) -> list[dict[str, Any]]:
+    analysis_locale = normalize_analysis_locale(locale)
     providers = {
         "groq": {
             "key": config.GROQ_API_KEY,
@@ -49,6 +51,7 @@ def _configured_llm_providers() -> list[dict[str, Any]]:
                 spot_name=site.name,
                 coordinates=(site.latitude, site.longitude),
                 model_name=config.GROQ_MODEL,
+                locale=analysis_locale,
             ),
         },
         "openrouter": {
@@ -63,6 +66,7 @@ def _configured_llm_providers() -> list[dict[str, Any]]:
                 spot_name=site.name,
                 coordinates=(site.latitude, site.longitude),
                 model_name=config.OPENROUTER_MODEL,
+                locale=analysis_locale,
             ),
         },
         "google": {
@@ -79,6 +83,7 @@ def _configured_llm_providers() -> list[dict[str, Any]]:
                 api_key=config.GOOGLE_API_KEY,
                 model_name=config.GEMINI_MODEL,
                 max_retries=3,
+                locale=analysis_locale,
             ),
         },
     }
@@ -107,12 +112,12 @@ def _configured_llm_providers() -> list[dict[str, Any]]:
 
 
 def _analyze_emagram_with_fallbacks(
-    screenshots: list[dict[str, str]], site: Site
+    screenshots: list[dict[str, str]], site: Site, locale: str | None = None
 ) -> dict[str, Any]:
     analysis_errors = []
     quota_errors = 0
     providers_tried = 0
-    configured_providers = _configured_llm_providers()
+    configured_providers = _configured_llm_providers(locale)
 
     if not configured_providers:
         env_vars = ", ".join(PROVIDER_ENV_VARS.values())
@@ -156,6 +161,10 @@ def _analyze_emagram_with_fallbacks(
 def _normalize_llm_analysis(
     raw_analysis: dict[str, Any], provider: dict[str, Any]
 ) -> dict[str, Any]:
+    explication_analyse = raw_analysis.get("explication_analyse")
+    if isinstance(explication_analyse, dict):
+        explication_analyse.setdefault("locale", normalize_analysis_locale(None))
+
     return {
         "success": True,
         "plafond_thermique_m": raw_analysis.get("plafond_thermique_m"),
@@ -165,7 +174,7 @@ def _normalize_llm_analysis(
         "conseils_vol": raw_analysis.get("conseils_vol"),
         "alertes_securite": raw_analysis.get("alertes_securite", []),
         "details_analyse": raw_analysis.get("details_analyse"),
-        "explication_analyse": raw_analysis.get("explication_analyse"),
+        "explication_analyse": explication_analyse,
         "llm_provider": provider["provider"],
         "llm_model": raw_analysis.get("llm_model", provider["model"]),
         "llm_tokens_used": raw_analysis.get("llm_tokens_used"),
@@ -199,6 +208,7 @@ async def generate_multi_source_emagram_for_spot(
     force_refresh: bool = False,
     day_index: int = 0,
     hour: int | None = None,
+    locale: str | None = None,
 ) -> dict[str, Any]:
     """
     Complete workflow to generate multi-source emagram analysis for a spot
@@ -306,7 +316,9 @@ async def generate_multi_source_emagram_for_spot(
         image_sources = [
             {"source": s["source"], "path": s["image_path"]} for s in successful_screenshots
         ]
-        analysis_result = _analyze_emagram_with_fallbacks(image_sources, site)
+        analysis_result = _analyze_emagram_with_fallbacks(
+            image_sources, site, locale=normalize_analysis_locale(locale)
+        )
 
         if not analysis_result.get("success"):
             logger.error(f"LLM analysis failed: {analysis_result.get('error')}")

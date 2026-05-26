@@ -659,6 +659,7 @@ class EmagramTriggerRequest(BaseModel):
     force_refresh: bool = False
     day_index: int = 0
     hour: int | None = None
+    locale: str | None = None
 
     @validator("user_latitude")
     def validate_latitude(cls, v):
@@ -671,6 +672,15 @@ class EmagramTriggerRequest(BaseModel):
         if v is not None and not -180 <= v <= 180:
             raise ValueError("Longitude must be between -180 and 180")
         return v
+
+    @validator("locale")
+    def validate_locale(cls, v):
+        if v is None:
+            return v
+        normalized = v.lower().split("-", maxsplit=1)[0]
+        if normalized not in {"fr", "en"}:
+            raise ValueError("Locale must be 'fr' or 'en'")
+        return normalized
 
 
 class VideoExportTempCleanupError(BaseModel):

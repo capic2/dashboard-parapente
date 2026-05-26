@@ -3,6 +3,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { getStaleTime, getWeatherRefetchInterval } from '../../lib/cacheConfig';
 import type { EmagramAnalysis, EmagramListItem } from '../../types/emagram';
 import { api } from '../../lib/api';
@@ -26,6 +27,7 @@ export function useLatestEmagram(
   hour?: number | null,
   options?: { enabled?: boolean }
 ) {
+  const { i18n } = useTranslation();
   return useQuery({
     queryKey: emagramKeys.latest(siteId, dayIndex, hour),
     queryFn: async (): Promise<EmagramAnalysis | null> => {
@@ -35,6 +37,7 @@ export function useLatestEmagram(
         site_id: siteId,
         day_index: dayIndex.toString(),
         auto_analyze: 'true',
+        locale: i18n.language,
       });
       if (hour != null) {
         params.set('hour', hour.toString());
@@ -126,6 +129,7 @@ export function useEmagramHistory(
  */
 export function useTriggerEmagram() {
   const queryClient = useQueryClient();
+  const { i18n } = useTranslation();
 
   return useMutation({
     mutationFn: async (request: {
@@ -135,9 +139,12 @@ export function useTriggerEmagram() {
       force_refresh?: boolean;
       day_index?: number;
       hour?: number | null;
+      locale?: string;
     }): Promise<EmagramAnalysis> => {
       return api
-        .post('emagram/analyze', { json: request })
+        .post('emagram/analyze', {
+          json: { locale: i18n.language, ...request },
+        })
         .json<EmagramAnalysis>();
     },
     onSuccess: () => {
