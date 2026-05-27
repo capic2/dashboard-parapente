@@ -70,6 +70,81 @@ const getRiskEmoji = (risque: string | null): string => {
   return '';
 };
 
+function useElapsedSeconds(isActive: boolean): number {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!isActive) {
+      setElapsedSeconds(0);
+      return undefined;
+    }
+
+    setElapsedSeconds(0);
+    const startedAt = Date.now();
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isActive]);
+
+  return elapsedSeconds;
+}
+
+function formatElapsedTime(elapsedSeconds: number): string {
+  const minutes = Math.floor(elapsedSeconds / 60);
+  const seconds = elapsedSeconds % 60;
+
+  if (minutes === 0) {
+    return `${seconds}s`;
+  }
+
+  return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
+}
+
+function getEstimatedProgress(elapsedSeconds: number): number {
+  if (elapsedSeconds < 10) return 20;
+  if (elapsedSeconds < 30) return 45;
+  if (elapsedSeconds < 60) return 70;
+  if (elapsedSeconds < 120) return 85;
+  return 95;
+}
+
+function getAnalysisProgressStep(elapsedSeconds: number): string {
+  if (elapsedSeconds < 10) return 'Préparation de la demande météo';
+  if (elapsedSeconds < 30) return 'Récupération des émagrammes sources';
+  if (elapsedSeconds < 60) return 'Analyse IA des profils thermiques';
+  if (elapsedSeconds < 120) return 'Consolidation des sources';
+  return 'Toujours en cours, la vérification continue automatiquement';
+}
+
+function AnalysisProgress({ elapsedSeconds }: { elapsedSeconds: number }) {
+  const progress = getEstimatedProgress(elapsedSeconds);
+
+  return (
+    <div className="py-4 text-sm text-gray-600 dark:text-gray-300">
+      <div className="flex items-center justify-center gap-2 font-medium text-purple-700 dark:text-purple-300">
+        <div className="animate-spin h-4 w-4 border-2 border-purple-600 border-t-transparent rounded-full" />
+        <span>Analyse en cours...</span>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-purple-100 dark:bg-purple-950">
+        <div
+          className="h-full rounded-full bg-purple-600 transition-all duration-500"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <div className="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+        <span>{getAnalysisProgressStep(elapsedSeconds)}</span>
+        <span>~{progress}%</span>
+      </div>
+      <div className="mt-1 text-center text-xs text-gray-500 dark:text-gray-400">
+        Temps écoulé : {formatElapsedTime(elapsedSeconds)} · actualisation
+        automatique toutes les 30s
+      </div>
+    </div>
+  );
+}
+
 function HourSlider({
   hours,
   selectedHour,
@@ -250,6 +325,9 @@ export default function EmagramWidget({
   } = useLatestEmagram(siteId, dayIndex, activeHour, {
     enabled: shouldFetchEmagram,
   });
+  const elapsedAnalysisSeconds = useElapsedSeconds(
+    shouldFetchEmagram && (isLoading || (!emagram && !error))
+  );
 
   const displayHours = useMemo(() => {
     if (emagram?.forecast_hour == null) {
@@ -339,9 +417,7 @@ export default function EmagramWidget({
           <EmagramHeaderTitle siteName={siteName} />
         </div>
         {hourSlider}
-        <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
-          Chargement...
-        </div>
+        <AnalysisProgress elapsedSeconds={elapsedAnalysisSeconds} />
       </div>
     );
   }
@@ -393,13 +469,12 @@ export default function EmagramWidget({
           </Button>
         </div>
         {hourSlider}
-        <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
-          {!siteId ? 'Aucun site selectionne' : 'Analyse en cours...'}
-        </div>
-        {siteId && (
-          <div className="flex justify-center mt-2">
-            <div className="animate-spin h-6 w-6 border-2 border-purple-600 border-t-transparent rounded-full" />
+        {!siteId ? (
+          <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
+            Aucun site sélectionné
           </div>
+        ) : (
+          <AnalysisProgress elapsedSeconds={elapsedAnalysisSeconds} />
         )}
       </div>
     );
