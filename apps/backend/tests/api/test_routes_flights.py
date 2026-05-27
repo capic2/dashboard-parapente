@@ -116,6 +116,46 @@ class TestFlightsListEndpoint:
         assert returned["video_export_progress"] == 42
         assert returned["gopro_overlay_progress"] == 55
 
+    def test_get_flights_hides_orphan_active_media_export_state(
+        self, client, db_session, arguel_site
+    ):
+        """GET /flights does not report missing active jobs as still in progress."""
+        flight = Flight(
+            id="flight-orphan-export",
+            name="Flight orphan export",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            video_export_job_id="missing-video-job",
+            video_export_status="processing",
+            gopro_overlay_job_id="missing-overlay-job",
+            gopro_overlay_status="queued",
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        with (
+            patch("routes.get_export_status_manual", return_value=None),
+            patch("routes.get_export_status_stream", return_value=None),
+            patch("routes.get_gopro_overlay_job", return_value=None),
+        ):
+            response = client.get(f"{API_PREFIX}/flights")
+
+        assert response.status_code == 200
+        returned = next(
+            flight
+            for flight in response.json()["flights"]
+            if flight["id"] == "flight-orphan-export"
+        )
+        assert returned["video_export_status"] is None
+        assert returned["video_export_progress"] is None
+        assert returned["gopro_overlay_status"] is None
+        assert returned["gopro_overlay_progress"] is None
+        db_session.refresh(flight)
+        assert flight.video_export_job_id is None
+        assert flight.video_export_status is None
+        assert flight.gopro_overlay_job_id is None
+        assert flight.gopro_overlay_status is None
+
     def test_get_flights_includes_preparing_gopro_overlay_progress(
         self, client, db_session, arguel_site
     ):
@@ -145,6 +185,40 @@ class TestFlightsListEndpoint:
         )
         assert returned["gopro_overlay_status"] == "preparing"
         assert returned["gopro_overlay_progress"] == 12
+
+    def test_get_flight_hides_and_persists_orphan_active_media_export_state(
+        self, client, db_session, arguel_site
+    ):
+        flight = Flight(
+            id="flight-detail-orphan-export",
+            name="Flight detail orphan export",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            video_export_job_id="missing-video-job",
+            video_export_status="processing",
+            gopro_overlay_status="queued",
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        with (
+            patch("routes.get_export_status_manual", return_value=None),
+            patch("routes.get_export_status_stream", return_value=None),
+            patch("routes.get_gopro_overlay_job", return_value=None),
+        ):
+            response = client.get(f"{API_PREFIX}/flights/{flight.id}")
+
+        assert response.status_code == 200
+        returned = response.json()
+        assert returned["video_export_status"] is None
+        assert returned["video_export_progress"] is None
+        assert returned["gopro_overlay_status"] is None
+        assert returned["gopro_overlay_progress"] is None
+        db_session.refresh(flight)
+        assert flight.video_export_job_id is None
+        assert flight.video_export_status is None
+        assert flight.gopro_overlay_job_id is None
+        assert flight.gopro_overlay_status is None
 
     def test_get_flights_includes_available_gopro_overlay_path(
         self, client, db_session, monkeypatch, tmp_path

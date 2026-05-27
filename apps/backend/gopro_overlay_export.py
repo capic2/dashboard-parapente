@@ -18,7 +18,7 @@ from fastapi import UploadFile
 
 import config
 from database import SessionLocal
-from models import GoproOverlayJob
+from models import Flight, GoproOverlayJob
 from sqlalchemy.exc import OperationalError
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,8 @@ _STATUS_RUNNING = "running"
 _STATUS_COMPLETED = "completed"
 _STATUS_FAILED = "failed"
 _STATUS_CANCELLED = "cancelled"
+_ACTIVE_STATUSES = {_STATUS_QUEUED, _STATUS_PREPARING, _STATUS_RUNNING}
+_INTERRUPTIBLE_STATUSES = {_STATUS_PREPARING, _STATUS_RUNNING}
 _TERMINAL_STATUSES = {_STATUS_COMPLETED, _STATUS_FAILED, _STATUS_CANCELLED}
 
 _VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v"}
@@ -265,6 +267,7 @@ def _touch_db_job(job_id: str, **changes: Any) -> dict[str, Any] | None:
                     job.cancelled_at = _utc_now_dt()
                 if job.status in {_STATUS_COMPLETED, _STATUS_FAILED} and not job.completed_at:
                     job.completed_at = _utc_now_dt()
+            _sync_flights_from_job(db, job)
             db.commit()
             payload = _job_to_payload(job)
             _set_memory_snapshot(payload)
@@ -296,6 +299,50 @@ def _update_job(job_id: str, **changes: Any) -> dict[str, Any]:
         job.update(changes)
         job["updated_at"] = _utc_now()
         return job.copy()
+
+
+def _sync_flights_from_job(db: Any, job: GoproOverlayJob) -> None:
+    flights = db.query(Flight).filter(Flight.gopro_overlay_job_id == job.id).all()
+    for flight in flights:
+        flight.gopro_overlay_status = job.status
+        if job.status == _STATUS_COMPLETED:
+            flight.gopro_overlay_file_path = job.output_path
+
+
+def reconcile_gopro_overlay_flight_refs() -> int:
+    """Clear or sync active flight overlay references that no longer have a live job."""
+    reconciled = 0
+    try:
+        with SessionLocal() as db:
+            flights = (
+                db.query(Flight).filter(Flight.gopro_overlay_status.in_(_ACTIVE_STATUSES)).all()
+            )
+            for flight in flights:
+                if not flight.gopro_overlay_job_id:
+                    flight.gopro_overlay_status = None
+                    reconciled += 1
+                    continue
+
+                job = (
+                    db.query(GoproOverlayJob)
+                    .filter(GoproOverlayJob.id == flight.gopro_overlay_job_id)
+                    .first()
+                )
+                if not job:
+                    flight.gopro_overlay_job_id = None
+                    flight.gopro_overlay_status = None
+                    reconciled += 1
+                    continue
+
+                if job.status != flight.gopro_overlay_status:
+                    _sync_flights_from_job(db, job)
+                    reconciled += 1
+            if reconciled:
+                db.commit()
+    except OperationalError as exc:
+        if "no such table" not in str(exc):
+            raise
+    return reconciled
 
 
 def _progress_from_output_chunk(chunk: str) -> int | None:
@@ -1057,10 +1104,14 @@ def _queued_job_ids() -> list[str]:
             return [job_id for job_id, job in _JOBS.items() if job.get("status") == _STATUS_QUEUED]
 
 
-def _mark_running_jobs_interrupted() -> None:
+def _mark_interrupted_jobs_failed() -> None:
     try:
         with SessionLocal() as db:
-            jobs = db.query(GoproOverlayJob).filter(GoproOverlayJob.status == _STATUS_RUNNING).all()
+            jobs = (
+                db.query(GoproOverlayJob)
+                .filter(GoproOverlayJob.status.in_(_INTERRUPTIBLE_STATUSES))
+                .all()
+            )
             for job in jobs:
                 job.status = _STATUS_FAILED
                 job.progress = 100
@@ -1068,13 +1119,14 @@ def _mark_running_jobs_interrupted() -> None:
                 job.error = "The backend stopped while the overlay process was running"
                 job.completed_at = _utc_now_dt()
                 job.updated_at = _utc_now_dt()
+                _sync_flights_from_job(db, job)
             db.commit()
     except OperationalError as exc:
         if "no such table: gopro_overlay_jobs" not in str(exc):
             raise
         with _LOCK:
             for job in _JOBS.values():
-                if job.get("status") == _STATUS_RUNNING:
+                if job.get("status") in _INTERRUPTIBLE_STATUSES:
                     job.update(
                         status=_STATUS_FAILED,
                         progress=100,
@@ -1087,7 +1139,7 @@ def _mark_running_jobs_interrupted() -> None:
 
 def _worker_loop() -> None:
     logger.info("GoPro overlay worker started")
-    _mark_running_jobs_interrupted()
+    _mark_interrupted_jobs_failed()
     while not _WORKER_STOP.is_set():
         for job_id in _queued_job_ids():
             with _LOCK:
@@ -1112,6 +1164,7 @@ def start_gopro_overlay_worker() -> None:
     with _WORKER_LOCK:
         if _WORKER_THREAD and _WORKER_THREAD.is_alive() is True:
             return
+        reconcile_gopro_overlay_flight_refs()
         _WORKER_STOP.clear()
         _WORKER_THREAD = threading.Thread(
             target=_worker_loop,
@@ -1175,9 +1228,12 @@ def delete_gopro_overlay_job(job_id: str) -> dict[str, Any] | None:
     try:
         with SessionLocal() as db:
             db_job = db.query(GoproOverlayJob).filter(GoproOverlayJob.id == job_id).first()
+            for flight in db.query(Flight).filter(Flight.gopro_overlay_job_id == job_id).all():
+                flight.gopro_overlay_job_id = None
+                flight.gopro_overlay_status = None
             if db_job:
                 db.delete(db_job)
-                db.commit()
+            db.commit()
     except OperationalError as exc:
         if "no such table: gopro_overlay_jobs" not in str(exc):
             raise

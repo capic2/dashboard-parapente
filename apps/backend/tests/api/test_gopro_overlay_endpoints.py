@@ -796,6 +796,15 @@ def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(
                 output_filename="final.mp4",
             )
         )
+        session.add(
+            Flight(
+                id="flight-gopro-delete",
+                name="Flight GoPro delete",
+                flight_date=date(2026, 3, 15),
+                gopro_overlay_job_id=job_id,
+                gopro_overlay_status="failed",
+            )
+        )
         session.commit()
 
         result = delete_gopro_overlay_job(job_id)
@@ -807,38 +816,86 @@ def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(
     assert result["files_deleted"] == 1
     assert not work_dir.exists()
     assert gopro_overlay_export.get_gopro_overlay_job(job_id) is None
+    session = test_db()
+    try:
+        flight = session.get(Flight, "flight-gopro-delete")
+        assert flight is not None
+        assert flight.gopro_overlay_job_id is None
+        assert flight.gopro_overlay_status is None
+    finally:
+        session.close()
 
 
-def test_mark_running_jobs_interrupted_marks_rows_failed(test_db, monkeypatch):
+def test_reconcile_gopro_overlay_flight_refs_clears_missing_active_job(test_db, monkeypatch):
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+    session = test_db()
+    try:
+        session.add(
+            Flight(
+                id="flight-orphan-gopro",
+                name="Flight orphan GoPro",
+                flight_date=date(2026, 3, 15),
+                gopro_overlay_job_id="missing-gopro-job",
+                gopro_overlay_status="queued",
+            )
+        )
+        session.commit()
+
+        assert gopro_overlay_export.reconcile_gopro_overlay_flight_refs() == 1
+
+        session.expire_all()
+        refreshed = session.get(Flight, "flight-orphan-gopro")
+        assert refreshed is not None
+        assert refreshed.gopro_overlay_job_id is None
+        assert refreshed.gopro_overlay_status is None
+    finally:
+        session.close()
+
+
+def test_mark_interrupted_jobs_failed_marks_active_rows_failed(test_db, monkeypatch):
     monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
     session = test_db()
     try:
         from models import GoproOverlayJob
 
-        session.add(
-            GoproOverlayJob(
-                id="job-running",
-                status="running",
-                progress=55,
-                message="Rendering overlay",
-                video_path="video.mp4",
-                gpx_path="track.gpx",
-                layout_id="parapente-1080",
-                layout_label="Parapente 1920x1080",
-                layout_path="layout.xml",
-                output_path="final.mp4",
-                temp_output_path=".final.job-running.part.mp4",
-                output_filename="final.mp4",
+        for job_id, status in (("job-preparing", "preparing"), ("job-running", "running")):
+            session.add(
+                GoproOverlayJob(
+                    id=job_id,
+                    status=status,
+                    progress=55,
+                    message="Rendering overlay",
+                    video_path="video.mp4",
+                    gpx_path="track.gpx",
+                    layout_id="parapente-1080",
+                    layout_label="Parapente 1920x1080",
+                    layout_path="layout.xml",
+                    output_path="final.mp4",
+                    temp_output_path=f".final.{job_id}.part.mp4",
+                    output_filename="final.mp4",
+                )
             )
-        )
+            session.add(
+                Flight(
+                    id=f"flight-{job_id}",
+                    name=f"Flight {job_id}",
+                    flight_date=date(2026, 3, 15),
+                    gopro_overlay_job_id=job_id,
+                    gopro_overlay_status=status,
+                )
+            )
         session.commit()
 
-        gopro_overlay_export._mark_running_jobs_interrupted()
+        gopro_overlay_export._mark_interrupted_jobs_failed()
 
-        refreshed = gopro_overlay_export.get_gopro_overlay_job("job-running")
-        assert refreshed is not None
-        assert refreshed["status"] == "failed"
-        assert refreshed["message"] == "Overlay interrupted by backend restart"
+        for job_id in ("job-preparing", "job-running"):
+            refreshed = gopro_overlay_export.get_gopro_overlay_job(job_id)
+            assert refreshed is not None
+            assert refreshed["status"] == "failed"
+            assert refreshed["message"] == "Overlay interrupted by backend restart"
+            refreshed_flight = session.get(Flight, f"flight-{job_id}")
+            assert refreshed_flight is not None
+            assert refreshed_flight.gopro_overlay_status == "failed"
     finally:
         session.close()
 

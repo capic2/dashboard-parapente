@@ -312,12 +312,27 @@ def _job_progress(job: dict[str, Any] | None) -> int | None:
 
 
 def _flight_video_export_progress(flight: Flight) -> int | None:
-    if (
-        not flight.video_export_job_id
-        or flight.video_export_status not in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
-    ):
-        return None
-    return _job_progress(_resolve_export_status(flight.video_export_job_id))
+    return _flight_video_export_state(None, flight)["progress"]
+
+
+def _flight_video_export_state(db: Session | None, flight: Flight) -> dict[str, Any]:
+    status = flight.video_export_status
+    if status not in _VIDEO_EXPORT_IN_PROGRESS_STATUSES:
+        return {"status": status, "progress": None}
+
+    if not flight.video_export_job_id:
+        if db is not None:
+            flight.video_export_status = None
+        return {"status": None, "progress": None}
+
+    job = _resolve_export_status(flight.video_export_job_id)
+    if not job:
+        if db is not None:
+            flight.video_export_job_id = None
+            flight.video_export_status = None
+        return {"status": None, "progress": None}
+
+    return {"status": status, "progress": _job_progress(job)}
 
 
 def _flight_gopro_overlay_progress(flight: Flight, job: dict[str, Any] | None = None) -> int | None:
@@ -338,6 +353,18 @@ def _flight_gopro_overlay_state(db: Session, flight: Flight) -> dict[str, Any]:
     job = (
         get_gopro_overlay_job(flight.gopro_overlay_job_id) if flight.gopro_overlay_job_id else None
     )
+    if flight.gopro_overlay_status in _GOPRO_OVERLAY_IN_PROGRESS_STATUSES and (
+        not flight.gopro_overlay_job_id or not job
+    ):
+        flight.gopro_overlay_job_id = None
+        flight.gopro_overlay_status = None
+        return {
+            "status": None,
+            "progress": None,
+            "file_path": _flight_gopro_overlay_file_path(db, flight),
+            "file_exists": _flight_gopro_overlay_file_exists(db, flight),
+        }
+
     overlay_path = _flight_gopro_overlay_file_path(db, flight, job)
     return {
         "status": _flight_gopro_overlay_status(flight, job),
@@ -3145,8 +3172,20 @@ def get_flights(
 
     # Convert to dict (user_id removed - not needed for single-user app)
     flights_data = []
+    export_state_changed = False
     for flight in flights:
+        previous_video_job_id = flight.video_export_job_id
+        previous_video_status = flight.video_export_status
+        previous_overlay_job_id = flight.gopro_overlay_job_id
+        previous_overlay_status = flight.gopro_overlay_status
+        video_export = _flight_video_export_state(db, flight)
         gopro_overlay = _flight_gopro_overlay_state(db, flight)
+        export_state_changed = export_state_changed or (
+            previous_video_job_id != flight.video_export_job_id
+            or previous_video_status != flight.video_export_status
+            or previous_overlay_job_id != flight.gopro_overlay_job_id
+            or previous_overlay_status != flight.gopro_overlay_status
+        )
         flight_dict = {
             "id": flight.id,
             "strava_id": flight.strava_id,
@@ -3165,8 +3204,8 @@ def get_flights(
             "notes": flight.notes,
             "gpx_file_path": flight.gpx_file_path,
             "video_export_job_id": flight.video_export_job_id,
-            "video_export_status": flight.video_export_status,
-            "video_export_progress": _flight_video_export_progress(flight),
+            "video_export_status": video_export["status"],
+            "video_export_progress": video_export["progress"],
             "video_file_path": flight.video_file_path,
             "video_file_exists": _flight_video_file_exists(flight),
             "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
@@ -3180,6 +3219,13 @@ def get_flights(
             "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
         }
         flights_data.append(flight_dict)
+
+    if export_state_changed:
+        try:
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.warning("Failed to persist reconciled export state in /flights: %s", exc)
 
     return {"flights": flights_data}
 
@@ -3481,7 +3527,18 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
                 "Failed to persist calculated max speed for flight %s: %s", flight_id, exc
             )
 
+    previous_video_job_id = flight.video_export_job_id
+    previous_video_status = flight.video_export_status
+    previous_overlay_job_id = flight.gopro_overlay_job_id
+    previous_overlay_status = flight.gopro_overlay_status
+    video_export = _flight_video_export_state(db, flight)
     gopro_overlay = _flight_gopro_overlay_state(db, flight)
+    export_state_changed = (
+        previous_video_job_id != flight.video_export_job_id
+        or previous_video_status != flight.video_export_status
+        or previous_overlay_job_id != flight.gopro_overlay_job_id
+        or previous_overlay_status != flight.gopro_overlay_status
+    )
 
     # Build response with flight data
     flight_dict = {
@@ -3504,8 +3561,8 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "gpx_elevation_gain_m": flight.gpx_elevation_gain_m,
         "external_url": flight.external_url,
         "video_export_job_id": flight.video_export_job_id,
-        "video_export_status": flight.video_export_status,
-        "video_export_progress": _flight_video_export_progress(flight),
+        "video_export_status": video_export["status"],
+        "video_export_progress": video_export["progress"],
         "video_file_path": flight.video_file_path,
         "video_file_exists": _flight_video_file_exists(flight),
         "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
@@ -3537,6 +3594,17 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
                 "region": site.region,
                 "country": site.country,
             }
+
+    if export_state_changed:
+        try:
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.warning(
+                "Failed to persist reconciled export state for flight %s: %s",
+                flight_id,
+                exc,
+            )
 
     return flight_dict
 
