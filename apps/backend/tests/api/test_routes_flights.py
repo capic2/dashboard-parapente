@@ -156,6 +156,49 @@ class TestFlightsListEndpoint:
         assert flight.gopro_overlay_job_id is None
         assert flight.gopro_overlay_status is None
 
+    def test_get_flights_reconciles_active_video_export_from_terminal_job(
+        self, client, db_session, arguel_site
+    ):
+        flight = Flight(
+            id="flight-terminal-export",
+            name="Flight terminal export",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            video_export_job_id="completed-video-job",
+            video_export_status="processing",
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        with (
+            patch(
+                "routes.get_export_status_manual",
+                return_value={
+                    "job_id": "completed-video-job",
+                    "status": "completed",
+                    "internal_status": "completed",
+                    "progress": 100,
+                    "video_path": "/exports/flight-terminal-export.mp4",
+                },
+            ),
+            patch("routes.get_export_status_stream", return_value=None),
+        ):
+            response = client.get(f"{API_PREFIX}/flights")
+
+        assert response.status_code == 200
+        returned = next(
+            flight
+            for flight in response.json()["flights"]
+            if flight["id"] == "flight-terminal-export"
+        )
+        assert returned["video_export_status"] == "completed"
+        assert returned["video_export_progress"] is None
+        assert returned["video_file_path"] == "/exports/flight-terminal-export.mp4"
+        db_session.refresh(flight)
+        assert flight.video_export_job_id is None
+        assert flight.video_export_status == "completed"
+        assert flight.video_file_path == "/exports/flight-terminal-export.mp4"
+
     def test_get_flights_includes_preparing_gopro_overlay_progress(
         self, client, db_session, arguel_site
     ):

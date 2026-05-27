@@ -332,7 +332,22 @@ def _flight_video_export_state(db: Session | None, flight: Flight) -> dict[str, 
             flight.video_export_status = None
         return {"status": None, "progress": None}
 
-    return {"status": status, "progress": _job_progress(job)}
+    resolved_status = _video_export_public_status(job)
+    if db is not None and resolved_status != flight.video_export_status:
+        flight.video_export_status = resolved_status
+    if db is not None and resolved_status in _VIDEO_EXPORT_TERMINAL_STATUSES:
+        flight.video_export_job_id = None
+        if resolved_status == "completed":
+            video_path = job.get("video_path")
+            if isinstance(video_path, str):
+                flight.video_file_path = video_path
+
+    return {
+        "status": resolved_status,
+        "progress": (
+            _job_progress(job) if resolved_status in _VIDEO_EXPORT_IN_PROGRESS_STATUSES else None
+        ),
+    }
 
 
 def _flight_gopro_overlay_progress(flight: Flight, job: dict[str, Any] | None = None) -> int | None:
