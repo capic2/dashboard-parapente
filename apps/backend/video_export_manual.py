@@ -56,6 +56,7 @@ _ACTIVE_STATUSES = {
     _STATUS_ENCODING,
     _STATUS_INITIALIZING,
 }
+_FLIGHT_ACTIVE_STATUSES = {*_ACTIVE_STATUSES, "processing"}
 
 _TERMINAL_STATUSES = {_STATUS_COMPLETED, _STATUS_FAILED, _STATUS_CANCELLED}
 
@@ -532,6 +533,41 @@ def _queued_job_ids() -> list[str]:
     return [str(job_id) for (job_id,) in jobs]
 
 
+def reconcile_video_export_flight_refs() -> int:
+    """Clear active flight video export references that no longer point to a live job."""
+    reconciled = 0
+    with SessionLocal() as db:
+        flights = (
+            db.query(Flight).filter(Flight.video_export_status.in_(_FLIGHT_ACTIVE_STATUSES)).all()
+        )
+        for flight in flights:
+            if not flight.video_export_job_id:
+                flight.video_export_status = None
+                reconciled += 1
+                continue
+
+            job = (
+                db.query(VideoExportJob)
+                .filter(VideoExportJob.id == flight.video_export_job_id)
+                .first()
+            )
+            if not job:
+                flight.video_export_job_id = None
+                flight.video_export_status = None
+                reconciled += 1
+                continue
+
+            expected_status = _to_public_status(job.status)
+            if flight.video_export_status != expected_status:
+                flight.video_export_status = expected_status
+                if job.status == _STATUS_COMPLETED:
+                    flight.video_file_path = job.video_path
+                reconciled += 1
+        if reconciled:
+            db.commit()
+    return reconciled
+
+
 def _rq_job_id(job_id: str) -> str:
     return f"video-export-{job_id}"
 
@@ -582,6 +618,7 @@ def enqueue_pending_video_export_jobs() -> int:
     """Enqueue queued DB jobs into RQ after an API or worker restart."""
     from job_queue import is_rq_enabled
 
+    reconcile_video_export_flight_refs()
     if not is_rq_enabled():
         return 0
 
@@ -852,9 +889,16 @@ def delete_video_export_job(job_id: str) -> dict[str, Any] | None:
     if job:
         with SessionLocal() as db:
             db_job = db.query(VideoExportJob).filter(VideoExportJob.id == job_id).first()
+            for flight in db.query(Flight).filter(Flight.video_export_job_id == job_id).all():
+                flight.video_export_job_id = None
+                if (
+                    flight.video_export_status in _FLIGHT_ACTIVE_STATUSES
+                    or not flight.video_file_path
+                ):
+                    flight.video_export_status = None
             if db_job:
                 db.delete(db_job)
-                db.commit()
+            db.commit()
 
     _set_memory_snapshot(job_id, None)
     _clear_job_runtime(job_id)

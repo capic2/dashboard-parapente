@@ -9,7 +9,7 @@ from urllib.error import URLError
 import pytest
 
 from auth import create_access_token, create_job_token, decode_job_token
-from models import VideoExportJob
+from models import Flight, VideoExportJob
 
 import video_export
 import video_export_manual
@@ -744,6 +744,84 @@ def test_delete_video_export_job_removes_started_rq_job(test_db, monkeypatch):
         .first()
         is None
     )
+    db_session.close()
+
+
+def test_reconcile_video_export_flight_refs_clears_missing_active_job(test_db, monkeypatch):
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    db_session = test_db()
+    db_session.add(
+        Flight(
+            id="flight-orphan-video",
+            flight_date=datetime.utcnow().date(),
+            video_export_job_id="missing-job",
+            video_export_status="processing",
+        )
+    )
+    db_session.commit()
+    db_session.close()
+
+    assert video_export_manual.reconcile_video_export_flight_refs() == 1
+
+    db_session = test_db()
+    flight = db_session.get(Flight, "flight-orphan-video")
+    assert flight is not None
+    assert flight.video_export_job_id is None
+    assert flight.video_export_status is None
+    db_session.close()
+
+
+def test_delete_video_export_job_clears_flight_reference(test_db, monkeypatch):
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    monkeypatch.setattr(video_export_manual, "_delete_rq_video_export_job", lambda _job_id: True)
+    monkeypatch.setattr(
+        video_export_manual,
+        "cleanup_video_export_job_temp_files",
+        lambda _job_id: {
+            "files_deleted": 0,
+            "dirs_deleted": 0,
+            "bytes_deleted": 0,
+            "paths_deleted": [],
+            "errors": [],
+        },
+    )
+    db_session = test_db()
+    db_session.add(
+        VideoExportJob(
+            id="job-delete-clears-flight",
+            flight_id="flight-delete-clears-job",
+            status="failed",
+            mode="manual",
+            quality="1080p",
+            fps=15,
+            speed=1,
+            progress=100,
+            message="failed",
+            frontend_url="http://localhost:5173",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+    )
+    db_session.add(
+        Flight(
+            id="flight-delete-clears-job",
+            flight_date=datetime.utcnow().date(),
+            video_export_job_id="job-delete-clears-flight",
+            video_export_status="processing",
+        )
+    )
+    db_session.commit()
+    db_session.close()
+
+    result = video_export_manual.delete_video_export_job("job-delete-clears-flight")
+
+    assert result is not None
+    assert result["deleted"] is True
+    db_session = test_db()
+    flight = db_session.get(Flight, "flight-delete-clears-job")
+    assert flight is not None
+    assert flight.video_export_job_id is None
+    assert flight.video_export_status is None
     db_session.close()
 
 
