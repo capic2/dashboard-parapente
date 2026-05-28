@@ -3,10 +3,23 @@ Test database models and schemas
 """
 
 from datetime import date, datetime, timedelta
+from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from models import Flight, Site, WeatherForecast
+from schemas import SiteCreate, SiteUpdate
+
+
+def create_site_payload(**overrides: Any) -> dict[str, Any]:
+    payload = {
+        "name": "Schema Site",
+        "latitude": 47.0,
+        "longitude": 6.0,
+    }
+    payload.update(overrides)
+    return payload
 
 
 class TestSiteModel:
@@ -52,6 +65,48 @@ class TestSiteModel:
         retrieved = db_session.query(Site).filter_by(id="site-test").first()
         assert retrieved.created_at is not None
         assert retrieved.updated_at is not None
+
+
+class TestSiteSchemaOrientation:
+    """Test site orientation validation and normalization."""
+
+    @pytest.mark.parametrize(
+        ("orientation", "expected"),
+        [("N", "N"), ("nw", "NW"), (" SE ", "SE"), ("", "")],
+    )
+    def test_site_create_normalizes_valid_orientation(self, orientation, expected):
+        site = SiteCreate(**create_site_payload(orientation=orientation))
+
+        assert site.orientation == expected
+
+    def test_site_create_accepts_none_orientation(self):
+        site = SiteCreate(**create_site_payload(orientation=None))
+
+        assert site.orientation is None
+
+    @pytest.mark.parametrize("orientation", ["INVALID", "Northeast"])
+    def test_site_create_rejects_invalid_orientation(self, orientation):
+        with pytest.raises(ValidationError):
+            SiteCreate(**create_site_payload(orientation=orientation))
+
+    @pytest.mark.parametrize(
+        ("orientation", "expected"),
+        [("N", "N"), ("nw", "NW"), (" SE ", "SE"), ("", "")],
+    )
+    def test_site_update_normalizes_valid_orientation(self, orientation, expected):
+        site = SiteUpdate(orientation=orientation)
+
+        assert site.orientation == expected
+
+    def test_site_update_accepts_none_orientation(self):
+        site = SiteUpdate(orientation=None)
+
+        assert site.orientation is None
+
+    @pytest.mark.parametrize("orientation", ["INVALID", "Northeast"])
+    def test_site_update_rejects_invalid_orientation(self, orientation):
+        with pytest.raises(ValidationError):
+            SiteUpdate(orientation=orientation)
 
 
 class TestFlightModel:

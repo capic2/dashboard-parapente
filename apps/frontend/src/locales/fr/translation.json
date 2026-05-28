@@ -979,7 +979,16 @@
     "additionalInfo": "Informations complémentaires sur le site...",
     "saving": "Enregistrement...",
     "saveButton": "Enregistrer",
-    "saveError": "Erreur lors de la sauvegarde"
+    "saveError": "Erreur lors de la sauvegarde",
+    "searchExistingTitle": "Rechercher un vrai site",
+    "searchExistingHelp": "Choisissez une ville pour trouver les décollages et atterrissages existants les plus proches. Le formulaire reste modifiable avant sauvegarde.",
+    "typeTakeoffShort": "Déco",
+    "typeLandingShort": "Atterro",
+    "typeBothShort": "Déco + Atterro",
+    "selectedSite": "Sélectionné",
+    "noExistingSiteFound": "Aucun site existant trouvé dans ce rayon. Augmentez le rayon ou utilisez la saisie manuelle.",
+    "duplicateSite": "{{name}} est déjà dans la liste.",
+    "searchSourceDescription": "Ajouté depuis la recherche de site ({{source}})"
   },
   "strava": {
     "title": "Synchroniser avec Strava",

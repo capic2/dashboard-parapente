@@ -1,21 +1,101 @@
-import React, { useState, useEffect } from 'react';
+import React, {
+  type ChangeEvent,
+  type KeyboardEvent,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextField, Label, Input } from 'react-aria-components';
 import { Button } from '@dashboard-parapente/design-system';
-import { Camera, Loader2, Save } from 'lucide-react';
+import { Camera, Check, Loader2, MapPin, Save } from 'lucide-react';
 import type {
+  LocationSuggestion,
+  ParaglidingSpotSearchResult,
   Site,
   SiteUpdate,
   CreateSiteData,
 } from '@dashboard-parapente/shared-types';
 import { Modal } from '@dashboard-parapente/design-system';
 import LandingAssociationsManager from './LandingAssociationsManager';
+import {
+  useLocationSearch,
+  useNearbyFlightOptions,
+} from '../../hooks/weather/useCityWeather';
+import { useSites } from '../../hooks/sites/useSites';
 
 type SiteFormData = Required<SiteUpdate>;
+type SiteUsageType = 'takeoff' | 'landing' | 'both';
+type SearchCandidate = {
+  spot: ParaglidingSpotSearchResult;
+  usageType: SiteUsageType;
+};
 
 const inputClass =
   'w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded outline-none focus:ring-2 focus:ring-blue-500';
 const labelClass = 'block text-sm font-medium mb-1 dark:text-gray-200';
+const radiusChoices = [10, 30, 50, 100];
+const limitChoices = [3, 5, 10];
+
+const normalizeSiteName = (name: string) =>
+  name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, ' ')
+    .trim();
+
+const isCompatibleUsage = (
+  siteUsage: Site['usage_type'],
+  usage: SiteUsageType
+) => siteUsage === usage || siteUsage === 'both' || usage === 'both';
+
+const isDuplicateSite = (site: Site, candidate: SearchCandidate): boolean => {
+  const sameName =
+    normalizeSiteName(site.name) === normalizeSiteName(candidate.spot.name);
+  const sameCoordinates =
+    Math.abs(site.latitude - candidate.spot.latitude) < 0.0001 &&
+    Math.abs(site.longitude - candidate.spot.longitude) < 0.0001;
+
+  return (
+    (sameName || sameCoordinates) &&
+    isCompatibleUsage(site.usage_type, candidate.usageType)
+  );
+};
+
+const mergeSearchCandidates = (
+  takeoffs: ParaglidingSpotSearchResult[],
+  landings: ParaglidingSpotSearchResult[]
+): SearchCandidate[] => {
+  const candidates = new Map<string, SearchCandidate>();
+
+  const addCandidate = (
+    spot: ParaglidingSpotSearchResult,
+    fallbackUsage: Exclude<SiteUsageType, 'both'>
+  ) => {
+    const usageType = spot.type === 'both' ? 'both' : fallbackUsage;
+    const existing = candidates.get(spot.id);
+
+    if (existing) {
+      candidates.set(spot.id, {
+        spot: { ...existing.spot, ...spot, type: 'both' },
+        usageType: 'both',
+      });
+      return;
+    }
+
+    candidates.set(spot.id, { spot, usageType });
+  };
+
+  for (const spot of takeoffs) addCandidate(spot, 'takeoff');
+  for (const spot of landings) addCandidate(spot, 'landing');
+
+  return [...candidates.values()].sort(
+    (a, b) =>
+      (a.spot.distance_km ?? Infinity) - (b.spot.distance_km ?? Infinity)
+  );
+};
 
 interface EditSiteModalProps {
   site: Site | null; // null = create mode, Site = edit mode
@@ -33,6 +113,9 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
   onCreate,
 }) => {
   const { t } = useTranslation();
+  const listboxId = useId();
+  const isCreateMode = !site;
+  const { data: existingSites = [] } = useSites();
   const [formData, setFormData] = useState<SiteFormData>({
     name: '',
     code: '',
@@ -58,6 +141,53 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
   const [originalData, setOriginalData] = useState<SiteFormData | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [selectedLocation, setSelectedLocation] =
+    useState<LocationSuggestion | null>(null);
+  const [radiusKm, setRadiusKm] = useState(30);
+  const [limit, setLimit] = useState(5);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
+  const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedQuery(query), 300);
+    return () => window.clearTimeout(timeout);
+  }, [query]);
+
+  const locationSearch = useLocationSearch(
+    isCreateMode ? debouncedQuery : '',
+    5
+  );
+  const nearbyOptions = useNearbyFlightOptions(
+    isCreateMode ? selectedLocation : null,
+    radiusKm,
+    limit
+  );
+  const suggestions = locationSearch.data?.locations ?? [];
+  const isSuggestionsOpen =
+    isCreateMode && debouncedQuery.length >= 3 && !selectedLocation;
+  const activeSuggestion = suggestions[activeSuggestionIndex];
+  const activeSuggestionId = activeSuggestion
+    ? `${listboxId}-${activeSuggestion.id}`
+    : undefined;
+  const searchCandidates = useMemo(
+    () =>
+      mergeSearchCandidates(
+        nearbyOptions.data?.takeoffs ?? [],
+        nearbyOptions.data?.landings ?? []
+      ),
+    [nearbyOptions.data?.landings, nearbyOptions.data?.takeoffs]
+  );
+  const selectedCandidate =
+    searchCandidates.find(
+      (candidate) => candidate.spot.id === selectedSpotId
+    ) ?? null;
+  const duplicateSite = selectedCandidate
+    ? existingSites.find((existingSite) =>
+        isDuplicateSite(existingSite, selectedCandidate)
+      )
+    : undefined;
 
   // Initialize form when site changes or modal opens
   useEffect(() => {
@@ -107,9 +237,50 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
       setLatitudeRaw('');
       setLongitudeRaw('');
       setElevationRaw('');
+      setQuery('');
+      setDebouncedQuery('');
+      setSelectedLocation(null);
+      setActiveSuggestionIndex(0);
+      setSelectedSpotId(null);
     }
     setErrors({});
   }, [site, isOpen]);
+
+  useEffect(() => {
+    setActiveSuggestionIndex(0);
+  }, [debouncedQuery]);
+
+  const handleSelectLocation = (location: LocationSuggestion) => {
+    setSelectedLocation(location);
+    setSelectedSpotId(null);
+    setQuery(location.name);
+    setActiveSuggestionIndex(0);
+  };
+
+  const handleSelectCandidate = (candidate: SearchCandidate) => {
+    const elevation = candidate.spot.elevation_m
+      ? Math.round(candidate.spot.elevation_m)
+      : 0;
+
+    setSelectedSpotId(candidate.spot.id);
+    setFormData((current) => ({
+      ...current,
+      name: candidate.spot.name,
+      latitude: candidate.spot.latitude,
+      longitude: candidate.spot.longitude,
+      elevation_m: elevation,
+      country: candidate.spot.country,
+      orientation: candidate.spot.orientation ?? '',
+      usage_type: candidate.usageType,
+      description: t('editSite.searchSourceDescription', {
+        source: candidate.spot.source,
+      }),
+    }));
+    setLatitudeRaw(String(candidate.spot.latitude));
+    setLongitudeRaw(String(candidate.spot.longitude));
+    setElevationRaw(elevation ? String(elevation) : '');
+    setErrors({});
+  };
 
   const parseNumericFields = () => {
     const lat = parseFloat(latitudeRaw) || 0;
@@ -151,6 +322,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
     const parsed = parseNumericFields();
 
     if (!validate()) return;
+    if (duplicateSite) return;
 
     setIsSaving(true);
     try {
@@ -171,6 +343,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           latitude: parsed.latitude,
           longitude: parsed.longitude,
           ...(formData.code && { code: formData.code }),
+          ...(formData.orientation && { orientation: formData.orientation }),
           ...(parsed.elevation_m !== undefined && {
             elevation_m: parsed.elevation_m,
           }),
@@ -198,6 +371,245 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        {isCreateMode && (
+          <div className="rounded-xl border border-sky-100 bg-sky-50/80 p-4 dark:border-sky-800 dark:bg-sky-950/30">
+            <div className="mb-3">
+              <p className="text-sm font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+                {t('editSite.searchExistingTitle')}
+              </p>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                {t('editSite.searchExistingHelp')}
+              </p>
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-end">
+              <TextField className="relative flex flex-col gap-1">
+                <Label className={labelClass}>{t('weather.search.city')}</Label>
+                <Input
+                  value={query}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                    setQuery(event.target.value);
+                    setSelectedLocation(null);
+                    setSelectedSpotId(null);
+                  }}
+                  onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+                    if (!isSuggestionsOpen || !suggestions.length) return;
+                    if (event.key === 'ArrowDown') {
+                      event.preventDefault();
+                      setActiveSuggestionIndex((index) =>
+                        Math.min(index + 1, suggestions.length - 1)
+                      );
+                    } else if (event.key === 'ArrowUp') {
+                      event.preventDefault();
+                      setActiveSuggestionIndex((index) =>
+                        Math.max(index - 1, 0)
+                      );
+                    } else if (event.key === 'Enter') {
+                      event.preventDefault();
+                      handleSelectLocation(suggestions[activeSuggestionIndex]);
+                    }
+                  }}
+                  aria-expanded={isSuggestionsOpen}
+                  aria-haspopup="listbox"
+                  aria-autocomplete="list"
+                  aria-controls={listboxId}
+                  aria-activedescendant={activeSuggestionId}
+                  placeholder={t('weather.search.cityPlaceholder')}
+                  className={inputClass}
+                />
+                {isSuggestionsOpen && (
+                  <div
+                    id={listboxId}
+                    // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
+                    role="listbox"
+                    className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900"
+                  >
+                    {locationSearch.isLoading && (
+                      <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
+                        {t('weather.search.loadingCities')}
+                      </div>
+                    )}
+                    {!locationSearch.isLoading &&
+                      suggestions.length > 0 &&
+                      suggestions.map((location, index) => (
+                        <button
+                          id={`${listboxId}-${location.id}`}
+                          key={location.id}
+                          type="button"
+                          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
+                          role="option"
+                          aria-selected={index === activeSuggestionIndex}
+                          onMouseEnter={() => setActiveSuggestionIndex(index)}
+                          onClick={() => handleSelectLocation(location)}
+                          className={`block w-full cursor-pointer border-b border-gray-100 px-3 py-2 text-left transition-colors last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 dark:border-gray-800 ${
+                            index === activeSuggestionIndex
+                              ? 'bg-sky-100 dark:bg-sky-950/60'
+                              : 'hover:bg-sky-50 dark:hover:bg-sky-950/40'
+                          }`}
+                        >
+                          <span className="block font-medium text-gray-950 dark:text-white">
+                            {location.name}
+                          </span>
+                          <span className="block text-xs text-gray-500 dark:text-gray-400">
+                            {location.display_name}
+                          </span>
+                        </button>
+                      ))}
+                    {!locationSearch.isLoading && suggestions.length === 0 && (
+                      <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
+                        {t('weather.search.noCityFound')}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </TextField>
+
+              <label className="flex flex-col gap-1 text-sm font-medium dark:text-gray-200">
+                {t('weather.search.radius')}
+                <select
+                  value={radiusKm}
+                  onChange={(event) => setRadiusKm(Number(event.target.value))}
+                  className={inputClass}
+                >
+                  {radiusChoices.map((radius) => (
+                    <option key={radius} value={radius}>
+                      {radius} km
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-sm font-medium dark:text-gray-200">
+                {t('weather.search.results')}
+                <select
+                  value={limit}
+                  onChange={(event) => setLimit(Number(event.target.value))}
+                  className={inputClass}
+                >
+                  {limitChoices.map((choice) => (
+                    <option key={choice} value={choice}>
+                      {choice}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            {selectedLocation && (
+              <div className="mt-4">
+                <div className="mb-3 rounded-lg bg-white/80 p-3 text-sm dark:bg-gray-900/70">
+                  <div className="font-semibold text-gray-950 dark:text-white">
+                    {selectedLocation.name}
+                  </div>
+                  <div className="text-gray-600 dark:text-gray-300">
+                    {selectedLocation.display_name}
+                  </div>
+                </div>
+
+                {nearbyOptions.isError && (
+                  <div
+                    className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+                    role="alert"
+                  >
+                    {t('weather.search.nearbyLoadError')}
+                  </div>
+                )}
+                {!nearbyOptions.isError && nearbyOptions.isLoading && (
+                  <div className="rounded-lg border border-gray-200 p-3 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">
+                    {t('weather.search.loadingNearby')}
+                  </div>
+                )}
+                {!nearbyOptions.isError &&
+                  !nearbyOptions.isLoading &&
+                  searchCandidates.length > 0 && (
+                    <div className="grid gap-2">
+                      {searchCandidates.map((candidate) => {
+                        const isSelected = selectedSpotId === candidate.spot.id;
+                        let usageLabel = t('editSite.typeLandingShort');
+                        if (candidate.usageType === 'both') {
+                          usageLabel = t('editSite.typeBothShort');
+                        } else if (candidate.usageType === 'takeoff') {
+                          usageLabel = t('editSite.typeTakeoffShort');
+                        }
+
+                        return (
+                          <button
+                            key={candidate.spot.id}
+                            type="button"
+                            onClick={() => handleSelectCandidate(candidate)}
+                            className={`cursor-pointer rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
+                              isSelected
+                                ? 'border-sky-500 bg-white ring-2 ring-sky-200 dark:border-sky-400 dark:bg-gray-900 dark:ring-sky-900'
+                                : 'border-sky-100 bg-white/80 hover:border-sky-300 dark:border-gray-700 dark:bg-gray-900/60 dark:hover:border-sky-700'
+                            }`}
+                          >
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <div className="font-semibold text-gray-950 dark:text-white">
+                                  {candidate.spot.name}
+                                </div>
+                                <div className="mt-1 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-300">
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 font-semibold text-sky-800 dark:bg-sky-950 dark:text-sky-200">
+                                    {usageLabel}
+                                  </span>
+                                  {candidate.spot.distance_km != null && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <MapPin
+                                        className="h-3 w-3"
+                                        aria-hidden="true"
+                                      />
+                                      {candidate.spot.distance_km.toFixed(1)} km
+                                    </span>
+                                  )}
+                                  {candidate.spot.elevation_m != null && (
+                                    <span>
+                                      {Math.round(candidate.spot.elevation_m)} m
+                                    </span>
+                                  )}
+                                  {candidate.spot.orientation && (
+                                    <span>
+                                      {t('sites.orientation')}{' '}
+                                      {candidate.spot.orientation}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {isSelected && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+                                  <Check
+                                    className="h-3 w-3"
+                                    aria-hidden="true"
+                                  />
+                                  {t('editSite.selectedSite')}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                {!nearbyOptions.isError &&
+                  !nearbyOptions.isLoading &&
+                  searchCandidates.length === 0 && (
+                    <div className="rounded-lg border border-gray-200 bg-white/80 p-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-300">
+                      {t('editSite.noExistingSiteFound')}
+                    </div>
+                  )}
+
+                {duplicateSite && (
+                  <p
+                    className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+                    role="alert"
+                  >
+                    {t('editSite.duplicateSite', { name: duplicateSite.name })}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Nom */}
         <TextField
           isRequired
@@ -521,7 +933,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           <Button
             type="submit"
             className="inline-flex flex-1 items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 cursor-pointer transition-colors"
-            isDisabled={isSaving}
+            isDisabled={isSaving || Boolean(duplicateSite)}
           >
             {isSaving ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />

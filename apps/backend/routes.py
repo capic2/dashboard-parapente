@@ -1228,8 +1228,11 @@ async def create_site(site_data: SiteCreate, db: Session = Depends(get_db)):
         latitude=site_data.latitude,
         longitude=site_data.longitude,
         elevation_m=site_data.elevation_m,
+        description=site_data.description,
         region=site_data.region,
         country=site_data.country or "FR",
+        usage_type=site_data.usage_type or "both",
+        orientation=site_data.orientation,
         site_type="user_spot",  # Mark as user-created
     )
 

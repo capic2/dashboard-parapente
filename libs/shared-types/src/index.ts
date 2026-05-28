@@ -477,7 +477,6 @@ export const SiteUpdateSchema = z
   .partial();
 
 export const CreateSiteSchema = SiteUpdateSchema.omit({
-  orientation: true,
   camera_angle: true,
   camera_distance: true,
   camera_close_zoom_percent: true,
