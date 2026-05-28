@@ -12,6 +12,10 @@ _Avoid_: Site, spot
 A real paragliding place that can be added to the user's list. A **Site** can be a **Decollage**, an **Atterrissage**, or both.
 _Avoid_: Ville, generic location
 
+**Localité de Site**:
+The geographic attachment displayed with a **Site** to help the pilot locate it. It may come from the **Ville** searched by the pilot and is not necessarily the exact administrative municipality.
+_Avoid_: Région, administrative city
+
 **Site Existant**:
 A **Site** discovered from an external flight-place source rather than invented from city coordinates. City-based creation should add **Sites Existants**, not arbitrary city locations.
 _Avoid_: Ville, manual placeholder

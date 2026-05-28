@@ -13,6 +13,7 @@ import type { Site } from '../../types';
 import { WindIndicatorCompact } from '../common/WindIndicator';
 import { Button } from '@dashboard-parapente/design-system';
 import { Check, ChevronDown, Layers, MapPin, Mountain } from 'lucide-react';
+import { getSiteDisplayName } from '../../lib/siteDisplay';
 
 interface MultiOrientationSelectorProps {
   sites: Site[]; // All variants of this site (different orientations)
@@ -43,7 +44,11 @@ export function MultiOrientationSelector({
   const hasSelectedSite = Boolean(selectedSite);
 
   // Determine display name (use baseName prop or extract from first site)
-  const displayName = baseName || extractBaseName(sites[0]?.name || '');
+  const rawDisplayName = baseName || extractBaseName(sites[0]?.name || '');
+  const displayName = getSiteDisplayName({
+    name: rawDisplayName,
+    region: sites[0]?.region,
+  });
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -155,7 +160,7 @@ export function MultiOrientationSelector({
             {sortedSites.map((site) => {
               const weather = weatherData.get(site.id);
               const isSelected = site.id === selectedSiteId;
-              const shortName = extractShortName(site.name, displayName);
+              const shortName = extractShortName(site.name, rawDisplayName);
 
               return (
                 <Button

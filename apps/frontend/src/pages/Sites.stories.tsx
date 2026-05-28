@@ -25,7 +25,7 @@ export const mockSites = {
       latitude: 47.2,
       longitude: 6.0,
       elevation_m: 427,
-      region: 'Doubs',
+      region: 'Besançon',
       country: 'FR',
       orientation: 'SW',
       usage_type: 'takeoff',
@@ -39,7 +39,7 @@ export const mockSites = {
       latitude: 47.18,
       longitude: 6.22,
       elevation_m: 920,
-      region: 'Doubs',
+      region: 'Besançon',
       country: 'FR',
       orientation: 'W',
       usage_type: 'takeoff',
@@ -53,7 +53,7 @@ export const mockSites = {
       latitude: 47.19,
       longitude: 5.99,
       elevation_m: 250,
-      region: 'Doubs',
+      region: 'Besançon',
       country: 'FR',
       usage_type: 'landing',
       flight_count: 0,
@@ -125,20 +125,22 @@ Default.test('filters by landing type', async ({ canvas, userEvent }) => {
   await expect(within(siteList).getAllByRole('option')).toHaveLength(1);
   await expect(
     within(within(siteList).getByRole('option')).getByRole('heading')
-  ).toHaveTextContent("Plaine d'Arguel");
+  ).toHaveTextContent("Besançon - Plaine d'Arguel");
 });
 Default.test('filters by name', async ({ canvas, userEvent }) => {
   await waitForElementToBeRemoved(canvas.getByText(/Loading.*/i));
   const siteList = canvas.getByRole('listbox', { name: 'Liste des sites' });
   await expect(within(siteList).getAllByRole('option')).toHaveLength(3);
   await userEvent.type(
-    await canvas.findByPlaceholderText('Rechercher par nom, code ou région...'),
+    await canvas.findByPlaceholderText(
+      'Rechercher par nom, code ou localité...'
+    ),
     'cha'
   );
   await expect(within(siteList).getAllByRole('option')).toHaveLength(1);
   await expect(
     within(within(siteList).getByRole('option')).getByRole('heading')
-  ).toHaveTextContent('Chalais');
+  ).toHaveTextContent('Besançon - Chalais');
 });
 Default.test(
   'it is possible to create a site',
@@ -187,10 +189,9 @@ Default.test(
     });
     await step('Update a site', async () => {
       await userEvent.click(
-        within(await canvas.findByRole('option', { name: 'Arguel' })).getByRole(
-          'button',
-          { name: /.*Éditer/ }
-        )
+        within(
+          await canvas.findByRole('option', { name: /Besançon - Arguel/u })
+        ).getByRole('button', { name: /.*Éditer/u })
       );
 
       const dialog = within(screen.getByRole('dialog'));
@@ -212,7 +213,9 @@ Default.test(
         await expect(screen.queryByRole('dialog')).toBeNull();
       });
       await expect(
-        await canvas.findByRole('option', { name: 'Arguel updated' })
+        await canvas.findByRole('option', {
+          name: /Besançon - Arguel updated/u,
+        })
       ).toBeInTheDocument();
     });
   }
@@ -225,10 +228,9 @@ Default.test(
     });
     await step('Delete a site', async () => {
       await userEvent.click(
-        within(await canvas.findByRole('option', { name: 'Arguel' })).getByRole(
-          'button',
-          { name: 'Supprimer le site' }
-        )
+        within(
+          await canvas.findByRole('option', { name: /Besançon - Arguel/u })
+        ).getByRole('button', { name: 'Supprimer le site' })
       );
       await userEvent.click(
         within(await screen.findByRole('alertdialog')).getByRole('button', {
@@ -243,7 +245,7 @@ Default.test(
       });
       await waitFor(async () => {
         await expect(
-          canvas.queryByRole('option', { name: 'Arguel' })
+          canvas.queryByRole('option', { name: /Besançon - Arguel/u })
         ).not.toBeInTheDocument();
       });
     });

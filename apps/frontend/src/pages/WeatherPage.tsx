@@ -25,6 +25,7 @@ import WeatherSelectionPanel, {
   type WeatherSelectionTab,
 } from '../components/weather/WeatherSelectionPanel';
 import WeatherPageMobileLayout from './WeatherPage.mobile';
+import { getSiteDisplayName } from '../lib/siteDisplay';
 
 const isSpotSearchTarget = (
   target: CityWeatherTarget | null
@@ -214,9 +215,12 @@ export default function WeatherPage() {
     day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
   };
   const selectedDayLabel = getSearchDayLabel(selectedDayIndex, t);
+  const selectedSiteDisplayName = selectedSite
+    ? getSiteDisplayName(selectedSite)
+    : undefined;
   const activeWeatherName = selectedSearchTarget
     ? selectedSearchTitle
-    : selectedSite?.name;
+    : selectedSiteDisplayName;
   const sourceLabel = selectedSearchTarget
     ? t('weather.source.search')
     : t('weather.source.favoriteSite');
@@ -351,7 +355,7 @@ export default function WeatherPage() {
       <EmagramWidget
         siteId={selectedSiteId}
         dayIndex={selectedDayIndex}
-        siteName={selectedSite?.name}
+        siteName={selectedSiteDisplayName}
       />
     ) : undefined;
 
@@ -448,7 +452,7 @@ export default function WeatherPage() {
           <EmagramWidget
             siteId={selectedSiteId}
             dayIndex={selectedDayIndex}
-            siteName={selectedSite?.name}
+            siteName={selectedSiteDisplayName}
           />
         )}
 

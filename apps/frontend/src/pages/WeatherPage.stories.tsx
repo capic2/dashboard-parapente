@@ -20,7 +20,7 @@ const mockSites = {
       latitude: 47.2,
       longitude: 6.0,
       elevation_m: 427,
-      region: 'Doubs',
+      region: 'Besançon',
       country: 'FR',
       orientation: 'SW',
       usage_type: 'takeoff',
@@ -34,7 +34,7 @@ const mockSites = {
       latitude: 47.18,
       longitude: 6.22,
       elevation_m: 920,
-      region: 'Doubs',
+      region: 'Besançon',
       country: 'FR',
       orientation: 'W',
       usage_type: 'both',
@@ -398,7 +398,7 @@ const mockCreatedSearchSite = {
   latitude: 47.205,
   longitude: 6.005,
   elevation_m: 427,
-  region: 'Doubs',
+  region: 'Besançon',
   country: 'FR',
   orientation: 'SW',
   usage_type: 'takeoff',
@@ -700,18 +700,20 @@ export const Default = meta.story({
 Default.test(
   'renders weather page with site selector and conditions',
   async ({ canvas, userEvent }) => {
-    await canvas.findAllByText('Arguel');
-    await canvas.findAllByText('Chalais');
+    await canvas.findAllByText(/Arguel/u);
+    await canvas.findAllByText(/Chalais/u);
     await canvas.findByText(
-      /Meilleur spot pour aujourd'hui|Best spot for today/
+      /Meilleur spot pour aujourd'hui|Best spot for today/u
     );
 
     const tomorrowButton = await canvas.findByRole('button', {
-      name: /\b85\b/,
+      name: /\b85\b/u,
     });
     await userEvent.click(tomorrowButton);
 
-    await canvas.findByText(/Meilleur spot pour demain|Best spot for tomorrow/);
+    await canvas.findByText(
+      /Meilleur spot pour demain|Best spot for tomorrow/u
+    );
   }
 );
 
@@ -729,9 +731,9 @@ export const WithSelectedSite = meta.story({
 WithSelectedSite.test(
   'renders weather for the selected site',
   async ({ canvas }) => {
-    await canvas.findAllByText('Chalais');
-    await canvas.findAllByText('Arguel');
-    await canvas.findByText(/Best spot for|Meilleur spot pour/);
+    await canvas.findAllByText(/Chalais/u);
+    await canvas.findAllByText(/Arguel/u);
+    await canvas.findByText(/Best spot for|Meilleur spot pour/u);
   }
 );
 
@@ -773,7 +775,7 @@ WithSpotQueryParam.test(
   'renders searched spot weather from query params',
   async ({ canvas }) => {
     await canvas.findByText(i18n.t('weather.page.selectedSearchResult'));
-    await canvas.findAllByText('Arguel déco');
+    await canvas.findAllByText(/Arguel déco/u);
     await canvas.findByText(i18n.t('weather.search.selectedWeather'));
     await canvas.findByRole('button', {
       name: i18n.t('weather.search.addToFavorites'),
@@ -908,9 +910,9 @@ export const WeatherError = meta.story({
 WeatherError.test(
   'renders site selector even when weather fails',
   async ({ canvas }) => {
-    await canvas.findAllByText('Arguel');
-    await canvas.findAllByText('Chalais');
-    await canvas.findByText(/Best spot for|Meilleur spot pour/);
+    await canvas.findAllByText(/Arguel/u);
+    await canvas.findAllByText(/Chalais/u);
+    await canvas.findByText(/Best spot for|Meilleur spot pour/u);
   }
 );
 
@@ -933,5 +935,5 @@ export const SingleSite = meta.story({
 });
 
 SingleSite.test('renders with a single site', async ({ canvas }) => {
-  await canvas.findAllByText('Arguel');
+  await canvas.findAllByText(/Arguel/u);
 });

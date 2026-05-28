@@ -12,6 +12,7 @@ import {
 import { Select, Button } from '@dashboard-parapente/design-system';
 import type { Key } from 'react-aria-components';
 import type { Flight, FlightFormData, Site } from '../../../types';
+import { getSiteDisplayName } from '../../../lib/siteDisplay';
 
 interface FlightEditFormProps {
   flight: Flight;
@@ -110,7 +111,7 @@ export function FlightEditForm({
 
   const siteOptions = sites.map((site) => ({
     id: site.id,
-    label: site.name,
+    label: getSiteDisplayName(site),
   }));
 
   const s = styles();

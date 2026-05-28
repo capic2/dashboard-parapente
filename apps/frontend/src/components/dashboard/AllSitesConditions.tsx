@@ -5,6 +5,7 @@ import { WindIndicator } from '../common/WindIndicator';
 import CacheTimestamp from '../common/CacheTimestamp';
 import type { WeatherData } from '../../types';
 import type { Site } from '@dashboard-parapente/shared-types';
+import { getSiteDisplayName } from '../../lib/siteDisplay';
 
 const getVerdictClass = (verdict: string): string => {
   const v = verdict.toLowerCase();
@@ -58,7 +59,7 @@ function SiteConditionCard({
       {/* Site name + orientation */}
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-black text-slate-950 dark:text-white truncate">
-          {site.name}
+          {getSiteDisplayName(site)}
         </h3>
         {site.orientation && (
           <span className="ml-2 shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">

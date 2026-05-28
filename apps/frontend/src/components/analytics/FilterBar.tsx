@@ -1,6 +1,7 @@
 import { Trans, useTranslation } from 'react-i18next';
 import { DatePicker, Select, Button } from '@dashboard-parapente/design-system';
 import type { Site } from '@dashboard-parapente/shared-types';
+import { getSiteDisplayName } from '../../lib/siteDisplay';
 
 export interface AnalyticsFilters {
   siteId: string | null;
@@ -43,7 +44,7 @@ export function FilterBar({
 
   const siteOptions = sites.map((site) => ({
     id: site.id,
-    label: site.name,
+    label: getSiteDisplayName(site),
   }));
 
   return (

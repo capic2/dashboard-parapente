@@ -9,6 +9,7 @@ import type { Site } from '../../types';
 import { Button } from '@dashboard-parapente/design-system';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { Check, MapPin, Mountain, Search } from 'lucide-react';
+import { getSiteDisplayName } from '../../lib/siteDisplay';
 
 interface SiteSelectorProps {
   selectedSiteId: string;
@@ -90,6 +91,7 @@ function SiteMeta({ site, isActive }: { site: Site; isActive: boolean }) {
 function getSiteSearchText(site: Site): string {
   return [
     site.name,
+    getSiteDisplayName(site),
     site.code,
     site.region,
     site.orientation,
@@ -161,6 +163,9 @@ export default function SiteSelector({
   // Group sites by base name
   const siteGroups = groupSitesByBaseName(visibleSites);
   const selectedSite = sites.find((site) => site.id === selectedSiteId);
+  const selectedSiteDisplayName = selectedSite
+    ? getSiteDisplayName(selectedSite)
+    : null;
 
   const handleMobileSelect = (siteId: string) => {
     onSelectSite(siteId);
@@ -181,7 +186,7 @@ export default function SiteSelector({
               Site sélectionné
             </span>
             <span className="block truncate text-base font-bold text-gray-950 dark:text-white">
-              {selectedSite?.name ?? 'Choisir un site'}
+              {selectedSiteDisplayName ?? 'Choisir un site'}
             </span>
             {selectedSite && (
               <span className="mt-0.5 block text-sm text-gray-600 dark:text-gray-300">
@@ -231,7 +236,7 @@ export default function SiteSelector({
                     >
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-semibold">
-                          {site.name}
+                          {getSiteDisplayName(site)}
                         </span>
                         {meta && <SiteMeta site={site} isActive={isActive} />}
                       </span>
@@ -259,7 +264,7 @@ export default function SiteSelector({
           <span>{visibleSites.length} sites disponibles</span>
           {selectedSite && (
             <span className="truncate font-semibold text-sky-700 dark:text-sky-300">
-              Actuel: {selectedSite.name}
+              Actuel: {selectedSiteDisplayName}
             </span>
           )}
         </div>
@@ -287,7 +292,7 @@ export default function SiteSelector({
                   onMouseEnter={() => handleMouseEnter(site.id)}
                 >
                   <span className="line-clamp-2 text-sm font-bold leading-tight">
-                    {site.name}
+                    {getSiteDisplayName(site)}
                   </span>
                   <SiteMeta site={site} isActive={isActive} />
                   {isActive && (
