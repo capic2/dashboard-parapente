@@ -31,11 +31,13 @@ import {
   useUpdateAppSettings,
   type AppSettings as BackendAppSettings,
 } from '../hooks/settings/useAppSettings';
+import { getSiteDisplayName } from '../lib/siteDisplay';
 
 // Site interface as returned by API
 interface ApiSite {
   id: string;
   name: string;
+  region?: string | null;
   latitude?: number;
   longitude?: number;
   elevation_m?: number;
@@ -190,7 +192,7 @@ function SitesTab({
             >
               <div className="flex-1">
                 <h3 className="font-semibold text-gray-900 dark:text-white">
-                  {site.name}
+                  {getSiteDisplayName(site)}
                 </h3>
                 {site.latitude && site.longitude && site.elevation_m && (
                   <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">

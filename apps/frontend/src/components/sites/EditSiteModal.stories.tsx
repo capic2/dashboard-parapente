@@ -27,7 +27,7 @@ const mockSite: Site = {
   latitude: 47.238,
   longitude: 6.024,
   elevation_m: 450,
-  region: 'Franche-Comté',
+  region: 'Besançon',
   country: 'FR',
   orientation: 'NW',
   camera_angle: 180,

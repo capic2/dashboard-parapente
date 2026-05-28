@@ -46,7 +46,7 @@ const mockSiteArguel = {
   longitude: 6.0,
   elevation_m: 427,
   orientation: 'N,NE,NW',
-  region: 'Doubs',
+  region: 'Besançon',
   country: 'FR',
   camera_distance: null,
   flight_count: 0,

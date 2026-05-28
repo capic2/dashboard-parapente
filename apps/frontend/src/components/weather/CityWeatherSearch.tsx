@@ -304,6 +304,7 @@ export default function CityWeatherSearch({
         elevation_m: selectedSpot.elevation_m
           ? Math.round(selectedSpot.elevation_m)
           : undefined,
+        region: selectedLocation?.name,
         country: selectedSpot.country,
         usage_type: selectedSpotUsageType,
         description: `Ajouté depuis la recherche météo (${selectedSpot.source})`,

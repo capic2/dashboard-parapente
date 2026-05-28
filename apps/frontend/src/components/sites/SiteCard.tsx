@@ -2,15 +2,8 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Site } from '@dashboard-parapente/shared-types';
 import { Button } from '@dashboard-parapente/design-system';
-import {
-  Compass,
-  List,
-  Map,
-  MapPin,
-  Pencil,
-  Plane,
-  Trash2,
-} from 'lucide-react';
+import { Compass, List, MapPin, Pencil, Plane, Trash2 } from 'lucide-react';
+import { getSiteDisplayName } from '../../lib/siteDisplay';
 
 interface SiteCardProps {
   site: Site;
@@ -55,6 +48,7 @@ export const SiteCard: React.FC<SiteCardProps> = ({
   };
 
   const typeBadge = getTypeBadge();
+  const siteDisplayName = getSiteDisplayName(site);
 
   return (
     <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-sky-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-sky-700">
@@ -62,7 +56,7 @@ export const SiteCard: React.FC<SiteCardProps> = ({
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-            {site.name}
+            {siteDisplayName}
           </h3>
           {site.code && (
             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -106,19 +100,6 @@ export const SiteCard: React.FC<SiteCardProps> = ({
             />
             <span className="text-gray-800 dark:text-gray-100">
               {t('sites.orientation')} {site.orientation}
-            </span>
-          </div>
-        )}
-
-        {/* Region */}
-        {site.region && (
-          <div className="flex items-start gap-2 text-sm">
-            <Map
-              className="mt-0.5 h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400"
-              aria-hidden="true"
-            />
-            <span className="text-gray-800 dark:text-gray-100">
-              {site.region}
             </span>
           </div>
         )}

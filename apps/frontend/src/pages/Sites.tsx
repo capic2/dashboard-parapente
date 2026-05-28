@@ -18,12 +18,16 @@ import { useUpdateSite, useDeleteSite } from '../hooks/sites/useSiteMutations';
 import type { Site } from '@dashboard-parapente/shared-types';
 import { SiteCard } from '../components/sites/SiteCard';
 import { EditSiteModal } from '../components/sites/EditSiteModal';
+import { getSiteDisplayName } from '../lib/siteDisplay';
 
 const columnHelper = createColumnHelper<Site>();
 
 const columns = [
   columnHelper.accessor('name', {
-    sortingFn: 'alphanumeric',
+    sortingFn: (rowA, rowB) =>
+      getSiteDisplayName(rowA.original).localeCompare(
+        getSiteDisplayName(rowB.original)
+      ),
   }),
   columnHelper.accessor('region', {
     sortingFn: (rowA, rowB) => {
@@ -43,7 +47,7 @@ const columns = [
 
 const SITE_SORTABLE_COLUMNS = [
   { id: 'name', label: 'Nom' },
-  { id: 'region', label: 'Région' },
+  { id: 'region', label: 'Localité' },
   { id: 'elevation_m', label: 'Altitude' },
 ];
 
@@ -78,6 +82,7 @@ export const Sites: React.FC = () => {
     return sites.filter((site) => {
       const matchesSearch =
         normalizedSearch === '' ||
+        getSiteDisplayName(site).toLowerCase().includes(normalizedSearch) ||
         site.name.toLowerCase().includes(normalizedSearch) ||
         site.code?.toLowerCase().includes(normalizedSearch) ||
         site.region?.toLowerCase().includes(normalizedSearch);
@@ -248,7 +253,7 @@ export const Sites: React.FC = () => {
         ariaLabel="Liste des sites"
         layout="grid"
         itemsClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-        getTextValue={(row) => row.original.name}
+        getTextValue={(row) => getSiteDisplayName(row.original)}
       />
 
       {filteredSites.length === 0 && hasActiveFilters && (
@@ -299,7 +304,9 @@ export const Sites: React.FC = () => {
         size="sm"
       >
         <p className="text-sm text-gray-700 dark:text-gray-300">
-          {t('sites.deleteSiteDescription', { name: siteToDelete?.name })}
+          {t('sites.deleteSiteDescription', {
+            name: siteToDelete ? getSiteDisplayName(siteToDelete) : undefined,
+          })}
         </p>
         <div className="flex flex-col sm:flex-row gap-3 pt-4">
           <Button

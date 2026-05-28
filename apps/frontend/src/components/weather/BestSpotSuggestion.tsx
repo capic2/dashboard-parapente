@@ -26,6 +26,7 @@ import { WindIndicator } from '../common/WindIndicator';
 import { Button } from '@dashboard-parapente/design-system';
 import type { BestSpotResult } from '@dashboard-parapente/shared-types';
 import { weatherCardClassName } from './weatherUi';
+import { getSiteDisplayName } from '../../lib/siteDisplay';
 
 type HourlyBestSpot = BestSpotResult & { hour: number };
 
@@ -289,7 +290,7 @@ export const BestSpotSuggestion = ({
         {/* Site name + rating */}
         <div className="flex min-w-0 items-center gap-2 mb-4">
           <span className="min-w-0 truncate text-2xl font-black tracking-tight text-slate-950 dark:text-white">
-            {site.name}
+            {getSiteDisplayName(site)}
           </span>
           {site.rating != null && site.rating > 0 && (
             <span className="text-sm text-amber-500 dark:text-amber-400">
@@ -634,7 +635,9 @@ export function BestSpotSuggestionCompact({
           />
         )}
       </div>
-      <div className="font-bold text-gray-900 dark:text-white">{site.name}</div>
+      <div className="font-bold text-gray-900 dark:text-white">
+        {getSiteDisplayName(site)}
+      </div>
       <div className="flex items-center gap-2 mt-1">
         <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
           <div
