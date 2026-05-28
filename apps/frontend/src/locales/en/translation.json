@@ -975,7 +975,16 @@
     "additionalInfo": "Additional information about the site...",
     "saving": "Saving...",
     "saveButton": "Save",
-    "saveError": "Error saving site"
+    "saveError": "Error saving site",
+    "searchExistingTitle": "Search for a real site",
+    "searchExistingHelp": "Choose a city to find the nearest existing takeoffs and landings. The form remains editable before saving.",
+    "typeTakeoffShort": "Takeoff",
+    "typeLandingShort": "Landing",
+    "typeBothShort": "Takeoff + Landing",
+    "selectedSite": "Selected",
+    "noExistingSiteFound": "No existing site found in this radius. Increase the radius or use manual entry.",
+    "duplicateSite": "{{name}} is already in the list.",
+    "searchSourceDescription": "Added from site search ({{source}})"
   },
   "strava": {
     "title": "Sync with Strava",

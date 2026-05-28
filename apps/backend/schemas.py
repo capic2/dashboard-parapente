@@ -3,6 +3,26 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, validator
 
+VALID_SITE_ORIENTATIONS = {
+    "",
+    "N",
+    "NNE",
+    "NE",
+    "ENE",
+    "E",
+    "ESE",
+    "SE",
+    "SSE",
+    "S",
+    "SSW",
+    "SW",
+    "WSW",
+    "W",
+    "WNW",
+    "NW",
+    "NNW",
+}
+
 
 class GoproOverlayDependencies(BaseModel):
     gopro_dashboard: bool
@@ -65,7 +85,19 @@ class SiteBase(BaseModel):
 
 
 class SiteCreate(SiteBase):
-    pass
+    orientation: str | None = None
+
+    @validator("orientation")
+    def validate_orientation(cls, v):
+        if v is None:
+            return v
+        orientation = v.strip().upper()
+        if orientation not in VALID_SITE_ORIENTATIONS:
+            raise ValueError(
+                "Orientation must be one of: "
+                "N, NNE, NE, ENE, E, ESE, SE, SSE, S, SSW, SW, WSW, W, WNW, NW, NNW"
+            )
+        return orientation
 
 
 class SiteUpdate(BaseModel):
@@ -124,9 +156,15 @@ class SiteUpdate(BaseModel):
 
     @validator("orientation")
     def validate_orientation(cls, v):
-        if v is not None and v not in ["N", "NE", "E", "SE", "S", "SW", "W", "NW", ""]:
-            raise ValueError("Orientation must be one of: N, NE, E, SE, S, SW, W, NW")
-        return v
+        if v is None:
+            return v
+        orientation = v.strip().upper()
+        if orientation not in VALID_SITE_ORIENTATIONS:
+            raise ValueError(
+                "Orientation must be one of: "
+                "N, NNE, NE, ENE, E, ESE, SE, SSE, S, SSW, SW, WSW, W, WNW, NW, NNW"
+            )
+        return orientation
 
 
 class Site(SiteBase):
