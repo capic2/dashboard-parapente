@@ -24,6 +24,9 @@ class _FakeLocator:
     async def screenshot(self, path: str) -> None:
         Path(path).write_bytes(b"png")
 
+    async def click(self, *args, **kwargs) -> None:
+        return None
+
 
 class _FakePage:
     def __init__(self, *, image_loaded: bool) -> None:
@@ -46,6 +49,32 @@ class _FakePage:
     async def screenshot(self, *args, **kwargs) -> None:
         self.full_page_screenshot_called = True
         raise AssertionError("Meteociel should not fall back to a full-page screenshot")
+
+
+class _FakeKeyboard:
+    def __init__(self) -> None:
+        self.pressed: list[str] = []
+
+    async def press(self, key: str) -> None:
+        self.pressed.append(key)
+
+
+class _FakeMeteoParapentePage:
+    def __init__(self, output_path: Path) -> None:
+        self.keyboard = _FakeKeyboard()
+        self.output_path = output_path
+
+    async def goto(self, *args, **kwargs) -> None:
+        return None
+
+    async def wait_for_timeout(self, *args, **kwargs) -> None:
+        return None
+
+    def locator(self, selector: str):
+        return _FakeLocator(count=0)
+
+    async def screenshot(self, path: str, *args, **kwargs) -> None:
+        Path(path).write_bytes(b"png")
 
 
 class _FakeBrowser:
@@ -79,7 +108,9 @@ class _FakePlaywright:
 
 
 @pytest.mark.asyncio
-async def test_meteociel_screenshot_requires_loaded_image(monkeypatch, tmp_path) -> None:
+async def test_meteociel_screenshot_captures_visible_image_after_load_timeout(
+    monkeypatch, tmp_path
+) -> None:
     page = _FakePage(image_loaded=False)
     monkeypatch.setattr(emagram_screenshots, "EMAGRAM_CACHE_DIR", tmp_path)
     monkeypatch.setattr(
@@ -95,11 +126,10 @@ async def test_meteociel_screenshot_requires_loaded_image(monkeypatch, tmp_path)
         hour=12,
     )
 
-    assert result["success"] is False
+    assert result["success"] is True
     assert result["source"] == "meteociel"
-    assert "image not loaded" in result["error"]
+    assert Path(result["image_path"]).read_bytes() == b"png"
     assert not page.full_page_screenshot_called
-    assert list(tmp_path.glob("*.png")) == []
 
 
 @pytest.mark.asyncio
@@ -123,3 +153,26 @@ async def test_meteociel_screenshot_captures_loaded_image(monkeypatch, tmp_path)
     assert result["source"] == "meteociel"
     assert Path(result["image_path"]).read_bytes() == b"png"
     assert not page.full_page_screenshot_called
+
+
+@pytest.mark.asyncio
+async def test_meteo_parapente_uses_keyboard_day_fallback(monkeypatch, tmp_path) -> None:
+    page = _FakeMeteoParapentePage(tmp_path)
+    monkeypatch.setattr(emagram_screenshots, "EMAGRAM_CACHE_DIR", tmp_path)
+    monkeypatch.setattr(
+        emagram_screenshots,
+        "async_playwright",
+        lambda: _FakePlaywright(page),
+    )
+
+    result = await emagram_screenshots.screenshot_meteo_parapente(
+        latitude=47.2,
+        longitude=6.0,
+        spot_name="Arguel",
+        day_index=1,
+    )
+
+    assert result["success"] is True
+    assert result["source"] == "meteo-parapente"
+    assert page.keyboard.pressed == ["ArrowRight"]
+    assert Path(result["image_path"]).read_bytes() == b"png"
