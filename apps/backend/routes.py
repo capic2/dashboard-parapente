@@ -5934,7 +5934,7 @@ def _auto_emagram_analysis(
     _pending_emagram_analyses.add(key)
     try:
         with get_db_context() as db:
-            asyncio.run(
+            result = asyncio.run(
                 generate_multi_source_emagram_for_spot(
                     site_id=site_id,
                     db=db,
@@ -5943,6 +5943,14 @@ def _auto_emagram_analysis(
                     locale=locale,
                 )
             )
+            if not result.get("success"):
+                logger.warning(
+                    "Auto emagram analysis ended in failure for %s day_index=%s hour=%s: %s",
+                    site_id,
+                    day_index,
+                    hour,
+                    result.get("error", "unknown error"),
+                )
     except Exception as e:
         logger.error(
             f"Auto emagram analysis failed for {site_id} day_index={day_index} hour={hour}: {e}"
