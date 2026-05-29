@@ -4,12 +4,17 @@ Captures emagram images from Meteo-Parapente, TopMeteo, and Windy
 """
 
 import asyncio
+import base64
 import logging
+from contextlib import suppress
 from datetime import datetime
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import urljoin
 
+import httpx
+from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
 logger = logging.getLogger(__name__)
@@ -17,6 +22,8 @@ logger = logging.getLogger(__name__)
 # Cache directory for temporary screenshots
 EMAGRAM_CACHE_DIR = Path("/tmp/emagram_cache")
 EMAGRAM_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+METEO_PARAPENTE_SCREENSHOT_TIMEOUT_SECONDS = 35
+METEOCIEL_SCREENSHOT_TIMEOUT_SECONDS = 30
 
 
 def _meteo_parapente_day_labels(day_index: int) -> list[str]:
@@ -41,6 +48,35 @@ async def _click_first_available(page: Any, selectors: list[str], timeout: int) 
         except Exception:
             continue
     return None
+
+
+async def _capture_page_png(
+    page: Any, image_path: Path, clip: dict[str, float] | None = None
+) -> None:
+    params: dict[str, Any] = {"format": "png", "captureBeyondViewport": False}
+    if clip:
+        params["clip"] = {
+            "x": clip["x"],
+            "y": clip["y"],
+            "width": clip["width"],
+            "height": clip["height"],
+            "scale": 1,
+        }
+
+    try:
+        cdp = await page.context.new_cdp_session(page)
+        result = await cdp.send("Page.captureScreenshot", params)
+        image_path.write_bytes(base64.b64decode(result["data"]))
+        return
+    except Exception as cdp_error:
+        logger.warning("CDP screenshot failed, using Playwright screenshot: %s", cdp_error)
+
+    screenshot_kwargs: dict[str, Any] = {"path": str(image_path), "timeout": 8000}
+    if clip:
+        screenshot_kwargs["clip"] = clip
+    else:
+        screenshot_kwargs["full_page"] = False
+    await page.screenshot(**screenshot_kwargs)
 
 
 async def screenshot_meteo_parapente(
@@ -84,7 +120,11 @@ async def screenshot_meteo_parapente(
             page = await browser.new_page(viewport={"width": 1920, "height": 1080})
 
             logger.info(f"📸 Meteo-Parapente: Loading {url}")
-            await page.goto(url, wait_until="networkidle", timeout=timeout)
+            await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
+            try:
+                await page.wait_for_load_state("networkidle", timeout=8000)
+            except Exception as e:
+                logger.warning("Meteo-Parapente network did not become idle, continuing: %s", e)
 
             # Wait for page to load
             await page.wait_for_timeout(3000)
@@ -228,8 +268,9 @@ async def screenshot_meteo_parapente(
 
             # Take screenshot of LEFT PANEL ONLY (clip to left side of screen)
             # Assume left panel is roughly 50% of screen width
-            await page.screenshot(
-                path=str(image_path),
+            await _capture_page_png(
+                page,
+                image_path,
                 clip={"x": 0, "y": 0, "width": 960, "height": 1080},  # Left half
             )
 
@@ -327,57 +368,29 @@ async def screenshot_meteociel_emagram(
     image_path = EMAGRAM_CACHE_DIR / filename
 
     try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page(viewport={"width": 1600, "height": 1200})
+        logger.info(f"Meteociel emagram: Loading {url}")
+        async with httpx.AsyncClient(follow_redirects=True, timeout=timeout / 1000) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+            image_src = None
+            for img in soup.find_all("img"):
+                src = str(img.get("src") or "")
+                if "sondage" in src or "emagram" in src:
+                    image_src = urljoin(str(response.url), src)
+                    break
 
-            try:
-                logger.info(f"Meteociel emagram: Loading {url}")
-                await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
+            if not image_src:
+                raise RuntimeError("Meteociel emagram image not found in page")
 
-                image_selector = "img[src*='sondagegfs'], img[src*='sondage'], img[src*='emagram']"
-                await page.wait_for_selector(image_selector, state="visible", timeout=timeout)
-                try:
-                    await page.wait_for_function(
-                        """
-                        selector => {
-                            const img = document.querySelector(selector);
-                            return img instanceof HTMLImageElement
-                                && img.complete
-                                && img.naturalWidth > 0
-                                && img.naturalHeight > 0;
-                        }
-                        """,
-                        arg=image_selector,
-                        timeout=min(timeout, 8000),
-                    )
-                except Exception as e:
-                    logger.warning(
-                        "Meteociel image load check timed out, trying visible image capture: %s",
-                        e,
-                    )
+            image_response = await client.get(image_src)
+            image_response.raise_for_status()
+            image_path.write_bytes(image_response.content)
 
-                # Meteociel shows emagram as an image; fail instead of storing a blank fallback.
-                emagram_img = page.locator(image_selector).first
-                parent = emagram_img.locator("xpath=ancestor::td").first
-                if await parent.count() > 0:
-                    await parent.screenshot(path=str(image_path))
-                    logger.info("Captured emagram with parent container (includes date)")
-                else:
-                    parent_table = emagram_img.locator("xpath=ancestor::table").first
-                    if await parent_table.count() > 0:
-                        await parent_table.screenshot(path=str(image_path))
-                        logger.info("Captured emagram with table container (includes date)")
-                    else:
-                        await emagram_img.screenshot(path=str(image_path))
-                        logger.info("Captured emagram image directly (no parent found)")
+        if not image_path.exists() or image_path.stat().st_size == 0:
+            raise RuntimeError("Meteociel emagram image was not written")
 
-                if not image_path.exists() or image_path.stat().st_size == 0:
-                    raise RuntimeError("Meteociel emagram screenshot was not written")
-
-                logger.info(f"Meteociel emagram screenshot saved: {image_path}")
-            finally:
-                await browser.close()
+        logger.info(f"Meteociel emagram image saved: {image_path}")
 
         return {
             "success": True,
@@ -394,6 +407,33 @@ async def screenshot_meteociel_emagram(
             "source": "meteociel",
             "error": str(e),
             "external_url": url,
+            "timestamp": datetime.now().isoformat(),
+        }
+
+
+async def _run_screenshot_with_timeout(
+    source: str, screenshot_coro: Any, timeout_seconds: float, external_url: str
+) -> dict[str, Any]:
+    task = asyncio.create_task(screenshot_coro)
+    try:
+        return await asyncio.wait_for(task, timeout=timeout_seconds)
+    except TimeoutError:
+        task.cancel()
+        with suppress(BaseException):
+            await task
+        return {
+            "success": False,
+            "source": source,
+            "error": f"{source} screenshot timed out after {timeout_seconds}s",
+            "external_url": external_url,
+            "timestamp": datetime.now().isoformat(),
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "source": source,
+            "error": str(e),
+            "external_url": external_url,
             "timestamp": datetime.now().isoformat(),
         }
 
@@ -433,12 +473,33 @@ async def fetch_all_emagram_screenshots(
 
     logger.info(f"🎬 Starting screenshot fetch for {spot_name} ({spot_id})")
     logger.info(f"   Coordinates: {latitude}, {longitude}")
+    meteo_parapente_url = f"https://meteo-parapente.com/#/sounding/{latitude}/{longitude}"
+    if hour is not None:
+        meteociel_ech = hour + (day_index * 24)
+    else:
+        meteociel_ech = 3 + (day_index * 24)
+    meteociel_url = (
+        "https://www.meteociel.fr/modeles/sondage2.php"
+        f"?mode=0&lon={longitude}&lat={latitude}&ech={meteociel_ech}&map=0"
+    )
 
     # Fetch sources in parallel
     tasks = [
-        screenshot_meteo_parapente(latitude, longitude, spot_name, day_index=day_index, hour=hour),
-        screenshot_meteociel_emagram(
-            latitude, longitude, spot_name, day_index=day_index, hour=hour
+        _run_screenshot_with_timeout(
+            "meteo-parapente",
+            screenshot_meteo_parapente(
+                latitude, longitude, spot_name, day_index=day_index, hour=hour
+            ),
+            timeout_seconds=METEO_PARAPENTE_SCREENSHOT_TIMEOUT_SECONDS,
+            external_url=meteo_parapente_url,
+        ),
+        _run_screenshot_with_timeout(
+            "meteociel",
+            screenshot_meteociel_emagram(
+                latitude, longitude, spot_name, day_index=day_index, hour=hour
+            ),
+            timeout_seconds=METEOCIEL_SCREENSHOT_TIMEOUT_SECONDS,
+            external_url=meteociel_url,
         ),
     ]
 
