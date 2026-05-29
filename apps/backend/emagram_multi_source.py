@@ -7,7 +7,7 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from datetime import time as dt_time
 from typing import Any
 
@@ -235,6 +235,10 @@ async def generate_multi_source_emagram_for_spot(
         }
     """
 
+    site: Site | None = None
+    forecast_date = None
+    screenshot_result: dict[str, Any] = {"screenshots": []}
+
     try:
         # Step 1: Get site from database
         site = db.query(Site).filter(Site.id == site_id).first()
@@ -293,22 +297,44 @@ async def generate_multi_source_emagram_for_spot(
 
         if not screenshot_result.get("success"):
             logger.error(f"Screenshot fetch failed: {screenshot_result.get('error')}")
-            return {
+            failure_result = {
                 "success": False,
                 "error": "Failed to fetch emagram screenshots",
                 "details": screenshot_result,
             }
+            failed_analysis = _record_failed_analysis(
+                db,
+                site,
+                screenshot_result,
+                failure_result,
+                forecast_date=forecast_date,
+                forecast_hour=hour,
+            )
+            if failed_analysis:
+                failure_result["analysis_id"] = failed_analysis.id
+            return failure_result
 
         screenshots = screenshot_result.get("screenshots", [])
         successful_screenshots = [s for s in screenshots if s.get("success")]
 
         if not successful_screenshots:
             logger.error("No screenshots were successful")
-            return {
+            failure_result = {
                 "success": False,
                 "error": "All screenshot sources failed",
                 "screenshots": screenshots,
             }
+            failed_analysis = _record_failed_analysis(
+                db,
+                site,
+                screenshot_result,
+                failure_result,
+                forecast_date=forecast_date,
+                forecast_hour=hour,
+            )
+            if failed_analysis:
+                failure_result["analysis_id"] = failed_analysis.id
+            return failure_result
 
         logger.info(f"📸 {len(successful_screenshots)}/3 screenshots successful")
 
@@ -352,9 +378,59 @@ async def generate_multi_source_emagram_for_spot(
 
         return emagram_analysis_to_dict(emagram_analysis, db=db)
 
+    except QuotaExhaustedError as e:
+        logger.error(f"LLM quota exhausted during emagram generation: {e}", exc_info=True)
+        failure_result = {"success": False, "error": f"LLM quota exhausted: {e}"}
+        if site is not None:
+            failed_analysis = _record_failed_analysis(
+                db,
+                site,
+                screenshot_result,
+                failure_result,
+                forecast_date=forecast_date,
+                forecast_hour=hour,
+            )
+            if failed_analysis:
+                failure_result["analysis_id"] = failed_analysis.id
+        return failure_result
     except Exception as e:
         logger.error(f"Error in multi-source emagram generation: {e}", exc_info=True)
-        return {"success": False, "error": f"Unexpected error: {str(e)}"}
+        failure_result = {"success": False, "error": f"Unexpected error: {str(e)}"}
+        if site is not None:
+            failed_analysis = _record_failed_analysis(
+                db,
+                site,
+                screenshot_result,
+                failure_result,
+                forecast_date=forecast_date,
+                forecast_hour=hour,
+            )
+            if failed_analysis:
+                failure_result["analysis_id"] = failed_analysis.id
+        return failure_result
+
+
+def _record_failed_analysis(
+    db: Session,
+    site: Site,
+    screenshot_result: dict[str, Any],
+    analysis_result: dict[str, Any],
+    forecast_date: date | None = None,
+    forecast_hour: int | None = None,
+) -> EmagramAnalysis | None:
+    try:
+        return save_failed_analysis(
+            db,
+            site,
+            screenshot_result,
+            analysis_result,
+            forecast_date=forecast_date,
+            forecast_hour=forecast_hour,
+        )
+    except Exception as save_error:
+        db.rollback()
+        logger.error("Failed to persist failed emagram analysis: %s", save_error, exc_info=True)
+        return None
 
 
 def save_emagram_analysis(
@@ -453,7 +529,7 @@ def save_failed_analysis(
     analysis_result: dict[str, Any],
     forecast_date=None,
     forecast_hour: int | None = None,
-):
+) -> EmagramAnalysis:
     """
     Save failed analysis attempt for debugging
     """
@@ -489,8 +565,10 @@ def save_failed_analysis(
 
     db.add(emagram)
     db.commit()
+    db.refresh(emagram)
 
     logger.warning("⚠️ Saved failed analysis attempt to database")
+    return emagram
 
 
 def parse_time_string(time_str: str | None) -> dt_time | None:
