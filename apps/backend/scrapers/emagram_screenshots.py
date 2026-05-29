@@ -6,6 +6,7 @@ Captures emagram images from Meteo-Parapente, TopMeteo, and Windy
 import asyncio
 import logging
 from datetime import datetime
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,30 @@ logger = logging.getLogger(__name__)
 # Cache directory for temporary screenshots
 EMAGRAM_CACHE_DIR = Path("/tmp/emagram_cache")
 EMAGRAM_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _meteo_parapente_day_labels(day_index: int) -> list[str]:
+    target_date = datetime.now() + timedelta(days=day_index)
+    day = target_date.day
+    month = target_date.month
+    return [
+        target_date.strftime("%Y-%m-%d"),
+        target_date.strftime("%d/%m"),
+        f"{day}/{month}",
+        f"{day:02d}/{month:02d}",
+    ]
+
+
+async def _click_first_available(page: Any, selectors: list[str], timeout: int) -> str | None:
+    for selector in selectors:
+        try:
+            element = page.locator(selector).first
+            if await element.count() > 0:
+                await element.click(timeout=timeout)
+                return selector
+        except Exception:
+            continue
+    return None
 
 
 async def screenshot_meteo_parapente(
@@ -80,16 +105,10 @@ async def screenshot_meteo_parapente(
                     "a:has-text('Sounding')",
                 ]
 
-                for selector in tab_selectors:
-                    try:
-                        element = page.locator(selector).first
-                        if await element.count() > 0:
-                            await element.click(timeout=3000)
-                            logger.info(f"✅ Clicked sounding tab: {selector}")
-                            emagram_tab_clicked = True
-                            break
-                    except Exception:
-                        continue
+                clicked_selector = await _click_first_available(page, tab_selectors, timeout=3000)
+                if clicked_selector:
+                    logger.info(f"✅ Clicked sounding tab: {clicked_selector}")
+                    emagram_tab_clicked = True
 
             except Exception as e:
                 logger.warning(f"Could not click sounding tab: {e}")
@@ -105,22 +124,53 @@ async def screenshot_meteo_parapente(
                         "button.next-day",
                         "[data-action='next-day']",
                         ".day-nav-next",
+                        "[aria-label*='Next']",
+                        "[aria-label*='next']",
+                        "[aria-label*='suivant']",
+                        "[title*='Next']",
+                        "[title*='Suivant']",
                         "button:has-text('▶')",
                         "button:has-text('›')",
+                        "button:has-text('>')",
+                        "a:has-text('›')",
+                        "a:has-text('>')",
                         ".nav-next",
                     ]
-                    clicked = False
-                    for sel in next_day_selectors:
+                    clicked_selector = await _click_first_available(
+                        page, next_day_selectors, timeout=2000
+                    )
+                    clicked = clicked_selector is not None
+                    if clicked_selector:
+                        await page.wait_for_timeout(1500)
+                        logger.info(f"Clicked next-day button: {clicked_selector}")
+
+                    if not clicked:
+                        day_selectors = []
+                        for label in _meteo_parapente_day_labels(day_index):
+                            day_selectors.extend(
+                                [
+                                    f"button:has-text('{label}')",
+                                    f"a:has-text('{label}')",
+                                    f"[role='button']:has-text('{label}')",
+                                ]
+                            )
+                        clicked_selector = await _click_first_available(
+                            page, day_selectors, timeout=2000
+                        )
+                        clicked = clicked_selector is not None
+                        if clicked_selector:
+                            await page.wait_for_timeout(1500)
+                            logger.info(f"Clicked target-day selector: {clicked_selector}")
+
+                    if not clicked:
                         try:
-                            el = page.locator(sel).first
-                            if await el.count() > 0:
-                                await el.click(timeout=2000)
-                                await page.wait_for_timeout(1500)
-                                clicked = True
-                                logger.info(f"Clicked next-day button: {sel}")
-                                break
-                        except Exception:
-                            continue
+                            await page.keyboard.press("ArrowRight")
+                            await page.wait_for_timeout(1500)
+                            clicked = True
+                            logger.info("Navigated to next day with ArrowRight fallback")
+                        except Exception as e:
+                            logger.warning(f"ArrowRight day navigation fallback failed: {e}")
+
                     if not clicked:
                         raise RuntimeError(
                             f"Could not navigate Meteo-Parapente to day_index={day_index}"
@@ -138,16 +188,12 @@ async def screenshot_meteo_parapente(
                         f"button:has-text('{hour}:00')",
                         f".hour-label:has-text('{hour}')",
                     ]
-                    for sel in hour_selectors:
-                        try:
-                            el = page.locator(sel).first
-                            if await el.count() > 0:
-                                await el.click(timeout=2000)
-                                hour_navigated = True
-                                logger.info(f"Clicked hour selector: {sel}")
-                                break
-                        except Exception:
-                            continue
+                    clicked_selector = await _click_first_available(
+                        page, hour_selectors, timeout=2000
+                    )
+                    if clicked_selector:
+                        hour_navigated = True
+                        logger.info(f"Clicked hour selector: {clicked_selector}")
 
                     # Strategy 2: Try to set a range slider via JS
                     if not hour_navigated:
@@ -291,19 +337,25 @@ async def screenshot_meteociel_emagram(
 
                 image_selector = "img[src*='sondagegfs'], img[src*='sondage'], img[src*='emagram']"
                 await page.wait_for_selector(image_selector, state="visible", timeout=timeout)
-                await page.wait_for_function(
-                    """
-                    selector => {
-                        const img = document.querySelector(selector);
-                        return img instanceof HTMLImageElement
-                            && img.complete
-                            && img.naturalWidth > 0
-                            && img.naturalHeight > 0;
-                    }
-                    """,
-                    arg=image_selector,
-                    timeout=timeout,
-                )
+                try:
+                    await page.wait_for_function(
+                        """
+                        selector => {
+                            const img = document.querySelector(selector);
+                            return img instanceof HTMLImageElement
+                                && img.complete
+                                && img.naturalWidth > 0
+                                && img.naturalHeight > 0;
+                        }
+                        """,
+                        arg=image_selector,
+                        timeout=min(timeout, 8000),
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Meteociel image load check timed out, trying visible image capture: %s",
+                        e,
+                    )
 
                 # Meteociel shows emagram as an image; fail instead of storing a blank fallback.
                 emagram_img = page.locator(image_selector).first
