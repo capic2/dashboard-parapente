@@ -631,6 +631,33 @@ const defaultHandlersWithoutSpotsAndDetails = defaultHandlers.filter(
   (handler) => handler !== spotsHandler && handler !== spotDetailsHandler
 );
 
+const DAY_SEARCH_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const parseLocalDate = (value: string) => {
+  if (!DAY_SEARCH_DATE_RE.test(value)) return null;
+  const [year = '', month = '', day = ''] = value.split('-');
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  return date.getFullYear() === Number(year) &&
+    date.getMonth() === Number(month) - 1 &&
+    date.getDate() === Number(day)
+    ? date
+    : null;
+};
+
+const getLocalDayStart = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const parseForecastDaySearch = (value: unknown) => {
+  if (typeof value !== 'string') return undefined;
+  const date = parseLocalDate(value);
+  if (!date) return undefined;
+
+  const today = getLocalDayStart(new Date());
+  const dayIndex = Math.round((date.getTime() - today.getTime()) / DAY_MS);
+  return dayIndex >= 0 && dayIndex <= 6 ? value : undefined;
+};
+
 const weatherRouteConfig = {
   initialPath: '/weather',
   routes: [
@@ -638,11 +665,6 @@ const weatherRouteConfig = {
       path: '/weather',
       element: 'story' as const,
       validateSearch: (search: Record<string, unknown>) => {
-        const rawDay = search.day;
-        const parsedDay =
-          typeof rawDay === 'string' || typeof rawDay === 'number'
-            ? Number(rawDay)
-            : Number.NaN;
         const parseNumber = (value: unknown) => {
           const parsed =
             typeof value === 'string' || typeof value === 'number'
@@ -667,10 +689,7 @@ const weatherRouteConfig = {
 
         return {
           siteId: typeof search.siteId === 'string' ? search.siteId : undefined,
-          day:
-            Number.isInteger(parsedDay) && parsedDay >= 0 && parsedDay <= 6
-              ? parsedDay
-              : undefined,
+          day: parseForecastDaySearch(search.day),
           target,
           city: parseString(search.city),
           displayName: parseString(search.displayName),
