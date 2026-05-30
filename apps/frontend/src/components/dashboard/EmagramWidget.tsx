@@ -12,6 +12,7 @@ import {
 import {
   parseAlerts,
   parseSourcesErrors,
+  parseThermalValidation,
   getScoreColor,
   getScoreCategory,
 } from '../../types/emagram';
@@ -549,6 +550,11 @@ export default function EmagramWidget({
   const scoreColor = getScoreColor(score);
   const scoreCategory = getScoreCategory(score);
   const alerts = parseAlerts(emagram.alertes_securite);
+  const thermalValidation = parseThermalValidation(emagram.ai_raw_response);
+  const shouldShowThermalValidation =
+    thermalValidation?.status === 'contradicted' ||
+    thermalValidation?.status === 'low_confidence' ||
+    thermalValidation?.status === 'not_checked';
 
   // Format analysis time
   const analysisDate = parseApiUtcDate(emagram.analysis_datetime);
@@ -665,6 +671,26 @@ export default function EmagramWidget({
           />
         )}
       </div>
+
+      {shouldShowThermalValidation && thermalValidation && (
+        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-100">
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 flex-shrink-0">⚠️</span>
+            <div className="min-w-0">
+              <div className="font-semibold">Force thermique IA à vérifier</div>
+              <p className="mt-1 text-xs leading-relaxed">
+                {thermalValidation.message}
+              </p>
+              {thermalValidation.metrics?.cape_jkg != null && (
+                <p className="mt-1 text-xs opacity-80">
+                  CAPE horaire: {Math.round(thermalValidation.metrics.cape_jkg)}{' '}
+                  J/kg
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary */}
       {emagram.resume_conditions && (

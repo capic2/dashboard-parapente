@@ -46,6 +46,97 @@ PROVIDER_ENV_VARS = {
 _LLM_QUOTA_COOLDOWNS: dict[str, float] = {}
 
 
+def _to_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed == parsed else None
+
+
+def _select_forecast_hour(
+    consensus_hours: list[dict[str, Any]], target_hour: int | None
+) -> dict[str, Any] | None:
+    if not consensus_hours:
+        return None
+    if target_hour is None:
+        return consensus_hours[0]
+
+    exact = next((hour for hour in consensus_hours if hour.get("hour") == target_hour), None)
+    if exact is not None:
+        return exact
+
+    return min(
+        consensus_hours,
+        key=lambda hour: abs(int(hour.get("hour") or 0) - target_hour),
+    )
+
+
+def validate_ai_thermal_consistency(
+    analysis_result: dict[str, Any],
+    weather_forecast: dict[str, Any] | None,
+    forecast_hour: int | None,
+) -> dict[str, Any]:
+    """Cross-check LLM thermal strength against numeric hourly instability data."""
+    force_ms = _to_float(analysis_result.get("force_thermique_ms"))
+    if force_ms is None:
+        return {
+            "status": "low_confidence",
+            "message": "Force thermique IA absente ou illisible.",
+            "metrics": {"force_thermique_ms": None},
+        }
+
+    selected_hour = _select_forecast_hour(
+        list(weather_forecast.get("consensus", [])) if weather_forecast else [], forecast_hour
+    )
+    if selected_hour is None:
+        return {
+            "status": "not_checked",
+            "message": "Meteo horaire indisponible pour recouper la force thermique IA.",
+            "metrics": {"force_thermique_ms": force_ms},
+        }
+
+    cape = _to_float(selected_hour.get("cape"))
+    lifted_index = _to_float(selected_hour.get("lifted_index"))
+    hour = selected_hour.get("hour")
+    metrics = {
+        "forecast_hour": hour,
+        "requested_hour": forecast_hour,
+        "force_thermique_ms": force_ms,
+        "cape_jkg": cape,
+        "lifted_index": lifted_index,
+    }
+
+    stable_or_unknown_li = lifted_index is None or lifted_index > -3
+    if force_ms >= 3.0 and cape is not None and cape < 200 and stable_or_unknown_li:
+        return {
+            "status": "contradicted",
+            "message": (
+                "Thermiques forts annonces par l'IA, mais CAPE horaire tres faible "
+                "et Lifted Index non instable. A verifier sur l'image source."
+            ),
+            "metrics": metrics,
+        }
+
+    if force_ms >= 3.0 and cape is None and lifted_index is None:
+        return {
+            "status": "low_confidence",
+            "message": (
+                "Thermiques forts annonces par l'IA sans CAPE ni Lifted Index horaire "
+                "pour confirmation."
+            ),
+            "metrics": metrics,
+        }
+
+    return {
+        "status": "plausible",
+        "message": "Force thermique IA coherente avec les donnees horaires disponibles.",
+        "metrics": metrics,
+    }
+
+
 def _configured_llm_providers(locale: str | None = None) -> list[dict[str, Any]]:
     analysis_locale = normalize_analysis_locale(locale)
 
@@ -338,6 +429,8 @@ def _normalize_llm_analysis(
         "success": True,
         "plafond_thermique_m": raw_analysis.get("plafond_thermique_m"),
         "force_thermique_ms": raw_analysis.get("force_thermique_ms"),
+        "force_thermique_confiance": raw_analysis.get("force_thermique_confiance"),
+        "force_thermique_indices": raw_analysis.get("force_thermique_indices", []),
         "heures_volables": raw_analysis.get("heures_volables"),
         "score_volabilite": raw_analysis.get("score_volabilite"),
         "conseils_vol": raw_analysis.get("conseils_vol"),
@@ -532,6 +625,33 @@ async def generate_multi_source_emagram_for_spot(
         logger.info(
             f"🤖 LLM analysis successful ({analyzer_used}): Score {analysis_result.get('score_volabilite')}/100"
         )
+
+        try:
+            from weather_pipeline import get_normalized_forecast
+
+            weather_forecast = await get_normalized_forecast(
+                lat=site.latitude,
+                lon=site.longitude,
+                day_index=day_index,
+                db=db,
+            )
+        except Exception as forecast_error:
+            logger.warning(
+                "Could not cross-check emagram thermal strength against hourly weather: %s",
+                forecast_error,
+            )
+            weather_forecast = None
+
+        thermal_validation = validate_ai_thermal_consistency(
+            analysis_result, weather_forecast, hour
+        )
+        analysis_result["thermal_validation"] = thermal_validation
+        if thermal_validation["status"] == "contradicted":
+            alerts = analysis_result.get("alertes_securite")
+            if not isinstance(alerts, list):
+                alerts = []
+            alerts.append(thermal_validation["message"])
+            analysis_result["alertes_securite"] = alerts
 
         # Step 5: Save to database
         emagram_analysis = save_emagram_analysis(
