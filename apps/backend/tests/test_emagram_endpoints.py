@@ -672,6 +672,52 @@ class TestEmagramEndpoints:
         )
         assert response.status_code == 400
 
+    def test_analyze_failure_includes_provider_errors(self, client, db_session):
+        """Trigger analysis failure returns provider diagnostics."""
+        site = Site(
+            id="site-llm-failure",
+            code="LLMFAIL",
+            name="LLM Failure Site",
+            latitude=47.0,
+            longitude=6.0,
+            elevation_m=500,
+        )
+        db_session.add(site)
+        db_session.commit()
+
+        with patch(
+            "emagram_multi_source.generate_multi_source_emagram_for_spot",
+            new=AsyncMock(
+                return_value={
+                    "success": False,
+                    "error": "LLM analysis failed",
+                    "analysis_id": "failed-analysis-id",
+                    "details": {
+                        "error": "All configured LLM providers failed",
+                        "provider_errors": [
+                            "groq: quota exhausted",
+                            "google: rejected key test_google_key",
+                        ],
+                    },
+                }
+            ),
+        ):
+            response = client.post(
+                "/api/emagram/analyze",
+                json={"site_id": site.id, "force_refresh": True},
+            )
+
+        assert response.status_code == 500
+        detail = response.json()["detail"]
+        assert detail["message"] == "Failed to generate emagram: LLM analysis failed"
+        assert detail["error"] == "LLM analysis failed"
+        assert detail["cause"] == "All configured LLM providers failed"
+        assert detail["analysis_id"] == "failed-analysis-id"
+        assert detail["provider_errors"] == [
+            "groq: quota exhausted",
+            "google: rejected key [redacted]",
+        ]
+
     def test_list_analyses_empty(self, client):
         """List analyses when DB is empty"""
         response = client.get("/api/emagram/history?user_lat=47.0&user_lon=6.0")

@@ -5985,6 +5985,46 @@ async def test_weather_source(
 _pending_emagram_analyses: set[str] = set()
 
 
+def _redact_emagram_failure_text(value: Any) -> str:
+    text = str(value)
+    for secret in [
+        config.GROQ_API_KEY,
+        config.OPENROUTER_API_KEY,
+        config.GOOGLE_API_KEY,
+        config.GITHUB_MODELS_API_KEY,
+        config.HUGGINGFACE_API_KEY,
+        config.CUSTOM_OPENAI_API_KEY,
+    ]:
+        if secret and len(secret) >= 6:
+            text = text.replace(secret, "[redacted]")
+    if len(text) > 1000:
+        return f"{text[:1000]}..."
+    return text
+
+
+def _emagram_generation_failure_detail(result: dict[str, Any]) -> dict[str, Any]:
+    error = _redact_emagram_failure_text(result.get("error", "Unknown error"))
+    details = result.get("details")
+    cause = None
+    provider_errors = []
+    if isinstance(details, dict):
+        if details.get("error"):
+            cause = _redact_emagram_failure_text(details["error"])
+        if isinstance(details.get("provider_errors"), list):
+            provider_errors = [
+                _redact_emagram_failure_text(provider_error)
+                for provider_error in details["provider_errors"]
+            ]
+
+    return {
+        "message": f"Failed to generate emagram: {error}",
+        "error": error,
+        "cause": cause,
+        "provider_errors": provider_errors,
+        "analysis_id": result.get("analysis_id"),
+    }
+
+
 def _auto_emagram_analysis(
     site_id: str, day_index: int = 0, hour: int | None = None, locale: str | None = None
 ):
@@ -6611,7 +6651,7 @@ async def trigger_emagram_analysis(
         if not result.get("success"):
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to generate emagram: {result.get('error', 'Unknown error')}",
+                detail=_emagram_generation_failure_detail(result),
             )
 
         # Fetch the saved analysis from database
