@@ -12,6 +12,7 @@ type WeatherPageMobileProps = {
   isSearchMode: boolean;
   isAuthenticated: boolean;
   selectionPanel: ReactNode;
+  decisionPanel?: ReactNode;
   searchResultPanel?: ReactNode;
   emptyPanel?: ReactNode;
   currentConditions?: ReactNode;
@@ -67,6 +68,7 @@ export default function WeatherPageMobileLayout({
   isSearchMode,
   isAuthenticated,
   selectionPanel,
+  decisionPanel,
   searchResultPanel,
   emptyPanel,
   currentConditions,
@@ -97,6 +99,7 @@ export default function WeatherPageMobileLayout({
       />
 
       {emptyPanel}
+      {decisionPanel}
       {currentConditions}
       {searchResultPanel}
       <ExpandableSection

@@ -24,6 +24,14 @@ import WeatherSearchResultPanel from '../components/weather/WeatherSearchResultP
 import WeatherSelectionPanel, {
   type WeatherSelectionTab,
 } from '../components/weather/WeatherSelectionPanel';
+import FlightDecisionCockpit from '../components/weather/FlightDecisionCockpit';
+import {
+  DEFAULT_FLIGHT_OBJECTIVE,
+  parseFlightObjective,
+  useFlightDecision,
+} from '../hooks/weather/useFlightDecision';
+import type { FlightObjective } from '@dashboard-parapente/shared-types';
+import { useAppSettings } from '../hooks/settings/useAppSettings';
 import WeatherPageMobileLayout from './WeatherPage.mobile';
 import { getSiteDisplayName } from '../lib/siteDisplay';
 
@@ -49,7 +57,7 @@ const getSearchDayLabel = (day: number, t: (key: string) => string) => {
   return `J+${day}`;
 };
 
-const DAY_SEARCH_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DAY_SEARCH_DATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const formatLocalDate = (date: Date) => {
@@ -101,6 +109,7 @@ type WeatherSearchParams = {
   orientation?: string;
   country?: string;
   source?: string;
+  objective?: FlightObjective;
 };
 
 const hasCoordinates = (
@@ -152,10 +161,14 @@ const getTargetFromSearch = (
   return null;
 };
 
-const getSearchForTarget = (target: CityWeatherTarget | null, day: number) => {
+const getSearchForTarget = (
+  target: CityWeatherTarget | null,
+  day: number,
+  objective: FlightObjective
+) => {
   const daySearch = getForecastDaySearch(day);
 
-  if (!target) return { day: daySearch };
+  if (!target) return { day: daySearch, objective };
 
   if (target.type === 'city') {
     return {
@@ -166,6 +179,7 @@ const getSearchForTarget = (target: CityWeatherTarget | null, day: number) => {
       lon: target.location.longitude,
       country: target.location.country,
       day: daySearch,
+      objective,
     };
   }
 
@@ -181,6 +195,7 @@ const getSearchForTarget = (target: CityWeatherTarget | null, day: number) => {
     country: target.spot.country,
     source: target.spot.source,
     day: daySearch,
+    objective,
   };
 };
 
@@ -191,10 +206,15 @@ export default function WeatherPage() {
   const favoriteSiteIds = useAppSettingsStore(
     (state) => state.settings.favoriteSites
   );
+  const { data: appSettings } = useAppSettings();
   const isMobile = useIsMobile();
   const search = useSearch({ from: '/weather' });
   const routeSiteId = search ? search.siteId : '';
   const selectedDayIndex = getDayIndexFromSearch(search.day);
+  const selectedObjective =
+    parseFlightObjective(search.objective) ??
+    parseFlightObjective(appSettings?.default_flight_objective) ??
+    DEFAULT_FLIGHT_OBJECTIVE;
   const selectedSearchTarget = getTargetFromSearch(search);
   const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
   const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(selectedDayIndex);
@@ -220,6 +240,11 @@ export default function WeatherPage() {
     sites[0]?.id ??
     '';
   const selectedSite = sites.find((site) => site.id === selectedSiteId);
+  const flightDecision = useFlightDecision(
+    !selectedSearchTarget && selectedSiteId ? selectedSiteId : undefined,
+    selectedDayIndex,
+    selectedObjective
+  );
   const selectedSearchTitle = getSearchTargetName(selectedSearchTarget);
   const selectedSearchLocation = getSearchTargetLocation(selectedSearchTarget);
   const coordinateWeather = useCoordinateWeather(
@@ -250,6 +275,7 @@ export default function WeatherPage() {
   const weatherSearch = {
     siteId: selectedSiteId,
     day: getForecastDaySearch(selectedDayIndex),
+    objective: selectedObjective,
   };
   const selectedDayLabel = getSearchDayLabel(selectedDayIndex, t);
   const selectedSiteDisplayName = selectedSite
@@ -269,6 +295,7 @@ export default function WeatherPage() {
       search: {
         siteId: selectedSiteId || undefined,
         day: getForecastDaySearch(selectedDayIndex),
+        objective: selectedObjective,
       },
     });
   };
@@ -287,6 +314,7 @@ export default function WeatherPage() {
       search: {
         siteId,
         day: getForecastDaySearch(selectedDayIndex),
+        objective: selectedObjective,
       },
     });
   };
@@ -295,14 +323,14 @@ export default function WeatherPage() {
     setSelectionTab('search');
     void navigate({
       to: '/weather',
-      search: getSearchForTarget(target, selectedDayIndex),
+      search: getSearchForTarget(target, selectedDayIndex, selectedObjective),
     });
   };
 
   const handleSelectSearchDay = (day: number) => {
     void navigate({
       to: '/weather',
-      search: getSearchForTarget(selectedSearchTarget, day),
+      search: getSearchForTarget(selectedSearchTarget, day, selectedObjective),
     });
   };
 
@@ -313,6 +341,19 @@ export default function WeatherPage() {
         ...weatherSearch,
         day: getForecastDaySearch(day),
       },
+    });
+  };
+
+  const handleObjectiveChange = (objective: FlightObjective) => {
+    void navigate({
+      to: '/weather',
+      search: selectedSearchTarget
+        ? getSearchForTarget(selectedSearchTarget, selectedDayIndex, objective)
+        : {
+            siteId: selectedSiteId || undefined,
+            day: getForecastDaySearch(selectedDayIndex),
+            objective,
+          },
     });
   };
 
@@ -364,6 +405,17 @@ export default function WeatherPage() {
         }
       />
     ) : undefined;
+
+  const mobileDecisionPanel = (
+    <FlightDecisionCockpit
+      decision={flightDecision.data}
+      objective={selectedObjective}
+      isLoading={flightDecision.isLoading}
+      isError={flightDecision.isError}
+      isCityContext={Boolean(selectedSearchTarget)}
+      onObjectiveChange={handleObjectiveChange}
+    />
+  );
 
   const mobileLiveWindPanel =
     !selectedSearchTarget && selectedSiteId ? (
@@ -418,6 +470,7 @@ export default function WeatherPage() {
         isSearchMode={Boolean(selectedSearchTarget)}
         isAuthenticated={isAuthenticated}
         selectionPanel={selectionPanel}
+        decisionPanel={mobileDecisionPanel}
         searchResultPanel={mobileSearchResultPanel}
         emptyPanel={mobileEmptyPanel}
         currentConditions={mobileCurrentConditions}
@@ -445,6 +498,17 @@ export default function WeatherPage() {
             selectedDayIndex={selectedDayIndex}
             getDayLabel={(day) => getSearchDayLabel(day, t)}
             onSelectDay={handleSelectSearchDay}
+          />
+        )}
+
+        {(selectedSearchTarget || selectedSiteId) && (
+          <FlightDecisionCockpit
+            decision={flightDecision.data}
+            objective={selectedObjective}
+            isLoading={flightDecision.isLoading}
+            isError={flightDecision.isError}
+            isCityContext={Boolean(selectedSearchTarget)}
+            onObjectiveChange={handleObjectiveChange}
           />
         )}
 
