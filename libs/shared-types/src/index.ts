@@ -234,6 +234,147 @@ export const BackendWeatherResponseSchema = z.object({
   cached_at: z.string().nullish(),
 });
 
+export const FlightDecisionLevelSchema = z.enum([
+  'favorable',
+  'vigilance',
+  'limite',
+  'deconseille',
+  'unavailable',
+]);
+
+export const FlightObjectiveSchema = z.enum([
+  'tranquille',
+  'progression',
+  'thermique',
+]);
+
+export const FlightDecisionRiskSeveritySchema = z.enum([
+  'info',
+  'vigilance',
+  'limiting',
+  'blocking',
+]);
+
+export const FlightDecisionDiagnosticSchema = z.object({
+  code: z.string(),
+  severity: FlightDecisionRiskSeveritySchema,
+  translation_key: z.string(),
+  params: z.record(z.string(), z.any()).default({}),
+});
+
+export const FlightDecisionWindowSchema = z.object({
+  start_hour: z.number(),
+  end_hour: z.number(),
+  level: FlightDecisionLevelSchema,
+  translation_key: z.string(),
+  score_objectif: z.number(),
+  min_score_objectif: z.number(),
+  hours: z.array(z.number()),
+  main_risk_codes: z.array(z.string()),
+  summary_key: z.string(),
+  summary_params: z.record(z.string(), z.any()),
+});
+
+export const FlightDecisionResponseSchema = z.object({
+  site: z.object({
+    id: z.string(),
+    name: z.string(),
+    usage_type: z.string().nullish(),
+    orientation: z.string().nullish(),
+  }),
+  objective: FlightObjectiveSchema,
+  timezone: z.string(),
+  day_index: z.number(),
+  summary: z.object({
+    level: FlightDecisionLevelSchema,
+    translation_key: z.string(),
+    score_objectif: z.number(),
+    title_key: z.string(),
+    message_key: z.string(),
+    message_params: z.record(z.string(), z.any()),
+    main_risk_code: z.string().nullish(),
+    has_recommended_window: z.boolean(),
+  }),
+  best_window: FlightDecisionWindowSchema.nullish(),
+  least_unfavorable_window: FlightDecisionWindowSchema.nullish(),
+  hourly: z.array(
+    z.object({
+      hour: z.number(),
+      is_past: z.boolean(),
+      level: FlightDecisionLevelSchema,
+      translation_key: z.string(),
+      score_objectif: z.number(),
+      para_index: z.number(),
+      risks: z.array(FlightDecisionDiagnosticSchema),
+      wind: z.object({
+        speed_kmh: z.number().nullish(),
+        gust_kmh: z.number().nullish(),
+        direction_deg: z.number().nullish(),
+        direction_label: z.string().nullish(),
+      }),
+      wind_decollage: z.object({
+        status: z.string(),
+        translation_key: z.string(),
+        angle_deviation_deg: z.number().nullish(),
+        selected_orientation: z.string().nullish(),
+        severity: FlightDecisionRiskSeveritySchema,
+      }),
+      thermal: z.object({
+        strength: z.string(),
+        cape: z.number().nullish(),
+        lifted_index: z.number().nullish(),
+        objective_effect: z.string(),
+        translation_key: z.string(),
+      }),
+      confidence: z.object({
+        level: z.string(),
+        score: z.number(),
+        source_count: z.number(),
+      }),
+    })
+  ),
+  risks: z.array(FlightDecisionDiagnosticSchema),
+  confidence: z.object({
+    level: z.string(),
+    score: z.number(),
+    translation_key: z.string(),
+    source_count: z.number(),
+    expected_source_count: z.number(),
+    freshness: z.object({
+      cached_at: z.string().nullish(),
+      age_minutes: z.number().nullish(),
+      status: z.string(),
+    }),
+    diagnostics: z.array(FlightDecisionDiagnosticSchema),
+  }),
+  landing_safety: z.object({
+    status: z.enum(['evaluated', 'not_configured', 'unavailable']),
+    level: FlightDecisionLevelSchema,
+    translation_key: z.string(),
+    summary_key: z.string(),
+    summary_params: z.record(z.string(), z.any()),
+    landings: z.array(
+      z.object({
+        site_id: z.string(),
+        name: z.string(),
+        distance_km: z.number().nullish(),
+        is_primary: z.boolean(),
+        level: FlightDecisionLevelSchema,
+        score_objectif: z.number().nullish(),
+        risks: z.array(FlightDecisionDiagnosticSchema),
+      })
+    ),
+  }),
+  live_wind: z.object({
+    status: z.enum(['not_evaluated', 'unavailable', 'evaluated', 'stale']),
+    influences_confidence: z.boolean(),
+    stations: z.array(z.record(z.string(), z.any())),
+    diagnostics: z.array(FlightDecisionDiagnosticSchema),
+  }),
+  alternatives: z.array(z.record(z.string(), z.any())),
+  cached_at: z.string().nullish(),
+});
+
 // ============================================================================
 // API WRAPPER SCHEMA
 // ============================================================================
@@ -496,6 +637,10 @@ export type Alert = z.infer<typeof AlertSchema>;
 export type ConsensusHour = z.infer<typeof ConsensusHourSchema>;
 export type BackendWeatherResponse = z.infer<
   typeof BackendWeatherResponseSchema
+>;
+export type FlightObjective = z.infer<typeof FlightObjectiveSchema>;
+export type FlightDecisionResponse = z.infer<
+  typeof FlightDecisionResponseSchema
 >;
 export type Slot = z.infer<typeof SlotSchema>;
 export type Metrics = z.infer<typeof MetricsSchema>;

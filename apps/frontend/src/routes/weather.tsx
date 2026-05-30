@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { queryClient } from '../lib/queryClient';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
+import { parseFlightObjective } from '../hooks/weather/useFlightDecision';
 
 type WeatherSearch = {
   variant?: 'A' | 'B' | 'C';
@@ -18,6 +19,7 @@ type WeatherSearch = {
   orientation?: string;
   country?: string;
   source?: string;
+  objective?: 'tranquille' | 'progression' | 'thermique';
 };
 
 const parseOptionalNumber = (value: unknown) => {
@@ -31,7 +33,7 @@ const parseOptionalNumber = (value: unknown) => {
 const parseString = (value: unknown) =>
   typeof value === 'string' && value.length > 0 ? value : undefined;
 
-const DAY_SEARCH_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DAY_SEARCH_DATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const parseLocalDate = (value: string) => {
@@ -94,6 +96,7 @@ export const Route = createFileRoute('/weather')({
       orientation: parseString(search.orientation),
       country: parseString(search.country),
       source: parseString(search.source),
+      objective: parseFlightObjective(search.objective),
     };
   },
   loader: () => {

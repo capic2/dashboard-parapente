@@ -315,6 +315,113 @@
       "noPrecipitation": "No precipitation"
     }
   },
+  "flightDecision": {
+    "title": "Flight decision",
+    "loadError": "Unable to calculate the flight decision.",
+    "scoreObjectif": "Objective score",
+    "bestWindow": "Best window",
+    "leastUnfavorable": "Least unfavorable moment",
+    "noWindow": "No window",
+    "mainRisks": "Watch points",
+    "level": {
+      "favorable": "Favorable",
+      "vigilance": "Caution",
+      "limite": "Limit",
+      "deconseille": "Discouraged",
+      "unavailable": "Unavailable"
+    },
+    "summary": {
+      "favorable": {
+        "title": "Favorable window identified",
+        "message": "A usable window stands out for the selected objective. Still check risks and local conditions before deciding."
+      },
+      "vigilance": {
+        "title": "Flight possible with caution",
+        "message": "A window exists, but {{main_reason}} needs attention between {{start_hour}}h and {{end_hour}}h."
+      },
+      "limite": {
+        "title": "No clearly recommended window",
+        "message": "Conditions remain limited. The least unfavorable moment is around {{start_hour}}h-{{end_hour}}h, mainly because of {{main_reason}}."
+      },
+      "deconseille": {
+        "title": "Flight discouraged",
+        "message": "Available risks do not allow a recommended flight window today."
+      },
+      "unavailable": {
+        "title": "Decision unavailable",
+        "message": "Available data is not sufficient to produce a reliable flight decision."
+      }
+    },
+    "objective": {
+      "active": "Objective: {{objective}}",
+      "tranquille": "Calm",
+      "progression": "Progression",
+      "thermique": "Thermal"
+    },
+    "context": {
+      "title": "Weather context",
+      "description": "A city or ad hoc search gives weather context. Select a takeoff to get a complete flight decision with orientation and landings."
+    },
+    "confidence": {
+      "title": "Confidence",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "very_low": "Very low",
+      "singleForecastSource": "Only one forecast source available",
+      "lowDiagnostic": "Low forecast confidence"
+    },
+    "landing": { "title": "Landings" },
+    "landingSafety": {
+      "notConfigured": "Not evaluated",
+      "unavailable": "Unavailable",
+      "evaluated": "Evaluated",
+      "notConfiguredDiagnostic": "Landing not configured",
+      "weatherNotEvaluated": "Landing weather not evaluated"
+    },
+    "risk": {
+      "weatherUnavailable": "Weather unavailable",
+      "windMissing": "Missing wind",
+      "windTooStrong": "Wind too strong",
+      "windTooWeak": "Wind too weak",
+      "windWeak": "Weak wind",
+      "gustHigh": "Strong gusts",
+      "rainSignificant": "Significant rain",
+      "thunderstormLow": "Low thunderstorm risk",
+      "thunderstormModerate": "Moderate thunderstorm risk",
+      "thunderstormHigh": "High thunderstorm risk"
+    },
+    "windDecollage": {
+      "face": "Headwind",
+      "travers_acceptable": "Acceptable crosswind",
+      "travers_fort": "Strong crosswind",
+      "cul": "Tailwind",
+      "orientation_unknown": "Unknown orientation",
+      "not_evaluated": "Orientation not evaluated"
+    },
+    "thermal": {
+      "tranquille": {
+        "positive": "Calm thermals",
+        "vigilance": "Moderate thermals",
+        "limiting": "Strong thermals"
+      },
+      "progression": {
+        "neutral": "Weak thermals",
+        "positive": "Useful thermals",
+        "vigilance": "Strong thermals"
+      },
+      "thermique": {
+        "limiting": "Weak thermals",
+        "positive": "Usable thermals"
+      }
+    },
+    "window": {
+      "favorable": "Favorable window",
+      "vigilance": "Caution window",
+      "limite": "Limited moment",
+      "deconseille": "Discouraged moment"
+    }
+  },
   "filters": {
     "title": "Filters",
     "reset": "Reset",

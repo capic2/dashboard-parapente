@@ -453,6 +453,151 @@ class NearbyFlightOptionsResponse(BaseModel):
     landings: list[ParaglidingSpotSearchResult]
 
 
+FlightDecisionLevel = Literal["favorable", "vigilance", "limite", "deconseille", "unavailable"]
+FlightDecisionRiskSeverity = Literal["info", "vigilance", "limiting", "blocking"]
+FlightDecisionObjective = Literal["tranquille", "progression", "thermique"]
+
+
+class FlightDecisionDiagnostic(BaseModel):
+    code: str
+    severity: FlightDecisionRiskSeverity
+    translation_key: str
+    params: dict[str, Any] = {}
+
+
+class FlightDecisionSite(BaseModel):
+    id: str
+    name: str
+    usage_type: str | None = None
+    orientation: str | None = None
+
+
+class FlightDecisionSummary(BaseModel):
+    level: FlightDecisionLevel
+    translation_key: str
+    score_objectif: int
+    title_key: str
+    message_key: str
+    message_params: dict[str, Any]
+    main_risk_code: str | None = None
+    has_recommended_window: bool
+
+
+class FlightDecisionWindow(BaseModel):
+    start_hour: int
+    end_hour: int
+    level: FlightDecisionLevel
+    translation_key: str
+    score_objectif: int
+    min_score_objectif: int
+    hours: list[int]
+    main_risk_codes: list[str]
+    summary_key: str
+    summary_params: dict[str, Any]
+
+
+class FlightDecisionWind(BaseModel):
+    speed_kmh: float | None = None
+    gust_kmh: float | None = None
+    direction_deg: float | None = None
+    direction_label: str | None = None
+
+
+class FlightDecisionWindDecollage(BaseModel):
+    status: str
+    translation_key: str
+    angle_deviation_deg: int | None = None
+    selected_orientation: str | None = None
+    severity: FlightDecisionRiskSeverity
+
+
+class FlightDecisionThermal(BaseModel):
+    strength: str
+    cape: float | None = None
+    lifted_index: float | None = None
+    objective_effect: str
+    translation_key: str
+
+
+class FlightDecisionHourConfidence(BaseModel):
+    level: str
+    score: int
+    source_count: int
+
+
+class FlightDecisionHour(BaseModel):
+    hour: int
+    is_past: bool
+    level: FlightDecisionLevel
+    translation_key: str
+    score_objectif: int
+    para_index: int
+    risks: list[FlightDecisionDiagnostic]
+    wind: FlightDecisionWind
+    wind_decollage: FlightDecisionWindDecollage
+    thermal: FlightDecisionThermal
+    confidence: FlightDecisionHourConfidence
+
+
+class FlightDecisionFreshness(BaseModel):
+    cached_at: str | None = None
+    age_minutes: int | None = None
+    status: str
+
+
+class FlightDecisionConfidence(BaseModel):
+    level: str
+    score: int
+    translation_key: str
+    source_count: int
+    expected_source_count: int
+    freshness: FlightDecisionFreshness
+    diagnostics: list[FlightDecisionDiagnostic]
+
+
+class FlightDecisionLanding(BaseModel):
+    site_id: str
+    name: str
+    distance_km: float | None = None
+    is_primary: bool
+    level: FlightDecisionLevel
+    score_objectif: int | None = None
+    risks: list[FlightDecisionDiagnostic]
+
+
+class FlightDecisionLandingSafety(BaseModel):
+    status: Literal["evaluated", "not_configured", "unavailable"]
+    level: FlightDecisionLevel
+    translation_key: str
+    summary_key: str
+    summary_params: dict[str, Any]
+    landings: list[FlightDecisionLanding]
+
+
+class FlightDecisionLiveWind(BaseModel):
+    status: Literal["not_evaluated", "unavailable", "evaluated", "stale"]
+    influences_confidence: bool
+    stations: list[dict[str, Any]]
+    diagnostics: list[FlightDecisionDiagnostic]
+
+
+class FlightDecisionResponse(BaseModel):
+    site: FlightDecisionSite
+    objective: FlightDecisionObjective
+    timezone: str
+    day_index: int
+    summary: FlightDecisionSummary
+    best_window: FlightDecisionWindow | None = None
+    least_unfavorable_window: FlightDecisionWindow | None = None
+    hourly: list[FlightDecisionHour]
+    risks: list[FlightDecisionDiagnostic]
+    confidence: FlightDecisionConfidence
+    landing_safety: FlightDecisionLandingSafety
+    live_wind: FlightDecisionLiveWind
+    alternatives: list[dict[str, Any]]
+    cached_at: str | None = None
+
+
 class SyncSpotsResponse(BaseModel):
     """Response for sync operation"""
 

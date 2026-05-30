@@ -52,6 +52,7 @@ DEFAULTS: dict[str, str] = {
     "ui_reason_gust_high_min": "45",
     "ui_reason_cloud_very_cloudy_min": "80",
     "ui_reason_wind_moderate_min": "25",
+    "default_flight_objective": "tranquille",
 }
 
 # Keys that must never be exposed via the public settings API
