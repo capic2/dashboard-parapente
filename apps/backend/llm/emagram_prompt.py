@@ -44,6 +44,8 @@ Reponds UNIQUEMENT avec ce JSON valide, sans markdown:
 {{
   "plafond_thermique_m": <altitude plafond en metres>,
   "force_thermique_ms": <force thermiques en m/s>,
+  "force_thermique_confiance": "high|medium|low",
+  "force_thermique_indices": ["<indice visible utilise pour estimer la force>"],
   "heures_volables": "<ex: 12h-18h>",
   "score_volabilite": <0-100>,
   "conseils_vol": "<conseils courts MAX 50 mots>",
@@ -102,6 +104,12 @@ Reponds UNIQUEMENT avec ce JSON valide, sans markdown:
     }}
   }}
 }}
+
+Contraintes obligatoires pour force_thermique_ms:
+- N'invente jamais une vitesse ascendante forte. Une valeur >= 3.0 m/s est autorisee seulement si une indication visible et lisible montre des ascendances fortes, une parcelle nettement plus chaude que l'environnement sur une couche profonde, ou une instabilite franche sans inversion bloquante.
+- Si l'echelle ou les courbes ne permettent pas d'estimer la force, mets force_thermique_ms a 0.0, force_thermique_confiance a "low", et explique l'incertitude dans force_thermique_indices et details_analyse.
+- Une belle hauteur de plafond ne suffit pas a conclure a des thermiques forts. Separe toujours plafond, declenchement, force et risque.
+- Chaque valeur de force_thermique_ms doit etre justifiee par au moins un indice concret dans force_thermique_indices.
 
 Contraintes obligatoires pour annotations_image:
 - Produis au maximum 6 annotations par source, uniquement sur les points importants pour comprendre les conditions de vol et apprendre a lire l'emagramme.

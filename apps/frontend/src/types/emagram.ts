@@ -105,6 +105,12 @@ export interface EmagramAnalysisExplanation {
   par_source: Record<string, string[]>;
 }
 
+export interface EmagramThermalValidation {
+  status: 'plausible' | 'contradicted' | 'low_confidence' | 'not_checked';
+  message: string;
+  metrics?: Record<string, number | null | undefined>;
+}
+
 // Parsed alerts (from JSON string)
 type SafetyAlert = string;
 
@@ -188,6 +194,39 @@ export function parseAnalysisExplanation(
   }
 
   return null;
+}
+
+export function parseThermalValidation(
+  ai_raw_response: string | null | undefined
+): EmagramThermalValidation | null {
+  if (!ai_raw_response) return null;
+
+  try {
+    const parsed = JSON.parse(ai_raw_response);
+    const validation = parsed?.thermal_validation;
+    if (!validation || typeof validation !== 'object') return null;
+
+    const status = validation.status;
+    if (
+      status !== 'plausible' &&
+      status !== 'contradicted' &&
+      status !== 'low_confidence' &&
+      status !== 'not_checked'
+    ) {
+      return null;
+    }
+
+    return {
+      status,
+      message: typeof validation.message === 'string' ? validation.message : '',
+      metrics:
+        typeof validation.metrics === 'object' && validation.metrics !== null
+          ? validation.metrics
+          : undefined,
+    };
+  } catch {
+    return null;
+  }
 }
 
 // Score categories
