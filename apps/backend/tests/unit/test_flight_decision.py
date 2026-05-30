@@ -14,17 +14,19 @@ def _site(orientation: str | None = "SW"):
     )
 
 
-def _payload(consensus: list[dict], total_sources: int = 4):
-    return {
+def _payload(consensus: list[dict], total_sources: int | None = 4):
+    payload = {
         "site_id": "site-arguel",
         "site_name": "Arguel",
         "day_index": 1,
         "sunrise": "08:00",
         "sunset": "18:00",
         "consensus": consensus,
-        "total_sources": total_sources,
         "cached_at": "2026-05-30T10:00:00Z",
     }
+    if total_sources is not None:
+        payload["total_sources"] = total_sources
+    return payload
 
 
 def _hour(hour: int, **overrides):
@@ -70,6 +72,32 @@ def test_blocking_gust_prevents_recommended_window():
     assert result["best_window"] is None
     assert result["least_unfavorable_window"]["level"] == "limite"
     assert any(risk["code"] == "gust_high" for risk in result["hourly"][0]["risks"])
+
+
+def test_summary_uses_highest_severity_window_risk_first():
+    result = build_flight_decision(
+        site=_site(),
+        weather_payload=_payload([_hour(11, wind_speed=2, wind_gust=38)]),
+        objective="progression",
+        now=datetime(2026, 5, 30, 9, tzinfo=ZoneInfo("Europe/Paris")),
+    )
+
+    assert result["best_window"] is None
+    assert result["least_unfavorable_window"]["main_risk_codes"][0] == "gust_high"
+    assert result["summary"]["main_risk_code"] == "gust_high"
+
+
+def test_confidence_keeps_zero_source_hours_when_total_sources_missing():
+    result = build_flight_decision(
+        site=_site(),
+        weather_payload=_payload([_hour(11, num_sources=0)], total_sources=None),
+        objective="tranquille",
+        now=datetime(2026, 5, 30, 9, tzinfo=ZoneInfo("Europe/Paris")),
+    )
+
+    assert result["hourly"][0]["confidence"]["source_count"] == 0
+    assert result["confidence"]["source_count"] == 0
+    assert result["confidence"]["score"] == 10
 
 
 def test_tailwind_is_blocking_for_decollage_orientation():

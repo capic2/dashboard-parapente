@@ -406,16 +406,17 @@ export default function WeatherPage() {
       />
     ) : undefined;
 
-  const mobileDecisionPanel = (
-    <FlightDecisionCockpit
-      decision={flightDecision.data}
-      objective={selectedObjective}
-      isLoading={flightDecision.isLoading}
-      isError={flightDecision.isError}
-      isCityContext={Boolean(selectedSearchTarget)}
-      onObjectiveChange={handleObjectiveChange}
-    />
-  );
+  const mobileDecisionPanel =
+    selectedSearchTarget || selectedSiteId ? (
+      <FlightDecisionCockpit
+        decision={flightDecision.data}
+        objective={selectedObjective}
+        isLoading={flightDecision.isLoading}
+        isError={flightDecision.isError}
+        isCityContext={Boolean(selectedSearchTarget)}
+        onObjectiveChange={handleObjectiveChange}
+      />
+    ) : undefined;
 
   const mobileLiveWindPanel =
     !selectedSearchTarget && selectedSiteId ? (

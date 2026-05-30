@@ -1,3 +1,6 @@
+import app_settings
+from models import AppSetting
+
 API_PREFIX = "/api"
 
 
@@ -63,6 +66,10 @@ class TestFlightDecisionEndpoint:
     ):
         import routes
 
+        app_settings.invalidate_cache()
+        db_session.add(AppSetting(key="default_flight_objective", value="thermique"))
+        db_session.commit()
+
         async def fake_forecast(*args, **kwargs):
             return _forecast_payload()
 
@@ -71,4 +78,5 @@ class TestFlightDecisionEndpoint:
         response = client.get(f"{API_PREFIX}/flight-decision/site-arguel?objective=distance")
 
         assert response.status_code == 200
-        assert response.json()["objective"] == "tranquille"
+        assert response.json()["objective"] == "thermique"
+        app_settings.invalidate_cache()

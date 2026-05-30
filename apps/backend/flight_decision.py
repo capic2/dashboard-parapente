@@ -494,15 +494,20 @@ def _thermal(hour: dict[str, Any], objective: FlightObjective) -> dict[str, Any]
 def _hour_confidence(hour: dict[str, Any]) -> dict[str, Any]:
     source_count = int(hour.get("num_sources") or len(hour.get("sources") or {}) or 0)
     score = min(100, max(20, source_count * 20)) if source_count else 20
-    return {"level": _confidence_level(score), "score": score}
+    return {"level": _confidence_level(score), "score": score, "source_count": source_count}
 
 
 def _build_confidence(
     weather_payload: dict[str, Any], hourly: list[dict[str, Any]]
 ) -> dict[str, Any]:
-    source_count = int(
-        weather_payload.get("total_sources")
-        or max((h["confidence"]["score"] // 20 for h in hourly), default=0)
+    total_sources = weather_payload.get("total_sources")
+    source_count = (
+        int(total_sources)
+        if total_sources is not None
+        else max(
+            (h["confidence"]["source_count"] for h in hourly),
+            default=0,
+        )
     )
     score = min(100, max(10, source_count * 20)) if source_count else 10
     diagnostics: list[dict[str, Any]] = []
@@ -634,7 +639,12 @@ def _build_windows(hours: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def _window_from_hours(hours: list[dict[str, Any]]) -> dict[str, Any]:
     min_level = min(hours, key=lambda h: _LEVEL_RANK[h["level"]])["level"]
     min_score = min(int(h["score_objectif"]) for h in hours)
-    main_risks = list(dict.fromkeys(risk["code"] for h in hours for risk in h["risks"]))
+    ordered_risks = sorted(
+        (risk for h in hours for risk in h["risks"]),
+        key=lambda risk: _severity_rank(risk["severity"]),
+        reverse=True,
+    )
+    main_risks = list(dict.fromkeys(risk["code"] for risk in ordered_risks))
     start_hour = min(h["hour"] for h in hours)
     end_hour = max(h["hour"] for h in hours)
     return {

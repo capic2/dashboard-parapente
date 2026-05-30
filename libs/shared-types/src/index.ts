@@ -326,7 +326,11 @@ export const FlightDecisionResponseSchema = z.object({
         objective_effect: z.string(),
         translation_key: z.string(),
       }),
-      confidence: z.object({ level: z.string(), score: z.number() }),
+      confidence: z.object({
+        level: z.string(),
+        score: z.number(),
+        source_count: z.number(),
+      }),
     })
   ),
   risks: z.array(FlightDecisionDiagnosticSchema),

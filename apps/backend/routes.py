@@ -2936,7 +2936,9 @@ async def get_flight_decision(
         raise HTTPException(status_code=400, detail="Site has no coordinates")
 
     selected_objective = normalize_objective(
-        objective or get_setting("default_flight_objective", db=db, default="tranquille")
+        objective
+        if objective in {"tranquille", "progression", "thermique"}
+        else get_setting("default_flight_objective", db=db, default="tranquille")
     )
     day_result = await get_normalized_forecast(
         site.latitude,
@@ -2955,6 +2957,11 @@ async def get_flight_decision(
     associations = (
         db.query(SiteLandingAssociation)
         .filter(SiteLandingAssociation.takeoff_site_id == site_id)
+        .order_by(
+            SiteLandingAssociation.is_primary.desc(),
+            SiteLandingAssociation.distance_km.asc(),
+            SiteLandingAssociation.id.asc(),
+        )
         .limit(10)
         .all()
     )

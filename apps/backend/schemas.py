@@ -522,6 +522,7 @@ class FlightDecisionThermal(BaseModel):
 class FlightDecisionHourConfidence(BaseModel):
     level: str
     score: int
+    source_count: int
 
 
 class FlightDecisionHour(BaseModel):
