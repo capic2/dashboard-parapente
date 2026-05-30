@@ -420,7 +420,10 @@ export default function WeatherPage() {
 
   const mobileLiveWindPanel =
     !selectedSearchTarget && selectedSiteId ? (
-      <WeatherLiveWindPanel />
+      <WeatherLiveWindPanel
+        latitude={selectedSite?.latitude}
+        longitude={selectedSite?.longitude}
+      />
     ) : undefined;
 
   const mobileLandingPanel =
@@ -530,7 +533,12 @@ export default function WeatherPage() {
           />
         )}
 
-        {!selectedSearchTarget && selectedSiteId && <WeatherLiveWindPanel />}
+        {!selectedSearchTarget && selectedSiteId && (
+          <WeatherLiveWindPanel
+            latitude={selectedSite?.latitude}
+            longitude={selectedSite?.longitude}
+          />
+        )}
 
         {/* Landing Sites Weather */}
         {!selectedSearchTarget && selectedSiteId && (
