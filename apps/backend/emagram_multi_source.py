@@ -6,6 +6,7 @@ Coordinates screenshot capture, LLM analysis, and database storage
 import asyncio
 import json
 import logging
+import time
 import uuid
 from datetime import date, datetime
 from datetime import time as dt_time
@@ -19,6 +20,7 @@ from llm.exceptions import QuotaExhaustedError
 from llm.emagram_prompt import normalize_analysis_locale
 from llm.gemini_analyzer import analyze_emagram_with_gemini
 from llm.groq_analyzer import analyze_emagram_with_groq
+from llm.openai_compatible_vision_analyzer import analyze_emagram_with_openai_compatible
 from llm.openrouter_analyzer import analyze_emagram_with_openrouter
 from models import EmagramAnalysis, Site
 from scrapers.emagram_screenshots import fetch_all_emagram_screenshots
@@ -28,64 +30,131 @@ logger = logging.getLogger(__name__)
 GOOGLE_API_ENV_VAR = "BACKEND_GOOGLE_API_KEY"
 GROQ_API_ENV_VAR = "BACKEND_GROQ_API_KEY"
 OPENROUTER_API_ENV_VAR = "BACKEND_OPENROUTER_API_KEY"
+GITHUB_MODELS_API_ENV_VAR = "BACKEND_GITHUB_MODELS_API_KEY"
+HUGGINGFACE_API_ENV_VAR = "BACKEND_HUGGINGFACE_API_KEY"
+CUSTOM_OPENAI_API_ENV_VAR = "BACKEND_CUSTOM_OPENAI_API_KEY"
 
 PROVIDER_ENV_VARS = {
     "google": GOOGLE_API_ENV_VAR,
     "groq": GROQ_API_ENV_VAR,
     "openrouter": OPENROUTER_API_ENV_VAR,
+    "github_models": GITHUB_MODELS_API_ENV_VAR,
+    "huggingface": HUGGINGFACE_API_ENV_VAR,
+    "custom_openai": CUSTOM_OPENAI_API_ENV_VAR,
 }
+
+_LLM_QUOTA_COOLDOWNS: dict[str, float] = {}
 
 
 def _configured_llm_providers(locale: str | None = None) -> list[dict[str, Any]]:
     analysis_locale = normalize_analysis_locale(locale)
-    providers = {
-        "groq": {
-            "key": config.GROQ_API_KEY,
-            "provider": "groq",
-            "analyzer": "groq",
-            "model": config.GROQ_MODEL,
-            "label": "Groq Llama Vision",
-            "free": True,
-            "call": lambda screenshots, site: analyze_emagram_with_groq(
-                screenshot_paths=screenshots,
-                spot_name=site.name,
-                coordinates=(site.latitude, site.longitude),
-                model_name=config.GROQ_MODEL,
-                locale=analysis_locale,
-            ),
-        },
-        "openrouter": {
-            "key": config.OPENROUTER_API_KEY,
-            "provider": "openrouter",
-            "analyzer": "openrouter",
-            "model": config.OPENROUTER_MODEL,
-            "label": "OpenRouter Vision",
-            "free": True,
-            "call": lambda screenshots, site: analyze_emagram_with_openrouter(
-                screenshot_paths=screenshots,
-                spot_name=site.name,
-                coordinates=(site.latitude, site.longitude),
-                model_name=config.OPENROUTER_MODEL,
-                locale=analysis_locale,
-            ),
-        },
-        "google": {
-            "key": config.GOOGLE_API_KEY,
-            "provider": "google",
-            "analyzer": "gemini",
-            "model": config.GEMINI_MODEL,
-            "label": "Gemini Vision",
-            "free": False,
-            "call": lambda screenshots, site: analyze_emagram_with_gemini(
-                screenshot_paths=screenshots,
-                spot_name=site.name,
-                coordinates=(site.latitude, site.longitude),
-                api_key=config.GOOGLE_API_KEY,
-                model_name=config.GEMINI_MODEL,
-                max_retries=3,
-                locale=analysis_locale,
-            ),
-        },
+
+    def groq_provider() -> list[dict[str, Any]]:
+        return [
+            {
+                "key": config.GROQ_API_KEY,
+                "provider": "groq",
+                "analyzer": "groq",
+                "model": config.GROQ_MODEL,
+                "label": "Groq Llama Vision",
+                "free": True,
+                "cooldown_key": f"groq:{config.GROQ_MODEL}",
+                "call": lambda screenshots, site: analyze_emagram_with_groq(
+                    screenshot_paths=screenshots,
+                    spot_name=site.name,
+                    coordinates=(site.latitude, site.longitude),
+                    model_name=config.GROQ_MODEL,
+                    locale=analysis_locale,
+                ),
+            }
+        ]
+
+    def openrouter_provider() -> list[dict[str, Any]]:
+        providers = []
+        for model_name in _dedupe(config.OPENROUTER_MODELS):
+            providers.append(
+                {
+                    "key": config.OPENROUTER_API_KEY,
+                    "provider": "openrouter",
+                    "analyzer": "openrouter",
+                    "model": model_name,
+                    "label": "OpenRouter Vision",
+                    "free": True,
+                    "cooldown_key": f"openrouter:{model_name}",
+                    "call": lambda screenshots, site, model_name=model_name: analyze_emagram_with_openrouter(
+                        screenshot_paths=screenshots,
+                        spot_name=site.name,
+                        coordinates=(site.latitude, site.longitude),
+                        model_name=model_name,
+                        locale=analysis_locale,
+                    ),
+                }
+            )
+        return providers
+
+    def google_provider() -> list[dict[str, Any]]:
+        return [
+            {
+                "key": config.GOOGLE_API_KEY,
+                "provider": "google",
+                "analyzer": "gemini",
+                "model": config.GEMINI_MODEL,
+                "label": "Gemini Vision",
+                "free": True,
+                "cooldown_key": f"google:{config.GEMINI_MODEL}",
+                "call": lambda screenshots, site: analyze_emagram_with_gemini(
+                    screenshot_paths=screenshots,
+                    spot_name=site.name,
+                    coordinates=(site.latitude, site.longitude),
+                    api_key=config.GOOGLE_API_KEY,
+                    model_name=config.GEMINI_MODEL,
+                    max_retries=3,
+                    locale=analysis_locale,
+                ),
+            }
+        ]
+
+    def github_models_provider() -> list[dict[str, Any]]:
+        return _openai_compatible_providers(
+            key=config.GITHUB_MODELS_API_KEY,
+            base_url=config.GITHUB_MODELS_BASE_URL,
+            models=config.GITHUB_MODELS_MODELS,
+            provider="github_models",
+            label="GitHub Models Vision",
+            free=True,
+            locale=analysis_locale,
+        )
+
+    def huggingface_provider() -> list[dict[str, Any]]:
+        return _openai_compatible_providers(
+            key=config.HUGGINGFACE_API_KEY,
+            base_url=config.HUGGINGFACE_BASE_URL,
+            models=config.HUGGINGFACE_MODELS,
+            provider="huggingface",
+            label="Hugging Face Router Vision",
+            free=True,
+            locale=analysis_locale,
+        )
+
+    def custom_openai_provider() -> list[dict[str, Any]]:
+        return _openai_compatible_providers(
+            key=config.CUSTOM_OPENAI_API_KEY,
+            base_url=config.CUSTOM_OPENAI_BASE_URL,
+            models=config.CUSTOM_OPENAI_MODELS,
+            provider="custom_openai",
+            label="Custom OpenAI-Compatible Vision",
+            free=False,
+            locale=analysis_locale,
+        )
+
+    provider_factories = {
+        "groq": groq_provider,
+        "openrouter": openrouter_provider,
+        "google": google_provider,
+        "github_models": github_models_provider,
+        "huggingface": huggingface_provider,
+        "custom_openai": custom_openai_provider,
+        "openai_compatible": custom_openai_provider,
     }
 
     configured = []
@@ -95,26 +164,105 @@ def _configured_llm_providers(locale: str | None = None) -> list[dict[str, Any]]
             continue
         seen.add(provider_name)
 
-        provider = providers.get(provider_name)
-        if not provider:
+        provider_factory = provider_factories.get(provider_name)
+        if not provider_factory:
             logger.warning(f"Unknown LLM provider in fallback order: {provider_name}")
             continue
 
+        provider_trials = provider_factory()
+        key_is_set = any(provider["key"] for provider in provider_trials)
+        label = provider_trials[0]["label"] if provider_trials else provider_name
         logger.info(
             "🔍 Checking %s availability: API Key = %s",
-            provider["label"],
-            "SET" if provider["key"] else "NOT SET",
+            label,
+            "SET" if key_is_set else "NOT SET",
         )
-        if provider["key"]:
-            configured.append(provider)
+        configured.extend(provider for provider in provider_trials if provider["key"])
 
     return configured
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    deduped = []
+    seen = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        deduped.append(value)
+    return deduped
+
+
+def _openai_compatible_providers(
+    *,
+    key: str | None,
+    base_url: str | None,
+    models: list[str],
+    provider: str,
+    label: str,
+    free: bool,
+    locale: str,
+) -> list[dict[str, Any]]:
+    providers = []
+    for model_name in _dedupe(models):
+        providers.append(
+            {
+                "key": key if base_url else None,
+                "provider": provider,
+                "analyzer": "openai_compatible",
+                "model": model_name,
+                "label": label,
+                "free": free,
+                "cooldown_key": f"{provider}:{model_name}",
+                "call": lambda screenshots, site, model_name=model_name: analyze_emagram_with_openai_compatible(
+                    screenshot_paths=screenshots,
+                    spot_name=site.name,
+                    coordinates=(site.latitude, site.longitude),
+                    api_key=key or "",
+                    base_url=base_url or "",
+                    provider_name=provider,
+                    model_name=model_name,
+                    locale=locale,
+                    extra_headers=_openai_compatible_extra_headers(provider),
+                ),
+            }
+        )
+    return providers
+
+
+def _openai_compatible_extra_headers(provider: str) -> dict[str, str]:
+    if provider == "openrouter":
+        return {
+            "HTTP-Referer": "https://dashboard-parapente.local",
+            "X-Title": "Dashboard Parapente",
+        }
+    return {}
+
+
+def _is_llm_trial_on_cooldown(provider: dict[str, Any]) -> bool:
+    expires_at = _LLM_QUOTA_COOLDOWNS.get(provider["cooldown_key"])
+    if not expires_at:
+        return False
+
+    if expires_at <= time.monotonic():
+        _LLM_QUOTA_COOLDOWNS.pop(provider["cooldown_key"], None)
+        return False
+
+    return True
+
+
+def _mark_llm_trial_quota_exhausted(provider: dict[str, Any]) -> None:
+    cooldown_seconds = config.LLM_QUOTA_COOLDOWN_SECONDS
+    if cooldown_seconds <= 0:
+        return
+    _LLM_QUOTA_COOLDOWNS[provider["cooldown_key"]] = time.monotonic() + cooldown_seconds
 
 
 def _analyze_emagram_with_fallbacks(
     screenshots: list[dict[str, str]], site: Site, locale: str | None = None
 ) -> dict[str, Any]:
     analysis_errors = []
+    cooldown_errors = []
     quota_errors = 0
     providers_tried = 0
     configured_providers = _configured_llm_providers(locale)
@@ -124,6 +272,17 @@ def _analyze_emagram_with_fallbacks(
         return {"success": False, "error": f"No LLM provider configured (set one of {env_vars})"}
 
     for provider in configured_providers:
+        if _is_llm_trial_on_cooldown(provider):
+            cooldown_errors.append(
+                f"{provider['provider']}:{provider['model']} cooling down after quota exhaustion"
+            )
+            logger.info(
+                "⏳ Skipping %s model %s during quota cooldown",
+                provider["label"],
+                provider["model"],
+            )
+            continue
+
         providers_tried += 1
         free_label = " (free)" if provider["free"] else ""
         logger.info(f"🤖 Trying {provider['label']} analysis{free_label}...")
@@ -140,21 +299,31 @@ def _analyze_emagram_with_fallbacks(
 
         except QuotaExhaustedError as e:
             quota_errors += 1
-            analysis_errors.append(f"{provider['provider']}: quota exhausted ({e})")
+            _mark_llm_trial_quota_exhausted(provider)
+            analysis_errors.append(
+                f"{provider['provider']}:{provider['model']}: quota exhausted ({e})"
+            )
             logger.warning(f"⚠️ {provider['label']} quota exhausted, trying next provider")
         except Exception as e:
-            analysis_errors.append(f"{provider['provider']}: {e}")
+            analysis_errors.append(f"{provider['provider']}:{provider['model']}: {e}")
             logger.warning(f"{provider['label']} analysis failed: {e}")
+
+    if providers_tried == 0 and cooldown_errors:
+        return {
+            "success": False,
+            "error": "All configured LLM providers are cooling down after quota exhaustion",
+            "provider_errors": cooldown_errors,
+        }
 
     if quota_errors > 0 and quota_errors >= providers_tried:
         raise QuotaExhaustedError(
-            f"All {providers_tried} configured LLM providers exhausted their quota"
+            f"All {providers_tried} configured LLM provider/model trials exhausted their quota"
         )
 
     return {
         "success": False,
         "error": "All configured LLM providers failed",
-        "provider_errors": analysis_errors,
+        "provider_errors": analysis_errors + cooldown_errors,
     }
 
 

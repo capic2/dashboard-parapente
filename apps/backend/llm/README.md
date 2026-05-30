@@ -22,25 +22,52 @@ BACKEND_GROQ_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
 
 ---
 
-### 2. `openrouter_analyzer.py` - OpenRouter Vision (Fallback gratuit)
+### 2. `openrouter_analyzer.py` - OpenRouter Vision (fallbacks gratuits)
 
-Utilise **OpenRouter** avec un modèle vision gratuit configurable.
+Utilise **OpenRouter** avec une file de modèles vision gratuits configurables.
 
 **Avantages:**
 - ✅ Donne accès à plusieurs modèles vision via une API compatible OpenAI
-- ✅ Permet d'ajouter un deuxième fallback gratuit après Groq
-- ✅ Le modèle peut être remplacé sans changement de code
+- ✅ Tente plusieurs modèles `:free` avant de consommer le quota Gemini
+- ✅ Les modèles peuvent être remplacés sans changement de code
 
 **Configuration:**
 ```bash
 # Dans .env
 BACKEND_OPENROUTER_API_KEY=your_openrouter_api_key_here
 BACKEND_OPENROUTER_MODEL=qwen/qwen2.5-vl-72b-instruct:free
+BACKEND_OPENROUTER_MODELS=qwen/qwen2.5-vl-72b-instruct:free,google/gemini-2.0-flash-exp:free,mistralai/mistral-small-3.2-24b-instruct:free
 ```
 
 ---
 
-### 3. `gemini_analyzer.py` - Google Gemini Vision
+### 3. `openai_compatible_vision_analyzer.py` - Providers OpenAI-compatibles
+
+Client générique pour ajouter des endpoints compatibles Chat Completions avec images.
+
+Providers configurés:
+- GitHub Models: quota gratuit limité selon compte GitHub.
+- Hugging Face Router: dépend du modèle et du quota/token Hugging Face.
+- Custom OpenAI-compatible: endpoint libre pour ajouter un provider sans changement de code.
+
+**Configuration:**
+```bash
+BACKEND_GITHUB_MODELS_API_KEY=your_github_token_here
+BACKEND_GITHUB_MODELS_BASE_URL=https://models.github.ai/inference/v1/chat/completions
+BACKEND_GITHUB_MODELS_MODELS=openai/gpt-4o-mini
+
+BACKEND_HUGGINGFACE_API_KEY=your_huggingface_token_here
+BACKEND_HUGGINGFACE_BASE_URL=https://router.huggingface.co/v1/chat/completions
+BACKEND_HUGGINGFACE_MODELS=Qwen/Qwen2.5-VL-7B-Instruct
+
+BACKEND_CUSTOM_OPENAI_API_KEY=your_custom_openai_key_here
+BACKEND_CUSTOM_OPENAI_BASE_URL=https://example.com/v1/chat/completions
+BACKEND_CUSTOM_OPENAI_MODELS=your/provider-vision-model
+```
+
+---
+
+### 4. `gemini_analyzer.py` - Google Gemini Vision
 
 Utilise **Google Gemini Vision API** pour analyser les emagrammes.
 
@@ -82,7 +109,19 @@ result = analyze_emagram_with_gemini(
 
 ---
 
-### 4. `vision_analyzer.py` - Wrapper générique
+### 5. Cooldown quota/rate-limit
+
+Quand un couple provider/modèle retourne un quota ou rate-limit, il est placé en cooldown mémoire pour éviter de retenter le même modèle à chaque spot.
+
+```bash
+BACKEND_LLM_QUOTA_COOLDOWN_SECONDS=3600
+```
+
+Mettre `0` désactive le cooldown.
+
+---
+
+### 6. `vision_analyzer.py` - Wrapper générique
 
 Module utilitaire pour fonctions communes de vision analysis.
 
@@ -97,12 +136,21 @@ Le fichier [`emagram_multi_source.py`](../emagram_multi_source.py) utilise la st
    └─> Gratuit, rapide
 
 2. Priority 2: OpenRouter Vision (si BACKEND_OPENROUTER_API_KEY présente)
-   └─> Fallback gratuit configurable
+   └─> Plusieurs modèles gratuits configurés par BACKEND_OPENROUTER_MODELS
 
-3. Priority 3: Google Gemini (si BACKEND_GOOGLE_API_KEY présente)
-   └─> Dernier recours pour économiser le quota Gemini
+3. Priority 3: GitHub Models (si BACKEND_GITHUB_MODELS_API_KEY présente)
+   └─> Fallback OpenAI-compatible avec quota gratuit limité
 
-4. Échec: Retour d'erreur
+4. Priority 4: Hugging Face Router (si BACKEND_HUGGINGFACE_API_KEY présente)
+   └─> Fallback OpenAI-compatible configurable
+
+5. Priority 5: Google Gemini (si BACKEND_GOOGLE_API_KEY présente)
+   └─> Dernier recours fiable
+
+6. Priority 6: Custom OpenAI-compatible (si configuré)
+   └─> Endpoint libre pour ajouter un autre provider sans code
+
+7. Échec: Retour d'erreur
 ```
 
 L'ordre est configurable avec `BACKEND_LLM_FALLBACK_ORDER`, par exemple `google,groq,openrouter` si la qualité Gemini doit primer sur l'économie de quota.
@@ -150,11 +198,17 @@ python groq_analyzer.py
 
 ```bash
 # .env
-BACKEND_LLM_FALLBACK_ORDER=groq,openrouter,google
+BACKEND_LLM_FALLBACK_ORDER=groq,openrouter,github_models,huggingface,google,custom_openai
+BACKEND_LLM_QUOTA_COOLDOWN_SECONDS=3600
 BACKEND_GROQ_API_KEY=your_groq_api_key_here
 BACKEND_GROQ_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
 BACKEND_OPENROUTER_API_KEY=your_openrouter_api_key_here
 BACKEND_OPENROUTER_MODEL=qwen/qwen2.5-vl-72b-instruct:free
+BACKEND_OPENROUTER_MODELS=qwen/qwen2.5-vl-72b-instruct:free,google/gemini-2.0-flash-exp:free,mistralai/mistral-small-3.2-24b-instruct:free
+BACKEND_GITHUB_MODELS_API_KEY=your_github_token_here
+BACKEND_GITHUB_MODELS_MODELS=openai/gpt-4o-mini
+BACKEND_HUGGINGFACE_API_KEY=your_huggingface_token_here
+BACKEND_HUGGINGFACE_MODELS=Qwen/Qwen2.5-VL-7B-Instruct
 BACKEND_GOOGLE_API_KEY=your_google_api_key_here
 BACKEND_GEMINI_MODEL=gemini-2.5-flash
 ```

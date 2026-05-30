@@ -26,14 +26,30 @@ def _site() -> SimpleNamespace:
     return SimpleNamespace(name="Arguel", latitude=47.2, longitude=6.0)
 
 
+@pytest.fixture(autouse=True)
+def clear_llm_cooldowns() -> None:
+    emagram._LLM_QUOTA_COOLDOWNS.clear()
+
+
 def _configure_providers(monkeypatch: pytest.MonkeyPatch, order: list[str]) -> None:
     monkeypatch.setattr(emagram.config, "LLM_FALLBACK_ORDER", order)
+    monkeypatch.setattr(emagram.config, "LLM_QUOTA_COOLDOWN_SECONDS", 0)
     monkeypatch.setattr(emagram.config, "GROQ_API_KEY", "groq-key")
     monkeypatch.setattr(emagram.config, "GROQ_MODEL", "groq-model")
     monkeypatch.setattr(emagram.config, "OPENROUTER_API_KEY", "openrouter-key")
     monkeypatch.setattr(emagram.config, "OPENROUTER_MODEL", "openrouter-model")
+    monkeypatch.setattr(emagram.config, "OPENROUTER_MODELS", ["openrouter-model"])
     monkeypatch.setattr(emagram.config, "GOOGLE_API_KEY", "google-key")
     monkeypatch.setattr(emagram.config, "GEMINI_MODEL", "gemini-model")
+    monkeypatch.setattr(emagram.config, "GITHUB_MODELS_API_KEY", None)
+    monkeypatch.setattr(emagram.config, "GITHUB_MODELS_BASE_URL", "https://models.github.ai")
+    monkeypatch.setattr(emagram.config, "GITHUB_MODELS_MODELS", ["github-model"])
+    monkeypatch.setattr(emagram.config, "HUGGINGFACE_API_KEY", None)
+    monkeypatch.setattr(emagram.config, "HUGGINGFACE_BASE_URL", "https://router.huggingface.co")
+    monkeypatch.setattr(emagram.config, "HUGGINGFACE_MODELS", ["huggingface-model"])
+    monkeypatch.setattr(emagram.config, "CUSTOM_OPENAI_API_KEY", None)
+    monkeypatch.setattr(emagram.config, "CUSTOM_OPENAI_BASE_URL", None)
+    monkeypatch.setattr(emagram.config, "CUSTOM_OPENAI_MODELS", [])
 
 
 def test_default_order_prefers_free_providers(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -114,6 +130,53 @@ def test_falls_back_to_gemini_after_free_providers(
     assert calls == ["groq", "openrouter", "google"]
 
 
+def test_rotates_between_openrouter_free_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = []
+    _configure_providers(monkeypatch, ["openrouter", "google"])
+    monkeypatch.setattr(emagram.config, "OPENROUTER_MODELS", ["free-model-1", "free-model-2"])
+
+    def openrouter(**kwargs: Any) -> dict[str, Any]:
+        calls.append(("openrouter", kwargs["model_name"]))
+        if kwargs["model_name"] == "free-model-1":
+            raise QuotaExhaustedError("quota")
+        return _analysis("openrouter")
+
+    monkeypatch.setattr(emagram, "analyze_emagram_with_openrouter", openrouter)
+
+    result = emagram._analyze_emagram_with_fallbacks(["/tmp/emagram.png"], _site())
+
+    assert result["success"] is True
+    assert result["llm_provider"] == "openrouter"
+    assert calls == [("openrouter", "free-model-1"), ("openrouter", "free-model-2")]
+
+
+def test_falls_back_across_openai_compatible_providers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = []
+    _configure_providers(monkeypatch, ["github_models", "huggingface", "google"])
+    monkeypatch.setattr(emagram.config, "GITHUB_MODELS_API_KEY", "github-key")
+    monkeypatch.setattr(emagram.config, "HUGGINGFACE_API_KEY", "huggingface-key")
+
+    def openai_compatible(**kwargs: Any) -> dict[str, Any]:
+        calls.append((kwargs["provider_name"], kwargs["model_name"]))
+        if kwargs["provider_name"] == "github_models":
+            raise QuotaExhaustedError("quota")
+        return _analysis(kwargs["provider_name"])
+
+    monkeypatch.setattr(
+        emagram,
+        "analyze_emagram_with_openai_compatible",
+        openai_compatible,
+    )
+
+    result = emagram._analyze_emagram_with_fallbacks(["/tmp/emagram.png"], _site())
+
+    assert result["success"] is True
+    assert result["llm_provider"] == "huggingface"
+    assert calls == [("github_models", "github-model"), ("huggingface", "huggingface-model")]
+
+
 def test_skips_unconfigured_providers(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = []
     _configure_providers(monkeypatch, ["groq", "openrouter", "google"])
@@ -144,6 +207,30 @@ def test_all_configured_quota_exhausted_raises(monkeypatch: pytest.MonkeyPatch) 
 
     with pytest.raises(QuotaExhaustedError):
         emagram._analyze_emagram_with_fallbacks(["/tmp/emagram.png"], _site())
+
+
+def test_quota_cooldown_skips_saturated_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = []
+    _configure_providers(monkeypatch, ["openrouter", "google"])
+    monkeypatch.setattr(emagram.config, "LLM_QUOTA_COOLDOWN_SECONDS", 60)
+
+    def openrouter(**kwargs: Any) -> dict[str, Any]:
+        calls.append("openrouter")
+        raise QuotaExhaustedError("quota")
+
+    def gemini(**kwargs: Any) -> dict[str, Any]:
+        calls.append("google")
+        return _analysis("google")
+
+    monkeypatch.setattr(emagram, "analyze_emagram_with_openrouter", openrouter)
+    monkeypatch.setattr(emagram, "analyze_emagram_with_gemini", gemini)
+
+    first_result = emagram._analyze_emagram_with_fallbacks(["/tmp/emagram.png"], _site())
+    second_result = emagram._analyze_emagram_with_fallbacks(["/tmp/emagram.png"], _site())
+
+    assert first_result["success"] is True
+    assert second_result["success"] is True
+    assert calls == ["openrouter", "google", "google"]
 
 
 def test_no_provider_configured_returns_clear_error(monkeypatch: pytest.MonkeyPatch) -> None:
