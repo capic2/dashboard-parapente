@@ -5,7 +5,7 @@ import { sitesQueryOptions } from '../hooks/sites/useSites';
 type WeatherSearch = {
   variant?: 'A' | 'B' | 'C';
   siteId?: string;
-  day?: number;
+  day?: string;
   target?: 'city' | 'takeoff' | 'landing';
   city?: string;
   displayName?: string;
@@ -31,13 +31,35 @@ const parseOptionalNumber = (value: unknown) => {
 const parseString = (value: unknown) =>
   typeof value === 'string' && value.length > 0 ? value : undefined;
 
+const DAY_SEARCH_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const parseLocalDate = (value: string) => {
+  if (!DAY_SEARCH_DATE_RE.test(value)) return null;
+  const [year = '', month = '', day = ''] = value.split('-');
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  return date.getFullYear() === Number(year) &&
+    date.getMonth() === Number(month) - 1 &&
+    date.getDate() === Number(day)
+    ? date
+    : null;
+};
+
+const getLocalDayStart = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const parseForecastDaySearch = (value: unknown) => {
+  if (typeof value !== 'string') return undefined;
+  const date = parseLocalDate(value);
+  if (!date) return undefined;
+
+  const today = getLocalDayStart(new Date());
+  const dayIndex = Math.round((date.getTime() - today.getTime()) / DAY_MS);
+  return dayIndex >= 0 && dayIndex <= 6 ? value : undefined;
+};
+
 export const Route = createFileRoute('/weather')({
   validateSearch: (search: Record<string, unknown>): WeatherSearch => {
-    const rawDay = search.day;
-    const parsedDay =
-      typeof rawDay === 'string' || typeof rawDay === 'number'
-        ? Number(rawDay)
-        : Number.NaN;
     const target =
       search.target === 'city' ||
       search.target === 'takeoff' ||
@@ -59,10 +81,7 @@ export const Route = createFileRoute('/weather')({
           ? search.variant
           : undefined,
       siteId: typeof search.siteId === 'string' ? search.siteId : undefined,
-      day:
-        Number.isInteger(parsedDay) && parsedDay >= 0 && parsedDay <= 6
-          ? parsedDay
-          : undefined,
+      day: parseForecastDaySearch(search.day),
       target,
       city: parseString(search.city),
       displayName: parseString(search.displayName),

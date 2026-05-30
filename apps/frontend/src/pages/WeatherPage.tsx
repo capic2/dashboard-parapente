@@ -49,9 +49,46 @@ const getSearchDayLabel = (day: number, t: (key: string) => string) => {
   return `J+${day}`;
 };
 
+const DAY_SEARCH_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getLocalDayStart = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const getForecastDaySearch = (dayIndex: number) => {
+  if (dayIndex <= 0) return undefined;
+  const date = getLocalDayStart(new Date());
+  date.setDate(date.getDate() + dayIndex);
+  return formatLocalDate(date);
+};
+
+const getDayIndexFromSearch = (value: string | undefined) => {
+  if (!value || !DAY_SEARCH_DATE_RE.test(value)) return 0;
+  const [year = '', month = '', day = ''] = value.split('-');
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  if (
+    date.getFullYear() !== Number(year) ||
+    date.getMonth() !== Number(month) - 1 ||
+    date.getDate() !== Number(day)
+  ) {
+    return 0;
+  }
+
+  const today = getLocalDayStart(new Date());
+  const dayIndex = Math.round((date.getTime() - today.getTime()) / DAY_MS);
+  return dayIndex >= 0 && dayIndex <= 6 ? dayIndex : 0;
+};
+
 type WeatherSearchParams = {
   siteId?: string;
-  day?: number;
+  day?: string;
   target?: 'city' | 'takeoff' | 'landing';
   city?: string;
   displayName?: string;
@@ -116,7 +153,7 @@ const getTargetFromSearch = (
 };
 
 const getSearchForTarget = (target: CityWeatherTarget | null, day: number) => {
-  const daySearch = day > 0 ? day : undefined;
+  const daySearch = getForecastDaySearch(day);
 
   if (!target) return { day: daySearch };
 
@@ -157,7 +194,7 @@ export default function WeatherPage() {
   const isMobile = useIsMobile();
   const search = useSearch({ from: '/weather' });
   const routeSiteId = search ? search.siteId : '';
-  const selectedDayIndex = search.day ?? 0;
+  const selectedDayIndex = getDayIndexFromSearch(search.day);
   const selectedSearchTarget = getTargetFromSearch(search);
   const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
   const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(selectedDayIndex);
@@ -212,7 +249,7 @@ export default function WeatherPage() {
   );
   const weatherSearch = {
     siteId: selectedSiteId,
-    day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
+    day: getForecastDaySearch(selectedDayIndex),
   };
   const selectedDayLabel = getSearchDayLabel(selectedDayIndex, t);
   const selectedSiteDisplayName = selectedSite
@@ -231,7 +268,7 @@ export default function WeatherPage() {
       to: '/weather',
       search: {
         siteId: selectedSiteId || undefined,
-        day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
+        day: getForecastDaySearch(selectedDayIndex),
       },
     });
   };
@@ -249,7 +286,7 @@ export default function WeatherPage() {
       to: '/weather',
       search: {
         siteId,
-        day: selectedDayIndex > 0 ? selectedDayIndex : undefined,
+        day: getForecastDaySearch(selectedDayIndex),
       },
     });
   };
@@ -274,7 +311,7 @@ export default function WeatherPage() {
       to: '/weather',
       search: {
         ...weatherSearch,
-        day: day > 0 ? day : undefined,
+        day: getForecastDaySearch(day),
       },
     });
   };
