@@ -248,7 +248,12 @@ def _build_hour_decision(
     current_time: datetime,
 ) -> dict[str, Any]:
     hour_num = int(hour.get("hour") or 0)
-    para_index = int(hour.get("para_index") or calculate_hourly_para_index(hour, thresholds))
+    raw_para_index = hour.get("para_index")
+    para_index = int(
+        raw_para_index
+        if raw_para_index is not None
+        else calculate_hourly_para_index(hour, thresholds)
+    )
     score = _score_for_objective(para_index, hour, objective)
     risks = _hour_risks(hour, thresholds)
     wind_decollage = _wind_decollage(hour.get("wind_direction"), site_orientation)

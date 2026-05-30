@@ -132,6 +132,17 @@ def test_objective_changes_thermal_score_without_changing_para_index():
     assert quiet["hourly"][0]["score_objectif"] < thermal["hourly"][0]["score_objectif"]
 
 
+def test_preserves_explicit_zero_para_index():
+    result = build_flight_decision(
+        site=_site(),
+        weather_payload=_payload([_hour(11, para_index=0)]),
+        objective="tranquille",
+        now=datetime(2026, 5, 30, 9, tzinfo=ZoneInfo("Europe/Paris")),
+    )
+
+    assert result["hourly"][0]["para_index"] == 0
+
+
 def test_unavailable_when_no_hourly_weather():
     result = build_flight_decision(
         site=_site(),
