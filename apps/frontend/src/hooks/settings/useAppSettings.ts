@@ -33,6 +33,7 @@ export interface AppSettings {
   ui_reason_gust_high_min: string;
   ui_reason_cloud_very_cloudy_min: string;
   ui_reason_wind_moderate_min: string;
+  default_flight_objective: string;
 }
 
 export function useAppSettings() {
@@ -53,6 +54,7 @@ export function useUpdateAppSettings() {
       void queryClient.invalidateQueries({ queryKey: ['app-settings'] });
       void queryClient.invalidateQueries({ queryKey: ['weather'] });
       void queryClient.invalidateQueries({ queryKey: ['bestSpot'] });
+      void queryClient.invalidateQueries({ queryKey: ['flight-decision'] });
       void queryClient.invalidateQueries({ queryKey: ['live-wind'] });
       void queryClient.invalidateQueries({ queryKey: ['landings-weather'] });
     },

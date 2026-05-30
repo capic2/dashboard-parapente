@@ -25,6 +25,7 @@ class TestGetSettings:
         data = response.json()
         assert "video_export_dir" not in data
         assert "video_temp_images_dir" not in data
+        assert data["default_flight_objective"] == "tranquille"
 
     def test_get_settings_returns_all(self, client, db_session):
         """Returns all settings as key-value pairs."""
@@ -175,6 +176,39 @@ class TestUpdateSettings:
         )
         assert radius_row is not None and radius_row.value == "12"
         assert ttl_row is not None and ttl_row.value == "420"
+
+    def test_update_default_flight_objective(self, client, db_session):
+        """Updates the default flight objective when the value is known."""
+        response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"default_flight_objective": "thermique"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["updated"]["default_flight_objective"] == "thermique"
+
+        row = (
+            db_session.query(AppSetting)
+            .filter(AppSetting.key == "default_flight_objective")
+            .first()
+        )
+        assert row is not None and row.value == "thermique"
+
+    def test_rejects_invalid_default_flight_objective(self, client, db_session):
+        """Rejects unknown flight objectives without persisting them."""
+        response = client.put(
+            f"{API_PREFIX}/settings",
+            json={"default_flight_objective": "distance"},
+        )
+        assert response.status_code == 400
+        assert "default_flight_objective must be one of" in response.json()["detail"]
+
+        row = (
+            db_session.query(AppSetting)
+            .filter(AppSetting.key == "default_flight_objective")
+            .first()
+        )
+        assert row is None
 
     def test_rejects_retired_video_storage_settings(self, client, db_session):
         """Video storage folders are managed by Docker volume mapping only."""

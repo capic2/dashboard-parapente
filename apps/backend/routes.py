@@ -39,6 +39,7 @@ from auth import (
 from database import get_db
 from emagram_freshness import get_emagram_cutoff_utc
 from flight_backfill import calculate_and_persist_missing_max_speed
+from flight_decision import build_flight_decision, normalize_objective
 from flight_storage import flight_sequence_number
 from flight_storage import write_flight_text_file
 from gopro_overlay_export import cancel_gopro_overlay_job
@@ -84,6 +85,7 @@ from schemas import (
     LocationSearchResponse,
     NearbyFlightOptionsResponse,
 )
+from schemas import FlightDecisionResponse
 from schemas import Site as SiteSchema
 from schemas import (
     SiteCreate,
@@ -1672,6 +1674,11 @@ async def get_landing_associations_weather(
     associations = (
         db.query(SiteLandingAssociation)
         .filter(SiteLandingAssociation.takeoff_site_id == site_id)
+        .order_by(
+            SiteLandingAssociation.is_primary.desc(),
+            SiteLandingAssociation.distance_km.asc(),
+            SiteLandingAssociation.id.asc(),
+        )
         .limit(10)
         .all()
     )
@@ -2910,6 +2917,65 @@ async def get_site_live_wind(site_id: str, db: Session = Depends(get_db)):
     }
     await set_cached(cache_key, result, cache_ttl)
     return result
+
+
+@public_router.get("/flight-decision/{site_id}", response_model=FlightDecisionResponse)
+async def get_flight_decision(
+    site_id: str,
+    day_index: int = Query(default=0, ge=0, le=6),
+    objective: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> FlightDecisionResponse:
+    """Get the backend-owned flight decision for a selected site."""
+    from app_settings import get_setting
+
+    site = db.query(Site).filter(Site.id == site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    if site.latitude is None or site.longitude is None:
+        raise HTTPException(status_code=400, detail="Site has no coordinates")
+
+    selected_objective = normalize_objective(
+        objective
+        if objective in {"tranquille", "progression", "thermique"}
+        else get_setting("default_flight_objective", db=db, default="tranquille")
+    )
+    day_result = await get_normalized_forecast(
+        site.latitude,
+        site.longitude,
+        day_index,
+        site_name=site.name,
+        elevation_m=site.elevation_m,
+        db=db,
+    )
+    if not day_result.get("success"):
+        raise HTTPException(
+            status_code=502,
+            detail=day_result.get("error", f"No forecast data available for {site.name}"),
+        )
+
+    associations = (
+        db.query(SiteLandingAssociation)
+        .filter(SiteLandingAssociation.takeoff_site_id == site_id)
+        .order_by(
+            SiteLandingAssociation.is_primary.desc(),
+            SiteLandingAssociation.distance_km.asc(),
+            SiteLandingAssociation.id.asc(),
+        )
+        .limit(10)
+        .all()
+    )
+    return build_flight_decision(
+        site=site,
+        weather_payload={
+            **day_result,
+            "site_id": site.id,
+            "site_name": site.name,
+            "day_index": day_index,
+        },
+        objective=selected_objective,
+        landing_associations=associations,
+    )
 
 
 @public_router.get("/weather/{spot_id}/summary")
@@ -7082,6 +7148,9 @@ def update_app_settings(
         "ui_reason_cloud_very_cloudy_min": (0, 100),
         "ui_reason_wind_moderate_min": (0, 150),
     }
+    enum_keys: dict[str, set[str]] = {
+        "default_flight_objective": {"tranquille", "progression", "thermique"},
+    }
     validated_updates: dict[str, str] = {}
 
     for key, value in settings.items():
@@ -7123,6 +7192,13 @@ def update_app_settings(
                     detail=f"{key} must be between {min_value:g} and {max_value:g}",
                 )
             normalized_value = f"{parsed_value:g}"
+        elif key in enum_keys:
+            if normalized_value not in enum_keys[key]:
+                allowed_values = ", ".join(sorted(enum_keys[key]))
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{key} must be one of: {allowed_values}",
+                )
         validated_updates[key] = normalized_value
 
     effective_settings = {**DEFAULTS, **get_all_settings(db), **validated_updates}

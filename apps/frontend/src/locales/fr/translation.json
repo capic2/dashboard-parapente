@@ -315,6 +315,113 @@
       "noPrecipitation": "Pas de précipitations"
     }
   },
+  "flightDecision": {
+    "title": "Décision de vol",
+    "loadError": "Impossible de calculer la décision de vol.",
+    "scoreObjectif": "Score objectif",
+    "bestWindow": "Meilleur créneau",
+    "leastUnfavorable": "Moment le moins défavorable",
+    "noWindow": "Aucun créneau",
+    "mainRisks": "Points de vigilance",
+    "level": {
+      "favorable": "Favorable",
+      "vigilance": "Vigilance",
+      "limite": "Limite",
+      "deconseille": "Déconseillé",
+      "unavailable": "Indisponible"
+    },
+    "summary": {
+      "favorable": {
+        "title": "Créneau favorable identifié",
+        "message": "Un créneau exploitable ressort pour l'objectif choisi. Vérifiez quand même les risques et le terrain avant de décider."
+      },
+      "vigilance": {
+        "title": "Vol possible avec vigilance",
+        "message": "Un créneau existe, mais {{main_reason}} demande une attention particulière entre {{start_hour}}h et {{end_hour}}h."
+      },
+      "limite": {
+        "title": "Aucun créneau conseillé net",
+        "message": "Les conditions restent limites. Le moment le moins défavorable est autour de {{start_hour}}h-{{end_hour}}h, principalement à cause de {{main_reason}}."
+      },
+      "deconseille": {
+        "title": "Vol déconseillé",
+        "message": "Les risques disponibles ne permettent pas de proposer un créneau conseillé aujourd'hui."
+      },
+      "unavailable": {
+        "title": "Décision indisponible",
+        "message": "Les données disponibles ne suffisent pas à produire une décision de vol fiable."
+      }
+    },
+    "objective": {
+      "active": "Objectif : {{objective}}",
+      "tranquille": "Tranquille",
+      "progression": "Progression",
+      "thermique": "Thermique"
+    },
+    "context": {
+      "title": "Contexte météo",
+      "description": "Une ville ou une recherche ponctuelle donne un contexte météo. Sélectionnez un décollage pour obtenir une décision de vol complète avec orientation et atterrissages."
+    },
+    "confidence": {
+      "title": "Confiance",
+      "high": "Élevée",
+      "medium": "Moyenne",
+      "low": "Faible",
+      "very_low": "Très faible",
+      "singleForecastSource": "Une seule source météo disponible",
+      "lowDiagnostic": "Confiance météo faible"
+    },
+    "landing": { "title": "Atterrissages" },
+    "landingSafety": {
+      "notConfigured": "Non évalués",
+      "unavailable": "Non disponibles",
+      "evaluated": "Évalués",
+      "notConfiguredDiagnostic": "Atterrissage non configuré",
+      "weatherNotEvaluated": "Météo atterrissage non évaluée"
+    },
+    "risk": {
+      "weatherUnavailable": "Météo indisponible",
+      "windMissing": "Vent manquant",
+      "windTooStrong": "Vent trop fort",
+      "windTooWeak": "Vent trop faible",
+      "windWeak": "Vent faible",
+      "gustHigh": "Rafales fortes",
+      "rainSignificant": "Pluie significative",
+      "thunderstormLow": "Risque orage faible",
+      "thunderstormModerate": "Risque orage modéré",
+      "thunderstormHigh": "Risque orage élevé"
+    },
+    "windDecollage": {
+      "face": "Vent de face",
+      "travers_acceptable": "Travers acceptable",
+      "travers_fort": "Travers fort",
+      "cul": "Vent arrière",
+      "orientation_unknown": "Orientation inconnue",
+      "not_evaluated": "Orientation non évaluée"
+    },
+    "thermal": {
+      "tranquille": {
+        "positive": "Thermiques calmes",
+        "vigilance": "Thermiques modérés",
+        "limiting": "Thermiques forts"
+      },
+      "progression": {
+        "neutral": "Thermiques faibles",
+        "positive": "Thermiques utiles",
+        "vigilance": "Thermiques forts"
+      },
+      "thermique": {
+        "limiting": "Thermiques faibles",
+        "positive": "Thermiques exploitables"
+      }
+    },
+    "window": {
+      "favorable": "Créneau favorable",
+      "vigilance": "Créneau avec vigilance",
+      "limite": "Moment limite",
+      "deconseille": "Moment déconseillé"
+    }
+  },
   "filters": {
     "title": "Filtres",
     "reset": "Réinitialiser",
