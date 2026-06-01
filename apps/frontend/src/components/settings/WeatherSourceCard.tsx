@@ -302,8 +302,8 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
           }
         >
           <div className="relative inline-flex items-center cursor-pointer">
-            <div className="w-11 h-6 bg-gray-300 group-focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-sky-300 rounded-full group-selected:bg-sky-600 transition-colors">
-              <div className="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform group-selected:translate-x-full"></div>
+            <div className="w-11 h-6 bg-gray-300 group-focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-sky-300 rounded-full group-data-[selected]:bg-sky-600 transition-colors">
+              <div className="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform group-data-[selected]:translate-x-full"></div>
             </div>
           </div>
         </Switch>
