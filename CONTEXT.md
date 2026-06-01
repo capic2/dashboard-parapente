@@ -84,6 +84,18 @@ _Avoid_: Safety guarantee, source count only
 Weather information shown for a **Ville** or another location that is not enough to produce a complete **Decision de Vol**. A **Contexte Meteo** can explain general conditions and guide the pilot toward nearby **Sites**.
 _Avoid_: Decision de Vol, site recommendation
 
+**Source de Prevision**:
+A weather source that predicts future conditions and can contribute to the forecast consensus used by a **Decision de Vol**.
+_Avoid_: Observation live, source meteo generic
+
+**Source d'Observation**:
+A weather source that reports current or recent real-world conditions and can confirm, contradict, or lower **Confiance Meteo** without replacing the forecast basis of a **Decision de Vol**.
+_Avoid_: Source de prevision, forecast model
+
+**Heure Courante**:
+The current clock hour for which live observations can meaningfully affect a **Decision de Vol**.
+_Avoid_: Whole day, future forecast window
+
 **Site Selectionne**:
 The **Site** currently being evaluated by the pilot on the weather page. The primary **Decision de Vol** is always about the Site Selectionne, even when other sites are shown as alternatives.
 _Avoid_: Best site, nearby city, arbitrary coordinates
@@ -197,6 +209,118 @@ Domain expert: Significant rain, excessive average wind, excessive gusts, and ta
 Dev: Can strong forecast confidence make a risky creneau favorable?
 
 Domain expert: No. Confiance meteo can only support or degrade the recommendation; it cannot cancel a weather risk.
+
+Dev: Does adding more weather sources automatically make a decision more precise?
+
+Domain expert: No. More sources are useful when they improve confiance meteo and the decision de vol, but source count alone is not precision.
+
+Dev: Should every available weather source be required for the weather page to work?
+
+Domain expert: No. The app should support as many activable sources as practical, but each source may fail or be disabled without blocking the main weather context or decision.
+
+Dev: If weather sources strongly disagree on a blocking risk, should the average hide it?
+
+Domain expert: No. A credible source that reports a blocking risk should degrade the decision instead of being diluted by more optimistic sources.
+
+Dev: What makes a weather source credible enough to influence a blocking risk?
+
+Domain expert: A weather source is credible for this purpose when its data is fresh, valid, and not known to be failing repeatedly.
+
+Dev: Should forecasts and live observations influence the decision in the same way?
+
+Domain expert: No. Sources de prevision build the forecast basis, while sources d'observation confirm, contradict, or lower confiance meteo without replacing the forecast.
+
+Dev: Should the expanded weather source work include observations live from the start?
+
+Domain expert: Yes. The app should expand both sources de prevision and sources d'observation, while keeping their roles distinct in the decision.
+
+Dev: Can a source d'observation affect every forecast hour of the day?
+
+Domain expert: No. A source d'observation can affect the decision only for the heure courante, because it reports current or recent conditions rather than the full future day.
+
+Dev: Does heure courante include the next forecast hour?
+
+Domain expert: No. Heure courante means only the current clock hour, not the next hour or a broader preparation window.
+
+Dev: If a live observation contradicts the forecast during the heure courante, should it replace the forecast display?
+
+Domain expert: No. Keep the forecast visible as the forecast basis, show the live observation beside it, and flag the contradiction clearly.
+
+Dev: Can several weather models from the same provider count as separate sources de prevision?
+
+Domain expert: Yes, but only when each model is clearly identified and traceable separately; otherwise source count would overstate confiance meteo.
+
+Dev: How should sources requiring an API key appear before the key is configured?
+
+Domain expert: They should be visible but disabled until their key is configured, so they do not break the main weather experience.
+
+Dev: Can a source de prevision influence the decision if it lacks the necessary flight weather fields?
+
+Domain expert: No. A source de prevision must provide the necessary flight weather fields, including wind, wind direction, gusts, and precipitation, to influence the decision de vol.
+
+Dev: Can a source de prevision contribute when it provides only some necessary fields?
+
+Domain expert: Yes. It may influence only the risks and confidence for the fields it provides, without increasing confidence for missing fields.
+
+Dev: Should many weak weather sources outweigh a fresher, more reliable local source by simple averaging?
+
+Domain expert: No. Consensus should account for source quality such as freshness, reliability, local resolution, and configured priority rather than using source count alone.
+
+Dev: When a reliable local source disagrees with global sources, which one wins?
+
+Domain expert: Blocking risks should follow the most cautious credible signal, while non-blocking displayed values may give more weight to the reliable local source for the fields where it is relevant.
+
+Dev: Should a failed specialized forecast source make the whole decision unavailable?
+
+Domain expert: No. A failed specialized source should be visible and may lower confiance meteo, but it should not by itself make the decision unavailable when enough other credible data remains.
+
+Dev: What is the minimum credible forecast basis for a decision de vol?
+
+Domain expert: A decision de vol should have at least two credible sources for the essential fields such as wind, wind direction, gusts, and precipitation; with fewer, the app should treat the decision as too fragile or low-confidence.
+
+Dev: If only one credible source is available, should the app still show a normal favorable decision?
+
+Domain expert: No. It may still provide a useful decision aid, but the result should be degraded because a single credible source is too fragile for a normal favorable decision.
+
+Dev: What is the best possible decision level when only one credible source supports otherwise good conditions?
+
+Domain expert: Vigilance is the best possible level in that case; favorable requires at least two credible sources for the essential fields.
+
+Dev: Should weather settings show every possible source all the time?
+
+Domain expert: Use a simple view for active sources and an advanced view for all potential configurable sources, so the pilot can enable many sources without making the default settings noisy.
+
+Dev: Can experimental or fragile weather sources be enabled?
+
+Domain expert: Yes, as long as their status is clear and the pilot keeps direct control to enable or disable them easily.
+
+Dev: Can an experimental weather source create a blocking risk by itself?
+
+Domain expert: No. An experimental source may alert and lower confiance meteo, but it should not create a blocking risk on its own until it is considered reliable.
+
+Dev: How does an experimental weather source become reliable?
+
+Domain expert: Reliability should combine observed history such as success rate, freshness, and coherence with other sources with explicit pilot control over the final source status.
+
+Dev: Should the pilot see whether a weather source is experimental, fragile, reliable, or disabled?
+
+Domain expert: Yes. The source status should be visible in settings and weather details so the pilot understands how source quality affects confiance meteo and decision de vol.
+
+Dev: Where should the pilot understand which sources influenced risks and confidence?
+
+Domain expert: Keep quick per-hour source details in the hourly hover, and use a collapsible detail panel to explain how sources affected risks and the decision de vol.
+
+Dev: At what level should detailed source explanations be shown?
+
+Domain expert: Show global source confidence for the day, source impact per creneau de vol, and keep per-hour source values in the hourly hover.
+
+Dev: Should every technically possible fragile web source be integrated automatically?
+
+Domain expert: No. Fragile or unofficial web sources should be evaluated case by case, can be marked experimental, and should not block the decision by themselves.
+
+Dev: Who decides whether a fragile weather source is worth integrating?
+
+Domain expert: A fragile source should meet minimum technical criteria, then the pilot decides whether its weather value justifies the maintenance cost.
 
 Dev: Is the weather page primarily a best-site finder?
 

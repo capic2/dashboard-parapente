@@ -274,6 +274,7 @@ def seed_weather_sources():
     import uuid
 
     from models import WeatherSourceConfig
+    from weather_sources import default_weather_source_rows
 
     logger.info("Checking for existing weather sources...")
 
@@ -286,32 +287,21 @@ def seed_weather_sources():
         if source_count > 0:
             logger.info(f"✓ Weather sources already exist ({source_count}) - checking API keys...")
 
-            # Update sources with API keys that may have been added after initial seed
-            weatherapi_key = config.WEATHERAPI_KEY
-            meteoblue_key = config.METEOBLUE_API_KEY
+            for source_data in default_weather_source_rows():
+                source = (
+                    db.query(WeatherSourceConfig)
+                    .filter(WeatherSourceConfig.source_name == source_data["source_name"])
+                    .first()
+                )
+                if source is None:
+                    db.add(WeatherSourceConfig(id=str(uuid.uuid4()), **source_data))
+                    logger.info(f"✓ Added missing weather source: {source_data['display_name']}")
+                    continue
 
-            wa_source = (
-                db.query(WeatherSourceConfig)
-                .filter(WeatherSourceConfig.source_name == "weatherapi")
-                .first()
-            )
-            if (
-                wa_source
-                and weatherapi_key
-                and (wa_source.api_key != weatherapi_key or not wa_source.is_enabled)
-            ):
-                wa_source.api_key = weatherapi_key
-                wa_source.is_enabled = True
-                logger.info("✓ WeatherAPI: updated API key and re-enabled")
-
-            mb_source = (
-                db.query(WeatherSourceConfig)
-                .filter(WeatherSourceConfig.source_name == "meteoblue")
-                .first()
-            )
-            if mb_source and meteoblue_key and mb_source.api_key != meteoblue_key:
-                mb_source.api_key = meteoblue_key
-                logger.info("✓ Meteoblue: updated API key")
+                configured_api_key = source_data.get("api_key")
+                if configured_api_key and source.api_key != configured_api_key:
+                    source.api_key = configured_api_key
+                    logger.info(f"✓ Updated API key for {source.display_name}")
 
             db.commit()
             db.close()
@@ -319,82 +309,9 @@ def seed_weather_sources():
 
         logger.info("No weather sources found - seeding defaults...")
 
-        # Get API keys from config
-        weatherapi_key = config.WEATHERAPI_KEY
-        meteoblue_key = config.METEOBLUE_API_KEY
-
-        # Define default sources (5 sources)
-        default_sources = [
-            {
-                "id": str(uuid.uuid4()),
-                "source_name": "open-meteo",
-                "display_name": "Open-Meteo",
-                "description": "API météo open-source gratuite, aucune clé requise. Données mondiales avec haute précision.",
-                "is_enabled": True,
-                "requires_api_key": False,
-                "api_key": None,
-                "priority": 10,
-                "scraper_type": "api",
-                "base_url": "https://api.open-meteo.com/v1/forecast",
-                "documentation_url": "https://open-meteo.com/en/docs",
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "source_name": "weatherapi",
-                "display_name": "WeatherAPI.com",
-                "description": "API météo mondiale avec données détaillées. Clé API requise (plan gratuit disponible).",
-                "is_enabled": bool(weatherapi_key),  # Enabled only if API key present
-                "requires_api_key": True,
-                "api_key": weatherapi_key,
-                "priority": 9,
-                "scraper_type": "api",
-                "base_url": "https://api.weatherapi.com/v1/forecast.json",
-                "documentation_url": "https://www.weatherapi.com/docs/",
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "source_name": "meteo-parapente",
-                "display_name": "Météo Parapente",
-                "description": "Prévisions spécialisées parapente avec thermiques et conditions de vol.",
-                "is_enabled": True,
-                "requires_api_key": False,
-                "api_key": None,
-                "priority": 8,
-                "scraper_type": "playwright",
-                "base_url": "https://meteo-parapente.com",
-                "documentation_url": None,
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "source_name": "meteociel",
-                "display_name": "Météociel",
-                "description": "Prévisions AROME haute résolution pour la France. Scraping de données HTML.",
-                "is_enabled": True,
-                "requires_api_key": False,
-                "api_key": None,
-                "priority": 7,
-                "scraper_type": "playwright",
-                "base_url": "https://www.meteociel.fr",
-                "documentation_url": None,
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "source_name": "meteoblue",
-                "display_name": "Meteoblue",
-                "description": "Prévisions météo professionnelles avec modèles multiples. API key optionnelle.",
-                "is_enabled": True,
-                "requires_api_key": False,
-                "api_key": meteoblue_key,
-                "priority": 6,
-                "scraper_type": "stealth",
-                "base_url": "https://www.meteoblue.com",
-                "documentation_url": "https://docs.meteoblue.com/",
-            },
-        ]
-
         # Insert sources using ORM
-        for source_data in default_sources:
-            source = WeatherSourceConfig(**source_data)
+        for source_data in default_weather_source_rows():
+            source = WeatherSourceConfig(id=str(uuid.uuid4()), **source_data)
             db.add(source)
             status = "✅" if source.is_enabled else "⚠️  (disabled - no API key)"
             logger.info(f"  {status} Seeded: {source.display_name}")

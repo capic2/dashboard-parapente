@@ -78,6 +78,77 @@ async def fetch_open_meteo(lat: float, lon: float, days: int = 2) -> dict[str, A
         }
 
 
+async def fetch_open_meteo_icon(lat: float, lon: float, days: int = 7) -> dict[str, Any]:
+    """Fetch a traceable ICON model forecast from Open-Meteo."""
+
+    return await _fetch_open_meteo_model(
+        lat=lat,
+        lon=lon,
+        days=days,
+        model="icon_seamless",
+        source="open-meteo-icon",
+    )
+
+
+async def fetch_open_meteo_gfs(lat: float, lon: float, days: int = 7) -> dict[str, Any]:
+    """Fetch a traceable GFS model forecast from Open-Meteo."""
+
+    return await _fetch_open_meteo_model(
+        lat=lat,
+        lon=lon,
+        days=days,
+        model="gfs_seamless",
+        source="open-meteo-gfs",
+    )
+
+
+async def _fetch_open_meteo_model(
+    lat: float,
+    lon: float,
+    days: int,
+    model: str,
+    source: str,
+) -> dict[str, Any]:
+    """Fetch a specific Open-Meteo forecast model as its own traceable source."""
+
+    try:
+        params = {
+            "latitude": lat,
+            "longitude": lon,
+            "hourly": "temperature_2m,windspeed_10m,wind_direction_10m,windgusts_10m,precipitation,cloudcover,cape,lifted_index",
+            "timezone": "Europe/Paris",
+            "forecast_days": days,
+            "models": model,
+        }
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get("https://api.open-meteo.com/v1/forecast", params=params)
+            response.raise_for_status()
+            data = response.json()
+
+        return {
+            "success": True,
+            "source": source,
+            "model": model,
+            "data": data,
+            "timestamp": datetime.now().isoformat(),
+        }
+    except httpx.HTTPStatusError as e:
+        return {
+            "success": False,
+            "source": source,
+            "error": f"HTTP {e.response.status_code}: {str(e)}",
+            "timestamp": datetime.now().isoformat(),
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "source": source,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat(),
+        }
+
+
 def extract_hourly_forecast(data: dict[str, Any], day_index: int = 0) -> list[dict[str, Any]]:
     """
     Extract hourly forecast for a specific day
