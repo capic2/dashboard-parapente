@@ -950,6 +950,33 @@ export default function HourlyForecast({
                   </div>
                   <div className="rounded-xl border border-white/80 bg-white/85 p-2 dark:border-slate-800 dark:bg-slate-950/55">
                     <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      <Compass
+                        className="h-3.5 w-3.5 text-violet-500"
+                        aria-hidden="true"
+                      />
+                      {t('weather.hourly.direction')}
+                    </span>
+                    <div className="flex items-center gap-1.5 font-bold text-slate-950 dark:text-white">
+                      {hour.wind_direction_deg === null ||
+                      typeof hour.wind_direction_deg === 'undefined' ? (
+                        '—'
+                      ) : (
+                        <>
+                          <WindArrow
+                            degrees={hour.wind_direction_deg}
+                            className="text-violet-600 dark:text-violet-400"
+                          />
+                          <span>
+                            {formatWindDirectionWithDegrees(
+                              hour.wind_direction_deg
+                            )}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-white/80 bg-white/85 p-2 dark:border-slate-800 dark:bg-slate-950/55">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                       <CloudRain
                         className="h-3.5 w-3.5 text-cyan-500"
                         aria-hidden="true"

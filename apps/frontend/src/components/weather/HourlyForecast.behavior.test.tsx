@@ -156,4 +156,10 @@ describe('HourlyForecast tooltip behavior', () => {
     expect(screen.getByText('✓ Verdict - 10:00')).toBeTruthy();
     expect(screen.getByText(/Criteres evalues/iu)).toBeTruthy();
   });
+
+  it('shows wind direction on mobile hourly cards', () => {
+    render(<HourlyForecast spotId="site-1" dayIndex={0} />);
+
+    expect(screen.getByText('NW (315°)')).toBeTruthy();
+  });
 });
