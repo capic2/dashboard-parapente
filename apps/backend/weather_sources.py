@@ -2,6 +2,7 @@
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+import uuid
 from typing import Any
 
 import config
@@ -256,3 +257,27 @@ def get_weather_source_definition(source_name: str) -> WeatherSourceDefinition |
 
 def default_weather_source_rows() -> list[dict[str, Any]]:
     return [source.seed_data() for source in WEATHER_SOURCE_DEFINITIONS]
+
+
+def ensure_weather_source_configs(db_session) -> list[str]:
+    """Ensure every registered source has a row in the database.
+
+    Returns the list of source names that were added.
+    """
+
+    from models import WeatherSourceConfig
+
+    existing_names = {row.source_name for row in db_session.query(WeatherSourceConfig).all()}
+    added_sources: list[str] = []
+
+    for source_data in default_weather_source_rows():
+        if source_data["source_name"] in existing_names:
+            continue
+
+        db_session.add(WeatherSourceConfig(id=str(uuid.uuid4()), **source_data))
+        added_sources.append(source_data["source_name"])
+
+    if added_sources:
+        db_session.commit()
+
+    return added_sources

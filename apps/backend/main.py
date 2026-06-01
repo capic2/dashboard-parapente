@@ -299,9 +299,15 @@ def seed_weather_sources():
                     continue
 
                 configured_api_key = source_data.get("api_key")
-                if configured_api_key and source.api_key != configured_api_key:
+                previous_api_key = source.api_key
+                if configured_api_key and previous_api_key != configured_api_key:
                     source.api_key = configured_api_key
                     logger.info(f"✓ Updated API key for {source.display_name}")
+                    if source.requires_api_key and not source.is_enabled and not previous_api_key:
+                        source.is_enabled = True
+                        logger.info(
+                            f"✓ Re-enabled {source.display_name} after API key configuration"
+                        )
 
             db.commit()
             db.close()
