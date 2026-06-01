@@ -5837,8 +5837,9 @@ def delete_weather_source(source_name: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=f"Weather source '{source_name}' not found")
 
     # Protection: Cannot delete system sources
-    SYSTEM_SOURCES = ["open-meteo", "weatherapi", "meteo-parapente", "meteociel", "meteoblue"]
-    if source_name in SYSTEM_SOURCES:
+    from weather_sources import SYSTEM_WEATHER_SOURCE_NAMES
+
+    if source_name in SYSTEM_WEATHER_SOURCE_NAMES:
         raise HTTPException(
             status_code=400,
             detail=f"Cannot delete system weather source '{source_name}'. You can disable it instead.",
@@ -5885,24 +5886,10 @@ async def test_weather_source(
     if not source:
         raise HTTPException(status_code=404, detail=f"Weather source '{source_name}' not found")
 
-    # Import fetch functions
-    from scrapers.meteo_parapente import fetch_meteo_parapente
-    from scrapers.meteoblue import fetch_meteoblue
-    from scrapers.meteociel import fetch_meteociel
-    from scrapers.open_meteo import fetch_open_meteo
-    from scrapers.weatherapi import fetch_weatherapi
+    from weather_sources import get_weather_source_definition
 
-    # Map source_name to fetch function
-    fetch_functions = {
-        "open-meteo": fetch_open_meteo,
-        "weatherapi": fetch_weatherapi,
-        "meteo-parapente": fetch_meteo_parapente,
-        "meteociel": fetch_meteociel,
-        "meteoblue": fetch_meteoblue,
-    }
-
-    fetch_func = fetch_functions.get(source_name)
-    if not fetch_func:
+    source_definition = get_weather_source_definition(source_name)
+    if not source_definition:
         raise HTTPException(
             status_code=400, detail=f"No fetch function available for source '{source_name}'"
         )
@@ -5913,15 +5900,12 @@ async def test_weather_source(
     start_time = time.time()
 
     try:
-        # Call fetch with appropriate parameters per source
-        if source_name == "meteo-parapente":
-            result = await fetch_func(lat, lon, site_name="Test Site", elevation_m=1000)
-        elif source_name == "meteociel":
-            result = await fetch_func(lat, lon, site_name="Test Site")
-        elif source_name == "meteoblue":
-            result = await fetch_func(lat, lon, city_name="Test City")
-        else:
-            result = await fetch_func(lat, lon)
+        result = await source_definition.fetch(
+            lat,
+            lon,
+            site_name="Test Site",
+            elevation_m=1000,
+        )
 
         response_time_ms = int((time.time() - start_time) * 1000)
 

@@ -13,20 +13,10 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from para_index import calculate_para_index
-from scrapers.meteo_parapente import extract_hourly_forecast as extract_mp
-from scrapers.meteo_parapente import fetch_meteo_parapente
-from scrapers.meteoblue import extract_hourly_forecast as extract_mb
-from scrapers.meteoblue import fetch_meteoblue
-from scrapers.meteociel import extract_hourly_forecast as extract_mc
-from scrapers.meteociel import fetch_meteociel
-
-# Import all scrapers
-from scrapers.open_meteo import extract_hourly_forecast as extract_om
-from scrapers.open_meteo import fetch_open_meteo
-from scrapers.weatherapi import extract_hourly_forecast as extract_wa
-from scrapers.weatherapi import fetch_weatherapi
+from weather_sources import WEATHER_SOURCE_REGISTRY
 
 logger = logging.getLogger(__name__)
+FULL_CONFIDENCE_SOURCE_BASELINE = 5
 
 
 # ============================================================================
@@ -151,36 +141,18 @@ async def fetch_from_enabled_sources(
             f"{[s.source_name for s in enabled_sources]}"
         )
 
-        # Map sources to fetch functions
-        fetch_map = {
-            "open-meteo": fetch_open_meteo,
-            "weatherapi": fetch_weatherapi,
-            "meteo-parapente": fetch_meteo_parapente,
-            "meteociel": fetch_meteociel,
-            "meteoblue": fetch_meteoblue,
-        }
-
         # Create instrumented tasks
-        async def instrumented_fetch(src_name, func):
+        async def instrumented_fetch(src_name: str):
             """Wrapper to instrument each fetch call"""
             result = None
             try:
-                # Clean site name for scrapers (remove suffixes like "Test", "Nord", etc. for better matching)
-                clean_site_name = site_name.split()[0] if site_name else site_name
-
-                # Adapt arguments per source
-                if src_name == "open-meteo":
-                    result = await func(lat, lon, days=7)
-                elif src_name == "meteo-parapente":
-                    result = await func(
-                        lat, lon, site_name=site_name, elevation_m=elevation_m, days=1
-                    )
-                elif src_name == "meteociel":
-                    result = await func(lat, lon, site_name=clean_site_name)
-                elif src_name == "meteoblue":
-                    result = await func(lat, lon, city_name=site_name)
-                else:
-                    result = await func(lat, lon)
+                source_definition = WEATHER_SOURCE_REGISTRY[src_name]
+                result = await source_definition.fetch(
+                    lat,
+                    lon,
+                    site_name=site_name,
+                    elevation_m=elevation_m,
+                )
 
                 # Update stats based on result
                 from models import WeatherSourceConfig
@@ -207,17 +179,7 @@ async def fetch_from_enabled_sources(
                 # Scrapers return {'success': True, 'data': {...}}
                 # but normalize_data() expects {'success': True, 'hourly': [...]}
                 if result and result.get("success") and "data" in result:
-                    # Extract hourly data for the requested day
-                    if src_name == "open-meteo":
-                        result["hourly"] = extract_om(result, day_index)
-                    elif src_name == "weatherapi":
-                        result["hourly"] = extract_wa(result, day_index)
-                    elif src_name == "meteo-parapente":
-                        result["hourly"] = extract_mp(result, day_index)
-                    elif src_name == "meteociel":
-                        result["hourly"] = extract_mc(result, day_index)
-                    elif src_name == "meteoblue":
-                        result["hourly"] = extract_mb(result, day_index)
+                    result["hourly"] = source_definition.extract(result, day_index)
 
                 return result
 
@@ -251,12 +213,11 @@ async def fetch_from_enabled_sources(
         source_names = []
 
         for source in enabled_sources:
-            fetch_func = fetch_map.get(source.source_name)
-            if not fetch_func:
+            if source.source_name not in WEATHER_SOURCE_REGISTRY:
                 logger.warning(f"No fetch function for source '{source.source_name}', skipping")
                 continue
 
-            tasks.append(instrumented_fetch(source.source_name, fetch_func))
+            tasks.append(instrumented_fetch(source.source_name))
             source_names.append(source.source_name)
 
         # Execute all fetches in parallel
@@ -425,12 +386,16 @@ def calculate_consensus(normalized: dict[str, Any]) -> dict[str, Any]:
 
             avg = statistics.mean(valid_values)
             # Confidence based on number of sources and variance
+            expected_sources = max(FULL_CONFIDENCE_SOURCE_BASELINE, len(valid_values))
             if len(valid_values) == 1:
                 confidence = 0.5
             else:
                 # Higher confidence with more sources and lower variance
                 variance = statistics.variance(valid_values) if len(valid_values) > 1 else 0
-                confidence = min(1.0, (len(valid_values) / 5) * (1 - min(variance / 100, 0.5)))
+                confidence = min(
+                    1.0,
+                    (len(valid_values) / expected_sources) * (1 - min(variance / 100, 0.5)),
+                )
             return avg, confidence
 
         temp_avg, temp_conf = safe_avg(hour_data["temperature"])
@@ -467,7 +432,8 @@ def calculate_consensus(normalized: dict[str, Any]) -> dict[str, Any]:
 
                 # Calculate confidence based on number of sources and vector magnitude
                 # magnitude close to 1.0 = all sources agree, close to 0 = sources disagree
-                source_factor = len(valid_directions) / 5
+                expected_sources = max(FULL_CONFIDENCE_SOURCE_BASELINE, len(valid_directions))
+                source_factor = len(valid_directions) / expected_sources
                 agreement_factor = magnitude / len(valid_directions)  # Normalize by count
                 dir_conf = min(1.0, source_factor * agreement_factor)
         else:
@@ -485,7 +451,7 @@ def calculate_consensus(normalized: dict[str, Any]) -> dict[str, Any]:
         sources_data = {}
 
         # Build initial per-source structure for all known sources
-        for source in ["open-meteo", "weatherapi", "meteo-parapente", "meteociel", "meteoblue"]:
+        for source in WEATHER_SOURCE_REGISTRY:
             sources_data[source] = {
                 "wind_speed": None,
                 "temperature": None,

@@ -128,14 +128,22 @@ const getSourceUrl = (sourceKey: string): string | null => {
   switch (sourceKey) {
     case 'open-meteo':
       return 'https://open-meteo.com/';
+    case 'open-meteo-icon':
+      return 'https://open-meteo.com/';
+    case 'open-meteo-gfs':
+      return 'https://open-meteo.com/';
     case 'weatherapi':
       return 'https://www.weatherapi.com/';
+    case 'met-no':
+      return 'https://www.met.no/en/free-meteorological-data';
     case 'meteo-parapente':
       return 'https://meteo-parapente.com/';
     case 'meteociel':
       return 'https://www.meteociel.fr/';
     case 'meteoblue':
       return 'https://www.meteoblue.com/';
+    case 'openweathermap':
+      return 'https://openweathermap.org/';
     default:
       return null;
   }
@@ -234,19 +242,27 @@ const formatConsensusValue = (value: number | string | null): string => {
 };
 
 const SOURCE_NAMES: Record<string, string> = {
-  'open-meteo': 'Open-Meteo',
+  'open-meteo': 'Open-Meteo AROME',
+  'open-meteo-icon': 'Open-Meteo ICON',
+  'open-meteo-gfs': 'Open-Meteo GFS',
   weatherapi: 'WeatherAPI',
+  'met-no': 'MET Norway',
   'meteo-parapente': 'Météo-parapente',
   meteociel: 'Meteociel',
   meteoblue: 'Meteoblue',
+  openweathermap: 'OpenWeatherMap',
 };
 
 const SOURCE_ORDER = [
   'open-meteo',
+  'open-meteo-icon',
+  'open-meteo-gfs',
   'weatherapi',
+  'met-no',
   'meteo-parapente',
   'meteociel',
   'meteoblue',
+  'openweathermap',
 ];
 
 export const DEFAULT_UI_THRESHOLDS: UiThresholds = {
@@ -432,6 +448,13 @@ const SourceDataTooltip = ({
   color,
 }: SourceDataTooltipProps) => {
   const { t } = useTranslation();
+  const sourceKeys = [
+    ...SOURCE_ORDER,
+    ...Object.keys(sources).filter(
+      (sourceKey) => !SOURCE_ORDER.includes(sourceKey)
+    ),
+  ];
+
   return (
     <div
       className="bg-white dark:bg-gray-800 border-2 rounded-lg shadow-xl p-4 text-sm max-w-[320px]"
@@ -441,7 +464,7 @@ const SourceDataTooltip = ({
         {label} - {hour}
       </div>
       <div className="space-y-2">
-        {SOURCE_ORDER.map((sourceKey) => {
+        {sourceKeys.map((sourceKey) => {
           const sourceData = sources[sourceKey];
           const sourceName = SOURCE_NAMES[sourceKey] || sourceKey;
 
