@@ -23,12 +23,13 @@ async def fetch_openweathermap(lat: float, lon: float, days: int = 5) -> dict[st
         }
 
     try:
+        forecast_days = max(1, days)
         params = {
             "lat": lat,
             "lon": lon,
             "appid": OPENWEATHERMAP_API_KEY,
             "units": "metric",
-            "cnt": min(days * 8, 40),
+            "cnt": min(forecast_days * 8, 40),
         }
 
         async with httpx.AsyncClient(timeout=10.0) as client:

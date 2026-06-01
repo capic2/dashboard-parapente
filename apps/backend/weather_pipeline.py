@@ -142,9 +142,8 @@ async def fetch_from_enabled_sources(
         )
 
         # Create instrumented tasks
-        async def instrumented_fetch(src_name: str):
+        async def instrumented_fetch(src_name: str) -> dict[str, Any]:
             """Wrapper to instrument each fetch call"""
-            result = None
             try:
                 source_definition = WEATHER_SOURCE_REGISTRY[src_name]
                 result = await source_definition.fetch(
@@ -153,27 +152,6 @@ async def fetch_from_enabled_sources(
                     site_name=site_name,
                     elevation_m=elevation_m,
                 )
-
-                # Update stats based on result
-                from models import WeatherSourceConfig
-
-                source = (
-                    db.query(WeatherSourceConfig)
-                    .filter(WeatherSourceConfig.source_name == src_name)
-                    .first()
-                )
-
-                if source and result:
-                    if result.get("success"):
-                        source.success_count += 1
-                        source.last_success_at = datetime.utcnow()
-                    else:
-                        source.error_count += 1
-                        source.last_error_at = datetime.utcnow()
-                        source.last_error_message = result.get("error", "Unknown error")[:500]
-
-                    source.updated_at = datetime.utcnow()
-                    db.commit()
 
                 # CRITICAL FIX: Transform raw data to hourly format
                 # Scrapers return {'success': True, 'data': {...}}
@@ -185,22 +163,6 @@ async def fetch_from_enabled_sources(
 
             except Exception as e:
                 logger.error(f"Error fetching from {src_name}: {e}")
-                # Update error stats
-                from models import WeatherSourceConfig
-
-                source = (
-                    db.query(WeatherSourceConfig)
-                    .filter(WeatherSourceConfig.source_name == src_name)
-                    .first()
-                )
-
-                if source:
-                    source.error_count += 1
-                    source.last_error_at = datetime.utcnow()
-                    source.last_error_message = str(e)[:500]
-                    source.updated_at = datetime.utcnow()
-                    db.commit()
-
                 return {
                     "success": False,
                     "source": src_name,
@@ -230,13 +192,38 @@ async def fetch_from_enabled_sources(
             "sources": {},
         }
 
+        from models import WeatherSourceConfig
+
         for i, result in enumerate(results):
             source_name = source_names[i]
 
             if isinstance(result, Exception):
-                aggregated["sources"][source_name] = {"success": False, "error": str(result)}
-            else:
-                aggregated["sources"][source_name] = result
+                result = {"success": False, "error": str(result)}
+
+            aggregated["sources"][source_name] = result
+
+            source = (
+                db.query(WeatherSourceConfig)
+                .filter(WeatherSourceConfig.source_name == source_name)
+                .first()
+            )
+
+            if source:
+                if result.get("success"):
+                    source.success_count += 1
+                    source.last_success_at = datetime.utcnow()
+                else:
+                    source.error_count += 1
+                    source.last_error_at = datetime.utcnow()
+                    source.last_error_message = result.get("error", "Unknown error")[:500]
+
+                source.updated_at = datetime.utcnow()
+
+        try:
+            db.commit()
+        except Exception as commit_error:
+            logger.error(f"Failed to update weather source stats: {commit_error}")
+            db.rollback()
 
         return aggregated
 

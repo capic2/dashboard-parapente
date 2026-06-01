@@ -117,6 +117,7 @@ from video_export_manual import start_video_export_manual
 from video_export_manual import start_video_export_manual_fast
 from versioning import get_version_payload
 from weather_pipeline import get_daily_aggregate, get_normalized_forecast
+from weather_sources import ensure_weather_source_configs
 
 logger = logging.getLogger(__name__)
 
@@ -5656,6 +5657,8 @@ def get_weather_sources(enabled_only: bool = False, db: Session = Depends(get_db
     Returns:
         List of WeatherSourceConfig with stats
     """
+    ensure_weather_source_configs(db)
+
     query = db.query(WeatherSourceConfig)
 
     if enabled_only:
@@ -5675,6 +5678,7 @@ def get_weather_sources_stats(db: Session = Depends(get_db)):
     Returns:
         WeatherSourceStats with aggregations
     """
+    ensure_weather_source_configs(db)
     sources = db.query(WeatherSourceConfig).all()
 
     total = len(sources)

@@ -5,6 +5,9 @@ Tests HTTP endpoints respond correctly without mocking external dependencies.
 Tests may fail if weather APIs are down, which is expected behavior.
 """
 
+from models import WeatherSourceConfig
+from weather_sources import SYSTEM_WEATHER_SOURCE_NAMES
+
 # API prefix for all routes
 API_PREFIX = "/api"
 
@@ -91,10 +94,28 @@ class TestWeatherSourcesEndpoints:
     """Tests for /weather-sources configuration endpoints"""
 
     def test_get_weather_sources(self, client, db_session):
-        """GET /weather-sources lists all weather sources"""
+        """GET /weather-sources lists all registered weather sources"""
+        db_session.query(WeatherSourceConfig).delete()
+        db_session.commit()
+
         response = client.get(f"{API_PREFIX}/weather-sources")
-        # Should return list of sources
-        assert response.status_code in [200, 500]
+        assert response.status_code == 200
+
+        data = response.json()
+        returned_names = {source["source_name"] for source in data}
+
+        assert set(SYSTEM_WEATHER_SOURCE_NAMES).issubset(returned_names)
+
+    def test_get_weather_sources_stats_synchronizes_missing_sources(self, client, db_session):
+        """GET /weather-sources/stats should reflect registry-backed sources."""
+        db_session.query(WeatherSourceConfig).delete()
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/weather-sources/stats")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["total_sources"] >= len(SYSTEM_WEATHER_SOURCE_NAMES)
 
     def test_get_weather_sources_stats(self, client, db_session):
         """GET /weather-sources/stats returns usage statistics"""
