@@ -156,6 +156,11 @@
     "notCached": "Not cached",
     "forecast7Days": "7-Day Forecast",
     "bestSpotFor": "Best spot for {{date}}",
+    "bestSpot": {
+      "reasonCodes": {
+        "windDecollageCul": "tailwind at takeoff"
+      }
+    },
     "bestSpotTimeline": "Best spot hour by hour",
     "byHour": "H -> end of day",
     "calculating": "Calculating...",
