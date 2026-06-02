@@ -30,6 +30,12 @@ import { getSiteDisplayName } from '../../lib/siteDisplay';
 
 type HourlyBestSpot = BestSpotResult & { hour: number };
 
+type ReasonTranslator = (key: string) => string;
+
+const BEST_SPOT_REASON_CODE_KEYS: Record<string, string> = {
+  wind_decollage_cul: 'weather.bestSpot.reasonCodes.windDecollageCul',
+};
+
 interface BestSpotSuggestionProps {
   bestSpot: BestSpotResult | null;
   hourlyBestSpots?: HourlyBestSpot[];
@@ -171,6 +177,17 @@ function getWindFavorabilityLabel(
   return t('weather.favorabilityPoor');
 }
 
+function localizeBestSpotReason(reason: string, t: ReasonTranslator) {
+  return Object.entries(BEST_SPOT_REASON_CODE_KEYS).reduce(
+    (localizedReason, [code, translationKey]) =>
+      localizedReason.replace(
+        new RegExp(`\\b${code}\\b`, 'gu'),
+        t(translationKey)
+      ),
+    reason.replace(/Para-Index/gu, t('weather.paraIndex'))
+  );
+}
+
 export const BestSpotSuggestion = ({
   bestSpot,
   hourlyBestSpots = [],
@@ -228,10 +245,7 @@ export const BestSpotSuggestion = ({
     100,
     Math.max(0, Math.round(score ?? paraIndex))
   );
-  const localizedReason = reason.replace(
-    /Para-Index/gu,
-    t('weather.paraIndex')
-  );
+  const localizedReason = localizeBestSpotReason(reason, t);
   const scoreColor = getScoreColor(adjustedScore);
   const verdictInfo = getVerdict(adjustedScore, verdict ?? undefined);
   const hourlyRows = hourlyBestSpots.map((hourlySpot) => {

@@ -156,6 +156,11 @@
     "notCached": "Non mis en cache",
     "forecast7Days": "Prévisions 7 Jours",
     "bestSpotFor": "Meilleur spot pour {{date}}",
+    "bestSpot": {
+      "reasonCodes": {
+        "windDecollageCul": "vent de cul au décollage"
+      }
+    },
     "bestSpotTimeline": "Meilleur spot heure par heure",
     "byHour": "H -> fin de journée",
     "calculating": "Calcul en cours...",
