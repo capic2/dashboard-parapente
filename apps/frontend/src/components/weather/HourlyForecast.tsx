@@ -1026,6 +1026,11 @@ export default function HourlyForecast({
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
+                  <CircleCheck size={14} /> {t('weather.hourly.flyability')}
+                </span>
+              </th>
+              <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
+                <span className="inline-flex items-center justify-center gap-1">
                   <Gauge size={14} /> {t('weather.paraIndex')}
                 </span>
               </th>
@@ -1070,11 +1075,6 @@ export default function HourlyForecast({
                   <Flame size={14} /> {t('weather.hourly.thermals')}
                 </span>
               </th>
-              <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
-                <span className="inline-flex items-center justify-center gap-1">
-                  <CircleCheck size={14} /> {t('weather.hourly.flyability')}
-                </span>
-              </th>
             </tr>
           </thead>
           <tbody className="text-gray-800 dark:text-gray-100">
@@ -1101,6 +1101,40 @@ export default function HourlyForecast({
                   >
                     <td className="py-2.5 px-2 font-medium text-center">
                       {hour.hour}
+                    </td>
+
+                    <td className="py-2.5 px-2 text-center">
+                      {(() => {
+                        const display = getFlyabilityDisplay(
+                          hour,
+                          uiThresholds,
+                          flyabilityReasonLabels
+                        );
+                        const FlyabilityIcon = display.Icon;
+                        return (
+                          <TooltipTrigger delay={150} closeDelay={100}>
+                            <Button
+                              aria-label={t('weather.hourly.verdictAt', {
+                                hour: hour.hour,
+                              })}
+                              className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+                            >
+                              <span
+                                className={`inline-flex items-center justify-center gap-1 font-medium ${display.color}`}
+                              >
+                                <FlyabilityIcon
+                                  className="h-4 w-4"
+                                  aria-hidden="true"
+                                />
+                                {display.text}
+                              </span>
+                            </Button>
+                            <Tooltip offset={8} className="z-50">
+                              {renderTooltipContent('verdict', hour)}
+                            </Tooltip>
+                          </TooltipTrigger>
+                        );
+                      })()}
                     </td>
 
                     <td className="py-2.5 px-2 text-center">
@@ -1239,40 +1273,6 @@ export default function HourlyForecast({
 
                     <td className="py-2.5 px-2 text-center">
                       {hour.thermal_strength || t('weather.hourly.weak')}
-                    </td>
-
-                    <td className="py-2.5 px-2 text-center">
-                      {(() => {
-                        const display = getFlyabilityDisplay(
-                          hour,
-                          uiThresholds,
-                          flyabilityReasonLabels
-                        );
-                        const FlyabilityIcon = display.Icon;
-                        return (
-                          <TooltipTrigger delay={150} closeDelay={100}>
-                            <Button
-                              aria-label={t('weather.hourly.verdictAt', {
-                                hour: hour.hour,
-                              })}
-                              className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
-                            >
-                              <span
-                                className={`inline-flex items-center justify-center gap-1 font-medium ${display.color}`}
-                              >
-                                <FlyabilityIcon
-                                  className="h-4 w-4"
-                                  aria-hidden="true"
-                                />
-                                {display.text}
-                              </span>
-                            </Button>
-                            <Tooltip offset={8} className="z-50">
-                              {renderTooltipContent('verdict', hour)}
-                            </Tooltip>
-                          </TooltipTrigger>
-                        );
-                      })()}
                     </td>
                   </tr>
                 );
