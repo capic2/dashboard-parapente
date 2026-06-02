@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+import select
 import shutil
 import subprocess
 import threading
@@ -82,7 +83,6 @@ _LAYOUTS = [
 
 _JOBS: dict[str, dict[str, Any]] = {}
 _PROCESSES: dict[str, subprocess.Popen[str]] = {}
-_ACTIVE_THREADS: set[str] = set()
 _LOCK = threading.Lock()
 _WORKER_THREAD: threading.Thread | None = None
 _WORKER_STOP = threading.Event()
@@ -364,6 +364,58 @@ def _read_process_updates(stream: Any) -> Iterator[str]:
         current += char
     if current.strip():
         yield current.strip()
+
+
+def _is_job_cancelled(job_id: str) -> bool:
+    job = get_gopro_overlay_job(job_id)
+    return bool(job and job.get("status") == _STATUS_CANCELLED)
+
+
+def _read_process_updates_from_process(
+    process: subprocess.Popen[str],
+    job_id: str,
+) -> Iterator[str]:
+    stream = process.stdout
+    if not stream:
+        return
+
+    current = ""
+    while process.poll() is None:
+        if _is_job_cancelled(job_id):
+            process.terminate()
+            return
+
+        ready, _, _ = select.select([stream], [], [], 1)
+        if not ready:
+            continue
+
+        char = stream.read(1)
+        if not char:
+            continue
+        if char in {"\n", "\r"}:
+            if current.strip():
+                yield current.strip()
+            current = ""
+            continue
+        current += char
+
+    if current.strip():
+        yield current.strip()
+
+
+def _background_process_command(command: list[str]) -> list[str]:
+    if config.TESTING:
+        return command.copy()
+
+    wrapped = command.copy()
+    ionice_class = str(config.GOPRO_OVERLAY_PROCESS_IONICE_CLASS).strip()
+    if os.name == "posix" and ionice_class and shutil.which("ionice"):
+        wrapped = ["ionice", "-c", ionice_class, *wrapped]
+
+    nice_value = config.GOPRO_OVERLAY_PROCESS_NICE
+    if os.name == "posix" and nice_value > 0 and shutil.which("nice"):
+        wrapped = ["nice", "-n", str(nice_value), *wrapped]
+    return wrapped
 
 
 def _tail_lines(path: Path, limit: int = 20) -> str:
@@ -837,6 +889,7 @@ def _create_gopro_overlay_job_from_paths(
         selected_layout.id,
         output_path,
     )
+    _enqueue_existing_gopro_overlay_job(job_id)
 
     return job.copy()
 
@@ -879,7 +932,7 @@ def _run_job(job_id: str) -> None:
         if temp_output_path.exists():
             temp_output_path.unlink()
         process = subprocess.Popen(
-            command,
+            _background_process_command(command),
             cwd=config.GOPRO_OVERLAY_ROOT or None,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -920,20 +973,19 @@ def _run_job(job_id: str) -> None:
             log_file.write(f"[{_utc_now()}] Starting GoPro overlay job {job_id}\n")
             log_file.write("Command: " + " ".join(command) + "\n")
             log_file.flush()
-            if process.stdout:
-                for line in _read_process_updates(process.stdout):
-                    log_file.write(line + "\n")
-                    log_file.flush()
-                    output_lines.append(line)
-                    if len(output_lines) > 50:
-                        output_lines = output_lines[-50:]
-                    progress = _progress_from_output_chunk(line)
-                    if progress is None:
-                        _update_job(job_id, message=line or "Rendering overlay")
-                    else:
-                        _update_job(
-                            job_id, progress=progress, message=f"Rendering overlay: {progress}%"
-                        )
+            for line in _read_process_updates_from_process(process, job_id):
+                log_file.write(line + "\n")
+                log_file.flush()
+                output_lines.append(line)
+                if len(output_lines) > 50:
+                    output_lines = output_lines[-50:]
+                progress = _progress_from_output_chunk(line)
+                if progress is None:
+                    _update_job(job_id, message=line or "Rendering overlay")
+                else:
+                    _update_job(
+                        job_id, progress=progress, message=f"Rendering overlay: {progress}%"
+                    )
 
         return_code = process.wait()
         with _LOCK:
@@ -1104,6 +1156,59 @@ def _queued_job_ids() -> list[str]:
             return [job_id for job_id, job in _JOBS.items() if job.get("status") == _STATUS_QUEUED]
 
 
+def _rq_job_id(job_id: str) -> str:
+    return f"gopro-overlay-{job_id}"
+
+
+def _enqueue_gopro_overlay_job_in_rq(job_id: str) -> None:
+    from job_queue import enqueue_once
+
+    enqueue_once(
+        "gopro_overlay_export.process_gopro_overlay_job",
+        job_id,
+        job_id=_rq_job_id(job_id),
+        timeout=config.JOB_QUEUE_TIMEOUT_SECONDS,
+        queue_name=config.GOPRO_OVERLAY_QUEUE_NAME,
+    )
+
+
+def _enqueue_existing_gopro_overlay_job(job_id: str) -> None:
+    from job_queue import is_rq_enabled
+
+    if is_rq_enabled():
+        _enqueue_gopro_overlay_job_in_rq(job_id)
+    elif not config.TESTING:
+        start_gopro_overlay_worker()
+
+
+def _delete_rq_gopro_overlay_job(job_id: str) -> bool:
+    from job_queue import delete_job, is_rq_enabled
+
+    if not is_rq_enabled():
+        return False
+    return delete_job(_rq_job_id(job_id), queue_name=config.GOPRO_OVERLAY_QUEUE_NAME)
+
+
+def enqueue_pending_gopro_overlay_jobs(*, mark_interrupted: bool = False) -> int:
+    """Enqueue queued overlay jobs into the dedicated RQ queue."""
+    from job_queue import is_rq_enabled
+
+    if not is_rq_enabled():
+        return 0
+
+    if mark_interrupted:
+        _mark_interrupted_jobs_failed()
+    job_ids = _queued_job_ids()
+    for job_id in job_ids:
+        _enqueue_gopro_overlay_job_in_rq(job_id)
+    return len(job_ids)
+
+
+def process_gopro_overlay_job(job_id: str) -> None:
+    """RQ job target for one GoPro overlay render."""
+    _run_job(job_id)
+
+
 def _mark_interrupted_jobs_failed() -> None:
     try:
         with SessionLocal() as db:
@@ -1141,30 +1246,24 @@ def _worker_loop() -> None:
     logger.info("GoPro overlay worker started")
     _mark_interrupted_jobs_failed()
     while not _WORKER_STOP.is_set():
-        for job_id in _queued_job_ids():
-            with _LOCK:
-                if job_id in _ACTIVE_THREADS:
-                    continue
-                _ACTIVE_THREADS.add(job_id)
-            thread = threading.Thread(target=_run_job_thread, args=(job_id,), daemon=True)
-            thread.start()
+        job_ids = _queued_job_ids()
+        if job_ids:
+            _run_job(job_ids[0])
+            continue
         _WORKER_STOP.wait(1)
-
-
-def _run_job_thread(job_id: str) -> None:
-    try:
-        _run_job(job_id)
-    finally:
-        with _LOCK:
-            _ACTIVE_THREADS.discard(job_id)
 
 
 def start_gopro_overlay_worker() -> None:
     global _WORKER_THREAD
+    from job_queue import is_rq_enabled
+
     with _WORKER_LOCK:
+        reconcile_gopro_overlay_flight_refs()
+        if is_rq_enabled():
+            enqueue_pending_gopro_overlay_jobs()
+            return
         if _WORKER_THREAD and _WORKER_THREAD.is_alive() is True:
             return
-        reconcile_gopro_overlay_flight_refs()
         _WORKER_STOP.clear()
         _WORKER_THREAD = threading.Thread(
             target=_worker_loop,
@@ -1254,6 +1353,8 @@ def cancel_gopro_overlay_job(job_id: str) -> bool:
 
     if process and process.poll() is None:
         process.terminate()
+    else:
+        _delete_rq_gopro_overlay_job(job_id)
 
     _finish_job(
         job_id,

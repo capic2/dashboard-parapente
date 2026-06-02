@@ -73,6 +73,7 @@ JOB_QUEUE_BACKEND = os.getenv(
     "thread" if IS_TEST_ENV else "rq",
 ).lower()
 JOB_QUEUE_NAME = os.getenv("BACKEND_JOB_QUEUE_NAME", "video_exports")
+GOPRO_OVERLAY_QUEUE_NAME = os.getenv("BACKEND_GOPRO_OVERLAY_QUEUE_NAME", "gopro_overlays")
 JOB_QUEUE_TIMEOUT_SECONDS = int(os.getenv("BACKEND_JOB_QUEUE_TIMEOUT_SECONDS", "21600"))
 
 # ============================================================================
@@ -208,6 +209,8 @@ GOPRO_OVERLAY_FONT = os.getenv(
     "BACKEND_GOPRO_OVERLAY_FONT",
     "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
 )
+GOPRO_OVERLAY_PROCESS_NICE = int(os.getenv("BACKEND_GOPRO_OVERLAY_PROCESS_NICE", "19"))
+GOPRO_OVERLAY_PROCESS_IONICE_CLASS = os.getenv("BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS", "3")
 
 # ============================================================================
 # VALIDATION
