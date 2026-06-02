@@ -11,3 +11,6 @@ services:
 
   backend-worker:
     image: parapente-backend:nx-latest
+
+  gopro-overlay-worker:
+    image: parapente-backend:nx-latest

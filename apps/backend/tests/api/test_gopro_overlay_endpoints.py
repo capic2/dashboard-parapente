@@ -1083,6 +1083,148 @@ def test_create_gopro_overlay_job_from_paths_defers_input_copy_to_worker_prepara
     assert prepared["video_height"] == 1080
 
 
+def test_create_gopro_overlay_job_from_paths_enqueues_rq_job(
+    tmp_path,
+    monkeypatch,
+    test_db,
+):
+    layout_dir = tmp_path / "layouts"
+    layout_dir.mkdir()
+    (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
+    video_path = tmp_path / "source.mp4"
+    gpx_path = tmp_path / "source.gpx"
+    video_path.write_bytes(b"video")
+    gpx_path.write_text("<gpx />")
+    enqueued_job_ids: list[str] = []
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+    monkeypatch.setattr(gopro_overlay_export.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "_enqueue_gopro_overlay_job_in_rq",
+        lambda job_id: enqueued_job_ids.append(job_id),
+    )
+
+    job = create_gopro_overlay_job_from_paths(
+        video_path=video_path,
+        gpx_path=gpx_path,
+        pip_path=None,
+        layout_id="parapente-1080",
+        output_filename="overlay.mp4",
+    )
+
+    assert enqueued_job_ids == [job["job_id"]]
+
+
+def test_enqueue_gopro_overlay_job_uses_dedicated_rq_queue(monkeypatch):
+    enqueued: list[dict[str, object]] = []
+
+    def enqueue_once(function_path: str, *args, **kwargs):
+        enqueued.append({"function_path": function_path, "args": args, "kwargs": kwargs})
+
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_QUEUE_NAME", "overlay-test-queue")
+    monkeypatch.setattr("job_queue.enqueue_once", enqueue_once)
+
+    gopro_overlay_export._enqueue_gopro_overlay_job_in_rq("job-rq")
+
+    assert enqueued == [
+        {
+            "function_path": "gopro_overlay_export.process_gopro_overlay_job",
+            "args": ("job-rq",),
+            "kwargs": {
+                "job_id": "gopro-overlay-job-rq",
+                "timeout": config.JOB_QUEUE_TIMEOUT_SECONDS,
+                "queue_name": "overlay-test-queue",
+            },
+        }
+    ]
+
+
+def test_start_gopro_overlay_worker_with_rq_does_not_start_local_thread(monkeypatch):
+    enqueued: list[bool] = []
+    monkeypatch.setattr(gopro_overlay_export.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(gopro_overlay_export, "reconcile_gopro_overlay_flight_refs", lambda: 0)
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "enqueue_pending_gopro_overlay_jobs",
+        lambda: enqueued.append(True) or 0,
+    )
+    monkeypatch.setattr(
+        gopro_overlay_export.threading,
+        "Thread",
+        lambda *_, **__: pytest.fail("RQ mode must not start a local overlay worker thread"),
+    )
+
+    gopro_overlay_export.start_gopro_overlay_worker()
+
+    assert enqueued == [True]
+
+
+def test_enqueue_pending_gopro_overlay_jobs_does_not_mark_running_failed_by_default(monkeypatch):
+    monkeypatch.setattr(gopro_overlay_export.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(gopro_overlay_export, "_queued_job_ids", lambda: [])
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "_mark_interrupted_jobs_failed",
+        lambda: pytest.fail("API startup must not fail active worker jobs"),
+    )
+
+    assert gopro_overlay_export.enqueue_pending_gopro_overlay_jobs() == 0
+
+
+def test_read_process_updates_from_process_terminates_cancelled_job(monkeypatch):
+    terminated: list[bool] = []
+
+    class FakeProcess:
+        stdout = object()
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            terminated.append(True)
+
+    monkeypatch.setattr(gopro_overlay_export, "_is_job_cancelled", lambda _job_id: True)
+
+    assert list(gopro_overlay_export._read_process_updates_from_process(FakeProcess(), "job")) == []
+    assert terminated == [True]
+
+
+def test_cancel_queued_gopro_overlay_job_removes_rq_job(monkeypatch):
+    job_id = "queued-rq-job"
+    deleted_rq_jobs: list[tuple[str, str | None]] = []
+    gopro_overlay_export._JOBS[job_id] = {
+        "job_id": job_id,
+        "status": "queued",
+        "progress": 0,
+        "message": "Overlay queued",
+        "gpx_path": "track.gpx",
+        "layout_path": "layout.xml",
+        "video_path": "flight.mp4",
+        "output_path": "overlay.mp4",
+        "pip_path": None,
+        "video_width": None,
+        "video_height": None,
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
+    monkeypatch.setattr(gopro_overlay_export.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(
+        gopro_overlay_export.config, "GOPRO_OVERLAY_QUEUE_NAME", "overlay-test-queue"
+    )
+    monkeypatch.setattr(
+        "job_queue.delete_job",
+        lambda rq_job_id, queue_name=None: deleted_rq_jobs.append((rq_job_id, queue_name)) or True,
+    )
+    try:
+        assert cancel_gopro_overlay_job(job_id)
+        assert deleted_rq_jobs == [("gopro-overlay-queued-rq-job", "overlay-test-queue")]
+        assert gopro_overlay_export._JOBS[job_id]["status"] == "cancelled"
+    finally:
+        gopro_overlay_export._JOBS.pop(job_id, None)
+        gopro_overlay_export._PROCESSES.pop(job_id, None)
+
+
 def test_run_job_prepares_inputs_before_starting_process(
     tmp_path,
     monkeypatch,
