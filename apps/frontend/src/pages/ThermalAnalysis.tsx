@@ -228,6 +228,7 @@ export default function ThermalAnalysis() {
       {parseApiUtcDate(latest.analysis_datetime).toLocaleDateString()}
     </p>
   );
+  const decisionSiteName = site?.name ?? latest.station_name;
 
   let emagramImageContent = (
     <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-8 text-center text-gray-500 dark:text-gray-400">
@@ -432,6 +433,9 @@ export default function ThermalAnalysis() {
             <h2 className="text-lg font-bold mb-3 text-blue-900 dark:text-blue-100">
               {t('thermal.tipsTitle')}
             </h2>
+            <p className="mb-2 text-sm font-semibold text-blue-700 dark:text-blue-300">
+              {t('flights.siteLabel')} : {decisionSiteName}
+            </p>
             <p className="text-blue-800 dark:text-blue-200 leading-relaxed">
               {latest.conseils_vol}
             </p>
