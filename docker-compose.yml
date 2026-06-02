@@ -43,6 +43,7 @@ services:
       - BACKEND_USE_FAKE_REDIS=${BACKEND_USE_FAKE_REDIS:-false}
       - BACKEND_JOB_QUEUE_BACKEND=${BACKEND_JOB_QUEUE_BACKEND:-rq}
       - BACKEND_JOB_QUEUE_NAME=${BACKEND_JOB_QUEUE_NAME:-video_exports}
+      - BACKEND_GOPRO_OVERLAY_QUEUE_NAME=${BACKEND_GOPRO_OVERLAY_QUEUE_NAME:-gopro_overlays}
 
       # Backend - API
       - BACKEND_API_HOST=${BACKEND_API_HOST:-0.0.0.0}
@@ -116,6 +117,8 @@ services:
       - BACKEND_GOPRO_OVERLAY_LAYOUT_DIR=/app/gopro-overlay
       - BACKEND_GOPRO_OVERLAY_PARAGLIDING_ROOT=/app/parapente
       - BACKEND_GOPRO_OVERLAY_FONT=/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf
+      - BACKEND_GOPRO_OVERLAY_PROCESS_NICE=${BACKEND_GOPRO_OVERLAY_PROCESS_NICE:-19}
+      - BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS=${BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS:-3}
 
       # Backend - Deployment metadata
       - BACKEND_DEPLOY_VERSION=${BACKEND_DEPLOY_VERSION}
@@ -155,6 +158,7 @@ services:
       - BACKEND_USE_FAKE_REDIS=${BACKEND_USE_FAKE_REDIS:-false}
       - BACKEND_JOB_QUEUE_BACKEND=${BACKEND_JOB_QUEUE_BACKEND:-rq}
       - BACKEND_JOB_QUEUE_NAME=${BACKEND_JOB_QUEUE_NAME:-video_exports}
+      - BACKEND_GOPRO_OVERLAY_QUEUE_NAME=${BACKEND_GOPRO_OVERLAY_QUEUE_NAME:-gopro_overlays}
       - BACKEND_API_HOST=${BACKEND_API_HOST:-0.0.0.0}
       - BACKEND_API_PORT=${BACKEND_API_PORT:-8001}
       - BACKEND_LOG_LEVEL=${BACKEND_LOG_LEVEL:-INFO}
@@ -173,6 +177,8 @@ services:
       - BACKEND_GOPRO_OVERLAY_LAYOUT_DIR=/app/gopro-overlay
       - BACKEND_GOPRO_OVERLAY_PARAGLIDING_ROOT=/app/parapente
       - BACKEND_GOPRO_OVERLAY_FONT=/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf
+      - BACKEND_GOPRO_OVERLAY_PROCESS_NICE=${BACKEND_GOPRO_OVERLAY_PROCESS_NICE:-19}
+      - BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS=${BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS:-3}
       - BACKEND_VERSION_STATE_FILE=${BACKEND_VERSION_STATE_FILE:?BACKEND_VERSION_STATE_FILE is required}
     depends_on:
       redis:
@@ -183,6 +189,64 @@ services:
       - /home/capic/docker-data/dashboard-parapente/db:/app/db
       - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
       - ${VIDEO_TEMP_IMAGES_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/video-temp-images}:${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
+      - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'python -c "from job_queue import get_redis_connection; get_redis_connection().ping()"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - parapente-network
+
+  gopro-overlay-worker:
+    image: ${BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
+    container_name: parapente-gopro-overlay-worker
+    restart: unless-stopped
+    command: ['python', 'gopro_overlay_worker.py']
+    cpus: '${GOPRO_OVERLAY_WORKER_CPUS:-1.0}'
+    mem_limit: ${GOPRO_OVERLAY_WORKER_MEM_LIMIT:-3g}
+    pids_limit: ${GOPRO_OVERLAY_WORKER_PIDS_LIMIT:-256}
+    labels:
+      project: dashboard-parapente
+      service: gopro-overlay-worker
+      env: ${ENVIRONMENT:-production}
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - BACKEND_DATABASE_URL=${BACKEND_DATABASE_URL:?BACKEND_DATABASE_URL is required}
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - BACKEND_REDIS_HOST=redis
+      - BACKEND_REDIS_PORT=6379
+      - BACKEND_USE_FAKE_REDIS=${BACKEND_USE_FAKE_REDIS:-false}
+      - BACKEND_JOB_QUEUE_BACKEND=${BACKEND_JOB_QUEUE_BACKEND:-rq}
+      - BACKEND_JOB_QUEUE_NAME=${BACKEND_JOB_QUEUE_NAME:-video_exports}
+      - BACKEND_GOPRO_OVERLAY_QUEUE_NAME=${BACKEND_GOPRO_OVERLAY_QUEUE_NAME:-gopro_overlays}
+      - BACKEND_LOG_LEVEL=${BACKEND_LOG_LEVEL:-INFO}
+      - BACKEND_LOG_FILE=${BACKEND_LOG_FILE:?BACKEND_LOG_FILE is required}
+      - BACKEND_METRICS_TOKEN=${BACKEND_METRICS_TOKEN:?required}
+      - BACKEND_JWT_SECRET=${BACKEND_JWT_SECRET:?required}
+      - BACKEND_WEATHERAPI_KEY=${BACKEND_WEATHERAPI_KEY}
+      - BACKEND_METEOBLUE_API_KEY=${BACKEND_METEOBLUE_API_KEY}
+      - BACKEND_STRAVA_VERIFY_TOKEN=${BACKEND_STRAVA_VERIFY_TOKEN:-PARAPENTE_2025}
+      - BACKEND_GOPRO_OVERLAY_ROOT=/app/gopro-overlay
+      - BACKEND_GOPRO_OVERLAY_BIN=/app/gopro-overlay/venv/bin/gopro-dashboard.py
+      - BACKEND_GOPRO_OVERLAY_LAYOUT_DIR=/app/gopro-overlay
+      - BACKEND_GOPRO_OVERLAY_PARAGLIDING_ROOT=/app/parapente
+      - BACKEND_GOPRO_OVERLAY_FONT=/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf
+      - BACKEND_GOPRO_OVERLAY_PROCESS_NICE=${BACKEND_GOPRO_OVERLAY_PROCESS_NICE:-19}
+      - BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS=${BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS:-3}
+      - BACKEND_VERSION_STATE_FILE=${BACKEND_VERSION_STATE_FILE:?BACKEND_VERSION_STATE_FILE is required}
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    volumes:
+      - /home/capic/docker-data/dashboard-parapente/db:/app/db
       - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
     healthcheck:
       test:
