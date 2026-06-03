@@ -439,6 +439,12 @@
     "fromDate": "Du {{date}}",
     "toDate": "Au {{date}}"
   },
+  "dataList": {
+    "sortOptions": "Options de tri",
+    "sortBy": "Trier par {{column}}",
+    "sortByAsc": "Trier par {{column}} croissant",
+    "sortByDesc": "Trier par {{column}} décroissant"
+  },
   "sites": {
     "management": "Gestion des Sites",
     "newSite": "Nouveau site",
@@ -467,6 +473,9 @@
     "orientation": "Orientation:",
     "editSite": "Éditer le site",
     "viewFlights": "Voir les vols",
+    "locationUnknown": "Sans localité",
+    "locationGroupCount_one": "{{count}} site",
+    "locationGroupCount_other": "{{count}} sites",
     "deleteSite": "Supprimer le site"
   },
   "settings": {
