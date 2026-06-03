@@ -2,8 +2,8 @@ import { useDeferredValue, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
 import { Input, Label, TextField } from 'react-aria-components';
-import { Button, DataList, Modal } from '@dashboard-parapente/design-system';
-import { Plus, Search, Trash2 } from 'lucide-react';
+import { Button, Modal } from '@dashboard-parapente/design-system';
+import { ArrowDown, ArrowUp, Plus, Search, Trash2 } from 'lucide-react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import {
   useReactTable,
@@ -50,6 +50,11 @@ const SITE_SORTABLE_COLUMNS = [
   { id: 'region', label: 'Localité' },
   { id: 'elevation_m', label: 'Altitude' },
 ];
+
+interface SiteGroup {
+  location: string;
+  rows: Row<Site>[];
+}
 
 export const Sites: React.FC = () => {
   const { t } = useTranslation();
@@ -110,6 +115,20 @@ export const Sites: React.FC = () => {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
+
+  const sortedSiteRows = table.getSortedRowModel().rows;
+  const siteGroups = sortedSiteRows.reduce<SiteGroup[]>((groups, row) => {
+    const location = row.original.region?.trim() || t('sites.locationUnknown');
+    const existingGroup = groups.find((group) => group.location === location);
+
+    if (existingGroup) {
+      existingGroup.rows.push(row);
+    } else {
+      groups.push({ location, rows: [row] });
+    }
+
+    return groups;
+  }, []);
 
   // Handlers
   const handleEdit = (site: Site) => {
@@ -244,17 +263,93 @@ export const Sites: React.FC = () => {
         {t('common.siteFound', { count: filteredSites.length })}
       </p>
 
-      {/* Sites Grid with DataList sort buttons */}
-      <DataList
-        table={table}
-        sortableColumns={SITE_SORTABLE_COLUMNS}
-        emptyMessage={t('sites.noSiteFound')}
-        renderItem={renderSiteCard}
-        ariaLabel="Liste des sites"
-        layout="grid"
-        itemsClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-        getTextValue={(row) => getSiteDisplayName(row.original)}
-      />
+      <div>
+        <fieldset className="mb-4 flex flex-wrap gap-1.5">
+          <legend className="sr-only">{t('dataList.sortOptions')}</legend>
+          {SITE_SORTABLE_COLUMNS.map((col) => {
+            const currentSort = sorting.find((sort) => sort.id === col.id);
+            const isActive = !!currentSort;
+
+            return (
+              <Button
+                key={col.id}
+                className={`inline-flex items-center rounded-md px-3 py-2 text-xs font-medium transition-colors sm:px-2 sm:py-1 ${
+                  isActive
+                    ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
+                }`}
+                aria-label={
+                  currentSort
+                    ? t(
+                        currentSort.desc
+                          ? 'dataList.sortByDesc'
+                          : 'dataList.sortByAsc',
+                        { column: col.label }
+                      )
+                    : t('dataList.sortBy', { column: col.label })
+                }
+                aria-pressed={isActive}
+                onPress={() => table.getColumn(col.id)?.toggleSorting()}
+              >
+                {col.label}
+                {currentSort &&
+                  (currentSort.desc ? (
+                    <ArrowDown
+                      className="ml-1 h-3.5 w-3.5 shrink-0"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <ArrowUp
+                      className="ml-1 h-3.5 w-3.5 shrink-0"
+                      aria-hidden="true"
+                    />
+                  ))}
+              </Button>
+            );
+          })}
+        </fieldset>
+
+        {siteGroups.length > 0 ? (
+          <div className="space-y-8">
+            {siteGroups.map((group, index) => {
+              const headingId = `site-location-${index}`;
+
+              return (
+                <section key={group.location} aria-labelledby={headingId}>
+                  <div className="mb-3 flex flex-col gap-1 border-b border-gray-200 pb-2 dark:border-gray-700 sm:flex-row sm:items-end sm:justify-between">
+                    <h2
+                      id={headingId}
+                      className="text-xl font-semibold text-gray-900 dark:text-white"
+                    >
+                      {group.location}
+                    </h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      {t('sites.locationGroupCount', {
+                        count: group.rows.length,
+                      })}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {group.rows.map((row) => (
+                      <div key={row.id}>
+                        {renderSiteCard(row, { isSelected: false })}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        ) : (
+          <output aria-label={t('sites.noSiteFound')}>
+            <div className="rounded-xl bg-white p-8 text-center shadow-md dark:bg-gray-800">
+              <p className="font-medium text-gray-700 dark:text-gray-300">
+                {t('sites.noSiteFound')}
+              </p>
+            </div>
+          </output>
+        )}
+      </div>
 
       {filteredSites.length === 0 && hasActiveFilters && (
         <div className="mt-4 text-center">

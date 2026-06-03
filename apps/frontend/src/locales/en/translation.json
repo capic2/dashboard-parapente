@@ -439,6 +439,12 @@
     "fromDate": "From {{date}}",
     "toDate": "To {{date}}"
   },
+  "dataList": {
+    "sortOptions": "Sort options",
+    "sortBy": "Sort by {{column}}",
+    "sortByAsc": "Sort by {{column}} ascending",
+    "sortByDesc": "Sort by {{column}} descending"
+  },
   "sites": {
     "management": "Site Management",
     "newSite": "New site",
@@ -467,6 +473,9 @@
     "orientation": "Orientation:",
     "editSite": "Edit site",
     "viewFlights": "View flights",
+    "locationUnknown": "No locality",
+    "locationGroupCount_one": "{{count}} site",
+    "locationGroupCount_other": "{{count}} sites",
     "deleteSite": "Delete site"
   },
   "settings": {
