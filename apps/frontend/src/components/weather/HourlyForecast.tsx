@@ -30,7 +30,6 @@ interface HourlyForecastProps {
   weatherData?: WeatherData;
   isLoading?: boolean;
   isError?: boolean;
-  siteName?: string;
 }
 
 // ============================================================================
@@ -613,7 +612,6 @@ export default function HourlyForecast({
   weatherData,
   isLoading: isOverrideLoading,
   isError: isOverrideError,
-  siteName,
 }: HourlyForecastProps) {
   const { t } = useTranslation();
   const {
@@ -689,11 +687,6 @@ export default function HourlyForecast({
           <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
             {t('weather.hourly.title')}
           </h2>
-          {siteName && (
-            <p className="mt-1 truncate text-sm font-bold text-gray-900 dark:text-white">
-              {t('weather.hourly.site', { siteName })}
-            </p>
-          )}
         </div>
         <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
           {t('common.loading')}
@@ -709,11 +702,6 @@ export default function HourlyForecast({
           <h2 className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
             {t('weather.hourly.title')}
           </h2>
-          {siteName && (
-            <p className="mt-1 truncate text-sm font-bold text-gray-900 dark:text-white">
-              {t('weather.hourly.site', { siteName })}
-            </p>
-          )}
         </div>
         <div className="py-5 text-center text-red-500 dark:text-red-400 text-sm">
           {t('common.dataUnavailable')}
@@ -859,11 +847,6 @@ export default function HourlyForecast({
           <h2 className={weatherSectionTitleClassName}>
             {t('weather.hourly.title')}
           </h2>
-          {siteName && (
-            <p className="mt-1 truncate text-sm font-bold text-slate-950 dark:text-white">
-              {t('weather.hourly.site', { siteName })}
-            </p>
-          )}
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
             {t('weather.hourly.description')}
           </p>

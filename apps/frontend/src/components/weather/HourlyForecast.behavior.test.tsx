@@ -7,7 +7,6 @@ vi.mock('react-i18next', () => ({
     t: (key: string, options?: Record<string, string>) => {
       const labels: Record<string, string> = {
         'weather.paraIndex': 'Para-Index',
-        'weather.hourly.site': `Site : ${options?.siteName}`,
         'weather.hourly.paraIndexAt': `Para-Index ${options?.hour}`,
         'weather.hourly.verdictAt': `Verdict ${options?.hour}`,
         'weather.metricsUsed': 'Metriques utilisees',
@@ -136,9 +135,7 @@ describe('HourlyForecast tooltip behavior', () => {
   });
 
   it('shows para-index tooltip content on hover', () => {
-    render(<HourlyForecast spotId="site-1" dayIndex={0} siteName="Arguel" />);
-
-    expect(screen.getByText('Site : Arguel')).toBeTruthy();
+    render(<HourlyForecast spotId="site-1" dayIndex={0} />);
 
     fireEvent.mouseOver(
       screen.getByRole('button', { name: 'Para-Index 10:00' })

@@ -221,6 +221,24 @@
       "favorites": "Favorites",
       "search": "Search"
     },
+    "sticky": {
+      "change": "Change",
+      "choose": "Choose",
+      "filterPlaceholder": "Name, orientation, altitude...",
+      "filterSites": "Filter saved sites",
+      "noContext": "No weather context",
+      "noSavedSiteFound": "No saved site found.",
+      "noTarget": "No weather target",
+      "panelTitle": "Change active weather",
+      "savedSites": "Saved sites",
+      "target": {
+        "city": "City",
+        "landing": "Landing",
+        "none": "Weather",
+        "savedSite": "Saved site",
+        "takeoff": "Takeoff"
+      }
+    },
     "page": {
       "badge": "Flight weather",
       "defaultTitle": "Weather forecast",
@@ -278,7 +296,6 @@
     },
     "hourly": {
       "title": "Hourly Forecast",
-      "site": "Site: {{siteName}}",
       "description": "Flight windows, source consensus and watch points.",
       "direction": "Direction",
       "cloudCover": "Cloud cover",

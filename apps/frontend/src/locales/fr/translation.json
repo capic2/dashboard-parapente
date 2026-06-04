@@ -221,6 +221,24 @@
       "favorites": "Favoris",
       "search": "Recherche"
     },
+    "sticky": {
+      "change": "Changer",
+      "choose": "Choisir",
+      "filterPlaceholder": "Nom, orientation, altitude...",
+      "filterSites": "Filtrer les sites enregistrés",
+      "noContext": "Aucun contexte météo",
+      "noSavedSiteFound": "Aucun site enregistré trouvé.",
+      "noTarget": "Aucune cible météo",
+      "panelTitle": "Changer la météo active",
+      "savedSites": "Sites enregistrés",
+      "target": {
+        "city": "Ville",
+        "landing": "Atterrissage",
+        "none": "Météo",
+        "savedSite": "Site enregistré",
+        "takeoff": "Décollage"
+      }
+    },
     "page": {
       "badge": "Météo de vol",
       "defaultTitle": "Prévisions météo",
@@ -278,7 +296,6 @@
     },
     "hourly": {
       "title": "Prévisions Horaires",
-      "site": "Site : {{siteName}}",
       "description": "Créneaux de vol, consensus des sources et points de vigilance.",
       "direction": "Direction",
       "cloudCover": "Couverture nuageuse",
