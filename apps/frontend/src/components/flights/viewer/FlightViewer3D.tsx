@@ -1350,12 +1350,16 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           lastIndex > 0
             ? (scenePosition.previousIndex + scenePosition.ratio) / lastIndex
             : 0;
-        const distance = getFlightCameraDistance({
-          progress,
-          baseDistance: cameraDistanceRef.current,
-          closeZoomPercent: cameraCloseZoomPercentRef.current,
-          transitionPercent: cameraTransitionPercentRef.current,
-        });
+        const isExportMode =
+          typeof window !== 'undefined' && Boolean(window._exportMode);
+        const distance = isExportMode
+          ? cameraDistanceRef.current
+          : getFlightCameraDistance({
+              progress,
+              baseDistance: cameraDistanceRef.current,
+              closeZoomPercent: cameraCloseZoomPercentRef.current,
+              transitionPercent: cameraTransitionPercentRef.current,
+            });
         const pitch = -0.05;
 
         if (!smoothCamera || !cameraTargetRef.current) {

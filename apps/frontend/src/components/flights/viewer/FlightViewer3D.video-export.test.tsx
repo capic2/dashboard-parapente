@@ -16,6 +16,9 @@ const {
     destroy: () => void;
     isDestroyed: () => boolean;
     useDefaultRenderLoop: boolean;
+    camera: {
+      moveBackward: ReturnType<typeof vi.fn>;
+    };
     scene?: {
       requestRender: ReturnType<typeof vi.fn>;
       render: ReturnType<typeof vi.fn>;
@@ -370,6 +373,26 @@ describe('FlightViewer3D video export mode', () => {
     expect(frameState).toMatchObject({ progress: 100, tilesLoaded: true });
     expect(viewer.scene?.requestRender).toHaveBeenCalled();
     expect(viewer.render).toHaveBeenCalled();
+  });
+
+  it('keeps the export camera distance constant across frames', async () => {
+    window._exportMode = 'manual_render';
+
+    render(<FlightViewer3D flightId="flight-1" exportOnly />);
+
+    await waitFor(() => {
+      expect(window._setExportFrame).toBeTypeOf('function');
+    });
+
+    const viewer = viewerInstances[viewerInstances.length - 1];
+
+    window._setExportFrame?.(0, 3);
+    window._setExportFrame?.(1, 3);
+    window._setExportFrame?.(2, 3);
+
+    expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(1, 500);
+    expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(2, 500);
+    expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(3, 500);
   });
 
   it('draws the replay track only as a volume plus curtain', async () => {
