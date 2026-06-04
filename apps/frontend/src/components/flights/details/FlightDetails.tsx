@@ -382,6 +382,12 @@ export function FlightDetails({
   } else if (!hasVideo) {
     goproOverlayTitle = t('flights.goproOverlayNeedsVideo');
   }
+  let goproOverlayUnavailableReason: string | null = null;
+  if (!isGoproOverlayRunning && !hasGoproCameraVideo) {
+    goproOverlayUnavailableReason = t('flights.goproOverlayNeedsCameraVideo');
+  } else if (!isGoproOverlayRunning && !hasVideo) {
+    goproOverlayUnavailableReason = t('flights.goproOverlayNeedsVideo');
+  }
   const canUseGoproOverlayAction =
     (isGoproOverlayRunning && Boolean(effectiveGoproOverlayJobId)) ||
     (hasGoproCameraVideo && hasVideo && !isGoproOverlayRunning);
@@ -433,6 +439,7 @@ export function FlightDetails({
               goproOverlayLabel={goproOverlayLabel}
               goproOverlayCompactLabel={goproOverlayCompactLabel}
               goproOverlayTitle={goproOverlayTitle}
+              goproOverlayUnavailableReason={goproOverlayUnavailableReason}
               onGoproOverlayAction={goproOverlayAction}
             />
           </div>
