@@ -12,7 +12,7 @@ type WeatherPageMobileProps = {
   isSearchMode: boolean;
   isAuthenticated: boolean;
   stickySelectionBar: ReactNode;
-  selectionPanel: ReactNode;
+  bestSpotSuggestion: ReactNode;
   decisionPanel?: ReactNode;
   searchResultPanel?: ReactNode;
   emptyPanel?: ReactNode;
@@ -69,7 +69,7 @@ export default function WeatherPageMobileLayout({
   isSearchMode,
   isAuthenticated,
   stickySelectionBar,
-  selectionPanel,
+  bestSpotSuggestion,
   decisionPanel,
   searchResultPanel,
   emptyPanel,
@@ -86,13 +86,6 @@ export default function WeatherPageMobileLayout({
     <div className="mx-auto flex w-full max-w-md flex-col gap-3 pb-24 sm:max-w-lg lg:max-w-xl">
       {stickySelectionBar}
 
-      <ExpandableSection
-        title={t('weather.selection.title')}
-        summary={t('weather.mobile.selectionSummary')}
-      >
-        {selectionPanel}
-      </ExpandableSection>
-
       <WeatherPageHero
         activeWeatherName={activeWeatherName}
         selectedDayLabel={selectedDayLabel}
@@ -100,6 +93,8 @@ export default function WeatherPageMobileLayout({
         isSearchMode={isSearchMode}
         variant="mobile"
       />
+
+      {bestSpotSuggestion}
 
       {emptyPanel}
       {decisionPanel}

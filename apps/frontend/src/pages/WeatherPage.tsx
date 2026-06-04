@@ -21,10 +21,10 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import WeatherEmptyState from '../components/weather/WeatherEmptyState';
 import WeatherLiveWindPanel from '../components/weather/WeatherLiveWindPanel';
 import WeatherSearchResultPanel from '../components/weather/WeatherSearchResultPanel';
-import WeatherSelectionPanel, {
+import WeatherStickySelectionBar, {
   type WeatherSelectionTab,
-} from '../components/weather/WeatherSelectionPanel';
-import WeatherStickySelectionBar from '../components/weather/WeatherStickySelectionBar';
+} from '../components/weather/WeatherStickySelectionBar';
+import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
 import FlightDecisionCockpit from '../components/weather/FlightDecisionCockpit';
 import {
   DEFAULT_FLIGHT_OBJECTIVE,
@@ -270,9 +270,6 @@ export default function WeatherPage() {
     : false;
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const [weatherDataMap] = useState<Map<string, Record<string, unknown>>>(
-    new Map()
-  );
   const weatherSearch = {
     siteId: selectedSiteId,
     day: getForecastDaySearch(selectedDayIndex),
@@ -358,25 +355,6 @@ export default function WeatherPage() {
     });
   };
 
-  const selectionPanel = (
-    <WeatherSelectionPanel
-      selectionTab={selectionTab}
-      sites={sites}
-      selectedSearchTarget={selectedSearchTarget}
-      selectedSiteId={selectedSiteId}
-      selectedDayIndex={selectedDayIndex}
-      weatherData={weatherDataMap}
-      bestSpot={bestSpot ?? null}
-      hourlyBestSpots={hourlyBestSpots?.hours}
-      hourlyStartHour={hourlyBestSpots?.startHour}
-      onSelectionTabChange={handleSelectionTabChange}
-      onSelectSite={handleSelectSite}
-      onSelectSearchTarget={handleSelectSearchTarget}
-      onFavoriteCreated={handleSelectSite}
-      onAddSite={() => void navigate({ to: '/sites' })}
-    />
-  );
-
   const stickySelectionBar = (
     <WeatherStickySelectionBar
       activeWeatherName={activeWeatherName}
@@ -391,6 +369,16 @@ export default function WeatherPage() {
       onSelectSite={handleSelectSite}
       onSelectSearchTarget={handleSelectSearchTarget}
       onFavoriteCreated={handleSelectSite}
+    />
+  );
+
+  const bestSpotSuggestion = (
+    <BestSpotSuggestion
+      bestSpot={bestSpot ?? null}
+      hourlyBestSpots={hourlyBestSpots?.hours}
+      hourlyStartHour={hourlyBestSpots?.startHour}
+      onSelectSite={handleSelectSite}
+      selectedDayIndex={selectedDayIndex}
     />
   );
 
@@ -487,7 +475,7 @@ export default function WeatherPage() {
         isSearchMode={Boolean(selectedSearchTarget)}
         isAuthenticated={isAuthenticated}
         stickySelectionBar={stickySelectionBar}
-        selectionPanel={selectionPanel}
+        bestSpotSuggestion={bestSpotSuggestion}
         decisionPanel={mobileDecisionPanel}
         searchResultPanel={mobileSearchResultPanel}
         emptyPanel={mobileEmptyPanel}
@@ -505,94 +493,89 @@ export default function WeatherPage() {
     <div className="w-full min-w-0">
       {stickySelectionBar}
 
-      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]">
-        <aside className="min-w-0 space-y-4">{selectionPanel}</aside>
+      <div className="min-w-0 space-y-4">
+        {bestSpotSuggestion}
 
-        <div className="min-w-0 space-y-4">
-          {!selectedSearchTarget && !selectedSiteId && <WeatherEmptyState />}
+        {!selectedSearchTarget && !selectedSiteId && <WeatherEmptyState />}
 
-          {selectedSearchTarget && (
-            <WeatherSearchResultPanel
-              selectedSearchTitle={selectedSearchTitle}
-              selectedDayIndex={selectedDayIndex}
-              getDayLabel={(day) => getSearchDayLabel(day, t)}
-              onSelectDay={handleSelectSearchDay}
-            />
-          )}
+        {selectedSearchTarget && (
+          <WeatherSearchResultPanel
+            selectedSearchTitle={selectedSearchTitle}
+            selectedDayIndex={selectedDayIndex}
+            getDayLabel={(day) => getSearchDayLabel(day, t)}
+            onSelectDay={handleSelectSearchDay}
+          />
+        )}
 
-          {(selectedSearchTarget || selectedSiteId) && (
-            <FlightDecisionCockpit
-              decision={flightDecision.data}
-              objective={selectedObjective}
-              isLoading={flightDecision.isLoading}
-              isError={flightDecision.isError}
-              isCityContext={Boolean(selectedSearchTarget)}
-              onObjectiveChange={handleObjectiveChange}
-            />
-          )}
+        {(selectedSearchTarget || selectedSiteId) && (
+          <FlightDecisionCockpit
+            decision={flightDecision.data}
+            objective={selectedObjective}
+            isLoading={flightDecision.isLoading}
+            isError={flightDecision.isError}
+            isCityContext={Boolean(selectedSearchTarget)}
+            onObjectiveChange={handleObjectiveChange}
+          />
+        )}
 
-          {(selectedSearchTarget || selectedSiteId) && (
-            <CurrentConditions
-              spotId={selectedSearchTarget ? undefined : selectedSiteId}
-              dayIndex={selectedDayIndex}
-              weatherData={selectedSearchWeatherData}
-              isLoading={
-                selectedSearchTarget ? isSearchWeatherLoading : undefined
-              }
-              isError={selectedSearchTarget ? isSearchWeatherError : undefined}
-              siteOrientation={
-                isSpotSearchTarget(selectedSearchTarget)
-                  ? selectedSearchTarget.spot.orientation
-                  : undefined
-              }
-            />
-          )}
+        {(selectedSearchTarget || selectedSiteId) && (
+          <CurrentConditions
+            spotId={selectedSearchTarget ? undefined : selectedSiteId}
+            dayIndex={selectedDayIndex}
+            weatherData={selectedSearchWeatherData}
+            isLoading={
+              selectedSearchTarget ? isSearchWeatherLoading : undefined
+            }
+            isError={selectedSearchTarget ? isSearchWeatherError : undefined}
+            siteOrientation={
+              isSpotSearchTarget(selectedSearchTarget)
+                ? selectedSearchTarget.spot.orientation
+                : undefined
+            }
+          />
+        )}
 
-          {!selectedSearchTarget && selectedSiteId && (
-            <WeatherLiveWindPanel
-              latitude={selectedSite?.latitude}
-              longitude={selectedSite?.longitude}
-            />
-          )}
+        {!selectedSearchTarget && selectedSiteId && (
+          <WeatherLiveWindPanel
+            latitude={selectedSite?.latitude}
+            longitude={selectedSite?.longitude}
+          />
+        )}
 
-          {/* Landing Sites Weather */}
-          {!selectedSearchTarget && selectedSiteId && (
-            <WeatherMultiLanding
-              spotId={selectedSiteId}
-              dayIndex={selectedDayIndex}
-            />
-          )}
+        {/* Landing Sites Weather */}
+        {!selectedSearchTarget && selectedSiteId && (
+          <WeatherMultiLanding
+            spotId={selectedSiteId}
+            dayIndex={selectedDayIndex}
+          />
+        )}
 
-          {/* 7-Day Forecast + Day Selector */}
-          {!selectedSearchTarget && selectedSiteId && (
-            <Forecast7Day
-              spotId={selectedSiteId}
-              selectedDayIndex={selectedDayIndex}
-              onSelectDay={handleSelectForecastDay}
-            />
-          )}
+        {/* 7-Day Forecast + Day Selector */}
+        {!selectedSearchTarget && selectedSiteId && (
+          <Forecast7Day
+            spotId={selectedSiteId}
+            selectedDayIndex={selectedDayIndex}
+            onSelectDay={handleSelectForecastDay}
+          />
+        )}
 
-          {/* Emagram Analysis (authenticated only) */}
-          {isAuthenticated && !selectedSearchTarget && selectedSiteId && (
-            <EmagramWidget
-              siteId={selectedSiteId}
-              dayIndex={selectedDayIndex}
-            />
-          )}
+        {/* Emagram Analysis (authenticated only) */}
+        {isAuthenticated && !selectedSearchTarget && selectedSiteId && (
+          <EmagramWidget siteId={selectedSiteId} dayIndex={selectedDayIndex} />
+        )}
 
-          {/* Hourly Forecast */}
-          {(selectedSearchTarget || selectedSiteId) && (
-            <HourlyForecast
-              spotId={selectedSearchTarget ? undefined : selectedSiteId}
-              dayIndex={selectedDayIndex}
-              weatherData={selectedSearchWeatherData}
-              isLoading={
-                selectedSearchTarget ? isSearchWeatherLoading : undefined
-              }
-              isError={selectedSearchTarget ? isSearchWeatherError : undefined}
-            />
-          )}
-        </div>
+        {/* Hourly Forecast */}
+        {(selectedSearchTarget || selectedSiteId) && (
+          <HourlyForecast
+            spotId={selectedSearchTarget ? undefined : selectedSiteId}
+            dayIndex={selectedDayIndex}
+            weatherData={selectedSearchWeatherData}
+            isLoading={
+              selectedSearchTarget ? isSearchWeatherLoading : undefined
+            }
+            isError={selectedSearchTarget ? isSearchWeatherError : undefined}
+          />
+        )}
       </div>
     </div>
   );

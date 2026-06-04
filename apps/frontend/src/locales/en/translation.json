@@ -214,11 +214,6 @@
       "favoriteSiteShort": "Favorite"
     },
     "selection": {
-      "title": "Site choice",
-      "heading": "Weather selection",
-      "description": "Keep your favorites close or search for a nearby city, takeoff or landing.",
-      "current": "Current",
-      "favorites": "Favorites",
       "search": "Search"
     },
     "sticky": {
@@ -252,7 +247,6 @@
     "mobile": {
       "badge": "Mobile weather",
       "description": "Read the essentials without a long scroll, and open only the useful details.",
-      "selectionSummary": "Change site or search for a city",
       "liveWindSummary": "External Spotair source",
       "forecastTitle": "7-day forecast",
       "forecastSummary": "Compare days",
