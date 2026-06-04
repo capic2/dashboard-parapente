@@ -11,6 +11,7 @@ type WeatherPageMobileProps = {
   selectedSiteId?: string;
   isSearchMode: boolean;
   isAuthenticated: boolean;
+  stickySelectionBar: ReactNode;
   selectionPanel: ReactNode;
   decisionPanel?: ReactNode;
   searchResultPanel?: ReactNode;
@@ -67,6 +68,7 @@ export default function WeatherPageMobileLayout({
   selectedSiteId,
   isSearchMode,
   isAuthenticated,
+  stickySelectionBar,
   selectionPanel,
   decisionPanel,
   searchResultPanel,
@@ -82,10 +84,11 @@ export default function WeatherPageMobileLayout({
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-3 pb-24 sm:max-w-lg lg:max-w-xl">
+      {stickySelectionBar}
+
       <ExpandableSection
         title={t('weather.selection.title')}
         summary={t('weather.mobile.selectionSummary')}
-        defaultOpen
       >
         {selectionPanel}
       </ExpandableSection>

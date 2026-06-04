@@ -79,9 +79,6 @@ export default function CurrentConditions({
             <p className={weatherSectionTitleClassName}>
               {t('weather.currentConditions')}
             </p>
-            <h2 className="mt-1 truncate text-xl font-black text-slate-950 dark:text-white">
-              {weather.spot_name}
-            </h2>
           </div>
           <div
             className={`inline-flex w-fit items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold whitespace-nowrap ${verdictVisual.badgeClassName}`}
