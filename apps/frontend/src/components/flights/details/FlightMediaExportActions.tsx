@@ -16,6 +16,7 @@ interface FlightMediaExportActionsProps {
   goproOverlayLabel: string;
   goproOverlayCompactLabel: string;
   goproOverlayTitle: string;
+  goproOverlayUnavailableReason: string | null;
   onGoproOverlayAction: () => void;
 }
 
@@ -31,6 +32,7 @@ export function FlightMediaExportActions({
   goproOverlayLabel,
   goproOverlayCompactLabel,
   goproOverlayTitle,
+  goproOverlayUnavailableReason,
   onGoproOverlayAction,
 }: FlightMediaExportActionsProps) {
   const { t } = useTranslation();
@@ -95,6 +97,11 @@ export function FlightMediaExportActions({
           {goproOverlayCompactLabel}
         </Button>
       </div>
+      {goproOverlayUnavailableReason && (
+        <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs font-medium text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+          {goproOverlayUnavailableReason}
+        </p>
+      )}
     </div>
   );
 }

@@ -154,6 +154,26 @@ describe('FlightDetails GoPro overlay action', () => {
     mockFlight.gopro_overlay_status = null;
     mockFlight.gopro_overlay_file_path = null;
     mockFlight.gopro_overlay_file_exists = undefined;
+    mockFlight.video_file_path = '/exports/flight.mp4';
+    mockFlight.video_file_exists = true;
+    mockFlight.gopro_camera_file_exists = true;
+  });
+
+  it('shows why overlay generation is unavailable', () => {
+    mockFlight.gopro_camera_file_exists = false;
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    expect(screen.getByText('Needs camera video')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Generate overlay/u })
+    ).toBeDisabled();
   });
 
   it('turns the overlay button into cancel while generation is running', async () => {
