@@ -382,23 +382,6 @@ export default function WeatherPage() {
     />
   );
 
-  const stickySelectionBar = (
-    <WeatherStickySelectionBar
-      activeWeatherName={activeWeatherName}
-      selectedDayLabel={selectedDayLabel}
-      selectionTab={selectionTab}
-      allSites={sites}
-      sites={favoriteSites}
-      selectedSearchTarget={selectedSearchTarget}
-      selectedSiteId={selectedSiteId}
-      selectedDayIndex={selectedDayIndex}
-      onSelectionTabChange={handleSelectionTabChange}
-      onSelectSite={handleSelectSite}
-      onSelectSearchTarget={handleSelectSearchTarget}
-      onFavoriteCreated={handleSelectSite}
-    />
-  );
-
   const mobileEmptyPanel =
     !selectedSearchTarget && !selectedSiteId ? (
       <WeatherEmptyState />
