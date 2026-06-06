@@ -12,6 +12,7 @@ type WeatherPageMobileProps = {
   isSearchMode: boolean;
   isAuthenticated: boolean;
   stickySelectionBar: ReactNode;
+  daySelectorPanel?: ReactNode;
   bestSpotSuggestion: ReactNode;
   decisionPanel?: ReactNode;
   searchResultPanel?: ReactNode;
@@ -69,6 +70,7 @@ export default function WeatherPageMobileLayout({
   isSearchMode,
   isAuthenticated,
   stickySelectionBar,
+  daySelectorPanel,
   bestSpotSuggestion,
   decisionPanel,
   searchResultPanel,
@@ -85,7 +87,7 @@ export default function WeatherPageMobileLayout({
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-3 pb-24 sm:max-w-lg lg:max-w-xl">
       {stickySelectionBar}
-      {forecastPanel}
+      {daySelectorPanel}
 
       <WeatherPageHero
         activeWeatherName={activeWeatherName}
@@ -106,6 +108,12 @@ export default function WeatherPageMobileLayout({
         summary={t('weather.mobile.liveWindSummary')}
       >
         {liveWindPanel}
+      </ExpandableSection>
+      <ExpandableSection
+        title={t('weather.mobile.forecastTitle')}
+        summary={t('weather.mobile.forecastSummary')}
+      >
+        {forecastPanel}
       </ExpandableSection>
       <ExpandableSection
         title={t('weather.mobile.hourlyTitle')}
