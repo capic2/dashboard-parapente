@@ -382,6 +382,15 @@ export default function WeatherPage() {
     />
   );
 
+  const forecastDaySelector =
+    !selectedSearchTarget && selectedSiteId ? (
+      <Forecast7Day
+        spotId={selectedSiteId}
+        selectedDayIndex={selectedDayIndex}
+        onSelectDay={handleSelectForecastDay}
+      />
+    ) : undefined;
+
   const mobileEmptyPanel =
     !selectedSearchTarget && !selectedSiteId ? (
       <WeatherEmptyState />
@@ -440,15 +449,6 @@ export default function WeatherPage() {
       />
     ) : undefined;
 
-  const mobileForecastPanel =
-    !selectedSearchTarget && selectedSiteId ? (
-      <Forecast7Day
-        spotId={selectedSiteId}
-        selectedDayIndex={selectedDayIndex}
-        onSelectDay={handleSelectForecastDay}
-      />
-    ) : undefined;
-
   const mobileEmagramPanel =
     isAuthenticated && !selectedSearchTarget && selectedSiteId ? (
       <EmagramWidget siteId={selectedSiteId} dayIndex={selectedDayIndex} />
@@ -475,6 +475,7 @@ export default function WeatherPage() {
         isSearchMode={Boolean(selectedSearchTarget)}
         isAuthenticated={isAuthenticated}
         stickySelectionBar={stickySelectionBar}
+        forecastPanel={forecastDaySelector}
         bestSpotSuggestion={bestSpotSuggestion}
         decisionPanel={mobileDecisionPanel}
         searchResultPanel={mobileSearchResultPanel}
@@ -482,7 +483,6 @@ export default function WeatherPage() {
         currentConditions={mobileCurrentConditions}
         liveWindPanel={mobileLiveWindPanel}
         landingPanel={mobileLandingPanel}
-        forecastPanel={mobileForecastPanel}
         emagramPanel={mobileEmagramPanel}
         hourlyPanel={mobileHourlyPanel}
       />
@@ -494,6 +494,8 @@ export default function WeatherPage() {
       {stickySelectionBar}
 
       <div className="min-w-0 space-y-4">
+        {forecastDaySelector}
+
         {bestSpotSuggestion}
 
         {!selectedSearchTarget && !selectedSiteId && <WeatherEmptyState />}
@@ -547,15 +549,6 @@ export default function WeatherPage() {
           <WeatherMultiLanding
             spotId={selectedSiteId}
             dayIndex={selectedDayIndex}
-          />
-        )}
-
-        {/* 7-Day Forecast + Day Selector */}
-        {!selectedSearchTarget && selectedSiteId && (
-          <Forecast7Day
-            spotId={selectedSiteId}
-            selectedDayIndex={selectedDayIndex}
-            onSelectDay={handleSelectForecastDay}
           />
         )}
 

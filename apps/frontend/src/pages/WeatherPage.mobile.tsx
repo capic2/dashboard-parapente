@@ -85,6 +85,7 @@ export default function WeatherPageMobileLayout({
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-3 pb-24 sm:max-w-lg lg:max-w-xl">
       {stickySelectionBar}
+      {forecastPanel}
 
       <WeatherPageHero
         activeWeatherName={activeWeatherName}
@@ -105,12 +106,6 @@ export default function WeatherPageMobileLayout({
         summary={t('weather.mobile.liveWindSummary')}
       >
         {liveWindPanel}
-      </ExpandableSection>
-      <ExpandableSection
-        title={t('weather.mobile.forecastTitle')}
-        summary={t('weather.mobile.forecastSummary')}
-      >
-        {forecastPanel}
       </ExpandableSection>
       <ExpandableSection
         title={t('weather.mobile.hourlyTitle')}
