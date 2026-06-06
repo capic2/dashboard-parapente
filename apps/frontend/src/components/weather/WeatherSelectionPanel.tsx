@@ -1,18 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { MapPin, Search } from 'lucide-react';
-import {
-  Button,
-  Tab,
-  TabList,
-  TabPanel,
-  Tabs,
-} from '@dashboard-parapente/design-system';
+import { Search } from 'lucide-react';
 import type {
   BestSpotResult,
   HourlyBestSpotsResult,
   Site,
 } from '@dashboard-parapente/shared-types';
-import SiteSelector from '../dashboard/SiteSelector';
 import CityWeatherSearch, { type CityWeatherTarget } from './CityWeatherSearch';
 import { BestSpotSuggestion } from './BestSpotSuggestion';
 import {
@@ -23,37 +15,27 @@ import {
 export type WeatherSelectionTab = 'favorites' | 'search';
 
 type WeatherSelectionPanelProps = {
-  selectionTab: WeatherSelectionTab;
   sites: Site[];
   selectedSearchTarget: CityWeatherTarget | null;
-  selectedSiteId: string;
   selectedDayIndex: number;
-  weatherData: Map<string, Record<string, unknown>>;
   bestSpot: BestSpotResult | null;
   hourlyBestSpots?: HourlyBestSpotsResult['hours'];
   hourlyStartHour?: number;
-  onSelectionTabChange: (tab: WeatherSelectionTab) => void;
   onSelectSite: (siteId: string) => void;
   onSelectSearchTarget: (target: CityWeatherTarget | null) => void;
   onFavoriteCreated: (siteId: string) => void;
-  onAddSite: () => void;
 };
 
 export default function WeatherSelectionPanel({
-  selectionTab,
   sites,
   selectedSearchTarget,
-  selectedSiteId,
   selectedDayIndex,
-  weatherData,
   bestSpot,
   hourlyBestSpots = [],
   hourlyStartHour,
-  onSelectionTabChange,
   onSelectSite,
   onSelectSearchTarget,
   onFavoriteCreated,
-  onAddSite,
 }: WeatherSelectionPanelProps) {
   const { t } = useTranslation();
 
@@ -76,59 +58,18 @@ export default function WeatherSelectionPanel({
           </div>
         </div>
         <div className="p-3 sm:p-4">
-          <Tabs
-            selectedKey={selectionTab}
-            onSelectionChange={(key) =>
-              onSelectionTabChange(key as WeatherSelectionTab)
-            }
-          >
-            <TabList className="grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 shadow-none dark:bg-slate-950/70">
-              <Tab id="favorites">
-                <span className="inline-flex items-center gap-2">
-                  <MapPin className="h-4 w-4" aria-hidden="true" />
-                  {t('weather.selection.favorites')}
-                </span>
-              </Tab>
-              <Tab id="search">
-                <span className="inline-flex items-center gap-2">
-                  <Search className="h-4 w-4" aria-hidden="true" />
-                  {t('weather.selection.search')}
-                </span>
-              </Tab>
-            </TabList>
-            <TabPanel id="favorites">
-              {sites.length > 0 ? (
-                <SiteSelector
-                  selectedSiteId={selectedSearchTarget ? '' : selectedSiteId}
-                  onSelectSite={onSelectSite}
-                  weatherData={weatherData}
-                />
-              ) : (
-                <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-600 dark:bg-gray-900/60 dark:text-gray-300">
-                  <p className="font-semibold text-gray-900 dark:text-white">
-                    {t('dashboard.noSites')}
-                  </p>
-                  <p className="mt-1">{t('dashboard.noSitesDescription')}</p>
-                  <Button
-                    onPress={onAddSite}
-                    className="mt-3 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
-                  >
-                    {t('dashboard.addSite')}
-                  </Button>
-                </div>
-              )}
-            </TabPanel>
-            <TabPanel id="search">
-              <CityWeatherSearch
-                dayIndex={selectedDayIndex}
-                selectedTarget={selectedSearchTarget}
-                favoriteSites={sites}
-                isEmbedded
-                onSelectTarget={onSelectSearchTarget}
-                onFavoriteCreated={onFavoriteCreated}
-              />
-            </TabPanel>
-          </Tabs>
+          <div className="mb-3 inline-flex items-center gap-2 text-sm font-black text-slate-950 dark:text-white">
+            <Search className="h-4 w-4 text-sky-600" aria-hidden="true" />
+            {t('weather.selection.search')}
+          </div>
+          <CityWeatherSearch
+            dayIndex={selectedDayIndex}
+            selectedTarget={selectedSearchTarget}
+            favoriteSites={sites}
+            isEmbedded
+            onSelectTarget={onSelectSearchTarget}
+            onFavoriteCreated={onFavoriteCreated}
+          />
         </div>
       </section>
 

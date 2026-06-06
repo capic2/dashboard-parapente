@@ -631,7 +631,7 @@ const defaultHandlersWithoutSpotsAndDetails = defaultHandlers.filter(
   (handler) => handler !== spotsHandler && handler !== spotDetailsHandler
 );
 
-const DAY_SEARCH_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DAY_SEARCH_DATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const parseLocalDate = (value: string) => {
@@ -717,7 +717,7 @@ export const Default = meta.story({
 });
 
 Default.test(
-  'renders weather page with site selector and conditions',
+  'renders weather page with sticky selector and conditions',
   async ({ canvas, userEvent }) => {
     await canvas.findAllByText(/Arguel/u);
     await canvas.findAllByText(/Chalais/u);
@@ -813,18 +813,14 @@ export const WithCitySearch = meta.story({
 WithCitySearch.test(
   'selects a searched spot, displays hourly details, and adds it to favorites',
   async ({ canvas, userEvent }) => {
-    const searchTab = await canvas.findByRole('tab', {
-      name: i18n.t('weather.selection.search'),
-    });
-    await userEvent.click(searchTab);
-    const input = await canvas.findByPlaceholderText(/Besançon/);
+    const input = await canvas.findByPlaceholderText(/Besançon/u);
     await userEvent.type(input, 'Besan');
-    const suggestion = await canvas.findByRole('option', { name: /Besançon/ });
+    const suggestion = await canvas.findByRole('option', { name: /Besançon/u });
     await userEvent.click(suggestion);
     const searchedSpotButton = await canvas.findByRole('button', {
-      name: /Arguel déco/,
+      name: /Arguel déco/u,
     });
-    await canvas.findByRole('button', { name: /Plaine d'Arguel/ });
+    await canvas.findByRole('button', { name: /Plaine d'Arguel/u });
 
     await userEvent.click(searchedSpotButton);
     await canvas.findByText(i18n.t('weather.page.selectedSearchResult'));
@@ -862,7 +858,7 @@ export const NoSites = meta.story({
 });
 
 NoSites.test('shows no sites message', async ({ canvas }) => {
-  await canvas.findByText(/Aucun site configuré/);
+  await canvas.findByText(/Aucun site configuré/u);
 });
 
 export const Loading = meta.story({
@@ -927,7 +923,7 @@ export const WeatherError = meta.story({
 });
 
 WeatherError.test(
-  'renders site selector even when weather fails',
+  'renders sticky selector even when weather fails',
   async ({ canvas }) => {
     await canvas.findAllByText(/Arguel/u);
     await canvas.findAllByText(/Chalais/u);

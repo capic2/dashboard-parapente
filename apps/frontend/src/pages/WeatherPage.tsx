@@ -270,9 +270,6 @@ export default function WeatherPage() {
     : false;
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const [weatherDataMap] = useState<Map<string, Record<string, unknown>>>(
-    new Map()
-  );
   const weatherSearch = {
     siteId: selectedSiteId,
     day: getForecastDaySearch(selectedDayIndex),
@@ -360,20 +357,15 @@ export default function WeatherPage() {
 
   const selectionPanel = (
     <WeatherSelectionPanel
-      selectionTab={selectionTab}
       sites={sites}
       selectedSearchTarget={selectedSearchTarget}
-      selectedSiteId={selectedSiteId}
       selectedDayIndex={selectedDayIndex}
-      weatherData={weatherDataMap}
       bestSpot={bestSpot ?? null}
       hourlyBestSpots={hourlyBestSpots?.hours}
       hourlyStartHour={hourlyBestSpots?.startHour}
-      onSelectionTabChange={handleSelectionTabChange}
       onSelectSite={handleSelectSite}
       onSelectSearchTarget={handleSelectSearchTarget}
       onFavoriteCreated={handleSelectSite}
-      onAddSite={() => void navigate({ to: '/sites' })}
     />
   );
 
