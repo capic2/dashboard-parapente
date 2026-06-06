@@ -10,7 +10,8 @@ import {
 import type { Site } from '@dashboard-parapente/shared-types';
 import { getSiteDisplayName } from '../../lib/siteDisplay';
 import CityWeatherSearch, { type CityWeatherTarget } from './CityWeatherSearch';
-import type { WeatherSelectionTab } from './WeatherSelectionPanel';
+
+export type WeatherSelectionTab = 'favorites' | 'search';
 
 type WeatherStickySelectionBarProps = {
   activeWeatherName?: string;

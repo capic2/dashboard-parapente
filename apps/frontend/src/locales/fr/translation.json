@@ -214,11 +214,6 @@
       "favoriteSiteShort": "Favori"
     },
     "selection": {
-      "title": "Choix du site",
-      "heading": "Sélection météo",
-      "description": "Gardez vos favoris sous la main ou cherchez une ville, un déco ou un atterro proche.",
-      "current": "Actuel",
-      "favorites": "Favoris",
       "search": "Recherche"
     },
     "sticky": {
@@ -252,7 +247,6 @@
     "mobile": {
       "badge": "Météo mobile",
       "description": "Lire l'essentiel sans scroll long, ouvrir seulement le détail utile.",
-      "selectionSummary": "Changer de site ou chercher une ville",
       "liveWindSummary": "Source externe Spotair",
       "forecastTitle": "Prévision 7 jours",
       "forecastSummary": "Comparer les jours",
