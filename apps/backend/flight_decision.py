@@ -90,13 +90,13 @@ def build_flight_decision(
         )
         for hour in flyable_hours
     ]
-    global_risks = _global_risks(hourly)
     confidence = _build_confidence(weather_payload, hourly)
     landing_safety = _build_landing_safety(landing_associations or [])
-    global_risks.extend(landing_safety.get("decision_risks", []))
+    global_risks = _global_risks(hourly)
+    decision_risks = list(landing_safety.get("decision_risks", []))
 
     if confidence["level"] in {"low", "very_low"}:
-        global_risks.append(
+        decision_risks.append(
             _diagnostic(
                 "forecast_confidence_low",
                 "vigilance",
@@ -107,9 +107,12 @@ def build_flight_decision(
 
     best_window = _select_best_window(hourly)
     least_unfavorable = None if best_window else _select_least_unfavorable_window(hourly)
+    display_risks = _dedupe_risks(
+        _window_risks(best_window or least_unfavorable, hourly, global_risks) + decision_risks
+    )
     summary_level: DecisionLevel = "unavailable"
     summary_score = 0
-    main_risk_code = global_risks[0]["code"] if global_risks else None
+    main_risk_code = display_risks[0]["code"] if display_risks else None
 
     if best_window:
         summary_level = best_window["level"]
@@ -149,7 +152,7 @@ def build_flight_decision(
         "best_window": best_window,
         "least_unfavorable_window": least_unfavorable,
         "hourly": hourly,
-        "risks": global_risks,
+        "risks": display_risks,
         "confidence": confidence,
         "landing_safety": {
             key: value for key, value in landing_safety.items() if key != "decision_risks"
@@ -667,15 +670,35 @@ def _window_from_hours(hours: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _global_risks(hourly: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    risks = [risk for hour in hourly for risk in hour["risks"]]
+    return sorted(
+        _dedupe_risks(risks), key=lambda risk: _severity_rank(risk["severity"]), reverse=True
+    )
+
+
+def _window_risks(
+    window: dict[str, Any] | None,
+    hourly: list[dict[str, Any]],
+    fallback: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if not window:
+        return fallback
+    window_hours = set(window["hours"])
+    risks = [risk for hour in hourly if hour["hour"] in window_hours for risk in hour["risks"]]
+    return sorted(
+        _dedupe_risks(risks), key=lambda risk: _severity_rank(risk["severity"]), reverse=True
+    )
+
+
+def _dedupe_risks(risks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     by_code: dict[str, dict[str, Any]] = {}
-    for hour in hourly:
-        for risk in hour["risks"]:
-            current = by_code.get(risk["code"])
-            if current is None or _severity_rank(risk["severity"]) > _severity_rank(
-                current["severity"]
-            ):
-                by_code[risk["code"]] = risk
-    return sorted(by_code.values(), key=lambda risk: _severity_rank(risk["severity"]), reverse=True)
+    for risk in risks:
+        current = by_code.get(risk["code"])
+        if current is None or _severity_rank(risk["severity"]) > _severity_rank(
+            current["severity"]
+        ):
+            by_code[risk["code"]] = risk
+    return list(by_code.values())
 
 
 def _severity_rank(severity: str) -> int:
