@@ -6,7 +6,6 @@ import CurrentConditions from '../components/weather/CurrentConditions';
 import Forecast7Day from '../components/weather/Forecast7Day';
 import HourlyForecast from '../components/weather/HourlyForecast';
 import EmagramWidget from '../components/dashboard/EmagramWidget';
-import DaySelector from '../components/dashboard/DaySelector';
 import WeatherMultiLanding from '../components/weather/WeatherMultiLanding';
 import { type CityWeatherTarget } from '../components/weather/CityWeatherSearch';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
@@ -383,17 +382,7 @@ export default function WeatherPage() {
     />
   );
 
-  const daySelectorPanel =
-    !selectedSearchTarget && selectedSiteId ? (
-      <div className="rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/95">
-        <DaySelector
-          selectedDayIndex={selectedDayIndex}
-          onSelectDay={handleSelectForecastDay}
-        />
-      </div>
-    ) : undefined;
-
-  const forecastPanel =
+  const forecastDaySelector =
     !selectedSearchTarget && selectedSiteId ? (
       <Forecast7Day
         spotId={selectedSiteId}
@@ -486,7 +475,7 @@ export default function WeatherPage() {
         isSearchMode={Boolean(selectedSearchTarget)}
         isAuthenticated={isAuthenticated}
         stickySelectionBar={stickySelectionBar}
-        daySelectorPanel={daySelectorPanel}
+        forecastPanel={forecastDaySelector}
         bestSpotSuggestion={bestSpotSuggestion}
         decisionPanel={mobileDecisionPanel}
         searchResultPanel={mobileSearchResultPanel}
@@ -494,7 +483,6 @@ export default function WeatherPage() {
         currentConditions={mobileCurrentConditions}
         liveWindPanel={mobileLiveWindPanel}
         landingPanel={mobileLandingPanel}
-        forecastPanel={forecastPanel}
         emagramPanel={mobileEmagramPanel}
         hourlyPanel={mobileHourlyPanel}
       />
@@ -506,7 +494,7 @@ export default function WeatherPage() {
       {stickySelectionBar}
 
       <div className="min-w-0 space-y-4">
-        {daySelectorPanel}
+        {forecastDaySelector}
 
         {bestSpotSuggestion}
 
@@ -563,8 +551,6 @@ export default function WeatherPage() {
             dayIndex={selectedDayIndex}
           />
         )}
-
-        {forecastPanel}
 
         {/* Emagram Analysis (authenticated only) */}
         {isAuthenticated && !selectedSearchTarget && selectedSiteId && (
