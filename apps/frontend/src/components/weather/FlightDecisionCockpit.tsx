@@ -23,6 +23,7 @@ import {
 
 type FlightDecisionCockpitProps = {
   decision?: FlightDecisionResponse;
+  expectedSiteId?: string;
   objective: FlightObjective;
   isLoading?: boolean;
   isError?: boolean;
@@ -42,6 +43,7 @@ const formatHourWindow = (start: number, end: number) =>
 
 export default function FlightDecisionCockpit({
   decision,
+  expectedSiteId,
   objective,
   isLoading = false,
   isError = false,
@@ -52,6 +54,9 @@ export default function FlightDecisionCockpit({
   const activeObjective = objective ?? DEFAULT_FLIGHT_OBJECTIVE;
   const translate = (key: string, params?: Record<string, unknown>) =>
     String(t(key, params));
+  const hasStaleDecision = Boolean(
+    expectedSiteId && decision && decision.site.id !== expectedSiteId
+  );
 
   if (isCityContext) {
     return (
@@ -66,7 +71,7 @@ export default function FlightDecisionCockpit({
     );
   }
 
-  if (isLoading) {
+  if (isLoading || (hasStaleDecision && !isError)) {
     return (
       <section
         className={`${weatherCardClassName} p-4 sm:p-5`}
@@ -82,7 +87,7 @@ export default function FlightDecisionCockpit({
     );
   }
 
-  if (isError || !decision) {
+  if (isError || !decision || hasStaleDecision) {
     return (
       <section className={`${weatherCardClassName} p-4 sm:p-5`} role="alert">
         <p className={weatherSectionTitleClassName}>

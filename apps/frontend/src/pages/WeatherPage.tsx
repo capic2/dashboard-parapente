@@ -425,6 +425,7 @@ export default function WeatherPage() {
     selectedSearchTarget || selectedSiteId ? (
       <FlightDecisionCockpit
         decision={flightDecision.data}
+        expectedSiteId={selectedSearchTarget ? undefined : selectedSiteId}
         objective={selectedObjective}
         isLoading={flightDecision.isLoading}
         isError={flightDecision.isError}
@@ -512,6 +513,7 @@ export default function WeatherPage() {
         {(selectedSearchTarget || selectedSiteId) && (
           <FlightDecisionCockpit
             decision={flightDecision.data}
+            expectedSiteId={selectedSearchTarget ? undefined : selectedSiteId}
             objective={selectedObjective}
             isLoading={flightDecision.isLoading}
             isError={flightDecision.isError}
