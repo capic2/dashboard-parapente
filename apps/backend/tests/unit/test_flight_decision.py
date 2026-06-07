@@ -113,6 +113,37 @@ def test_tailwind_is_blocking_for_decollage_orientation():
     assert result["best_window"] is None
 
 
+def test_displayed_risks_are_scoped_to_recommended_window():
+    payload = _payload(
+        [
+            _hour(12, wind_speed=8.6, wind_direction=263.8, para_index=80),
+            _hour(13, wind_speed=9.8, wind_direction=266.4, para_index=80),
+            _hour(14, wind_speed=9.7, wind_direction=269.6, para_index=80),
+            _hour(15, wind_speed=8.9, wind_direction=269.7, para_index=80),
+            _hour(16, wind_speed=8.2, wind_direction=277.0, para_index=80),
+            _hour(17, wind_speed=8.0, wind_direction=281.0, para_index=90),
+            _hour(18, wind_speed=6.1, wind_direction=290.1, para_index=90),
+            _hour(19, wind_speed=5.0, wind_direction=296.1, para_index=90),
+            _hour(20, wind_speed=4.4, wind_direction=6.3, para_index=60),
+            _hour(21, wind_speed=4.5, wind_direction=63.9, para_index=60),
+        ]
+    )
+    payload.update({"day_index": 0, "sunrise": "05:00", "sunset": "21:00"})
+
+    result = build_flight_decision(
+        site=_site("SW"),
+        weather_payload=payload,
+        objective="tranquille",
+        now=datetime(2026, 5, 30, 12, tzinfo=ZoneInfo("Europe/Paris")),
+    )
+
+    assert result["best_window"]["hours"] == [12, 13, 14, 15, 16, 17, 18, 19]
+    risk_codes = [risk["code"] for risk in result["risks"]]
+    assert "wind_decollage_travers_fort" in risk_codes
+    assert "wind_decollage_cul" not in risk_codes
+    assert "wind_too_weak" not in risk_codes
+
+
 def test_objective_changes_thermal_score_without_changing_para_index():
     payload = _payload([_hour(11, thermal_strength="fort", cape=700, lifted_index=-1)])
     quiet = build_flight_decision(
