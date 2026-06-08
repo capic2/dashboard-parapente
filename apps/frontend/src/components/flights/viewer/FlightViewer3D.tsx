@@ -57,6 +57,7 @@ import {
   getBearingRadians,
   getRenderedTrackElevation,
 } from './flightViewerTrackPlacement';
+import { getReplayTrackTrailPositions } from './flightViewerTrackTrail';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 
 declare global {
@@ -1305,16 +1306,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           ? scenePosition.nextIndex
           : scenePosition.previousIndex;
       currentTimestampRef.current = scenePosition.timestamp;
-      visiblePositionsRef.current = allPositionsRef.current.slice(
-        0,
-        scenePosition.previousIndex + 1
+      visiblePositionsRef.current = getReplayTrackTrailPositions(
+        allPositionsRef.current,
+        scenePosition.previousIndex,
+        scenePosition.ratio > 0 ? scenePosition.position : undefined
       );
-      if (scenePosition.ratio > 0) {
-        visiblePositionsRef.current = [
-          ...visiblePositionsRef.current,
-          scenePosition.position,
-        ];
-      }
 
       if (timestampsRef.current.length > 0) {
         const startTimestamp = timestampsRef.current[0];
