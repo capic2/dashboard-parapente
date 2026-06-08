@@ -4,7 +4,9 @@
   "description": "Add 'skip-nx-cloud' label to all PRs to conserve NX Cloud credits. Remove the label from a PR to enable NX Cloud for that specific update.",
   "labels": ["renovate", "skip-nx-cloud"],
   "pip_requirements": {
-    "fileMatch": ["apps/backend/requirements\\.txt$"]
+    "managerFilePatterns": [
+      "/apps/backend/requirements\\.txt$/"
+    ]
   },
   "packageRules": [
     {
