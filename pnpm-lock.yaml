@@ -24,6 +24,21 @@ catalogs:
     '@playwright/test':
       specifier: 1.60.0
       version: 1.60.0
+    '@storybook/addon-a11y':
+      specifier: ^10.3.3
+      version: 10.4.2
+    '@storybook/addon-docs':
+      specifier: ^10.3.3
+      version: 10.4.2
+    '@storybook/addon-vitest':
+      specifier: ^10.3.4
+      version: 10.4.2
+    '@storybook/react':
+      specifier: ^10.3.4
+      version: 10.4.2
+    '@storybook/react-vite':
+      specifier: ^10.3.3
+      version: 10.4.2
     '@tailwindcss/vite':
       specifier: ^4.2.1
       version: 4.3.0
@@ -99,9 +114,9 @@ catalogs:
     ky:
       specifier: ^2.0.0
       version: 2.0.2
-    lint-staged:
-      specifier: ^17.0.0
-      version: 17.0.4
+    lucide-react:
+      specifier: ^1.7.0
+      version: 1.17.0
     msw:
       specifier: ^2.13.6
       version: 2.14.6
@@ -314,7 +329,7 @@ importers:
         version: 6.13.1(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
       lint-staged:
         specifier: 'catalog:'
-        version: 17.0.4
+        version: 17.0.7
       msw:
         specifier: 'catalog:'
         version: 2.14.6(@types/node@24.12.4)(typescript@6.0.3)
@@ -4106,8 +4121,8 @@ packages:
     resolution: {integrity: sha512-cNOjgCnLB+FnvWWtyRTzmB3POJ+cXxTA81LoW7u8JdmhfXzriropYwpjShnz1QLLWsQwY7nIxoDmcPTwphDK9w==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
-  lint-staged@17.0.4:
-    resolution: {integrity: sha512-+rU9lSUyVOZ/hDUmRLVGzyS2v73cDdQjX+XQz1AaOdIE4RysLq0HoPW2HrrgeNCLklkhi904VBU1bmgWLHVnkA==}
+  lint-staged@17.0.7:
+    resolution: {integrity: sha512-JrSobt+tW3rH8IOMi8tDZd3foorM5yPEkLD/V2NxobgHrFfHWGee4MOLVuZeScgxftEwbHrPHIFA/ZL+nUJeuA==}
     engines: {node: '>=22.22.1'}
     hasBin: true
 
@@ -4923,6 +4938,10 @@ packages:
     resolution: {integrity: sha512-dAqSqE/RabpBKI8+h26GfLq6Vb3JVXs30XYQjdMjaj/c2tS8IYYMbIzP599KtRj7c57/wYApb3QjgRgXmrCukA==}
     engines: {node: '>=18'}
 
+  tinyexec@1.2.4:
+    resolution: {integrity: sha512-SHf/r48b7vOrjve9PxJo3MN5v5yuyjHvdUcrQffT3WXMUfnGmHDVbC4k3sHJaJTgZCwpUplIaAo5ANtMyp3YHg==}
+    engines: {node: '>=18'}
+
   tinyglobby@0.2.16:
     resolution: {integrity: sha512-pn99VhoACYR8nFHhxqix+uvsbXineAasWm5ojXoN8xEwK5Kd3/TrhNn1wByuD52UxWRLy8pu+kRMniEi6Eq9Zg==}
     engines: {node: '>=12.0.0'}
@@ -5247,11 +5266,6 @@ packages:
 
   yaml@2.8.0:
     resolution: {integrity: sha512-4lLa/EcQCB0cJkyts+FpIRx5G/llPxfP6VQU5KByHEhLxY3IJCH0f0Hy1MHI8sClTvsIb8qwRJ6R/ZdlDJ/leQ==}
-    engines: {node: '>= 14.6'}
-    hasBin: true
-
-  yaml@2.8.4:
-    resolution: {integrity: sha512-ml/JPOj9fOQK8RNnWojA67GbZ0ApXAUlN2UQclwv2eVgTgn7O9gg9o7paZWKMp4g0H3nTLtS9LVzhkpOFIKzog==}
     engines: {node: '>= 14.6'}
     hasBin: true
 
@@ -8833,14 +8847,14 @@ snapshots:
 
   lines-and-columns@2.0.3: {}
 
-  lint-staged@17.0.4:
+  lint-staged@17.0.7:
     dependencies:
       listr2: 10.2.1
       picomatch: 4.0.4
       string-argv: 0.3.2
-      tinyexec: 1.1.2
+      tinyexec: 1.2.4
     optionalDependencies:
-      yaml: 2.8.4
+      yaml: 2.9.0
 
   listr2@10.2.1:
     dependencies:
@@ -9917,6 +9931,8 @@ snapshots:
 
   tinyexec@1.1.2: {}
 
+  tinyexec@1.2.4: {}
+
   tinyglobby@0.2.16:
     dependencies:
       fdir: 6.5.0(picomatch@4.0.4)
@@ -10172,9 +10188,6 @@ snapshots:
   yaml@1.10.3: {}
 
   yaml@2.8.0: {}
-
-  yaml@2.8.4:
-    optional: true
 
   yaml@2.9.0: {}
 
