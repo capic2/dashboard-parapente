@@ -14,7 +14,6 @@ import {
   Cartographic,
   Color,
   ConstantPositionProperty,
-  CornerType,
   HeadingPitchRange,
   HorizontalOrigin,
   ImageMaterialProperty,
@@ -153,16 +152,6 @@ const renderViewerFrame = (viewer: CesiumViewer) => {
   }
 };
 
-const createTubeShape = (radiusMeters: number, segments = 10) =>
-  Array.from({ length: segments }, (_, index) => {
-    const angle = (index / segments) * Math.PI * 2;
-    return new Cartesian2(
-      Math.cos(angle) * radiusMeters,
-      Math.sin(angle) * radiusMeters
-    );
-  });
-
-const replayTrackTubeShape = createTubeShape(1.8);
 const MIN_TRACK_SEGMENT_DISTANCE_SQUARED = 0.01;
 const REPLAY_TRACK_ALTITUDE_OFFSET_METERS = 0;
 
@@ -488,24 +477,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         });
       }
 
-      if (trackPositionCountRef.current === renderablePositions.length) return;
-
-      if (
-        trackEntityRef.current &&
-        viewer.entities.contains(trackEntityRef.current)
-      ) {
-        viewer.entities.remove(trackEntityRef.current);
-      }
-
-      trackEntityRef.current = viewer.entities.add({
-        polylineVolume: {
-          positions: renderablePositions,
-          shape: replayTrackTubeShape,
-          cornerType: CornerType.ROUNDED,
-          material: Color.fromCssColorString('#ff5a1f').withAlpha(0.92),
-          shadows: ShadowMode.DISABLED,
-        },
-      });
       trackPositionCountRef.current = renderablePositions.length;
     },
     [isActiveViewer, removeTrackEntity]
