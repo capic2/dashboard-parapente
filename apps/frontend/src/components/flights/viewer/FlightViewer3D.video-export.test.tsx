@@ -5,11 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   invalidateQueries,
   mockFlight,
+  cartesianFromDegreesCalls,
   entityOptions,
   viewerInstances,
   viewerOptions,
 } = vi.hoisted(() => ({
   invalidateQueries: vi.fn(),
+  cartesianFromDegreesCalls: [] as unknown[][],
   entityOptions: [] as unknown[],
   viewerInstances: [] as {
     render: ReturnType<typeof vi.fn>;
@@ -42,7 +44,8 @@ vi.mock('cesium', () => {
       public z = 0
     ) {}
 
-    static fromDegrees() {
+    static fromDegrees(...args: unknown[]) {
+      cartesianFromDegreesCalls.push(args);
       return new Cartesian3();
     }
 
@@ -282,6 +285,7 @@ describe('FlightViewer3D video export mode', () => {
     invalidateQueries.mockClear();
     viewerInstances.length = 0;
     viewerOptions.length = 0;
+    cartesianFromDegreesCalls.length = 0;
     entityOptions.length = 0;
     mockFlight.video_export_status = null;
     mockFlight.video_export_job_id = null;
@@ -393,6 +397,21 @@ describe('FlightViewer3D video export mode', () => {
     expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(1, 500);
     expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(2, 500);
     expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(3, 500);
+  });
+
+  it('passes GPX longitude, latitude and rendered elevation to Cesium', async () => {
+    window._exportMode = 'manual_render';
+
+    render(<FlightViewer3D flightId="flight-1" exportOnly />);
+
+    await waitFor(() => {
+      expect(window._setExportFrame).toBeTypeOf('function');
+    });
+
+    await waitFor(() => {
+      expect(cartesianFromDegreesCalls[0]).toEqual([6, 45, 1000]);
+      expect(cartesianFromDegreesCalls[1]).toEqual([6.1, 45.1, 1100]);
+    });
   });
 
   it('draws the replay track only as a volume plus curtain', async () => {
