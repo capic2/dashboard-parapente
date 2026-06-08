@@ -180,6 +180,9 @@ vi.mock('cesium', () => {
       ) {}
     },
     HorizontalOrigin: { CENTER: 0 },
+    ImageMaterialProperty: class ImageMaterialProperty {
+      constructor(public options: unknown) {}
+    },
     Ion: { defaultAccessToken: '' },
     JulianDate: { fromDate: () => ({}), fromIso8601: () => ({}) },
     LabelStyle: { FILL_AND_OUTLINE: 0 },
@@ -414,7 +417,7 @@ describe('FlightViewer3D video export mode', () => {
     });
   });
 
-  it('draws the replay track only as a volume plus curtain', async () => {
+  it('draws the replay track as a wall without a thick line', async () => {
     window._exportMode = 'manual_render';
 
     render(<FlightViewer3D flightId="flight-1" exportOnly />);
@@ -434,7 +437,7 @@ describe('FlightViewer3D video export mode', () => {
       entityOptions.some((options) =>
         Boolean((options as { polylineVolume?: unknown }).polylineVolume)
       )
-    ).toBe(true);
+    ).toBe(false);
     expect(
       entityOptions.some((options) =>
         Boolean((options as { wall?: unknown }).wall)
@@ -442,7 +445,7 @@ describe('FlightViewer3D video export mode', () => {
     ).toBe(true);
   });
 
-  it('ignores stale track callbacks after switching flights', async () => {
+  it('ignores stale wall callbacks after switching flights', async () => {
     window._exportMode = 'manual_render';
 
     const { rerender } = render(
