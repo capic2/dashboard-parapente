@@ -54,6 +54,10 @@ import {
   computeCursorTelemetryLabel,
   type ViewerUnits,
 } from './flightViewerTelemetry';
+import {
+  getBearingRadians,
+  getRenderedTrackElevation,
+} from './flightViewerTrackPlacement';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 
 declare global {
@@ -301,6 +305,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [terrainReady, setTerrainReady] = useState(false);
   const [elevationOffset, setElevationOffset] = useState(0);
   const [autoOffset, setAutoOffset] = useState(0);
+  const [landingElevationOffset, setLandingElevationOffset] = useState<
+    number | null
+  >(null);
   const [isCalculatingOffset, setIsCalculatingOffset] = useState(false);
   const [currentProgress, setCurrentProgress] = useState(0);
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(compact);
@@ -657,6 +664,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   useEffect(() => {
     setElevationOffset(0);
     setAutoOffset(0);
+    setLandingElevationOffset(null);
     setTerrainReady(false); // Reset terrain ready state on flight change
   }, [flightId]);
 
@@ -713,11 +721,17 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
     try {
       // Convert GPX coordinates to Cartesian3 avec offset d'élévation
-      const positions = gpxData.coordinates.map((point) =>
+      const positions = gpxData.coordinates.map((point, index) =>
         Cartesian3.fromDegrees(
           point.lon,
           point.lat,
-          point.elevation + elevationOffset
+          getRenderedTrackElevation(
+            point,
+            index,
+            gpxData.coordinates.length,
+            elevationOffset,
+            landingElevationOffset
+          )
         )
       );
 
@@ -826,21 +840,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
         // Calculate heading from reference point BACK to takeoff
         // This makes the camera look toward the takeoff/launch site
-        const deltaLon = takeoffCoord.lon - referenceCoord.lon;
-
-        // Calculate angle in radians
-        // We need to convert lon/lat differences to proper bearing
-        // Using standard bearing formula
-        const y =
-          Math.sin(deltaLon) * Math.cos((takeoffCoord.lat * Math.PI) / 180);
-        const x =
-          Math.cos((referenceCoord.lat * Math.PI) / 180) *
-            Math.sin((takeoffCoord.lat * Math.PI) / 180) -
-          Math.sin((referenceCoord.lat * Math.PI) / 180) *
-            Math.cos((takeoffCoord.lat * Math.PI) / 180) *
-            Math.cos(deltaLon);
-
-        return Math.atan2(y, x);
+        return getBearingRadians(referenceCoord, takeoffCoord);
       };
 
       // Position camera - MUST happen after elevation offset is calculated
@@ -951,6 +951,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     elevationOffset,
     gpxData,
     isActiveViewer,
+    landingElevationOffset,
     viewerReady,
   ]);
 
@@ -1059,15 +1060,22 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
     try {
       const firstPoint = gpxData.coordinates[0];
+      const lastPoint = gpxData.coordinates[gpxData.coordinates.length - 1];
 
       // Créer une position cartographique pour le premier point
-      const position = Cartesian3.fromDegrees(firstPoint.lon, firstPoint.lat);
-      const cartographic = Cartographic.fromCartesian(position);
+      const firstPosition = Cartesian3.fromDegrees(
+        firstPoint.lon,
+        firstPoint.lat
+      );
+      const firstCartographic = Cartographic.fromCartesian(firstPosition);
+      const lastPosition = Cartesian3.fromDegrees(lastPoint.lon, lastPoint.lat);
+      const lastCartographic = Cartographic.fromCartesian(lastPosition);
 
       // Échantillonner le terrain pour obtenir la hauteur réelle du sol
       const terrainProvider = viewer.terrainProvider;
       const samples = await sampleTerrainMostDetailed(terrainProvider, [
-        cartographic,
+        firstCartographic,
+        lastCartographic,
       ]);
 
       if (!isMountedRef.current || !isActiveViewer(viewer)) {
@@ -1085,6 +1093,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
         setAutoOffset(offset);
         setElevationOffset(offset);
+        const landingTerrainHeight = samples[1]?.height;
+        if (landingTerrainHeight === undefined) {
+          setLandingElevationOffset(null);
+        } else {
+          setLandingElevationOffset(landingTerrainHeight - lastPoint.elevation);
+        }
         // Le flyTo se fera automatiquement via le useEffect qui dépend de elevationOffset
       }
     } catch (error) {
