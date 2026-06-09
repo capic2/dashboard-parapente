@@ -8,10 +8,18 @@ import path from 'path';
 
 const cesiumBuildRootPath = path.resolve(__dirname, '../../node_modules/cesium/Build');
 const cesiumBuildPath = path.join(cesiumBuildRootPath, 'Cesium');
+const workspaceRoot = path.resolve(__dirname, '../..');
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
   root: __dirname,
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+    alias: {
+      react: path.resolve(workspaceRoot, 'node_modules/react'),
+      'react-dom': path.resolve(workspaceRoot, 'node_modules/react-dom'),
+    },
+  },
   plugins: [
     TanStackRouterVite({
       routesDirectory: path.resolve(__dirname, './src/routes'),
