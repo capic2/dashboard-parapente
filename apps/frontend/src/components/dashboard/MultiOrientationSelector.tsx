@@ -151,9 +151,9 @@ export function MultiOrientationSelector({
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-3 w-full min-w-[240px] overflow-hidden rounded-3xl border-2 border-sky-500 bg-sky-100 shadow-[0_24px_70px_rgba(2,132,199,0.35)] ring-8 ring-sky-500/20 dark:border-sky-400 dark:bg-sky-950 dark:shadow-[0_24px_70px_rgba(0,0,0,0.75)] dark:ring-sky-400/25">
+        <div className="absolute left-0 top-full z-50 mt-3 w-full min-w-[240px] overflow-hidden rounded-3xl border-2 border-sky-500 bg-sky-100 shadow-[0_24px_70px_rgba(2,132,199,0.35)] ring-8 ring-sky-500/20 dark:border-cyan-300 dark:bg-cyan-100 dark:shadow-[0_28px_80px_rgba(0,0,0,0.9)] dark:ring-cyan-200/40">
           <div className="p-2">
-            <div className="mb-2 rounded-2xl bg-sky-700 px-3 py-2 text-xs font-black uppercase tracking-[0.18em] text-white shadow-sm shadow-sky-950/20 dark:bg-sky-500 dark:text-slate-950">
+            <div className="mb-2 rounded-2xl bg-sky-700 px-3 py-2 text-xs font-black uppercase tracking-[0.18em] text-white shadow-sm shadow-sky-950/20 dark:bg-slate-950 dark:text-white">
               Choisir un décollage
             </div>
 
@@ -169,18 +169,26 @@ export function MultiOrientationSelector({
                   className={`flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
                     isSelected
                       ? 'border-sky-500 bg-sky-600 text-white shadow-sm shadow-sky-900/20 dark:border-sky-400 dark:bg-sky-600'
-                      : 'border-sky-200 bg-white text-slate-900 shadow-sm shadow-sky-900/10 hover:border-sky-500 hover:bg-white dark:border-sky-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-slate-900'
+                      : 'border-sky-200 bg-white text-slate-900 shadow-sm shadow-sky-900/10 hover:border-sky-500 hover:bg-white dark:border-cyan-300 dark:bg-white dark:text-slate-950 dark:hover:border-sky-700 dark:hover:bg-white'
                   }`}
                 >
                   <div className="flex flex-col items-start">
                     <span className="text-sm font-bold">{shortName}</span>
-                    <span className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                    <span
+                      className={`mt-0.5 flex flex-wrap items-center gap-2 text-xs ${
+                        isSelected ? 'text-sky-100' : 'text-slate-600'
+                      }`}
+                    >
                       <span>{site.orientation || 'N/A'}</span>
                       {site.elevation_m && <span>{site.elevation_m}m</span>}
                       {site.rating && <span>Note {site.rating}/5</span>}
                     </span>
                     {weather?.paraIndex !== undefined && (
-                      <span className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      <span
+                        className={`mt-1 text-xs font-semibold ${
+                          isSelected ? 'text-sky-100' : 'text-slate-700'
+                        }`}
+                      >
                         {t('weather.paraIndex')}: {weather.paraIndex}
                       </span>
                     )}

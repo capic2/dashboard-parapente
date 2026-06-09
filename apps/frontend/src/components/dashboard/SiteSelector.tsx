@@ -67,11 +67,23 @@ function getSiteMeta(site: Site): string {
     .join(' · ');
 }
 
-function SiteMeta({ site, isActive }: { site: Site; isActive: boolean }) {
+function SiteMeta({
+  site,
+  isActive,
+  forceLightSurface = false,
+}: {
+  site: Site;
+  isActive: boolean;
+  forceLightSurface?: boolean;
+}) {
   return (
     <span
       className={`mt-1 flex flex-wrap items-center gap-2 text-xs ${
-        isActive ? 'text-sky-100' : 'text-slate-500 dark:text-slate-400'
+        isActive
+          ? 'text-sky-100'
+          : forceLightSurface
+            ? 'text-slate-600'
+            : 'text-slate-500 dark:text-slate-400'
       }`}
     >
       {site.orientation && (
@@ -200,15 +212,15 @@ export default function SiteSelector({
         </Button>
 
         {isMobileSelectorOpen && (
-          <div className="absolute left-0 right-0 top-full z-30 mt-3 rounded-3xl border-2 border-sky-500 bg-sky-100 p-3 shadow-[0_24px_70px_rgba(2,132,199,0.35)] ring-8 ring-sky-500/20 dark:border-sky-400 dark:bg-sky-950 dark:shadow-[0_24px_70px_rgba(0,0,0,0.75)] dark:ring-sky-400/25">
-            <div className="mb-3 rounded-2xl bg-sky-700 px-3 py-2 text-white shadow-sm shadow-sky-950/20 dark:bg-sky-500 dark:text-slate-950">
+          <div className="absolute left-0 right-0 top-full z-30 mt-3 rounded-3xl border-2 border-sky-500 bg-sky-100 p-3 shadow-[0_24px_70px_rgba(2,132,199,0.35)] ring-8 ring-sky-500/20 dark:border-cyan-300 dark:bg-cyan-100 dark:shadow-[0_28px_80px_rgba(0,0,0,0.9)] dark:ring-cyan-200/40">
+            <div className="mb-3 rounded-2xl bg-sky-700 px-3 py-2 text-white shadow-sm shadow-sky-950/20 dark:bg-slate-950 dark:text-white">
               <span className="text-xs font-black uppercase tracking-[0.18em]">
                 Menu de sélection
               </span>
             </div>
             <label
               htmlFor={searchInputId}
-              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.16em] text-sky-900 dark:text-sky-100"
+              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.16em] text-sky-900 dark:text-slate-950"
             >
               <Search className="h-3 w-3" aria-hidden="true" />
               Rechercher
@@ -219,7 +231,7 @@ export default function SiteSelector({
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Nom, orientation, altitude..."
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-950 outline-none transition-colors placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-sky-900"
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-950 outline-none transition-colors placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-cyan-300 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-500 dark:focus:ring-cyan-300"
             />
 
             <div className="mt-3 max-h-[55vh] space-y-1 overflow-y-auto overscroll-contain pr-1">
@@ -236,14 +248,20 @@ export default function SiteSelector({
                       className={`flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
                         isActive
                           ? 'border-sky-500 bg-sky-600 text-white shadow-sm shadow-sky-900/20 dark:border-sky-400 dark:bg-sky-600'
-                          : 'border-sky-200 bg-white text-slate-900 shadow-sm shadow-sky-900/10 hover:border-sky-500 hover:bg-white dark:border-sky-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-slate-900'
+                          : 'border-sky-200 bg-white text-slate-900 shadow-sm shadow-sky-900/10 hover:border-sky-500 hover:bg-white dark:border-cyan-300 dark:bg-white dark:text-slate-950 dark:hover:border-sky-700 dark:hover:bg-white'
                       }`}
                     >
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-semibold">
                           {getSiteDisplayName(site)}
                         </span>
-                        {meta && <SiteMeta site={site} isActive={isActive} />}
+                        {meta && (
+                          <SiteMeta
+                            site={site}
+                            isActive={isActive}
+                            forceLightSurface
+                          />
+                        )}
                       </span>
                       {isActive && (
                         <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-xs font-bold text-white ring-1 ring-white/20">
@@ -255,7 +273,7 @@ export default function SiteSelector({
                   );
                 })
               ) : (
-                <div className="rounded-xl bg-gray-50 px-3 py-5 text-center text-sm text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+                <div className="rounded-xl bg-gray-50 px-3 py-5 text-center text-sm text-gray-500 dark:bg-white dark:text-slate-600">
                   Aucun site trouvé
                 </div>
               )}
