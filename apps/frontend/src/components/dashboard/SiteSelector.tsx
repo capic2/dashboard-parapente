@@ -200,10 +200,15 @@ export default function SiteSelector({
         </Button>
 
         {isMobileSelectorOpen && (
-          <div className="absolute left-0 right-0 top-full z-30 mt-2 rounded-2xl border border-sky-300 bg-sky-50/95 p-3 shadow-2xl shadow-sky-950/25 ring-4 ring-sky-500/10 backdrop-blur dark:border-sky-600/80 dark:bg-slate-950 dark:shadow-black/50 dark:ring-sky-400/15">
+          <div className="absolute left-0 right-0 top-full z-30 mt-3 rounded-3xl border-2 border-sky-500 bg-sky-100 p-3 shadow-[0_24px_70px_rgba(2,132,199,0.35)] ring-8 ring-sky-500/20 dark:border-sky-400 dark:bg-sky-950 dark:shadow-[0_24px_70px_rgba(0,0,0,0.75)] dark:ring-sky-400/25">
+            <div className="mb-3 rounded-2xl bg-sky-700 px-3 py-2 text-white shadow-sm shadow-sky-950/20 dark:bg-sky-500 dark:text-slate-950">
+              <span className="text-xs font-black uppercase tracking-[0.18em]">
+                Menu de sélection
+              </span>
+            </div>
             <label
               htmlFor={searchInputId}
-              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"
+              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.16em] text-sky-900 dark:text-sky-100"
             >
               <Search className="h-3 w-3" aria-hidden="true" />
               Rechercher
@@ -231,7 +236,7 @@ export default function SiteSelector({
                       className={`flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
                         isActive
                           ? 'border-sky-500 bg-sky-600 text-white shadow-sm shadow-sky-900/20 dark:border-sky-400 dark:bg-sky-600'
-                          : 'border-white/70 bg-white/80 text-slate-900 hover:border-sky-300 hover:bg-white dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-sky-700 dark:hover:bg-slate-900'
+                          : 'border-sky-200 bg-white text-slate-900 shadow-sm shadow-sky-900/10 hover:border-sky-500 hover:bg-white dark:border-sky-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:bg-slate-900'
                       }`}
                     >
                       <span className="min-w-0">
