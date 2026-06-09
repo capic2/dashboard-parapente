@@ -547,6 +547,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
             has_pip=pip_path is not None,
         )
 
+        render_width, render_height = _layout_render_size(selected_layout, width, height)
         prepared_job = _update_job(
             job_id,
             status=_STATUS_QUEUED,
@@ -556,8 +557,8 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
             layout_id=selected_layout.id,
             layout_label=selected_layout.label,
             layout_path=str(layout_path),
-            video_width=width,
-            video_height=height,
+            video_width=render_width,
+            video_height=render_height,
             command_json=None,
             message="Overlay queued",
         )
@@ -596,11 +597,23 @@ def _find_layout(layout_id: str) -> GoproOverlayLayout | None:
 
 
 def _nearest_layout(width: int | None, height: int | None) -> GoproOverlayLayout:
+    max_width = config.GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH
+    max_height = config.GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT
+    layouts = [
+        layout
+        for layout in _LAYOUTS
+        if (
+            layout.width is None
+            or layout.height is None
+            or (layout.width <= max_width and layout.height <= max_height)
+        )
+    ] or _LAYOUTS
+
     if width is None or height is None:
-        return _LAYOUTS[0]
+        return layouts[0]
 
     exact = next(
-        (layout for layout in _LAYOUTS if layout.width == width and layout.height == height), None
+        (layout for layout in layouts if layout.width == width and layout.height == height), None
     )
     if exact:
         return exact
@@ -610,7 +623,13 @@ def _nearest_layout(width: int | None, height: int | None) -> GoproOverlayLayout
             return 10**12
         return abs(layout.width - width) + abs(layout.height - height)
 
-    return min(_LAYOUTS, key=score)
+    return min(layouts, key=score)
+
+
+def _layout_render_size(
+    layout: GoproOverlayLayout, source_width: int | None, source_height: int | None
+) -> tuple[int | None, int | None]:
+    return layout.width or source_width, layout.height or source_height
 
 
 def list_gopro_overlay_layouts(
