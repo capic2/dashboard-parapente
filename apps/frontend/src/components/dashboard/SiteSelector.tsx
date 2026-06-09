@@ -200,7 +200,7 @@ export default function SiteSelector({
         </Button>
 
         {isMobileSelectorOpen && (
-          <div className="absolute left-0 right-0 top-full z-30 mt-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40">
+          <div className="absolute left-0 right-0 top-full z-30 mt-2 rounded-2xl border border-sky-300 bg-sky-50/95 p-3 shadow-2xl shadow-sky-950/25 ring-4 ring-sky-500/10 backdrop-blur dark:border-sky-600/80 dark:bg-slate-950 dark:shadow-black/50 dark:ring-sky-400/15">
             <label
               htmlFor={searchInputId}
               className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"
@@ -231,7 +231,7 @@ export default function SiteSelector({
                       className={`flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
                         isActive
                           ? 'border-sky-500 bg-sky-600 text-white shadow-sm shadow-sky-900/20 dark:border-sky-400 dark:bg-sky-600'
-                          : 'border-transparent text-slate-900 hover:border-sky-200 hover:bg-sky-50/70 dark:text-slate-100 dark:hover:border-sky-800 dark:hover:bg-sky-950/30'
+                          : 'border-white/70 bg-white/80 text-slate-900 hover:border-sky-300 hover:bg-white dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-sky-700 dark:hover:bg-slate-900'
                       }`}
                     >
                       <span className="min-w-0">
