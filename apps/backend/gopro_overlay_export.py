@@ -146,9 +146,19 @@ def _temp_output_path(output_path: Path, job_id: str) -> Path:
     return output_path.with_name(f".{stem}.{job_id}.part{suffix}")
 
 
-def _prepare_layout_file(layout_path: Path, destination: Path, has_pip: bool) -> Path:
+def _prepare_layout_file(
+    layout_path: Path,
+    destination: Path,
+    has_pip: bool,
+    target_width: int | None = None,
+    target_height: int | None = None,
+) -> Path:
     tree = ET.parse(layout_path)
     root = tree.getroot()
+
+    if target_width is not None and target_height is not None:
+        root.set("width", str(target_width))
+        root.set("height", str(target_height))
 
     def normalize_video_components(parent: ET.Element) -> None:
         for child in list(parent):
@@ -545,6 +555,8 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
             source_layout_path,
             work_dir / source_layout_path.name,
             has_pip=pip_path is not None,
+            target_width=width,
+            target_height=height,
         )
 
         render_width, render_height = _layout_render_size(selected_layout, width, height)
@@ -629,7 +641,7 @@ def _nearest_layout(width: int | None, height: int | None) -> GoproOverlayLayout
 def _layout_render_size(
     layout: GoproOverlayLayout, source_width: int | None, source_height: int | None
 ) -> tuple[int | None, int | None]:
-    return layout.width or source_width, layout.height or source_height
+    return source_width or layout.width, source_height or layout.height
 
 
 def list_gopro_overlay_layouts(

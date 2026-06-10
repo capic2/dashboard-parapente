@@ -920,6 +920,18 @@ def test_prepare_layout_file_removes_pip_without_video(tmp_path):
     assert 'type="video"' not in destination.read_text()
 
 
+def test_prepare_layout_file_sets_video_dimensions(tmp_path):
+    source = tmp_path / "layout.xml"
+    destination = tmp_path / "prepared.xml"
+    source.write_text('<layout width="1920" height="1080" />')
+
+    _prepare_layout_file(source, destination, has_pip=False, target_width=2704, target_height=1520)
+
+    prepared = destination.read_text()
+    assert 'width="2704"' in prepared
+    assert 'height="1520"' in prepared
+
+
 def test_gopro_overlay_progress_is_parsed_from_render_output():
     assert _progress_from_output_chunk("Render: 42 [42%] [1.2/s] ETA: 00:10") == 42
 
@@ -1092,15 +1104,15 @@ def test_auto_layout_selection_caps_4k_sources_to_1080_by_default(monkeypatch):
     assert selected.id == "parapente-1080"
 
 
-def test_worker_preparation_uses_selected_layout_render_size_for_4k_source(
+def test_worker_preparation_uses_video_render_size_for_4k_source(
     tmp_path,
     monkeypatch,
     test_db,
 ):
     layout_dir = tmp_path / "layouts"
     layout_dir.mkdir()
-    (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
-    (layout_dir / "layout_parapente_3840.xml").write_text("<layout />")
+    (layout_dir / "layout_parapente_1080.xml").write_text('<layout width="1920" height="1080" />')
+    (layout_dir / "layout_parapente_3840.xml").write_text('<layout width="3840" height="2160" />')
     video_path = tmp_path / "source.mp4"
     gpx_path = tmp_path / "source.gpx"
     video_path.write_bytes(b"video")
@@ -1125,8 +1137,50 @@ def test_worker_preparation_uses_selected_layout_render_size_for_4k_source(
 
     assert prepared is not None
     assert prepared["layout_id"] == "parapente-1080"
-    assert prepared["video_width"] == 1920
-    assert prepared["video_height"] == 1080
+    assert prepared["video_width"] == 3840
+    assert prepared["video_height"] == 2160
+    prepared_layout = Path(prepared["layout_path"]).read_text()
+    assert 'width="3840"' in prepared_layout
+    assert 'height="2160"' in prepared_layout
+
+
+def test_worker_preparation_uses_exact_video_size_for_non_standard_source(
+    tmp_path,
+    monkeypatch,
+    test_db,
+):
+    layout_dir = tmp_path / "layouts"
+    layout_dir.mkdir()
+    (layout_dir / "layout_parapente_1080.xml").write_text('<layout width="1920" height="1080" />')
+    video_path = tmp_path / "source.mp4"
+    gpx_path = tmp_path / "source.gpx"
+    video_path.write_bytes(b"video")
+    gpx_path.write_text("<gpx />")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH", 1920)
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT", 1080)
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (2704, 1520))
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+
+    job = create_gopro_overlay_job_from_paths(
+        video_path=video_path,
+        gpx_path=gpx_path,
+        pip_path=None,
+        layout_id=None,
+        output_filename="overlay.mp4",
+    )
+    queued_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
+    assert queued_job is not None
+
+    prepared = gopro_overlay_export._prepare_queued_job(job["job_id"], queued_job)
+
+    assert prepared is not None
+    assert prepared["layout_id"] == "parapente-1080"
+    assert prepared["video_width"] == 2704
+    assert prepared["video_height"] == 1520
+    prepared_layout = Path(prepared["layout_path"]).read_text()
+    assert 'width="2704"' in prepared_layout
+    assert 'height="1520"' in prepared_layout
 
 
 def test_explicit_4k_layout_is_preserved_for_4k_source(
@@ -1355,6 +1409,7 @@ def test_run_job_prepares_inputs_before_starting_process(
     command = popen.call_args.args[0]
     assert popen.call_args.kwargs["cwd"] == str(tmp_path / "runner-root")
     assert Path(command[command.index("--layout-xml") + 1]).parent == work_dir
+    assert command[command.index("--overlay-size") + 1] == "1920x1080"
     assert Path(command[-2]).parent == work_dir
     assert Path(command[-1]) == Path(job["temp_output_path"])
     assert gopro_overlay_export.get_gopro_overlay_job(job["job_id"])["status"] == "completed"
