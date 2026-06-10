@@ -87,12 +87,12 @@ catalogs:
     '@vitest/ui':
       specifier: 4.1.8
       version: 4.1.8
+    cesium:
+      specifier: ^1.139.1
+      version: 1.142.0
     chromatic:
       specifier: ^16.0.0
       version: 16.10.1
-    date-fns:
-      specifier: ^4.0.0
-      version: 4.1.0
     happy-dom:
       specifier: ^20.8.9
       version: 20.9.0
@@ -208,7 +208,7 @@ importers:
         version: 1.142.0
       date-fns:
         specifier: 'catalog:'
-        version: 4.1.0
+        version: 4.4.0
       i18next:
         specifier: 'catalog:'
         version: 26.3.1(typescript@6.0.3)
@@ -3363,8 +3363,8 @@ packages:
     resolution: {integrity: sha512-ndfJ/JxxMd3nw31uyKoY2naivF+r29V+Lc0svZxe1JvvIRmi8hUsrMvdOwgS1o6uBHmiz91geQ0ylPP0aj1VUA==}
     engines: {node: '>=12'}
 
-  date-fns@4.1.0:
-    resolution: {integrity: sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg==}
+  date-fns@4.4.0:
+    resolution: {integrity: sha512-+1UMbeh68lH1SegH83CGWwpb6OHHbpSgr3+s5Eww5M4CAgswBpoWS0AjTOfEJ33HiYKz1hdj/KTFprzXHmq/6w==}
 
   debug@2.6.9:
     resolution: {integrity: sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA==}
@@ -8101,7 +8101,7 @@ snapshots:
 
   d3-timer@3.0.1: {}
 
-  date-fns@4.1.0: {}
+  date-fns@4.4.0: {}
 
   debug@2.6.9:
     dependencies:
