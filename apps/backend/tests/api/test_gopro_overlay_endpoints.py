@@ -1125,20 +1125,18 @@ def test_create_gopro_overlay_job_from_paths_defers_input_copy_to_worker_prepara
     assert prepared is not None
     assert prepared["status"] == "queued"
     assert Path(prepared["video_path"]).parent == work_dir
-    assert Path(prepared["gpx_path"]).parent == work_dir
+    assert Path(prepared["gpx_path"]) == gpx_path
+    assert Path(prepared["command"]["render_gpx_path"]).parent == work_dir
     assert Path(prepared["video_path"]).read_bytes() == b"video"
-    assert Path(prepared["gpx_path"]).read_text() == "<gpx />"
+    assert Path(prepared["command"]["render_gpx_path"]).read_text() == "<gpx />"
     assert prepared["video_width"] == 1920
     assert prepared["video_height"] == 1080
 
 
-def test_auto_layout_selection_caps_4k_sources_to_1080_by_default(monkeypatch):
-    monkeypatch.setattr(config, "GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH", 1920)
-    monkeypatch.setattr(config, "GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT", 1080)
-
+def test_auto_layout_selection_uses_4k_layout_for_4k_source():
     selected = gopro_overlay_export._nearest_layout(3840, 2160)
 
-    assert selected.id == "parapente-1080"
+    assert selected.id == "parapente-3840"
 
 
 def test_worker_preparation_uses_video_render_size_for_4k_source(
@@ -1173,7 +1171,7 @@ def test_worker_preparation_uses_video_render_size_for_4k_source(
     prepared = gopro_overlay_export._prepare_queued_job(job["job_id"], queued_job)
 
     assert prepared is not None
-    assert prepared["layout_id"] == "parapente-1080"
+    assert prepared["layout_id"] == "parapente-3840"
     assert prepared["video_width"] == 3840
     assert prepared["video_height"] == 2160
     prepared_layout = Path(prepared["layout_path"]).read_text()

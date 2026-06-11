@@ -520,6 +520,8 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         video_path = Path(str(job["video_path"]))
         gpx_path = Path(str(job["gpx_path"]))
         pip_path = Path(str(job["pip_path"])) if job.get("pip_path") else None
+        command_metadata = dict(metadata)
+        render_gpx_path = gpx_path
 
         if metadata.get("pin_inputs"):
             video_path = _copy_job_input(
@@ -527,9 +529,9 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 work_dir / f"input{video_path.suffix.lower()}",
                 _VIDEO_EXTENSIONS,
             )
-            gpx_path = _copy_job_input(
+            render_gpx_path = _copy_job_input(
                 gpx_path,
-                work_dir / f"track{gpx_path.suffix.lower()}",
+                work_dir / f"gpx-{job_id}{gpx_path.suffix.lower()}",
                 _GPX_EXTENSIONS,
             )
             if pip_path:
@@ -538,6 +540,8 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                     work_dir / f"pip{pip_path.suffix.lower()}",
                     _VIDEO_EXTENSIONS,
                 )
+
+        command_metadata["render_gpx_path"] = str(render_gpx_path)
 
         width, height = probe_video_resolution(video_path)
         requested_layout_id = metadata.get("requested_layout_id")
@@ -571,11 +575,12 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
             layout_path=str(layout_path),
             video_width=render_width,
             video_height=render_height,
-            command_json=None,
+            command_json=json.dumps(command_metadata),
             message="Overlay queued",
         )
         if not prepared_job or prepared_job.get("status") != _STATUS_QUEUED:
             return None
+        prepared_job["command"] = command_metadata
         return prepared_job
     except Exception as exc:
         logger.exception("Failed to prepare GoPro overlay job %s", job_id)
@@ -609,17 +614,7 @@ def _find_layout(layout_id: str) -> GoproOverlayLayout | None:
 
 
 def _nearest_layout(width: int | None, height: int | None) -> GoproOverlayLayout:
-    max_width = config.GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH
-    max_height = config.GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT
-    layouts = [
-        layout
-        for layout in _LAYOUTS
-        if (
-            layout.width is None
-            or layout.height is None
-            or (layout.width <= max_width and layout.height <= max_height)
-        )
-    ] or _LAYOUTS
+    layouts = _LAYOUTS
 
     if width is None or height is None:
         return layouts[0]
@@ -935,11 +930,14 @@ def _run_job(job_id: str) -> None:
     if not job or job.get("status") != _STATUS_QUEUED:
         return
 
+    prepared_command = job.get("command") if isinstance(job.get("command"), dict) else {}
+    render_gpx_path = Path(str(prepared_command.get("render_gpx_path") or job["gpx_path"]))
+
     command = [
         config.GOPRO_OVERLAY_BIN,
         "--use-gpx-only",
         "--gpx",
-        job["gpx_path"],
+        str(render_gpx_path),
         "--layout",
         "xml",
         "--layout-xml",
