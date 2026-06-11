@@ -317,8 +317,8 @@ jobs:
               export BACKEND_IMAGE
               export BACKEND_DEPLOY_VERSION="$TARGET_VERSION"
 
-              compose_cmd pull backend backend-worker redis
-              compose_cmd up -d --force-recreate --remove-orphans backend backend-worker redis
+              compose_cmd pull backend backend-worker gopro-overlay-worker redis
+              compose_cmd up -d --force-recreate --remove-orphans backend backend-worker gopro-overlay-worker redis
             }
 
             deploy_from_portainer_volume() {
@@ -355,8 +355,8 @@ jobs:
                   export BACKEND_IMAGE
                   export BACKEND_DEPLOY_VERSION="$TARGET_VERSION"
 
-                  compose_cmd pull backend backend-worker redis
-                  compose_cmd up -d --force-recreate --remove-orphans backend backend-worker redis
+                  compose_cmd pull backend backend-worker gopro-overlay-worker redis
+                  compose_cmd up -d --force-recreate --remove-orphans backend backend-worker gopro-overlay-worker redis
                 '
             }
 
