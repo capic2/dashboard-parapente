@@ -468,6 +468,94 @@ def _verify_video_output(path: Path) -> tuple[bool, str | None]:
     return True, None
 
 
+def _scaled_video_path(path: Path) -> Path:
+    return path.with_name(f".{path.stem}.scaled{path.suffix or '.mp4'}")
+
+
+def _unlink_if_exists(path: Path) -> None:
+    try:
+        if path.exists():
+            path.unlink()
+    except OSError:
+        pass
+
+
+def _ensure_video_output_resolution(
+    path: Path,
+    expected_width: int | None,
+    expected_height: int | None,
+) -> tuple[bool, str | None]:
+    if not expected_width or not expected_height:
+        return True, None
+    if expected_width <= 0 or expected_height <= 0:
+        return False, f"Invalid expected dimensions: {expected_width}x{expected_height}"
+    if expected_width > 16384 or expected_height > 16384:
+        return False, f"Expected dimensions too large: {expected_width}x{expected_height}"
+
+    output_width, output_height = probe_video_resolution(path)
+    if output_width == expected_width and output_height == expected_height:
+        return True, None
+    if output_width is None or output_height is None:
+        return False, "ffprobe did not report a valid output resolution"
+
+    scaled_path = _scaled_video_path(path)
+    _unlink_if_exists(scaled_path)
+    command = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(path),
+        "-vf",
+        f"scale={expected_width}:{expected_height}:flags=lanczos",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "18",
+        "-c:a",
+        "copy",
+        "-movflags",
+        "+faststart",
+        str(scaled_path),
+    ]
+    logger.info(
+        "Rescaling GoPro overlay output from %sx%s to %sx%s: %s",
+        output_width,
+        output_height,
+        expected_width,
+        expected_height,
+        path,
+    )
+    try:
+        result = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2 * 60 * 60,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError, TimeoutError) as exc:
+        _unlink_if_exists(scaled_path)
+        return False, str(exc) or exc.__class__.__name__
+
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "ffmpeg scale failed"
+        _unlink_if_exists(scaled_path)
+        return False, detail
+    scaled_width, scaled_height = probe_video_resolution(scaled_path)
+    if scaled_width != expected_width or scaled_height != expected_height:
+        _unlink_if_exists(scaled_path)
+        return (
+            False,
+            f"scaled output resolution is {scaled_width}x{scaled_height}, expected "
+            f"{expected_width}x{expected_height}",
+        )
+
+    scaled_path.replace(path)
+    return True, None
+
+
 def _transition_job_to_running(job_id: str, command: list[str]) -> dict[str, Any] | None:
     try:
         with SessionLocal() as db:
@@ -1064,6 +1152,22 @@ def _run_job(job_id: str) -> None:
                 progress=100,
                 message="Overlay output is invalid",
                 error=validation_error or "ffprobe validation failed",
+                completed_at=_utc_now(),
+            )
+            return
+
+        resolution_ok, resolution_error = _ensure_video_output_resolution(
+            temp_output_path,
+            int(job["video_width"]) if job.get("video_width") else None,
+            int(job["video_height"]) if job.get("video_height") else None,
+        )
+        if not resolution_ok:
+            _finish_job(
+                job_id,
+                status=_STATUS_FAILED,
+                progress=100,
+                message="Overlay output resolution is invalid",
+                error=resolution_error or "ffmpeg resolution correction failed",
                 completed_at=_utc_now(),
             )
             return
