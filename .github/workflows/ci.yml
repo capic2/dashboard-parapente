@@ -183,7 +183,7 @@ jobs:
 
       - name: 📊 Upload frontend coverage
         if: always() && env.CODECOV_TOKEN != ''
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           files: ./coverage/apps/frontend/lcov.info
           flags: frontend
@@ -192,7 +192,7 @@ jobs:
 
       - name: 📊 Upload backend coverage
         if: always() && env.CODECOV_TOKEN != ''
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           files: ./coverage/apps/backend/coverage.xml
           flags: backend
