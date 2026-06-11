@@ -160,7 +160,7 @@ jobs:
             }
 
       - name: Checkout source for image build
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Verify GoPro overlay build context
         env:
