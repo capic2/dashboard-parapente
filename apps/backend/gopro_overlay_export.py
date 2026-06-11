@@ -717,6 +717,7 @@ async def create_gopro_overlay_job(
     fallback_gpx_path: Path | None = None,
     fallback_pip_path: Path | None = None,
     output_dir: str | None = None,
+    pin_inputs: bool = False,
 ) -> dict[str, Any]:
     job_id = str(uuid.uuid4())
     job_upload_dir = _uploaded_job_work_dir(job_id)
@@ -758,6 +759,7 @@ async def create_gopro_overlay_job(
             output_filename=output_filename,
             work_dir=job_upload_dir,
             output_dir=output_dir,
+            pin_inputs=pin_inputs,
         )
     except Exception:
         shutil.rmtree(job_upload_dir, ignore_errors=True)

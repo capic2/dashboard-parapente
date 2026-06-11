@@ -55,6 +55,7 @@ class GoproOverlayJob(BaseModel):
     progress: int
     message: str
     error: str | None = None
+    gpx_path: str | None = None
     layout_id: str
     layout_label: str
     output_filename: str
