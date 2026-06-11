@@ -155,10 +155,17 @@ def _prepare_layout_file(
 ) -> Path:
     tree = ET.parse(layout_path)
     root = tree.getroot()
+    source_width = _parse_float(root.attrib.get("width"))
+    source_height = _parse_float(root.attrib.get("height"))
+    scale_x = target_width / source_width if target_width and source_width else None
+    scale_y = target_height / source_height if target_height and source_height else None
 
     if target_width is not None and target_height is not None:
         root.set("width", str(target_width))
         root.set("height", str(target_height))
+
+    if scale_x is not None and scale_y is not None:
+        _scale_layout_geometry(root, scale_x, scale_y)
 
     def normalize_video_components(parent: ET.Element) -> None:
         for child in list(parent):
@@ -176,6 +183,44 @@ def _prepare_layout_file(
     destination.parent.mkdir(parents=True, exist_ok=True)
     tree.write(destination, encoding="unicode")
     return destination
+
+
+def _parse_float(value: str | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def _format_scaled_number(value: float) -> str:
+    rounded = round(value)
+    if abs(value - rounded) < 1e-6:
+        return str(int(rounded))
+    text = f"{value:.6f}".rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def _scale_layout_geometry(parent: ET.Element, scale_x: float, scale_y: float) -> None:
+    x_attrs = {"x", "cx", "rx"}
+    y_attrs = {"y", "cy", "ry"}
+    uniform_attrs = {"width", "height", "size", "font-size", "stroke-width", "r"}
+
+    for child in parent.iter():
+        if child is parent:
+            continue
+        for attr, raw_value in list(child.attrib.items()):
+            numeric_value = _parse_float(raw_value)
+            if numeric_value is None:
+                continue
+            if attr in x_attrs:
+                child.set(attr, _format_scaled_number(numeric_value * scale_x))
+            elif attr in y_attrs:
+                child.set(attr, _format_scaled_number(numeric_value * scale_y))
+            elif attr in uniform_attrs:
+                uniform_scale = (scale_x + scale_y) / 2
+                child.set(attr, _format_scaled_number(numeric_value * uniform_scale))
 
 
 def _safe_filename(filename: str | None, fallback: str) -> str:

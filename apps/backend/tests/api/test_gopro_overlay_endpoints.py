@@ -1093,13 +1093,23 @@ def test_prepare_layout_file_removes_pip_without_video(tmp_path):
 def test_prepare_layout_file_sets_video_dimensions(tmp_path):
     source = tmp_path / "layout.xml"
     destination = tmp_path / "prepared.xml"
-    source.write_text('<layout width="1920" height="1080" />')
+    source.write_text(
+        '<layout width="1920" height="1080">'
+        '<component type="video" size="220" x="100" y="50" width="300" height="100" />'
+        "</layout>"
+    )
 
-    _prepare_layout_file(source, destination, has_pip=False, target_width=2704, target_height=1520)
+    _prepare_layout_file(source, destination, has_pip=True, target_width=3840, target_height=2160)
 
     prepared = destination.read_text()
-    assert 'width="2704"' in prepared
-    assert 'height="1520"' in prepared
+    assert 'width="3840"' in prepared
+    assert 'height="2160"' in prepared
+    assert 'id="pip"' in prepared
+    assert 'size="440"' in prepared
+    assert 'x="200"' in prepared
+    assert 'y="100"' in prepared
+    assert 'width="600"' in prepared
+    assert 'height="200"' in prepared
 
 
 def test_gopro_overlay_progress_is_parsed_from_render_output():
@@ -1279,12 +1289,17 @@ def test_worker_preparation_uses_video_render_size_for_4k_source(
 ):
     layout_dir = tmp_path / "layouts"
     layout_dir.mkdir()
-    (layout_dir / "layout_parapente_1080.xml").write_text('<layout width="1920" height="1080" />')
-    (layout_dir / "layout_parapente_3840.xml").write_text('<layout width="3840" height="2160" />')
+    (layout_dir / "layout_parapente_1080.xml").write_text(
+        '<layout width="1920" height="1080">'
+        '<component type="video" size="220" x="100" y="50" width="300" height="100" />'
+        "</layout>"
+    )
     video_path = tmp_path / "source.mp4"
     gpx_path = tmp_path / "source.gpx"
+    pip_path = tmp_path / "pip.mp4"
     video_path.write_bytes(b"video")
     gpx_path.write_text("<gpx />")
+    pip_path.write_bytes(b"pip")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH", 1920)
     monkeypatch.setattr(config, "GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT", 1080)
@@ -1294,8 +1309,8 @@ def test_worker_preparation_uses_video_render_size_for_4k_source(
     job = create_gopro_overlay_job_from_paths(
         video_path=video_path,
         gpx_path=gpx_path,
-        pip_path=None,
-        layout_id=None,
+        pip_path=pip_path,
+        layout_id="parapente-1080",
         output_filename="overlay.mp4",
     )
     queued_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
@@ -1304,12 +1319,16 @@ def test_worker_preparation_uses_video_render_size_for_4k_source(
     prepared = gopro_overlay_export._prepare_queued_job(job["job_id"], queued_job)
 
     assert prepared is not None
-    assert prepared["layout_id"] == "parapente-3840"
+    assert prepared["layout_id"] == "parapente-1080"
     assert prepared["video_width"] == 3840
     assert prepared["video_height"] == 2160
     prepared_layout = Path(prepared["layout_path"]).read_text()
     assert 'width="3840"' in prepared_layout
     assert 'height="2160"' in prepared_layout
+    assert 'id="pip"' in prepared_layout
+    assert 'size="440"' in prepared_layout
+    assert 'x="200"' in prepared_layout
+    assert 'y="100"' in prepared_layout
 
 
 def test_worker_preparation_uses_exact_video_size_for_non_standard_source(
@@ -1319,7 +1338,11 @@ def test_worker_preparation_uses_exact_video_size_for_non_standard_source(
 ):
     layout_dir = tmp_path / "layouts"
     layout_dir.mkdir()
-    (layout_dir / "layout_parapente_1080.xml").write_text('<layout width="1920" height="1080" />')
+    (layout_dir / "layout_parapente_1080.xml").write_text(
+        '<layout width="1920" height="1080">'
+        '<component type="video" size="220" x="100" y="50" width="300" height="100" />'
+        "</layout>"
+    )
     video_path = tmp_path / "source.mp4"
     gpx_path = tmp_path / "source.gpx"
     video_path.write_bytes(b"video")
