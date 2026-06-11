@@ -260,10 +260,10 @@ def test_create_flight_gopro_overlay_job_uses_auto_flight_directory_files(
     input_dir = paragliding_root / "20260315" / "01"
     input_dir.mkdir(parents=True)
     camera_path = input_dir / "camera.mp4"
-    first_gpx_path = input_dir / "Zepp-a.gpx"
+    first_gpx_path = input_dir / "Zepp-a.GPX"
     second_gpx_path = input_dir / "Zepp-b.gpx"
     old_pip_path = input_dir / "flight-old.mp4"
-    new_pip_path = input_dir / "flight-new.mp4"
+    new_pip_path = input_dir / "flight-new.MP4"
     camera_path.write_bytes(b"camera")
     first_gpx_path.write_text("<gpx>first</gpx>")
     second_gpx_path.write_text("<gpx>second</gpx>")
@@ -401,7 +401,7 @@ def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
     camera_path = input_dir / "camera.mp4"
     gpx_path = input_dir / "Zepp-track.gpx"
     pip_path = input_dir / "flight-pip.mp4"
-    first_osv = input_dir / "first.osv"
+    first_osv = input_dir / "first.OSV"
     second_osv = input_dir / "second.osv"
     merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
     camera_path.write_bytes(b"camera")
@@ -540,6 +540,139 @@ def test_merge_osv_files_with_gpx_writes_stable_file_in_flight_directory(
     command = run.call_args.args[0]
     assert command[-2:] == [str(source_gpx), str(merged_gpx_path)]
     assert str(input_dir / ".gopro-overlay-work") not in command[-1]
+
+
+def test_gopro_overlay_output_resolution_is_rescaled_when_needed(tmp_path, monkeypatch) -> None:
+    output_path = tmp_path / "overlay.mp4"
+    output_path.write_bytes(b"small")
+    scaled_path = gopro_overlay_export._scaled_video_path(output_path)
+
+    def fake_probe(path: Path):
+        if path == output_path:
+            return (1280, 720)
+        if path == scaled_path:
+            return (1920, 1080)
+        return (None, None)
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = ""
+
+    def fake_run(command, **kwargs):
+        Path(command[-1]).write_bytes(b"scaled")
+        return Result()
+
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", fake_probe)
+    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run) as run:
+        ok, error = gopro_overlay_export._ensure_video_output_resolution(
+            output_path,
+            1920,
+            1080,
+        )
+
+    assert ok is True
+    assert error is None
+    assert output_path.read_bytes() == b"scaled"
+    command = run.call_args.args[0]
+    assert command[command.index("-vf") + 1] == "scale=1920:1080:flags=lanczos"
+
+
+def test_gopro_overlay_output_resolution_noops_when_size_matches(tmp_path, monkeypatch) -> None:
+    output_path = tmp_path / "overlay.mp4"
+    output_path.write_bytes(b"video")
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+
+    with patch("gopro_overlay_export.subprocess.run") as run:
+        ok, error = gopro_overlay_export._ensure_video_output_resolution(
+            output_path,
+            1920,
+            1080,
+        )
+
+    assert ok is True
+    assert error is None
+    assert not run.called
+    assert output_path.read_bytes() == b"video"
+
+
+def test_gopro_overlay_output_resolution_rejects_invalid_expected_dimensions(tmp_path) -> None:
+    output_path = tmp_path / "overlay.mp4"
+    output_path.write_bytes(b"video")
+
+    ok, error = gopro_overlay_export._ensure_video_output_resolution(output_path, -1, 1080)
+
+    assert ok is False
+    assert error == "Invalid expected dimensions: -1x1080"
+
+
+def test_gopro_overlay_output_resolution_cleans_scaled_file_on_ffmpeg_error(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    output_path = tmp_path / "overlay.mp4"
+    output_path.write_bytes(b"small")
+    scaled_path = gopro_overlay_export._scaled_video_path(output_path)
+
+    class Result:
+        returncode = 1
+        stderr = "scale failed"
+        stdout = ""
+
+    def fake_run(command, **kwargs):
+        Path(command[-1]).write_bytes(b"partial")
+        return Result()
+
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1280, 720))
+    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run):
+        ok, error = gopro_overlay_export._ensure_video_output_resolution(
+            output_path,
+            1920,
+            1080,
+        )
+
+    assert ok is False
+    assert error == "scale failed"
+    assert not scaled_path.exists()
+    assert output_path.read_bytes() == b"small"
+
+
+def test_gopro_overlay_output_resolution_cleans_scaled_file_on_wrong_scaled_size(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    output_path = tmp_path / "overlay.mp4"
+    output_path.write_bytes(b"small")
+    scaled_path = gopro_overlay_export._scaled_video_path(output_path)
+
+    def fake_probe(path: Path):
+        if path == output_path:
+            return (1280, 720)
+        if path == scaled_path:
+            return (1600, 900)
+        return (None, None)
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = ""
+
+    def fake_run(command, **kwargs):
+        Path(command[-1]).write_bytes(b"wrong-size")
+        return Result()
+
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", fake_probe)
+    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run):
+        ok, error = gopro_overlay_export._ensure_video_output_resolution(
+            output_path,
+            1920,
+            1080,
+        )
+
+    assert ok is False
+    assert error == "scaled output resolution is 1600x900, expected 1920x1080"
+    assert not scaled_path.exists()
+    assert output_path.read_bytes() == b"small"
 
 
 def test_create_flight_gopro_overlay_job_rejects_paths_outside_paragliding_root(
