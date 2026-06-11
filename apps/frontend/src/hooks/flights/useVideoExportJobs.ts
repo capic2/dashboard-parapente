@@ -16,6 +16,7 @@ export type VideoExportJob = {
   progress?: number | null;
   message?: string | null;
   error?: string | null;
+  gpx_path?: string | null;
   mode?: string | null;
   started_at?: string | null;
   completed_at?: string | null;

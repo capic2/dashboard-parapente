@@ -14,6 +14,7 @@ export type GoproOverlayJob = {
   progress: number;
   message: string;
   error?: string | null;
+  gpx_path?: string | null;
   layout_id: string;
   layout_label: string;
   output_filename: string;

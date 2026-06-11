@@ -403,7 +403,7 @@ def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
     pip_path = input_dir / "flight-pip.mp4"
     first_osv = input_dir / "first.osv"
     second_osv = input_dir / "second.osv"
-    merged_gpx_path = input_dir / ".gopro-overlay-work" / "merged.gpx"
+    merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
     camera_path.write_bytes(b"camera")
     gpx_path.write_text("<gpx />")
     pip_path.write_bytes(b"pip")
@@ -411,7 +411,6 @@ def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
     second_osv.write_bytes(b"second")
     sample_flight.video_file_path = str(pip_path)
     db_session.commit()
-    merged_gpx_path.parent.mkdir(parents=True)
     merged_gpx_path.write_text("<gpx>merged</gpx>")
     os.utime(first_osv, (1, 1))
     os.utime(second_osv, (2, 2))
@@ -456,13 +455,12 @@ def test_create_flight_gopro_overlay_job_uses_merged_uploaded_gpx_when_osv_exist
     input_dir.mkdir(parents=True)
     pip_path = input_dir / "flight-pip.mp4"
     osv_path = input_dir / "flight.osv"
-    merged_gpx_path = input_dir / ".gopro-overlay-work" / "merged.gpx"
+    merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
     pip_path.write_bytes(b"pip")
     osv_path.write_bytes(b"osv")
     sample_flight.gpx_file_path = None
     sample_flight.video_file_path = str(pip_path)
     db_session.commit()
-    merged_gpx_path.parent.mkdir(parents=True)
     merged_gpx_path.write_text("<gpx>merged</gpx>")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
 
@@ -503,6 +501,45 @@ def test_create_flight_gopro_overlay_job_uses_merged_uploaded_gpx_when_osv_exist
     assert merge_osv.call_args.args[2] == input_dir
     assert create_job.call_args.kwargs["gpx_file"] is None
     assert create_job.call_args.kwargs["fallback_gpx_path"] == merged_gpx_path
+    assert create_job.call_args.kwargs["pin_inputs"] is True
+
+
+def test_merge_osv_files_with_gpx_writes_stable_file_in_flight_directory(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    gopro_root = tmp_path / "gopro-overlay"
+    gopro_root.mkdir()
+    (gopro_root / "osv_merge.py").write_text("# merge")
+    input_dir = tmp_path / "20260315" / "01"
+    input_dir.mkdir(parents=True)
+    first_osv = input_dir / "first.osv"
+    second_osv = input_dir / "second.osv"
+    source_gpx = input_dir / "Zepp-track.gpx"
+    merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
+    first_osv.write_bytes(b"first")
+    second_osv.write_bytes(b"second")
+    source_gpx.write_text("<gpx>source</gpx>")
+    merged_gpx_path.write_text("stale")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(gopro_root))
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = ""
+
+    def fake_run(command, **kwargs):
+        Path(command[-1]).write_text("<gpx>merged</gpx>")
+        return Result()
+
+    with patch("routes.subprocess.run", side_effect=fake_run) as run:
+        result = routes._merge_osv_files_with_gpx([first_osv, second_osv], source_gpx, input_dir)
+
+    assert result == merged_gpx_path
+    assert merged_gpx_path.read_text() == "<gpx>merged</gpx>"
+    command = run.call_args.args[0]
+    assert command[-2:] == [str(source_gpx), str(merged_gpx_path)]
+    assert str(input_dir / ".gopro-overlay-work") not in command[-1]
 
 
 def test_create_flight_gopro_overlay_job_rejects_paths_outside_paragliding_root(

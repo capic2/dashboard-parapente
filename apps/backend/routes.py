@@ -280,6 +280,7 @@ def _flight_gopro_camera_file_exists(db: Session, flight: Flight) -> bool:
 
 
 _GOPRO_OVERLAY_IN_PROGRESS_STATUSES = {"queued", "preparing", "running"}
+_GOPRO_OVERLAY_MERGED_GPX_FILENAME = "merged-gopro-overlay.gpx"
 
 
 def _flight_gopro_overlay_file_path(
@@ -408,9 +409,10 @@ def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: 
     if not merge_script.exists():
         raise ValueError(f"OSV merge script not found: {merge_script}")
 
-    work_dir = input_dir / ".gopro-overlay-work"
-    work_dir.mkdir(parents=True, exist_ok=True)
-    merged_gpx_path = work_dir / f"merged-{uuid.uuid4()}.gpx"
+    input_dir.mkdir(parents=True, exist_ok=True)
+    merged_gpx_path = input_dir / _GOPRO_OVERLAY_MERGED_GPX_FILENAME
+    if merged_gpx_path.exists():
+        merged_gpx_path.unlink()
     command = [
         "python3",
         str(merge_script),
@@ -504,6 +506,7 @@ def _gopro_overlay_export_job_payload(job: dict[str, Any]) -> dict[str, Any]:
         "progress": job.get("progress"),
         "message": job.get("message"),
         "error": job.get("error"),
+        "gpx_path": job.get("gpx_path"),
         "mode": "gopro_overlay",
         "flight_title": job.get("output_filename") or job.get("layout_label"),
         "flight_name": job.get("layout_label"),
@@ -5387,6 +5390,7 @@ async def create_flight_gopro_overlay_job(
         )
         fallback_pip_path = resolved_pip_path or auto_pip_path or generated_video_path
         gpx_file_for_job = gpx_file
+        pin_overlay_inputs = False
         if gpx_file and gpx_file.filename and auto_osv_paths:
             uploaded_gpx_path = await save_uploaded_file(
                 gpx_file,
@@ -5402,6 +5406,7 @@ async def create_flight_gopro_overlay_job(
                 input_dir,
             )
             gpx_file_for_job = None
+            pin_overlay_inputs = True
         elif fallback_gpx_path and fallback_gpx_path.exists() and auto_osv_paths:
             fallback_gpx_path = await asyncio.to_thread(
                 _merge_osv_files_with_gpx,
@@ -5409,6 +5414,7 @@ async def create_flight_gopro_overlay_job(
                 fallback_gpx_path,
                 input_dir,
             )
+            pin_overlay_inputs = True
 
         if resolved_video_path:
             if not resolved_video_path.exists():
@@ -5455,6 +5461,7 @@ async def create_flight_gopro_overlay_job(
             layout_id=layout_id,
             output_filename=resolved_output_filename,
             output_dir=resolved_output_dir,
+            pin_inputs=pin_overlay_inputs,
         )
         _mark_flight_gopro_overlay_job(db, flight, job)
         return _with_gopro_overlay_job_token(job)
