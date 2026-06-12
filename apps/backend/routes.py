@@ -456,7 +456,7 @@ def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: 
             capture_output=True,
             check=False,
             text=True,
-            timeout=60,
+            timeout=config.GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired as exc:
         detail = exc.stderr or exc.stdout or "OSV merge timed out"

@@ -508,6 +508,7 @@ def test_merge_osv_files_with_gpx_writes_stable_file_in_flight_directory(
     source_gpx.write_text("<gpx>source</gpx>")
     merged_gpx_path.write_text("stale")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(gopro_root))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS", 123)
 
     class Result:
         returncode = 0
@@ -526,6 +527,45 @@ def test_merge_osv_files_with_gpx_writes_stable_file_in_flight_directory(
     command = run.call_args.args[0]
     assert command[-2:] == [str(source_gpx), str(merged_gpx_path)]
     assert str(input_dir / ".gopro-overlay-work") not in command[-1]
+    assert run.call_args.kwargs["timeout"] == 123
+
+
+def test_worker_merge_osv_files_with_gpx_uses_configured_timeout(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    gopro_root = tmp_path / "gopro-overlay"
+    gopro_root.mkdir()
+    (gopro_root / "osv_merge.py").write_text("# merge")
+    input_dir = tmp_path / "20260315" / "01"
+    input_dir.mkdir(parents=True)
+    source_gpx = input_dir / "Zepp-track.gpx"
+    osv_path = input_dir / "flight.osv"
+    merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
+    source_gpx.write_text("<gpx>source</gpx>")
+    osv_path.write_bytes(b"osv")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(gopro_root))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS", 456)
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = ""
+
+    def fake_run(command, **kwargs):
+        Path(command[-1]).write_text("<gpx>merged</gpx>")
+        return Result()
+
+    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run) as run:
+        result = gopro_overlay_export._merge_osv_files_with_gpx(
+            [osv_path],
+            source_gpx,
+            input_dir,
+        )
+
+    assert result == merged_gpx_path
+    assert merged_gpx_path.read_text() == "<gpx>merged</gpx>"
+    assert run.call_args.kwargs["timeout"] == 456
 
 
 def test_gopro_overlay_output_resolution_is_rescaled_when_needed(tmp_path, monkeypatch) -> None:
