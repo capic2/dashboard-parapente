@@ -3,15 +3,19 @@ import { Trans, useTranslation } from 'react-i18next';
 import { Modal, Button } from '@dashboard-parapente/design-system';
 import { useCreateFlightFromGPX } from '../../../hooks/flights/useFlights';
 import { useToast } from '../../../hooks/useToast';
+import type { Site } from '../../../types';
+import { formatFlightSiteLabel } from '../siteDisplay';
 
 interface CreateFlightModalProps {
   isOpen: boolean;
+  sites: Site[];
   onClose: () => void;
   onCreateComplete: () => void;
 }
 
 export function CreateFlightModal({
   isOpen,
+  sites,
   onClose,
   onCreateComplete,
 }: CreateFlightModalProps) {
@@ -22,6 +26,13 @@ export function CreateFlightModal({
 
   const { mutate: createFlight, isPending, data } = useCreateFlightFromGPX();
   const toast = useToast();
+  const createdFlightSiteLabel = data
+    ? formatFlightSiteLabel({
+        siteId: data.flight.site_id,
+        siteName: data.flight.site_name,
+        sites,
+      })
+    : '';
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -58,7 +69,6 @@ export function CreateFlightModal({
         setTimeout(() => onClose(), 2000); // Fermer après 2s
       },
       onError: (error: Error) => {
-        console.log({ error });
         const errorMessage = error.message || t('flights.createGenericError');
         setError(errorMessage);
         toast.error(t('flights.createFailure') + ` ${errorMessage}`);
@@ -103,6 +113,7 @@ export function CreateFlightModal({
               ref={fileInputRef}
               type="file"
               accept=".gpx,.igc"
+              aria-label={t('flights.gpxFile')}
               onChange={handleFileChange}
               disabled={isPending}
               className="block w-full text-sm text-gray-500 dark:text-gray-400
@@ -147,9 +158,10 @@ export function CreateFlightModal({
               <li>
                 • <strong>{t('flights.date')}</strong> {data.flight.flight_date}
               </li>
-              {data.flight.site_name && (
+              {createdFlightSiteLabel && (
                 <li>
-                  • <strong>{t('flights.site')}</strong> {data.flight.site_name}
+                  • <strong>{t('flights.site')}</strong>{' '}
+                  {createdFlightSiteLabel}
                 </li>
               )}
               {data.flight.duration_minutes && (

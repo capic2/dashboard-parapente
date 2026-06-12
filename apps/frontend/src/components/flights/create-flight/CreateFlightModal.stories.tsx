@@ -4,6 +4,21 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse, delay } from 'msw';
 import { fn } from 'storybook/test';
 import { CreateFlightModal } from './CreateFlightModal';
+import type { Site } from '../../../types';
+
+const mockSites: Site[] = [
+  {
+    id: 'site-mont-poupet',
+    name: 'Mont Poupet',
+    latitude: 46.98,
+    longitude: 5.88,
+    country: 'FR',
+    region: 'Besançon',
+    camera_distance: null,
+    flight_count: 1,
+    is_active: true,
+  },
+];
 
 const meta = preview.meta({
   title: 'Components/Forms/CreateFlightModal',
@@ -38,6 +53,7 @@ const meta = preview.meta({
 const mockFlightResult = {
   flight: {
     id: 'new-flight-1',
+    site_id: 'site-mont-poupet',
     name: 'Vol Mont Poupet',
     flight_date: '2024-03-15',
     site_name: 'Mont Poupet',
@@ -52,6 +68,7 @@ export const FlightModal = meta.story({
   name: 'Flight Modal',
   args: {
     isOpen: true,
+    sites: mockSites,
     onClose: fn(),
     onCreateComplete: fn(),
   },
@@ -89,7 +106,7 @@ FlightModal.test('It can upload a file', async ({ args }) => {
 
   // Upload the file
   await userEvent.upload(input, file);
-  await expect(await screen.findByText(/test-flight.gpx/)).toBeInTheDocument();
+  await expect(await screen.findByText(/test-flight.gpx/u)).toBeInTheDocument();
 
   // Click the upload button
   const uploadButton = await screen.findByText('📤 Créer le vol');
@@ -98,6 +115,9 @@ FlightModal.test('It can upload a file', async ({ args }) => {
   // Verify success message appears
   await expect(
     await screen.findByText('✅ Vol créé avec succès')
+  ).toBeInTheDocument();
+  await expect(
+    await screen.findByText(/Besançon - Mont Poupet/u)
   ).toBeInTheDocument();
 
   await expect(args.onCreateComplete).toHaveBeenCalled();
@@ -129,14 +149,16 @@ FlightModal.test(
     // Upload the file
     await userEvent.upload(input, file);
     await expect(
-      await screen.findByText(/test-flight.gpx/)
+      await screen.findByText(/test-flight.gpx/u)
     ).toBeInTheDocument();
 
     // Click the upload button
     const cancelButton = screen.getByText('Annuler');
     await userEvent.click(cancelButton);
 
-    await expect(screen.queryByText(/test-flight.gpx/)).not.toBeInTheDocument();
+    await expect(
+      screen.queryByText(/test-flight.gpx/u)
+    ).not.toBeInTheDocument();
   }
 );
 
@@ -152,7 +174,7 @@ FlightModal.test(
   await userEvent.click(uploadButton);
 
 
-    await expect(await screen.findByText(/Création en cours.../)).toBeInTheDocument();
+    await expect(await screen.findByText(/Création en cours.../u)).toBeInTheDocument();
 })*/
 
 FlightModal.test(
@@ -199,7 +221,7 @@ FlightModal.test(
 
     // Verify file is selected
     await expect(
-      await screen.findByText(/invalid-flight.gpx/)
+      await screen.findByText(/invalid-flight.gpx/u)
     ).toBeInTheDocument();
 
     // Click the upload button
@@ -239,7 +261,7 @@ FlightModal.test(
 FlightModal.test(
   'it calls onClose when click on close button',
   async ({ args }) => {
-    await userEvent.click(screen.getByRole('button', { name: /fermer/i }));
+    await userEvent.click(screen.getByRole('button', { name: /fermer/iu }));
     await expect(args.onClose).toHaveBeenCalled();
   }
 );

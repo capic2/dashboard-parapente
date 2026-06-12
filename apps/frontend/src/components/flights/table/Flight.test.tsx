@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import type React from 'react';
 import { expect, test, vi } from 'vitest';
-import type { Flight as FlightRecord } from '../../../types';
+import type { Flight as FlightRecord, Site } from '../../../types';
 
 vi.mock('@dashboard-parapente/design-system', () => ({
   Button: ({
@@ -52,10 +52,25 @@ const flight = {
   site_id: 'site-1',
 } as FlightRecord;
 
+const sites = [
+  {
+    id: 'site-1',
+    name: 'Puy de Dôme',
+    latitude: 45.77,
+    longitude: 2.96,
+    country: 'FR',
+    region: 'Besançon',
+    camera_distance: null,
+    flight_count: 1,
+    is_active: true,
+  },
+] as Site[];
+
 test('does not render the selected flight badge', () => {
   render(
     <Flight
       flight={flight}
+      sites={sites}
       isActive={true}
       isSelected={false}
       selectionMode={false}
@@ -77,4 +92,5 @@ test('does not render the selected flight badge', () => {
     'data-selected',
     'true'
   );
+  expect(screen.getByText('Besançon - Puy de Dôme')).toBeInTheDocument();
 });
