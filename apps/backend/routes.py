@@ -5428,31 +5428,7 @@ async def create_flight_gopro_overlay_job(
         )
         fallback_pip_path = resolved_pip_path or auto_pip_path or generated_video_path
         gpx_file_for_job = gpx_file
-        pin_overlay_inputs = False
-        if gpx_file and gpx_file.filename and auto_osv_paths:
-            uploaded_gpx_path = await save_uploaded_file(
-                gpx_file,
-                input_dir
-                / ".gopro-overlay-work"
-                / f"uploaded-{uuid.uuid4()}{Path(gpx_file.filename).suffix.lower()}",
-                {".gpx", ".fit"},
-            )
-            fallback_gpx_path = await asyncio.to_thread(
-                _merge_osv_files_with_gpx,
-                auto_osv_paths,
-                uploaded_gpx_path,
-                input_dir,
-            )
-            gpx_file_for_job = None
-            pin_overlay_inputs = True
-        elif fallback_gpx_path and fallback_gpx_path.exists() and auto_osv_paths:
-            fallback_gpx_path = await asyncio.to_thread(
-                _merge_osv_files_with_gpx,
-                auto_osv_paths,
-                fallback_gpx_path,
-                input_dir,
-            )
-            pin_overlay_inputs = True
+        pin_overlay_inputs = bool(auto_osv_paths)
 
         if resolved_video_path:
             if not resolved_video_path.exists():

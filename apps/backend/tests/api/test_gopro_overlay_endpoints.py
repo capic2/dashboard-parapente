@@ -403,7 +403,6 @@ def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
     pip_path = input_dir / "flight-pip.mp4"
     first_osv = input_dir / "first.OSV"
     second_osv = input_dir / "second.osv"
-    merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
     camera_path.write_bytes(b"camera")
     gpx_path.write_text("<gpx />")
     pip_path.write_bytes(b"pip")
@@ -411,7 +410,6 @@ def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
     second_osv.write_bytes(b"second")
     sample_flight.video_file_path = str(pip_path)
     db_session.commit()
-    merged_gpx_path.write_text("<gpx>merged</gpx>")
     os.utime(first_osv, (1, 1))
     os.utime(second_osv, (2, 2))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
@@ -433,14 +431,12 @@ def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
             "routes.check_gopro_overlay_dependencies",
             return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
         ),
-        patch("routes._merge_osv_files_with_gpx", return_value=merged_gpx_path) as merge_osv,
         patch("routes.create_gopro_overlay_job_from_paths", return_value=expected) as create_job,
     ):
         response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay")
 
     assert response.status_code == 200
-    assert merge_osv.call_args.args == ([first_osv, second_osv], gpx_path, input_dir)
-    assert create_job.call_args.kwargs["gpx_path"] == merged_gpx_path
+    assert create_job.call_args.kwargs["gpx_path"] == gpx_path
 
 
 def test_create_flight_gopro_overlay_job_uses_merged_uploaded_gpx_when_osv_exists(
@@ -455,13 +451,11 @@ def test_create_flight_gopro_overlay_job_uses_merged_uploaded_gpx_when_osv_exist
     input_dir.mkdir(parents=True)
     pip_path = input_dir / "flight-pip.mp4"
     osv_path = input_dir / "flight.osv"
-    merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
     pip_path.write_bytes(b"pip")
     osv_path.write_bytes(b"osv")
     sample_flight.gpx_file_path = None
     sample_flight.video_file_path = str(pip_path)
     db_session.commit()
-    merged_gpx_path.write_text("<gpx>merged</gpx>")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
 
     expected = {
@@ -481,7 +475,6 @@ def test_create_flight_gopro_overlay_job_uses_merged_uploaded_gpx_when_osv_exist
             "routes.check_gopro_overlay_dependencies",
             return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
         ),
-        patch("routes._merge_osv_files_with_gpx", return_value=merged_gpx_path) as merge_osv,
         patch("routes.create_gopro_overlay_job", AsyncMock(return_value=expected)) as create_job,
     ):
         response = client.post(
@@ -493,15 +486,8 @@ def test_create_flight_gopro_overlay_job_uses_merged_uploaded_gpx_when_osv_exist
         )
 
     assert response.status_code == 200
-    uploaded_gpx_path = merge_osv.call_args.args[1]
-    assert merge_osv.call_args.args[0] == [osv_path]
-    assert uploaded_gpx_path.parent == input_dir / ".gopro-overlay-work"
-    assert uploaded_gpx_path.name.startswith("uploaded-")
-    assert uploaded_gpx_path.read_text() == "<gpx>uploaded</gpx>"
-    assert merge_osv.call_args.args[2] == input_dir
-    assert create_job.call_args.kwargs["gpx_file"] is None
-    assert create_job.call_args.kwargs["fallback_gpx_path"] == merged_gpx_path
-    assert create_job.call_args.kwargs["pin_inputs"] is True
+    assert create_job.call_args.kwargs["gpx_file"] is not None
+    assert create_job.call_args.kwargs["fallback_gpx_path"] is None
 
 
 def test_merge_osv_files_with_gpx_writes_stable_file_in_flight_directory(
@@ -1329,6 +1315,52 @@ def test_worker_preparation_uses_video_render_size_for_4k_source(
     assert 'size="440"' in prepared_layout
     assert 'x="200"' in prepared_layout
     assert 'y="100"' in prepared_layout
+
+
+def test_worker_preparation_merges_osv_files_before_rendering(
+    tmp_path,
+    monkeypatch,
+    test_db,
+):
+    layout_dir = tmp_path / "layouts"
+    layout_dir.mkdir()
+    (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
+    video_path = tmp_path / "source.mp4"
+    gpx_path = tmp_path / "source.gpx"
+    pip_path = tmp_path / "pip.mp4"
+    first_osv = tmp_path / "first.OSV"
+    second_osv = tmp_path / "second.osv"
+    merged_gpx_path = tmp_path / "merged-gopro-overlay.gpx"
+    video_path.write_bytes(b"video")
+    gpx_path.write_text("<gpx />")
+    pip_path.write_bytes(b"pip")
+    first_osv.write_bytes(b"first")
+    second_osv.write_bytes(b"second")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+
+    job = create_gopro_overlay_job_from_paths(
+        video_path=video_path,
+        gpx_path=gpx_path,
+        pip_path=pip_path,
+        layout_id="parapente-1080",
+        output_filename="overlay.mp4",
+    )
+    queued_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
+    assert queued_job is not None
+
+    with patch(
+        "gopro_overlay_export._merge_osv_files_with_gpx",
+        return_value=merged_gpx_path,
+    ) as merge_osv:
+        prepared = gopro_overlay_export._prepare_queued_job(job["job_id"], queued_job)
+
+    assert prepared is not None
+    assert merge_osv.call_args.args[0] == [first_osv, second_osv]
+    assert merge_osv.call_args.args[1].name == "gpx-" + job["job_id"] + ".gpx"
+    assert merge_osv.call_args.args[2] == tmp_path
+    assert prepared["command"]["render_gpx_path"] == str(merged_gpx_path)
 
 
 def test_worker_preparation_uses_exact_video_size_for_non_standard_source(
