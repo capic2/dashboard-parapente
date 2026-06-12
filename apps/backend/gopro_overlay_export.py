@@ -1,4 +1,5 @@
 import asyncio
+import fnmatch
 import json
 import logging
 import os
@@ -126,6 +127,80 @@ def _uploaded_job_work_dir(job_id: str) -> Path:
 
 def _path_job_work_dir(video_path: Path, job_id: str) -> Path:
     return video_path.expanduser().resolve().parent / _PATH_WORK_DIR_NAME / job_id
+
+
+def _first_matching_file(directory: Path, pattern: str) -> Path | None:
+    if not directory.is_dir():
+        return None
+    pattern_lower = pattern.lower()
+    matches = sorted(
+        path
+        for path in directory.iterdir()
+        if path.is_file() and fnmatch.fnmatchcase(path.name.lower(), pattern_lower)
+    )
+    return matches[0] if matches else None
+
+
+def _matching_files_by_mtime(directory: Path, pattern: str) -> list[Path]:
+    if not directory.is_dir():
+        return []
+    pattern_lower = pattern.lower()
+    matches = [
+        path
+        for path in directory.iterdir()
+        if path.is_file() and fnmatch.fnmatchcase(path.name.lower(), pattern_lower)
+    ]
+    return sorted(matches, key=lambda path: (path.stat().st_mtime, path.name))
+
+
+def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: Path) -> Path:
+    if not osv_paths:
+        return gpx_path
+
+    merge_script = Path(config.GOPRO_OVERLAY_ROOT) / "osv_merge.py"
+    if not merge_script.exists():
+        raise ValueError(f"OSV merge script not found: {merge_script}")
+
+    input_dir.mkdir(parents=True, exist_ok=True)
+    merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
+    if merged_gpx_path.exists():
+        merged_gpx_path.unlink()
+
+    logger.info(
+        "Merging %s OSV file(s) with GPX %s into %s",
+        len(osv_paths),
+        gpx_path,
+        merged_gpx_path,
+    )
+    command = [
+        "python3",
+        str(merge_script),
+        *(str(path) for path in osv_paths),
+        str(gpx_path),
+        str(merged_gpx_path),
+    ]
+
+    try:
+        result = subprocess.run(
+            command,
+            cwd=config.GOPRO_OVERLAY_ROOT or None,
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired as exc:
+        detail = exc.stderr or exc.stdout or "OSV merge timed out"
+        raise ValueError(detail) from exc
+
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "OSV merge failed"
+        raise ValueError(detail)
+    if not merged_gpx_path.exists():
+        raise ValueError("OSV merge did not create a GPX file")
+
+    logger.info("Created merged GoPro overlay GPX: %s", merged_gpx_path)
+    return merged_gpx_path
 
 
 def _output_path_for_video(video_path: Path, output_name: str) -> Path:
@@ -673,6 +748,13 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                     work_dir / f"pip{pip_path.suffix.lower()}",
                     _VIDEO_EXTENSIONS,
                 )
+
+        source_input_dir = Path(str(job["output_path"])).parent
+        osv_paths = _matching_files_by_mtime(source_input_dir, "*.osv")
+        if osv_paths:
+            render_gpx_path = _merge_osv_files_with_gpx(
+                osv_paths, render_gpx_path, source_input_dir
+            )
 
         command_metadata["render_gpx_path"] = str(render_gpx_path)
 
