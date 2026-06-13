@@ -35,6 +35,10 @@ _ACTIVE_STATUSES = {_STATUS_QUEUED, _STATUS_PREPARING, _STATUS_RUNNING}
 _INTERRUPTIBLE_STATUSES = {_STATUS_PREPARING, _STATUS_RUNNING}
 _TERMINAL_STATUSES = {_STATUS_COMPLETED, _STATUS_FAILED, _STATUS_CANCELLED}
 
+_GPX_NAMESPACE = "http://www.topografix.com/GPX/1/1"
+_GARMIN_GPX_EXTENSION_NAMESPACE = "http://www.garmin.com/xmlschemas/GpxExtensions/v3"
+_XSI_NAMESPACE = "http://www.w3.org/2001/XMLSchema-instance"
+
 _VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v"}
 _GPX_EXTENSIONS = {".gpx", ".fit"}
 _UPLOAD_WORK_ROOT = Path("/tmp/dashboard-parapente/gopro-overlays")
@@ -157,6 +161,12 @@ def _xml_local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1].lower()
 
 
+def _register_gpx_namespaces() -> None:
+    ET.register_namespace("", _GPX_NAMESPACE)
+    ET.register_namespace("gpxpx", _GARMIN_GPX_EXTENSION_NAMESPACE)
+    ET.register_namespace("xsi", _XSI_NAMESPACE)
+
+
 def _trkpt_has_osv_sensor_data(point: ET.Element) -> bool:
     extension_names = {
         _xml_local_name(element.tag)
@@ -211,6 +221,7 @@ def _trim_gpx_before_first_osv_sensor_point(gpx_path: Path) -> bool:
 
     temp_path = gpx_path.with_name(f".{gpx_path.name}.trimmed")
     try:
+        _register_gpx_namespaces()
         tree.write(temp_path, encoding="unicode", xml_declaration=True)
         temp_path.replace(gpx_path)
     except OSError as exc:
