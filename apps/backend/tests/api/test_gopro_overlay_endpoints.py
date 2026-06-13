@@ -1258,7 +1258,9 @@ def test_prepare_pip_video_delays_pip_until_gpx_start(tmp_path, monkeypatch):
     assert prepared.read_bytes() == b"prepared"
     command = commands[0]
     assert "-ss" not in command
-    assert "setpts=PTS-STARTPTS+5.000/TB" in command[command.index("-filter_complex") + 1]
+    filter_complex = command[command.index("-filter_complex") + 1]
+    assert "setpts=PTS-STARTPTS+5.000/TB" in filter_complex
+    assert "tpad=stop_mode=clone:stop_duration=15.000" in filter_complex
 
 
 def test_prepare_pip_video_trims_pip_when_camera_starts_after_gpx(tmp_path, monkeypatch):
