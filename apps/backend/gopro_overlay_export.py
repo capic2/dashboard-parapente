@@ -588,6 +588,220 @@ def _verify_video_output(path: Path) -> tuple[bool, str | None]:
     return True, None
 
 
+def probe_video_duration(video_path: Path) -> float | None:
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "json",
+                str(video_path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError, TimeoutError):
+        return None
+
+    try:
+        duration = float((json.loads(result.stdout or "{}").get("format") or {}).get("duration", 0))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    return duration if duration > 0 else None
+
+
+def _parse_utc_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def probe_video_start_time(video_path: Path) -> datetime | None:
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format_tags=creation_time:stream_tags=creation_time",
+                "-of",
+                "json",
+                str(video_path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError, TimeoutError):
+        return None
+
+    try:
+        payload = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError:
+        return None
+
+    candidates = [
+        ((payload.get("format") or {}).get("tags") or {}).get("creation_time"),
+        *[
+            ((stream.get("tags") or {}).get("creation_time"))
+            for stream in payload.get("streams") or []
+        ],
+    ]
+    return next(
+        (parsed for candidate in candidates if (parsed := _parse_utc_datetime(candidate))),
+        None,
+    )
+
+
+def _first_gpx_timestamp(gpx_path: Path) -> datetime | None:
+    try:
+        root = ET.parse(gpx_path).getroot()
+    except (ET.ParseError, OSError):
+        return None
+
+    for element in root.iter():
+        if element.tag.rsplit("}", 1)[-1] == "time" and element.text:
+            parsed = _parse_utc_datetime(element.text)
+            if parsed:
+                return parsed
+    return None
+
+
+def _pip_timeline_offsets(
+    video_start: datetime | None,
+    gpx_start: datetime | None,
+) -> tuple[float, float]:
+    if video_start is None or gpx_start is None:
+        return 0.0, 0.0
+    offset = (gpx_start - video_start).total_seconds()
+    if offset >= 0:
+        return offset, 0.0
+    return 0.0, abs(offset)
+
+
+def _prepared_pip_path(work_dir: Path, job_id: str) -> Path:
+    return work_dir / f"pip-prepared-{job_id}.mp4"
+
+
+def _ffmpeg_timeout_for_duration(duration: float) -> int:
+    return max(600, min(int(duration * 20), 6 * 60 * 60))
+
+
+def _prepare_pip_video_for_overlay(
+    job_id: str,
+    video_path: Path,
+    gpx_path: Path,
+    pip_path: Path,
+    work_dir: Path,
+) -> Path:
+    video_duration = probe_video_duration(video_path)
+    pip_width, pip_height = probe_video_resolution(pip_path)
+    if video_duration is None or not pip_width or not pip_height:
+        return pip_path
+
+    pip_duration = probe_video_duration(pip_path)
+    video_start = probe_video_start_time(video_path)
+    gpx_start = _first_gpx_timestamp(gpx_path)
+    pip_delay, pip_trim = _pip_timeline_offsets(video_start, gpx_start)
+    prepared_path = _prepared_pip_path(work_dir, job_id)
+    _unlink_if_exists(prepared_path)
+
+    base_input = f"color=c=black:s={pip_width}x{pip_height}:r=30:d={video_duration:.3f}"
+    if pip_delay >= video_duration or (pip_duration is not None and pip_trim >= pip_duration):
+        command = [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            base_input,
+            "-t",
+            f"{video_duration:.3f}",
+            "-an",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "18",
+            "-movflags",
+            "+faststart",
+            str(prepared_path),
+        ]
+    else:
+        command = [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            base_input,
+        ]
+        if pip_trim > 0:
+            command.extend(["-ss", f"{pip_trim:.3f}"])
+        command.extend(
+            [
+                "-i",
+                str(pip_path),
+                "-filter_complex",
+                f"[1:v]setpts=PTS-STARTPTS+{pip_delay:.3f}/TB[pip];"
+                "[0:v][pip]overlay=0:0:eof_action=pass:shortest=0[v]",
+                "-map",
+                "[v]",
+                "-t",
+                f"{video_duration:.3f}",
+                "-an",
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                "-preset",
+                "veryfast",
+                "-crf",
+                "18",
+                "-movflags",
+                "+faststart",
+                str(prepared_path),
+            ]
+        )
+
+    try:
+        result = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=_ffmpeg_timeout_for_duration(video_duration),
+        )
+    except (FileNotFoundError, subprocess.SubprocessError, TimeoutError) as exc:
+        _unlink_if_exists(prepared_path)
+        raise ValueError(str(exc) or exc.__class__.__name__) from exc
+
+    if result.returncode != 0:
+        _unlink_if_exists(prepared_path)
+        detail = result.stderr.strip() or result.stdout.strip() or "ffmpeg pip preparation failed"
+        raise ValueError(detail)
+    if not prepared_path.exists():
+        raise ValueError("ffmpeg did not create the prepared PIP video")
+    return prepared_path
+
+
 def _scaled_video_path(path: Path) -> Path:
     return path.with_name(f".{path.stem}.scaled{path.suffix or '.mp4'}")
 
@@ -757,6 +971,15 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
             )
 
         command_metadata["render_gpx_path"] = str(render_gpx_path)
+
+        if pip_path:
+            pip_path = _prepare_pip_video_for_overlay(
+                job_id,
+                video_path,
+                gpx_path,
+                pip_path,
+                work_dir,
+            )
 
         width, height = probe_video_resolution(video_path)
         requested_layout_id = metadata.get("requested_layout_id")
