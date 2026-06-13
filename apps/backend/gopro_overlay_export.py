@@ -12,7 +12,7 @@ import uuid
 import xml.etree.ElementTree as ET
 from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -767,6 +767,32 @@ def _pip_timeline_offsets(
     return 0.0, abs(offset)
 
 
+def _align_video_start_time_to_gpx(
+    video_start: datetime | None,
+    gpx_start: datetime | None,
+) -> datetime | None:
+    if video_start is None or gpx_start is None:
+        return video_start
+
+    aligned_start = video_start
+    aligned_gap = abs((video_start - gpx_start).total_seconds())
+    for shift_minutes in range(-12 * 60, 14 * 60 + 1, 15):
+        candidate_start = video_start + timedelta(minutes=shift_minutes)
+        candidate_gap = abs((candidate_start - gpx_start).total_seconds())
+        if candidate_gap < aligned_gap:
+            aligned_start = candidate_start
+            aligned_gap = candidate_gap
+
+    if aligned_start != video_start:
+        logger.info(
+            "Adjusted video start time %s -> %s to better align with GPX %s",
+            video_start,
+            aligned_start,
+            gpx_start,
+        )
+    return aligned_start
+
+
 def _prepared_pip_path(work_dir: Path, job_id: str) -> Path:
     return work_dir / f"pip-prepared-{job_id}.mp4"
 
@@ -788,8 +814,11 @@ def _prepare_pip_video_for_overlay(
         return pip_path
 
     pip_duration = probe_video_duration(pip_path)
-    video_start = probe_video_start_time(video_path)
     gpx_start = _first_gpx_timestamp(gpx_path)
+    video_start = _align_video_start_time_to_gpx(
+        probe_video_start_time(video_path),
+        gpx_start,
+    )
     pip_delay, pip_trim = _pip_timeline_offsets(video_start, gpx_start)
     prepared_path = _prepared_pip_path(work_dir, job_id)
     _unlink_if_exists(prepared_path)
