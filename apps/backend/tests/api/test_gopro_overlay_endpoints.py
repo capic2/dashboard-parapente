@@ -1166,6 +1166,136 @@ def test_gopro_overlay_process_updates_split_carriage_returns():
     ]
 
 
+def test_prepare_pip_video_delays_pip_until_gpx_start(tmp_path, monkeypatch):
+    video_path = tmp_path / "camera.mp4"
+    gpx_path = tmp_path / "track.gpx"
+    pip_path = tmp_path / "pip.mp4"
+    work_dir = tmp_path / "work"
+    video_path.write_bytes(b"video")
+    pip_path.write_bytes(b"pip")
+    gpx_path.write_text(
+        "<gpx><trk><trkseg><trkpt><time>2026-03-15T10:00:05Z</time></trkpt></trkseg></trk></gpx>"
+    )
+    work_dir.mkdir()
+    commands: list[list[str]] = []
+
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_duration",
+        lambda path: 30.0 if path == video_path else 10.0,
+    )
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (640, 480))
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_start_time",
+        lambda _: gopro_overlay_export._parse_utc_datetime("2026-03-15T10:00:00Z"),
+    )
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = ""
+
+    def run(command, **_kwargs):
+        commands.append(command)
+        Path(command[-1]).write_bytes(b"prepared")
+        return Result()
+
+    monkeypatch.setattr(gopro_overlay_export.subprocess, "run", run)
+
+    prepared = gopro_overlay_export._prepare_pip_video_for_overlay(
+        "job-pip", video_path, gpx_path, pip_path, work_dir
+    )
+
+    assert prepared == work_dir / "pip-prepared-job-pip.mp4"
+    assert prepared.read_bytes() == b"prepared"
+    command = commands[0]
+    assert "-ss" not in command
+    assert "setpts=PTS-STARTPTS+5.000/TB" in command[command.index("-filter_complex") + 1]
+
+
+def test_prepare_pip_video_trims_pip_when_camera_starts_after_gpx(tmp_path, monkeypatch):
+    video_path = tmp_path / "camera.mp4"
+    gpx_path = tmp_path / "track.gpx"
+    pip_path = tmp_path / "pip.mp4"
+    work_dir = tmp_path / "work"
+    video_path.write_bytes(b"video")
+    pip_path.write_bytes(b"pip")
+    gpx_path.write_text("<gpx><time>2026-03-15T10:00:00Z</time></gpx>")
+    work_dir.mkdir()
+    commands: list[list[str]] = []
+
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_duration",
+        lambda path: 30.0 if path == video_path else 20.0,
+    )
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (640, 480))
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_start_time",
+        lambda _: gopro_overlay_export._parse_utc_datetime("2026-03-15T10:00:05Z"),
+    )
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = ""
+
+    def run(command, **_kwargs):
+        commands.append(command)
+        Path(command[-1]).write_bytes(b"prepared")
+        return Result()
+
+    monkeypatch.setattr(gopro_overlay_export.subprocess, "run", run)
+
+    prepared = gopro_overlay_export._prepare_pip_video_for_overlay(
+        "job-pip", video_path, gpx_path, pip_path, work_dir
+    )
+
+    assert prepared.exists()
+    command = commands[0]
+    assert command[command.index("-ss") + 1] == "5.000"
+    assert "setpts=PTS-STARTPTS+0.000/TB" in command[command.index("-filter_complex") + 1]
+
+
+def test_prepare_queued_job_uses_prepared_pip_path(tmp_path, monkeypatch, test_db):
+    layout_dir = tmp_path / "layouts"
+    layout_dir.mkdir()
+    (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
+    video_path = tmp_path / "source.mp4"
+    gpx_path = tmp_path / "source.gpx"
+    pip_path = tmp_path / "pip.mp4"
+    prepared_pip_path = tmp_path / "prepared-pip.mp4"
+    video_path.write_bytes(b"video")
+    gpx_path.write_text("<gpx />")
+    pip_path.write_bytes(b"pip")
+    prepared_pip_path.write_bytes(b"prepared")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "_prepare_pip_video_for_overlay",
+        lambda *_args: prepared_pip_path,
+    )
+
+    job = create_gopro_overlay_job_from_paths(
+        video_path=video_path,
+        gpx_path=gpx_path,
+        pip_path=pip_path,
+        layout_id="parapente-1080",
+        output_filename="overlay.mp4",
+    )
+    queued_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
+    assert queued_job is not None
+
+    prepared = gopro_overlay_export._prepare_queued_job(job["job_id"], queued_job)
+
+    assert prepared is not None
+    assert Path(prepared["pip_path"]) == prepared_pip_path
+
+
 @pytest.mark.asyncio
 async def test_create_gopro_overlay_job_cleans_uploads_after_validation_failure(
     tmp_path,
