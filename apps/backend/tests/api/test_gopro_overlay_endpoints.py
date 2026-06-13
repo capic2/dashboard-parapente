@@ -1629,6 +1629,56 @@ def test_worker_preparation_merges_osv_files_before_rendering(
     assert prepared["command"]["render_gpx_path"] == str(merged_gpx_path)
 
 
+def test_trim_gpx_preserves_default_gpx_namespace(tmp_path: Path) -> None:
+    gpx_path = tmp_path / "merged-gopro-overlay.gpx"
+    gpx_path.write_text("""<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1"
+     creator="OSV+GPX Merger v2.0"
+     xmlns="http://www.topografix.com/GPX/1/1"
+     xmlns:ns1="http://www.garmin.com/xmlschemas/TrackPointExtension/v1"
+     xmlns:gpxpx="http://www.garmin.com/xmlschemas/GpxExtensions/v3"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+    <name>Merged OSV + GPX Track</name>
+    <trk>
+    <trkseg>
+      <trkpt lat="47.1" lon="5.1">
+        <ele>491.57</ele>
+        <time>2026-06-07T12:54:49Z</time>
+        <extensions>
+          <ns1:TrackPointExtension>
+            <ns1:speed>0.0</ns1:speed>
+          </ns1:TrackPointExtension>
+        </extensions>
+      </trkpt>
+      <trkpt lat="47.2" lon="5.2">
+        <ele>491.86</ele>
+        <time>2026-06-07T12:54:58+00:00</time>
+        <extensions>
+          <ns1:TrackPointExtension>
+            <ns1:speed>0.0</ns1:speed>
+          </ns1:TrackPointExtension>
+          <gpxpx:Acceleration>
+            <gpxpx:x>-0.338608</gpxpx:x>
+            <gpxpx:y>-0.869588</gpxpx:y>
+            <gpxpx:z>-0.784719</gpxpx:z>
+          </gpxpx:Acceleration>
+        </extensions>
+      </trkpt>
+    </trkseg>
+    </trk>
+</gpx>""")
+
+    assert gopro_overlay_export._trim_gpx_before_first_osv_sensor_point(gpx_path)
+
+    trimmed_gpx = gpx_path.read_text()
+    assert "<gpx " in trimmed_gpx
+    assert "<ns0:gpx" not in trimmed_gpx
+    assert "<trkpt " in trimmed_gpx
+    assert "2026-06-07T12:54:49Z" not in trimmed_gpx
+    assert "2026-06-07T12:54:58+00:00" in trimmed_gpx
+
+
 def test_worker_preparation_uses_exact_video_size_for_non_standard_source(
     tmp_path,
     monkeypatch,
