@@ -717,6 +717,12 @@ def _prepare_pip_video_for_overlay(
     video_start = probe_video_start_time(video_path)
     gpx_start = _first_gpx_timestamp(gpx_path)
     pip_delay, pip_trim = _pip_timeline_offsets(video_start, gpx_start)
+    visible_pip_duration = max(0.0, pip_duration - pip_trim) if pip_duration is not None else None
+    pip_tail_duration = (
+        max(0.0, video_duration - pip_delay - visible_pip_duration)
+        if visible_pip_duration is not None
+        else None
+    )
     prepared_path = _prepared_pip_path(work_dir, job_id)
     _unlink_if_exists(prepared_path)
 
@@ -755,12 +761,15 @@ def _prepare_pip_video_for_overlay(
         ]
         if pip_trim > 0:
             command.extend(["-ss", f"{pip_trim:.3f}"])
+        pip_filters = [f"setpts=PTS-STARTPTS+{pip_delay:.3f}/TB"]
+        if pip_tail_duration and pip_tail_duration > 0:
+            pip_filters.append(f"tpad=stop_mode=clone:stop_duration={pip_tail_duration:.3f}")
         command.extend(
             [
                 "-i",
                 str(pip_path),
                 "-filter_complex",
-                f"[1:v]setpts=PTS-STARTPTS+{pip_delay:.3f}/TB[pip];"
+                f"[1:v]{','.join(pip_filters)}[pip];"
                 "[0:v][pip]overlay=0:0:eof_action=pass:shortest=0[v]",
                 "-map",
                 "[v]",
