@@ -1,5 +1,6 @@
 import logging
 import os
+import xml.etree.ElementTree as ET
 from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
@@ -566,6 +567,52 @@ def test_worker_merge_osv_files_with_gpx_uses_configured_timeout(
     assert result == merged_gpx_path
     assert merged_gpx_path.read_text() == "<gpx>merged</gpx>"
     assert run.call_args.kwargs["timeout"] == 456
+
+
+def test_worker_merge_osv_files_with_gpx_trims_gpx_preroll_before_osv_sensor_data(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    gopro_root = tmp_path / "gopro-overlay"
+    gopro_root.mkdir()
+    (gopro_root / "osv_merge.py").write_text("# merge")
+    input_dir = tmp_path / "20260607" / "01"
+    input_dir.mkdir(parents=True)
+    source_gpx = input_dir / "strava.gpx"
+    osv_path = input_dir / "flight.osv"
+    source_gpx.write_text("<gpx />")
+    osv_path.write_bytes(b"osv")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(gopro_root))
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = ""
+
+    def fake_run(command, **kwargs):
+        Path(command[-1]).write_text("""<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxpx="http://www.garmin.com/xmlschemas/GpxExtensions/v3">
+  <trk><trkseg>
+    <trkpt lat="46.0" lon="6.0"><time>2026-06-07T12:54:49Z</time></trkpt>
+    <trkpt lat="46.0" lon="6.0"><time>2026-06-07T12:54:50Z</time></trkpt>
+    <trkpt lat="46.0" lon="6.0"><time>2026-06-07T12:54:58Z</time><extensions><gpxpx:Acceleration><gpxpx:x>0.1</gpxpx:x><gpxpx:y>0.2</gpxpx:y><gpxpx:z>0.3</gpxpx:z></gpxpx:Acceleration></extensions></trkpt>
+    <trkpt lat="46.0" lon="6.0"><time>2026-06-07T12:54:59Z</time><extensions><gpxpx:Acceleration><gpxpx:x>0.2</gpxpx:x><gpxpx:y>0.3</gpxpx:y><gpxpx:z>0.4</gpxpx:z></gpxpx:Acceleration></extensions></trkpt>
+  </trkseg></trk>
+</gpx>""")
+        return Result()
+
+    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run):
+        result = gopro_overlay_export._merge_osv_files_with_gpx(
+            [osv_path],
+            source_gpx,
+            input_dir,
+        )
+
+    root = ET.parse(result).getroot()
+    times = [
+        element.text for element in root.iter() if element.tag.rsplit("}", 1)[-1].lower() == "time"
+    ]
+    assert times == ["2026-06-07T12:54:58Z", "2026-06-07T12:54:59Z"]
 
 
 def test_gopro_overlay_output_resolution_is_rescaled_when_needed(tmp_path, monkeypatch) -> None:

@@ -153,6 +153,79 @@ def _matching_files_by_mtime(directory: Path, pattern: str) -> list[Path]:
     return sorted(matches, key=lambda path: (path.stat().st_mtime, path.name))
 
 
+def _xml_local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1].lower()
+
+
+def _trkpt_has_osv_sensor_data(point: ET.Element) -> bool:
+    extension_names = {
+        _xml_local_name(element.tag)
+        for extensions in point
+        if _xml_local_name(extensions.tag) == "extensions"
+        for element in extensions.iter()
+    }
+    if extension_names & {
+        "acceleration",
+        "gyroscope",
+        "g_force",
+        "gforce",
+        "accel_x",
+        "accel_y",
+        "accel_z",
+        "gyro_x",
+        "gyro_y",
+        "gyro_z",
+    }:
+        return True
+    return {"x", "y", "z"}.issubset(extension_names)
+
+
+def _trim_gpx_before_first_osv_sensor_point(gpx_path: Path) -> bool:
+    try:
+        tree = ET.parse(gpx_path)
+    except (ET.ParseError, OSError) as exc:
+        logger.warning("Could not parse merged GoPro overlay GPX %s: %s", gpx_path, exc)
+        return False
+
+    root = tree.getroot()
+    trimmed = False
+    removed_count = 0
+
+    for segment in root.iter():
+        if _xml_local_name(segment.tag) != "trkseg":
+            continue
+        points = [child for child in list(segment) if _xml_local_name(child.tag) == "trkpt"]
+        first_osv_index = next(
+            (index for index, point in enumerate(points) if _trkpt_has_osv_sensor_data(point)),
+            None,
+        )
+        if first_osv_index is None or first_osv_index == 0:
+            continue
+        for point in points[:first_osv_index]:
+            segment.remove(point)
+        removed_count += first_osv_index
+        trimmed = True
+
+    if not trimmed:
+        return False
+
+    temp_path = gpx_path.with_name(f".{gpx_path.name}.trimmed")
+    try:
+        tree.write(temp_path, encoding="unicode", xml_declaration=True)
+        temp_path.replace(gpx_path)
+    except OSError as exc:
+        temp_path.unlink(missing_ok=True)
+        logger.warning("Could not write trimmed GoPro overlay GPX %s: %s", gpx_path, exc)
+        return False
+
+    logger.info(
+        "Trimmed %s pre-OSV GPX point(s) from merged GoPro overlay GPX %s",
+        removed_count,
+        gpx_path,
+    )
+    return True
+
+
 def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: Path) -> Path:
     if not osv_paths:
         return gpx_path
@@ -199,6 +272,7 @@ def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: 
     if not merged_gpx_path.exists():
         raise ValueError("OSV merge did not create a GPX file")
 
+    _trim_gpx_before_first_osv_sensor_point(merged_gpx_path)
     logger.info("Created merged GoPro overlay GPX: %s", merged_gpx_path)
     return merged_gpx_path
 
