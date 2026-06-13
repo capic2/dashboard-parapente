@@ -12,7 +12,7 @@ import uuid
 import xml.etree.ElementTree as ET
 from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -153,79 +153,6 @@ def _matching_files_by_mtime(directory: Path, pattern: str) -> list[Path]:
     return sorted(matches, key=lambda path: (path.stat().st_mtime, path.name))
 
 
-def _xml_local_name(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1].lower()
-
-
-def _trkpt_has_osv_sensor_data(point: ET.Element) -> bool:
-    extension_names = {
-        _xml_local_name(element.tag)
-        for extensions in point
-        if _xml_local_name(extensions.tag) == "extensions"
-        for element in extensions.iter()
-    }
-    if extension_names & {
-        "acceleration",
-        "gyroscope",
-        "g_force",
-        "gforce",
-        "accel_x",
-        "accel_y",
-        "accel_z",
-        "gyro_x",
-        "gyro_y",
-        "gyro_z",
-    }:
-        return True
-    return {"x", "y", "z"}.issubset(extension_names)
-
-
-def _trim_gpx_before_first_osv_sensor_point(gpx_path: Path) -> bool:
-    try:
-        tree = ET.parse(gpx_path)
-    except (ET.ParseError, OSError) as exc:
-        logger.warning("Could not parse merged GoPro overlay GPX %s: %s", gpx_path, exc)
-        return False
-
-    root = tree.getroot()
-    trimmed = False
-    removed_count = 0
-
-    for segment in root.iter():
-        if _xml_local_name(segment.tag) != "trkseg":
-            continue
-        points = [child for child in list(segment) if _xml_local_name(child.tag) == "trkpt"]
-        first_osv_index = next(
-            (index for index, point in enumerate(points) if _trkpt_has_osv_sensor_data(point)),
-            None,
-        )
-        if first_osv_index is None or first_osv_index == 0:
-            continue
-        for point in points[:first_osv_index]:
-            segment.remove(point)
-        removed_count += first_osv_index
-        trimmed = True
-
-    if not trimmed:
-        return False
-
-    temp_path = gpx_path.with_name(f".{gpx_path.name}.trimmed")
-    try:
-        tree.write(temp_path, encoding="unicode", xml_declaration=True)
-        temp_path.replace(gpx_path)
-    except OSError as exc:
-        temp_path.unlink(missing_ok=True)
-        logger.warning("Could not write trimmed GoPro overlay GPX %s: %s", gpx_path, exc)
-        return False
-
-    logger.info(
-        "Trimmed %s pre-OSV GPX point(s) from merged GoPro overlay GPX %s",
-        removed_count,
-        gpx_path,
-    )
-    return True
-
-
 def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: Path) -> Path:
     if not osv_paths:
         return gpx_path
@@ -272,7 +199,6 @@ def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: 
     if not merged_gpx_path.exists():
         raise ValueError("OSV merge did not create a GPX file")
 
-    _trim_gpx_before_first_osv_sensor_point(merged_gpx_path)
     logger.info("Created merged GoPro overlay GPX: %s", merged_gpx_path)
     return merged_gpx_path
 
@@ -767,6 +693,32 @@ def _pip_timeline_offsets(
     return 0.0, abs(offset)
 
 
+def _align_video_start_time_to_gpx(
+    video_start: datetime | None,
+    gpx_start: datetime | None,
+) -> datetime | None:
+    if video_start is None or gpx_start is None:
+        return video_start
+
+    aligned_start = video_start
+    aligned_gap = abs((video_start - gpx_start).total_seconds())
+    for shift_minutes in range(-12 * 60, 14 * 60 + 1, 15):
+        candidate_start = video_start + timedelta(minutes=shift_minutes)
+        candidate_gap = abs((candidate_start - gpx_start).total_seconds())
+        if candidate_gap < aligned_gap:
+            aligned_start = candidate_start
+            aligned_gap = candidate_gap
+
+    if aligned_start != video_start:
+        logger.info(
+            "Adjusted video start time %s -> %s to better align with GPX %s",
+            video_start,
+            aligned_start,
+            gpx_start,
+        )
+    return aligned_start
+
+
 def _prepared_pip_path(work_dir: Path, job_id: str) -> Path:
     return work_dir / f"pip-prepared-{job_id}.mp4"
 
@@ -788,8 +740,11 @@ def _prepare_pip_video_for_overlay(
         return pip_path
 
     pip_duration = probe_video_duration(pip_path)
-    video_start = probe_video_start_time(video_path)
     gpx_start = _first_gpx_timestamp(gpx_path)
+    video_start = _align_video_start_time_to_gpx(
+        probe_video_start_time(video_path),
+        gpx_start,
+    )
     pip_delay, pip_trim = _pip_timeline_offsets(video_start, gpx_start)
     prepared_path = _prepared_pip_path(work_dir, job_id)
     _unlink_if_exists(prepared_path)
