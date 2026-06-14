@@ -826,7 +826,6 @@ def _prepare_pip_video_for_overlay(
     prepared_path = _prepared_pip_path(work_dir, job_id)
     _unlink_if_exists(prepared_path)
 
-    base_input = f"color=c=black:s={pip_width}x{pip_height}:r=30:d={video_duration:.3f}"
     if pip_delay >= video_duration or (pip_duration is not None and pip_trim >= pip_duration):
         command = [
             "ffmpeg",
@@ -834,7 +833,7 @@ def _prepare_pip_video_for_overlay(
             "-f",
             "lavfi",
             "-i",
-            base_input,
+            f"color=c=black:s={pip_width}x{pip_height}:r=30:d={video_duration:.3f}",
             "-t",
             f"{video_duration:.3f}",
             "-an",
@@ -851,28 +850,23 @@ def _prepare_pip_video_for_overlay(
             str(prepared_path),
         ]
     else:
+        pip_filters = ["setpts=PTS-STARTPTS"]
+        if pip_delay > 0:
+            pip_filters.append(f"tpad=start_mode=add:start_duration={pip_delay:.3f}")
+        if pip_tail_duration and pip_tail_duration > 0:
+            pip_filters.append(f"tpad=stop_mode=clone:stop_duration={pip_tail_duration:.3f}")
         command = [
             "ffmpeg",
             "-y",
-            "-f",
-            "lavfi",
-            "-i",
-            base_input,
         ]
         if pip_trim > 0:
             command.extend(["-ss", f"{pip_trim:.3f}"])
-        pip_filters = [f"setpts=PTS-STARTPTS+{pip_delay:.3f}/TB"]
-        if pip_tail_duration and pip_tail_duration > 0:
-            pip_filters.append(f"tpad=stop_mode=clone:stop_duration={pip_tail_duration:.3f}")
         command.extend(
             [
                 "-i",
                 str(pip_path),
-                "-filter_complex",
-                f"[1:v]{','.join(pip_filters)}[pip];"
-                "[0:v][pip]overlay=0:0:eof_action=pass:shortest=0[v]",
-                "-map",
-                "[v]",
+                "-vf",
+                ",".join(pip_filters),
                 "-t",
                 f"{video_duration:.3f}",
                 "-an",

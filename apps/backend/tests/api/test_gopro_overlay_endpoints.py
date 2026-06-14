@@ -1258,9 +1258,10 @@ def test_prepare_pip_video_delays_pip_until_gpx_start(tmp_path, monkeypatch):
     assert prepared.read_bytes() == b"prepared"
     command = commands[0]
     assert "-ss" not in command
-    filter_complex = command[command.index("-filter_complex") + 1]
-    assert "setpts=PTS-STARTPTS+5.000/TB" in filter_complex
-    assert "tpad=stop_mode=clone:stop_duration=15.000" in filter_complex
+    video_filter = command[command.index("-vf") + 1]
+    assert "setpts=PTS-STARTPTS" in video_filter
+    assert "tpad=start_mode=add:start_duration=5.000" in video_filter
+    assert "tpad=stop_mode=clone:stop_duration=15.000" in video_filter
 
 
 def test_prepare_pip_video_trims_pip_when_camera_starts_after_gpx(tmp_path, monkeypatch):
@@ -1305,7 +1306,7 @@ def test_prepare_pip_video_trims_pip_when_camera_starts_after_gpx(tmp_path, monk
     assert prepared.exists()
     command = commands[0]
     assert command[command.index("-ss") + 1] == "5.000"
-    assert "setpts=PTS-STARTPTS+0.000/TB" in command[command.index("-filter_complex") + 1]
+    assert "tpad=stop_mode=clone:stop_duration=15.000" in command[command.index("-vf") + 1]
 
 
 def test_prepare_pip_video_auto_aligns_start_time_by_timezone_offset(tmp_path, monkeypatch):
@@ -1352,7 +1353,7 @@ def test_prepare_pip_video_auto_aligns_start_time_by_timezone_offset(tmp_path, m
     assert prepared == work_dir / "pip-prepared-job-pip.mp4"
     assert prepared.read_bytes() == b"prepared"
     command = commands[0]
-    assert "setpts=PTS-STARTPTS+0.000/TB" in command[command.index("-filter_complex") + 1]
+    assert "tpad=stop_mode=clone:stop_duration=20.000" in command[command.index("-vf") + 1]
 
 
 def test_prepare_queued_job_uses_prepared_pip_path(tmp_path, monkeypatch, test_db):
