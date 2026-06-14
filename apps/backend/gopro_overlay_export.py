@@ -781,6 +781,32 @@ def _pip_timeline_offsets(
     return 0.0, abs(offset)
 
 
+def _align_video_start_time_to_gpx(
+    video_start: datetime | None,
+    gpx_start: datetime | None,
+) -> datetime | None:
+    if video_start is None or gpx_start is None:
+        return video_start
+
+    aligned_start = video_start
+    aligned_gap = abs((video_start - gpx_start).total_seconds())
+    for shift_minutes in range(-12 * 60, 14 * 60 + 1, 15):
+        candidate_start = video_start + timedelta(minutes=shift_minutes)
+        candidate_gap = abs((candidate_start - gpx_start).total_seconds())
+        if candidate_gap < aligned_gap:
+            aligned_start = candidate_start
+            aligned_gap = candidate_gap
+
+    if aligned_start != video_start:
+        logger.info(
+            "Adjusted video start time %s -> %s to better align with GPX %s",
+            video_start,
+            aligned_start,
+            gpx_start,
+        )
+    return aligned_start
+
+
 def _prepared_pip_path(work_dir: Path, job_id: str) -> Path:
     return work_dir / f"pip-prepared-{job_id}.mp4"
 
@@ -807,7 +833,7 @@ def _prepare_pip_video_for_overlay(
 
     pip_duration = probe_video_duration(pip_path)
     gpx_start = _first_gpx_timestamp(gpx_path)
-    video_start = probe_video_start_time(video_path)
+    video_start = _align_video_start_time_to_gpx(probe_video_start_time(video_path), gpx_start)
     pip_delay, pip_trim = _pip_timeline_offsets(video_start, gpx_start)
     visible_pip_duration = max(0.0, pip_duration - pip_trim) if pip_duration is not None else None
     pip_tail_duration = (
@@ -818,7 +844,6 @@ def _prepare_pip_video_for_overlay(
     prepared_path = _prepared_pip_path(work_dir, job_id)
     _unlink_if_exists(prepared_path)
 
-    base_input = f"color=c=black:s={pip_width}x{pip_height}:r=30:d={video_duration:.3f}"
     if pip_delay >= video_duration or (pip_duration is not None and pip_trim >= pip_duration):
         command = [
             "ffmpeg",
@@ -826,7 +851,7 @@ def _prepare_pip_video_for_overlay(
             "-f",
             "lavfi",
             "-i",
-            base_input,
+            f"color=c=black:s={pip_width}x{pip_height}:r=30:d={video_duration:.3f}",
             "-t",
             f"{video_duration:.3f}",
             "-an",
@@ -843,28 +868,23 @@ def _prepare_pip_video_for_overlay(
             str(prepared_path),
         ]
     else:
+        pip_filters = ["setpts=PTS-STARTPTS"]
+        if pip_delay > 0:
+            pip_filters.append(f"tpad=start_mode=add:start_duration={pip_delay:.3f}")
+        if pip_tail_duration and pip_tail_duration > 0:
+            pip_filters.append(f"tpad=stop_mode=clone:stop_duration={pip_tail_duration:.3f}")
         command = [
             "ffmpeg",
             "-y",
-            "-f",
-            "lavfi",
-            "-i",
-            base_input,
         ]
         if pip_trim > 0:
             command.extend(["-ss", f"{pip_trim:.3f}"])
-        pip_filters = [f"setpts=PTS-STARTPTS+{pip_delay:.3f}/TB"]
-        if pip_tail_duration and pip_tail_duration > 0:
-            pip_filters.append(f"tpad=stop_mode=clone:stop_duration={pip_tail_duration:.3f}")
         command.extend(
             [
                 "-i",
                 str(pip_path),
-                "-filter_complex",
-                f"[1:v]{','.join(pip_filters)}[pip];"
-                "[0:v][pip]overlay=0:0:eof_action=pass:shortest=0[v]",
-                "-map",
-                "[v]",
+                "-vf",
+                ",".join(pip_filters),
                 "-t",
                 f"{video_duration:.3f}",
                 "-an",
