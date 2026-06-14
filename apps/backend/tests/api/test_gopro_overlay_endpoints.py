@@ -1899,6 +1899,57 @@ def test_run_job_prepares_inputs_before_starting_process(
     assert Path(command[-2]).parent == work_dir
     assert Path(command[-1]) == Path(job["temp_output_path"])
     assert gopro_overlay_export.get_gopro_overlay_job(job["job_id"])["status"] == "completed"
+    assert Path(job["output_path"]).read_bytes() == b"video"
+    assert not Path(job["temp_output_path"]).exists()
+    assert not work_dir.exists()
+
+
+def test_run_job_cleans_temp_files_after_process_failure(
+    tmp_path,
+    monkeypatch,
+    test_db,
+):
+    layout_dir = tmp_path / "layouts"
+    layout_dir.mkdir()
+    (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
+    video_path = tmp_path / "source.mp4"
+    gpx_path = tmp_path / "source.gpx"
+    video_path.write_bytes(b"video")
+    gpx_path.write_text("<gpx />")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_BIN", "gopro-dashboard.py")
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+
+    job = create_gopro_overlay_job_from_paths(
+        video_path=video_path,
+        gpx_path=gpx_path,
+        pip_path=None,
+        layout_id="parapente-1080",
+        output_filename="overlay.mp4",
+    )
+    work_dir = tmp_path / ".gopro-overlay-work" / job["job_id"]
+
+    class FailedProcess:
+        def __init__(self, command: list[str]):
+            self.command = command
+            self.stdout = None
+
+        def wait(self) -> int:
+            Path(self.command[-1]).write_bytes(b"partial")
+            return 1
+
+    with patch(
+        "gopro_overlay_export.subprocess.Popen",
+        side_effect=lambda command, **kwargs: FailedProcess(command),
+    ):
+        gopro_overlay_export._run_job(job["job_id"])
+
+    failed_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"])
+    assert failed_job is not None
+    assert failed_job["status"] == "failed"
+    assert not Path(job["temp_output_path"]).exists()
+    assert not work_dir.exists()
 
 
 def test_create_gopro_overlay_job_from_paths_sanitizes_output_filename_in_source_dir(

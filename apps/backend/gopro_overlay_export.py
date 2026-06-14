@@ -1491,6 +1491,9 @@ def _run_job(job_id: str) -> None:
         return
     job = _prepare_queued_job(job_id, job)
     if not job or job.get("status") != _STATUS_QUEUED:
+        current_job = get_gopro_overlay_job(job_id)
+        if current_job and current_job.get("status") in _TERMINAL_STATUSES:
+            _cleanup_gopro_overlay_temp_files(current_job)
         return
 
     prepared_command = job.get("command") if isinstance(job.get("command"), dict) else {}
@@ -1520,6 +1523,9 @@ def _run_job(job_id: str) -> None:
     command.extend([job["video_path"], str(temp_output_path)])
 
     if not _transition_job_to_running(job_id, command):
+        current_job = get_gopro_overlay_job(job_id)
+        if current_job and current_job.get("status") in _TERMINAL_STATUSES:
+            _cleanup_gopro_overlay_temp_files(current_job)
         return
     logger.info("Starting GoPro overlay job %s", job_id)
     _append_job_log(log_path, f"Starting GoPro overlay job {job_id}")
@@ -1535,7 +1541,7 @@ def _run_job(job_id: str) -> None:
         )
     except FileNotFoundError as exc:
         logger.exception("GoPro overlay binary not found for job %s", job_id)
-        _finish_job(
+        finished_job = _finish_job(
             job_id,
             status=_STATUS_FAILED,
             progress=100,
@@ -1543,10 +1549,11 @@ def _run_job(job_id: str) -> None:
             error=str(exc),
             completed_at=_utc_now(),
         )
+        _cleanup_gopro_overlay_temp_files(finished_job)
         return
     except Exception as exc:
         logger.exception("Failed to start GoPro overlay job %s", job_id)
-        _finish_job(
+        finished_job = _finish_job(
             job_id,
             status=_STATUS_FAILED,
             progress=100,
@@ -1554,6 +1561,7 @@ def _run_job(job_id: str) -> None:
             error=str(exc) or exc.__class__.__name__,
             completed_at=_utc_now(),
         )
+        _cleanup_gopro_overlay_temp_files(finished_job)
         return
 
     with _LOCK:
@@ -1671,6 +1679,9 @@ def _run_job(job_id: str) -> None:
     finally:
         with _LOCK:
             _PROCESSES.pop(job_id, None)
+        current_job = get_gopro_overlay_job(job_id)
+        if current_job and current_job.get("status") in _TERMINAL_STATUSES:
+            _cleanup_gopro_overlay_temp_files(current_job)
 
 
 def get_gopro_overlay_job(job_id: str, include_command: bool = False) -> dict[str, Any] | None:
@@ -1754,6 +1765,29 @@ def _can_delete_work_dir(work_dir: Path) -> bool:
     if _is_path_inside(work_dir, _UPLOAD_WORK_ROOT):
         return True
     return work_dir.parent.name == _PATH_WORK_DIR_NAME
+
+
+def _cleanup_gopro_overlay_temp_files(job: dict[str, Any]) -> None:
+    temp_output_path = job.get("temp_output_path")
+    if temp_output_path:
+        _unlink_if_exists(Path(str(temp_output_path)))
+
+    work_dir = _job_work_dir(job)
+    if not work_dir or not work_dir.exists():
+        return
+    if not _can_delete_work_dir(work_dir):
+        logger.warning(
+            "Refusing to clean GoPro overlay work directory outside temp roots: %s", work_dir
+        )
+        return
+
+    try:
+        if work_dir.is_dir() and not work_dir.is_symlink():
+            shutil.rmtree(work_dir)
+        else:
+            work_dir.unlink()
+    except OSError:
+        logger.exception("Failed to clean GoPro overlay work directory %s", work_dir)
 
 
 def _queued_job_ids() -> list[str]:
