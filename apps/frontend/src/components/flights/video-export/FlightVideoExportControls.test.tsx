@@ -54,6 +54,10 @@ vi.mock('react-i18next', () => ({
         'flights.viewer.cancelGenerationShort': 'Cancel generation',
         'flights.viewer.regenerateVideo': 'Restart generation',
         'flights.viewer.regenerateVideoShort': 'Regenerate video',
+        'videoJobs.liveLogs.title': 'Live logs',
+        'videoJobs.liveLogs.empty': 'No logs yet.',
+        'videoJobs.liveLogs.show': 'Show',
+        'videoJobs.liveLogs.hide': 'Hide',
       })[key] ?? key,
   }),
 }));
@@ -166,6 +170,29 @@ describe('FlightVideoExportControls', () => {
     await waitFor(() => {
       expect(apiDelete).toHaveBeenCalledWith('exports/job-running/cancel');
     });
+  });
+
+  it('reopens live logs when remounting with an active export', () => {
+    const { unmount } = render(
+      <FlightVideoExportControls flight={mockFlight} />
+    );
+
+    unmount();
+
+    mockFlight.video_export_status = 'running';
+    mockFlight.video_export_job_id = 'job-running';
+    exportStatusMock.current = {
+      job_id: 'job-running',
+      status: 'processing',
+      internal_status: 'encoding',
+      log_tail: ['Loading export viewer', 'Encoding with FFmpeg'],
+    };
+
+    render(<FlightVideoExportControls flight={mockFlight} />);
+
+    expect(screen.getByText('Live logs')).toBeInTheDocument();
+    expect(screen.getByText('Hide')).toBeInTheDocument();
+    expect(screen.getByText(/Encoding with FFmpeg/u)).toBeInTheDocument();
   });
 
   it('does not show the download button for completed videos', () => {

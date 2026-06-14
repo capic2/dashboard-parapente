@@ -116,7 +116,9 @@ export function FlightVideoExportControls({
   const [videoExportMode, setVideoExportMode] =
     useState<VideoExportMode>('manual_fast');
   const [isStartingVideoExport, setIsStartingVideoExport] = useState(false);
-  const [isLogsOpen, setIsLogsOpen] = useState(false);
+  const [isLogsOpen, setIsLogsOpen] = useState(() =>
+    hasActiveVideoExport(initialFlight)
+  );
   const [videoExportJobToken, setVideoExportJobToken] = useState<string | null>(
     null
   );
@@ -140,6 +142,12 @@ export function FlightVideoExportControls({
   const canResumeFailedVideoExport = Boolean(
     flight.video_export_status === 'failed' && canResumeVideoExport
   );
+
+  useEffect(() => {
+    if (isExportActive) {
+      setIsLogsOpen(true);
+    }
+  }, [flight.video_export_job_id, isExportActive]);
 
   useEffect(() => {
     if (!flight.id || !exportStatus?.internal_status) {
