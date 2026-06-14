@@ -21,6 +21,7 @@ export type VideoExportStatusPayload = {
   frames_captured?: number;
   resume_from_frame?: number | null;
   phase?: VideoExportPhase;
+  log_tail?: string[];
 };
 
 type HookState = {
@@ -74,6 +75,11 @@ export const toStatusPayload = (
       typeof value.phase === 'string'
         ? (value.phase as VideoExportPhase)
         : undefined,
+    log_tail: Array.isArray(value.log_tail)
+      ? value.log_tail.filter(
+          (line): line is string => typeof line === 'string'
+        )
+      : undefined,
   };
 };
 

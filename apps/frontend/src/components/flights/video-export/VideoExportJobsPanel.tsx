@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unstable-nested-components */
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -16,8 +17,11 @@ import {
   useResumeVideoExportJob,
   useVideoExportJobs,
 } from '../../../hooks/flights/useVideoExportJobs';
+import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
+import { useGoproOverlayJobStream } from '../../../hooks/gopro/useGoproOverlay';
 import { api } from '../../../lib/api';
 import { useToast } from '../../../hooks/useToast';
+import { JobLiveLogsPanel } from './JobLiveLogsPanel';
 
 const statusLabelFallbacks: Record<string, string> = {
   queued: 'En attente',
@@ -303,6 +307,38 @@ function JobTypeBadge({ job }: { job: VideoExportJob }) {
     <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-200">
       {t(typeLabel.key, typeLabel.fallback)}
     </span>
+  );
+}
+
+function JobLogsDetails({ job }: { job: VideoExportJob }) {
+  const { t } = useTranslation();
+  const [isOpen, setIsOpen] = useState(false);
+  const { status: videoStatus } = useVideoExportStatus(
+    isGoproOverlayJob(job) ? null : job.job_id,
+    isOpen
+  );
+  const { job: goproJob } = useGoproOverlayJobStream(
+    isGoproOverlayJob(job) ? job.job_id : null,
+    null,
+    isOpen
+  );
+  const logs =
+    (isGoproOverlayJob(job) ? goproJob?.log_tail : videoStatus?.log_tail) ??
+    job.log_tail;
+
+  return (
+    <JobLiveLogsPanel
+      title={t('videoJobs.liveLogs.title', 'Logs en direct')}
+      emptyLabel={t(
+        'videoJobs.liveLogs.empty',
+        'Aucun log disponible pour le moment.'
+      )}
+      showLabel={t('videoJobs.liveLogs.show', 'Afficher')}
+      hideLabel={t('videoJobs.liveLogs.hide', 'Masquer')}
+      isOpen={isOpen}
+      onToggle={() => setIsOpen((value) => !value)}
+      logs={logs}
+    />
   );
 }
 
@@ -615,6 +651,15 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
         header: t('videoJobs.table.actions', 'Actions'),
         cell: ({ row }) => renderJobActions(row.original),
       }),
+      columnHelper.display({
+        id: 'logs',
+        header: t('videoJobs.table.logs', 'Logs'),
+        cell: ({ row }) => (
+          <div className="min-w-72">
+            <JobLogsDetails job={row.original} />
+          </div>
+        ),
+      }),
     ],
     [renderJobActions, t]
   );
@@ -876,6 +921,8 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
                       />
                     </div>
                   </div>
+
+                  <JobLogsDetails job={job} />
                 </article>
               );
             })}

@@ -98,6 +98,12 @@
       "type": "Type",
       "status": "Statut"
     },
+    "liveLogs": {
+      "title": "Logs en direct",
+      "empty": "Aucun log disponible pour le moment.",
+      "show": "Afficher",
+      "hide": "Masquer"
+    },
     "mode": {
       "goproOverlay": "Overlay GoPro"
     },

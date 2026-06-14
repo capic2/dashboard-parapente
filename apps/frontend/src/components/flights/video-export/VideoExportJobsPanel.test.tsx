@@ -32,6 +32,7 @@ const {
       progress: 42,
       message: 'Capturing frames',
       mode: 'manual_fast',
+      log_tail: ['Opening viewer', 'Captured 10/100 frames'],
       can_cancel: true,
       can_delete: true,
     },
@@ -54,6 +55,7 @@ const {
       progress: 50,
       message: 'Rendering overlay',
       mode: 'gopro_overlay',
+      log_tail: ['Starting overlay', 'Rendering overlay: 50%'],
       can_cancel: true,
       can_delete: false,
     },
@@ -132,6 +134,40 @@ vi.mock('../../../hooks/flights/useVideoExportJobs', () => ({
   }),
 }));
 
+vi.mock('../../../hooks/flights/useVideoExportStatus', () => ({
+  useVideoExportStatus: (jobId?: string | null, enabled?: boolean) => ({
+    status:
+      enabled && jobId
+        ? {
+            job_id: jobId,
+            status: 'processing',
+            log_tail: ['Opening viewer', 'Captured 20/100 frames'],
+          }
+        : null,
+    isConnected: Boolean(enabled && jobId),
+  }),
+}));
+
+vi.mock('../../../hooks/gopro/useGoproOverlay', () => ({
+  useGoproOverlayJobStream: (
+    jobId?: string | null,
+    _token?: string | null,
+    enabled?: boolean
+  ) => ({
+    job:
+      enabled && jobId
+        ? {
+            job_id: jobId,
+            status: 'running',
+            progress: 50,
+            message: 'Rendering overlay',
+            log_tail: ['Starting overlay', 'Rendering overlay: 60%'],
+          }
+        : null,
+    isConnected: Boolean(enabled && jobId),
+  }),
+}));
+
 describe('VideoExportJobsPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -147,6 +183,7 @@ describe('VideoExportJobsPanel', () => {
         progress: 42,
         message: 'Capturing frames',
         mode: 'manual_fast',
+        log_tail: ['Opening viewer', 'Captured 10/100 frames'],
         can_cancel: true,
         can_delete: true,
       },
@@ -169,6 +206,7 @@ describe('VideoExportJobsPanel', () => {
         progress: 50,
         message: 'Rendering overlay',
         mode: 'gopro_overlay',
+        log_tail: ['Starting overlay', 'Rendering overlay: 50%'],
         can_cancel: true,
         can_delete: false,
       },
@@ -228,6 +266,18 @@ describe('VideoExportJobsPanel', () => {
     expect(
       screen.getAllByRole('button', { name: 'Supprimer' }).length
     ).toBeGreaterThan(0);
+  });
+
+  it('keeps live logs collapsed by default and expands on demand', () => {
+    render(<VideoExportJobsPanel />);
+
+    expect(screen.queryByText('Opening viewer')).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getAllByRole('button', { name: /Logs en direct/u })[0]!
+    );
+
+    expect(screen.getByText(/Captured 20\/100 frames/u)).toBeInTheDocument();
   });
 
   it('filters jobs by status', () => {
@@ -315,6 +365,7 @@ describe('VideoExportJobsPanel', () => {
       progress: 12,
       message: 'Capturing frames',
       mode: 'manual_fast',
+      log_tail: ['Capturing frames'],
       can_cancel: true,
       can_delete: true,
     });
