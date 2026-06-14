@@ -158,7 +158,12 @@ def _matching_files_by_mtime(directory: Path, pattern: str) -> list[Path]:
     return sorted(matches, key=lambda path: (path.stat().st_mtime, path.name))
 
 
-def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: Path) -> Path:
+def _merge_osv_files_with_gpx(
+    osv_paths: list[Path],
+    gpx_path: Path,
+    input_dir: Path,
+    log_path: Path | None = None,
+) -> Path:
     if not osv_paths:
         return gpx_path
 
@@ -177,6 +182,11 @@ def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: 
         gpx_path,
         merged_gpx_path,
     )
+    if log_path:
+        _append_job_log(
+            log_path,
+            f"Merging {len(osv_paths)} OSV file(s) into {merged_gpx_path.name}",
+        )
     command = [
         "python3",
         str(merge_script),
@@ -200,15 +210,23 @@ def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: 
         )
     except subprocess.TimeoutExpired as exc:
         detail = exc.stderr or exc.stdout or "OSV merge timed out"
+        if log_path:
+            _append_job_log(log_path, f"OSV merge timed out: {detail}")
         raise ValueError(detail) from exc
 
     if result.returncode != 0:
         detail = result.stderr.strip() or result.stdout.strip() or "OSV merge failed"
+        if log_path:
+            _append_job_log(log_path, f"OSV merge failed: {detail}")
         raise ValueError(detail)
     if not merged_gpx_path.exists():
+        if log_path:
+            _append_job_log(log_path, "OSV merge did not create a GPX file")
         raise ValueError("OSV merge did not create a GPX file")
 
     logger.info("Created merged GoPro overlay GPX: %s", merged_gpx_path)
+    if log_path:
+        _append_job_log(log_path, f"Created merged GPX: {merged_gpx_path.name}")
     return merged_gpx_path
 
 
@@ -333,6 +351,16 @@ def _job_preparation_metadata(pin_inputs: bool, requested_layout_id: str | None)
         "pin_inputs": pin_inputs,
         "requested_layout_id": requested_layout_id,
     }
+
+
+def _append_job_log(log_path: Path, message: str) -> None:
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        with log_path.open("a", encoding="utf-8") as log_file:
+            log_file.write(f"[{timestamp}] {message}\n")
+    except OSError:
+        pass
 
 
 def _job_to_payload(job: GoproOverlayJob, include_command: bool = False) -> dict[str, Any]:
@@ -767,11 +795,15 @@ def _prepare_pip_video_for_overlay(
     gpx_path: Path,
     pip_path: Path,
     work_dir: Path,
+    log_path: Path | None = None,
 ) -> Path:
     video_duration = probe_video_duration(video_path)
     pip_width, pip_height = probe_video_resolution(pip_path)
     if video_duration is None or not pip_width or not pip_height:
         return pip_path
+
+    if log_path:
+        _append_job_log(log_path, f"Preparing PIP video: {pip_path.name}")
 
     pip_duration = probe_video_duration(pip_path)
     gpx_start = _first_gpx_timestamp(gpx_path)
@@ -860,14 +892,22 @@ def _prepare_pip_video_for_overlay(
         )
     except (FileNotFoundError, subprocess.SubprocessError, TimeoutError) as exc:
         _unlink_if_exists(prepared_path)
+        if log_path:
+            _append_job_log(log_path, f"PIP preparation failed: {exc}")
         raise ValueError(str(exc) or exc.__class__.__name__) from exc
 
     if result.returncode != 0:
         _unlink_if_exists(prepared_path)
         detail = result.stderr.strip() or result.stdout.strip() or "ffmpeg pip preparation failed"
+        if log_path:
+            _append_job_log(log_path, f"PIP preparation failed: {detail}")
         raise ValueError(detail)
     if not prepared_path.exists():
+        if log_path:
+            _append_job_log(log_path, "ffmpeg did not create the prepared PIP video")
         raise ValueError("ffmpeg did not create the prepared PIP video")
+    if log_path:
+        _append_job_log(log_path, f"Prepared PIP video: {prepared_path.name}")
     return prepared_path
 
 
@@ -999,7 +1039,10 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
     if not isinstance(metadata, dict) or not metadata.get("prepare_overlay_inputs"):
         return job
 
+    log_path = Path(str(job.get("log_path") or Path(str(job["output_path"])).with_suffix(".log")))
+
     try:
+        _append_job_log(log_path, "Preparing overlay files")
         current_job = _update_job(
             job_id,
             status=_STATUS_PREPARING,
@@ -1015,6 +1058,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         render_gpx_path = gpx_path
 
         if metadata.get("pin_inputs"):
+            _append_job_log(log_path, "Pinning overlay input files")
             video_path = _copy_job_input(
                 video_path,
                 work_dir / f"input{video_path.suffix.lower()}",
@@ -1036,10 +1080,16 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         osv_paths = _matching_files_by_mtime(source_input_dir, "*.osv")
         if osv_paths:
             render_gpx_path = _merge_osv_files_with_gpx(
-                osv_paths, render_gpx_path, source_input_dir
+                osv_paths,
+                render_gpx_path,
+                source_input_dir,
+                log_path=log_path,
             )
+        else:
+            _append_job_log(log_path, "No OSV files found; using GPX directly")
 
         command_metadata["render_gpx_path"] = str(render_gpx_path)
+        _append_job_log(log_path, f"Render GPX: {render_gpx_path.name}")
 
         if pip_path:
             pip_path = _prepare_pip_video_for_overlay(
@@ -1048,7 +1098,10 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 gpx_path,
                 pip_path,
                 work_dir,
+                log_path=log_path,
             )
+        else:
+            _append_job_log(log_path, "No PIP video configured")
 
         width, height = probe_video_resolution(video_path)
         requested_layout_id = metadata.get("requested_layout_id")
@@ -1062,6 +1115,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         source_layout_path = _layout_path(selected_layout)
         if not source_layout_path.exists():
             raise ValueError(f"Layout file not found: {source_layout_path}")
+        _append_job_log(log_path, f"Using layout {selected_layout.label}")
         layout_path = _prepare_layout_file(
             source_layout_path,
             work_dir / source_layout_path.name,
@@ -1088,8 +1142,10 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         if not prepared_job or prepared_job.get("status") != _STATUS_QUEUED:
             return None
         prepared_job["command"] = command_metadata
+        _append_job_log(log_path, "Overlay queued")
         return prepared_job
     except Exception as exc:
+        _append_job_log(log_path, f"Overlay preparation failed: {exc}")
         logger.exception("Failed to prepare GoPro overlay job %s", job_id)
         _finish_job(
             job_id,
@@ -1466,6 +1522,7 @@ def _run_job(job_id: str) -> None:
     if not _transition_job_to_running(job_id, command):
         return
     logger.info("Starting GoPro overlay job %s", job_id)
+    _append_job_log(log_path, f"Starting GoPro overlay job {job_id}")
     try:
         if temp_output_path.exists():
             temp_output_path.unlink()

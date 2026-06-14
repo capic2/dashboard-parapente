@@ -570,6 +570,46 @@ def test_worker_merge_osv_files_with_gpx_uses_configured_timeout(
     assert run.call_args.kwargs["timeout"] == 456
 
 
+def test_worker_merge_osv_files_with_gpx_writes_log_steps(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    gopro_root = tmp_path / "gopro-overlay"
+    gopro_root.mkdir()
+    (gopro_root / "osv_merge.py").write_text("# merge")
+    input_dir = tmp_path / "20260315" / "01"
+    input_dir.mkdir(parents=True)
+    source_gpx = input_dir / "Zepp-track.gpx"
+    osv_path = input_dir / "flight.osv"
+    merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
+    log_path = input_dir / "overlay.log"
+    source_gpx.write_text("<gpx>source</gpx>")
+    osv_path.write_bytes(b"osv")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(gopro_root))
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = ""
+
+    def fake_run(command, **kwargs):
+        Path(command[-1]).write_text("<gpx>merged</gpx>")
+        return Result()
+
+    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run):
+        result = gopro_overlay_export._merge_osv_files_with_gpx(
+            [osv_path],
+            source_gpx,
+            input_dir,
+            log_path=log_path,
+        )
+
+    assert result == merged_gpx_path
+    log_lines = log_path.read_text().splitlines()
+    assert any("Merging 1 OSV file(s)" in line for line in log_lines)
+    assert any("Created merged GPX" in line for line in log_lines)
+
+
 def test_worker_merge_osv_files_with_gpx_passes_first_gpx_at_from_osv_start(
     tmp_path,
     monkeypatch,
@@ -1330,7 +1370,7 @@ def test_prepare_queued_job_uses_prepared_pip_path(tmp_path, monkeypatch, test_d
     monkeypatch.setattr(
         gopro_overlay_export,
         "_prepare_pip_video_for_overlay",
-        lambda *_args: prepared_pip_path,
+        lambda *_args, **_kwargs: prepared_pip_path,
     )
 
     job = create_gopro_overlay_job_from_paths(
