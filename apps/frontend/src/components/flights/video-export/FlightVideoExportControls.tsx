@@ -74,6 +74,32 @@ const needsVideoExportRecovery = (status?: string | null) =>
 const isCancelledVideoExport = (status?: string | null) =>
   status === 'cancelled';
 
+const getLogsOpenStorageKey = (flightId: string) =>
+  `flight-video-export-logs-open:${flightId}`;
+
+const hasStoredLogsOpenPreference = (flightId: string) => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return (
+    window.sessionStorage.getItem(getLogsOpenStorageKey(flightId)) !== null
+  );
+};
+
+const readStoredLogsOpenState = (flightId: string) => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const stored = window.sessionStorage.getItem(getLogsOpenStorageKey(flightId));
+  if (stored === null) {
+    return null;
+  }
+
+  return stored === 'true';
+};
+
 const getHttpErrorDetail = async (error: HTTPError): Promise<string | null> => {
   try {
     const body = (await error.response.json()) as {
@@ -113,11 +139,16 @@ export function FlightVideoExportControls({
   const toast = useToast();
   const { data: refreshedFlight } = useFlight(initialFlight.id);
   const flight = refreshedFlight ?? initialFlight;
+  const [hasSavedLogsOpenPreference] = useState(() =>
+    hasStoredLogsOpenPreference(initialFlight.id)
+  );
   const [videoExportMode, setVideoExportMode] =
     useState<VideoExportMode>('manual_fast');
   const [isStartingVideoExport, setIsStartingVideoExport] = useState(false);
-  const [isLogsOpen, setIsLogsOpen] = useState(() =>
-    hasActiveVideoExport(initialFlight)
+  const [isLogsOpen, setIsLogsOpen] = useState(
+    () =>
+      readStoredLogsOpenState(initialFlight.id) ??
+      hasActiveVideoExport(initialFlight)
   );
   const [videoExportJobToken, setVideoExportJobToken] = useState<string | null>(
     null
@@ -144,10 +175,21 @@ export function FlightVideoExportControls({
   );
 
   useEffect(() => {
-    if (isExportActive) {
+    if (isExportActive && !hasSavedLogsOpenPreference) {
       setIsLogsOpen(true);
     }
-  }, [flight.video_export_job_id, isExportActive]);
+  }, [flight.video_export_job_id, hasSavedLogsOpenPreference, isExportActive]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.sessionStorage.setItem(
+      getLogsOpenStorageKey(flight.id),
+      String(isLogsOpen)
+    );
+  }, [flight.id, isLogsOpen]);
 
   useEffect(() => {
     if (!flight.id || !exportStatus?.internal_status) {
