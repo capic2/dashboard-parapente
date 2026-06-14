@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 from typing import Any, Literal
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, Field, validator
 
 VALID_SITE_ORIENTATIONS = {
     "",
@@ -64,6 +64,7 @@ class GoproOverlayJob(BaseModel):
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None = None
+    log_tail: list[str] = Field(default_factory=list)
     job_token: str | None = None
 
 

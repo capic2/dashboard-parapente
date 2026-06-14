@@ -544,6 +544,7 @@ def _gopro_overlay_export_job_payload(job: dict[str, Any]) -> dict[str, Any]:
         "completed_at": job.get("completed_at"),
         "output_filename": job.get("output_filename"),
         "layout_label": job.get("layout_label"),
+        "log_tail": job.get("log_tail") or [],
         "has_output_file": bool(output_path and Path(str(output_path)).exists()),
     }
 

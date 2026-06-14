@@ -13,7 +13,7 @@ import threading
 import uuid
 import traceback
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -38,6 +38,38 @@ def _video_export_dir() -> Path:
 
 def _video_temp_images_dir() -> Path:
     return Path(config.VIDEO_TEMP_IMAGES_DIR)
+
+
+_LOG_TAIL_LINE_COUNT = 100
+
+
+def _job_log_path(job_id: str) -> Path:
+    return _job_temp_dir(_video_temp_images_dir(), job_id) / "export.log"
+
+
+def _tail_log_lines(path: Path, limit: int = _LOG_TAIL_LINE_COUNT) -> list[str]:
+    if not path.exists():
+        return []
+    try:
+        return path.read_text(errors="replace").splitlines()[-limit:]
+    except OSError:
+        return []
+
+
+def _job_log_tail(job_id: str) -> list[str]:
+    return _tail_log_lines(_job_log_path(job_id))
+
+
+def _log_job(job_id: str, message: str) -> None:
+    print(message)
+    try:
+        log_path = _job_log_path(job_id)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        with log_path.open("a", encoding="utf-8") as log_file:
+            log_file.write(f"[{timestamp}] {message}\n")
+    except OSError:
+        pass
 
 
 _STATUS_QUEUED = "queued"
@@ -250,6 +282,7 @@ def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
         "created_at": _to_iso(job.created_at),
         "updated_at": _to_iso(job.updated_at),
         "cancelled_at": _to_iso(job.cancelled_at),
+        "log_tail": _job_log_tail(job.id),
         **resume_info,
     }
 
@@ -1280,10 +1313,12 @@ async def _export_video_manual_render(job_id: str):
 
             await page.add_init_script(_build_playwright_init_script(auth_token))
 
-            page.on("console", lambda msg: print(f"🖥️  [{msg.type}]: {msg.text}"))
-            page.on("pageerror", lambda err: print(f"❌ Browser error: {err}"))
+            page.on(
+                "console", lambda msg: _log_job(job_id, f"Browser console [{msg.type}]: {msg.text}")
+            )
+            page.on("pageerror", lambda err: _log_job(job_id, f"Browser error: {err}"))
 
-            print(f"📺 Opening {log_url}")
+            _log_job(job_id, f"Opening export viewer: {log_url}")
 
             _update_job(job_id, message="Loading export viewer")
             response = await page.goto(url, wait_until="networkidle", timeout=60000)
@@ -1332,7 +1367,7 @@ async def _export_video_manual_render(job_id: str):
 
             await asyncio.sleep(3)
 
-            print("✅ Cesium viewer found")
+            _log_job(job_id, "Cesium viewer found")
 
             _update_job(job_id, message="Configuring manual render mode")
 
@@ -1371,7 +1406,7 @@ async def _export_video_manual_render(job_id: str):
             if not setup_result.get("success"):
                 raise Exception("Failed to configure Cesium manual render mode")
 
-            print("✅ Cesium manual render mode configured")
+            _log_job(job_id, "Cesium manual render mode configured")
 
             _update_job(job_id, message="Waiting for terrain")
             terrain_ready = await _wait_for_export_frame_terrain(
@@ -1380,9 +1415,9 @@ async def _export_video_manual_render(job_id: str):
                 poll_seconds=0.5,
             )
             if terrain_ready:
-                print("✅ Initial terrain loaded")
+                _log_job(job_id, "Initial terrain loaded")
             else:
-                print("⚠️  Terrain timeout - continuing anyway")
+                _log_job(job_id, "Terrain timeout - continuing anyway")
 
             await asyncio.sleep(2)
 
@@ -1411,17 +1446,17 @@ async def _export_video_manual_render(job_id: str):
 
             if total_gps_points == 0:
                 total_gps_points = duration_seconds
-                print(f"⚠️  No GPS data found, using estimated {total_gps_points} points")
+                _log_job(job_id, f"No GPS data found, using estimated {total_gps_points} points")
 
-            print(f"📊 GPS Points: {total_gps_points}")
-            print(f"📊 Duration: {duration_seconds}s")
+            _log_job(job_id, f"GPS points: {total_gps_points}")
+            _log_job(job_id, f"Duration: {duration_seconds}s")
 
             video_duration = float(duration_seconds) / max(speed, 1)
             total_frames = int(video_duration * fps)
             if total_frames <= 0:
                 total_frames = 1
 
-            print(f"🎬 Will capture {total_frames} frames at {fps} FPS")
+            _log_job(job_id, f"Will capture {total_frames} frames at {fps} FPS")
 
             _update_job(
                 job_id,
@@ -1436,7 +1471,7 @@ async def _export_video_manual_render(job_id: str):
             frames_dir = _job_frames_dir(temp_root, job_id)
             _prepare_export_dirs(export_root, temp_dir, frames_dir)
 
-            print(f"📁 Frames directory: {frames_dir}")
+            _log_job(job_id, f"Frames directory: {frames_dir}")
 
             capture_mode_message = (
                 "Starting fast deterministic frame capture"
@@ -1472,7 +1507,7 @@ async def _export_video_manual_render(job_id: str):
 
             frame_count = 0
             ms_per_frame = (duration_seconds * 1000) / max(total_frames, 1)
-            print(f"⏱️  Capturing 1 frame every {ms_per_frame:.1f}ms")
+            _log_job(job_id, f"Capturing 1 frame every {ms_per_frame:.1f}ms")
             start_time = time.time()
             resume_from_frame = _first_missing_frame_index(frames_dir, total_frames)
             if resume_from_frame > 0:
@@ -1490,12 +1525,12 @@ async def _export_video_manual_render(job_id: str):
                     progress=progress,
                     message=f"Resuming from frame {resume_from_frame}/{total_frames}",
                 )
-                print(f"▶️  Resuming capture from frame {resume_from_frame}/{total_frames}")
+                _log_job(job_id, f"Resuming capture from frame {resume_from_frame}/{total_frames}")
 
             terrain_wait_enabled = True
             for i in range(resume_from_frame, total_frames):
                 if i % _CANCEL_CHECK_INTERVAL == 0 and _is_cancelled(job_id):
-                    print("🛑 Export cancelled by user")
+                    _log_job(job_id, "Export cancelled by user")
                     await browser.close()
                     _update_job(
                         job_id,
@@ -1520,9 +1555,9 @@ async def _export_video_manual_render(job_id: str):
                 if not tiles_loaded and terrain_wait_enabled:
                     tiles_loaded = await _wait_for_export_frame_terrain(page)
                     if not tiles_loaded:
-                        print(f"⚠️  Terrain still loading for frame {i} after timeout")
+                        _log_job(job_id, f"Terrain still loading for frame {i} after timeout")
                         terrain_wait_enabled = False
-                        print("⚠️  Disabling per-frame terrain waits after timeout")
+                        _log_job(job_id, "Disabling per-frame terrain waits after timeout")
 
                 frame_path = frames_dir / f"frame{i:05d}.png"
                 await page.screenshot(path=str(frame_path), timeout=60000)
@@ -1549,22 +1584,26 @@ async def _export_video_manual_render(job_id: str):
                         message=f"Captured {frame_count}/{total_frames} frames",
                     )
 
-                    print(
-                        f"📸 {frame_count}/{total_frames} frames ({fps_actual:.1f} fps, ETA: {int(eta_seconds/60)}min)"
+                    _log_job(
+                        job_id,
+                        f"Captured {frame_count}/{total_frames} frames "
+                        f"({fps_actual:.1f} fps, ETA: {int(eta_seconds/60)}min)",
                     )
 
                 if not is_fast_mode:
                     await asyncio.sleep(ms_per_frame / 1000)
 
             total_capture_time = time.time() - start_time
-            print(
-                f"✅ Captured all {frame_count} frames in {int(total_capture_time/60)}min {int(total_capture_time%60)}s"
+            _log_job(
+                job_id,
+                f"Captured all {frame_count} frames in "
+                f"{int(total_capture_time/60)}min {int(total_capture_time%60)}s",
             )
 
             await browser.close()
 
             if _is_cancelled(job_id):
-                print("🛑 Export cancelled by user before encoding")
+                _log_job(job_id, "Export cancelled by user before encoding")
                 _update_job(
                     job_id,
                     status=_STATUS_CANCELLED,
@@ -1605,7 +1644,7 @@ async def _export_video_manual_render(job_id: str):
                 str(output_file),
             ]
 
-            print(f"🎬 FFmpeg command: {' '.join(ffmpeg_cmd)}")
+            _log_job(job_id, f"FFmpeg command: {' '.join(ffmpeg_cmd)}")
             process = await asyncio.create_subprocess_exec(
                 *ffmpeg_cmd,
                 stdout=asyncio.subprocess.DEVNULL,
@@ -1676,6 +1715,8 @@ async def _export_video_manual_render(job_id: str):
                     line = line_bytes.decode("utf-8", errors="replace").strip()
                     last_ffmpeg_output_at = time.monotonic()
                     ffmpeg_stderr.append(line)
+                    if line:
+                        _log_job(job_id, f"ffmpeg: {line}")
                     encoded_seconds = _parse_ffmpeg_out_time_seconds(line)
 
                     if encoded_seconds is not None:
@@ -1714,7 +1755,7 @@ async def _export_video_manual_render(job_id: str):
                     process.kill()
                     await process.wait()
 
-            print(f"✅ Video encoded: {output_file}")
+            _log_job(job_id, f"Video encoded: {output_file}")
 
             _cleanup_temp_dir(temp_dir)
 
@@ -1729,11 +1770,11 @@ async def _export_video_manual_render(job_id: str):
             _set_job_runtime(job_id, phase=_STATUS_COMPLETED, eta_seconds=0)
 
             capture_time_min = int(total_capture_time / 60)
-            print(f"✅ Export completed in {capture_time_min} minutes")
-            print(f"📹 Video: {output_file} ({file_size_mb:.1f} MB)")
+            _log_job(job_id, f"Export completed in {capture_time_min} minutes")
+            _log_job(job_id, f"Video: {output_file} ({file_size_mb:.1f} MB)")
 
     except Exception as e:
-        print(f"❌ Export failed: {e}")
+        _log_job(job_id, f"Export failed: {e}")
         traceback.print_exc()
         _update_job(
             job_id,

@@ -44,6 +44,7 @@ _GPX_EXTENSIONS = {".gpx", ".fit"}
 _UPLOAD_WORK_ROOT = Path("/tmp/dashboard-parapente/gopro-overlays")
 _PATH_WORK_DIR_NAME = ".gopro-overlay-work"
 _PROGRESS_PERCENT_RE = re.compile(r"(?P<percent>\d{1,3})\s*%")
+_LOG_TAIL_LINE_COUNT = 100
 
 
 @dataclass(frozen=True)
@@ -351,6 +352,9 @@ def _job_to_payload(job: GoproOverlayJob, include_command: bool = False) -> dict
         "temp_output_path": job.temp_output_path,
         "output_filename": job.output_filename,
         "log_path": job.log_path,
+        "log_tail": (
+            _tail_log_lines(Path(job.log_path), _LOG_TAIL_LINE_COUNT) if job.log_path else []
+        ),
         "video_width": job.video_width,
         "video_height": job.video_height,
         "created_at": _to_iso(job.created_at),
@@ -556,13 +560,18 @@ def _background_process_command(command: list[str]) -> list[str]:
     return wrapped
 
 
-def _tail_lines(path: Path, limit: int = 20) -> str:
+def _tail_log_lines(path: Path, limit: int = _LOG_TAIL_LINE_COUNT) -> list[str]:
     if not path.exists():
-        return ""
+        return []
     try:
         lines = path.read_text(errors="replace").splitlines()
     except OSError:
-        return ""
+        return []
+    return lines[-limit:]
+
+
+def _tail_lines(path: Path, limit: int = 20) -> str:
+    lines = _tail_log_lines(path, limit)
     return "\n".join(lines[-limit:])
 
 
@@ -1617,6 +1626,8 @@ def get_gopro_overlay_job(job_id: str, include_command: bool = False) -> dict[st
         if not job:
             return None
         payload = job.copy()
+    log_path = payload.get("log_path")
+    payload["log_tail"] = _tail_log_lines(Path(str(log_path))) if log_path else []
     if not include_command:
         payload.pop("command", None)
     return payload
@@ -1633,9 +1644,13 @@ def list_gopro_overlay_jobs() -> list[dict[str, Any]]:
             raise
 
     with _LOCK:
-        return [
-            {key: value for key, value in job.items() if key != "command"} for job in _JOBS.values()
-        ]
+        jobs = []
+        for job in _JOBS.values():
+            payload = {key: value for key, value in job.items() if key != "command"}
+            log_path = payload.get("log_path")
+            payload["log_tail"] = _tail_log_lines(Path(str(log_path))) if log_path else []
+            jobs.append(payload)
+        return jobs
 
 
 def _path_usage(path: Path) -> tuple[int, int, int]:

@@ -56,6 +56,7 @@ describe('toStatusPayload', () => {
       frames_captured: 120,
       resume_from_frame: 120,
       phase: 'encoding',
+      log_tail: ['Opening viewer', 'Encoding 32%', 42],
     });
 
     expect(payload).toEqual({
@@ -69,6 +70,7 @@ describe('toStatusPayload', () => {
       frames_captured: 120,
       resume_from_frame: 120,
       phase: 'encoding',
+      log_tail: ['Opening viewer', 'Encoding 32%'],
     });
   });
 

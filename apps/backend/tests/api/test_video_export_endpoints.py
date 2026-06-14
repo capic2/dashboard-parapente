@@ -398,6 +398,7 @@ class TestExportStatusAndCancel:
             "internal_status": "capturing",
             "progress": 44,
             "message": "Captured 44/100 frames",
+            "log_tail": ["Opening viewer", "Captured 44/100 frames"],
         }
         completed_status = {
             "job_id": "job-stream-1",
@@ -417,6 +418,7 @@ class TestExportStatusAndCancel:
         assert "retry: 3000" in response.text
         assert "event: status" in response.text
         assert '"progress": 44' in response.text
+        assert '"log_tail": ["Opening viewer", "Captured 44/100 frames"]' in response.text
 
     def test_export_status_stream_returns_404_when_job_missing(self, client: TestClient):
         """SSE endpoint should return HTTP 404 for missing jobs."""

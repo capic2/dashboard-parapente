@@ -62,6 +62,7 @@ def test_create_gopro_overlay_job_passes_uploaded_files(client: TestClient):
         "layout_id": "parapente-1080",
         "layout_label": "Parapente 1920x1080",
         "output_filename": "flight-overlay.mp4",
+        "log_tail": ["Starting overlay", "Rendering overlay: 50%"],
         "created_at": "2026-01-01T00:00:00+00:00",
         "updated_at": "2026-01-01T00:00:00+00:00",
     }
@@ -86,6 +87,7 @@ def test_create_gopro_overlay_job_passes_uploaded_files(client: TestClient):
 
     assert response.status_code == 200
     assert response.json()["job_id"] == "job-gopro"
+    assert response.json()["log_tail"] == ["Starting overlay", "Rendering overlay: 50%"]
     assert response.json()["job_token"]
     assert create_job.call_args.kwargs["layout_id"] == "parapente-1080"
     assert create_job.call_args.kwargs["output_filename"] == "flight-overlay.mp4"
