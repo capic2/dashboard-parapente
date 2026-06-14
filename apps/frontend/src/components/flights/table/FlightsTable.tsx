@@ -5,10 +5,11 @@ import type { Selection } from 'react-aria-components';
 import { DataList } from '@dashboard-parapente/design-system';
 import { Flight, type DownloadingMedia } from './Flight';
 import { useFlightsTable, FLIGHT_SORTABLE_COLUMNS } from './useFlightsTable';
-import type { Flight as FlightRecord } from '../../../types';
+import type { Flight as FlightRecord, Site } from '../../../types';
 
 interface FlightsTableProps {
   flights: FlightRecord[];
+  sites: Site[];
   selectedFlightId: string | null;
   selectionMode: boolean;
   onSelectFlight: (flight: FlightRecord) => void;
@@ -23,6 +24,7 @@ interface FlightsTableProps {
 
 export function FlightsTable({
   flights,
+  sites,
   selectedFlightId,
   selectionMode,
   onSelectFlight,
@@ -75,6 +77,7 @@ export function FlightsTable({
       return (
         <Flight
           flight={flight}
+          sites={sites}
           isActive={selectedFlightId === flight.id}
           isSelected={isSelected}
           selectionMode={selectionMode}
@@ -90,6 +93,7 @@ export function FlightsTable({
     [
       selectionMode,
       selectedFlightId,
+      sites,
       onSelectFlight,
       onDeleteFlight,
       onDownloadGpx,
@@ -110,7 +114,12 @@ export function FlightsTable({
       className="flex h-full flex-col lg:min-h-[calc(100vh-22rem)]"
       itemsClassName="min-h-72 flex-1 overflow-y-auto pr-1"
       virtualizedLayoutOptions={{ estimatedRowSize: 136, gap: 8 }}
-      renderDependencies={[selectedFlightId, selectionMode, rowSelection]}
+      renderDependencies={[
+        selectedFlightId,
+        selectionMode,
+        rowSelection,
+        sites,
+      ]}
       selectionMode={selectionMode ? 'multiple' : 'none'}
       selectedKeys={selectedKeys}
       onSelectionChange={handleSelectionChange}

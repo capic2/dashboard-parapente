@@ -62,6 +62,7 @@ def test_create_gopro_overlay_job_passes_uploaded_files(client: TestClient):
         "layout_id": "parapente-1080",
         "layout_label": "Parapente 1920x1080",
         "output_filename": "flight-overlay.mp4",
+        "log_tail": ["Starting overlay", "Rendering overlay: 50%"],
         "created_at": "2026-01-01T00:00:00+00:00",
         "updated_at": "2026-01-01T00:00:00+00:00",
     }
@@ -86,6 +87,7 @@ def test_create_gopro_overlay_job_passes_uploaded_files(client: TestClient):
 
     assert response.status_code == 200
     assert response.json()["job_id"] == "job-gopro"
+    assert response.json()["log_tail"] == ["Starting overlay", "Rendering overlay: 50%"]
     assert response.json()["job_token"]
     assert create_job.call_args.kwargs["layout_id"] == "parapente-1080"
     assert create_job.call_args.kwargs["output_filename"] == "flight-overlay.mp4"
@@ -260,10 +262,10 @@ def test_create_flight_gopro_overlay_job_uses_auto_flight_directory_files(
     input_dir = paragliding_root / "20260315" / "01"
     input_dir.mkdir(parents=True)
     camera_path = input_dir / "camera.mp4"
-    first_gpx_path = input_dir / "Zepp-a.gpx"
+    first_gpx_path = input_dir / "Zepp-a.GPX"
     second_gpx_path = input_dir / "Zepp-b.gpx"
     old_pip_path = input_dir / "flight-old.mp4"
-    new_pip_path = input_dir / "flight-new.mp4"
+    new_pip_path = input_dir / "flight-new.MP4"
     camera_path.write_bytes(b"camera")
     first_gpx_path.write_text("<gpx>first</gpx>")
     second_gpx_path.write_text("<gpx>second</gpx>")
@@ -401,9 +403,8 @@ def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
     camera_path = input_dir / "camera.mp4"
     gpx_path = input_dir / "Zepp-track.gpx"
     pip_path = input_dir / "flight-pip.mp4"
-    first_osv = input_dir / "first.osv"
+    first_osv = input_dir / "first.OSV"
     second_osv = input_dir / "second.osv"
-    merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
     camera_path.write_bytes(b"camera")
     gpx_path.write_text("<gpx />")
     pip_path.write_bytes(b"pip")
@@ -411,7 +412,6 @@ def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
     second_osv.write_bytes(b"second")
     sample_flight.video_file_path = str(pip_path)
     db_session.commit()
-    merged_gpx_path.write_text("<gpx>merged</gpx>")
     os.utime(first_osv, (1, 1))
     os.utime(second_osv, (2, 2))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
@@ -433,14 +433,12 @@ def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
             "routes.check_gopro_overlay_dependencies",
             return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
         ),
-        patch("routes._merge_osv_files_with_gpx", return_value=merged_gpx_path) as merge_osv,
         patch("routes.create_gopro_overlay_job_from_paths", return_value=expected) as create_job,
     ):
         response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay")
 
     assert response.status_code == 200
-    assert merge_osv.call_args.args == ([first_osv, second_osv], gpx_path, input_dir)
-    assert create_job.call_args.kwargs["gpx_path"] == merged_gpx_path
+    assert create_job.call_args.kwargs["gpx_path"] == gpx_path
 
 
 def test_create_flight_gopro_overlay_job_uses_merged_uploaded_gpx_when_osv_exists(
@@ -455,13 +453,11 @@ def test_create_flight_gopro_overlay_job_uses_merged_uploaded_gpx_when_osv_exist
     input_dir.mkdir(parents=True)
     pip_path = input_dir / "flight-pip.mp4"
     osv_path = input_dir / "flight.osv"
-    merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
     pip_path.write_bytes(b"pip")
     osv_path.write_bytes(b"osv")
     sample_flight.gpx_file_path = None
     sample_flight.video_file_path = str(pip_path)
     db_session.commit()
-    merged_gpx_path.write_text("<gpx>merged</gpx>")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
 
     expected = {
@@ -481,7 +477,6 @@ def test_create_flight_gopro_overlay_job_uses_merged_uploaded_gpx_when_osv_exist
             "routes.check_gopro_overlay_dependencies",
             return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
         ),
-        patch("routes._merge_osv_files_with_gpx", return_value=merged_gpx_path) as merge_osv,
         patch("routes.create_gopro_overlay_job", AsyncMock(return_value=expected)) as create_job,
     ):
         response = client.post(
@@ -493,15 +488,8 @@ def test_create_flight_gopro_overlay_job_uses_merged_uploaded_gpx_when_osv_exist
         )
 
     assert response.status_code == 200
-    uploaded_gpx_path = merge_osv.call_args.args[1]
-    assert merge_osv.call_args.args[0] == [osv_path]
-    assert uploaded_gpx_path.parent == input_dir / ".gopro-overlay-work"
-    assert uploaded_gpx_path.name.startswith("uploaded-")
-    assert uploaded_gpx_path.read_text() == "<gpx>uploaded</gpx>"
-    assert merge_osv.call_args.args[2] == input_dir
-    assert create_job.call_args.kwargs["gpx_file"] is None
-    assert create_job.call_args.kwargs["fallback_gpx_path"] == merged_gpx_path
-    assert create_job.call_args.kwargs["pin_inputs"] is True
+    assert create_job.call_args.kwargs["gpx_file"] is not None
+    assert create_job.call_args.kwargs["fallback_gpx_path"] is None
 
 
 def test_merge_osv_files_with_gpx_writes_stable_file_in_flight_directory(
@@ -522,6 +510,7 @@ def test_merge_osv_files_with_gpx_writes_stable_file_in_flight_directory(
     source_gpx.write_text("<gpx>source</gpx>")
     merged_gpx_path.write_text("stale")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(gopro_root))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS", 123)
 
     class Result:
         returncode = 0
@@ -540,6 +529,227 @@ def test_merge_osv_files_with_gpx_writes_stable_file_in_flight_directory(
     command = run.call_args.args[0]
     assert command[-2:] == [str(source_gpx), str(merged_gpx_path)]
     assert str(input_dir / ".gopro-overlay-work") not in command[-1]
+    assert run.call_args.kwargs["timeout"] == 123
+
+
+def test_worker_merge_osv_files_with_gpx_uses_configured_timeout(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    gopro_root = tmp_path / "gopro-overlay"
+    gopro_root.mkdir()
+    (gopro_root / "osv_merge.py").write_text("# merge")
+    input_dir = tmp_path / "20260315" / "01"
+    input_dir.mkdir(parents=True)
+    source_gpx = input_dir / "Zepp-track.gpx"
+    osv_path = input_dir / "flight.osv"
+    merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
+    source_gpx.write_text("<gpx>source</gpx>")
+    osv_path.write_bytes(b"osv")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(gopro_root))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS", 456)
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = ""
+
+    def fake_run(command, **kwargs):
+        Path(command[-1]).write_text("<gpx>merged</gpx>")
+        return Result()
+
+    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run) as run:
+        result = gopro_overlay_export._merge_osv_files_with_gpx(
+            [osv_path],
+            source_gpx,
+            input_dir,
+        )
+
+    assert result == merged_gpx_path
+    assert merged_gpx_path.read_text() == "<gpx>merged</gpx>"
+    assert run.call_args.kwargs["timeout"] == 456
+
+
+def test_worker_merge_osv_files_with_gpx_passes_first_gpx_at_from_osv_start(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    gopro_root = tmp_path / "gopro-overlay"
+    gopro_root.mkdir()
+    (gopro_root / "osv_merge.py").write_text("# merge")
+    input_dir = tmp_path / "20260315" / "01"
+    input_dir.mkdir(parents=True)
+    source_gpx = input_dir / "Zepp-track.gpx"
+    osv_path = input_dir / "flight.osv"
+    merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
+    source_gpx.write_text(
+        "<gpx><trk><trkseg>"
+        "<trkpt><time>2026-03-15T09:59:50Z</time></trkpt>"
+        "<trkpt><time>2026-03-15T10:00:20Z</time></trkpt>"
+        "</trkseg></trk></gpx>"
+    )
+    osv_path.write_bytes(b"osv")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(gopro_root))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: 30.0)
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_start_time",
+        lambda _: gopro_overlay_export._parse_utc_datetime("2026-03-15T10:00:00Z"),
+    )
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = ""
+
+    def fake_run(command, **_kwargs):
+        Path(command[-1]).write_text("<gpx>merged</gpx>")
+        return Result()
+
+    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run) as run:
+        result = gopro_overlay_export._merge_osv_files_with_gpx(
+            [osv_path],
+            source_gpx,
+            input_dir,
+        )
+
+    assert result == merged_gpx_path
+    assert merged_gpx_path.read_text() == "<gpx>merged</gpx>"
+    command = run.call_args.args[0]
+    assert command[2:4] == ["--first-gpx-at", "10.000"]
+
+
+def test_gopro_overlay_output_resolution_is_rescaled_when_needed(tmp_path, monkeypatch) -> None:
+    output_path = tmp_path / "overlay.mp4"
+    output_path.write_bytes(b"small")
+    scaled_path = gopro_overlay_export._scaled_video_path(output_path)
+
+    def fake_probe(path: Path):
+        if path == output_path:
+            return (1280, 720)
+        if path == scaled_path:
+            return (1920, 1080)
+        return (None, None)
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = ""
+
+    def fake_run(command, **kwargs):
+        Path(command[-1]).write_bytes(b"scaled")
+        return Result()
+
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", fake_probe)
+    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run) as run:
+        ok, error = gopro_overlay_export._ensure_video_output_resolution(
+            output_path,
+            1920,
+            1080,
+        )
+
+    assert ok is True
+    assert error is None
+    assert output_path.read_bytes() == b"scaled"
+    command = run.call_args.args[0]
+    assert command[command.index("-vf") + 1] == "scale=1920:1080:flags=lanczos"
+
+
+def test_gopro_overlay_output_resolution_noops_when_size_matches(tmp_path, monkeypatch) -> None:
+    output_path = tmp_path / "overlay.mp4"
+    output_path.write_bytes(b"video")
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+
+    with patch("gopro_overlay_export.subprocess.run") as run:
+        ok, error = gopro_overlay_export._ensure_video_output_resolution(
+            output_path,
+            1920,
+            1080,
+        )
+
+    assert ok is True
+    assert error is None
+    assert not run.called
+    assert output_path.read_bytes() == b"video"
+
+
+def test_gopro_overlay_output_resolution_rejects_invalid_expected_dimensions(tmp_path) -> None:
+    output_path = tmp_path / "overlay.mp4"
+    output_path.write_bytes(b"video")
+
+    ok, error = gopro_overlay_export._ensure_video_output_resolution(output_path, -1, 1080)
+
+    assert ok is False
+    assert error == "Invalid expected dimensions: -1x1080"
+
+
+def test_gopro_overlay_output_resolution_cleans_scaled_file_on_ffmpeg_error(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    output_path = tmp_path / "overlay.mp4"
+    output_path.write_bytes(b"small")
+    scaled_path = gopro_overlay_export._scaled_video_path(output_path)
+
+    class Result:
+        returncode = 1
+        stderr = "scale failed"
+        stdout = ""
+
+    def fake_run(command, **kwargs):
+        Path(command[-1]).write_bytes(b"partial")
+        return Result()
+
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1280, 720))
+    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run):
+        ok, error = gopro_overlay_export._ensure_video_output_resolution(
+            output_path,
+            1920,
+            1080,
+        )
+
+    assert ok is False
+    assert error == "scale failed"
+    assert not scaled_path.exists()
+    assert output_path.read_bytes() == b"small"
+
+
+def test_gopro_overlay_output_resolution_cleans_scaled_file_on_wrong_scaled_size(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    output_path = tmp_path / "overlay.mp4"
+    output_path.write_bytes(b"small")
+    scaled_path = gopro_overlay_export._scaled_video_path(output_path)
+
+    def fake_probe(path: Path):
+        if path == output_path:
+            return (1280, 720)
+        if path == scaled_path:
+            return (1600, 900)
+        return (None, None)
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = ""
+
+    def fake_run(command, **kwargs):
+        Path(command[-1]).write_bytes(b"wrong-size")
+        return Result()
+
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", fake_probe)
+    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run):
+        ok, error = gopro_overlay_export._ensure_video_output_resolution(
+            output_path,
+            1920,
+            1080,
+        )
+
+    assert ok is False
+    assert error == "scaled output resolution is 1600x900, expected 1920x1080"
+    assert not scaled_path.exists()
+    assert output_path.read_bytes() == b"small"
 
 
 def test_create_flight_gopro_overlay_job_rejects_paths_outside_paragliding_root(
@@ -960,13 +1170,23 @@ def test_prepare_layout_file_removes_pip_without_video(tmp_path):
 def test_prepare_layout_file_sets_video_dimensions(tmp_path):
     source = tmp_path / "layout.xml"
     destination = tmp_path / "prepared.xml"
-    source.write_text('<layout width="1920" height="1080" />')
+    source.write_text(
+        '<layout width="1920" height="1080">'
+        '<component type="video" size="220" x="100" y="50" width="300" height="100" />'
+        "</layout>"
+    )
 
-    _prepare_layout_file(source, destination, has_pip=False, target_width=2704, target_height=1520)
+    _prepare_layout_file(source, destination, has_pip=True, target_width=3840, target_height=2160)
 
     prepared = destination.read_text()
-    assert 'width="2704"' in prepared
-    assert 'height="1520"' in prepared
+    assert 'width="3840"' in prepared
+    assert 'height="2160"' in prepared
+    assert 'id="pip"' in prepared
+    assert 'size="440"' in prepared
+    assert 'x="200"' in prepared
+    assert 'y="100"' in prepared
+    assert 'width="600"' in prepared
+    assert 'height="200"' in prepared
 
 
 def test_gopro_overlay_progress_is_parsed_from_render_output():
@@ -995,6 +1215,138 @@ def test_gopro_overlay_process_updates_split_carriage_returns():
         "Render: 2%",
         "Done",
     ]
+
+
+def test_prepare_pip_video_delays_pip_until_gpx_start(tmp_path, monkeypatch):
+    video_path = tmp_path / "camera.mp4"
+    gpx_path = tmp_path / "track.gpx"
+    pip_path = tmp_path / "pip.mp4"
+    work_dir = tmp_path / "work"
+    video_path.write_bytes(b"video")
+    pip_path.write_bytes(b"pip")
+    gpx_path.write_text(
+        "<gpx><trk><trkseg><trkpt><time>2026-03-15T10:00:05Z</time></trkpt></trkseg></trk></gpx>"
+    )
+    work_dir.mkdir()
+    commands: list[list[str]] = []
+
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_duration",
+        lambda path: 30.0 if path == video_path else 10.0,
+    )
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (640, 480))
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_start_time",
+        lambda _: gopro_overlay_export._parse_utc_datetime("2026-03-15T10:00:00Z"),
+    )
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = ""
+
+    def run(command, **_kwargs):
+        commands.append(command)
+        Path(command[-1]).write_bytes(b"prepared")
+        return Result()
+
+    monkeypatch.setattr(gopro_overlay_export.subprocess, "run", run)
+
+    prepared = gopro_overlay_export._prepare_pip_video_for_overlay(
+        "job-pip", video_path, gpx_path, pip_path, work_dir
+    )
+
+    assert prepared == work_dir / "pip-prepared-job-pip.mp4"
+    assert prepared.read_bytes() == b"prepared"
+    command = commands[0]
+    assert "-ss" not in command
+    filter_complex = command[command.index("-filter_complex") + 1]
+    assert "setpts=PTS-STARTPTS+5.000/TB" in filter_complex
+    assert "tpad=stop_mode=clone:stop_duration=15.000" in filter_complex
+
+
+def test_prepare_pip_video_trims_pip_when_camera_starts_after_gpx(tmp_path, monkeypatch):
+    video_path = tmp_path / "camera.mp4"
+    gpx_path = tmp_path / "track.gpx"
+    pip_path = tmp_path / "pip.mp4"
+    work_dir = tmp_path / "work"
+    video_path.write_bytes(b"video")
+    pip_path.write_bytes(b"pip")
+    gpx_path.write_text("<gpx><time>2026-03-15T10:00:00Z</time></gpx>")
+    work_dir.mkdir()
+    commands: list[list[str]] = []
+
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_duration",
+        lambda path: 30.0 if path == video_path else 20.0,
+    )
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (640, 480))
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_start_time",
+        lambda _: gopro_overlay_export._parse_utc_datetime("2026-03-15T10:00:05Z"),
+    )
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = ""
+
+    def run(command, **_kwargs):
+        commands.append(command)
+        Path(command[-1]).write_bytes(b"prepared")
+        return Result()
+
+    monkeypatch.setattr(gopro_overlay_export.subprocess, "run", run)
+
+    prepared = gopro_overlay_export._prepare_pip_video_for_overlay(
+        "job-pip", video_path, gpx_path, pip_path, work_dir
+    )
+
+    assert prepared.exists()
+    command = commands[0]
+    assert command[command.index("-ss") + 1] == "5.000"
+    assert "setpts=PTS-STARTPTS+0.000/TB" in command[command.index("-filter_complex") + 1]
+
+
+def test_prepare_queued_job_uses_prepared_pip_path(tmp_path, monkeypatch, test_db):
+    layout_dir = tmp_path / "layouts"
+    layout_dir.mkdir()
+    (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
+    video_path = tmp_path / "source.mp4"
+    gpx_path = tmp_path / "source.gpx"
+    pip_path = tmp_path / "pip.mp4"
+    prepared_pip_path = tmp_path / "prepared-pip.mp4"
+    video_path.write_bytes(b"video")
+    gpx_path.write_text("<gpx />")
+    pip_path.write_bytes(b"pip")
+    prepared_pip_path.write_bytes(b"prepared")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "_prepare_pip_video_for_overlay",
+        lambda *_args: prepared_pip_path,
+    )
+
+    job = create_gopro_overlay_job_from_paths(
+        video_path=video_path,
+        gpx_path=gpx_path,
+        pip_path=pip_path,
+        layout_id="parapente-1080",
+        output_filename="overlay.mp4",
+    )
+    queued_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
+    assert queued_job is not None
+
+    prepared = gopro_overlay_export._prepare_queued_job(job["job_id"], queued_job)
+
+    assert prepared is not None
+    assert Path(prepared["pip_path"]) == prepared_pip_path
 
 
 @pytest.mark.asyncio
@@ -1125,20 +1477,18 @@ def test_create_gopro_overlay_job_from_paths_defers_input_copy_to_worker_prepara
     assert prepared is not None
     assert prepared["status"] == "queued"
     assert Path(prepared["video_path"]).parent == work_dir
-    assert Path(prepared["gpx_path"]).parent == work_dir
+    assert Path(prepared["gpx_path"]) == gpx_path
+    assert Path(prepared["command"]["render_gpx_path"]).parent == work_dir
     assert Path(prepared["video_path"]).read_bytes() == b"video"
-    assert Path(prepared["gpx_path"]).read_text() == "<gpx />"
+    assert Path(prepared["command"]["render_gpx_path"]).read_text() == "<gpx />"
     assert prepared["video_width"] == 1920
     assert prepared["video_height"] == 1080
 
 
-def test_auto_layout_selection_caps_4k_sources_to_1080_by_default(monkeypatch):
-    monkeypatch.setattr(config, "GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH", 1920)
-    monkeypatch.setattr(config, "GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT", 1080)
-
+def test_auto_layout_selection_uses_4k_layout_for_4k_source():
     selected = gopro_overlay_export._nearest_layout(3840, 2160)
 
-    assert selected.id == "parapente-1080"
+    assert selected.id == "parapente-3840"
 
 
 def test_worker_preparation_uses_video_render_size_for_4k_source(
@@ -1148,12 +1498,17 @@ def test_worker_preparation_uses_video_render_size_for_4k_source(
 ):
     layout_dir = tmp_path / "layouts"
     layout_dir.mkdir()
-    (layout_dir / "layout_parapente_1080.xml").write_text('<layout width="1920" height="1080" />')
-    (layout_dir / "layout_parapente_3840.xml").write_text('<layout width="3840" height="2160" />')
+    (layout_dir / "layout_parapente_1080.xml").write_text(
+        '<layout width="1920" height="1080">'
+        '<component type="video" size="220" x="100" y="50" width="300" height="100" />'
+        "</layout>"
+    )
     video_path = tmp_path / "source.mp4"
     gpx_path = tmp_path / "source.gpx"
+    pip_path = tmp_path / "pip.mp4"
     video_path.write_bytes(b"video")
     gpx_path.write_text("<gpx />")
+    pip_path.write_bytes(b"pip")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH", 1920)
     monkeypatch.setattr(config, "GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT", 1080)
@@ -1163,8 +1518,8 @@ def test_worker_preparation_uses_video_render_size_for_4k_source(
     job = create_gopro_overlay_job_from_paths(
         video_path=video_path,
         gpx_path=gpx_path,
-        pip_path=None,
-        layout_id=None,
+        pip_path=pip_path,
+        layout_id="parapente-1080",
         output_filename="overlay.mp4",
     )
     queued_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
@@ -1179,6 +1534,56 @@ def test_worker_preparation_uses_video_render_size_for_4k_source(
     prepared_layout = Path(prepared["layout_path"]).read_text()
     assert 'width="3840"' in prepared_layout
     assert 'height="2160"' in prepared_layout
+    assert 'id="pip"' in prepared_layout
+    assert 'size="440"' in prepared_layout
+    assert 'x="200"' in prepared_layout
+    assert 'y="100"' in prepared_layout
+
+
+def test_worker_preparation_merges_osv_files_before_rendering(
+    tmp_path,
+    monkeypatch,
+    test_db,
+):
+    layout_dir = tmp_path / "layouts"
+    layout_dir.mkdir()
+    (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
+    video_path = tmp_path / "source.mp4"
+    gpx_path = tmp_path / "source.gpx"
+    pip_path = tmp_path / "pip.mp4"
+    first_osv = tmp_path / "first.OSV"
+    second_osv = tmp_path / "second.osv"
+    merged_gpx_path = tmp_path / "merged-gopro-overlay.gpx"
+    video_path.write_bytes(b"video")
+    gpx_path.write_text("<gpx />")
+    pip_path.write_bytes(b"pip")
+    first_osv.write_bytes(b"first")
+    second_osv.write_bytes(b"second")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+
+    job = create_gopro_overlay_job_from_paths(
+        video_path=video_path,
+        gpx_path=gpx_path,
+        pip_path=pip_path,
+        layout_id="parapente-1080",
+        output_filename="overlay.mp4",
+    )
+    queued_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
+    assert queued_job is not None
+
+    with patch(
+        "gopro_overlay_export._merge_osv_files_with_gpx",
+        return_value=merged_gpx_path,
+    ) as merge_osv:
+        prepared = gopro_overlay_export._prepare_queued_job(job["job_id"], queued_job)
+
+    assert prepared is not None
+    assert merge_osv.call_args.args[0] == [first_osv, second_osv]
+    assert merge_osv.call_args.args[1].name == "gpx-" + job["job_id"] + ".gpx"
+    assert merge_osv.call_args.args[2] == tmp_path
+    assert prepared["command"]["render_gpx_path"] == str(merged_gpx_path)
 
 
 def test_worker_preparation_uses_exact_video_size_for_non_standard_source(
@@ -1188,7 +1593,11 @@ def test_worker_preparation_uses_exact_video_size_for_non_standard_source(
 ):
     layout_dir = tmp_path / "layouts"
     layout_dir.mkdir()
-    (layout_dir / "layout_parapente_1080.xml").write_text('<layout width="1920" height="1080" />')
+    (layout_dir / "layout_parapente_1080.xml").write_text(
+        '<layout width="1920" height="1080">'
+        '<component type="video" size="220" x="100" y="50" width="300" height="100" />'
+        "</layout>"
+    )
     video_path = tmp_path / "source.mp4"
     gpx_path = tmp_path / "source.gpx"
     video_path.write_bytes(b"video")

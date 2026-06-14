@@ -171,15 +171,13 @@ export default function FlightHistory() {
         let successCount = 0;
         let failCount = 0;
 
-        for (const flightId of selectedFlightIds) {
-          try {
-            await api.delete(`flights/${flightId}`);
-            successCount++;
-          } catch (err) {
-            console.error(`Failed to delete flight ${flightId}:`, err);
-            failCount++;
-          }
-        }
+        const deleteResults = await Promise.allSettled(
+          selectedFlightIds.map((flightId) => api.delete(`flights/${flightId}`))
+        );
+        successCount = deleteResults.filter(
+          (result) => result.status === 'fulfilled'
+        ).length;
+        failCount = deleteResults.length - successCount;
 
         queryClient.invalidateQueries({ queryKey: ['flights'] });
         queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] });
@@ -210,7 +208,6 @@ export default function FlightHistory() {
         setFlightToDelete(null);
       }
     } catch (err) {
-      console.error('Failed to delete flight:', err);
       let errorMessage = t('flights.unknownError');
       if (err instanceof HTTPError) {
         try {
@@ -460,6 +457,7 @@ export default function FlightHistory() {
           <div className={isMobile ? '' : 'lg:col-span-1 lg:h-full'}>
             <FlightsTable
               flights={filteredFlights}
+              sites={sites}
               selectedFlightId={selectedFlightId}
               selectionMode={selectionMode}
               onSelectFlight={handleSelectFlight}
@@ -529,6 +527,7 @@ export default function FlightHistory() {
       {/* Modal Créer un vol depuis GPX */}
       <CreateFlightModal
         isOpen={showCreateFlightModal}
+        sites={sites}
         onClose={() => setShowCreateFlightModal(false)}
         onCreateComplete={() => {
           void queryClient.invalidateQueries({ queryKey: ['flights'] });

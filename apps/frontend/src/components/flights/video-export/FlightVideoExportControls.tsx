@@ -22,6 +22,7 @@ import { useFlight } from '../../../hooks/flights/useFlight';
 import { useToast } from '../../../hooks/useToast';
 import { api } from '../../../lib/api';
 import { hasFlightVideo } from '../../../lib/flightMediaState';
+import { JobLiveLogsPanel } from './JobLiveLogsPanel';
 
 type VideoExportMode = 'manual_fast' | 'manual';
 
@@ -115,6 +116,7 @@ export function FlightVideoExportControls({
   const [videoExportMode, setVideoExportMode] =
     useState<VideoExportMode>('manual_fast');
   const [isStartingVideoExport, setIsStartingVideoExport] = useState(false);
+  const [isLogsOpen, setIsLogsOpen] = useState(false);
   const [videoExportJobToken, setVideoExportJobToken] = useState<string | null>(
     null
   );
@@ -122,7 +124,8 @@ export function FlightVideoExportControls({
   const hasGeneratedVideo = hasFlightVideo(flight);
   const shouldReadExportStatus = Boolean(
     flight.video_export_job_id &&
-    (isExportActive ||
+    (isLogsOpen ||
+      isExportActive ||
       flight.video_export_status === 'failed' ||
       flight.video_export_status === 'cancelled')
   );
@@ -339,6 +342,15 @@ export function FlightVideoExportControls({
   ]
     .filter(Boolean)
     .join(' ');
+  let primaryButtonVariant: 'primary' | 'danger' | 'warning' = 'primary';
+  if (hasActiveVideoExport(flight)) {
+    primaryButtonVariant = 'danger';
+  } else if (
+    needsVideoExportRecovery(flight.video_export_status) ||
+    hasGeneratedVideo
+  ) {
+    primaryButtonVariant = 'warning';
+  }
 
   return (
     <div className={className}>
@@ -372,6 +384,7 @@ export function FlightVideoExportControls({
                         value={value}
                         checked={isSelected}
                         onChange={() => setVideoExportMode(value)}
+                        aria-label={t(labelKey)}
                         className="sr-only"
                       />
                       <span className="flex items-start gap-2">
@@ -410,14 +423,7 @@ export function FlightVideoExportControls({
       <Button
         onClick={handlePrimaryAction}
         isDisabled={isStartingVideoExport}
-        variant={
-          hasActiveVideoExport(flight)
-            ? 'danger'
-            : needsVideoExportRecovery(flight.video_export_status) ||
-                hasGeneratedVideo
-              ? 'warning'
-              : 'primary'
-        }
+        variant={primaryButtonVariant}
         className={primaryButtonClassName}
         title={getPrimaryButtonTitle()}
       >
@@ -435,6 +441,22 @@ export function FlightVideoExportControls({
             count: exportStatus?.frames_captured ?? 0,
           })}
         </p>
+      )}
+
+      {flight.video_export_job_id && (
+        <JobLiveLogsPanel
+          className="mt-3"
+          title={t('videoJobs.liveLogs.title', 'Logs en direct')}
+          emptyLabel={t(
+            'videoJobs.liveLogs.empty',
+            'Aucun log disponible pour le moment.'
+          )}
+          showLabel={t('videoJobs.liveLogs.show', 'Afficher')}
+          hideLabel={t('videoJobs.liveLogs.hide', 'Masquer')}
+          isOpen={isLogsOpen}
+          onToggle={() => setIsLogsOpen((value) => !value)}
+          logs={exportStatus?.log_tail}
+        />
       )}
     </div>
   );

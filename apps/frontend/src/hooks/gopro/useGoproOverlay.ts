@@ -23,6 +23,7 @@ export type GoproOverlayJob = {
   created_at: string;
   updated_at: string;
   completed_at?: string | null;
+  log_tail?: string[];
   job_token?: string | null;
 };
 
@@ -46,13 +47,14 @@ const initialState = {
 
 export function useGoproOverlayJobStream(
   jobId?: string | null,
-  jobToken?: string | null
+  jobToken?: string | null,
+  enabled = true
 ) {
   const [state, setState] = useState(initialState);
 
   useEffect(() => {
     setState(initialState);
-    if (!jobId || typeof window === 'undefined') {
+    if (!enabled || !jobId || typeof window === 'undefined') {
       return;
     }
 
@@ -88,7 +90,7 @@ export function useGoproOverlayJobStream(
       eventSource.removeEventListener('error', onError);
       eventSource.close();
     };
-  }, [jobId, jobToken]);
+  }, [enabled, jobId, jobToken]);
 
   return state;
 }

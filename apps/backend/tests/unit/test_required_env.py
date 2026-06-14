@@ -50,3 +50,15 @@ def test_gopro_overlay_paths_are_derived_from_paragliding_root():
     assert Path(config.GOPRO_OVERLAY_PARAGLIDING_ROOT) == data_root
     assert Path(config.GOPRO_OVERLAY_OUTPUT_DIR) == data_root
     assert Path(config.GOPRO_OVERLAY_UPLOAD_DIR) == data_root / ".tmp" / "gopro-uploads"
+
+
+def test_default_job_queue_backend_uses_thread_outside_production(monkeypatch):
+    monkeypatch.setattr(config, "ENVIRONMENT", "development")
+
+    assert config._default_job_queue_backend() == "thread"
+
+
+def test_default_job_queue_backend_uses_rq_in_production(monkeypatch):
+    monkeypatch.setattr(config, "ENVIRONMENT", "production")
+
+    assert config._default_job_queue_backend() == "rq"

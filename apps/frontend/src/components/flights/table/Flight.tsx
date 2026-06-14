@@ -13,7 +13,7 @@ import {
   Wand2,
 } from 'lucide-react';
 import { formatMediaProgressLabel } from './mediaProgress';
-import type { Flight as FlightRecord } from '../../../types';
+import type { Flight as FlightRecord, Site } from '../../../types';
 import {
   formatAltitudeMeters,
   formatDistanceKm,
@@ -24,6 +24,7 @@ import {
   hasFlightVideo,
   isGoproOverlayInProgress,
 } from '../../../lib/flightMediaState';
+import { formatFlightSiteLabel } from '../siteDisplay';
 
 export interface DownloadingMedia {
   flightId: string;
@@ -32,6 +33,7 @@ export interface DownloadingMedia {
 
 interface FlightProps {
   flight: FlightRecord;
+  sites: Site[];
   isActive: boolean;
   isSelected: boolean;
   selectionMode: boolean;
@@ -64,6 +66,7 @@ function formatDepartureTime(date: string, language: string) {
 // oxlint-disable-next-line max-lines-per-function
 export function Flight({
   flight,
+  sites,
   isActive,
   isSelected,
   selectionMode,
@@ -121,6 +124,11 @@ export function Flight({
     hasPersistedGoproOverlay ||
     isGoproOverlayRunning ||
     isGoproOverlayFailed;
+  const siteLabel = formatFlightSiteLabel({
+    siteId: flight.site_id,
+    siteName: flight.site_name,
+    sites,
+  });
 
   return (
     <Card
@@ -282,12 +290,12 @@ export function Flight({
           </div>
         )}
       </div>
-      {flight.site_id && (
+      {siteLabel && (
         <div
           className={`mt-2 flex items-center gap-1 pl-1.5 text-xs ${metaColor}`}
         >
           <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span className="truncate">{flight.site_name || flight.site_id}</span>
+          <span className="truncate">{siteLabel}</span>
         </div>
       )}
     </Card>

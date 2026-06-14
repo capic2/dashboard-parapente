@@ -1,4 +1,5 @@
 import asyncio
+import fnmatch
 import json
 import logging
 import os
@@ -11,7 +12,7 @@ import uuid
 import xml.etree.ElementTree as ET
 from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -34,11 +35,16 @@ _ACTIVE_STATUSES = {_STATUS_QUEUED, _STATUS_PREPARING, _STATUS_RUNNING}
 _INTERRUPTIBLE_STATUSES = {_STATUS_PREPARING, _STATUS_RUNNING}
 _TERMINAL_STATUSES = {_STATUS_COMPLETED, _STATUS_FAILED, _STATUS_CANCELLED}
 
+_GPX_NAMESPACE = "http://www.topografix.com/GPX/1/1"
+_GARMIN_GPX_EXTENSION_NAMESPACE = "http://www.garmin.com/xmlschemas/GpxExtensions/v3"
+_XSI_NAMESPACE = "http://www.w3.org/2001/XMLSchema-instance"
+
 _VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v"}
 _GPX_EXTENSIONS = {".gpx", ".fit"}
 _UPLOAD_WORK_ROOT = Path("/tmp/dashboard-parapente/gopro-overlays")
 _PATH_WORK_DIR_NAME = ".gopro-overlay-work"
 _PROGRESS_PERCENT_RE = re.compile(r"(?P<percent>\d{1,3})\s*%")
+_LOG_TAIL_LINE_COUNT = 100
 
 
 @dataclass(frozen=True)
@@ -128,6 +134,84 @@ def _path_job_work_dir(video_path: Path, job_id: str) -> Path:
     return video_path.expanduser().resolve().parent / _PATH_WORK_DIR_NAME / job_id
 
 
+def _first_matching_file(directory: Path, pattern: str) -> Path | None:
+    if not directory.is_dir():
+        return None
+    pattern_lower = pattern.lower()
+    matches = sorted(
+        path
+        for path in directory.iterdir()
+        if path.is_file() and fnmatch.fnmatchcase(path.name.lower(), pattern_lower)
+    )
+    return matches[0] if matches else None
+
+
+def _matching_files_by_mtime(directory: Path, pattern: str) -> list[Path]:
+    if not directory.is_dir():
+        return []
+    pattern_lower = pattern.lower()
+    matches = [
+        path
+        for path in directory.iterdir()
+        if path.is_file() and fnmatch.fnmatchcase(path.name.lower(), pattern_lower)
+    ]
+    return sorted(matches, key=lambda path: (path.stat().st_mtime, path.name))
+
+
+def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: Path) -> Path:
+    if not osv_paths:
+        return gpx_path
+
+    merge_script = Path(config.GOPRO_OVERLAY_ROOT) / "osv_merge.py"
+    if not merge_script.exists():
+        raise ValueError(f"OSV merge script not found: {merge_script}")
+
+    input_dir.mkdir(parents=True, exist_ok=True)
+    merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
+    if merged_gpx_path.exists():
+        merged_gpx_path.unlink()
+
+    logger.info(
+        "Merging %s OSV file(s) with GPX %s into %s",
+        len(osv_paths),
+        gpx_path,
+        merged_gpx_path,
+    )
+    command = [
+        "python3",
+        str(merge_script),
+        *(str(path) for path in osv_paths),
+        str(gpx_path),
+        str(merged_gpx_path),
+    ]
+
+    first_gpx_at = _first_gpx_at_seconds(osv_paths[0], gpx_path)
+    if first_gpx_at and first_gpx_at > 0:
+        command[2:2] = ["--first-gpx-at", f"{first_gpx_at:.3f}"]
+
+    try:
+        result = subprocess.run(
+            command,
+            cwd=config.GOPRO_OVERLAY_ROOT or None,
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=config.GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        detail = exc.stderr or exc.stdout or "OSV merge timed out"
+        raise ValueError(detail) from exc
+
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "OSV merge failed"
+        raise ValueError(detail)
+    if not merged_gpx_path.exists():
+        raise ValueError("OSV merge did not create a GPX file")
+
+    logger.info("Created merged GoPro overlay GPX: %s", merged_gpx_path)
+    return merged_gpx_path
+
+
 def _output_path_for_video(video_path: Path, output_name: str) -> Path:
     return video_path.expanduser().resolve().parent / output_name
 
@@ -155,10 +239,17 @@ def _prepare_layout_file(
 ) -> Path:
     tree = ET.parse(layout_path)
     root = tree.getroot()
+    source_width = _parse_float(root.attrib.get("width"))
+    source_height = _parse_float(root.attrib.get("height"))
+    scale_x = target_width / source_width if target_width and source_width else None
+    scale_y = target_height / source_height if target_height and source_height else None
 
     if target_width is not None and target_height is not None:
         root.set("width", str(target_width))
         root.set("height", str(target_height))
+
+    if scale_x is not None and scale_y is not None:
+        _scale_layout_geometry(root, scale_x, scale_y)
 
     def normalize_video_components(parent: ET.Element) -> None:
         for child in list(parent):
@@ -176,6 +267,44 @@ def _prepare_layout_file(
     destination.parent.mkdir(parents=True, exist_ok=True)
     tree.write(destination, encoding="unicode")
     return destination
+
+
+def _parse_float(value: str | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def _format_scaled_number(value: float) -> str:
+    rounded = round(value)
+    if abs(value - rounded) < 1e-6:
+        return str(int(rounded))
+    text = f"{value:.6f}".rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def _scale_layout_geometry(parent: ET.Element, scale_x: float, scale_y: float) -> None:
+    x_attrs = {"x", "cx", "rx"}
+    y_attrs = {"y", "cy", "ry"}
+    uniform_attrs = {"width", "height", "size", "font-size", "stroke-width", "r"}
+
+    for child in parent.iter():
+        if child is parent:
+            continue
+        for attr, raw_value in list(child.attrib.items()):
+            numeric_value = _parse_float(raw_value)
+            if numeric_value is None:
+                continue
+            if attr in x_attrs:
+                child.set(attr, _format_scaled_number(numeric_value * scale_x))
+            elif attr in y_attrs:
+                child.set(attr, _format_scaled_number(numeric_value * scale_y))
+            elif attr in uniform_attrs:
+                uniform_scale = (scale_x + scale_y) / 2
+                child.set(attr, _format_scaled_number(numeric_value * uniform_scale))
 
 
 def _safe_filename(filename: str | None, fallback: str) -> str:
@@ -223,6 +352,9 @@ def _job_to_payload(job: GoproOverlayJob, include_command: bool = False) -> dict
         "temp_output_path": job.temp_output_path,
         "output_filename": job.output_filename,
         "log_path": job.log_path,
+        "log_tail": (
+            _tail_log_lines(Path(job.log_path), _LOG_TAIL_LINE_COUNT) if job.log_path else []
+        ),
         "video_width": job.video_width,
         "video_height": job.video_height,
         "created_at": _to_iso(job.created_at),
@@ -428,13 +560,18 @@ def _background_process_command(command: list[str]) -> list[str]:
     return wrapped
 
 
-def _tail_lines(path: Path, limit: int = 20) -> str:
+def _tail_log_lines(path: Path, limit: int = _LOG_TAIL_LINE_COUNT) -> list[str]:
     if not path.exists():
-        return ""
+        return []
     try:
         lines = path.read_text(errors="replace").splitlines()
     except OSError:
-        return ""
+        return []
+    return lines[-limit:]
+
+
+def _tail_lines(path: Path, limit: int = 20) -> str:
+    lines = _tail_log_lines(path, limit)
     return "\n".join(lines[-limit:])
 
 
@@ -465,6 +602,360 @@ def _verify_video_output(path: Path) -> tuple[bool, str | None]:
         duration = 0
     if duration <= 0:
         return False, "ffprobe did not report a valid duration"
+    return True, None
+
+
+def probe_video_duration(video_path: Path) -> float | None:
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "json",
+                str(video_path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError, TimeoutError):
+        return None
+
+    try:
+        duration = float((json.loads(result.stdout or "{}").get("format") or {}).get("duration", 0))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    return duration if duration > 0 else None
+
+
+def _parse_utc_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _gpx_time_bounds(gpx_path: Path) -> tuple[datetime | None, datetime | None]:
+    try:
+        root = ET.parse(gpx_path).getroot()
+    except (ET.ParseError, OSError):
+        return None, None
+
+    times = [
+        parsed
+        for element in root.iter()
+        if element.tag.rsplit("}", 1)[-1] == "time"
+        and element.text
+        and (parsed := _parse_utc_datetime(element.text))
+    ]
+    if not times:
+        return None, None
+    return times[0], times[-1]
+
+
+def _first_gpx_at_seconds(osv_path: Path, gpx_path: Path) -> float | None:
+    osv_start = probe_video_start_time(osv_path)
+    osv_duration = probe_video_duration(osv_path)
+    gpx_start, gpx_end = _gpx_time_bounds(gpx_path)
+    if not osv_start or not osv_duration or not gpx_start or not gpx_end:
+        return None
+
+    best_start = osv_start
+    best_overlap = -1.0
+    best_offset_minutes = 0
+    for offset_minutes in range(-12 * 60, 14 * 60 + 1, 15):
+        shift = timedelta(minutes=-offset_minutes)
+        candidate_start = osv_start + shift
+        candidate_end = candidate_start + timedelta(seconds=osv_duration)
+        overlap = max(
+            0.0, (min(candidate_end, gpx_end) - max(candidate_start, gpx_start)).total_seconds()
+        )
+        if (overlap, -abs(offset_minutes)) > (best_overlap, -abs(best_offset_minutes)):
+            best_start = candidate_start
+            best_overlap = overlap
+            best_offset_minutes = offset_minutes
+
+    return max(0.0, (best_start - gpx_start).total_seconds())
+
+
+def probe_video_start_time(video_path: Path) -> datetime | None:
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format_tags=creation_time:stream_tags=creation_time",
+                "-of",
+                "json",
+                str(video_path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError, TimeoutError):
+        return None
+
+    try:
+        payload = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError:
+        return None
+
+    candidates = [
+        ((payload.get("format") or {}).get("tags") or {}).get("creation_time"),
+        *[
+            ((stream.get("tags") or {}).get("creation_time"))
+            for stream in payload.get("streams") or []
+        ],
+    ]
+    return next(
+        (parsed for candidate in candidates if (parsed := _parse_utc_datetime(candidate))),
+        None,
+    )
+
+
+def _first_gpx_timestamp(gpx_path: Path) -> datetime | None:
+    try:
+        root = ET.parse(gpx_path).getroot()
+    except (ET.ParseError, OSError):
+        return None
+
+    for element in root.iter():
+        if element.tag.rsplit("}", 1)[-1] == "time" and element.text:
+            parsed = _parse_utc_datetime(element.text)
+            if parsed:
+                return parsed
+    return None
+
+
+def _pip_timeline_offsets(
+    video_start: datetime | None,
+    gpx_start: datetime | None,
+) -> tuple[float, float]:
+    if video_start is None or gpx_start is None:
+        return 0.0, 0.0
+    offset = (gpx_start - video_start).total_seconds()
+    if offset >= 0:
+        return offset, 0.0
+    return 0.0, abs(offset)
+
+
+def _prepared_pip_path(work_dir: Path, job_id: str) -> Path:
+    return work_dir / f"pip-prepared-{job_id}.mp4"
+
+
+def _ffmpeg_timeout_for_duration(duration: float) -> int:
+    return max(600, min(int(duration * 20), 6 * 60 * 60))
+
+
+def _prepare_pip_video_for_overlay(
+    job_id: str,
+    video_path: Path,
+    gpx_path: Path,
+    pip_path: Path,
+    work_dir: Path,
+) -> Path:
+    video_duration = probe_video_duration(video_path)
+    pip_width, pip_height = probe_video_resolution(pip_path)
+    if video_duration is None or not pip_width or not pip_height:
+        return pip_path
+
+    pip_duration = probe_video_duration(pip_path)
+    gpx_start = _first_gpx_timestamp(gpx_path)
+    video_start = probe_video_start_time(video_path)
+    pip_delay, pip_trim = _pip_timeline_offsets(video_start, gpx_start)
+    visible_pip_duration = max(0.0, pip_duration - pip_trim) if pip_duration is not None else None
+    pip_tail_duration = (
+        max(0.0, video_duration - pip_delay - visible_pip_duration)
+        if visible_pip_duration is not None
+        else None
+    )
+    prepared_path = _prepared_pip_path(work_dir, job_id)
+    _unlink_if_exists(prepared_path)
+
+    base_input = f"color=c=black:s={pip_width}x{pip_height}:r=30:d={video_duration:.3f}"
+    if pip_delay >= video_duration or (pip_duration is not None and pip_trim >= pip_duration):
+        command = [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            base_input,
+            "-t",
+            f"{video_duration:.3f}",
+            "-an",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "18",
+            "-movflags",
+            "+faststart",
+            str(prepared_path),
+        ]
+    else:
+        command = [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            base_input,
+        ]
+        if pip_trim > 0:
+            command.extend(["-ss", f"{pip_trim:.3f}"])
+        pip_filters = [f"setpts=PTS-STARTPTS+{pip_delay:.3f}/TB"]
+        if pip_tail_duration and pip_tail_duration > 0:
+            pip_filters.append(f"tpad=stop_mode=clone:stop_duration={pip_tail_duration:.3f}")
+        command.extend(
+            [
+                "-i",
+                str(pip_path),
+                "-filter_complex",
+                f"[1:v]{','.join(pip_filters)}[pip];"
+                "[0:v][pip]overlay=0:0:eof_action=pass:shortest=0[v]",
+                "-map",
+                "[v]",
+                "-t",
+                f"{video_duration:.3f}",
+                "-an",
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                "-preset",
+                "veryfast",
+                "-crf",
+                "18",
+                "-movflags",
+                "+faststart",
+                str(prepared_path),
+            ]
+        )
+
+    try:
+        result = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=_ffmpeg_timeout_for_duration(video_duration),
+        )
+    except (FileNotFoundError, subprocess.SubprocessError, TimeoutError) as exc:
+        _unlink_if_exists(prepared_path)
+        raise ValueError(str(exc) or exc.__class__.__name__) from exc
+
+    if result.returncode != 0:
+        _unlink_if_exists(prepared_path)
+        detail = result.stderr.strip() or result.stdout.strip() or "ffmpeg pip preparation failed"
+        raise ValueError(detail)
+    if not prepared_path.exists():
+        raise ValueError("ffmpeg did not create the prepared PIP video")
+    return prepared_path
+
+
+def _scaled_video_path(path: Path) -> Path:
+    return path.with_name(f".{path.stem}.scaled{path.suffix or '.mp4'}")
+
+
+def _unlink_if_exists(path: Path) -> None:
+    try:
+        if path.exists():
+            path.unlink()
+    except OSError:
+        pass
+
+
+def _ensure_video_output_resolution(
+    path: Path,
+    expected_width: int | None,
+    expected_height: int | None,
+) -> tuple[bool, str | None]:
+    if not expected_width or not expected_height:
+        return True, None
+    if expected_width <= 0 or expected_height <= 0:
+        return False, f"Invalid expected dimensions: {expected_width}x{expected_height}"
+    if expected_width > 16384 or expected_height > 16384:
+        return False, f"Expected dimensions too large: {expected_width}x{expected_height}"
+
+    output_width, output_height = probe_video_resolution(path)
+    if output_width == expected_width and output_height == expected_height:
+        return True, None
+    if output_width is None or output_height is None:
+        return False, "ffprobe did not report a valid output resolution"
+
+    scaled_path = _scaled_video_path(path)
+    _unlink_if_exists(scaled_path)
+    command = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(path),
+        "-vf",
+        f"scale={expected_width}:{expected_height}:flags=lanczos",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "18",
+        "-c:a",
+        "copy",
+        "-movflags",
+        "+faststart",
+        str(scaled_path),
+    ]
+    logger.info(
+        "Rescaling GoPro overlay output from %sx%s to %sx%s: %s",
+        output_width,
+        output_height,
+        expected_width,
+        expected_height,
+        path,
+    )
+    try:
+        result = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2 * 60 * 60,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError, TimeoutError) as exc:
+        _unlink_if_exists(scaled_path)
+        return False, str(exc) or exc.__class__.__name__
+
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "ffmpeg scale failed"
+        _unlink_if_exists(scaled_path)
+        return False, detail
+    scaled_width, scaled_height = probe_video_resolution(scaled_path)
+    if scaled_width != expected_width or scaled_height != expected_height:
+        _unlink_if_exists(scaled_path)
+        return (
+            False,
+            f"scaled output resolution is {scaled_width}x{scaled_height}, expected "
+            f"{expected_width}x{expected_height}",
+        )
+
+    scaled_path.replace(path)
     return True, None
 
 
@@ -520,6 +1011,8 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         video_path = Path(str(job["video_path"]))
         gpx_path = Path(str(job["gpx_path"]))
         pip_path = Path(str(job["pip_path"])) if job.get("pip_path") else None
+        command_metadata = dict(metadata)
+        render_gpx_path = gpx_path
 
         if metadata.get("pin_inputs"):
             video_path = _copy_job_input(
@@ -527,9 +1020,9 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 work_dir / f"input{video_path.suffix.lower()}",
                 _VIDEO_EXTENSIONS,
             )
-            gpx_path = _copy_job_input(
+            render_gpx_path = _copy_job_input(
                 gpx_path,
-                work_dir / f"track{gpx_path.suffix.lower()}",
+                work_dir / f"gpx-{job_id}{gpx_path.suffix.lower()}",
                 _GPX_EXTENSIONS,
             )
             if pip_path:
@@ -538,6 +1031,24 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                     work_dir / f"pip{pip_path.suffix.lower()}",
                     _VIDEO_EXTENSIONS,
                 )
+
+        source_input_dir = Path(str(job["output_path"])).parent
+        osv_paths = _matching_files_by_mtime(source_input_dir, "*.osv")
+        if osv_paths:
+            render_gpx_path = _merge_osv_files_with_gpx(
+                osv_paths, render_gpx_path, source_input_dir
+            )
+
+        command_metadata["render_gpx_path"] = str(render_gpx_path)
+
+        if pip_path:
+            pip_path = _prepare_pip_video_for_overlay(
+                job_id,
+                video_path,
+                gpx_path,
+                pip_path,
+                work_dir,
+            )
 
         width, height = probe_video_resolution(video_path)
         requested_layout_id = metadata.get("requested_layout_id")
@@ -571,11 +1082,12 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
             layout_path=str(layout_path),
             video_width=render_width,
             video_height=render_height,
-            command_json=None,
+            command_json=json.dumps(command_metadata),
             message="Overlay queued",
         )
         if not prepared_job or prepared_job.get("status") != _STATUS_QUEUED:
             return None
+        prepared_job["command"] = command_metadata
         return prepared_job
     except Exception as exc:
         logger.exception("Failed to prepare GoPro overlay job %s", job_id)
@@ -609,17 +1121,7 @@ def _find_layout(layout_id: str) -> GoproOverlayLayout | None:
 
 
 def _nearest_layout(width: int | None, height: int | None) -> GoproOverlayLayout:
-    max_width = config.GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH
-    max_height = config.GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT
-    layouts = [
-        layout
-        for layout in _LAYOUTS
-        if (
-            layout.width is None
-            or layout.height is None
-            or (layout.width <= max_width and layout.height <= max_height)
-        )
-    ] or _LAYOUTS
+    layouts = _LAYOUTS
 
     if width is None or height is None:
         return layouts[0]
@@ -935,11 +1437,14 @@ def _run_job(job_id: str) -> None:
     if not job or job.get("status") != _STATUS_QUEUED:
         return
 
+    prepared_command = job.get("command") if isinstance(job.get("command"), dict) else {}
+    render_gpx_path = Path(str(prepared_command.get("render_gpx_path") or job["gpx_path"]))
+
     command = [
         config.GOPRO_OVERLAY_BIN,
         "--use-gpx-only",
         "--gpx",
-        job["gpx_path"],
+        str(render_gpx_path),
         "--layout",
         "xml",
         "--layout-xml",
@@ -1070,6 +1575,22 @@ def _run_job(job_id: str) -> None:
             )
             return
 
+        resolution_ok, resolution_error = _ensure_video_output_resolution(
+            temp_output_path,
+            int(job["video_width"]) if job.get("video_width") else None,
+            int(job["video_height"]) if job.get("video_height") else None,
+        )
+        if not resolution_ok:
+            _finish_job(
+                job_id,
+                status=_STATUS_FAILED,
+                progress=100,
+                message="Overlay output resolution is invalid",
+                error=resolution_error or "ffmpeg resolution correction failed",
+                completed_at=_utc_now(),
+            )
+            return
+
         temp_output_path.replace(output_path)
 
         _finish_job(
@@ -1105,6 +1626,8 @@ def get_gopro_overlay_job(job_id: str, include_command: bool = False) -> dict[st
         if not job:
             return None
         payload = job.copy()
+    log_path = payload.get("log_path")
+    payload["log_tail"] = _tail_log_lines(Path(str(log_path))) if log_path else []
     if not include_command:
         payload.pop("command", None)
     return payload
@@ -1121,9 +1644,13 @@ def list_gopro_overlay_jobs() -> list[dict[str, Any]]:
             raise
 
     with _LOCK:
-        return [
-            {key: value for key, value in job.items() if key != "command"} for job in _JOBS.values()
-        ]
+        jobs = []
+        for job in _JOBS.values():
+            payload = {key: value for key, value in job.items() if key != "command"}
+            log_path = payload.get("log_path")
+            payload["log_tail"] = _tail_log_lines(Path(str(log_path))) if log_path else []
+            jobs.append(payload)
+        return jobs
 
 
 def _path_usage(path: Path) -> tuple[int, int, int]:

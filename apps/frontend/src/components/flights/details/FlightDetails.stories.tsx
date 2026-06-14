@@ -20,6 +20,7 @@ const mockSites: Site[] = [
     flight_count: 12,
     is_active: true,
     camera_distance: null,
+    region: 'Besançon',
   },
   {
     id: 'site-chalais',
@@ -33,6 +34,7 @@ const mockSites: Site[] = [
     flight_count: 5,
     is_active: true,
     camera_distance: null,
+    region: 'Besançon',
   },
 ];
 

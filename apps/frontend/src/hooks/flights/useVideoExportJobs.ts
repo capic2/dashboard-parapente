@@ -28,6 +28,7 @@ export type VideoExportJob = {
   resume_from_frame?: number | null;
   output_filename?: string | null;
   layout_label?: string | null;
+  log_tail?: string[];
   has_output_file?: boolean;
   can_cancel: boolean;
   can_delete: boolean;

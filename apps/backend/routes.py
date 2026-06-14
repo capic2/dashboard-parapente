@@ -1,4 +1,5 @@
 import asyncio
+import fnmatch
 import json
 import logging
 import math
@@ -228,19 +229,40 @@ def _resolve_gopro_paragliding_path(file_path: str | None) -> Path | None:
 
 
 def _latest_matching_file(directory: Path, pattern: str) -> Path | None:
-    matches = [path for path in directory.glob(pattern) if path.is_file()]
+    if not directory.is_dir():
+        return None
+    pattern_lower = pattern.lower()
+    matches = [
+        path
+        for path in directory.iterdir()
+        if path.is_file() and fnmatch.fnmatchcase(path.name.lower(), pattern_lower)
+    ]
     if not matches:
         return None
-    return max(matches, key=lambda path: path.stat().st_mtime)
+    return max(matches, key=lambda path: (path.stat().st_mtime, path.name))
 
 
 def _first_matching_file(directory: Path, pattern: str) -> Path | None:
-    matches = sorted(path for path in directory.glob(pattern) if path.is_file())
+    if not directory.is_dir():
+        return None
+    pattern_lower = pattern.lower()
+    matches = sorted(
+        path
+        for path in directory.iterdir()
+        if path.is_file() and fnmatch.fnmatchcase(path.name.lower(), pattern_lower)
+    )
     return matches[0] if matches else None
 
 
 def _matching_files_by_mtime(directory: Path, pattern: str) -> list[Path]:
-    matches = [path for path in directory.glob(pattern) if path.is_file()]
+    if not directory.is_dir():
+        return []
+    pattern_lower = pattern.lower()
+    matches = [
+        path
+        for path in directory.iterdir()
+        if path.is_file() and fnmatch.fnmatchcase(path.name.lower(), pattern_lower)
+    ]
     return sorted(matches, key=lambda path: (path.stat().st_mtime, path.name))
 
 
@@ -413,6 +435,12 @@ def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: 
     merged_gpx_path = input_dir / _GOPRO_OVERLAY_MERGED_GPX_FILENAME
     if merged_gpx_path.exists():
         merged_gpx_path.unlink()
+    logger.info(
+        "Merging %s OSV file(s) with GPX %s into %s",
+        len(osv_paths),
+        gpx_path,
+        merged_gpx_path,
+    )
     command = [
         "python3",
         str(merge_script),
@@ -428,7 +456,7 @@ def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: 
             capture_output=True,
             check=False,
             text=True,
-            timeout=60,
+            timeout=config.GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired as exc:
         detail = exc.stderr or exc.stdout or "OSV merge timed out"
@@ -438,6 +466,7 @@ def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: 
         raise ValueError(detail)
     if not merged_gpx_path.exists():
         raise ValueError("OSV merge did not create a GPX file")
+    logger.info("Created merged GoPro overlay GPX: %s", merged_gpx_path)
     return merged_gpx_path
 
 
@@ -515,6 +544,7 @@ def _gopro_overlay_export_job_payload(job: dict[str, Any]) -> dict[str, Any]:
         "completed_at": job.get("completed_at"),
         "output_filename": job.get("output_filename"),
         "layout_label": job.get("layout_label"),
+        "log_tail": job.get("log_tail") or [],
         "has_output_file": bool(output_path and Path(str(output_path)).exists()),
     }
 
@@ -5383,6 +5413,15 @@ async def create_flight_gopro_overlay_job(
         auto_gpx_path = _first_matching_file(input_dir, "Zepp*.gpx")
         auto_pip_path = _latest_matching_file(input_dir, "flight*.mp4")
         auto_osv_paths = _matching_files_by_mtime(input_dir, "*.osv")
+        logger.info(
+            "GoPro overlay auto inputs for flight %s in %s: camera=%s, gpx=%s, pip=%s, osv=%s",
+            flight_id,
+            input_dir,
+            auto_video_path if auto_video_path.exists() else None,
+            auto_gpx_path,
+            auto_pip_path,
+            [str(path) for path in auto_osv_paths],
+        )
         if not resolved_video_path and auto_video_path.exists():
             resolved_video_path = auto_video_path
         fallback_gpx_path = (
@@ -5390,31 +5429,7 @@ async def create_flight_gopro_overlay_job(
         )
         fallback_pip_path = resolved_pip_path or auto_pip_path or generated_video_path
         gpx_file_for_job = gpx_file
-        pin_overlay_inputs = False
-        if gpx_file and gpx_file.filename and auto_osv_paths:
-            uploaded_gpx_path = await save_uploaded_file(
-                gpx_file,
-                input_dir
-                / ".gopro-overlay-work"
-                / f"uploaded-{uuid.uuid4()}{Path(gpx_file.filename).suffix.lower()}",
-                {".gpx", ".fit"},
-            )
-            fallback_gpx_path = await asyncio.to_thread(
-                _merge_osv_files_with_gpx,
-                auto_osv_paths,
-                uploaded_gpx_path,
-                input_dir,
-            )
-            gpx_file_for_job = None
-            pin_overlay_inputs = True
-        elif fallback_gpx_path and fallback_gpx_path.exists() and auto_osv_paths:
-            fallback_gpx_path = await asyncio.to_thread(
-                _merge_osv_files_with_gpx,
-                auto_osv_paths,
-                fallback_gpx_path,
-                input_dir,
-            )
-            pin_overlay_inputs = True
+        pin_overlay_inputs = bool(auto_osv_paths)
 
         if resolved_video_path:
             if not resolved_video_path.exists():

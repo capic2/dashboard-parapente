@@ -3,7 +3,7 @@ import { expect, fn, userEvent, within } from 'storybook/test';
 import { useState } from 'react';
 import type { RowSelectionState } from '@tanstack/react-table';
 import { FlightsTable } from './FlightsTable';
-import type { Flight } from '../../../types';
+import type { Flight, Site } from '../../../types';
 
 const mockFlights: Flight[] = [
   {
@@ -89,6 +89,53 @@ const mockFlights: Flight[] = [
   },
 ];
 
+const mockSites: Site[] = [
+  {
+    id: 'site-1',
+    name: 'Puy de Dôme',
+    latitude: 45.77,
+    longitude: 2.96,
+    country: 'FR',
+    region: 'Besançon',
+    camera_distance: null,
+    flight_count: 1,
+    is_active: true,
+  },
+  {
+    id: 'site-2',
+    name: 'Col de la Forclaz',
+    latitude: 45.86,
+    longitude: 6.24,
+    country: 'FR',
+    region: 'Annecy',
+    camera_distance: null,
+    flight_count: 1,
+    is_active: true,
+  },
+  {
+    id: 'site-3',
+    name: 'Planfait',
+    latitude: 45.84,
+    longitude: 6.21,
+    country: 'FR',
+    region: 'Annecy',
+    camera_distance: null,
+    flight_count: 1,
+    is_active: true,
+  },
+  {
+    id: 'site-4',
+    name: 'Sancy',
+    latitude: 45.53,
+    longitude: 2.81,
+    country: 'FR',
+    region: 'Besançon',
+    camera_distance: null,
+    flight_count: 1,
+    is_active: true,
+  },
+];
+
 function FlightsTableWrapper({
   flights,
   selectionMode = false,
@@ -107,6 +154,7 @@ function FlightsTableWrapper({
     <div style={{ maxWidth: '400px' }}>
       <FlightsTable
         flights={flights}
+        sites={mockSites}
         selectedFlightId={selectedFlightId}
         selectionMode={selectionMode}
         onSelectFlight={(flight) => setSelectedFlightId(flight.id)}

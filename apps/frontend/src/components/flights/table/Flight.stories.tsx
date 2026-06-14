@@ -1,6 +1,6 @@
 import preview from '../../../../.storybook/preview';
 import { Flight } from './Flight';
-import type { Flight as FlightRecord } from '../../../types';
+import type { Flight as FlightRecord, Site } from '../../../types';
 import { fn } from 'storybook/test';
 
 const mockFlight: FlightRecord = {
@@ -20,6 +20,20 @@ const mockFlight: FlightRecord = {
   notes: null,
 };
 
+const mockSites: Site[] = [
+  {
+    id: 'site-1',
+    name: 'Puy de Dome',
+    latitude: 45.77,
+    longitude: 2.96,
+    country: 'FR',
+    region: 'Besançon',
+    camera_distance: null,
+    flight_count: 1,
+    is_active: true,
+  },
+];
+
 const meta = preview.meta({
   title: 'Components/Flights/Flight',
   component: Flight,
@@ -35,6 +49,7 @@ export const Default = meta.story({
     <div className="max-w-sm">
       <Flight
         flight={mockFlight}
+        sites={mockSites}
         isActive={false}
         isSelected={false}
         selectionMode={false}
@@ -55,6 +70,7 @@ export const Active = meta.story({
     <div className="max-w-sm">
       <Flight
         flight={mockFlight}
+        sites={mockSites}
         isActive
         isSelected={false}
         selectionMode={false}
@@ -80,6 +96,7 @@ export const NoFile = meta.story({
           video_file_path: null,
           gopro_overlay_file_path: null,
         }}
+        sites={mockSites}
         isActive={false}
         isSelected={false}
         selectionMode={false}
@@ -104,6 +121,7 @@ export const WithGpx = meta.story({
           video_file_path: null,
           gopro_overlay_file_path: null,
         }}
+        sites={mockSites}
         isActive={false}
         isSelected={false}
         selectionMode={false}
@@ -124,6 +142,7 @@ export const WithGpxVideo = meta.story({
     <div className="max-w-sm">
       <Flight
         flight={{ ...mockFlight, gopro_overlay_file_path: null }}
+        sites={mockSites}
         isActive={false}
         isSelected={false}
         selectionMode={false}
@@ -144,6 +163,7 @@ export const WithOverlay = meta.story({
     <div className="max-w-sm">
       <Flight
         flight={mockFlight}
+        sites={mockSites}
         isActive={false}
         isSelected={false}
         selectionMode={false}
@@ -171,6 +191,7 @@ export const VideoProcessing = meta.story({
           video_export_progress: 42,
           gopro_overlay_file_path: null,
         }}
+        sites={mockSites}
         isActive={false}
         isSelected={false}
         selectionMode={false}
@@ -196,6 +217,7 @@ export const OverlayProcessing = meta.story({
           gopro_overlay_status: 'running',
           gopro_overlay_progress: 42,
         }}
+        sites={mockSites}
         isActive={false}
         isSelected={false}
         selectionMode={false}
@@ -223,6 +245,7 @@ export const VideoError = meta.story({
           video_export_progress: 42,
           gopro_overlay_file_path: null,
         }}
+        sites={mockSites}
         isActive={false}
         isSelected={false}
         selectionMode={false}
@@ -249,6 +272,7 @@ export const OverlayError = meta.story({
           gopro_overlay_progress: 42,
           gopro_overlay_file_path: null,
         }}
+        sites={mockSites}
         isActive={false}
         isSelected={false}
         selectionMode={false}

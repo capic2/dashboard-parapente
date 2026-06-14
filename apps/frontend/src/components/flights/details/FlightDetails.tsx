@@ -104,6 +104,12 @@ export function FlightDetails({
   const canRegenerateGoproOverlay =
     hasPersistedGoproOverlay || isGoproOverlayCancelled;
   const isDownloadingAnyMedia = downloadingMedia !== null;
+  let gpxUploadLabel = t('flights.addGpx');
+  if (uploadGPXMutation.isPending) {
+    gpxUploadLabel = t('flights.uploadInProgress');
+  } else if (flight.gpx_file_path) {
+    gpxUploadLabel = t('flights.replaceGpx');
+  }
   const videoProcessingLabel = formatMediaProgressLabel(
     t('flights.videoProcessingBadge'),
     flight.video_export_progress
@@ -170,8 +176,8 @@ export function FlightDetails({
         notes: notesText,
       });
       setEditingNotes(false);
-    } catch (err) {
-      console.error('Failed to update notes:', err);
+    } catch {
+      toast.error(t('flights.updateError'));
     }
   };
 
@@ -204,7 +210,7 @@ export function FlightDetails({
     }
   };
 
-  const handleGPXUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+  const handleGPXUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -461,11 +467,7 @@ export function FlightDetails({
               isDisabled={uploadGPXMutation.isPending}
             >
               <FileUp className="h-4 w-4" aria-hidden="true" />
-              {uploadGPXMutation.isPending
-                ? t('flights.uploadInProgress')
-                : flight.gpx_file_path
-                  ? t('flights.replaceGpx')
-                  : t('flights.addGpx')}
+              {gpxUploadLabel}
             </Button>
           </div>
 
@@ -485,7 +487,7 @@ export function FlightDetails({
               onDownload={handleDownloadGoproOverlay}
             />
           )}
-          <FlightStatsGrid flight={flight} />
+          <FlightStatsGrid flight={flight} sites={sites} />
           <FlightNotesSection
             notes={flight.notes}
             editingNotes={editingNotes}

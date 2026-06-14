@@ -53,6 +53,11 @@ if ENVIRONMENT != "production":
 else:
     logger.info("🐳 Production mode: using Docker environment variables")
 
+
+def _default_job_queue_backend() -> str:
+    return "rq" if ENVIRONMENT == "production" else "thread"
+
+
 # ============================================================================
 # DATABASE
 # ============================================================================
@@ -70,7 +75,7 @@ USE_FAKE_REDIS = os.getenv("BACKEND_USE_FAKE_REDIS", "true").lower() == "true"
 # ============================================================================
 JOB_QUEUE_BACKEND = os.getenv(
     "BACKEND_JOB_QUEUE_BACKEND",
-    "thread" if IS_TEST_ENV else "rq",
+    _default_job_queue_backend(),
 ).lower()
 JOB_QUEUE_NAME = os.getenv("BACKEND_JOB_QUEUE_NAME", "video_exports")
 GOPRO_OVERLAY_QUEUE_NAME = os.getenv("BACKEND_GOPRO_OVERLAY_QUEUE_NAME", "gopro_overlays")
@@ -208,6 +213,9 @@ GOPRO_OVERLAY_UPLOAD_DIR = str(Path(PARAGLIDING_DATA_ROOT) / ".tmp" / "gopro-upl
 GOPRO_OVERLAY_FONT = os.getenv(
     "BACKEND_GOPRO_OVERLAY_FONT",
     "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+)
+GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS = int(
+    os.getenv("BACKEND_GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS", "1800")
 )
 GOPRO_OVERLAY_PROCESS_NICE = int(os.getenv("BACKEND_GOPRO_OVERLAY_PROCESS_NICE", "19"))
 GOPRO_OVERLAY_PROCESS_IONICE_CLASS = os.getenv("BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS", "3")
