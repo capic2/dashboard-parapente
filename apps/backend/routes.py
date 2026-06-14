@@ -37,7 +37,7 @@ from auth import (
     decode_job_token,
     get_current_user,
 )
-from database import get_db
+from database import SessionLocal, get_db
 from emagram_freshness import get_emagram_cutoff_utc
 from flight_backfill import calculate_and_persist_missing_max_speed
 from flight_decision import build_flight_decision, normalize_objective
@@ -596,6 +596,18 @@ def _build_video_export_jobs_payload(
         jobs.append(job)
 
     return sorted(jobs, key=_video_export_sort_value, reverse=True)
+
+
+def _get_video_export_jobs_payload(db: Session, active_only: bool = False) -> dict[str, Any]:
+    jobs = _build_video_export_jobs_payload(
+        list_exports_manual()
+        + list_exports_stream()
+        + [_gopro_overlay_export_job_payload(job) for job in list_gopro_overlay_jobs()],
+        db,
+    )
+    if active_only:
+        jobs = [job for job in jobs if job.get("can_cancel")]
+    return {"jobs": jobs}
 
 
 # Public routes: no authentication required (weather, spots read, auth)
@@ -5078,16 +5090,52 @@ def list_video_export_jobs(
     db: Session = Depends(get_db),
 ):
     """List video export jobs across all flights."""
-    jobs = _build_video_export_jobs_payload(
-        list_exports_manual()
-        + list_exports_stream()
-        + [_gopro_overlay_export_job_payload(job) for job in list_gopro_overlay_jobs()],
-        db,
-    )
-    if active_only:
-        jobs = [job for job in jobs if job.get("can_cancel")]
+    return _get_video_export_jobs_payload(db, active_only=active_only)
 
-    return {"jobs": jobs}
+
+@router.get("/video-export-jobs/stream")
+async def stream_video_export_jobs(request: Request) -> StreamingResponse:
+    """Stream video export job list updates without frontend polling."""
+
+    def read_payload() -> dict[str, Any]:
+        with SessionLocal() as db:
+            return _get_video_export_jobs_payload(db)
+
+    async def event_stream():
+        yield "retry: 5000\n\n"
+
+        heartbeat_tick = 0
+        last_serialized = ""
+
+        while True:
+            if await request.is_disconnected():
+                break
+
+            payload = await asyncio.to_thread(read_payload)
+            serialized = json.dumps(payload, sort_keys=True)
+            if serialized != last_serialized:
+                yield serialize_sse_event("jobs", payload)
+                last_serialized = serialized
+
+            heartbeat_tick += 1
+            if heartbeat_tick >= 10:
+                yield serialize_sse_event(
+                    "ping",
+                    {"timestamp": datetime.now(timezone.utc).isoformat()},
+                )
+                heartbeat_tick = 0
+
+            await asyncio.sleep(2)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.delete(

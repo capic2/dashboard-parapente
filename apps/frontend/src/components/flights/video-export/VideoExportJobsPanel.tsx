@@ -310,9 +310,16 @@ function JobTypeBadge({ job }: { job: VideoExportJob }) {
   );
 }
 
-function JobLogsDetails({ job }: { job: VideoExportJob }) {
+function JobLogsDetails({
+  job,
+  isOpen,
+  onToggle,
+}: {
+  job: VideoExportJob;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
   const { t } = useTranslation();
-  const [isOpen, setIsOpen] = useState(false);
   const { status: videoStatus } = useVideoExportStatus(
     isGoproOverlayJob(job) ? null : job.job_id,
     isOpen
@@ -336,7 +343,7 @@ function JobLogsDetails({ job }: { job: VideoExportJob }) {
       showLabel={t('videoJobs.liveLogs.show', 'Afficher')}
       hideLabel={t('videoJobs.liveLogs.hide', 'Masquer')}
       isOpen={isOpen}
-      onToggle={() => setIsOpen((value) => !value)}
+      onToggle={onToggle}
       logs={logs}
     />
   );
@@ -349,6 +356,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
     useState<PendingVideoConfirm | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  const [openLogJobIds, setOpenLogJobIds] = useState<Set<string>>(new Set());
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'last_activity', desc: true },
   ]);
@@ -556,6 +564,29 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
     ]
   );
 
+  const toggleJobLogs = useCallback((jobId: string) => {
+    setOpenLogJobIds((current) => {
+      const next = new Set(current);
+      if (next.has(jobId)) {
+        next.delete(jobId);
+      } else {
+        next.add(jobId);
+      }
+      return next;
+    });
+  }, []);
+
+  const renderJobLogs = useCallback(
+    (job: VideoExportJob) => (
+      <JobLogsDetails
+        job={job}
+        isOpen={openLogJobIds.has(job.job_id)}
+        onToggle={() => toggleJobLogs(job.job_id)}
+      />
+    ),
+    [openLogJobIds, toggleJobLogs]
+  );
+
   const columns = useMemo(
     () => [
       columnHelper.accessor('status', {
@@ -655,13 +686,11 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
         id: 'logs',
         header: t('videoJobs.table.logs', 'Logs'),
         cell: ({ row }) => (
-          <div className="min-w-72">
-            <JobLogsDetails job={row.original} />
-          </div>
+          <div className="min-w-72">{renderJobLogs(row.original)}</div>
         ),
       }),
     ],
-    [renderJobActions, t]
+    [renderJobActions, renderJobLogs, t]
   );
 
   const table = useReactTable({
@@ -922,7 +951,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
                     </div>
                   </div>
 
-                  <JobLogsDetails job={job} />
+                  {renderJobLogs(job)}
                 </article>
               );
             })}

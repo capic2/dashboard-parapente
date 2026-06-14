@@ -4,6 +4,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { api } from '../../lib/api';
 
 export type VideoExportJob = {
@@ -46,23 +47,77 @@ export type VideoExportTempCleanupResult = {
   errors: { path: string; error: string }[];
 };
 
-const hasActiveJob = (jobs: VideoExportJob[] | undefined) =>
-  Boolean(jobs?.some((job) => job.can_cancel));
+const videoExportJobsQueryKey = ['video-export-jobs'];
+
+function toVideoExportJobsResponse(
+  value: unknown
+): VideoExportJobsResponse | null {
+  if (!value || typeof value !== 'object' || !('jobs' in value)) {
+    return null;
+  }
+
+  const jobs = (value as { jobs: unknown }).jobs;
+  if (!Array.isArray(jobs)) {
+    return null;
+  }
+
+  return { jobs: jobs as VideoExportJob[] };
+}
 
 export const videoExportJobsQueryOptions = () =>
   queryOptions<VideoExportJob[]>({
-    queryKey: ['video-export-jobs'],
+    queryKey: videoExportJobsQueryKey,
     queryFn: async () => {
       const data = await api
         .get('video-export-jobs')
         .json<VideoExportJobsResponse>();
       return data.jobs;
     },
-    refetchInterval: (query) => (hasActiveJob(query.state.data) ? 3000 : false),
   });
 
 export function useVideoExportJobs() {
-  return useQuery(videoExportJobsQueryOptions());
+  const queryClient = useQueryClient();
+  const query = useQuery(videoExportJobsQueryOptions());
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const streamUrl = new URL(
+      '/api/video-export-jobs/stream',
+      window.location.origin
+    );
+    const eventSource = new EventSource(streamUrl.toString(), {
+      withCredentials: true,
+    });
+
+    const handleJobsEvent = (event: MessageEvent<string>) => {
+      let parsed: unknown;
+
+      try {
+        parsed = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+
+      const data = toVideoExportJobsResponse(parsed);
+      if (!data) {
+        return;
+      }
+
+      queryClient.setQueryData(videoExportJobsQueryKey, data.jobs);
+    };
+
+    eventSource.addEventListener('jobs', handleJobsEvent);
+
+    return () => {
+      eventSource.removeEventListener('jobs', handleJobsEvent);
+      eventSource.close();
+    };
+  }, [queryClient]);
+
+  return query;
 }
 
 export function useCancelVideoExportJob() {
