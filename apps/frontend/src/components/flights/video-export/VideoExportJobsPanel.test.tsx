@@ -141,7 +141,7 @@ vi.mock('../../../hooks/flights/useVideoExportStatus', () => ({
         ? {
             job_id: jobId,
             status: 'processing',
-            log_tail: ['Opening viewer', 'Captured 20/100 frames'],
+            log_tail: ['Opening viewer', `${jobId} Captured 20/100 frames`],
           }
         : null,
     isConnected: Boolean(enabled && jobId),
@@ -277,7 +277,32 @@ describe('VideoExportJobsPanel', () => {
       screen.getAllByRole('button', { name: /Logs en direct/u })[0]!
     );
 
-    expect(screen.getByText(/Captured 20\/100 frames/u)).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/Captured 20\/100 frames/u).length
+    ).toBeGreaterThan(0);
+  });
+
+  it('keeps the same job logs open after a jobs refresh reorders rows', () => {
+    const { rerender } = render(<VideoExportJobsPanel />);
+
+    fireEvent.click(
+      screen.getAllByRole('button', { name: /Logs en direct/u })[0]!
+    );
+
+    expect(
+      screen.getAllByText(/job-active Captured 20\/100 frames/u).length
+    ).toBeGreaterThan(0);
+
+    const [activeJob, completedJob, ...remainingJobs] = jobs;
+    jobs.splice(0, jobs.length, completedJob!, ...remainingJobs, activeJob!);
+    rerender(<VideoExportJobsPanel />);
+
+    expect(
+      screen.getAllByText(/job-active Captured 20\/100 frames/u).length
+    ).toBeGreaterThan(0);
+    expect(
+      screen.queryAllByText(/job-done Captured 20\/100 frames/u)
+    ).toHaveLength(0);
   });
 
   it('filters jobs by status', () => {

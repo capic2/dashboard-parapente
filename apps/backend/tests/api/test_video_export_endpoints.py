@@ -4,6 +4,7 @@ Tests for video export API endpoints.
 Covers fallback behavior between manual/stream modes and internal status guards.
 """
 
+import json
 import tempfile
 from unittest.mock import patch
 
@@ -12,6 +13,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from auth import create_job_token
+from routes import _get_video_export_jobs_payload, serialize_sse_event
 
 API_PREFIX = "/api"
 
@@ -585,6 +587,38 @@ class TestVideoExportJobsEndpoint:
             "job-overlay-running",
         }
         assert all(job["can_cancel"] is True for job in jobs)
+
+    def test_video_export_jobs_stream_serializes_jobs_event(self, db_session):
+        with (
+            patch(
+                "routes.list_exports_manual",
+                return_value=[
+                    {
+                        "job_id": "job-streamed-list",
+                        "status": "processing",
+                        "internal_status": "capturing",
+                    }
+                ],
+            ),
+            patch("routes.list_exports_stream", return_value=[]),
+            patch("routes.list_gopro_overlay_jobs", return_value=[]),
+        ):
+            payload = _get_video_export_jobs_payload(db_session)
+
+        chunk = serialize_sse_event("jobs", payload)
+
+        event_name = None
+        event_data = None
+        for raw_line in chunk.splitlines():
+            if raw_line.startswith("event: "):
+                event_name = raw_line.replace("event: ", "", 1)
+            if raw_line.startswith("data: ") and event_name == "jobs":
+                event_data = json.loads(raw_line.replace("data: ", "", 1))
+
+        assert event_name == "jobs"
+        assert event_data is not None
+        assert event_data["jobs"][0]["job_id"] == "job-streamed-list"
+        assert event_data["jobs"][0]["can_cancel"] is True
 
     def test_video_export_jobs_marks_terminal_stream_and_overlay_deletable(
         self, client: TestClient
