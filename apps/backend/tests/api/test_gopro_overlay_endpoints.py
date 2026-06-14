@@ -1,6 +1,5 @@
 import logging
 import os
-import xml.etree.ElementTree as ET
 from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
@@ -569,50 +568,53 @@ def test_worker_merge_osv_files_with_gpx_uses_configured_timeout(
     assert run.call_args.kwargs["timeout"] == 456
 
 
-def test_worker_merge_osv_files_with_gpx_trims_gpx_preroll_before_osv_sensor_data(
+def test_worker_merge_osv_files_with_gpx_passes_first_gpx_at_from_osv_start(
     tmp_path,
     monkeypatch,
 ) -> None:
     gopro_root = tmp_path / "gopro-overlay"
     gopro_root.mkdir()
     (gopro_root / "osv_merge.py").write_text("# merge")
-    input_dir = tmp_path / "20260607" / "01"
+    input_dir = tmp_path / "20260315" / "01"
     input_dir.mkdir(parents=True)
-    source_gpx = input_dir / "strava.gpx"
+    source_gpx = input_dir / "Zepp-track.gpx"
     osv_path = input_dir / "flight.osv"
-    source_gpx.write_text("<gpx />")
+    merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
+    source_gpx.write_text(
+        "<gpx><trk><trkseg>"
+        "<trkpt><time>2026-03-15T09:59:50Z</time></trkpt>"
+        "<trkpt><time>2026-03-15T10:00:20Z</time></trkpt>"
+        "</trkseg></trk></gpx>"
+    )
     osv_path.write_bytes(b"osv")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(gopro_root))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: 30.0)
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_start_time",
+        lambda _: gopro_overlay_export._parse_utc_datetime("2026-03-15T10:00:00Z"),
+    )
 
     class Result:
         returncode = 0
         stderr = ""
         stdout = ""
 
-    def fake_run(command, **kwargs):
-        Path(command[-1]).write_text("""<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxpx="http://www.garmin.com/xmlschemas/GpxExtensions/v3">
-  <trk><trkseg>
-    <trkpt lat="46.0" lon="6.0"><time>2026-06-07T12:54:49Z</time></trkpt>
-    <trkpt lat="46.0" lon="6.0"><time>2026-06-07T12:54:50Z</time></trkpt>
-    <trkpt lat="46.0" lon="6.0"><time>2026-06-07T12:54:58Z</time><extensions><gpxpx:Acceleration><gpxpx:x>0.1</gpxpx:x><gpxpx:y>0.2</gpxpx:y><gpxpx:z>0.3</gpxpx:z></gpxpx:Acceleration></extensions></trkpt>
-    <trkpt lat="46.0" lon="6.0"><time>2026-06-07T12:54:59Z</time><extensions><gpxpx:Acceleration><gpxpx:x>0.2</gpxpx:x><gpxpx:y>0.3</gpxpx:y><gpxpx:z>0.4</gpxpx:z></gpxpx:Acceleration></extensions></trkpt>
-  </trkseg></trk>
-</gpx>""")
+    def fake_run(command, **_kwargs):
+        Path(command[-1]).write_text("<gpx>merged</gpx>")
         return Result()
 
-    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run):
+    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run) as run:
         result = gopro_overlay_export._merge_osv_files_with_gpx(
             [osv_path],
             source_gpx,
             input_dir,
         )
 
-    root = ET.parse(result).getroot()
-    times = [
-        element.text for element in root.iter() if element.tag.rsplit("}", 1)[-1].lower() == "time"
-    ]
-    assert times == ["2026-06-07T12:54:58Z", "2026-06-07T12:54:59Z"]
+    assert result == merged_gpx_path
+    assert merged_gpx_path.read_text() == "<gpx>merged</gpx>"
+    command = run.call_args.args[0]
+    assert command[2:4] == ["--first-gpx-at", "10.000"]
 
 
 def test_gopro_overlay_output_resolution_is_rescaled_when_needed(tmp_path, monkeypatch) -> None:
@@ -1308,53 +1310,6 @@ def test_prepare_pip_video_trims_pip_when_camera_starts_after_gpx(tmp_path, monk
     assert "setpts=PTS-STARTPTS+0.000/TB" in command[command.index("-filter_complex") + 1]
 
 
-def test_prepare_pip_video_auto_aligns_start_time_by_timezone_offset(tmp_path, monkeypatch):
-    video_path = tmp_path / "camera.mp4"
-    gpx_path = tmp_path / "track.gpx"
-    pip_path = tmp_path / "pip.mp4"
-    work_dir = tmp_path / "work"
-    video_path.write_bytes(b"video")
-    pip_path.write_bytes(b"pip")
-    gpx_path.write_text(
-        "<gpx><trk><trkseg><trkpt><time>2026-03-15T10:00:00Z</time></trkpt></trkseg></trk></gpx>"
-    )
-    work_dir.mkdir()
-    commands: list[list[str]] = []
-
-    monkeypatch.setattr(
-        gopro_overlay_export,
-        "probe_video_duration",
-        lambda path: 30.0 if path == video_path else 10.0,
-    )
-    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (640, 480))
-    monkeypatch.setattr(
-        gopro_overlay_export,
-        "probe_video_start_time",
-        lambda _: gopro_overlay_export._parse_utc_datetime("2026-03-15T11:00:00Z"),
-    )
-
-    class Result:
-        returncode = 0
-        stderr = ""
-        stdout = ""
-
-    def run(command, **_kwargs):
-        commands.append(command)
-        Path(command[-1]).write_bytes(b"prepared")
-        return Result()
-
-    monkeypatch.setattr(gopro_overlay_export.subprocess, "run", run)
-
-    prepared = gopro_overlay_export._prepare_pip_video_for_overlay(
-        "job-pip", video_path, gpx_path, pip_path, work_dir
-    )
-
-    assert prepared == work_dir / "pip-prepared-job-pip.mp4"
-    assert prepared.read_bytes() == b"prepared"
-    command = commands[0]
-    assert "setpts=PTS-STARTPTS+0.000/TB" in command[command.index("-filter_complex") + 1]
-
-
 def test_prepare_queued_job_uses_prepared_pip_path(tmp_path, monkeypatch, test_db):
     layout_dir = tmp_path / "layouts"
     layout_dir.mkdir()
@@ -1627,56 +1582,6 @@ def test_worker_preparation_merges_osv_files_before_rendering(
     assert merge_osv.call_args.args[1].name == "gpx-" + job["job_id"] + ".gpx"
     assert merge_osv.call_args.args[2] == tmp_path
     assert prepared["command"]["render_gpx_path"] == str(merged_gpx_path)
-
-
-def test_trim_gpx_preserves_default_gpx_namespace(tmp_path: Path) -> None:
-    gpx_path = tmp_path / "merged-gopro-overlay.gpx"
-    gpx_path.write_text("""<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1"
-     creator="OSV+GPX Merger v2.0"
-     xmlns="http://www.topografix.com/GPX/1/1"
-     xmlns:ns1="http://www.garmin.com/xmlschemas/TrackPointExtension/v1"
-     xmlns:gpxpx="http://www.garmin.com/xmlschemas/GpxExtensions/v3"
-     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-     xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
-    <name>Merged OSV + GPX Track</name>
-    <trk>
-    <trkseg>
-      <trkpt lat="47.1" lon="5.1">
-        <ele>491.57</ele>
-        <time>2026-06-07T12:54:49Z</time>
-        <extensions>
-          <ns1:TrackPointExtension>
-            <ns1:speed>0.0</ns1:speed>
-          </ns1:TrackPointExtension>
-        </extensions>
-      </trkpt>
-      <trkpt lat="47.2" lon="5.2">
-        <ele>491.86</ele>
-        <time>2026-06-07T12:54:58+00:00</time>
-        <extensions>
-          <ns1:TrackPointExtension>
-            <ns1:speed>0.0</ns1:speed>
-          </ns1:TrackPointExtension>
-          <gpxpx:Acceleration>
-            <gpxpx:x>-0.338608</gpxpx:x>
-            <gpxpx:y>-0.869588</gpxpx:y>
-            <gpxpx:z>-0.784719</gpxpx:z>
-          </gpxpx:Acceleration>
-        </extensions>
-      </trkpt>
-    </trkseg>
-    </trk>
-</gpx>""")
-
-    assert gopro_overlay_export._trim_gpx_before_first_osv_sensor_point(gpx_path)
-
-    trimmed_gpx = gpx_path.read_text()
-    assert "<gpx " in trimmed_gpx
-    assert "<ns0:gpx" not in trimmed_gpx
-    assert "<trkpt " in trimmed_gpx
-    assert "2026-06-07T12:54:49Z" not in trimmed_gpx
-    assert "2026-06-07T12:54:58+00:00" in trimmed_gpx
 
 
 def test_worker_preparation_uses_exact_video_size_for_non_standard_source(

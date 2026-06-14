@@ -157,86 +157,6 @@ def _matching_files_by_mtime(directory: Path, pattern: str) -> list[Path]:
     return sorted(matches, key=lambda path: (path.stat().st_mtime, path.name))
 
 
-def _xml_local_name(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1].lower()
-
-
-def _register_gpx_namespaces() -> None:
-    ET.register_namespace("", _GPX_NAMESPACE)
-    ET.register_namespace("gpxpx", _GARMIN_GPX_EXTENSION_NAMESPACE)
-    ET.register_namespace("xsi", _XSI_NAMESPACE)
-
-
-def _trkpt_has_osv_sensor_data(point: ET.Element) -> bool:
-    extension_names = {
-        _xml_local_name(element.tag)
-        for extensions in point
-        if _xml_local_name(extensions.tag) == "extensions"
-        for element in extensions.iter()
-    }
-    if extension_names & {
-        "acceleration",
-        "gyroscope",
-        "g_force",
-        "gforce",
-        "accel_x",
-        "accel_y",
-        "accel_z",
-        "gyro_x",
-        "gyro_y",
-        "gyro_z",
-    }:
-        return True
-    return {"x", "y", "z"}.issubset(extension_names)
-
-
-def _trim_gpx_before_first_osv_sensor_point(gpx_path: Path) -> bool:
-    try:
-        tree = ET.parse(gpx_path)
-    except (ET.ParseError, OSError) as exc:
-        logger.warning("Could not parse merged GoPro overlay GPX %s: %s", gpx_path, exc)
-        return False
-
-    root = tree.getroot()
-    trimmed = False
-    removed_count = 0
-
-    for segment in root.iter():
-        if _xml_local_name(segment.tag) != "trkseg":
-            continue
-        points = [child for child in list(segment) if _xml_local_name(child.tag) == "trkpt"]
-        first_osv_index = next(
-            (index for index, point in enumerate(points) if _trkpt_has_osv_sensor_data(point)),
-            None,
-        )
-        if first_osv_index is None or first_osv_index == 0:
-            continue
-        for point in points[:first_osv_index]:
-            segment.remove(point)
-        removed_count += first_osv_index
-        trimmed = True
-
-    if not trimmed:
-        return False
-
-    temp_path = gpx_path.with_name(f".{gpx_path.name}.trimmed")
-    try:
-        _register_gpx_namespaces()
-        tree.write(temp_path, encoding="unicode", xml_declaration=True)
-        temp_path.replace(gpx_path)
-    except OSError as exc:
-        temp_path.unlink(missing_ok=True)
-        logger.warning("Could not write trimmed GoPro overlay GPX %s: %s", gpx_path, exc)
-        return False
-
-    logger.info(
-        "Trimmed %s pre-OSV GPX point(s) from merged GoPro overlay GPX %s",
-        removed_count,
-        gpx_path,
-    )
-    return True
-
-
 def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: Path) -> Path:
     if not osv_paths:
         return gpx_path
@@ -264,6 +184,10 @@ def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: 
         str(merged_gpx_path),
     ]
 
+    first_gpx_at = _first_gpx_at_seconds(osv_paths[0], gpx_path)
+    if first_gpx_at and first_gpx_at > 0:
+        command[2:2] = ["--first-gpx-at", f"{first_gpx_at:.3f}"]
+
     try:
         result = subprocess.run(
             command,
@@ -283,7 +207,6 @@ def _merge_osv_files_with_gpx(osv_paths: list[Path], gpx_path: Path, input_dir: 
     if not merged_gpx_path.exists():
         raise ValueError("OSV merge did not create a GPX file")
 
-    _trim_gpx_before_first_osv_sensor_point(merged_gpx_path)
     logger.info("Created merged GoPro overlay GPX: %s", merged_gpx_path)
     return merged_gpx_path
 
@@ -713,6 +636,49 @@ def _parse_utc_datetime(value: str | None) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+def _gpx_time_bounds(gpx_path: Path) -> tuple[datetime | None, datetime | None]:
+    try:
+        root = ET.parse(gpx_path).getroot()
+    except (ET.ParseError, OSError):
+        return None, None
+
+    times = [
+        parsed
+        for element in root.iter()
+        if element.tag.rsplit("}", 1)[-1] == "time"
+        and element.text
+        and (parsed := _parse_utc_datetime(element.text))
+    ]
+    if not times:
+        return None, None
+    return times[0], times[-1]
+
+
+def _first_gpx_at_seconds(osv_path: Path, gpx_path: Path) -> float | None:
+    osv_start = probe_video_start_time(osv_path)
+    osv_duration = probe_video_duration(osv_path)
+    gpx_start, gpx_end = _gpx_time_bounds(gpx_path)
+    if not osv_start or not osv_duration or not gpx_start or not gpx_end:
+        return None
+
+    best_start = osv_start
+    best_overlap = -1.0
+    best_offset_minutes = 0
+    for offset_minutes in range(-12 * 60, 14 * 60 + 1, 15):
+        shift = timedelta(minutes=-offset_minutes)
+        candidate_start = osv_start + shift
+        candidate_end = candidate_start + timedelta(seconds=osv_duration)
+        overlap = max(
+            0.0, (min(candidate_end, gpx_end) - max(candidate_start, gpx_start)).total_seconds()
+        )
+        if (overlap, -abs(offset_minutes)) > (best_overlap, -abs(best_offset_minutes)):
+            best_start = candidate_start
+            best_overlap = overlap
+            best_offset_minutes = offset_minutes
+
+    return max(0.0, (best_start - gpx_start).total_seconds())
+
+
 def probe_video_start_time(video_path: Path) -> datetime | None:
     try:
         result = subprocess.run(
@@ -778,32 +744,6 @@ def _pip_timeline_offsets(
     return 0.0, abs(offset)
 
 
-def _align_video_start_time_to_gpx(
-    video_start: datetime | None,
-    gpx_start: datetime | None,
-) -> datetime | None:
-    if video_start is None or gpx_start is None:
-        return video_start
-
-    aligned_start = video_start
-    aligned_gap = abs((video_start - gpx_start).total_seconds())
-    for shift_minutes in range(-12 * 60, 14 * 60 + 1, 15):
-        candidate_start = video_start + timedelta(minutes=shift_minutes)
-        candidate_gap = abs((candidate_start - gpx_start).total_seconds())
-        if candidate_gap < aligned_gap:
-            aligned_start = candidate_start
-            aligned_gap = candidate_gap
-
-    if aligned_start != video_start:
-        logger.info(
-            "Adjusted video start time %s -> %s to better align with GPX %s",
-            video_start,
-            aligned_start,
-            gpx_start,
-        )
-    return aligned_start
-
-
 def _prepared_pip_path(work_dir: Path, job_id: str) -> Path:
     return work_dir / f"pip-prepared-{job_id}.mp4"
 
@@ -826,7 +766,7 @@ def _prepare_pip_video_for_overlay(
 
     pip_duration = probe_video_duration(pip_path)
     gpx_start = _first_gpx_timestamp(gpx_path)
-    video_start = _align_video_start_time_to_gpx(probe_video_start_time(video_path), gpx_start)
+    video_start = probe_video_start_time(video_path)
     pip_delay, pip_trim = _pip_timeline_offsets(video_start, gpx_start)
     visible_pip_duration = max(0.0, pip_duration - pip_trim) if pip_duration is not None else None
     pip_tail_duration = (
