@@ -191,6 +191,8 @@ export const getFlyabilityDisplay = (
   // Priority order for reason
   if (precipitation > thresholds.slotPrecipitationMax) {
     reason = reasonLabels.rain;
+  } else if (gust >= thresholds.gustHighMax) {
+    reason = reasonLabels.strongGusts;
   } else if (wind > thresholds.reasonWindVeryStrongMin) {
     reason = reasonLabels.strongWind;
   } else if (gust > thresholds.reasonGustHighMin) {
@@ -999,63 +1001,77 @@ export default function HourlyForecast({
       </div>
 
       <div className="hidden max-w-full min-w-0 touch-pan-x overflow-x-auto overscroll-x-contain rounded-2xl border border-gray-200 dark:border-gray-700 md:block">
-        <table className="w-full min-w-[800px] text-sm">
+        <table
+          aria-label={t('weather.hourly.title')}
+          className="w-full min-w-[800px] text-sm"
+        >
           <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur dark:bg-slate-950/95">
-            <tr className="border-b border-gray-200 dark:border-gray-700">
+            <tr
+              aria-label={t('weather.hourly.title')}
+              className="border-b border-gray-200 dark:border-gray-700"
+            >
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Clock size={14} /> {t('common.time')}
+                  <Clock size={14} aria-hidden="true" /> {t('common.time')}
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <CircleCheck size={14} /> {t('weather.hourly.flyability')}
+                  <CircleCheck size={14} aria-hidden="true" />{' '}
+                  {t('weather.hourly.flyability')}
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Gauge size={14} /> {t('weather.paraIndex')}
+                  <Gauge size={14} aria-hidden="true" />{' '}
+                  {t('weather.paraIndex')}
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Wind size={14} /> {t('weather.hourly.windWithUnit')}
+                  <Wind size={14} aria-hidden="true" />{' '}
+                  {t('weather.hourly.windWithUnit')}
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Zap size={14} /> {t('weather.hourly.gustsWithUnit')}
+                  <Zap size={14} aria-hidden="true" />{' '}
+                  {t('weather.hourly.gustsWithUnit')}
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Compass size={14} /> {t('weather.hourly.direction')}
+                  <Compass size={14} aria-hidden="true" />{' '}
+                  {t('weather.hourly.direction')}
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Thermometer size={14} /> {t('weather.hourly.tempWithUnit')}
+                  <Thermometer size={14} aria-hidden="true" />{' '}
+                  {t('weather.hourly.tempWithUnit')}
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <CloudRain size={14} />{' '}
+                  <CloudRain size={14} aria-hidden="true" />{' '}
                   {t('weather.hourly.precipitationWithUnit')}
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Cloud size={14} /> {t('weather.hourly.cloudsWithUnit')}
+                  <Cloud size={14} aria-hidden="true" />{' '}
+                  {t('weather.hourly.cloudsWithUnit')}
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Zap size={14} /> CAPE (J/kg)
+                  <Zap size={14} aria-hidden="true" /> CAPE (J/kg)
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
-                  <Flame size={14} /> {t('weather.hourly.thermals')}
+                  <Flame size={14} aria-hidden="true" />{' '}
+                  {t('weather.hourly.thermals')}
                 </span>
               </th>
             </tr>

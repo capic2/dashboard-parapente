@@ -53,4 +53,26 @@ describe('getFlyabilityDisplay', () => {
     expect(display.text).toBe('BON');
     expect(display.Icon).toBeTruthy();
   });
+
+  it('distinguishes strong gusts from strong wind', () => {
+    const display = getFlyabilityDisplay(
+      {
+        ...baseHour,
+        wind: 12,
+        wind_speed: 12,
+        wind_gust: 30,
+        precipitation: 0,
+        sources: {
+          'open-meteo': {
+            cloud_cover: 20,
+            wind_gust: 30,
+          },
+        },
+      },
+      DEFAULT_UI_THRESHOLDS
+    );
+
+    expect(display.text).toContain('Rafales importantes');
+    expect(display.text).not.toContain('Vent');
+  });
 });
