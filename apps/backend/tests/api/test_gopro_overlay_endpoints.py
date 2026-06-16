@@ -624,8 +624,8 @@ def test_worker_merge_osv_files_with_gpx_passes_first_gpx_at_from_osv_start(
     merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
     source_gpx.write_text(
         "<gpx><trk><trkseg>"
-        "<trkpt><time>2026-03-15T09:59:50Z</time></trkpt>"
-        "<trkpt><time>2026-03-15T10:00:20Z</time></trkpt>"
+        "<trkpt><time>2026-03-15T10:00:10Z</time></trkpt>"
+        "<trkpt><time>2026-03-15T10:00:40Z</time></trkpt>"
         "</trkseg></trk></gpx>"
     )
     osv_path.write_bytes(b"osv")
@@ -657,6 +657,61 @@ def test_worker_merge_osv_files_with_gpx_passes_first_gpx_at_from_osv_start(
     assert merged_gpx_path.read_text() == "<gpx>merged</gpx>"
     command = run.call_args.args[0]
     assert command[2:4] == ["--first-gpx-at", "10.000"]
+
+
+def test_worker_merge_osv_files_with_gpx_trims_gpx_when_video_starts_after_gpx(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    gopro_root = tmp_path / "gopro-overlay"
+    gopro_root.mkdir()
+    (gopro_root / "osv_merge.py").write_text("# merge")
+    input_dir = tmp_path / "work"
+    input_dir.mkdir()
+    source_gpx = input_dir / "Zepp-track.gpx"
+    osv_path = input_dir / "flight.osv"
+    merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
+    source_gpx.write_text(
+        "<gpx><trk><trkseg>"
+        "<trkpt><time>2026-06-13T08:20:26Z</time></trkpt>"
+        "<trkpt><time>2026-06-13T08:20:33Z</time></trkpt>"
+        "<trkpt><time>2026-06-13T08:20:34Z</time></trkpt>"
+        "<trkpt><time>2026-06-13T08:20:35Z</time></trkpt>"
+        "</trkseg></trk></gpx>"
+    )
+    osv_path.write_bytes(b"osv")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(gopro_root))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: 548.8)
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_start_time",
+        lambda _: gopro_overlay_export._parse_utc_datetime("2026-06-13T09:20:34Z"),
+    )
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = ""
+
+    def fake_run(command, **_kwargs):
+        Path(command[-1]).write_text("<gpx>merged</gpx>")
+        return Result()
+
+    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run) as run:
+        result = gopro_overlay_export._merge_osv_files_with_gpx(
+            [osv_path],
+            source_gpx,
+            input_dir,
+        )
+
+    assert result == merged_gpx_path
+    command = run.call_args.args[0]
+    assert command[2:4] == ["--first-gpx-at", "0.000"]
+    trimmed_gpx_path = Path(command[-2])
+    assert trimmed_gpx_path != source_gpx
+    trimmed_gpx = trimmed_gpx_path.read_text()
+    assert "2026-06-13T08:20:33Z" not in trimmed_gpx
+    assert "2026-06-13T08:20:34Z" in trimmed_gpx
 
 
 def test_gopro_overlay_output_resolution_is_rescaled_when_needed(tmp_path, monkeypatch) -> None:
@@ -1641,7 +1696,6 @@ def test_worker_preparation_merges_osv_files_before_rendering(
     pip_path = tmp_path / "pip.mp4"
     first_osv = tmp_path / "first.OSV"
     second_osv = tmp_path / "second.osv"
-    merged_gpx_path = tmp_path / "merged-gopro-overlay.gpx"
     video_path.write_bytes(b"video")
     gpx_path.write_text("<gpx />")
     pip_path.write_bytes(b"pip")
@@ -1658,6 +1712,8 @@ def test_worker_preparation_merges_osv_files_before_rendering(
         layout_id="parapente-1080",
         output_filename="overlay.mp4",
     )
+    work_dir = tmp_path / ".gopro-overlay-work" / job["job_id"]
+    merged_gpx_path = work_dir / "merged-gopro-overlay.gpx"
     queued_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
     assert queued_job is not None
 
@@ -1670,7 +1726,7 @@ def test_worker_preparation_merges_osv_files_before_rendering(
     assert prepared is not None
     assert merge_osv.call_args.args[0] == [first_osv, second_osv]
     assert merge_osv.call_args.args[1].name == "gpx-" + job["job_id"] + ".gpx"
-    assert merge_osv.call_args.args[2] == tmp_path
+    assert merge_osv.call_args.args[2] == work_dir
     assert prepared["command"]["render_gpx_path"] == str(merged_gpx_path)
 
 
