@@ -95,6 +95,7 @@ describe('FlightVideoExportControls', () => {
     confirmMock.mockReset();
     confirmMock.mockReturnValue(true);
     vi.stubGlobal('confirm', confirmMock);
+    window.sessionStorage.clear();
     mockFlight.video_export_status = null;
     mockFlight.video_export_job_id = null;
     mockFlight.video_file_path = null;
@@ -187,6 +188,34 @@ describe('FlightVideoExportControls', () => {
       internal_status: 'encoding',
       log_tail: ['Loading export viewer', 'Encoding with FFmpeg'],
     };
+
+    render(<FlightVideoExportControls flight={mockFlight} />);
+
+    expect(screen.getByText('Live logs')).toBeInTheDocument();
+    expect(screen.getByText('Hide')).toBeInTheDocument();
+    expect(screen.getByText(/Encoding with FFmpeg/u)).toBeInTheDocument();
+  });
+
+  it('restores live logs from session storage on remount', () => {
+    window.sessionStorage.setItem(
+      'flight-video-export-logs-open:flight-1',
+      'true'
+    );
+
+    mockFlight.video_export_status = 'completed';
+    mockFlight.video_export_job_id = 'job-running';
+    exportStatusMock.current = {
+      job_id: 'job-running',
+      status: 'processing',
+      internal_status: 'encoding',
+      log_tail: ['Loading export viewer', 'Encoding with FFmpeg'],
+    };
+
+    const { unmount } = render(
+      <FlightVideoExportControls flight={mockFlight} />
+    );
+
+    unmount();
 
     render(<FlightVideoExportControls flight={mockFlight} />);
 
