@@ -375,6 +375,32 @@ export const FlightDecisionResponseSchema = z.object({
   cached_at: z.string().nullish(),
 });
 
+export const AzbaConstraintSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  valid_from: z.string().nullish(),
+  valid_to: z.string().nullish(),
+  floor: z.string().nullish(),
+  ceiling: z.string().nullish(),
+  geometry: z.record(z.string(), z.any()).nullish(),
+  distance_km: z.number().nullish(),
+});
+
+export const AzbaAirspaceResponseSchema = z.object({
+  site_id: z.string(),
+  site_name: z.string(),
+  status: z.enum(['clear', 'blocking', 'unknown']),
+  source: z.string(),
+  source_url: z.string(),
+  retrieved_at: z.string(),
+  valid_from: z.string(),
+  valid_to: z.string(),
+  radius_km: z.number(),
+  latest_azba_date: z.string().nullish(),
+  constraints: z.array(AzbaConstraintSchema),
+  message: z.string().nullish(),
+});
+
 // ============================================================================
 // API WRAPPER SCHEMA
 // ============================================================================
@@ -642,6 +668,8 @@ export type FlightObjective = z.infer<typeof FlightObjectiveSchema>;
 export type FlightDecisionResponse = z.infer<
   typeof FlightDecisionResponseSchema
 >;
+export type AzbaConstraint = z.infer<typeof AzbaConstraintSchema>;
+export type AzbaAirspaceResponse = z.infer<typeof AzbaAirspaceResponseSchema>;
 export type Slot = z.infer<typeof SlotSchema>;
 export type Metrics = z.infer<typeof MetricsSchema>;
 export type DailySummaryDay = z.infer<typeof DailySummaryDaySchema>;

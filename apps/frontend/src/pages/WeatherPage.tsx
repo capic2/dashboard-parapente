@@ -26,11 +26,13 @@ import WeatherStickySelectionBar, {
 } from '../components/weather/WeatherStickySelectionBar';
 import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
 import FlightDecisionCockpit from '../components/weather/FlightDecisionCockpit';
+import AirspaceConstraintsPanel from '../components/weather/AirspaceConstraintsPanel';
 import {
   DEFAULT_FLIGHT_OBJECTIVE,
   parseFlightObjective,
   useFlightDecision,
 } from '../hooks/weather/useFlightDecision';
+import { useAzbaAirspace } from '../hooks/weather/useAzbaAirspace';
 import type { FlightObjective } from '@dashboard-parapente/shared-types';
 import { useAppSettings } from '../hooks/settings/useAppSettings';
 import WeatherPageMobileLayout from './WeatherPage.mobile';
@@ -246,6 +248,10 @@ export default function WeatherPage() {
     selectedDayIndex,
     selectedObjective
   );
+  const azbaAirspace = useAzbaAirspace(
+    !selectedSearchTarget && selectedSiteId ? selectedSiteId : undefined,
+    selectedDayIndex
+  );
   const selectedSearchTitle = getSearchTargetName(selectedSearchTarget);
   const selectedSearchLocation = getSearchTargetLocation(selectedSearchTarget);
   const coordinateWeather = useCoordinateWeather(
@@ -442,6 +448,15 @@ export default function WeatherPage() {
       />
     ) : undefined;
 
+  const mobileAirspacePanel =
+    !selectedSearchTarget && selectedSiteId ? (
+      <AirspaceConstraintsPanel
+        airspace={azbaAirspace.data}
+        isLoading={azbaAirspace.isLoading}
+        isError={azbaAirspace.isError}
+      />
+    ) : undefined;
+
   const mobileLandingPanel =
     !selectedSearchTarget && selectedSiteId ? (
       <WeatherMultiLanding
@@ -482,6 +497,7 @@ export default function WeatherPage() {
         searchResultPanel={mobileSearchResultPanel}
         emptyPanel={mobileEmptyPanel}
         currentConditions={mobileCurrentConditions}
+        airspacePanel={mobileAirspacePanel}
         liveWindPanel={mobileLiveWindPanel}
         landingPanel={mobileLandingPanel}
         emagramPanel={mobileEmagramPanel}
@@ -537,6 +553,14 @@ export default function WeatherPage() {
               }
             />
           </div>
+        )}
+
+        {!selectedSearchTarget && selectedSiteId && (
+          <AirspaceConstraintsPanel
+            airspace={azbaAirspace.data}
+            isLoading={azbaAirspace.isLoading}
+            isError={azbaAirspace.isError}
+          />
         )}
 
         {!selectedSearchTarget && selectedSiteId && (

@@ -444,6 +444,19 @@
       "deconseille": "Discouraged moment"
     }
   },
+  "airspace": {
+    "title": "Airspace constraints",
+    "azba": {
+      "clearTitle": "No RTBA/AZBA activity detected",
+      "clearMessage": "No official RTBA/AZBA activity is detected around the site for the analyzed window.",
+      "blockingTitle": "RTBA/AZBA active nearby",
+      "blockingMessage": "Official RTBA/AZBA activity is detected around the site. Treat the flight as blocked until the official information has been checked.",
+      "unknownTitle": "AZBA information unavailable",
+      "unknownMessage": "Official AZBA information could not be retrieved. Check the SIA directly before flying.",
+      "officialLink": "Open SIA",
+      "pilotReminder": "Official SIA information. Pilot verification is mandatory before flying."
+    }
+  },
   "filters": {
     "title": "Filters",
     "reset": "Reset",
