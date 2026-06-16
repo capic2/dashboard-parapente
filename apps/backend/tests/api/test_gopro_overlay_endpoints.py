@@ -1619,10 +1619,9 @@ def test_create_gopro_overlay_job_from_paths_defers_input_copy_to_worker_prepara
 
     assert prepared is not None
     assert prepared["status"] == "queued"
-    assert Path(prepared["video_path"]).parent == work_dir
+    assert Path(prepared["video_path"]) == video_path
     assert Path(prepared["gpx_path"]) == gpx_path
     assert Path(prepared["command"]["render_gpx_path"]).parent == work_dir
-    assert Path(prepared["video_path"]).read_bytes() == b"video"
     assert Path(prepared["command"]["render_gpx_path"]).read_text() == "<gpx />"
     assert prepared["video_width"] == 1920
     assert prepared["video_height"] == 1080
@@ -2000,7 +1999,7 @@ def test_run_job_prepares_inputs_before_starting_process(
     assert popen.call_args.kwargs["cwd"] == str(tmp_path / "runner-root")
     assert Path(command[command.index("--layout-xml") + 1]).parent == work_dir
     assert command[command.index("--overlay-size") + 1] == "1920x1080"
-    assert Path(command[-2]).parent == work_dir
+    assert Path(command[-2]) == video_path
     assert Path(command[-1]) == Path(job["temp_output_path"])
     assert gopro_overlay_export.get_gopro_overlay_job(job["job_id"])["status"] == "completed"
     assert Path(job["output_path"]).read_bytes() == b"video"
