@@ -1138,6 +1138,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         current_job = _update_job(
             job_id,
             status=_STATUS_PREPARING,
+            progress=5,
             message="Preparing overlay files",
         )
         if not current_job or current_job.get("status") != _STATUS_PREPARING:
@@ -1150,27 +1151,18 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         render_gpx_path = gpx_path
 
         if metadata.get("pin_inputs"):
-            _append_job_log(log_path, "Pinning overlay input files")
-            video_path = _copy_job_input(
-                video_path,
-                work_dir / f"input{video_path.suffix.lower()}",
-                _VIDEO_EXTENSIONS,
-            )
+            _append_job_log(log_path, "Pinning GPX input file")
+            _update_job(job_id, progress=7, message="Preparing GPX input")
             render_gpx_path = _copy_job_input(
                 gpx_path,
                 work_dir / f"gpx-{job_id}{gpx_path.suffix.lower()}",
                 _GPX_EXTENSIONS,
             )
-            if pip_path:
-                pip_path = _copy_job_input(
-                    pip_path,
-                    work_dir / f"pip{pip_path.suffix.lower()}",
-                    _VIDEO_EXTENSIONS,
-                )
 
         source_input_dir = Path(str(job["output_path"])).parent
         osv_paths = _matching_files_by_mtime(source_input_dir, "*.osv")
         if osv_paths:
+            _update_job(job_id, progress=10, message="Merging OSV telemetry")
             render_gpx_path = _merge_osv_files_with_gpx(
                 osv_paths,
                 render_gpx_path,
@@ -1184,6 +1176,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         _append_job_log(log_path, f"Render GPX: {render_gpx_path.name}")
 
         if pip_path:
+            _update_job(job_id, progress=15, message="Preparing PIP video")
             pip_path = _prepare_pip_video_for_overlay(
                 job_id,
                 video_path,
@@ -1196,6 +1189,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
             _append_job_log(log_path, "No PIP video configured")
 
         width, height = probe_video_resolution(video_path)
+        _update_job(job_id, progress=20, message="Preparing overlay layout")
         requested_layout_id = metadata.get("requested_layout_id")
         selected_layout = (
             _find_layout(str(requested_layout_id))
