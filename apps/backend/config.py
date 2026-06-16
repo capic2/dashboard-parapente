@@ -97,6 +97,18 @@ OPENWEATHERMAP_API_KEY = os.getenv("BACKEND_OPENWEATHERMAP_API_KEY")
 SPOTAIR_BALISES_API_KEY = os.getenv("BACKEND_SPOTAIR_BALISES_API_KEY")
 
 # ============================================================================
+# SIA AZBA / RTBA
+# ============================================================================
+AZBA_API_BASE_URL = os.getenv(
+    "BACKEND_AZBA_API_BASE_URL",
+    "https://bo-prod-sofia-vac.sia-france.fr/api/",
+)
+AZBA_API_VERSION = os.getenv("BACKEND_AZBA_API_VERSION", "v2/")
+AZBA_API_AUTH_SECRET = os.getenv("BACKEND_AZBA_API_AUTH_SECRET")
+AZBA_CACHE_TTL_SECONDS = int(os.getenv("BACKEND_AZBA_CACHE_TTL_SECONDS", "900"))
+AZBA_SITE_RADIUS_KM = float(os.getenv("BACKEND_AZBA_SITE_RADIUS_KM", "10"))
+
+# ============================================================================
 # STRAVA OAUTH
 # ============================================================================
 STRAVA_CLIENT_ID = os.getenv("BACKEND_STRAVA_CLIENT_ID")

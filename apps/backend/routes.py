@@ -37,6 +37,7 @@ from auth import (
     decode_job_token,
     get_current_user,
 )
+from azba_airspace import evaluate_site_azba_constraints, parse_optional_window
 from database import SessionLocal, get_db
 from emagram_freshness import get_emagram_cutoff_utc
 from flight_backfill import calculate_and_persist_missing_max_speed
@@ -87,6 +88,7 @@ from schemas import (
     NearbyFlightOptionsResponse,
 )
 from schemas import FlightDecisionResponse
+from schemas import AzbaAirspaceResponse
 from schemas import Site as SiteSchema
 from schemas import (
     SiteCreate,
@@ -3021,6 +3023,40 @@ async def get_flight_decision(
         },
         objective=selected_objective,
         landing_associations=associations,
+    )
+
+
+@public_router.get("/sites/{site_id}/airspace/azba", response_model=AzbaAirspaceResponse)
+async def get_site_azba_airspace(
+    site_id: str,
+    day_index: int = Query(default=0, ge=0, le=6),
+    start: str | None = Query(default=None),
+    end: str | None = Query(default=None),
+    radius_km: float | None = Query(default=None, gt=0, le=100),
+    db: Session = Depends(get_db),
+) -> AzbaAirspaceResponse:
+    """Get official SIA AZBA/RTBA constraints around a selected site."""
+    site = db.query(Site).filter(Site.id == site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    if site.latitude is None or site.longitude is None:
+        raise HTTPException(status_code=400, detail="Site has no coordinates")
+
+    try:
+        window_start, window_end = parse_optional_window(start, end, day_index)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return AzbaAirspaceResponse.model_validate(
+        await evaluate_site_azba_constraints(
+            site_id=site.id,
+            site_name=site.name,
+            site_lat=float(site.latitude),
+            site_lon=float(site.longitude),
+            start=window_start,
+            end=window_end,
+            radius_km=radius_km,
+        )
     )
 
 

@@ -186,6 +186,32 @@ class Site(SiteBase):
         from_attributes = True
 
 
+class AzbaConstraint(BaseModel):
+    id: str
+    name: str
+    valid_from: str | None = None
+    valid_to: str | None = None
+    floor: str | None = None
+    ceiling: str | None = None
+    geometry: dict[str, Any] | None = None
+    distance_km: float | None = None
+
+
+class AzbaAirspaceResponse(BaseModel):
+    site_id: str
+    site_name: str
+    status: Literal["clear", "blocking", "unknown"]
+    source: str
+    source_url: str
+    retrieved_at: str
+    valid_from: str
+    valid_to: str
+    radius_km: float
+    latest_azba_date: str | None = None
+    constraints: list[AzbaConstraint]
+    message: str | None = None
+
+
 # Landing Associations
 class LandingAssociationCreate(BaseModel):
     landing_site_id: str
