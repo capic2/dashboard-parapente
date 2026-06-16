@@ -17,6 +17,7 @@ type WeatherPageMobileProps = {
   searchResultPanel?: ReactNode;
   emptyPanel?: ReactNode;
   currentConditions?: ReactNode;
+  airspacePanel?: ReactNode;
   liveWindPanel?: ReactNode;
   landingPanel?: ReactNode;
   forecastPanel?: ReactNode;
@@ -74,6 +75,7 @@ export default function WeatherPageMobileLayout({
   searchResultPanel,
   emptyPanel,
   currentConditions,
+  airspacePanel,
   liveWindPanel,
   landingPanel,
   forecastPanel,
@@ -99,6 +101,7 @@ export default function WeatherPageMobileLayout({
 
       {emptyPanel}
       {decisionPanel}
+      {airspacePanel}
       {currentConditions}
       {searchResultPanel}
       <ExpandableSection

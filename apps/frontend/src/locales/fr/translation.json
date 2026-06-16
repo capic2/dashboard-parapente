@@ -444,6 +444,19 @@
       "deconseille": "Moment déconseillé"
     }
   },
+  "airspace": {
+    "title": "Contraintes aériennes",
+    "azba": {
+      "clearTitle": "Aucune activité RTBA/AZBA détectée",
+      "clearMessage": "Aucune activité RTBA/AZBA officielle n'est détectée autour du site sur le créneau analysé.",
+      "blockingTitle": "RTBA/AZBA active à proximité",
+      "blockingMessage": "Une activité RTBA/AZBA officielle est détectée autour du site. Le vol doit être considéré comme bloqué tant que l'information officielle n'est pas vérifiée.",
+      "unknownTitle": "Information AZBA indisponible",
+      "unknownMessage": "L'information officielle AZBA n'a pas pu être récupérée. Vérifiez directement le SIA avant de voler.",
+      "officialLink": "Voir le SIA",
+      "pilotReminder": "Information officielle SIA. Vérification pilote obligatoire avant vol."
+    }
+  },
   "filters": {
     "title": "Filtres",
     "reset": "Réinitialiser",
