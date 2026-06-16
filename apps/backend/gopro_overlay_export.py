@@ -195,24 +195,12 @@ def _merge_osv_files_with_gpx(
             log_path,
             f"Merging {len(osv_paths)} OSV file(s) into {merged_gpx_path.name}",
         )
-    merge_gpx_path = gpx_path
     first_gpx_at = _first_gpx_at_seconds(osv_paths[0], gpx_path)
-    alignment = _gpx_video_alignment(osv_paths[0], gpx_path)
-    if alignment and alignment.gpx_start < alignment.video_start:
-        trimmed_gpx_path = _trim_gpx_before_timestamp(
-            gpx_path,
-            input_dir / f"{gpx_path.stem}-from-video-start{gpx_path.suffix or '.gpx'}",
-            alignment.video_start,
-        )
-        if trimmed_gpx_path:
-            merge_gpx_path = trimmed_gpx_path
-            first_gpx_at = 0.0
-
     command = [
         "python3",
         str(merge_script),
         *(str(path) for path in osv_paths),
-        str(merge_gpx_path),
+        str(gpx_path),
         str(merged_gpx_path),
     ]
 
@@ -745,47 +733,7 @@ def _first_gpx_at_seconds(osv_path: Path, gpx_path: Path) -> float | None:
     alignment = _gpx_video_alignment(osv_path, gpx_path)
     if not alignment:
         return None
-    return max(0.0, (alignment.gpx_start - alignment.video_start).total_seconds())
-
-
-def _trim_gpx_before_timestamp(gpx_path: Path, output_path: Path, cutoff: datetime) -> Path | None:
-    try:
-        tree = ET.parse(gpx_path)
-    except (ET.ParseError, OSError):
-        return None
-
-    root = tree.getroot()
-    removed = 0
-    kept = 0
-    for parent in root.iter():
-        for child in list(parent):
-            if child.tag.rsplit("}", 1)[-1] != "trkpt":
-                continue
-            point_time = next(
-                (
-                    parsed
-                    for element in child.iter()
-                    if element.tag.rsplit("}", 1)[-1] == "time"
-                    and element.text
-                    and (parsed := _parse_utc_datetime(element.text))
-                ),
-                None,
-            )
-            if point_time and point_time < cutoff:
-                parent.remove(child)
-                removed += 1
-            else:
-                kept += 1
-
-    if removed == 0 or kept == 0:
-        return None
-
-    ET.register_namespace("", _GPX_NAMESPACE)
-    ET.register_namespace("gpxpx", _GARMIN_GPX_EXTENSION_NAMESPACE)
-    ET.register_namespace("xsi", _XSI_NAMESPACE)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    tree.write(output_path, encoding="utf-8", xml_declaration=True)
-    return output_path
+    return abs((alignment.video_start - alignment.gpx_start).total_seconds())
 
 
 def probe_video_start_time(video_path: Path) -> datetime | None:

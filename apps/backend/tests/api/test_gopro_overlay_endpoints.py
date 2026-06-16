@@ -659,7 +659,7 @@ def test_worker_merge_osv_files_with_gpx_passes_first_gpx_at_from_osv_start(
     assert command[2:4] == ["--first-gpx-at", "10.000"]
 
 
-def test_worker_merge_osv_files_with_gpx_trims_gpx_when_video_starts_after_gpx(
+def test_worker_merge_osv_files_with_gpx_keeps_source_gpx_when_video_starts_after_gpx(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -706,12 +706,8 @@ def test_worker_merge_osv_files_with_gpx_trims_gpx_when_video_starts_after_gpx(
 
     assert result == merged_gpx_path
     command = run.call_args.args[0]
-    assert command[2:4] == ["--first-gpx-at", "0.000"]
-    trimmed_gpx_path = Path(command[-2])
-    assert trimmed_gpx_path != source_gpx
-    trimmed_gpx = trimmed_gpx_path.read_text()
-    assert "2026-06-13T08:20:33Z" not in trimmed_gpx
-    assert "2026-06-13T08:20:34Z" in trimmed_gpx
+    assert command[2:4] == ["--first-gpx-at", "8.000"]
+    assert Path(command[-2]) == source_gpx
 
 
 def test_gopro_overlay_output_resolution_is_rescaled_when_needed(tmp_path, monkeypatch) -> None:
