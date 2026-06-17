@@ -164,7 +164,7 @@ jobs:
 
       - name: Verify GoPro overlay build context
         env:
-          GOPRO_OVERLAY_BUILD_CONTEXT: ${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT }}
+          GOPRO_OVERLAY_BUILD_CONTEXT: ${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT || 'https://github.com/capic2/gopro-dashboard-overlay.git#main' }}
         run: |
           if [ -z "$GOPRO_OVERLAY_BUILD_CONTEXT" ]; then
             echo "Missing repository variable GOPRO_OVERLAY_BUILD_CONTEXT"
@@ -193,7 +193,7 @@ jobs:
           build-args: |
             VITE_CESIUM_ION_TOKEN=${{ secrets.VITE_CESIUM_ION_TOKEN }}
           build-contexts: |
-            gopro-overlay-src=${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT }}
+            gopro-overlay-src=${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT || 'https://github.com/capic2/gopro-dashboard-overlay.git#main' }}
           tags: |
             ghcr.io/${{ github.repository }}/backend:${{ steps.version.outputs.version }}
             ghcr.io/${{ github.repository }}/backend:main
