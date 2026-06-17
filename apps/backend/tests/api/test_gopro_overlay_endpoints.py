@@ -610,7 +610,7 @@ def test_worker_merge_osv_files_with_gpx_writes_log_steps(
     assert any("Created merged GPX" in line for line in log_lines)
 
 
-def test_worker_merge_osv_files_with_gpx_passes_first_gpx_at_from_osv_start(
+def test_worker_merge_osv_files_with_gpx_uses_absolute_timestamps_without_forced_offset(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -656,7 +656,7 @@ def test_worker_merge_osv_files_with_gpx_passes_first_gpx_at_from_osv_start(
     assert result == merged_gpx_path
     assert merged_gpx_path.read_text() == "<gpx>merged</gpx>"
     command = run.call_args.args[0]
-    assert command[2:4] == ["--first-gpx-at", "10.000"]
+    assert "--first-gpx-at" not in command
 
 
 def test_worker_merge_osv_files_with_gpx_keeps_source_gpx_when_video_starts_after_gpx(
@@ -706,7 +706,7 @@ def test_worker_merge_osv_files_with_gpx_keeps_source_gpx_when_video_starts_afte
 
     assert result == merged_gpx_path
     command = run.call_args.args[0]
-    assert command[2:4] == ["--first-gpx-at", "8.000"]
+    assert "--first-gpx-at" not in command
     assert Path(command[-2]) == source_gpx
 
 
