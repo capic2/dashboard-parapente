@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       additional_contexts:
-        gopro-overlay-src: ${GOPRO_OVERLAY_HOST_DIR:?GOPRO_OVERLAY_HOST_DIR is required}
+        gopro-overlay-src: ${GOPRO_OVERLAY_BUILD_CONTEXT:-https://github.com/capic2/gopro-dashboard-overlay.git#main}
       args:
         - VITE_CESIUM_ION_TOKEN=${VITE_CESIUM_ION_TOKEN:?required}
     image: parapente-backend:nx-latest
