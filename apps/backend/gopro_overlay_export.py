@@ -195,7 +195,6 @@ def _merge_osv_files_with_gpx(
             log_path,
             f"Merging {len(osv_paths)} OSV file(s) into {merged_gpx_path.name}",
         )
-    first_gpx_at = _first_gpx_at_seconds(osv_paths[0], gpx_path)
     command = [
         "python3",
         str(merge_script),
@@ -203,9 +202,6 @@ def _merge_osv_files_with_gpx(
         str(gpx_path),
         str(merged_gpx_path),
     ]
-
-    if first_gpx_at is not None:
-        command[2:2] = ["--first-gpx-at", f"{first_gpx_at:.3f}"]
 
     try:
         result = subprocess.run(
@@ -727,13 +723,6 @@ def _gpx_video_alignment(osv_path: Path, gpx_path: Path) -> GpxVideoAlignment | 
         gpx_start=gpx_start,
         gpx_end=gpx_end,
     )
-
-
-def _first_gpx_at_seconds(osv_path: Path, gpx_path: Path) -> float | None:
-    alignment = _gpx_video_alignment(osv_path, gpx_path)
-    if not alignment:
-        return None
-    return abs((alignment.video_start - alignment.gpx_start).total_seconds())
 
 
 def probe_video_start_time(video_path: Path) -> datetime | None:
