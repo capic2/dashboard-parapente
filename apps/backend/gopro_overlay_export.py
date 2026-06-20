@@ -364,7 +364,10 @@ def _job_preparation_metadata(
 
 def _gpx_offset_from_command_metadata(command: Any) -> float:
     if isinstance(command, dict):
-        return float(command.get("gpx_offset") or 0.0)
+        try:
+            return float(command.get("gpx_offset") or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
     if isinstance(command, list) and "--gpx-offset" in command:
         try:
             return float(command[command.index("--gpx-offset") + 1])
@@ -1182,7 +1185,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         )
         if not prepared_job or prepared_job.get("status") != _STATUS_QUEUED:
             return None
-        prepared_job["gpx_offset"] = float(command_metadata.get("gpx_offset") or 0.0)
+        prepared_job["gpx_offset"] = _gpx_offset_from_command_metadata(command_metadata)
         prepared_job["command"] = command_metadata
         _append_job_log(log_path, "Overlay queued")
         return prepared_job

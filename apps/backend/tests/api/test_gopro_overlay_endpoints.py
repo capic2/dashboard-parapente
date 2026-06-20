@@ -99,6 +99,28 @@ def test_create_gopro_overlay_job_passes_uploaded_files(client: TestClient):
     assert create_job.call_args.kwargs["pip_file"] is not None
 
 
+@pytest.mark.parametrize("gpx_offset", ["nan", "inf", "-inf"])
+def test_create_gopro_overlay_job_rejects_non_finite_gpx_offset(
+    client: TestClient, gpx_offset: str
+):
+    response = client.post(
+        f"{API_PREFIX}/gopro-overlays/jobs",
+        files={
+            "video_file": ("flight.mp4", b"video", "video/mp4"),
+            "gpx_file": ("flight.gpx", b"<gpx />", "application/gpx+xml"),
+        },
+        data={"gpx_offset": gpx_offset},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "gpx_offset must be a finite number"
+
+
+def test_gpx_offset_from_command_metadata_defaults_malformed_values():
+    assert gopro_overlay_export._gpx_offset_from_command_metadata({"gpx_offset": "bad"}) == 0.0
+    assert gopro_overlay_export._gpx_offset_from_command_metadata({"gpx_offset": None}) == 0.0
+
+
 def test_gopro_overlay_job_access_status_accepts_job_token(client: TestClient):
     token = create_job_token(purpose="gopro_overlay", job_id="job-gopro")
     expected = {
@@ -185,6 +207,21 @@ def test_create_flight_gopro_overlay_job_uses_flight_files(
     assert create_job.call_args.kwargs["pip_file"] is not None
     assert create_job.call_args.kwargs["output_filename"] == "Arguel test-overlay.mp4"
     assert create_job.call_args.kwargs["output_dir"] == str(output_dir)
+
+
+@pytest.mark.parametrize("gpx_offset", ["nan", "inf", "-inf"])
+def test_create_flight_gopro_overlay_job_rejects_non_finite_gpx_offset(
+    client: TestClient,
+    sample_flight,
+    gpx_offset: str,
+):
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay",
+        data={"gpx_offset": gpx_offset},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "gpx_offset must be a finite number"
 
 
 def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
