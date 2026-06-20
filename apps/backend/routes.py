@@ -339,6 +339,11 @@ def _job_progress(job: dict[str, Any] | None) -> int | None:
     return max(0, min(100, round(progress)))
 
 
+def _validate_gpx_offset(gpx_offset: float) -> None:
+    if not math.isfinite(gpx_offset):
+        raise HTTPException(status_code=422, detail="gpx_offset must be a finite number")
+
+
 def _flight_video_export_progress(flight: Flight) -> int | None:
     return _flight_video_export_state(None, flight)["progress"]
 
@@ -5459,9 +5464,11 @@ async def create_flight_gopro_overlay_job(
     output_dir: str | None = Form(None),
     layout_id: str | None = Form(None),
     output_filename: str | None = Form(None),
+    gpx_offset: float = Form(0.0),
     db: Session = Depends(get_db),
 ) -> GoproOverlayJob:
     """Create a GoPro overlay render job from provided media and the flight GPX fallback."""
+    _validate_gpx_offset(gpx_offset)
     dependencies = check_gopro_overlay_dependencies()
     missing = [name for name, available in dependencies.items() if not available]
     if missing:
@@ -5533,6 +5540,7 @@ async def create_flight_gopro_overlay_job(
                 layout_id=layout_id,
                 output_filename=resolved_output_filename,
                 output_dir=resolved_output_dir,
+                gpx_offset=gpx_offset,
             )
             _mark_flight_gopro_overlay_job(db, flight, job)
             return _with_gopro_overlay_job_token(job)
@@ -5561,6 +5569,7 @@ async def create_flight_gopro_overlay_job(
             output_filename=resolved_output_filename,
             output_dir=resolved_output_dir,
             pin_inputs=pin_overlay_inputs,
+            gpx_offset=gpx_offset,
         )
         _mark_flight_gopro_overlay_job(db, flight, job)
         return _with_gopro_overlay_job_token(job)
@@ -5611,8 +5620,10 @@ async def create_gopro_overlay_render_job(
     pip_file: UploadFile | None = File(None),
     layout_id: str | None = Form(None),
     output_filename: str | None = Form(None),
+    gpx_offset: float = Form(0.0),
 ) -> GoproOverlayJob:
     """Create a GoPro overlay render job from uploaded video, GPX, and optional PIP video."""
+    _validate_gpx_offset(gpx_offset)
     dependencies = check_gopro_overlay_dependencies()
     missing = [name for name, available in dependencies.items() if not available]
     if missing:
@@ -5628,6 +5639,7 @@ async def create_gopro_overlay_render_job(
             pip_file=pip_file,
             layout_id=layout_id,
             output_filename=output_filename,
+            gpx_offset=gpx_offset,
         )
         return _with_gopro_overlay_job_token(job)
     except ValueError as exc:

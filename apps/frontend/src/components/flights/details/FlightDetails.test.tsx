@@ -82,6 +82,8 @@ vi.mock('react-i18next', () => ({
         'flights.goproOverlayRegenerateShort': 'Regenerate overlay',
         'flights.goproOverlayGenerate': 'Generate overlay',
         'flights.goproOverlayGenerateShort': 'Generate overlay',
+        'flights.goproOverlayGpxOffsetLabel': 'GPX offset (seconds)',
+        'flights.goproOverlayGpxOffsetHint': 'Offset hint',
         'flights.goproOverlayStarted': 'Overlay started',
         'flights.goproOverlayCancelled': 'Overlay cancelled',
         'flights.goproOverlayStartError': 'Overlay start error',
@@ -198,6 +200,27 @@ describe('FlightDetails GoPro overlay action', () => {
     });
   });
 
+
+  it('passes the GPX offset when starting overlay generation', async () => {
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText('GPX offset (seconds)'), {
+      target: { value: '2.5' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Generate overlay/u }));
+
+    await waitFor(() => {
+      expect(createOverlayMock).toHaveBeenCalled();
+    });
+    const formData = createOverlayMock.mock.calls[0][0] as FormData;
+    expect(formData.get('gpx_offset')).toBe('2.5');
+  });
   it('regenerates overlay after cancellation', async () => {
     mockFlight.gopro_overlay_job_id = 'job-overlay';
     mockFlight.gopro_overlay_status = 'cancelled';

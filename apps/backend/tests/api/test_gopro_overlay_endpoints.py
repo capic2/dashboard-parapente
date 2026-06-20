@@ -82,7 +82,11 @@ def test_create_gopro_overlay_job_passes_uploaded_files(client: TestClient):
                 "gpx_file": ("flight.gpx", b"<gpx />", "application/gpx+xml"),
                 "pip_file": ("pip.mp4", b"pip", "video/mp4"),
             },
-            data={"layout_id": "parapente-1080", "output_filename": "flight-overlay.mp4"},
+            data={
+                "layout_id": "parapente-1080",
+                "output_filename": "flight-overlay.mp4",
+                "gpx_offset": "2.5",
+            },
         )
 
     assert response.status_code == 200
@@ -91,7 +95,30 @@ def test_create_gopro_overlay_job_passes_uploaded_files(client: TestClient):
     assert response.json()["job_token"]
     assert create_job.call_args.kwargs["layout_id"] == "parapente-1080"
     assert create_job.call_args.kwargs["output_filename"] == "flight-overlay.mp4"
+    assert create_job.call_args.kwargs["gpx_offset"] == 2.5
     assert create_job.call_args.kwargs["pip_file"] is not None
+
+
+@pytest.mark.parametrize("gpx_offset", ["nan", "inf", "-inf"])
+def test_create_gopro_overlay_job_rejects_non_finite_gpx_offset(
+    client: TestClient, gpx_offset: str
+):
+    response = client.post(
+        f"{API_PREFIX}/gopro-overlays/jobs",
+        files={
+            "video_file": ("flight.mp4", b"video", "video/mp4"),
+            "gpx_file": ("flight.gpx", b"<gpx />", "application/gpx+xml"),
+        },
+        data={"gpx_offset": gpx_offset},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "gpx_offset must be a finite number"
+
+
+def test_gpx_offset_from_command_metadata_defaults_malformed_values():
+    assert gopro_overlay_export._gpx_offset_from_command_metadata({"gpx_offset": "bad"}) == 0.0
+    assert gopro_overlay_export._gpx_offset_from_command_metadata({"gpx_offset": None}) == 0.0
 
 
 def test_gopro_overlay_job_access_status_accepts_job_token(client: TestClient):
@@ -180,6 +207,21 @@ def test_create_flight_gopro_overlay_job_uses_flight_files(
     assert create_job.call_args.kwargs["pip_file"] is not None
     assert create_job.call_args.kwargs["output_filename"] == "Arguel test-overlay.mp4"
     assert create_job.call_args.kwargs["output_dir"] == str(output_dir)
+
+
+@pytest.mark.parametrize("gpx_offset", ["nan", "inf", "-inf"])
+def test_create_flight_gopro_overlay_job_rejects_non_finite_gpx_offset(
+    client: TestClient,
+    sample_flight,
+    gpx_offset: str,
+):
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay",
+        data={"gpx_offset": gpx_offset},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "gpx_offset must be a finite number"
 
 
 def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
@@ -1972,6 +2014,7 @@ def test_run_job_prepares_inputs_before_starting_process(
         pip_path=None,
         layout_id="parapente-1080",
         output_filename="overlay.mp4",
+        gpx_offset=-1.5,
     )
     work_dir = tmp_path / ".gopro-overlay-work" / job["job_id"]
 
@@ -1995,6 +2038,7 @@ def test_run_job_prepares_inputs_before_starting_process(
     assert popen.call_args.kwargs["cwd"] == str(tmp_path / "runner-root")
     assert Path(command[command.index("--layout-xml") + 1]).parent == work_dir
     assert command[command.index("--overlay-size") + 1] == "1920x1080"
+    assert command[command.index("--gpx-offset") + 1] == "-1.5"
     assert Path(command[-2]) == video_path
     assert Path(command[-1]) == Path(job["temp_output_path"])
     assert gopro_overlay_export.get_gopro_overlay_job(job["job_id"])["status"] == "completed"
