@@ -5459,6 +5459,7 @@ async def create_flight_gopro_overlay_job(
     output_dir: str | None = Form(None),
     layout_id: str | None = Form(None),
     output_filename: str | None = Form(None),
+    gpx_offset: float = Form(0.0),
     db: Session = Depends(get_db),
 ) -> GoproOverlayJob:
     """Create a GoPro overlay render job from provided media and the flight GPX fallback."""
@@ -5533,6 +5534,7 @@ async def create_flight_gopro_overlay_job(
                 layout_id=layout_id,
                 output_filename=resolved_output_filename,
                 output_dir=resolved_output_dir,
+                gpx_offset=gpx_offset,
             )
             _mark_flight_gopro_overlay_job(db, flight, job)
             return _with_gopro_overlay_job_token(job)
@@ -5561,6 +5563,7 @@ async def create_flight_gopro_overlay_job(
             output_filename=resolved_output_filename,
             output_dir=resolved_output_dir,
             pin_inputs=pin_overlay_inputs,
+            gpx_offset=gpx_offset,
         )
         _mark_flight_gopro_overlay_job(db, flight, job)
         return _with_gopro_overlay_job_token(job)
@@ -5611,6 +5614,7 @@ async def create_gopro_overlay_render_job(
     pip_file: UploadFile | None = File(None),
     layout_id: str | None = Form(None),
     output_filename: str | None = Form(None),
+    gpx_offset: float = Form(0.0),
 ) -> GoproOverlayJob:
     """Create a GoPro overlay render job from uploaded video, GPX, and optional PIP video."""
     dependencies = check_gopro_overlay_dependencies()
@@ -5628,6 +5632,7 @@ async def create_gopro_overlay_render_job(
             pip_file=pip_file,
             layout_id=layout_id,
             output_filename=output_filename,
+            gpx_offset=gpx_offset,
         )
         return _with_gopro_overlay_job_token(job)
     except ValueError as exc:

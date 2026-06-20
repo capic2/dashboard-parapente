@@ -77,6 +77,7 @@ export function FlightDetails({
   >(null);
   const [isCancellingGoproOverlay, setIsCancellingGoproOverlay] =
     useState(false);
+  const [goproOverlayGpxOffset, setGoproOverlayGpxOffset] = useState('0');
   const [downloadingMedia, setDownloadingMedia] =
     useState<DownloadableFlightMedia | null>(null);
 
@@ -138,6 +139,7 @@ export function FlightDetails({
     setGoproOverlayJobId(null);
     setGoproOverlayJobToken(null);
     setIsCancellingGoproOverlay(false);
+    setGoproOverlayGpxOffset('0');
     setDownloadingMedia(null);
     resetGoproOverlayJob();
   }, [flight.id, resetGoproOverlayJob]);
@@ -245,6 +247,10 @@ export function FlightDetails({
 
     const requestedFlightId = flight.id;
     const formData = new FormData();
+    const normalizedGpxOffset = goproOverlayGpxOffset.trim();
+    if (normalizedGpxOffset) {
+      formData.append('gpx_offset', normalizedGpxOffset);
+    }
 
     try {
       const job = await createGoproOverlayJob.mutateAsync(formData);
@@ -450,25 +456,50 @@ export function FlightDetails({
             />
           </div>
 
-          <div className="flex flex-wrap gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
-            <Button
-              variant="ghost"
-              className="min-h-10 rounded-lg px-3 py-2 text-sm"
-              onPress={() => setEditingMode(true)}
-              aria-label={t('flights.editFlight')}
-            >
-              <Edit3 className="h-4 w-4" aria-hidden="true" />
-              {t('flights.editButton')}
-            </Button>
-            <Button
-              variant="ghost"
-              className="min-h-10 rounded-lg px-3 py-2 text-sm"
-              onPress={() => fileInputRef.current?.click()}
-              isDisabled={uploadGPXMutation.isPending}
-            >
-              <FileUp className="h-4 w-4" aria-hidden="true" />
-              {gpxUploadLabel}
-            </Button>
+          <div className="border-t border-gray-200 pt-3 dark:border-gray-700">
+            <label className="mb-3 flex max-w-xs flex-col gap-1 text-sm text-gray-700 dark:text-gray-200">
+              <span className="font-medium">
+                {t('flights.goproOverlayGpxOffsetLabel')}
+              </span>
+              <input
+                type="number"
+                step="0.1"
+                value={goproOverlayGpxOffset}
+                onChange={(event) =>
+                  setGoproOverlayGpxOffset(event.currentTarget.value)
+                }
+                disabled={isGoproOverlayRunning || createGoproOverlayJob.isPending}
+                className="min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                aria-describedby="gopro-overlay-gpx-offset-hint"
+              />
+              <span
+                id="gopro-overlay-gpx-offset-hint"
+                className="text-xs text-gray-500 dark:text-gray-400"
+              >
+                {t('flights.goproOverlayGpxOffsetHint')}
+              </span>
+            </label>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="ghost"
+                className="min-h-10 rounded-lg px-3 py-2 text-sm"
+                onPress={() => setEditingMode(true)}
+                aria-label={t('flights.editFlight')}
+              >
+                <Edit3 className="h-4 w-4" aria-hidden="true" />
+                {t('flights.editButton')}
+              </Button>
+              <Button
+                variant="ghost"
+                className="min-h-10 rounded-lg px-3 py-2 text-sm"
+                onPress={() => fileInputRef.current?.click()}
+                isDisabled={uploadGPXMutation.isPending}
+              >
+                <FileUp className="h-4 w-4" aria-hidden="true" />
+                {gpxUploadLabel}
+              </Button>
+            </div>
           </div>
 
           <input

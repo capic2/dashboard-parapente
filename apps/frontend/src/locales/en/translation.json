@@ -942,6 +942,8 @@
     "goproOverlayDownload": "Download overlay",
     "goproOverlayDownloadShort": "Download",
     "goproOverlayGenerateTitle": "Generate a GoPro overlay video for this flight",
+    "goproOverlayGpxOffsetLabel": "GPX offset (seconds)",
+    "goproOverlayGpxOffsetHint": "Positive values delay the GPX track; negative values advance it.",
     "goproOverlayCanProvideGpx": "Provide a GPX in the next step or add one to the flight",
     "goproOverlayNeedsGpx": "Add a GPX to this flight before generating the overlay",
     "goproOverlayNeedsVideo": "Generate the flight video before adding the overlay",

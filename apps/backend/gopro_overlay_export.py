@@ -349,12 +349,28 @@ def _copy_job_input(source: Path, destination: Path, allowed_extensions: set[str
     return destination
 
 
-def _job_preparation_metadata(pin_inputs: bool, requested_layout_id: str | None) -> dict[str, Any]:
+def _job_preparation_metadata(
+    pin_inputs: bool,
+    requested_layout_id: str | None,
+    gpx_offset: float = 0.0,
+) -> dict[str, Any]:
     return {
         "prepare_overlay_inputs": True,
         "pin_inputs": pin_inputs,
         "requested_layout_id": requested_layout_id,
+        "gpx_offset": gpx_offset,
     }
+
+
+def _gpx_offset_from_command_metadata(command: Any) -> float:
+    if isinstance(command, dict):
+        return float(command.get("gpx_offset") or 0.0)
+    if isinstance(command, list) and "--gpx-offset" in command:
+        try:
+            return float(command[command.index("--gpx-offset") + 1])
+        except (IndexError, TypeError, ValueError):
+            return 0.0
+    return 0.0
 
 
 def _append_job_log(log_path: Path, message: str) -> None:
@@ -368,6 +384,7 @@ def _append_job_log(log_path: Path, message: str) -> None:
 
 
 def _job_to_payload(job: GoproOverlayJob, include_command: bool = False) -> dict[str, Any]:
+    command = json.loads(job.command_json) if job.command_json else None
     payload = {
         "job_id": job.id,
         "status": job.status,
@@ -389,12 +406,13 @@ def _job_to_payload(job: GoproOverlayJob, include_command: bool = False) -> dict
         ),
         "video_width": job.video_width,
         "video_height": job.video_height,
+        "gpx_offset": _gpx_offset_from_command_metadata(command),
         "created_at": _to_iso(job.created_at),
         "updated_at": _to_iso(job.updated_at),
         "completed_at": _to_iso(job.completed_at),
     }
     if include_command:
-        payload["command"] = json.loads(job.command_json) if job.command_json else None
+        payload["command"] = command
     return payload
 
 
@@ -1164,6 +1182,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         )
         if not prepared_job or prepared_job.get("status") != _STATUS_QUEUED:
             return None
+        prepared_job["gpx_offset"] = float(command_metadata.get("gpx_offset") or 0.0)
         prepared_job["command"] = command_metadata
         _append_job_log(log_path, "Overlay queued")
         return prepared_job
@@ -1299,6 +1318,7 @@ async def create_gopro_overlay_job(
     fallback_pip_path: Path | None = None,
     output_dir: str | None = None,
     pin_inputs: bool = False,
+    gpx_offset: float = 0.0,
 ) -> dict[str, Any]:
     job_id = str(uuid.uuid4())
     job_upload_dir = _uploaded_job_work_dir(job_id)
@@ -1341,6 +1361,7 @@ async def create_gopro_overlay_job(
             work_dir=job_upload_dir,
             output_dir=output_dir,
             pin_inputs=pin_inputs,
+            gpx_offset=gpx_offset,
         )
     except Exception:
         shutil.rmtree(job_upload_dir, ignore_errors=True)
@@ -1354,6 +1375,7 @@ def create_gopro_overlay_job_from_paths(
     layout_id: str | None,
     output_filename: str | None,
     output_dir: str | None = None,
+    gpx_offset: float = 0.0,
 ) -> dict[str, Any]:
     _validate_file_extension(video_path, _VIDEO_EXTENSIONS)
     _validate_file_extension(gpx_path, _GPX_EXTENSIONS)
@@ -1374,6 +1396,7 @@ def create_gopro_overlay_job_from_paths(
             work_dir=work_dir,
             pin_inputs=True,
             output_dir=output_dir,
+            gpx_offset=gpx_offset,
         )
     except Exception:
         shutil.rmtree(work_dir, ignore_errors=True)
@@ -1390,6 +1413,7 @@ def _create_gopro_overlay_job_from_paths(
     work_dir: Path,
     pin_inputs: bool = False,
     output_dir: str | None = None,
+    gpx_offset: float = 0.0,
 ) -> dict[str, Any]:
     output_name = _safe_filename(output_filename, f"gopro-overlay-{job_id}.mp4")
     if Path(output_name).suffix.lower() != ".mp4":
@@ -1410,6 +1434,7 @@ def _create_gopro_overlay_job_from_paths(
     preparation_metadata = _job_preparation_metadata(
         pin_inputs=pin_inputs,
         requested_layout_id=layout_id,
+        gpx_offset=gpx_offset,
     )
 
     now = _utc_now_dt()
@@ -1465,6 +1490,7 @@ def _create_gopro_overlay_job_from_paths(
             "log_path": str(log_path),
             "video_width": None,
             "video_height": None,
+            "gpx_offset": gpx_offset,
             "created_at": _utc_now(),
             "updated_at": _utc_now(),
             "completed_at": None,
@@ -1489,6 +1515,7 @@ def _create_gopro_overlay_job_from_paths(
         "log_path": str(log_path),
         "video_width": None,
         "video_height": None,
+        "gpx_offset": gpx_offset,
         "created_at": _utc_now(),
         "updated_at": _utc_now(),
         "completed_at": None,
@@ -1536,6 +1563,9 @@ def _run_job(job_id: str) -> None:
         command.extend(["--font", config.GOPRO_OVERLAY_FONT])
     if job.get("video_width") and job.get("video_height"):
         command.extend(["--overlay-size", f"{job['video_width']}x{job['video_height']}"])
+    gpx_offset = float(job.get("gpx_offset") or 0.0)
+    if gpx_offset:
+        command.extend(["--gpx-offset", str(gpx_offset)])
     if job.get("pip_path"):
         command.extend(["--video", f"pip={job['pip_path']}"])
     output_path = Path(job["output_path"])
