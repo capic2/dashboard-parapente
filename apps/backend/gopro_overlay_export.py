@@ -171,6 +171,7 @@ def _merge_osv_files_with_gpx(
     gpx_path: Path,
     input_dir: Path,
     log_path: Path | None = None,
+    gpx_offset: float = 0.0,
 ) -> Path:
     if not osv_paths:
         return gpx_path
@@ -198,6 +199,7 @@ def _merge_osv_files_with_gpx(
     command = [
         "python3",
         str(merge_script),
+        *(["--gpx-offset", str(gpx_offset)] if gpx_offset else []),
         *(str(path) for path in osv_paths),
         str(gpx_path),
         str(merged_gpx_path),
@@ -1126,6 +1128,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 render_gpx_path,
                 work_dir,
                 log_path=log_path,
+                gpx_offset=_gpx_offset_from_command_metadata(command_metadata),
             )
         else:
             _append_job_log(log_path, "No OSV files found; using GPX directly")
@@ -1566,9 +1569,6 @@ def _run_job(job_id: str) -> None:
         command.extend(["--font", config.GOPRO_OVERLAY_FONT])
     if job.get("video_width") and job.get("video_height"):
         command.extend(["--overlay-size", f"{job['video_width']}x{job['video_height']}"])
-    gpx_offset = float(job.get("gpx_offset") or 0.0)
-    if gpx_offset:
-        command.extend(["--gpx-offset", str(gpx_offset)])
     if job.get("pip_path"):
         command.extend(["--video", f"pip={job['pip_path']}"])
     output_path = Path(job["output_path"])
