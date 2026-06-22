@@ -15,6 +15,7 @@ import {
   useUpdateFlight,
   useUploadGPXToFlight,
 } from '../../../hooks/flights/useFlights';
+import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
 import {
   useCreateFlightGoproOverlayJob,
   useGoproOverlayJobStream,
@@ -30,6 +31,7 @@ import type { Flight, FlightFormData, Site } from '../../../types';
 import { FlightEditForm } from '../edit/FlightEditForm';
 import { formatMediaProgressLabel } from '../table/mediaProgress';
 import type { DownloadableFlightMedia } from './FlightDetails.types';
+import { FlightGenerationLogsPanel } from './FlightGenerationLogsPanel';
 import { FlightMediaBadges } from './FlightMediaBadges';
 import { FlightMediaExportActions } from './FlightMediaExportActions';
 import { FlightNotesSection } from './FlightNotesSection';
@@ -91,7 +93,12 @@ export function FlightDetails({
     effectiveGoproOverlayJobId,
     goproOverlayJobToken
   );
-  const goproOverlayJob = streamedGoproOverlayJob ?? createGoproOverlayJob.data;
+  const goproOverlayJob =
+    streamedGoproOverlayJob ?? createGoproOverlayJob.data ?? null;
+  const { status: videoExportStatus } = useVideoExportStatus(
+    flight.video_export_job_id,
+    Boolean(flight.video_export_job_id)
+  );
   const goproOverlayStatus =
     goproOverlayJob?.status ?? flight.gopro_overlay_status ?? null;
   const isGoproOverlayRunning = isGoproOverlayInProgress(goproOverlayStatus);
@@ -521,6 +528,14 @@ export function FlightDetails({
               onDownload={handleDownloadGoproOverlay}
             />
           )}
+          <FlightGenerationLogsPanel
+            videoStatus={videoExportStatus}
+            videoFallbackStatus={flight.video_export_status}
+            videoFallbackProgress={flight.video_export_progress}
+            goproOverlayJob={goproOverlayJob}
+            goproOverlayFallbackStatus={flight.gopro_overlay_status}
+            goproOverlayFallbackProgress={flight.gopro_overlay_progress}
+          />
           <FlightStatsGrid flight={flight} sites={sites} />
           <FlightNotesSection
             notes={flight.notes}

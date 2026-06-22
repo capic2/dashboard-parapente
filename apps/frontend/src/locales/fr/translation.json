@@ -977,10 +977,35 @@
     "goproOverlayAutoValue": "Valeur automatique",
     "goproOverlayStatus": {
       "queued": "En attente",
+      "preparing": "Préparation",
       "running": "En cours",
       "completed": "Terminé",
       "failed": "Erreur",
       "cancelled": "Annulé"
+    },
+    "generationLogs": {
+      "title": "Logs de génération",
+      "description": "Suivi lisible des deux traitements média liés à ce vol.",
+      "videoTitle": "Vidéo du vol",
+      "goproOverlayTitle": "Overlay GoPro",
+      "progress": "Progression",
+      "error": "Erreur",
+      "rawLogs": "Logs bruts",
+      "noLogs": "Aucun log disponible pour le moment.",
+      "noRawLogs": "Aucun log brut disponible ; seul le message courant est exposé.",
+      "status": {
+        "queued": "En attente",
+        "processing": "En cours",
+        "started": "Démarré",
+        "running": "En cours",
+        "initializing": "Initialisation",
+        "capturing": "Capture",
+        "encoding": "Encodage",
+        "preparing": "Préparation",
+        "completed": "Terminé",
+        "failed": "Erreur",
+        "cancelled": "Annulé"
+      }
     },
     "videoProductionActions": "Production vidéo",
     "flightFileActions": "Vol & fichiers",

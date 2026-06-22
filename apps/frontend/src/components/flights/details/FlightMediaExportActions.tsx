@@ -36,6 +36,12 @@ export function FlightMediaExportActions({
   onGoproOverlayAction,
 }: FlightMediaExportActionsProps) {
   const { t } = useTranslation();
+  let goproOverlayVariant: 'danger' | 'warning' | 'outline' = 'outline';
+  if (isGoproOverlayRunning) {
+    goproOverlayVariant = 'danger';
+  } else if (canRegenerateGoproOverlay) {
+    goproOverlayVariant = 'warning';
+  }
 
   return (
     <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-900/50 sm:w-auto sm:min-w-80">
@@ -59,6 +65,7 @@ export function FlightMediaExportActions({
             compact
             showModeSelector={false}
             showCancelAction={false}
+            showLogsPanel={false}
           />
         ) : (
           <Button
@@ -72,13 +79,7 @@ export function FlightMediaExportActions({
           </Button>
         )}
         <Button
-          variant={
-            isGoproOverlayRunning
-              ? 'danger'
-              : canRegenerateGoproOverlay
-                ? 'warning'
-                : 'outline'
-          }
+          variant={goproOverlayVariant}
           className={`min-h-10 w-full rounded-lg px-3 py-2 text-sm ${
             isGoproOverlayRunning || canRegenerateGoproOverlay
               ? ''

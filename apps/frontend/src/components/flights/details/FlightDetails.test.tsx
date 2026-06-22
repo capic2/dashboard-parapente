@@ -10,12 +10,14 @@ const {
   mockFlight,
   overlayJobStreamMock,
   resetOverlayMock,
+  videoStatusMock,
 } = vi.hoisted(() => ({
   apiDelete: vi.fn(),
   confirmMock: vi.fn(),
   createOverlayMock: vi.fn(),
   resetOverlayMock: vi.fn(),
   overlayJobStreamMock: { current: null as unknown },
+  videoStatusMock: { current: null as unknown },
   mockFlight: {
     id: 'flight-1',
     flight_date: '2026-03-15',
@@ -90,6 +92,18 @@ vi.mock('react-i18next', () => ({
         'flights.goproOverlayCancelError': 'Overlay cancel error',
         'flights.goproOverlayNeedsVideo': 'Needs video',
         'flights.goproOverlayNeedsCameraVideo': 'Needs camera video',
+        'flights.generationLogs.title': 'Generation logs',
+        'flights.generationLogs.description': 'Media job tracking',
+        'flights.generationLogs.videoTitle': 'Flight video',
+        'flights.generationLogs.goproOverlayTitle': 'GoPro overlay',
+        'flights.generationLogs.progress': 'Progress',
+        'flights.generationLogs.error': 'Error',
+        'flights.generationLogs.rawLogs': 'Raw logs',
+        'flights.generationLogs.noLogs': 'No logs yet.',
+        'flights.generationLogs.noRawLogs': 'No raw logs.',
+        'flights.generationLogs.status.running': 'Running',
+        'flights.generationLogs.status.encoding': 'Encoding',
+        'flights.generationLogs.status.failed': 'Failed',
       })[key] ?? key,
   }),
 }));
@@ -101,6 +115,10 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('../../../hooks/flights/useFlights', () => ({
   useUpdateFlight: () => ({ mutateAsync: vi.fn() }),
   useUploadGPXToFlight: () => ({ isPending: false, mutate: vi.fn() }),
+}));
+
+vi.mock('../../../hooks/flights/useVideoExportStatus', () => ({
+  useVideoExportStatus: () => ({ status: videoStatusMock.current }),
 }));
 
 vi.mock('../../../hooks/gopro/useGoproOverlay', () => ({
@@ -121,7 +139,8 @@ vi.mock('../../../lib/api', () => ({
   api: {
     delete: apiDelete,
   },
-  getApiErrorMessage: async (_error: unknown, fallback: string) => fallback,
+  getApiErrorMessage: (_error: unknown, fallback: string) =>
+    Promise.resolve(fallback),
 }));
 
 vi.mock('../../../stores/appSettingsStore', () => ({
@@ -156,9 +175,14 @@ describe('FlightDetails GoPro overlay action', () => {
     mockFlight.gopro_overlay_status = null;
     mockFlight.gopro_overlay_file_path = null;
     mockFlight.gopro_overlay_file_exists = undefined;
+    mockFlight.gopro_overlay_progress = null;
+    mockFlight.video_export_job_id = null;
+    mockFlight.video_export_status = null;
+    mockFlight.video_export_progress = null;
     mockFlight.video_file_path = '/exports/flight.mp4';
     mockFlight.video_file_exists = true;
     mockFlight.gopro_camera_file_exists = true;
+    videoStatusMock.current = null;
   });
 
   it('shows why overlay generation is unavailable', () => {
@@ -200,7 +224,6 @@ describe('FlightDetails GoPro overlay action', () => {
     });
   });
 
-
   it('passes the GPX offset when starting overlay generation', async () => {
     render(
       <FlightDetails
@@ -221,6 +244,60 @@ describe('FlightDetails GoPro overlay action', () => {
     const formData = createOverlayMock.mock.calls[0][0] as FormData;
     expect(formData.get('gpx_offset')).toBe('2.5');
   });
+
+  it('shows a dedicated generation logs panel for video and GoPro jobs', () => {
+    mockFlight.video_export_job_id = 'video-job';
+    mockFlight.video_export_status = 'running';
+    overlayJobStreamMock.current = {
+      job_id: 'overlay-job',
+      status: 'failed',
+      progress: 43,
+      message: 'Rendering overlay',
+      error: 'Overlay failed on frame 42',
+      layout_id: 'layout',
+      layout_label: 'Parapente',
+      output_filename: 'final.mp4',
+      created_at: '2026-03-15T14:00:00Z',
+      updated_at: '2026-03-15T14:10:00Z',
+      log_tail: ['Starting overlay', 'Frame 42 failed'],
+    };
+    videoStatusMock.current = {
+      job_id: 'video-job',
+      status: 'running',
+      internal_status: 'encoding',
+      progress: 78,
+      message: 'Encoding with FFmpeg',
+      log_tail: ['Captured frames', 'Encoding with FFmpeg'],
+    };
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    expect(screen.getByText('Generation logs')).toBeInTheDocument();
+    expect(screen.getByText('Flight video')).toBeInTheDocument();
+    expect(screen.getByText('GoPro overlay')).toBeInTheDocument();
+    expect(screen.getByText('Encoding with FFmpeg')).toBeInTheDocument();
+    expect(screen.getByText('Overlay failed on frame 42')).toBeInTheDocument();
+    expect(screen.getByText(/Frame 42 failed/u)).toBeInTheDocument();
+  });
+
+  it('does not render an empty generation logs panel', () => {
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    expect(screen.queryByText('Generation logs')).not.toBeInTheDocument();
+  });
+
   it('regenerates overlay after cancellation', async () => {
     mockFlight.gopro_overlay_job_id = 'job-overlay';
     mockFlight.gopro_overlay_status = 'cancelled';

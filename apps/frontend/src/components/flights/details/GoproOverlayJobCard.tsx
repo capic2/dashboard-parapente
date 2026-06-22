@@ -1,9 +1,7 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
 import { Download } from 'lucide-react';
 import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
-import { JobLiveLogsPanel } from '../video-export/JobLiveLogsPanel';
 
 interface GoproOverlayJobCardProps {
   job: GoproOverlayJob;
@@ -17,7 +15,6 @@ export function GoproOverlayJobCard({
   onDownload,
 }: GoproOverlayJobCardProps) {
   const { t } = useTranslation();
-  const [isLogsOpen, setIsLogsOpen] = useState(false);
 
   return (
     <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
@@ -50,24 +47,6 @@ export function GoproOverlayJobCard({
           </Button>
         </div>
       )}
-      {job.error && (
-        <pre className="mt-2 max-h-36 overflow-auto rounded bg-red-950 p-2 text-xs text-red-50">
-          {job.error}
-        </pre>
-      )}
-      <JobLiveLogsPanel
-        className="mt-3"
-        title={t('videoJobs.liveLogs.title', 'Logs en direct')}
-        emptyLabel={t(
-          'videoJobs.liveLogs.empty',
-          'Aucun log disponible pour le moment.'
-        )}
-        showLabel={t('videoJobs.liveLogs.show', 'Afficher')}
-        hideLabel={t('videoJobs.liveLogs.hide', 'Masquer')}
-        isOpen={isLogsOpen}
-        onToggle={() => setIsLogsOpen((value) => !value)}
-        logs={job.log_tail}
-      />
     </div>
   );
 }
