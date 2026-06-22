@@ -55,6 +55,7 @@ interface FlightVideoExportControlsProps {
   compact?: boolean;
   showModeSelector?: boolean;
   showCancelAction?: boolean;
+  showLogsPanel?: boolean;
 }
 
 const isVideoExportInProgress = (status?: string | null) =>
@@ -133,6 +134,7 @@ export function FlightVideoExportControls({
   buttonClassName = '',
   compact = false,
   showModeSelector = true,
+  showLogsPanel = true,
 }: FlightVideoExportControlsProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -493,7 +495,7 @@ export function FlightVideoExportControls({
         </p>
       )}
 
-      {flight.video_export_job_id && (
+      {showLogsPanel && flight.video_export_job_id && (
         <JobLiveLogsPanel
           className="mt-3"
           title={t('videoJobs.liveLogs.title', 'Logs en direct')}

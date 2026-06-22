@@ -973,10 +973,35 @@
     "goproOverlayAutoValue": "Automatic value",
     "goproOverlayStatus": {
       "queued": "Queued",
+      "preparing": "Preparing",
       "running": "Running",
       "completed": "Completed",
       "failed": "Error",
       "cancelled": "Cancelled"
+    },
+    "generationLogs": {
+      "title": "Generation logs",
+      "description": "Readable tracking for both media jobs linked to this flight.",
+      "videoTitle": "Flight video",
+      "goproOverlayTitle": "GoPro overlay",
+      "progress": "Progress",
+      "error": "Error",
+      "rawLogs": "Raw logs",
+      "noLogs": "No log available yet.",
+      "noRawLogs": "No raw log available; only the current message is exposed.",
+      "status": {
+        "queued": "Queued",
+        "processing": "Running",
+        "started": "Started",
+        "running": "Running",
+        "initializing": "Initializing",
+        "capturing": "Capturing",
+        "encoding": "Encoding",
+        "preparing": "Preparing",
+        "completed": "Completed",
+        "failed": "Error",
+        "cancelled": "Cancelled"
+      }
     },
     "videoProductionActions": "Video production",
     "flightFileActions": "Flight & files",
