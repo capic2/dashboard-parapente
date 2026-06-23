@@ -1,6 +1,9 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
+  "toolSettings": {
+    "nodeMaxMemory": 1536
+  },
   "description": "Add 'skip-nx-cloud' label to all PRs to conserve NX Cloud credits. Remove the label from a PR to enable NX Cloud for that specific update.",
   "labels": ["renovate", "skip-nx-cloud"],
   "pip_requirements": {
