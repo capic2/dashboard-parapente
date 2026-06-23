@@ -34,7 +34,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: 📥 Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -209,7 +209,7 @@ jobs:
 
     steps:
       - name: 📥 Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # NX Local Cache for E2E: same strategy as main job
       - name: 💾 Setup NX Cache (local fallback)
