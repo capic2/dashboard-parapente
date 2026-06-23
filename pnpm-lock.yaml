@@ -87,9 +87,6 @@ catalogs:
     cesium:
       specifier: ^1.139.1
       version: 1.142.0
-    chromatic:
-      specifier: ^17.0.0
-      version: 17.4.0
     date-fns:
       specifier: ^4.0.0
       version: 4.4.0
@@ -314,7 +311,7 @@ importers:
         version: 4.1.8(vitest@4.1.8)
       chromatic:
         specifier: 'catalog:'
-        version: 17.4.0
+        version: 17.5.0
       happy-dom:
         specifier: 'catalog:'
         version: 20.10.2
@@ -3240,8 +3237,8 @@ packages:
       '@chromatic-com/vitest':
         optional: true
 
-  chromatic@17.4.0:
-    resolution: {integrity: sha512-DWHWcnCO6NR6HZ6ta5XFKHI+PBvYxAPSFX8xORhXxRPangWpsAs0FgMlz64L1oZPkEkzM7r0B4PkMb0R6e43CQ==}
+  chromatic@17.5.0:
+    resolution: {integrity: sha512-jYtXDaY1VeaNaWMom4HewLQTL574s4wTtkg5Kryov9Cj7D6i8Pe7twpLsetG7apxD0aITWUhx6KiqfN6p380rw==}
     engines: {node: '>=22.0.0'}
     hasBin: true
     peerDependencies:
@@ -4733,8 +4730,8 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-  semver@7.8.4:
-    resolution: {integrity: sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA==}
+  semver@7.8.5:
+    resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
     engines: {node: '>=10'}
     hasBin: true
 
@@ -6397,7 +6394,7 @@ snapshots:
       enquirer: 2.3.6
       minimatch: 10.2.5
       nx: 22.7.5
-      semver: 7.8.4
+      semver: 7.8.5
       tslib: 2.8.1
       yargs-parser: 21.1.1
 
@@ -6406,7 +6403,7 @@ snapshots:
       '@nx/devkit': 22.7.5(nx@22.7.5)
       '@nx/js': 22.7.5(@babel/traverse@7.29.7)(nx@22.7.5)
       eslint: 8.57.1
-      semver: 7.8.4
+      semver: 7.8.5
       tslib: 2.8.1
       typescript: 5.9.3
     optionalDependencies:
@@ -6444,7 +6441,7 @@ snapshots:
       npm-run-path: 4.0.1
       picocolors: 1.1.1
       picomatch: 4.0.4
-      semver: 7.8.4
+      semver: 7.8.5
       source-map-support: 0.5.19
       tinyglobby: 0.2.17
       tslib: 2.8.1
@@ -6561,7 +6558,7 @@ snapshots:
       enquirer: 2.3.6
       nx: 22.7.5
       picomatch: 4.0.4
-      semver: 7.8.4
+      semver: 7.8.5
       tslib: 2.8.1
       yargs-parser: 21.1.1
     transitivePeerDependencies:
@@ -8004,11 +8001,11 @@ snapshots:
 
   chromatic@16.10.0:
     dependencies:
-      semver: 7.8.2
+      semver: 7.8.5
 
-  chromatic@17.4.0:
+  chromatic@17.5.0:
     dependencies:
-      semver: 7.8.4
+      semver: 7.8.5
 
   cli-cursor@3.1.0:
     dependencies:
@@ -8878,7 +8875,7 @@ snapshots:
 
   make-dir@4.0.0:
     dependencies:
-      semver: 7.8.4
+      semver: 7.8.5
 
   math-intrinsics@1.1.0: {}
 
@@ -9677,7 +9674,7 @@ snapshots:
 
   semver@7.8.2: {}
 
-  semver@7.8.4: {}
+  semver@7.8.5: {}
 
   send@0.19.2:
     dependencies:
