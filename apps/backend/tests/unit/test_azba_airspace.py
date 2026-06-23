@@ -16,14 +16,20 @@ def test_evaluate_site_azba_constraints_blocks_near_active_zone(monkeypatch):
                 {
                     "id": "rtba-near",
                     "name": "RTBA TEST",
-                    "startTime": "2026-06-16T08:00:00Z",
-                    "endTime": "2026-06-16T10:00:00Z",
-                    "floor": "SFC",
-                    "ceiling": "4500FT",
+                    "valDistVerLower": 0,
+                    "uomDistVerLower": "FT",
+                    "valDistVerUpper": 4500,
+                    "uomDistVerUpper": "FT",
+                    "timeSlots": [
+                        {
+                            "startTime": "2026-06-16T08:00:00Z",
+                            "endTime": "2026-06-16T10:00:00Z",
+                        }
+                    ],
                     "coordinates": [
-                        {"latitude": 47.2, "longitude": 6.0},
-                        {"latitude": 47.21, "longitude": 6.0},
-                        {"latitude": 47.21, "longitude": 6.01},
+                        {"latitude": "471200N", "longitude": "0060000E"},
+                        {"latitude": "471236N", "longitude": "0060000E"},
+                        {"latitude": "471236N", "longitude": "0060036E"},
                     ],
                 },
                 {
@@ -114,3 +120,33 @@ def test_evaluate_site_azba_constraints_returns_unknown_on_source_error(monkeypa
     assert result["status"] == "unknown"
     assert result["message"]
     assert azba_airspace._CACHE == {}
+
+
+def test_get_active_zones_uses_sia_v3_interval_params(monkeypatch):
+    captured = {}
+
+    async def fake_get_json(path_with_query):
+        captured["path_with_query"] = path_with_query
+        return {"items": []}
+
+    monkeypatch.setattr(azba_airspace, "_get_json", fake_get_json)
+
+    asyncio.run(
+        azba_airspace._get_active_zones(
+            datetime(2026, 6, 16, 8, tzinfo=timezone.utc),
+            datetime(2026, 6, 16, 12, tzinfo=timezone.utc),
+            "2026-06-16",
+        )
+    )
+
+    assert captured["path_with_query"].startswith("v3/r_t_b_as?")
+    assert "itemsPerPage=600" in captured["path_with_query"]
+    assert "debutIntervalTemps=2026-06-16T08%3A00%3A00.000Z" in captured["path_with_query"]
+    assert "finIntervalTemps=2026-06-16T12%3A00%3A00.000Z" in captured["path_with_query"]
+    assert "timeSlots" not in captured["path_with_query"]
+
+
+def test_extract_coordinates_supports_sia_dms_coordinates():
+    assert azba_airspace._extract_coordinates(
+        {"coordinates": [{"latitude": "470438.00N", "longitude": "0034000.00E"}]}
+    ) == [(47.077222222222225, 3.6666666666666665)]
