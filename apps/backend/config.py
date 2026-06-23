@@ -103,7 +103,7 @@ AZBA_API_BASE_URL = os.getenv(
     "BACKEND_AZBA_API_BASE_URL",
     "https://bo-prod-sofia-vac.sia-france.fr/api/",
 )
-AZBA_API_VERSION = os.getenv("BACKEND_AZBA_API_VERSION", "v2/")
+AZBA_API_VERSION = os.getenv("BACKEND_AZBA_API_VERSION", "v3/")
 AZBA_API_AUTH_SECRET = os.getenv("BACKEND_AZBA_API_AUTH_SECRET")
 AZBA_CACHE_TTL_SECONDS = int(os.getenv("BACKEND_AZBA_CACHE_TTL_SECONDS", "900"))
 AZBA_SITE_RADIUS_KM = float(os.getenv("BACKEND_AZBA_SITE_RADIUS_KM", "10"))

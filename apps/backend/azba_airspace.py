@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta, timezone
 from typing import Any
@@ -14,6 +15,9 @@ logger = logging.getLogger(__name__)
 
 AZBA_OFFICIAL_URL = "https://www.sia.aviation-civile.gouv.fr/schedules"
 _CACHE: dict[str, tuple[datetime, dict[str, Any]]] = {}
+_DMS_RE = re.compile(
+    r"^(?P<degrees>\d{2,3})(?P<minutes>\d{2})(?P<seconds>\d{2}(?:\.\d+)?)(?P<hemisphere>[NSEW])$"
+)
 
 
 @dataclass(frozen=True)
@@ -67,6 +71,12 @@ def _to_iso_utc(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _to_sia_utc(value: datetime) -> str:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
 def _parse_datetime(value: str) -> datetime:
     normalized = value.replace("Z", "+00:00")
     parsed = datetime.fromisoformat(normalized)
@@ -83,6 +93,31 @@ def _first_text(payload: dict[str, Any], keys: tuple[str, ...]) -> str | None:
         if isinstance(value, int | float):
             return str(value)
     return None
+
+
+def _coordinate_to_decimal(value: Any) -> float | None:
+    if isinstance(value, int | float):
+        return float(value)
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    if not stripped:
+        return None
+    try:
+        return float(stripped)
+    except ValueError:
+        pass
+    match = _DMS_RE.match(stripped)
+    if match is None:
+        return None
+    decimal = (
+        int(match.group("degrees"))
+        + int(match.group("minutes")) / 60
+        + float(match.group("seconds")) / 3600
+    )
+    if match.group("hemisphere") in {"S", "W"}:
+        decimal *= -1
+    return decimal
 
 
 def _iter_nested_dicts(value: Any):
@@ -112,8 +147,10 @@ def _extract_coordinates(payload: dict[str, Any]) -> list[tuple[float, float]]:
     for item in _iter_nested_dicts(payload):
         lat = item.get("lat", item.get("latitude"))
         lon = item.get("lon", item.get("lng", item.get("longitude")))
-        if isinstance(lat, int | float) and isinstance(lon, int | float):
-            coords.append((float(lat), float(lon)))
+        decimal_lat = _coordinate_to_decimal(lat)
+        decimal_lon = _coordinate_to_decimal(lon)
+        if decimal_lat is not None and decimal_lon is not None:
+            coords.append((decimal_lat, decimal_lon))
     return coords
 
 
@@ -203,9 +240,8 @@ async def _get_active_zones(
     params = urlencode(
         {
             "itemsPerPage": "600",
-            "date": latest_azba_date,
-            "timeSlots.startTime[before]": _to_iso_utc(end),
-            "timeSlots.endTime[after]": _to_iso_utc(start),
+            "debutIntervalTemps": _to_sia_utc(start),
+            "finIntervalTemps": _to_sia_utc(end),
         }
     )
     path = f"{config.AZBA_API_VERSION.rstrip('/')}/r_t_b_as?{params}"
