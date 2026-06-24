@@ -270,3 +270,39 @@ def generate_emagram_from_wyoming(
     )
 
     return result
+
+
+def generate_emagram_from_openmeteo(
+    sounding_data: dict[str, Any], output_dir: str = "/tmp/emagram_images"
+) -> dict[str, Any]:
+    """Generate a Skew-T image from a normalized Open-Meteo sounding."""
+    if not sounding_data.get("success"):
+        upstream_error = sounding_data.get("error") or "Open-Meteo data fetch was not successful"
+        return {"success": False, "error": str(upstream_error)}
+
+    generator_data = sounding_data.get("generator_data")
+    if not generator_data:
+        return {"success": False, "error": "No generator_data in Open-Meteo result"}
+
+    source = str(sounding_data.get("source") or "open-meteo")
+    station_name = str(sounding_data.get("station_name") or "Open-Meteo model sounding")
+    sounding_time = str(sounding_data.get("sounding_time") or "model")
+    sounding_date = str(sounding_data.get("sounding_date") or "unknown")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    filename = f"skewt_{source}_{sounding_date}_{sounding_time}_{timestamp}.png"
+    output_path = os.path.join(output_dir, filename)
+
+    result = generate_skewt_image(
+        sounding_data=generator_data,
+        station_name=station_name,
+        sounding_time=sounding_time,
+        output_path=output_path,
+        show_parcel=True,
+        compress_webp=False,
+    )
+    if result.get("success"):
+        result["source"] = source
+        result["external_url"] = sounding_data.get("external_url")
+        result["model"] = sounding_data.get("model")
+
+    return result

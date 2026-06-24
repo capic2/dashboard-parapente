@@ -233,8 +233,18 @@ async def test_fetch_all_returns_success_when_one_source_times_out(monkeypatch) 
             "timestamp": datetime.now().isoformat(),
         }
 
+    async def failed_open_meteo(*args, model: str, **kwargs) -> dict[str, str | bool]:
+        return {
+            "success": False,
+            "source": f"open-meteo-{model}",
+            "error": "not tested here",
+            "external_url": "https://open-meteo.com/",
+            "timestamp": datetime.now().isoformat(),
+        }
+
     monkeypatch.setattr(emagram_screenshots, "screenshot_meteo_parapente", slow_meteo_parapente)
     monkeypatch.setattr(emagram_screenshots, "screenshot_meteociel_emagram", successful_meteociel)
+    monkeypatch.setattr(emagram_screenshots, "generate_open_meteo_emagram_image", failed_open_meteo)
     monkeypatch.setattr(emagram_screenshots, "METEO_PARAPENTE_SCREENSHOT_TIMEOUT_SECONDS", 0.01)
 
     result = await emagram_screenshots.fetch_all_emagram_screenshots(
