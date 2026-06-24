@@ -1,10 +1,11 @@
 import base64
 import hashlib
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta, timezone
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urljoin
 
 import httpx
 
@@ -13,7 +14,16 @@ import config
 logger = logging.getLogger(__name__)
 
 AZBA_OFFICIAL_URL = "https://www.sia.aviation-civile.gouv.fr/schedules"
+AZBA_PUBLIC_APP_URL = "https://www.sia.aviation-civile.gouv.fr/azbaEx/?lang=fr"
 _CACHE: dict[str, tuple[datetime, dict[str, Any]]] = {}
+_AZBA_API_AUTH_SECRET_CACHE: str | None = None
+_DMS_RE = re.compile(
+    r"^(?P<degrees>\d{2,3})(?P<minutes>\d{2})(?P<seconds>\d{2}(?:\.\d+)?)(?P<hemisphere>[NSEW])$"
+)
+_AZBA_MAIN_SCRIPT_RE = re.compile(
+    r'<script\s+src="(?P<src>main\.[^"]+\.js)"\s+type="module"></script>'
+)
+_AZBA_SHARE_SECRET_RE = re.compile(r'share_secret:"(?P<secret>[^"]+)"')
 
 
 @dataclass(frozen=True)
@@ -47,12 +57,51 @@ def _cache_set(key: str, payload: dict[str, Any]) -> None:
     _CACHE[key] = (datetime.now(timezone.utc), payload)
 
 
-def _build_auth_header(path_with_query: str) -> dict[str, str]:
-    if not config.AZBA_API_AUTH_SECRET:
+def _extract_azba_public_app_script_url(html: str) -> str | None:
+    match = _AZBA_MAIN_SCRIPT_RE.search(html)
+    if match is None:
+        return None
+    return urljoin(AZBA_PUBLIC_APP_URL, match.group("src"))
+
+
+def _extract_azba_public_auth_secret(script: str) -> str | None:
+    match = _AZBA_SHARE_SECRET_RE.search(script)
+    if match is None:
+        return None
+    return match.group("secret")
+
+
+async def _get_azba_api_auth_secret(client: httpx.AsyncClient) -> str:
+    global _AZBA_API_AUTH_SECRET_CACHE
+
+    if config.AZBA_API_AUTH_SECRET:
+        return config.AZBA_API_AUTH_SECRET
+    if _AZBA_API_AUTH_SECRET_CACHE:
+        return _AZBA_API_AUTH_SECRET_CACHE
+
+    try:
+        app_response = await client.get(AZBA_PUBLIC_APP_URL)
+        app_response.raise_for_status()
+        script_url = _extract_azba_public_app_script_url(app_response.text)
+        if script_url is None:
+            raise AzbaClientError("Unable to locate SIA AZBA public app script")
+
+        script_response = await client.get(script_url)
+        script_response.raise_for_status()
+        auth_secret = _extract_azba_public_auth_secret(script_response.text)
+        if auth_secret is None:
+            raise AzbaClientError("Unable to locate SIA AZBA public auth signature")
+    except httpx.HTTPError as exc:
+        raise AzbaClientError("Unable to retrieve SIA AZBA public app signature") from exc
+
+    _AZBA_API_AUTH_SECRET_CACHE = auth_secret
+    return auth_secret
+
+
+def _build_auth_header(path_with_query: str, auth_secret: str | None) -> dict[str, str]:
+    if not auth_secret:
         return {}
-    token_uri = hashlib.sha512(
-        f"{config.AZBA_API_AUTH_SECRET}/api/{path_with_query}".encode()
-    ).hexdigest()
+    token_uri = hashlib.sha512(f"{auth_secret}/api/{path_with_query}".encode()).hexdigest()
     token = base64.b64encode(f'{{"tokenUri":"{token_uri}"}}'.encode()).decode("ascii")
     return {"AUTH": token}
 
@@ -65,6 +114,12 @@ def _to_iso_utc(value: datetime) -> str:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _to_sia_utc(value: datetime) -> str:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def _parse_datetime(value: str) -> datetime:
@@ -83,6 +138,31 @@ def _first_text(payload: dict[str, Any], keys: tuple[str, ...]) -> str | None:
         if isinstance(value, int | float):
             return str(value)
     return None
+
+
+def _coordinate_to_decimal(value: Any) -> float | None:
+    if isinstance(value, int | float):
+        return float(value)
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    if not stripped:
+        return None
+    try:
+        return float(stripped)
+    except ValueError:
+        pass
+    match = _DMS_RE.match(stripped)
+    if match is None:
+        return None
+    decimal = (
+        int(match.group("degrees"))
+        + int(match.group("minutes")) / 60
+        + float(match.group("seconds")) / 3600
+    )
+    if match.group("hemisphere") in {"S", "W"}:
+        decimal *= -1
+    return decimal
 
 
 def _iter_nested_dicts(value: Any):
@@ -112,8 +192,10 @@ def _extract_coordinates(payload: dict[str, Any]) -> list[tuple[float, float]]:
     for item in _iter_nested_dicts(payload):
         lat = item.get("lat", item.get("latitude"))
         lon = item.get("lon", item.get("lng", item.get("longitude")))
-        if isinstance(lat, int | float) and isinstance(lon, int | float):
-            coords.append((float(lat), float(lon)))
+        decimal_lat = _coordinate_to_decimal(lat)
+        decimal_lon = _coordinate_to_decimal(lon)
+        if decimal_lat is not None and decimal_lon is not None:
+            coords.append((decimal_lat, decimal_lon))
     return coords
 
 
@@ -179,17 +261,33 @@ def _zone_matches_site(zone: AzbaActiveZone, radius_km: float) -> bool:
 
 
 async def _get_json(path_with_query: str) -> dict[str, Any]:
+    global _AZBA_API_AUTH_SECRET_CACHE
+
     url = _join_api_path(path_with_query)
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.get(url, headers=_build_auth_header(path_with_query))
-            response.raise_for_status()
+            try:
+                response = await _get_json_response(client, url, path_with_query)
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code not in {401, 403} or config.AZBA_API_AUTH_SECRET:
+                    raise
+                _AZBA_API_AUTH_SECRET_CACHE = None
+                response = await _get_json_response(client, url, path_with_query)
             payload = response.json()
     except (httpx.HTTPError, ValueError) as exc:
         raise AzbaClientError(f"Unable to retrieve SIA AZBA data from {url}") from exc
     if not isinstance(payload, dict):
         return {"items": payload}
     return payload
+
+
+async def _get_json_response(
+    client: httpx.AsyncClient, url: str, path_with_query: str
+) -> httpx.Response:
+    auth_secret = await _get_azba_api_auth_secret(client)
+    response = await client.get(url, headers=_build_auth_header(path_with_query, auth_secret))
+    response.raise_for_status()
+    return response
 
 
 async def _get_current_range() -> dict[str, Any]:
@@ -203,9 +301,8 @@ async def _get_active_zones(
     params = urlencode(
         {
             "itemsPerPage": "600",
-            "date": latest_azba_date,
-            "timeSlots.startTime[before]": _to_iso_utc(end),
-            "timeSlots.endTime[after]": _to_iso_utc(start),
+            "debutIntervalTemps": _to_sia_utc(start),
+            "finIntervalTemps": _to_sia_utc(end),
         }
     )
     path = f"{config.AZBA_API_VERSION.rstrip('/')}/r_t_b_as?{params}"

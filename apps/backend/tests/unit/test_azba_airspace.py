@@ -1,6 +1,8 @@
 import asyncio
 from datetime import datetime, timezone
 
+import httpx
+
 import azba_airspace
 
 
@@ -16,14 +18,20 @@ def test_evaluate_site_azba_constraints_blocks_near_active_zone(monkeypatch):
                 {
                     "id": "rtba-near",
                     "name": "RTBA TEST",
-                    "startTime": "2026-06-16T08:00:00Z",
-                    "endTime": "2026-06-16T10:00:00Z",
-                    "floor": "SFC",
-                    "ceiling": "4500FT",
+                    "valDistVerLower": 0,
+                    "uomDistVerLower": "FT",
+                    "valDistVerUpper": 4500,
+                    "uomDistVerUpper": "FT",
+                    "timeSlots": [
+                        {
+                            "startTime": "2026-06-16T08:00:00Z",
+                            "endTime": "2026-06-16T10:00:00Z",
+                        }
+                    ],
                     "coordinates": [
-                        {"latitude": 47.2, "longitude": 6.0},
-                        {"latitude": 47.21, "longitude": 6.0},
-                        {"latitude": 47.21, "longitude": 6.01},
+                        {"latitude": "471200N", "longitude": "0060000E"},
+                        {"latitude": "471236N", "longitude": "0060000E"},
+                        {"latitude": "471236N", "longitude": "0060036E"},
                     ],
                 },
                 {
@@ -114,3 +122,111 @@ def test_evaluate_site_azba_constraints_returns_unknown_on_source_error(monkeypa
     assert result["status"] == "unknown"
     assert result["message"]
     assert azba_airspace._CACHE == {}
+
+
+def test_get_active_zones_uses_sia_v3_interval_params(monkeypatch):
+    captured = {}
+
+    async def fake_get_json(path_with_query):
+        captured["path_with_query"] = path_with_query
+        return {"items": []}
+
+    monkeypatch.setattr(azba_airspace, "_get_json", fake_get_json)
+
+    asyncio.run(
+        azba_airspace._get_active_zones(
+            datetime(2026, 6, 16, 8, tzinfo=timezone.utc),
+            datetime(2026, 6, 16, 12, tzinfo=timezone.utc),
+            "2026-06-16",
+        )
+    )
+
+    assert captured["path_with_query"].startswith("v3/r_t_b_as?")
+    assert "itemsPerPage=600" in captured["path_with_query"]
+    assert "debutIntervalTemps=2026-06-16T08%3A00%3A00.000Z" in captured["path_with_query"]
+    assert "finIntervalTemps=2026-06-16T12%3A00%3A00.000Z" in captured["path_with_query"]
+    assert "timeSlots" not in captured["path_with_query"]
+
+
+def test_extract_coordinates_supports_sia_dms_coordinates():
+    assert azba_airspace._extract_coordinates(
+        {"coordinates": [{"latitude": "470438.00N", "longitude": "0034000.00E"}]}
+    ) == [(47.077222222222225, 3.6666666666666665)]
+
+
+def test_extract_azba_public_app_script_url():
+    assert (
+        azba_airspace._extract_azba_public_app_script_url(
+            '<script src="runtime.123.js" type="module"></script>'
+            '<script src="main.35bcb85181c01b05.js" type="module"></script>'
+        )
+        == "https://www.sia.aviation-civile.gouv.fr/azbaEx/main.35bcb85181c01b05.js"
+    )
+
+
+def test_extract_azba_public_auth_secret():
+    assert (
+        azba_airspace._extract_azba_public_auth_secret(
+            'baseUrl:"https://bo-prod-sofia-vac.sia-france.fr/api/",share_secret:"public-signature"'
+        )
+        == "public-signature"
+    )
+
+
+def test_get_json_retries_once_after_cached_public_auth_failure(monkeypatch):
+    request = httpx.Request(
+        "GET", "https://bo-prod-sofia-vac.sia-france.fr/api/v3/custom/currentDate"
+    )
+    api_call_count = {"value": 0}
+
+    class FakeResponse:
+        def __init__(self, status_code, *, text="", payload=None):
+            self.status_code = status_code
+            self.text = text
+            self._payload = payload
+            self.request = request
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise httpx.HTTPStatusError("error", request=self.request, response=self)
+
+        def json(self):
+            return self._payload
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return False
+
+        async def get(self, url, headers=None):
+            if url == azba_airspace.AZBA_PUBLIC_APP_URL:
+                return FakeResponse(
+                    200,
+                    text='<script src="main.35bcb85181c01b05.js" type="module"></script>',
+                )
+            if url.endswith("/azbaEx/main.35bcb85181c01b05.js"):
+                return FakeResponse(200, text='share_secret:"fresh-public-signature"')
+
+            api_call_count["value"] += 1
+            if api_call_count["value"] == 1:
+                return FakeResponse(401)
+            expected_auth = azba_airspace._build_auth_header(
+                "v3/custom/currentDate", "fresh-public-signature"
+            )["AUTH"]
+            assert headers and headers["AUTH"] == expected_auth
+            return FakeResponse(200, payload={"rtba": "2026-06-16"})
+
+    monkeypatch.setattr(azba_airspace.config, "AZBA_API_AUTH_SECRET", None)
+    monkeypatch.setattr(azba_airspace.httpx, "AsyncClient", FakeClient)
+    monkeypatch.setattr(azba_airspace, "_AZBA_API_AUTH_SECRET_CACHE", "stale-public-signature")
+
+    result = asyncio.run(azba_airspace._get_json("v3/custom/currentDate"))
+
+    assert result == {"rtba": "2026-06-16"}
+    assert api_call_count["value"] == 2
+    assert azba_airspace._AZBA_API_AUTH_SECRET_CACHE == "fresh-public-signature"
