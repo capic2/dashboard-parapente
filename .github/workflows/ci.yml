@@ -45,7 +45,7 @@ jobs:
       #   - Fallback 1: OS + pnpm-lock hash (recent builds with same deps)
       #   - Fallback 2: OS only (any recent build)
       - name: 💾 Setup NX Cache (local fallback)
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .nx/cache
           key: nx-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ github.sha }}
@@ -79,7 +79,7 @@ jobs:
 
       - name: 💾 Cache Playwright browsers
         id: playwright-cache-main
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -213,7 +213,7 @@ jobs:
 
       # NX Local Cache for E2E: same strategy as main job
       - name: 💾 Setup NX Cache (local fallback)
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .nx/cache
           key: nx-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ github.sha }}
@@ -247,7 +247,7 @@ jobs:
 
       - name: 💾 Cache Playwright browsers
         id: playwright-cache-e2e
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
