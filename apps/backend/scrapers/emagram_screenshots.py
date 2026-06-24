@@ -24,6 +24,7 @@ EMAGRAM_CACHE_DIR = Path("/tmp/emagram_cache")
 EMAGRAM_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 METEO_PARAPENTE_SCREENSHOT_TIMEOUT_SECONDS = 35
 METEOCIEL_SCREENSHOT_TIMEOUT_SECONDS = 30
+OPEN_METEO_EMAGRAM_TIMEOUT_SECONDS = 35
 
 
 def _meteo_parapente_day_labels(day_index: int) -> list[str]:
@@ -411,6 +412,58 @@ async def screenshot_meteociel_emagram(
         }
 
 
+async def generate_open_meteo_emagram_image(
+    latitude: float,
+    longitude: float,
+    spot_name: str,
+    model: str,
+    day_index: int = 0,
+    hour: int | None = None,
+) -> dict[str, Any]:
+    """Generate an emagram image from Open-Meteo pressure-level model data."""
+    from scrapers.emagram_generator import generate_emagram_from_openmeteo
+    from scrapers.open_meteo_sounding import fetch_sounding_for_spot
+
+    sounding = await fetch_sounding_for_spot(
+        spot_latitude=latitude,
+        spot_longitude=longitude,
+        spot_name=spot_name,
+        model=model,
+        day_index=day_index,
+        hour=hour,
+    )
+    source = str(sounding.get("source") or f"open-meteo-{model}")
+    if not sounding.get("success"):
+        return {
+            "success": False,
+            "source": source,
+            "error": str(sounding.get("error") or "Open-Meteo sounding fetch failed"),
+            "external_url": sounding.get("external_url", "https://open-meteo.com/"),
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    image_result = generate_emagram_from_openmeteo(
+        sounding_data=sounding,
+        output_dir=str(EMAGRAM_CACHE_DIR),
+    )
+    if not image_result.get("success"):
+        return {
+            "success": False,
+            "source": source,
+            "error": str(image_result.get("error") or "Open-Meteo emagram generation failed"),
+            "external_url": sounding.get("external_url", "https://open-meteo.com/"),
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    return {
+        "success": True,
+        "source": source,
+        "image_path": image_result["image_path"],
+        "external_url": sounding.get("external_url", "https://open-meteo.com/"),
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
 async def _run_screenshot_with_timeout(
     source: str, screenshot_coro: Any, timeout_seconds: float, external_url: str
 ) -> dict[str, Any]:
@@ -447,7 +500,7 @@ async def fetch_all_emagram_screenshots(
     hour: int | None = None,
 ) -> dict[str, Any]:
     """
-    Fetch emagram screenshots from all 3 sources in parallel
+    Fetch emagram images from screenshot and model-generated sources in parallel
 
     Args:
         spot_id: Site ID (e.g., "arguel")
@@ -462,11 +515,12 @@ async def fetch_all_emagram_screenshots(
             "spot_name": "Arguel",
             "screenshots": [
                 {"source": "meteo-parapente", "success": True, "image_path": "...", ...},
-                {"source": "topmeteo", "success": True, "image_path": "...", ...},
-                {"source": "windy", "success": False, "error": "...", ...}
+                {"source": "meteociel", "success": True, "image_path": "...", ...},
+                {"source": "open-meteo-arome", "success": True, "image_path": "...", ...},
+                {"source": "open-meteo-icon", "success": True, "image_path": "...", ...}
             ],
-            "sources_successful": 2,
-            "sources_total": 3,
+            "sources_successful": 4,
+            "sources_total": 4,
             "timestamp": "2024-03-07T20:00:00"
         }
     """
@@ -500,6 +554,22 @@ async def fetch_all_emagram_screenshots(
             ),
             timeout_seconds=METEOCIEL_SCREENSHOT_TIMEOUT_SECONDS,
             external_url=meteociel_url,
+        ),
+        _run_screenshot_with_timeout(
+            "open-meteo-arome",
+            generate_open_meteo_emagram_image(
+                latitude, longitude, spot_name, model="arome", day_index=day_index, hour=hour
+            ),
+            timeout_seconds=OPEN_METEO_EMAGRAM_TIMEOUT_SECONDS,
+            external_url="https://open-meteo.com/en/docs/meteofrance-api",
+        ),
+        _run_screenshot_with_timeout(
+            "open-meteo-icon",
+            generate_open_meteo_emagram_image(
+                latitude, longitude, spot_name, model="icon", day_index=day_index, hour=hour
+            ),
+            timeout_seconds=OPEN_METEO_EMAGRAM_TIMEOUT_SECONDS,
+            external_url="https://open-meteo.com/en/docs/dwd-api",
         ),
     ]
 
