@@ -53,6 +53,7 @@ export interface HourlyForecastItem {
   sources?: Record<string, Record<string, number | null>>;
   thermal_strength?: string;
   cape?: number | null;
+  lifted_index?: number | null;
   cloud_cover?: number | null;
 }
 

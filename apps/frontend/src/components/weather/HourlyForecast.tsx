@@ -101,6 +101,8 @@ type FlyabilityReasonLabels = {
   veryCloudy: string;
   moderateWind: string;
   averageConditions: string;
+  thunderstorms: string;
+  thunderstormRisk: string;
 };
 
 const DEFAULT_FLYABILITY_REASON_LABELS: FlyabilityReasonLabels = {
@@ -113,6 +115,69 @@ const DEFAULT_FLYABILITY_REASON_LABELS: FlyabilityReasonLabels = {
   veryCloudy: 'Très nuageux',
   moderateWind: 'Vent modéré',
   averageConditions: 'Conditions moyennes',
+  thunderstorms: 'Orages',
+  thunderstormRisk: "Risque d'orage",
+};
+
+type ThunderstormRisk = 'nul' | 'faible' | 'modere' | 'eleve';
+
+const THUNDERSTORM_RISK_RANKS: Record<ThunderstormRisk, number> = {
+  nul: 0,
+  faible: 1,
+  modere: 2,
+  eleve: 3,
+};
+
+const maxThunderstormRisk = (
+  left: ThunderstormRisk,
+  right: ThunderstormRisk
+): ThunderstormRisk => {
+  return THUNDERSTORM_RISK_RANKS[left] >= THUNDERSTORM_RISK_RANKS[right]
+    ? left
+    : right;
+};
+
+const getLiftedIndexRisk = (
+  liftedIndex: number | null | undefined
+): ThunderstormRisk => {
+  if (liftedIndex == null) return 'nul';
+  if (liftedIndex <= -7) return 'eleve';
+  if (liftedIndex <= -5) return 'modere';
+  if (liftedIndex <= -3) return 'faible';
+  return 'nul';
+};
+
+const getCapeRisk = (cape: number | null | undefined): ThunderstormRisk => {
+  if (cape == null) return 'nul';
+  if (cape >= 2500) return 'eleve';
+  if (cape >= 1500) return 'modere';
+  if (cape >= 300) return 'faible';
+  return 'nul';
+};
+
+const getThunderstormRisk = (
+  cape: number | null | undefined,
+  liftedIndex: number | null | undefined
+): ThunderstormRisk => {
+  const capeRisk = getCapeRisk(cape);
+  const liftedIndexRisk = getLiftedIndexRisk(liftedIndex);
+
+  if (
+    cape != null &&
+    liftedIndex != null &&
+    cape >= 1500 &&
+    liftedIndex <= -4
+  ) {
+    return 'eleve';
+  }
+  if (cape != null && liftedIndex != null && cape >= 800 && liftedIndex <= -2) {
+    return maxThunderstormRisk(
+      'modere',
+      maxThunderstormRisk(capeRisk, liftedIndexRisk)
+    );
+  }
+
+  return maxThunderstormRisk(capeRisk, liftedIndexRisk);
 };
 
 // ============================================================================
@@ -160,6 +225,26 @@ export const getFlyabilityDisplay = (
   color: string;
   Icon: ReturnType<typeof getVerdictVisual>['Icon'];
 } => {
+  const thunderstormRisk = getThunderstormRisk(hour.cape, hour.lifted_index);
+
+  if (thunderstormRisk === 'eleve') {
+    const visual = getVerdictVisual('mauvais');
+    return {
+      text: `MAUVAIS — ${reasonLabels.thunderstorms}`,
+      color: visual.textClassName,
+      Icon: visual.Icon,
+    };
+  }
+
+  if (thunderstormRisk === 'modere') {
+    const visual = getVerdictVisual('moyen');
+    return {
+      text: `MOYEN — ${reasonLabels.thunderstormRisk}`,
+      color: visual.textClassName,
+      Icon: visual.Icon,
+    };
+  }
+
   const verdict = hour.verdict?.toLowerCase();
   const verdictUpper = verdict?.toUpperCase() || 'MOYEN';
   const visual = getVerdictVisual(verdict || 'moyen');
@@ -680,6 +765,8 @@ export default function HourlyForecast({
     veryCloudy: t('weather.hourly.reasons.veryCloudy'),
     moderateWind: t('weather.hourly.reasons.moderateWind'),
     averageConditions: t('weather.hourly.reasons.averageConditions'),
+    thunderstorms: t('weather.hourly.reasons.thunderstorms'),
+    thunderstormRisk: t('weather.hourly.reasons.thunderstormRisk'),
   };
 
   if (isLoading) {
