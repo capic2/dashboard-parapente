@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import HourlyForecast from './HourlyForecast';
 
@@ -12,6 +12,8 @@ vi.mock('react-i18next', () => ({
         'weather.metricsUsed': 'Metriques utilisees',
         'weather.verdictLabel': 'Verdict',
         'weather.criteriaEvaluated': 'Criteres evalues',
+        'weather.hourly.reasons.thunderstorms': 'Orages',
+        'weather.hourly.reasons.thunderstormRisk': "Risque d'orage",
       };
       if (labels[key]) return labels[key];
       return key;
@@ -158,5 +160,79 @@ describe('HourlyForecast tooltip behavior', () => {
     render(<HourlyForecast spotId="site-1" dayIndex={0} />);
 
     expect(screen.getByText('NW (315°)')).toBeTruthy();
+  });
+
+  it('shows thunderstorms as the hourly flyability reason', () => {
+    mockedUseWeather.mockReturnValue({
+      data: {
+        cached_at: '2026-04-25T10:00:00Z',
+        hourly_forecast: [
+          {
+            hour: '10:00',
+            time: '10:00',
+            temp: 22,
+            temperature: 22,
+            wind: 10,
+            wind_speed: 10,
+            wind_gust: 15,
+            direction: 'NW',
+            wind_direction: 'NW',
+            wind_direction_deg: 315,
+            conditions: 'clear',
+            precipitation: 0,
+            cloud_cover: 10,
+            cape: 2600,
+            lifted_index: -5,
+            thermal_strength: 'fort',
+            para_index: 25,
+            verdict: 'mauvais',
+            sources: {},
+          },
+          {
+            hour: '11:00',
+            time: '11:00',
+            temp: 23,
+            temperature: 23,
+            wind: 10,
+            wind_speed: 10,
+            wind_gust: 15,
+            direction: 'NW',
+            wind_direction: 'NW',
+            wind_direction_deg: 315,
+            conditions: 'clear',
+            precipitation: 0,
+            cloud_cover: 10,
+            cape: 1600,
+            lifted_index: -2,
+            thermal_strength: 'fort',
+            para_index: 55,
+            verdict: 'moyen',
+            sources: {},
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    } as never);
+
+    render(<HourlyForecast spotId="site-1" dayIndex={0} />);
+
+    const tenRow = screen
+      .getAllByText('10:00')
+      .map((element) => element.closest('tr'))
+      .find((row) => row != null);
+    const elevenRow = screen
+      .getAllByText('11:00')
+      .map((element) => element.closest('tr'))
+      .find((row) => row != null);
+
+    expect(tenRow).not.toBeNull();
+    expect(elevenRow).not.toBeNull();
+    expect(
+      within(tenRow as HTMLElement).getByText('MAUVAIS — Orages')
+    ).toBeTruthy();
+    expect(
+      within(elevenRow as HTMLElement).getByText("MOYEN — Risque d'orage")
+    ).toBeTruthy();
   });
 });

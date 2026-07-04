@@ -143,20 +143,15 @@ class MeteocielScraper(BaseScraper):
         """
         site_name = kwargs.get("site_name")
 
-        if not site_name:
-            return self._build_response(
-                success=False, error="site_name is required for meteociel scraper"
-            )
-
         try:
-            # Step 1: Get INSEE code
-            insee_code = await self._get_insee_code(site_name)
+            # Step 1: Get INSEE code from site name, or from nearest commune when absent.
+            insee_code = await self._get_insee_code(site_name) if site_name else None
             city_name_for_url = site_name
 
             if not insee_code:
                 # Graceful degradation: Try to find nearest French city using coordinates
                 logger.info(
-                    f"No INSEE code found for {site_name}, trying reverse geocoding with coordinates"
+                    f"No INSEE code found for {site_name or 'coordinates'}, trying reverse geocoding with coordinates"
                 )
                 nearest_commune = await self._get_nearest_commune(lat, lon)
 
