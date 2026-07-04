@@ -5,7 +5,7 @@ Live tests for Meteoblue scraper
 import pytest
 
 from config import METEOBLUE_API_KEY
-from scrapers.meteoblue import fetch_meteoblue
+from scrapers.meteoblue import MeteoblueScraper, fetch_meteoblue
 
 ARGUEL_LAT = 47.2
 ARGUEL_LON = 6.0
@@ -33,3 +33,9 @@ async def test_fetch_meteoblue_timeout():
     duration = time.time() - start
     assert duration < 20.0
     assert "success" in result
+
+
+def test_meteoblue_city_code_handles_missing_city_name() -> None:
+    scraper = MeteoblueScraper()
+
+    assert scraper._get_city_code(None) is None
