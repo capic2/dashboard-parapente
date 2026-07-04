@@ -149,6 +149,7 @@ async def fetch_from_enabled_sources(
                 result = await source_definition.fetch(
                     lat,
                     lon,
+                    day_index=day_index,
                     site_name=site_name,
                     elevation_m=elevation_m,
                 )
