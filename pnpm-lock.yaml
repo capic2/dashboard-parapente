@@ -87,9 +87,6 @@ catalogs:
     husky:
       specifier: ^9.1.7
       version: 9.1.7
-    i18next:
-      specifier: ^26.0.1
-      version: 26.3.1
     i18next-browser-languagedetector:
       specifier: ^8.2.1
       version: 8.2.1
@@ -196,7 +193,7 @@ importers:
         version: 4.4.0
       i18next:
         specifier: 'catalog:'
-        version: 26.3.1(typescript@6.0.3)
+        version: 26.3.2(typescript@6.0.3)
       i18next-browser-languagedetector:
         specifier: 'catalog:'
         version: 8.2.1
@@ -214,7 +211,7 @@ importers:
         version: 19.2.7(react@19.2.7)
       react-i18next:
         specifier: 'catalog:'
-        version: 17.0.8(i18next@26.3.1(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3)
+        version: 17.0.8(i18next@26.3.2(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3)
       react-is:
         specifier: 'catalog:'
         version: 19.2.7
@@ -338,7 +335,7 @@ importers:
         version: 10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.17)(prettier@3.8.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       storybook-react-i18next:
         specifier: 'catalog:'
-        version: 10.1.2(i18next-browser-languagedetector@8.2.1)(i18next-http-backend@3.0.2)(i18next@26.3.1(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react-i18next@17.0.8(i18next@26.3.1(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3))(react@19.2.7)(storybook@10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.17)(prettier@3.8.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))
+        version: 10.1.2(i18next-browser-languagedetector@8.2.1)(i18next-http-backend@3.0.2)(i18next@26.3.2(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react-i18next@17.0.8(i18next@26.3.2(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3))(react@19.2.7)(storybook@10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.17)(prettier@3.8.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.1
@@ -3868,6 +3865,14 @@ packages:
 
   i18next@26.3.1:
     resolution: {integrity: sha512-txQqd5EULsqEh9OJqRH15aCaOuy/nLJyhw5EHCSKLKJE1aBbb3Zve2+uQIxgWhPm1QqUQoWyQBm2kfmmIrzkcQ==}
+    peerDependencies:
+      typescript: ^5 || ^6
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
+  i18next@26.3.2:
+    resolution: {integrity: sha512-QQkXAM1sPDHqhxMQuBeHVMUn6mJchF+wdpOoQerciLAFqO3ZYdxO0EUbeEhruyutnNwpUQIITDVzLjwnNL0T1w==}
     peerDependencies:
       typescript: ^5 || ^6
     peerDependenciesMeta:
@@ -8651,6 +8656,10 @@ snapshots:
     optionalDependencies:
       typescript: 6.0.3
 
+  i18next@26.3.2(typescript@6.0.3):
+    optionalDependencies:
+      typescript: 6.0.3
+
   ieee754@1.2.1: {}
 
   ignore@5.3.2: {}
@@ -9523,6 +9532,17 @@ snapshots:
       react-dom: 19.2.7(react@19.2.7)
       typescript: 6.0.3
 
+  react-i18next@17.0.8(i18next@26.3.2(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3):
+    dependencies:
+      '@babel/runtime': 7.29.2
+      html-parse-stringify: 3.0.1
+      i18next: 26.3.2(typescript@6.0.3)
+      react: 19.2.7
+      use-sync-external-store: 1.6.0(react@19.2.7)
+    optionalDependencies:
+      react-dom: 19.2.7(react@19.2.7)
+      typescript: 6.0.3
+
   react-is@17.0.2: {}
 
   react-is@19.2.7: {}
@@ -9825,12 +9845,12 @@ snapshots:
       - react
       - react-dom
 
-  storybook-react-i18next@10.1.2(i18next-browser-languagedetector@8.2.1)(i18next-http-backend@3.0.2)(i18next@26.3.1(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react-i18next@17.0.8(i18next@26.3.1(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3))(react@19.2.7)(storybook@10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.17)(prettier@3.8.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)):
+  storybook-react-i18next@10.1.2(i18next-browser-languagedetector@8.2.1)(i18next-http-backend@3.0.2)(i18next@26.3.2(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react-i18next@17.0.8(i18next@26.3.2(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3))(react@19.2.7)(storybook@10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.17)(prettier@3.8.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)):
     dependencies:
-      i18next: 26.3.1(typescript@6.0.3)
+      i18next: 26.3.2(typescript@6.0.3)
       i18next-browser-languagedetector: 8.2.1
       i18next-http-backend: 3.0.2
-      react-i18next: 17.0.8(i18next@26.3.1(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3)
+      react-i18next: 17.0.8(i18next@26.3.2(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3)
       storybook: 10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.17)(prettier@3.8.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       storybook-i18n: 10.1.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(storybook@10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.17)(prettier@3.8.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))
     transitivePeerDependencies:
