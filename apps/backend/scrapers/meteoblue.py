@@ -85,8 +85,11 @@ class MeteoblueScraper(PlaywrightScraper):
             timeout=timeout,
         )
 
-    def _get_city_code(self, city_name: str) -> str | None:
+    def _get_city_code(self, city_name: str | None) -> str | None:
         """Get Meteoblue city code"""
+        if not city_name:
+            return None
+
         city_key = city_name.lower()
 
         if city_key in self.CITY_CODE_OVERRIDE:
@@ -110,7 +113,7 @@ class MeteoblueScraper(PlaywrightScraper):
         Returns:
             List of hourly forecast dictionaries
         """
-        city_name = kwargs.get("city_name", "location")
+        city_name = kwargs.get("city_name") or "location"
 
         # Get city code
         city_code = self._get_city_code(city_name)

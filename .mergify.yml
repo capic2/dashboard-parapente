@@ -5,10 +5,9 @@ queue_rules:
     merge_method: squash
     update_method: merge
     batch_size: 5
-    commit_message_template: |
-      {{ title }} (#{{ number }})
-
-      {{ body }}
+    commit_message_format:
+      title: pr-title
+      body: pr-body
     queue_conditions:
       - check-success=main
       - check-success=E2E Tests

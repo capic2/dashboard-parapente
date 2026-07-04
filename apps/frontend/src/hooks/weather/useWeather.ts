@@ -107,6 +107,7 @@ export const transformWeatherResponse = (
       para_index: hour.para_index ?? 0,
       verdict: hour.verdict ?? hourToVerdict.get(hour.hour) ?? 'N/A',
       cape: hour.cape ?? null,
+      lifted_index: hour.lifted_index ?? null,
       thermal_strength:
         (hour.thermal_strength?.toLowerCase() as HourlyForecastItem['thermal_strength']) ||
         'faible',
