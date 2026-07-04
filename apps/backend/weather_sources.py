@@ -2,6 +2,7 @@
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 import uuid
 from typing import Any
 
@@ -57,16 +58,32 @@ class WeatherSourceDefinition:
         }
 
 
-async def fetch_open_meteo_default(lat: float, lon: float, **_: Any) -> dict[str, Any]:
-    return await fetch_open_meteo(lat, lon, days=7)
+def _bounded_day_index(day_index: int, max_days: int) -> int:
+    if max_days < 1:
+        raise ValueError("max_days must be greater than 0")
+    return max(0, min(day_index, max_days - 1))
 
 
-async def fetch_open_meteo_icon_default(lat: float, lon: float, **_: Any) -> dict[str, Any]:
-    return await fetch_open_meteo_icon(lat, lon, days=7)
+def _days_needed_for_day_index(day_index: int, max_days: int) -> int:
+    return _bounded_day_index(day_index, max_days) + 1
 
 
-async def fetch_open_meteo_gfs_default(lat: float, lon: float, **_: Any) -> dict[str, Any]:
-    return await fetch_open_meteo_gfs(lat, lon, days=7)
+async def fetch_open_meteo_default(
+    lat: float, lon: float, *, day_index: int = 0, **_: Any
+) -> dict[str, Any]:
+    return await fetch_open_meteo(lat, lon, days=_days_needed_for_day_index(day_index, 7))
+
+
+async def fetch_open_meteo_icon_default(
+    lat: float, lon: float, *, day_index: int = 0, **_: Any
+) -> dict[str, Any]:
+    return await fetch_open_meteo_icon(lat, lon, days=_days_needed_for_day_index(day_index, 7))
+
+
+async def fetch_open_meteo_gfs_default(
+    lat: float, lon: float, *, day_index: int = 0, **_: Any
+) -> dict[str, Any]:
+    return await fetch_open_meteo_gfs(lat, lon, days=_days_needed_for_day_index(day_index, 7))
 
 
 async def fetch_weatherapi_default(lat: float, lon: float, **_: Any) -> dict[str, Any]:
@@ -77,6 +94,7 @@ async def fetch_meteo_parapente_default(
     lat: float,
     lon: float,
     *,
+    day_index: int = 0,
     site_name: str | None = None,
     elevation_m: int | None = None,
     **_: Any,
@@ -87,6 +105,7 @@ async def fetch_meteo_parapente_default(
         site_name=site_name,
         elevation_m=elevation_m,
         days=1,
+        date=(datetime.now() + timedelta(days=_bounded_day_index(day_index, 7))).strftime("%Y%m%d"),
     )
 
 
@@ -107,7 +126,7 @@ async def fetch_meteoblue_default(
     site_name: str | None = None,
     **_: Any,
 ) -> dict[str, Any]:
-    return await fetch_meteoblue(lat, lon, city_name=site_name)
+    return await fetch_meteoblue(lat, lon, city_name=site_name or "location")
 
 
 async def fetch_met_no_default(lat: float, lon: float, **_: Any) -> dict[str, Any]:
