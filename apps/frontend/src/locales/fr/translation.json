@@ -326,7 +326,9 @@
         "acceptableWind": "Vent acceptable",
         "veryCloudy": "Très nuageux",
         "moderateWind": "Vent modéré",
-        "averageConditions": "Conditions moyennes"
+        "averageConditions": "Conditions moyennes",
+        "thunderstorms": "Orages",
+        "thunderstormRisk": "Risque d'orage"
       }
     },
     "criteria": {
