@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSuspenseQuery } from '@tanstack/react-query';
+import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
+import { RefreshCw } from 'lucide-react';
 import CurrentConditions from '../components/weather/CurrentConditions';
 import Forecast7Day from '../components/weather/Forecast7Day';
 import HourlyForecast from '../components/weather/HourlyForecast';
@@ -14,8 +15,15 @@ import {
   useBestSpotAPI,
   useHourlyBestSpotsAPI,
 } from '../hooks/weather/useBestSpotAPI';
-import { useCoordinateWeather } from '../hooks/weather/useCityWeather';
-import { transformWeatherResponse } from '../hooks/weather/useWeather';
+import {
+  createCoordinateWeatherQueryFn,
+  useCoordinateWeather,
+} from '../hooks/weather/useCityWeather';
+import {
+  createDailySummaryQueryFn,
+  createWeatherQueryFn,
+  transformWeatherResponse,
+} from '../hooks/weather/useWeather';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { useIsMobile } from '../hooks/useIsMobile';
 import WeatherEmptyState from '../components/weather/WeatherEmptyState';
@@ -205,6 +213,7 @@ const getSearchForTarget = (
 export default function WeatherPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: sites } = useSuspenseQuery(sitesQueryOptions());
   const favoriteSiteIds = useAppSettingsStore(
     (state) => state.settings.favoriteSites
@@ -226,6 +235,8 @@ export default function WeatherPage() {
     : 'favorites';
   const [selectionTab, setSelectionTab] =
     useState<WeatherSelectionTab>(routeSelectionTab);
+  const [isForceRefreshing, setIsForceRefreshing] = useState(false);
+  const [forceRefreshError, setForceRefreshError] = useState(false);
   useEffect(() => {
     setSelectionTab(routeSelectionTab);
   }, [routeSelectionTab]);
@@ -291,6 +302,86 @@ export default function WeatherPage() {
   const sourceLabel = selectedSearchTarget
     ? t('weather.source.search')
     : t('weather.source.favoriteSite');
+  const canForceRefresh =
+    isAuthenticated && Boolean(selectedSearchTarget || selectedSiteId);
+
+  const handleForceRefresh = async () => {
+    if (!canForceRefresh || isForceRefreshing) return;
+
+    setIsForceRefreshing(true);
+    setForceRefreshError(false);
+
+    try {
+      if (selectedSearchTarget && selectedSearchLocation) {
+        await queryClient.fetchQuery({
+          queryKey: [
+            'weather',
+            'coordinates',
+            selectedSearchLocation.latitude,
+            selectedSearchLocation.longitude,
+            selectedSearchLocation.name,
+            selectedDayIndex,
+          ],
+          queryFn: createCoordinateWeatherQueryFn(
+            selectedSearchLocation,
+            selectedDayIndex,
+            true
+          ),
+          staleTime: 0,
+        });
+        return;
+      }
+
+      if (!selectedSiteId) return;
+
+      await Promise.all([
+        queryClient.fetchQuery({
+          queryKey: ['weather', 'combined', selectedSiteId, selectedDayIndex],
+          queryFn: createWeatherQueryFn(selectedSiteId, selectedDayIndex, true),
+          staleTime: 0,
+        }),
+        queryClient.fetchQuery({
+          queryKey: ['weather', 'daily-summary', selectedSiteId],
+          queryFn: createDailySummaryQueryFn(selectedSiteId, true),
+          staleTime: 0,
+        }),
+      ]);
+      await queryClient.invalidateQueries({
+        queryKey: ['flight-decision', selectedSiteId, selectedDayIndex],
+      });
+    } catch {
+      setForceRefreshError(true);
+    } finally {
+      setIsForceRefreshing(false);
+    }
+  };
+
+  const forceRefreshControl = canForceRefresh ? (
+    <div className="flex flex-col items-start gap-2">
+      <button
+        type="button"
+        onClick={() => void handleForceRefresh()}
+        disabled={isForceRefreshing}
+        className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-black text-sky-700 shadow-sm transition-colors hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-900/60"
+      >
+        <RefreshCw
+          className={`h-4 w-4 ${isForceRefreshing ? 'animate-spin' : ''}`}
+          aria-hidden="true"
+        />
+        {isForceRefreshing
+          ? t('weather.refreshingData')
+          : t('weather.refreshData')}
+      </button>
+      {forceRefreshError && (
+        <p
+          role="alert"
+          className="text-sm font-semibold text-red-600 dark:text-red-400"
+        >
+          {t('weather.refreshError')}
+        </p>
+      )}
+    </div>
+  ) : undefined;
 
   const handleSelectFavoriteTab = () => {
     setSelectionTab('favorites');
@@ -478,6 +569,9 @@ export default function WeatherPage() {
         weatherData={selectedSearchWeatherData}
         isLoading={selectedSearchTarget ? isSearchWeatherLoading : undefined}
         isError={selectedSearchTarget ? isSearchWeatherError : undefined}
+        canForceRefresh={canForceRefresh}
+        isForceRefreshing={isForceRefreshing}
+        onForceRefresh={handleForceRefresh}
       />
     ) : undefined;
 
@@ -493,6 +587,7 @@ export default function WeatherPage() {
         stickySelectionBar={stickySelectionBar}
         forecastPanel={forecastDaySelector}
         bestSpotSuggestion={bestSpotSuggestion}
+        forceRefreshControl={forceRefreshControl}
         decisionPanel={mobileDecisionPanel}
         searchResultPanel={mobileSearchResultPanel}
         emptyPanel={mobileEmptyPanel}
@@ -511,6 +606,8 @@ export default function WeatherPage() {
       {stickySelectionBar}
 
       <div className="min-w-0 space-y-4">
+        {forceRefreshControl}
+
         {forecastDaySelector}
 
         {bestSpotSuggestion}
@@ -593,6 +690,9 @@ export default function WeatherPage() {
               selectedSearchTarget ? isSearchWeatherLoading : undefined
             }
             isError={selectedSearchTarget ? isSearchWeatherError : undefined}
+            canForceRefresh={canForceRefresh}
+            isForceRefreshing={isForceRefreshing}
+            onForceRefresh={handleForceRefresh}
           />
         )}
       </div>

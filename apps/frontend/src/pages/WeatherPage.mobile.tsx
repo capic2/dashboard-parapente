@@ -13,6 +13,7 @@ type WeatherPageMobileProps = {
   isAuthenticated: boolean;
   stickySelectionBar: ReactNode;
   bestSpotSuggestion: ReactNode;
+  forceRefreshControl?: ReactNode;
   decisionPanel?: ReactNode;
   searchResultPanel?: ReactNode;
   emptyPanel?: ReactNode;
@@ -71,6 +72,7 @@ export default function WeatherPageMobileLayout({
   isAuthenticated,
   stickySelectionBar,
   bestSpotSuggestion,
+  forceRefreshControl,
   decisionPanel,
   searchResultPanel,
   emptyPanel,
@@ -96,6 +98,8 @@ export default function WeatherPageMobileLayout({
         isSearchMode={isSearchMode}
         variant="mobile"
       />
+
+      {forceRefreshControl}
 
       {bestSpotSuggestion}
 

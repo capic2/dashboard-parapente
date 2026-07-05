@@ -188,12 +188,18 @@ export const transformWeatherResponse = (
  * EXPORTED for use in Forecast7Day and SiteSelector prefetch
  */
 export const createWeatherQueryFn =
-  (siteId: string, dayIndex: number) => async () => {
+  (siteId: string, dayIndex: number, forceRefresh = false) =>
+  async () => {
     if (!siteId) throw new Error('Site ID is required');
 
     // Fetch selected day first for current conditions (IMMEDIATE)
     const todayResponse = await api
-      .get(`weather/${siteId}?day_index=${dayIndex}`)
+      .get(`weather/${siteId}`, {
+        searchParams: {
+          day_index: dayIndex,
+          ...(forceRefresh ? { force_refresh: true } : {}),
+        },
+      })
       .json();
 
     // Validate today's response with Zod
@@ -222,13 +228,28 @@ export const useWeather = (siteId: string | undefined, dayIndex = 0) => {
     queryKey: ['weather', 'combined', siteId, dayIndex],
     queryFn: siteId
       ? createWeatherQueryFn(siteId, dayIndex)
-      : async () => {
+      : () => {
           throw new Error('Site ID required');
         },
     staleTime: getStaleTime(1000 * 60 * 30), // 30 minutes - weather forecasts don't change that fast
     enabled: !!siteId,
   });
 };
+
+export const createDailySummaryQueryFn =
+  (siteId: string, forceRefresh = false) =>
+  async () => {
+    if (!siteId) throw new Error('Site ID is required');
+    const data = await api
+      .get(`weather/${siteId}/daily-summary`, {
+        searchParams: {
+          days: 7,
+          ...(forceRefresh ? { force_refresh: true } : {}),
+        },
+      })
+      .json();
+    return DailySummarySchema.parse(data);
+  };
 
 /**
  * Hook to fetch daily summary for 7 days (lightweight, no hourly data)
@@ -245,13 +266,11 @@ export const useDailySummary = (
 ): UseQueryResult<DailySummary, Error> => {
   return useQuery({
     queryKey: ['weather', 'daily-summary', siteId],
-    queryFn: async () => {
-      if (!siteId) throw new Error('Site ID is required');
-      const data = await api
-        .get(`weather/${siteId}/daily-summary?days=7`)
-        .json();
-      return DailySummarySchema.parse(data);
-    },
+    queryFn: siteId
+      ? createDailySummaryQueryFn(siteId)
+      : () => {
+          throw new Error('Site ID required');
+        },
     staleTime: getStaleTime(1000 * 60 * 30), // 30 minutes - daily summaries don't change fast
     enabled: !!siteId,
   });

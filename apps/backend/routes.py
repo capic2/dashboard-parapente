@@ -624,6 +624,12 @@ public_router = APIRouter(prefix="/api", tags=["api"])
 router = APIRouter(prefix="/api", tags=["api"], dependencies=[Depends(get_current_user)])
 
 
+def _require_force_refresh_auth(force_refresh: bool, request: Request, db: Session) -> None:
+    """Keep weather endpoints public, but require auth for expensive forced refreshes."""
+    if force_refresh:
+        get_current_user(request, db)
+
+
 # ============================================================================
 # AUTHENTICATION ENDPOINTS (public)
 # ============================================================================
@@ -2669,6 +2675,7 @@ async def _build_coordinate_weather_payload(
     day_index: int,
     days: int = 1,
     elevation_m: int | None = None,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     """Build the standard weather payload for free coordinates."""
     day_index = max(0, min(6, day_index))
@@ -2681,6 +2688,7 @@ async def _build_coordinate_weather_payload(
             day_index + d,
             site_name=name,
             elevation_m=elevation_m,
+            force_refresh=force_refresh,
         )
         for d in range(days)
     ]
@@ -2755,19 +2763,30 @@ async def _build_coordinate_weather_payload(
 
 @public_router.get("/weather/coordinates")
 async def get_weather_by_coordinates(
+    request: Request,
     lat: float = Query(..., ge=-90, le=90),
     lon: float = Query(..., ge=-180, le=180),
     name: str = Query(default="Ville"),
     day_index: int = Query(default=0, ge=0, le=6),
     days: int = Query(default=1, ge=1, le=7),
+    force_refresh: bool = Query(default=False),
+    db: Session = Depends(get_db),
 ):
     """Get weather forecast for arbitrary coordinates such as a selected city."""
-    return await _build_coordinate_weather_payload(lat, lon, name, day_index, days)
+    _require_force_refresh_auth(force_refresh, request, db)
+    return await _build_coordinate_weather_payload(
+        lat, lon, name, day_index, days, force_refresh=force_refresh
+    )
 
 
 @public_router.get("/weather/{spot_id}")
 async def get_weather(
-    spot_id: str, day_index: int = 0, days: int = 1, db: Session = Depends(get_db)
+    spot_id: str,
+    request: Request,
+    day_index: int = 0,
+    days: int = 1,
+    force_refresh: bool = Query(default=False),
+    db: Session = Depends(get_db),
 ):
     """
     Get weather forecast for a spot (LIVE from all sources)
@@ -2780,6 +2799,7 @@ async def get_weather(
     """
     day_index = max(0, min(6, day_index))
     days = max(1, min(7, days))
+    _require_force_refresh_auth(force_refresh, request, db)
 
     site = db.query(Site).filter(Site.id == spot_id).first()
     if not site:
@@ -2796,6 +2816,7 @@ async def get_weather(
                 site_name=site.name,
                 elevation_m=site.elevation_m,
                 db=db,
+                force_refresh=force_refresh,
             )
         )
 
@@ -2920,9 +2941,14 @@ async def get_weather(
 
 
 @public_router.get("/weather/{spot_id}/today")
-async def get_weather_today(spot_id: str, db: Session = Depends(get_db)):
+async def get_weather_today(
+    spot_id: str,
+    request: Request,
+    force_refresh: bool = Query(default=False),
+    db: Session = Depends(get_db),
+):
     """Get today's weather forecast (day_index=0)"""
-    return await get_weather(spot_id, day_index=0, db=db)
+    return await get_weather(spot_id, request, day_index=0, force_refresh=force_refresh, db=db)
 
 
 @public_router.get("/sites/{site_id}/live-wind")
@@ -3066,7 +3092,13 @@ async def get_site_azba_airspace(
 
 
 @public_router.get("/weather/{spot_id}/summary")
-async def get_weather_summary(spot_id: str, day_index: int = 0, db: Session = Depends(get_db)):
+async def get_weather_summary(
+    spot_id: str,
+    request: Request,
+    day_index: int = 0,
+    force_refresh: bool = Query(default=False),
+    db: Session = Depends(get_db),
+):
     """
     Get lightweight weather summary for a site (optimized for site selector).
     Returns only essential data: para_index, verdict, wind_avg.
@@ -3075,6 +3107,8 @@ async def get_weather_summary(spot_id: str, day_index: int = 0, db: Session = De
     - Returns minimal data (no hourly details, no consensus breakdown)
     - Useful for site selector buttons to show quick status
     """
+    _require_force_refresh_auth(force_refresh, request, db)
+
     # Get the site
     site = db.query(Site).filter(Site.id == spot_id).first()
     if not site:
@@ -3088,6 +3122,7 @@ async def get_weather_summary(spot_id: str, day_index: int = 0, db: Session = De
         site_name=site.name,
         elevation_m=site.elevation_m,
         db=db,
+        force_refresh=force_refresh,
     )
 
     if not day_result.get("success"):
@@ -3135,7 +3170,13 @@ async def get_weather_summary(spot_id: str, day_index: int = 0, db: Session = De
 
 
 @public_router.get("/weather/{spot_id}/daily-summary")
-async def get_daily_summary(spot_id: str, days: int = 7, db: Session = Depends(get_db)):
+async def get_daily_summary(
+    spot_id: str,
+    request: Request,
+    days: int = 7,
+    force_refresh: bool = Query(default=False),
+    db: Session = Depends(get_db),
+):
     """
     Get multi-day summary WITHOUT hourly details (MUCH FASTER).
 
@@ -3170,6 +3211,7 @@ async def get_daily_summary(spot_id: str, days: int = 7, db: Session = Depends(g
     """
     try:
         days = max(1, min(7, days))
+        _require_force_refresh_auth(force_refresh, request, db)
 
         # Get the site
         site = db.query(Site).filter(Site.id == spot_id).first()
@@ -3200,6 +3242,7 @@ async def get_daily_summary(spot_id: str, days: int = 7, db: Session = Depends(g
                     sources=None,  # Use all 5 sources (default: open-meteo, weatherapi, meteo-parapente, meteociel, meteoblue)
                     site_name=site.name,
                     elevation_m=site.elevation_m,
+                    force_refresh=force_refresh,
                 )
             )
 

@@ -12,6 +12,8 @@ vi.mock('react-i18next', () => ({
         'weather.metricsUsed': 'Metriques utilisees',
         'weather.verdictLabel': 'Verdict',
         'weather.criteriaEvaluated': 'Criteres evalues',
+        'weather.refreshData': 'Recharger les données météo',
+        'weather.refreshingData': 'Rechargement...',
         'weather.hourly.reasons.thunderstorms': 'Orages',
         'weather.hourly.reasons.thunderstormRisk': "Risque d'orage",
       };
@@ -160,6 +162,32 @@ describe('HourlyForecast tooltip behavior', () => {
     render(<HourlyForecast spotId="site-1" dayIndex={0} />);
 
     expect(screen.getByText('NW (315°)')).toBeTruthy();
+  });
+
+  it('shows force refresh action only when allowed', () => {
+    const onForceRefresh = vi.fn();
+    const { rerender } = render(
+      <HourlyForecast
+        spotId="site-1"
+        dayIndex={0}
+        onForceRefresh={onForceRefresh}
+      />
+    );
+
+    expect(screen.queryByText('Recharger les données météo')).toBeNull();
+
+    rerender(
+      <HourlyForecast
+        spotId="site-1"
+        dayIndex={0}
+        canForceRefresh
+        onForceRefresh={onForceRefresh}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Recharger les données météo'));
+
+    expect(onForceRefresh).toHaveBeenCalledOnce();
   });
 
   it('shows thunderstorms as the hourly flyability reason', () => {
