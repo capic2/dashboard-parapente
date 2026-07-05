@@ -12,6 +12,7 @@ import {
   Cloud,
   Flame,
   CircleCheck,
+  RefreshCw,
 } from 'lucide-react';
 import { useAppSettings } from '../../hooks/settings/useAppSettings';
 import { useWeather } from '../../hooks/weather/useWeather';
@@ -30,6 +31,9 @@ interface HourlyForecastProps {
   weatherData?: WeatherData;
   isLoading?: boolean;
   isError?: boolean;
+  canForceRefresh?: boolean;
+  isForceRefreshing?: boolean;
+  onForceRefresh?: () => void;
 }
 
 // ============================================================================
@@ -699,6 +703,9 @@ export default function HourlyForecast({
   weatherData,
   isLoading: isOverrideLoading,
   isError: isOverrideError,
+  canForceRefresh = false,
+  isForceRefreshing = false,
+  onForceRefresh,
 }: HourlyForecastProps) {
   const { t } = useTranslation();
   const {
@@ -940,7 +947,24 @@ export default function HourlyForecast({
             {t('weather.hourly.description')}
           </p>
         </div>
-        <CacheTimestamp cachedAt={weather.cached_at} />
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <CacheTimestamp cachedAt={weather.cached_at} />
+          {canForceRefresh && onForceRefresh && (
+            <Button
+              onPress={onForceRefresh}
+              isDisabled={isForceRefreshing}
+              className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-700 transition-colors hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-900/60"
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${isForceRefreshing ? 'animate-spin' : ''}`}
+                aria-hidden="true"
+              />
+              {isForceRefreshing
+                ? t('weather.refreshingData')
+                : t('weather.refreshData')}
+            </Button>
+          )}
+        </div>
       </div>
       <div className="grid gap-3 md:hidden">
         {flyingHours.length > 0 ? (

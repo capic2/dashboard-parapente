@@ -31,9 +31,12 @@ export const useLocationSearch = (query: string, limit = 5) => {
 };
 
 export const useNearbyFlightOptions = (
-  location:
-    | { latitude: number; longitude: number; name: string; display_name: string }
-    | null,
+  location: {
+    latitude: number;
+    longitude: number;
+    name: string;
+    display_name: string;
+  } | null,
   radiusKm: number,
   limit: number
 ) => {
@@ -67,6 +70,27 @@ export const useNearbyFlightOptions = (
   });
 };
 
+export const createCoordinateWeatherQueryFn =
+  (
+    location: { latitude: number; longitude: number; name: string },
+    dayIndex: number,
+    forceRefresh = false
+  ) =>
+  async () => {
+    const data = await api
+      .get('weather/coordinates', {
+        searchParams: {
+          lat: location.latitude,
+          lon: location.longitude,
+          name: location.name,
+          day_index: dayIndex,
+          ...(forceRefresh ? { force_refresh: true } : {}),
+        },
+      })
+      .json();
+    return BackendWeatherResponseSchema.parse(data);
+  };
+
 export const useCoordinateWeather = (
   location: { latitude: number; longitude: number; name: string } | null,
   dayIndex: number
@@ -80,20 +104,11 @@ export const useCoordinateWeather = (
       location?.name,
       dayIndex,
     ],
-    queryFn: async () => {
-      if (!location) throw new Error('Location is required');
-      const data = await api
-        .get('weather/coordinates', {
-          searchParams: {
-            lat: location.latitude,
-            lon: location.longitude,
-            name: location.name,
-            day_index: dayIndex,
-          },
-        })
-        .json();
-      return BackendWeatherResponseSchema.parse(data);
-    },
+    queryFn: location
+      ? createCoordinateWeatherQueryFn(location, dayIndex)
+      : () => {
+          throw new Error('Location is required');
+        },
     enabled: !!location,
     staleTime: getStaleTime(1000 * 60 * 30),
   });

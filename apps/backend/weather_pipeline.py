@@ -594,6 +594,7 @@ async def get_normalized_forecast(
     site_name: str | None = None,
     elevation_m: int | None = None,
     db=None,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     """
     Complete pipeline: fetch -> normalize -> consensus (with Redis cache)
@@ -606,6 +607,7 @@ async def get_normalized_forecast(
         site_name: Site name (required for meteo_parapente)
         elevation_m: Site elevation in meters (required for meteo_parapente)
         db: Database session (optional, will create new one if not provided)
+        force_refresh: Skip cached forecast and fetch fresh source data
 
     Returns:
         Normalized consensus forecast with sunrise/sunset times
@@ -621,14 +623,17 @@ async def get_normalized_forecast(
         "forecast", lat=round(lat, 4), lon=round(lon, 4), day_index=day_index
     )
 
-    # Try cache first
-    try:
-        cached_result = await get_cached(cache_key)
-        if cached_result is not None:
-            logger.info(f"✅ Cache HIT for forecast: {cache_key}")
-            return cached_result
-    except Exception as e:
-        logger.warning(f"Cache get error: {e}, falling back to live fetch")
+    # Try cache first unless the caller explicitly asks for fresh source data.
+    if not force_refresh:
+        try:
+            cached_result = await get_cached(cache_key)
+            if cached_result is not None:
+                logger.info(f"✅ Cache HIT for forecast: {cache_key}")
+                return cached_result
+        except Exception as e:
+            logger.warning(f"Cache get error: {e}, falling back to live fetch")
+    else:
+        logger.info(f"🔄 Force refresh for forecast: {cache_key}, fetching live...")
 
     logger.info(f"❌ Cache MISS for forecast: {cache_key}, fetching live...")
 
@@ -673,6 +678,7 @@ async def get_daily_aggregate(
     site_name: str | None = None,
     elevation_m: int | None = None,
     db=None,
+    force_refresh: bool = False,
 ) -> dict[str, Any] | None:
     """
     Get daily aggregate data (SIMPLIFIED - reuses get_normalized_forecast).
@@ -699,7 +705,14 @@ async def get_daily_aggregate(
     """
     # Reuse get_normalized_forecast (already working and tested)
     forecast_result = await get_normalized_forecast(
-        lat, lon, day_index, sources=sources, site_name=site_name, elevation_m=elevation_m, db=db
+        lat,
+        lon,
+        day_index,
+        sources=sources,
+        site_name=site_name,
+        elevation_m=elevation_m,
+        db=db,
+        force_refresh=force_refresh,
     )
 
     if not forecast_result.get("success"):

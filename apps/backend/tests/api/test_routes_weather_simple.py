@@ -21,6 +21,11 @@ class TestWeatherEndpointBasic:
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
 
+    def test_get_weather_force_refresh_requires_auth(self, client, db_session):
+        """GET /weather/{spot_id}?force_refresh=true requires a real auth token."""
+        response = client.get(f"{API_PREFIX}/weather/non-existent-spot?force_refresh=true")
+        assert response.status_code == 401
+
     def test_get_weather_valid_spot_responds(self, client, db_session, arguel_site):
         """GET /weather/{spot_id} responds for valid spot (may fail if API down)"""
         response = client.get(f"{API_PREFIX}/weather/site-arguel")

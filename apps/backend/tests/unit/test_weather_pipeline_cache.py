@@ -132,6 +132,52 @@ async def test_cache_miss_fetches_and_caches(mock_redis):
 
 
 @pytest.mark.asyncio
+async def test_force_refresh_skips_cache_and_updates_cache(mock_redis):
+    """force_refresh should bypass cache reads, fetch live data, and cache the fresh result."""
+    from weather_pipeline import get_normalized_forecast
+
+    aggregated = {
+        "sources": {
+            "open-meteo": {
+                "success": True,
+                "data": {
+                    "daily": {
+                        "sunrise": ["2026-03-30T07:15"],
+                        "sunset": ["2026-03-30T19:30"],
+                    }
+                },
+                "hourly": [
+                    {"hour": 12, "temperature": 18, "wind_speed": 15, "wind_direction": 270}
+                ],
+            }
+        }
+    }
+    consensus = {
+        "success": True,
+        "consensus": [{"hour": 12, "temperature": 18, "wind_speed": 15, "wind_direction": 270}],
+        "total_sources": 1,
+    }
+
+    with (
+        patch("cache.get_cached", new=AsyncMock(return_value=_make_cached_forecast())) as mock_get,
+        patch("cache.set_cached", new=AsyncMock()) as mock_set,
+        patch(
+            "weather_pipeline.aggregate_forecasts", new=AsyncMock(return_value=aggregated)
+        ) as mock_agg,
+        patch("weather_pipeline.normalize_data", return_value={"success": True, "normalized": []}),
+        patch("weather_pipeline.calculate_consensus", return_value=consensus),
+        patch("weather_pipeline.extract_sunrise_sunset", return_value=("07:15", "19:30")),
+    ):
+        result = await get_normalized_forecast(lat=47.2, lon=6.0, day_index=0, force_refresh=True)
+
+        mock_get.assert_not_called()
+        mock_agg.assert_called_once()
+        mock_set.assert_called_once()
+        assert result["success"] is True
+        assert result["sunrise"] == "07:15"
+
+
+@pytest.mark.asyncio
 async def test_cache_error_falls_back_to_live_fetch():
     """If cache read raises an exception, should fall back to live fetch."""
     from weather_pipeline import get_normalized_forecast
