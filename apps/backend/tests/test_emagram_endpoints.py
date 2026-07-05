@@ -114,6 +114,47 @@ class TestEmagramEndpoints:
         assert data["station_code"] == "site-arguel"
         assert data["score_volabilite"] == 72
 
+    def test_get_latest_returns_recent_partial_analysis(self, client, db_session):
+        """Partial analyses are exposed instead of causing immediate regeneration loops."""
+        site = Site(
+            id="site-partial",
+            code="PAR",
+            name="Partial Site",
+            latitude=47.2,
+            longitude=6.0,
+            elevation_m=427,
+        )
+        db_session.add(site)
+
+        analysis = EmagramAnalysis(
+            id="partial-site-analysis",
+            station_code="site-partial",
+            station_name="Partial Site",
+            station_latitude=47.2,
+            station_longitude=6.0,
+            analysis_date=datetime.utcnow().date(),
+            analysis_time=datetime.utcnow().time(),
+            analysis_datetime=datetime.utcnow(),
+            forecast_date=datetime.utcnow().date(),
+            distance_km=0.0,
+            data_source="test",
+            sounding_time="12Z",
+            analysis_method="llm_vision",
+            score_volabilite=55,
+            analysis_status="partial",
+            sources_count=1,
+        )
+        db_session.add(analysis)
+        db_session.commit()
+
+        response = client.get("/api/emagram/latest?site_id=site-partial&auto_analyze=true")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == "partial-site-analysis"
+        assert data["analysis_status"] == "partial"
+        assert data["sources_count"] == 1
+
     def test_get_emagram_screenshot_regenerates_missing_file(self, client, db_session, tmp_path):
         """Missing screenshot files are regenerated instead of returning 404"""
         from models import EmagramAnalysis

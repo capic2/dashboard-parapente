@@ -95,7 +95,8 @@ COPY --from=frontend-builder /workspace/dist/apps/frontend ./static
 
 # Créer répertoires pour la base de données et les exports vidéo
 RUN mkdir -p /app/db && chmod 755 /app/db && \
-    mkdir -p /app/exports/videos && chmod 755 /app/exports/videos
+    mkdir -p /app/exports/videos && chmod 755 /app/exports/videos && \
+    mkdir -p /app/emagram-cache && chmod 755 /app/emagram-cache
 
 # Rendre le script d'entrypoint exécutable
 RUN chmod +x entrypoint.sh

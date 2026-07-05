@@ -6,6 +6,7 @@ Captures emagram images from Meteo-Parapente, TopMeteo, and Windy
 import asyncio
 import base64
 import logging
+import os
 from contextlib import suppress
 from datetime import datetime
 from datetime import timedelta
@@ -20,7 +21,7 @@ from playwright.async_api import async_playwright
 logger = logging.getLogger(__name__)
 
 # Cache directory for temporary screenshots
-EMAGRAM_CACHE_DIR = Path("/tmp/emagram_cache")
+EMAGRAM_CACHE_DIR = Path(os.getenv("BACKEND_EMAGRAM_CACHE_DIR", "/tmp/emagram_cache"))
 EMAGRAM_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 METEO_PARAPENTE_SCREENSHOT_TIMEOUT_SECONDS = 35
 METEOCIEL_SCREENSHOT_TIMEOUT_SECONDS = 30
@@ -78,6 +79,19 @@ async def _capture_page_png(
     else:
         screenshot_kwargs["full_page"] = False
     await page.screenshot(**screenshot_kwargs)
+
+
+def _write_image_atomically(image_path: Path, content: bytes) -> None:
+    if not content:
+        raise RuntimeError("Downloaded image is empty")
+
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = image_path.with_suffix(f"{image_path.suffix}.tmp")
+    tmp_path.write_bytes(content)
+    if tmp_path.stat().st_size == 0:
+        tmp_path.unlink(missing_ok=True)
+        raise RuntimeError("Downloaded image was written as an empty file")
+    tmp_path.replace(image_path)
 
 
 async def screenshot_meteo_parapente(
@@ -218,6 +232,7 @@ async def screenshot_meteo_parapente(
                         )
 
             # Navigate to the correct hour if specified
+            hour_navigated = hour is None
             if hour is not None:
                 logger.info(f"Navigating to hour {hour}h on Meteo-Parapente...")
                 hour_navigated = False
@@ -257,12 +272,11 @@ async def screenshot_meteo_parapente(
                                 continue
 
                     if not hour_navigated:
-                        logger.warning(
-                            f"Could not navigate to hour {hour} on Meteo-Parapente, "
-                            "capturing default hour"
+                        raise RuntimeError(
+                            f"Could not navigate Meteo-Parapente to requested hour {hour}"
                         )
                 except Exception as e:
-                    logger.warning(f"Hour navigation failed: {e}")
+                    raise RuntimeError(f"Hour navigation failed: {e}") from e
 
             # Wait for emagram to render
             await page.wait_for_timeout(5000)
@@ -283,6 +297,8 @@ async def screenshot_meteo_parapente(
             "source": "meteo-parapente",
             "image_path": str(image_path),
             "external_url": url,
+            "requested_hour": hour,
+            "hour_confirmed": hour is None or hour_navigated,
             "timestamp": datetime.now().isoformat(),
         }
 
@@ -386,7 +402,13 @@ async def screenshot_meteociel_emagram(
 
             image_response = await client.get(image_src)
             image_response.raise_for_status()
-            image_path.write_bytes(image_response.content)
+            content_type = image_response.headers.get("content-type", "")
+            if content_type and not content_type.startswith("image/"):
+                logger.warning(
+                    "Meteociel emagram image response has unexpected content-type: %s",
+                    content_type,
+                )
+            _write_image_atomically(image_path, image_response.content)
 
         if not image_path.exists() or image_path.stat().st_size == 0:
             raise RuntimeError("Meteociel emagram image was not written")
@@ -631,7 +653,7 @@ def cleanup_old_screenshots(max_age_hours: int = 1, cache_dir: Path | None = Non
             fresh_analyses = (
                 db.query(EmagramAnalysis)
                 .filter(
-                    EmagramAnalysis.analysis_status == "completed",
+                    EmagramAnalysis.analysis_status.in_(["completed", "partial"]),
                     EmagramAnalysis.analysis_datetime >= get_emagram_cutoff_utc(db=db),
                     EmagramAnalysis.screenshot_paths.isnot(None),
                 )
