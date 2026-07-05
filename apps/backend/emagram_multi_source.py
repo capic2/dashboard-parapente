@@ -44,6 +44,7 @@ PROVIDER_ENV_VARS = {
 }
 
 _LLM_QUOTA_COOLDOWNS: dict[str, float] = {}
+MIN_COMPLETED_EMAGRAM_SOURCES = 2
 
 
 def _to_float(value: Any) -> float | None:
@@ -464,6 +465,10 @@ def _is_usable_llm_analysis(analysis: dict[str, Any]) -> bool:
     return not any(phrase in details or phrase in advice for phrase in failure_phrases)
 
 
+def _analysis_status_for_sources(successful_source_count: int) -> str:
+    return "completed" if successful_source_count >= MIN_COMPLETED_EMAGRAM_SOURCES else "partial"
+
+
 async def generate_multi_source_emagram_for_spot(
     site_id: str,
     db: Session,
@@ -528,7 +533,7 @@ async def generate_multi_source_emagram_for_spot(
                 EmagramAnalysis.station_code == site_id,
                 EmagramAnalysis.analysis_method == "llm_vision",
                 EmagramAnalysis.analysis_datetime >= cutoff_time,
-                EmagramAnalysis.analysis_status == "completed",
+                EmagramAnalysis.analysis_status.in_(["completed", "partial"]),
                 EmagramAnalysis.forecast_date == forecast_date,
             ]
             if hour is not None:
@@ -598,7 +603,11 @@ async def generate_multi_source_emagram_for_spot(
                 failure_result["analysis_id"] = failed_analysis.id
             return failure_result
 
-        logger.info(f"📸 {len(successful_screenshots)}/3 screenshots successful")
+        logger.info(
+            "📸 %s/%s emagram sources successful",
+            len(successful_screenshots),
+            screenshot_result.get("sources_total", 0),
+        )
 
         # Step 4: Analyze with AI using the configured fallback chain.
         image_sources = [
@@ -750,6 +759,14 @@ def save_emagram_analysis(
             source_name = screenshot.get("source", "unknown")
             sources_errors[source_name] = screenshot.get("error", "Unknown error")
 
+    source_count = screenshot_result.get("sources_successful", 0)
+    analysis_status = _analysis_status_for_sources(source_count)
+    if analysis_status == "partial":
+        sources_errors["analysis_quality"] = (
+            f"Only {source_count}/{screenshot_result.get('sources_total', 0)} emagram sources "
+            "were available; analysis saved as partial."
+        )
+
     # Create EmagramAnalysis object
     emagram = EmagramAnalysis(
         id=analysis_id,
@@ -794,19 +811,19 @@ def save_emagram_analysis(
         # Raw data storage (new fields for multi-source)
         external_source_urls=json.dumps(external_urls, ensure_ascii=False),
         screenshot_paths=json.dumps(screenshot_paths, ensure_ascii=False),
-        sources_count=screenshot_result.get("sources_successful", 0),
+        sources_count=source_count,
         sources_agreement=analysis_result.get("sources_agreement"),
         sources_errors=json.dumps(sources_errors, ensure_ascii=False) if sources_errors else None,
         ai_raw_response=json.dumps(analysis_result, ensure_ascii=False),
         # Status
-        analysis_status="completed",
+        analysis_status=analysis_status,
     )
 
     db.add(emagram)
     db.commit()
     db.refresh(emagram)
 
-    logger.info(f"💾 Saved emagram analysis {analysis_id} to database")
+    logger.info("💾 Saved %s emagram analysis %s to database", analysis_status, analysis_id)
 
     return emagram
 
@@ -894,8 +911,9 @@ def emagram_analysis_to_dict(emagram: EmagramAnalysis, db: Session | None = None
         alertes = []
 
     return {
-        "success": emagram.analysis_status == "completed",
+        "success": emagram.analysis_status in {"completed", "partial"},
         "analysis_id": emagram.id,
+        "analysis_status": emagram.analysis_status,
         "spot_name": emagram.station_name,
         "spot_id": emagram.station_code,
         "last_update": emagram.analysis_datetime.isoformat(),

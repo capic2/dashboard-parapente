@@ -6,6 +6,7 @@ Skew-T generator used by the LLM vision pipeline.
 """
 
 from datetime import datetime
+from time import monotonic
 from typing import Any
 
 import httpx
@@ -30,6 +31,8 @@ OPEN_METEO_MODEL_CONFIGS = {
         "model": "auto",
     },
 }
+OPEN_METEO_RATE_LIMIT_COOLDOWN_SECONDS = 15 * 60
+_OPEN_METEO_RATE_LIMIT_COOLDOWNS: dict[str, float] = {}
 
 COMMON_PRESSURE_LEVELS = [
     1000,
@@ -125,6 +128,30 @@ def _target_hour_index(day_index: int, hour: int | None, forecast_hour: int) -> 
     return forecast_hour
 
 
+def _open_meteo_cooldown_key(model_key: str, latitude: float, longitude: float) -> str:
+    return f"{model_key}:{latitude:.3f}:{longitude:.3f}"
+
+
+def _get_open_meteo_cooldown_error(cooldown_key: str, source: str) -> dict[str, Any] | None:
+    expires_at = _OPEN_METEO_RATE_LIMIT_COOLDOWNS.get(cooldown_key)
+    if not expires_at:
+        return None
+
+    now = monotonic()
+    if expires_at <= now:
+        _OPEN_METEO_RATE_LIMIT_COOLDOWNS.pop(cooldown_key, None)
+        return None
+
+    remaining_seconds = int(expires_at - now)
+    return {
+        "success": False,
+        "source": source,
+        "error": f"Open-Meteo rate limited; cooling down for {remaining_seconds}s",
+        "rate_limited": True,
+        "retry_after_seconds": remaining_seconds,
+    }
+
+
 def _hourly_value(hourly: dict[str, list[Any]], key: str, index: int) -> Any:
     values = hourly.get(key) or []
     if index < 0 or index >= len(values):
@@ -167,6 +194,10 @@ async def fetch_open_meteo_sounding(
         return {"success": False, "source": "open-meteo", "error": f"Unknown model {model_key}"}
 
     config = OPEN_METEO_MODEL_CONFIGS[model_key]
+    cooldown_key = _open_meteo_cooldown_key(model_key, latitude, longitude)
+    if cooldown_error := _get_open_meteo_cooldown_error(cooldown_key, config["source"]):
+        return cooldown_error
+
     pressure_levels = _pressure_levels_for_model(model_key)
     if (
         day_index < 0
@@ -279,6 +310,23 @@ async def fetch_open_meteo_sounding(
         }
 
     except httpx.HTTPStatusError as e:
+        retry_after = e.response.headers.get("retry-after")
+        retry_after_seconds = None
+        if retry_after:
+            try:
+                retry_after_seconds = max(1, int(retry_after))
+            except ValueError:
+                retry_after_seconds = None
+        if e.response.status_code == 429:
+            cooldown_seconds = retry_after_seconds or OPEN_METEO_RATE_LIMIT_COOLDOWN_SECONDS
+            _OPEN_METEO_RATE_LIMIT_COOLDOWNS[cooldown_key] = monotonic() + cooldown_seconds
+            return {
+                "success": False,
+                "source": config["source"],
+                "error": f"Open-Meteo rate limited (HTTP 429); cooling down for {cooldown_seconds}s",
+                "rate_limited": True,
+                "retry_after_seconds": cooldown_seconds,
+            }
         return {
             "success": False,
             "source": config["source"],

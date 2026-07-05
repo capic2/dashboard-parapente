@@ -6281,7 +6281,7 @@ async def get_latest_emagram(
 
         analysis_filters = [
             EmagramAnalysis.forecast_date == target_date,
-            EmagramAnalysis.analysis_status == "completed",
+            EmagramAnalysis.analysis_status.in_(["completed", "partial"]),
             EmagramAnalysis.analysis_datetime >= cutoff_time,
         ]
         if hour is not None:
@@ -6322,7 +6322,7 @@ async def get_latest_emagram(
                     min_distance = dist
                     result = analysis
 
-        # If no completed analysis, check for recent failed ones to show the error
+        # If no usable analysis, check for recent failed ones to show the error
         if result is None and site_id:
             failed_filters = [
                 EmagramAnalysis.forecast_date == target_date,
@@ -6735,7 +6735,7 @@ async def trigger_emagram_analysis(
                     EmagramAnalysis.station_code == closest_site.id,
                     EmagramAnalysis.analysis_method == "llm_vision",
                     EmagramAnalysis.analysis_datetime >= cutoff_time,
-                    EmagramAnalysis.analysis_status == "completed",
+                    EmagramAnalysis.analysis_status.in_(["completed", "partial"]),
                     EmagramAnalysis.forecast_date == forecast_date,
                 )
                 .count()
@@ -6748,7 +6748,7 @@ async def trigger_emagram_analysis(
                         EmagramAnalysis.station_code == closest_site.id,
                         EmagramAnalysis.analysis_method == "llm_vision",
                         EmagramAnalysis.analysis_datetime >= cutoff_time,
-                        EmagramAnalysis.analysis_status == "completed",
+                        EmagramAnalysis.analysis_status.in_(["completed", "partial"]),
                         EmagramAnalysis.forecast_date == forecast_date,
                     )
                     .order_by(EmagramAnalysis.analysis_datetime.desc())
@@ -6766,7 +6766,7 @@ async def trigger_emagram_analysis(
                 EmagramAnalysis.station_code == closest_site.id,
                 EmagramAnalysis.analysis_method == "llm_vision",
                 EmagramAnalysis.analysis_datetime >= cutoff_time,
-                EmagramAnalysis.analysis_status == "completed",
+                EmagramAnalysis.analysis_status.in_(["completed", "partial"]),
                 EmagramAnalysis.forecast_date == forecast_date,
                 EmagramAnalysis.forecast_hour == request.hour,
             ]

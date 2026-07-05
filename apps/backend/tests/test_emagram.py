@@ -430,5 +430,122 @@ class TestCleanupOldScreenshots:
         assert recent.exists()
 
 
+class TestEmagramProductionHardening:
+    """Regression tests for production emagram failure modes."""
+
+    def test_write_image_atomically_rejects_empty_content(self, tmp_path):
+        from scrapers.emagram_screenshots import _write_image_atomically
+
+        image_path = tmp_path / "empty.png"
+
+        with pytest.raises(RuntimeError, match="empty"):
+            _write_image_atomically(image_path, b"")
+
+        assert not image_path.exists()
+
+    def test_write_image_atomically_writes_non_empty_content(self, tmp_path):
+        from scrapers.emagram_screenshots import _write_image_atomically
+
+        image_path = tmp_path / "emagram.png"
+
+        _write_image_atomically(image_path, b"png-bytes")
+
+        assert image_path.read_bytes() == b"png-bytes"
+
+    def test_single_source_analysis_is_saved_as_partial(self, db_session):
+        import json
+
+        from emagram_multi_source import save_emagram_analysis
+        from models import Site
+
+        site = Site(
+            id="site-single-source",
+            code="SSS",
+            name="Single Source",
+            latitude=47.0,
+            longitude=6.0,
+            elevation_m=500,
+        )
+        db_session.add(site)
+        db_session.commit()
+
+        emagram = save_emagram_analysis(
+            db=db_session,
+            site=site,
+            screenshot_result={
+                "sources_successful": 1,
+                "sources_total": 4,
+                "screenshots": [
+                    {
+                        "success": True,
+                        "source": "meteo-parapente",
+                        "image_path": "/tmp/emagram.png",
+                        "external_url": "https://example.test/emagram",
+                    },
+                    {
+                        "success": False,
+                        "source": "open-meteo-arome",
+                        "error": "Open-Meteo rate limited",
+                    },
+                ],
+            },
+            analysis_result={
+                "llm_provider": "groq",
+                "llm_model": "test-model",
+                "plafond_thermique_m": 1800,
+                "force_thermique_ms": 1.5,
+                "score_volabilite": 55,
+                "conseils_vol": "Analyse de confiance reduite.",
+                "alertes_securite": [],
+            },
+        )
+
+        assert emagram.analysis_status == "partial"
+        assert emagram.sources_count == 1
+        assert emagram.sources_errors is not None
+        errors = json.loads(emagram.sources_errors)
+        assert "analysis_quality" in errors
+        assert "open-meteo-arome" in errors
+
+    @pytest.mark.asyncio
+    async def test_open_meteo_429_sets_cooldown(self, monkeypatch):
+        import httpx
+        import scrapers.open_meteo_sounding as sounding
+
+        sounding._OPEN_METEO_RATE_LIMIT_COOLDOWNS.clear()
+
+        class RateLimitedClient:
+            calls = 0
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+            async def get(self, url, params=None):
+                RateLimitedClient.calls += 1
+                request = httpx.Request("GET", url, params=params)
+                response = httpx.Response(429, request=request, headers={"retry-after": "42"})
+                raise httpx.HTTPStatusError("rate limited", request=request, response=response)
+
+        monkeypatch.setattr(sounding.httpx, "AsyncClient", RateLimitedClient)
+
+        first = await sounding.fetch_open_meteo_sounding(47.0, 6.0, model="icon")
+        second = await sounding.fetch_open_meteo_sounding(47.0, 6.0, model="icon")
+
+        assert first["success"] is False
+        assert first["rate_limited"] is True
+        assert first["retry_after_seconds"] == 42
+        assert second["success"] is False
+        assert second["rate_limited"] is True
+        assert RateLimitedClient.calls == 1
+
+        sounding._OPEN_METEO_RATE_LIMIT_COOLDOWNS.clear()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

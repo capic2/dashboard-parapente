@@ -110,6 +110,7 @@ services:
       # Backend - Video export storage
       - BACKEND_VIDEO_EXPORT_DIR=${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
       - BACKEND_VIDEO_TEMP_IMAGES_DIR=${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
+      - BACKEND_EMAGRAM_CACHE_DIR=${BACKEND_EMAGRAM_CACHE_DIR:-/app/emagram-cache}
 
       # Backend - GoPro overlay toolchain
       - BACKEND_GOPRO_OVERLAY_ROOT=/app/gopro-overlay
@@ -133,6 +134,7 @@ services:
       - /home/capic/docker-data/dashboard-parapente/db:/app/db
       - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
       - ${VIDEO_TEMP_IMAGES_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/video-temp-images}:${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
+      - ${EMAGRAM_CACHE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/emagram-cache}:${BACKEND_EMAGRAM_CACHE_DIR:-/app/emagram-cache}
       - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8001/health']
