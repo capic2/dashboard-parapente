@@ -159,6 +159,7 @@ export const transformWeatherResponse = (
     temperature: currentHour.temperature ?? metrics.avg_temp_c ?? 0,
     wind_speed: currentHour.wind_speed ?? metrics.avg_wind_kmh ?? 0,
     wind_direction: formatWindDirection(currentHour.wind_direction),
+    wind_direction_deg: currentHour.wind_direction ?? null,
     wind_gusts: currentHour.wind_gust ?? metrics.max_gust_kmh ?? 0,
     conditions: buildCurrentConditions(),
     forecast_time: data.cached_at || new Date().toISOString(),
