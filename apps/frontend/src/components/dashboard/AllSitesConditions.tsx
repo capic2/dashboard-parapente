@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { Cloud, Thermometer, Wind } from 'lucide-react';
 import { WindIndicator } from '../common/WindIndicator';
 import CacheTimestamp from '../common/CacheTimestamp';
+import WindArrow from '../weather/WindArrow';
 import type { WeatherData } from '../../types';
 import type { Site } from '@dashboard-parapente/shared-types';
 import { getSiteDisplayName } from '../../lib/siteDisplay';
@@ -121,6 +122,13 @@ function SiteConditionCard({
                 <span className="font-bold text-slate-950 dark:text-white">
                   {weather.wind_speed} km/h
                 </span>
+                {weather.wind_direction_deg != null && (
+                  <WindArrow
+                    degrees={weather.wind_direction_deg}
+                    size={16}
+                    className="text-slate-700 dark:text-slate-200"
+                  />
+                )}
                 {site.orientation && (
                   <WindIndicator
                     windDirection={weather.wind_direction}

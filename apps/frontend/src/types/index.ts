@@ -27,6 +27,7 @@ export interface WeatherData {
   temperature: number;
   wind_speed: number;
   wind_direction: string;
+  wind_direction_deg?: number | null;
   wind_gusts?: number;
   conditions: string;
   forecast_time: string;

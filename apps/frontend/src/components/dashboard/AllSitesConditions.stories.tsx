@@ -25,6 +25,7 @@ const makeWeather = (
   temp: number,
   windSpeed: number,
   windDir: string,
+  windDegrees: number,
   conditions: string
 ): WeatherData => ({
   spot_name: name,
@@ -34,6 +35,7 @@ const makeWeather = (
   temperature: temp,
   wind_speed: windSpeed,
   wind_direction: windDir,
+  wind_direction_deg: windDegrees,
   conditions,
   forecast_time: '2025-06-15T10:00:00Z',
   cached_at: '2025-06-15T10:00:00Z',
@@ -42,7 +44,7 @@ const makeWeather = (
 const threeEntries: SiteWeatherEntry[] = [
   {
     site: makeSite('site-1', 'Arguel', 'NW'),
-    weather: makeWeather('Arguel', 82, 'bon', 22, 12, 'NW', 'Ensoleillé'),
+    weather: makeWeather('Arguel', 82, 'bon', 22, 12, 'NW', 315, 'Ensoleillé'),
     isLoading: false,
     isError: false,
   },
@@ -55,6 +57,7 @@ const threeEntries: SiteWeatherEntry[] = [
       18,
       22,
       'S',
+      180,
       '45% nuages, Sec'
     ),
     isLoading: false,
@@ -69,6 +72,7 @@ const threeEntries: SiteWeatherEntry[] = [
       12,
       35,
       'E',
+      90,
       '85% nuages, 3mm pluie'
     ),
     isLoading: false,
@@ -103,6 +107,7 @@ Default.test('displays all site cards', async ({ canvas }) => {
   await canvas.findByText('Arguel');
   await expect(canvas.getByText('Mont Poupet Sud')).toBeInTheDocument();
   await expect(canvas.getByText('La Côte')).toBeInTheDocument();
+  await expect(canvas.getByLabelText('Vent 315°')).toBeInTheDocument();
 });
 
 // Loading state
