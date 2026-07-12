@@ -110,10 +110,16 @@ def get_wind_favorability(
         return "bad"
 
 
-def get_wind_score_multiplier(favorability: str) -> float:
-    """Get score multiplier based on wind favorability"""
-    multipliers = {"good": 1.0, "moderate": 0.7, "bad": 0.3}
-    return multipliers.get(favorability, 0.7)
+def calculate_wind_adjusted_score(para_index: float, favorability: str) -> int:
+    """Return a 0-100 score whose bands preserve wind-category priority."""
+    score_bands = {
+        "good": (68, 100),
+        "moderate": (34, 66),
+        "bad": (0, 32),
+    }
+    lower_bound, upper_bound = score_bands.get(favorability, score_bands["moderate"])
+    clamped_para_index = min(max(para_index, 0), 100)
+    return round(lower_bound + (upper_bound - lower_bound) * clamped_para_index / 100)
 
 
 def _filter_flyable_hours(
@@ -235,8 +241,7 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
                 )
 
                 # Calculate final score
-                wind_multiplier = get_wind_score_multiplier(wind_favorability)
-                final_score = para_index * wind_multiplier
+                final_score = calculate_wind_adjusted_score(para_index, wind_favorability)
 
                 # Calculate best flyable slot
                 slots = analyze_hourly_slots(flyable_hours)
@@ -470,8 +475,7 @@ async def calculate_best_spot_from_db(db: Session, day_index: int = 0) -> dict[s
             wind_favorability = get_wind_favorability(wind_direction, site.orientation, wind_speed)
 
             # Calculate final score
-            wind_multiplier = get_wind_score_multiplier(wind_favorability)
-            final_score = para_index * wind_multiplier
+            final_score = calculate_wind_adjusted_score(para_index, wind_favorability)
 
             # Generate reason text
             if para_index >= 70:
@@ -585,7 +589,7 @@ async def calculate_hourly_best_spots_from_cache(
                     wind_favorability = get_wind_favorability(
                         wind_dir_str, site.orientation, wind_speed
                     )
-                    final_score = para_index * get_wind_score_multiplier(wind_favorability)
+                    final_score = calculate_wind_adjusted_score(para_index, wind_favorability)
 
                     parts = [f"Para-Index {para_index}"]
                     if wind_dir_str and wind_speed is not None:

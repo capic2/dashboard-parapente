@@ -18,6 +18,7 @@ Strategy:
 """
 
 from datetime import date, datetime
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -29,9 +30,9 @@ from best_spot import (
     calculate_best_spot_from_cache,
     calculate_best_spot_from_db,
     calculate_hourly_best_spots_from_cache,
+    calculate_wind_adjusted_score,
     degrees_to_cardinal,
     get_wind_favorability,
-    get_wind_score_multiplier,
     parse_wind_direction,
     refresh_best_spot_cache,
 )
@@ -170,14 +171,10 @@ def test_get_wind_favorability_missing_data():
     assert get_wind_favorability("SW", "SW", None) == "moderate"
 
 
-def test_get_wind_score_multiplier():
-    """Test wind score multiplier"""
-    assert get_wind_score_multiplier("good") == 1.0
-    assert get_wind_score_multiplier("moderate") == 0.7
-    assert get_wind_score_multiplier("bad") == 0.3
-
-    # Unknown favorability defaults to moderate
-    assert get_wind_score_multiplier("unknown") == 0.7
+def test_wind_category_score_bands_are_strictly_ordered() -> None:
+    """A less favorable wind category can never receive a higher score."""
+    assert calculate_wind_adjusted_score(0, "good") > calculate_wind_adjusted_score(100, "moderate")
+    assert calculate_wind_adjusted_score(0, "moderate") > calculate_wind_adjusted_score(100, "bad")
 
 
 # ============================================================================
@@ -242,6 +239,51 @@ async def test_calculate_best_spot_from_cache_success(db_session, arguel_site, c
     assert result["paraIndex"] == 75
     assert result["windFavorability"] == "good"
     assert result["score"] > 0
+
+
+@pytest.mark.asyncio
+async def test_daily_best_spot_prioritizes_wind_category_over_para_index(
+    db_session, arguel_site, chalais_site
+) -> None:
+    """A good wind category wins even when another site has a higher Para-Index."""
+    forecasts = {
+        "Arguel": {
+            "success": True,
+            "sunrise": "07:00",
+            "sunset": "19:00",
+            "consensus": [{"hour": 12, "wind_speed": 15, "wind_direction": 225}],
+        },
+        "Chalais": {
+            "success": True,
+            "sunrise": "07:00",
+            "sunset": "19:00",
+            "consensus": [{"hour": 12, "wind_speed": 15, "wind_direction": 90}],
+        },
+    }
+
+    async def mock_get_forecast(
+        lat: float,
+        lon: float,
+        day_index: int,
+        site_name: str | None = None,
+        elevation_m: float | None = None,
+        db: object | None = None,
+    ) -> dict[str, Any]:
+        return forecasts[site_name]
+
+    def mock_calculate_para_index(consensus_hours: list[dict[str, Any]]) -> dict[str, int]:
+        return {"para_index": 1 if consensus_hours == forecasts["Arguel"]["consensus"] else 100}
+
+    with (
+        patch("weather_pipeline.get_normalized_forecast", new=mock_get_forecast),
+        patch("para_index.calculate_para_index", side_effect=mock_calculate_para_index),
+    ):
+        result = await calculate_best_spot_from_cache(db_session)
+
+    assert result is not None
+    assert result["site"]["name"] == "Arguel"
+    assert result["windFavorability"] == "good"
+    assert result["score"] > calculate_wind_adjusted_score(100, "bad")
 
 
 @pytest.mark.asyncio
@@ -343,6 +385,52 @@ async def test_calculate_hourly_best_spots_from_cache_can_change_by_hour(
     assert result["hours"][1]["site"]["name"] == "Chalais"
     assert result["hours"][0]["windFavorability"] == "good"
     assert result["hours"][1]["windFavorability"] == "good"
+
+
+@pytest.mark.asyncio
+async def test_hourly_best_spot_prioritizes_wind_category_over_para_index(
+    db_session, arguel_site, chalais_site
+) -> None:
+    """Hourly winners cannot be overtaken by a less favorable wind category."""
+    forecasts = {
+        "Arguel": {
+            "success": True,
+            "sunrise": "07:00",
+            "sunset": "19:00",
+            "consensus": [{"hour": 12, "wind_speed": 15, "wind_direction": 225}],
+        },
+        "Chalais": {
+            "success": True,
+            "sunrise": "07:00",
+            "sunset": "19:00",
+            "consensus": [{"hour": 12, "wind_speed": 15, "wind_direction": 90}],
+        },
+    }
+
+    async def mock_get_forecast(
+        lat: float,
+        lon: float,
+        day_index: int,
+        site_name: str | None = None,
+        elevation_m: float | None = None,
+        db: object | None = None,
+    ) -> dict[str, Any]:
+        return forecasts[site_name]
+
+    def mock_hourly_para_index(hour_data: dict[str, Any]) -> int:
+        return 1 if hour_data["wind_direction"] == 225 else 100
+
+    with (
+        patch("weather_pipeline.get_normalized_forecast", new=mock_get_forecast),
+        patch("para_index.calculate_hourly_para_index", side_effect=mock_hourly_para_index),
+    ):
+        result = await calculate_hourly_best_spots_from_cache(db_session, day_index=1, hours=1)
+
+    assert result is not None
+    winner = result["hours"][0]
+    assert winner["site"]["name"] == "Arguel"
+    assert winner["windFavorability"] == "good"
+    assert winner["score"] > calculate_wind_adjusted_score(100, "bad")
 
 
 @pytest.mark.asyncio
