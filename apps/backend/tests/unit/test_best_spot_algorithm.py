@@ -12,9 +12,9 @@ import pytest
 
 from best_spot import (
     calculate_angle_difference,
+    calculate_wind_adjusted_score,
     degrees_to_cardinal,
     get_wind_favorability,
-    get_wind_score_multiplier,
     parse_wind_direction,
 )
 
@@ -172,29 +172,6 @@ class TestGetWindFavorability:
 
 
 @pytest.mark.unit
-class TestGetWindScoreMultiplier:
-    """Test score multiplier calculation"""
-
-    def test_good_multiplier(self):
-        """Good favorability → 1.0"""
-        assert get_wind_score_multiplier("good") == 1.0
-
-    def test_moderate_multiplier(self):
-        """Moderate favorability → 0.7"""
-        assert get_wind_score_multiplier("moderate") == 0.7
-
-    def test_bad_multiplier(self):
-        """Bad favorability → 0.3"""
-        assert get_wind_score_multiplier("bad") == 0.3
-
-    def test_invalid_favorability_default(self):
-        """Invalid → default 0.7"""
-        assert get_wind_score_multiplier("unknown") == 0.7
-        assert get_wind_score_multiplier("") == 0.7
-        assert get_wind_score_multiplier(None) == 0.7
-
-
-@pytest.mark.unit
 class TestDegreesToCardinal:
     """Test degrees to cardinal direction conversion"""
 
@@ -248,67 +225,26 @@ class TestBestSpotAlgorithm:
     """Test the overall best spot algorithm logic"""
 
     def test_para_index_with_good_wind(self):
-        """High Para-Index × good wind → high score"""
-        # Simulate: Para-Index 80, wind aligned → score = 80 × 1.0 = 80
-        para_index = 80
-        favorability = get_wind_favorability("SW", "SW", 12.0)
-        multiplier = get_wind_score_multiplier(favorability)
-
-        final_score = para_index * multiplier
-
-        assert favorability == "good"
-        assert multiplier == 1.0
-        assert final_score == 80
+        """Good wind scores in the top band."""
+        assert calculate_wind_adjusted_score(80, "good") == 94
 
     def test_para_index_with_moderate_wind(self):
-        """High Para-Index × moderate wind → reduced score"""
-        # Simulate: Para-Index 80, wind cross → score = 80 × 0.7 = 56
-        para_index = 80
-        favorability = get_wind_favorability("W", "SW", 12.0)  # Cross wind
-        multiplier = get_wind_score_multiplier(favorability)
-
-        final_score = para_index * multiplier
-
-        assert favorability in ["moderate", "good"]
-        if favorability == "moderate":
-            assert multiplier == 0.7
-            assert final_score == 56.0
+        """Moderate wind scores in the middle band."""
+        assert calculate_wind_adjusted_score(80, "moderate") == 60
 
     def test_para_index_with_bad_wind(self):
-        """High Para-Index × bad wind → very low score"""
-        # Simulate: Para-Index 80, wind opposed → score = 80 × 0.3 = 24
-        para_index = 80
-        favorability = get_wind_favorability("NE", "SW", 12.0)  # Opposite
-        multiplier = get_wind_score_multiplier(favorability)
-
-        final_score = para_index * multiplier
-
-        assert favorability == "bad"
-        assert multiplier == 0.3
-        assert final_score == 24.0
+        """Bad wind scores in the bottom band."""
+        assert calculate_wind_adjusted_score(80, "bad") == 26
 
     def test_low_para_index_good_wind(self):
-        """Low Para-Index even with good wind → low score"""
-        # Simulate: Para-Index 30, wind aligned → score = 30 × 1.0 = 30
-        para_index = 30
-        favorability = get_wind_favorability("SW", "SW", 12.0)
-        multiplier = get_wind_score_multiplier(favorability)
-
-        final_score = para_index * multiplier
-
-        assert favorability == "good"
-        assert final_score == 30.0
+        """Even a low Para-Index stays above lower wind categories."""
+        assert calculate_wind_adjusted_score(0, "good") > calculate_wind_adjusted_score(
+            100, "moderate"
+        )
 
     def test_wind_orientation_matters(self):
-        """Site with lower Para-Index but better wind can win"""
-        # Site A: Para-Index 70, wind aligned → 70 × 1.0 = 70
-        site_a_score = 70 * get_wind_score_multiplier(get_wind_favorability("SW", "SW", 12.0))
-
-        # Site B: Para-Index 80, wind opposed → 80 × 0.3 = 24
-        site_b_score = 80 * get_wind_score_multiplier(get_wind_favorability("NE", "SW", 12.0))
-
-        # Site A should win despite lower Para-Index
-        assert site_a_score > site_b_score
+        """A better wind category always wins across sites."""
+        assert calculate_wind_adjusted_score(1, "good") > calculate_wind_adjusted_score(100, "bad")
 
 
 @pytest.mark.unit
@@ -339,11 +275,11 @@ class TestEdgeCases:
         result = get_wind_favorability("SW", "SW", 30.0)
         assert result in ["bad", "moderate", "good"]
 
-    def test_multiplier_range(self):
-        """Multipliers always in valid range"""
-        for favorability in ["good", "moderate", "bad", "unknown", None]:
-            multiplier = get_wind_score_multiplier(favorability)
-            assert 0.0 <= multiplier <= 1.0
+    def test_score_is_clamped_to_the_valid_range(self):
+        """Scores remain within the public 0-100 range."""
+        for favorability in ["good", "moderate", "bad", "unknown"]:
+            assert 0 <= calculate_wind_adjusted_score(-1, favorability) <= 100
+            assert 0 <= calculate_wind_adjusted_score(101, favorability) <= 100
 
     def test_circular_symmetry(self):
         """Angle difference is symmetric"""

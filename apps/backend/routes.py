@@ -2876,7 +2876,7 @@ async def get_weather(
     para_result = calculate_para_index(flyable_consensus)
 
     # Calculate wind-adjusted score (same logic as best_spot)
-    from best_spot import degrees_to_cardinal, get_wind_favorability, get_wind_score_multiplier
+    from best_spot import calculate_wind_adjusted_score, degrees_to_cardinal, get_wind_favorability
 
     midday_hours = [h for h in flyable_consensus if 10 <= h.get("hour", 0) <= 14]
     if midday_hours:
@@ -2889,8 +2889,7 @@ async def get_weather(
 
     wind_dir_str = degrees_to_cardinal(mid_wind_dir) if mid_wind_dir is not None else None
     wind_favorability = get_wind_favorability(wind_dir_str, site.orientation, mid_wind_speed)
-    wind_multiplier = get_wind_score_multiplier(wind_favorability)
-    score = round(para_result["para_index"] * wind_multiplier)
+    score = calculate_wind_adjusted_score(para_result["para_index"], wind_favorability)
 
     # Analyze hourly slots (also only flyable hours)
     slots = analyze_hourly_slots(flyable_consensus)
@@ -3263,9 +3262,9 @@ async def get_daily_summary(
             if day_result:
                 # Calculate wind-adjusted score
                 from best_spot import (
+                    calculate_wind_adjusted_score,
                     degrees_to_cardinal,
                     get_wind_favorability,
-                    get_wind_score_multiplier,
                 )
 
                 wind_dir_str = (
@@ -3276,8 +3275,7 @@ async def get_daily_summary(
                 wind_fav = get_wind_favorability(
                     wind_dir_str, site.orientation, day_result["wind_avg"]
                 )
-                wind_mult = get_wind_score_multiplier(wind_fav)
-                day_score = round(day_result["para_index"] * wind_mult)
+                day_score = calculate_wind_adjusted_score(day_result["para_index"], wind_fav)
 
                 summary_days.append(
                     {
