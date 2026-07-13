@@ -225,26 +225,24 @@ class TestBestSpotAlgorithm:
     """Test the overall best spot algorithm logic"""
 
     def test_para_index_with_good_wind(self):
-        """Good wind scores in the top band."""
-        assert calculate_wind_adjusted_score(80, "good") == 94
+        """Good wind boosts the Para-Index."""
+        assert calculate_wind_adjusted_score(80, "good") == 92
 
     def test_para_index_with_moderate_wind(self):
-        """Moderate wind scores in the middle band."""
+        """Moderate wind penalizes the Para-Index."""
         assert calculate_wind_adjusted_score(80, "moderate") == 60
 
     def test_para_index_with_bad_wind(self):
-        """Bad wind scores in the bottom band."""
-        assert calculate_wind_adjusted_score(80, "bad") == 26
+        """Bad wind strongly penalizes the Para-Index."""
+        assert calculate_wind_adjusted_score(80, "bad") == 28
 
     def test_low_para_index_good_wind(self):
-        """Even a low Para-Index stays above lower wind categories."""
-        assert calculate_wind_adjusted_score(0, "good") > calculate_wind_adjusted_score(
-            100, "moderate"
-        )
+        """Good wind does not create an artificial high score floor."""
+        assert calculate_wind_adjusted_score(30, "good") == 34
 
     def test_wind_orientation_matters(self):
-        """A better wind category always wins across sites."""
-        assert calculate_wind_adjusted_score(1, "good") > calculate_wind_adjusted_score(100, "bad")
+        """A better wind category matters for comparable Para-Index values."""
+        assert calculate_wind_adjusted_score(60, "good") > calculate_wind_adjusted_score(60, "bad")
 
 
 @pytest.mark.unit

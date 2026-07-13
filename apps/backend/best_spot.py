@@ -110,16 +110,36 @@ def get_wind_favorability(
         return "bad"
 
 
-def calculate_wind_adjusted_score(para_index: float, favorability: str) -> int:
-    """Return a 0-100 score whose bands preserve wind-category priority."""
-    score_bands = {
-        "good": (68, 100),
-        "moderate": (34, 66),
-        "bad": (0, 32),
+def _flyability_safety_cap(slots: list[dict[str, Any]] | None) -> int:
+    """Cap daily score when the day has few genuinely green slots."""
+    if slots is None:
+        return 100
+
+    flyable_hours = sum(
+        slot["end_hour"] - slot["start_hour"] + 1 for slot in slots if slot.get("verdict") == "🟢"
+    )
+    if flyable_hours == 0:
+        return 40
+    if flyable_hours == 1:
+        return 55
+    if flyable_hours == 2:
+        return 70
+    return 100
+
+
+def calculate_wind_adjusted_score(
+    para_index: float, favorability: str, slots: list[dict[str, Any]] | None = None
+) -> int:
+    """Return Para-Index adjusted by site orientation, with optional safety cap."""
+    multipliers = {
+        "good": 1.15,
+        "moderate": 0.75,
+        "bad": 0.35,
     }
-    lower_bound, upper_bound = score_bands.get(favorability, score_bands["moderate"])
+    multiplier = multipliers.get(favorability, multipliers["moderate"])
     clamped_para_index = min(max(para_index, 0), 100)
-    return round(lower_bound + (upper_bound - lower_bound) * clamped_para_index / 100)
+    adjusted_score = min(100, round(clamped_para_index * multiplier))
+    return min(adjusted_score, _flyability_safety_cap(slots))
 
 
 def _filter_flyable_hours(
@@ -240,11 +260,11 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
                     wind_dir_str, site.orientation, avg_wind_speed
                 )
 
-                # Calculate final score
-                final_score = calculate_wind_adjusted_score(para_index, wind_favorability)
-
                 # Calculate best flyable slot
                 slots = analyze_hourly_slots(flyable_hours)
+                final_score = calculate_wind_adjusted_score(
+                    para_index, wind_favorability, slots=slots
+                )
                 best_slot = get_best_slot(slots)
                 if not best_slot:
                     flyable_slot = None
