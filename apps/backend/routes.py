@@ -2889,10 +2889,9 @@ async def get_weather(
 
     wind_dir_str = degrees_to_cardinal(mid_wind_dir) if mid_wind_dir is not None else None
     wind_favorability = get_wind_favorability(wind_dir_str, site.orientation, mid_wind_speed)
-    score = calculate_wind_adjusted_score(para_result["para_index"], wind_favorability)
-
     # Analyze hourly slots (also only flyable hours)
     slots = analyze_hourly_slots(flyable_consensus)
+    score = calculate_wind_adjusted_score(para_result["para_index"], wind_favorability, slots=slots)
     slots_summary = format_slots_summary(slots)
 
     # Build sources metadata
@@ -3275,7 +3274,9 @@ async def get_daily_summary(
                 wind_fav = get_wind_favorability(
                     wind_dir_str, site.orientation, day_result["wind_avg"]
                 )
-                day_score = calculate_wind_adjusted_score(day_result["para_index"], wind_fav)
+                day_score = calculate_wind_adjusted_score(
+                    day_result["para_index"], wind_fav, slots=day_result.get("slots")
+                )
 
                 summary_days.append(
                     {

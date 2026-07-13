@@ -171,10 +171,23 @@ def test_get_wind_favorability_missing_data():
     assert get_wind_favorability("SW", "SW", None) == "moderate"
 
 
-def test_wind_category_score_bands_are_strictly_ordered() -> None:
-    """A less favorable wind category can never receive a higher score."""
-    assert calculate_wind_adjusted_score(0, "good") > calculate_wind_adjusted_score(100, "moderate")
-    assert calculate_wind_adjusted_score(0, "moderate") > calculate_wind_adjusted_score(100, "bad")
+def test_wind_category_adjusts_score_without_creating_artificial_floor() -> None:
+    """A good orientation boosts the Para-Index without masking a poor day."""
+    assert calculate_wind_adjusted_score(33, "good") == 38
+    assert calculate_wind_adjusted_score(80, "good") > calculate_wind_adjusted_score(80, "moderate")
+    assert calculate_wind_adjusted_score(80, "moderate") > calculate_wind_adjusted_score(80, "bad")
+
+
+def test_wind_adjusted_score_applies_flyability_safety_cap() -> None:
+    """Mostly unflyable days stay limited even with favorable orientation."""
+    no_green_slots = [{"start_hour": 10, "end_hour": 14, "verdict": "🔴"}]
+    one_green_hour = [
+        {"start_hour": 10, "end_hour": 10, "verdict": "🟢"},
+        {"start_hour": 11, "end_hour": 14, "verdict": "🔴"},
+    ]
+
+    assert calculate_wind_adjusted_score(90, "good", slots=no_green_slots) == 40
+    assert calculate_wind_adjusted_score(90, "good", slots=one_green_hour) == 55
 
 
 # ============================================================================
@@ -242,10 +255,10 @@ async def test_calculate_best_spot_from_cache_success(db_session, arguel_site, c
 
 
 @pytest.mark.asyncio
-async def test_daily_best_spot_prioritizes_wind_category_over_para_index(
+async def test_daily_best_spot_uses_strong_wind_orientation_adjustment(
     db_session, arguel_site, chalais_site
 ) -> None:
-    """A good wind category wins even when another site has a higher Para-Index."""
+    """A good wind category can win against a meaningfully higher bad-orientation site."""
     forecasts = {
         "Arguel": {
             "success": True,
@@ -272,7 +285,7 @@ async def test_daily_best_spot_prioritizes_wind_category_over_para_index(
         return forecasts[site_name]
 
     def mock_calculate_para_index(consensus_hours: list[dict[str, Any]]) -> dict[str, int]:
-        return {"para_index": 1 if consensus_hours == forecasts["Arguel"]["consensus"] else 100}
+        return {"para_index": 40 if consensus_hours == forecasts["Arguel"]["consensus"] else 100}
 
     with (
         patch("weather_pipeline.get_normalized_forecast", new=mock_get_forecast),
@@ -388,10 +401,10 @@ async def test_calculate_hourly_best_spots_from_cache_can_change_by_hour(
 
 
 @pytest.mark.asyncio
-async def test_hourly_best_spot_prioritizes_wind_category_over_para_index(
+async def test_hourly_best_spot_uses_strong_wind_orientation_adjustment(
     db_session, arguel_site, chalais_site
 ) -> None:
-    """Hourly winners cannot be overtaken by a less favorable wind category."""
+    """Hourly good orientation can beat a meaningfully higher bad-orientation score."""
     forecasts = {
         "Arguel": {
             "success": True,
@@ -418,7 +431,7 @@ async def test_hourly_best_spot_prioritizes_wind_category_over_para_index(
         return forecasts[site_name]
 
     def mock_hourly_para_index(hour_data: dict[str, Any]) -> int:
-        return 1 if hour_data["wind_direction"] == 225 else 100
+        return 40 if hour_data["wind_direction"] == 225 else 100
 
     with (
         patch("weather_pipeline.get_normalized_forecast", new=mock_get_forecast),

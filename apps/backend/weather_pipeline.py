@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Any
 
-from para_index import calculate_para_index
+from para_index import analyze_hourly_slots, calculate_para_index
 from weather_sources import WEATHER_SOURCE_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -774,6 +774,7 @@ async def get_daily_aggregate(
     # Use the SAME para_index calculation as /weather endpoint for consistency
     # Calculate on flyable hours only (same filtering as /weather)
     para_result = calculate_para_index(flyable_consensus)
+    slots = analyze_hourly_slots(flyable_consensus)
 
     para_index = para_result["para_index"]
     verdict = para_result["verdict"]
@@ -788,6 +789,7 @@ async def get_daily_aggregate(
         "temp_max": temp_max,
         "wind_avg": wind_avg,
         "wind_direction_avg": wind_direction_avg,
+        "slots": slots,
         "precip_total": precip_total,
         "cached_at": forecast_result.get("cached_at"),
     }
