@@ -34,7 +34,7 @@ aiofiles==25.1.0
 # Web Scraping & Browser Automation
 # ============================================
 playwright==1.61.0
-scrapling==0.4.9
+scrapling==0.4.11
 beautifulsoup4==4.15.0
 
 # ============================================
