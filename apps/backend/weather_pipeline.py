@@ -16,6 +16,55 @@ from para_index import analyze_hourly_slots, calculate_para_index
 from weather_sources import WEATHER_SOURCE_REGISTRY
 
 logger = logging.getLogger(__name__)
+
+OPEN_METEO_STALE_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
+
+
+async def _apply_open_meteo_stale_fallback(
+    source_name: str,
+    result: dict[str, Any] | None,
+    *,
+    lat: float,
+    lon: float,
+    day_index: int,
+) -> dict[str, Any] | None:
+    """Cache successful Open-Meteo data and reuse it when the API rate-limits."""
+    if not source_name.startswith("open-meteo") or result is None:
+        return result
+
+    from cache import generate_cache_key, get_cached, set_cached
+
+    cache_key = generate_cache_key(
+        "source-last-success",
+        source=source_name,
+        lat=round(lat, 4),
+        lon=round(lon, 4),
+        day_index=day_index,
+    )
+
+    if result.get("success") and result.get("hourly"):
+        result["is_stale"] = False
+        await set_cached(cache_key, result, OPEN_METEO_STALE_CACHE_TTL_SECONDS)
+        return result
+
+    if result.get("status_code") != 429:
+        return result
+
+    cached_result = await get_cached(cache_key)
+    if not isinstance(cached_result, dict) or not cached_result.get("hourly"):
+        return result
+
+    cached_result["success"] = True
+    cached_result["is_stale"] = True
+    cached_result["stale_reason"] = "rate_limited"
+    cached_result["stale_cached_at"] = cached_result.get("cached_at") or cached_result.get(
+        "timestamp"
+    )
+    cached_result["freshness_error"] = result.get("error")
+    logger.warning("Using stale cached data for rate-limited source %s", source_name)
+    return cached_result
+
+
 FULL_CONFIDENCE_SOURCE_BASELINE = 5
 
 
@@ -142,7 +191,7 @@ async def fetch_from_enabled_sources(
         )
 
         # Create instrumented tasks
-        async def instrumented_fetch(src_name: str) -> dict[str, Any]:
+        async def instrumented_fetch(src_name: str, api_key: str | None = None) -> dict[str, Any]:
             """Wrapper to instrument each fetch call"""
             try:
                 source_definition = WEATHER_SOURCE_REGISTRY[src_name]
@@ -152,6 +201,7 @@ async def fetch_from_enabled_sources(
                     day_index=day_index,
                     site_name=site_name,
                     elevation_m=elevation_m,
+                    api_key=api_key,
                 )
 
                 # CRITICAL FIX: Transform raw data to hourly format
@@ -159,6 +209,22 @@ async def fetch_from_enabled_sources(
                 # but normalize_data() expects {'success': True, 'hourly': [...]}
                 if result and result.get("success") and "data" in result:
                     result["hourly"] = source_definition.extract(result, day_index)
+
+                result = await _apply_open_meteo_stale_fallback(
+                    src_name,
+                    result,
+                    lat=lat,
+                    lon=lon,
+                    day_index=day_index,
+                )
+
+                if result is None:
+                    return {
+                        "success": False,
+                        "source": src_name,
+                        "error": "Weather source returned no result",
+                        "timestamp": datetime.now().isoformat(),
+                    }
 
                 return result
 
@@ -180,7 +246,7 @@ async def fetch_from_enabled_sources(
                 logger.warning(f"No fetch function for source '{source.source_name}', skipping")
                 continue
 
-            tasks.append(instrumented_fetch(source.source_name))
+            tasks.append(instrumented_fetch(source.source_name, source.api_key))
             source_names.append(source.source_name)
 
         # Execute all fetches in parallel
@@ -210,13 +276,15 @@ async def fetch_from_enabled_sources(
             )
 
             if source:
-                if result.get("success"):
+                if result.get("success") and not result.get("is_stale"):
                     source.success_count += 1
                     source.last_success_at = datetime.utcnow()
                 else:
                     source.error_count += 1
                     source.last_error_at = datetime.utcnow()
-                    source.last_error_message = result.get("error", "Unknown error")[:500]
+                    source.last_error_message = str(
+                        result.get("freshness_error") or result.get("error") or "Unknown error"
+                    )[:500]
 
                 source.updated_at = datetime.utcnow()
 
@@ -293,7 +361,18 @@ def normalize_data(aggregated: dict[str, Any]) -> dict[str, Any]:
 
         hourly = source_data.get("hourly", [])
         if hourly:
-            all_hourly.append({"source": source_name, "data": hourly})
+            all_hourly.append(
+                {
+                    "source": source_name,
+                    "data": hourly,
+                    "freshness": {
+                        "is_stale": bool(source_data.get("is_stale")),
+                        "stale_reason": source_data.get("stale_reason"),
+                        "cached_at": source_data.get("stale_cached_at")
+                        or source_data.get("cached_at"),
+                    },
+                }
+            )
 
     if not all_hourly:
         return {"success": False, "error": "No successful data from any source"}
@@ -322,10 +401,12 @@ def normalize_data(aggregated: dict[str, Any]) -> dict[str, Any]:
                     "cloud_cover": [],
                     "cape": [],
                     "lifted_index": [],
+                    "source_freshness": {},
                 }
 
             # Add source data
             normalized_hours[hour]["sources"].append(source)
+            normalized_hours[hour]["source_freshness"][source] = source_info["freshness"]
 
             # Collect values - ALWAYS append (even None) to maintain alignment with sources list
             # This is critical for the mapping in calculate_consensus()
@@ -437,6 +518,7 @@ def calculate_consensus(normalized: dict[str, Any]) -> dict[str, Any]:
         # Note: this requires we have the original aggregated data
         # For now, we'll preserve the per-source indices during normalization
         sources_data = {}
+        source_freshness = hour_data.get("source_freshness", {})
 
         # Build initial per-source structure for all known sources
         for source in WEATHER_SOURCE_REGISTRY:
@@ -522,6 +604,7 @@ def calculate_consensus(normalized: dict[str, Any]) -> dict[str, Any]:
                 "lifted_index": round(li_avg, 1) if li_avg is not None else None,
                 "li_confidence": round(li_conf, 2),
                 "sources": sources_data,
+                "source_freshness": source_freshness,
             }
         )
 

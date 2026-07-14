@@ -6,6 +6,7 @@ Strategy: Get INSEE code from city name, then parse forecast HTML
 
 import logging
 import re
+import unicodedata
 from typing import Any
 
 import httpx
@@ -129,6 +130,41 @@ class MeteocielScraper(BaseScraper):
             logger.error(f"Error in reverse geocoding for {lat},{lon}: {e}")
             return None
 
+    async def _get_forecast_path(self, city_name: str) -> str | None:
+        """Resolve Meteociel's internal city identifier through its city search."""
+        search_name = "".join(
+            char
+            for char in unicodedata.normalize("NFD", city_name)
+            if unicodedata.category(char) != "Mn"
+        )
+        expected_slug = re.sub(r"[^a-z0-9]+", "_", search_name.lower()).strip("_")
+
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.get(
+                    "https://www.meteociel.fr/prevville.php",
+                    params={"action": "getville", "ville": search_name},
+                )
+                response.raise_for_status()
+
+            # The search page contains malformed legacy HTML that BeautifulSoup
+            # can discard; extract the stable forecast href directly.
+            forecast_path = None
+            for link_match in re.finditer(r"/previsions/\d+/([^\"' >]+)\.htm", response.text):
+                candidate_slug = re.sub(r"[^a-z0-9]+", "_", link_match.group(1).lower()).strip("_")
+                if candidate_slug == expected_slug:
+                    forecast_path = link_match.group(0)
+                    break
+
+            if not forecast_path:
+                logger.warning(f"No Meteociel forecast page found for city: {city_name}")
+                return None
+
+            return forecast_path.replace("/previsions/", "/previsions-arome-1h/", 1)
+        except Exception as e:
+            logger.error(f"Error resolving Meteociel city '{city_name}': {e}")
+            return None
+
     async def fetch(self, lat: float, lon: float, **kwargs) -> dict[str, Any]:
         """
         Fetch forecast from meteociel
@@ -144,36 +180,34 @@ class MeteocielScraper(BaseScraper):
         site_name = kwargs.get("site_name")
 
         try:
-            # Step 1: Get INSEE code from site name, or from nearest commune when absent.
-            insee_code = await self._get_insee_code(site_name) if site_name else None
-            city_name_for_url = site_name
+            # Meteociel search is fuzzy. Only search a site name when Geo API
+            # confirms that it is a commune; otherwise use reverse geocoding.
+            is_commune = bool(await self._get_insee_code(site_name)) if site_name else False
+            forecast_path = (
+                await self._get_forecast_path(site_name) if site_name and is_commune else None
+            )
 
-            if not insee_code:
-                # Graceful degradation: Try to find nearest French city using coordinates
+            if not forecast_path:
                 logger.info(
-                    f"No INSEE code found for {site_name or 'coordinates'}, trying reverse geocoding with coordinates"
+                    f"No Meteociel page found for {site_name or 'coordinates'}, trying the nearest commune"
                 )
                 nearest_commune = await self._get_nearest_commune(lat, lon)
 
                 if not nearest_commune:
                     return self._build_response(
                         success=False,
-                        error=f"Meteociel only supports French cities. Could not find INSEE code for {site_name} or nearby location.",
+                        error=f"Meteociel only supports French cities. Could not resolve {site_name or 'coordinates'} or a nearby location.",
                     )
 
-                insee_code, city_name_for_url = nearest_commune
+                _, nearest_city_name = nearest_commune
+                forecast_path = await self._get_forecast_path(nearest_city_name)
+                if not forecast_path:
+                    return self._build_response(
+                        success=False,
+                        error=f"No Meteociel forecast page found for nearest city {nearest_city_name}.",
+                    )
 
-            # Step 2: Build URL - Using AROME hourly forecasts (1h resolution)
-            # Normalize city name: lowercase, remove accents, replace spaces
-            import unicodedata
-
-            city_normalized = "".join(
-                c
-                for c in unicodedata.normalize("NFD", city_name_for_url)
-                if unicodedata.category(c) != "Mn"
-            )
-            city_slug = city_normalized.lower().replace(" ", "-").replace("_", "-")
-            url = f"https://www.meteociel.fr/previsions-arome-1h/{insee_code}/{city_slug}.htm"
+            url = f"https://www.meteociel.fr{forecast_path}"
 
             logger.info(f"Fetching meteociel forecast: {url}")
 

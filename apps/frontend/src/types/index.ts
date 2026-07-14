@@ -52,6 +52,14 @@ export interface HourlyForecastItem {
   para_index: number;
   verdict: string;
   sources?: Record<string, Record<string, number | null>>;
+  source_freshness?: Record<
+    string,
+    {
+      is_stale: boolean;
+      stale_reason?: string | null;
+      cached_at?: string | null;
+    }
+  >;
   thermal_strength?: string;
   cape?: number | null;
   lifted_index?: number | null;

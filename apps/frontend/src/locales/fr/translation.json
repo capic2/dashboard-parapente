@@ -201,6 +201,7 @@
     "liveWindOpenSpotair": "Ouvrir SpotAiR",
     "reasonsTextualFlyability": "Raisons textuelles volabilité",
     "notAvailable": "non disponible",
+    "staleSourceData": "données non actualisées, limite API atteinte",
     "windOrientation": "Vent / Orientation",
     "favorabilityGood": "Favorable",
     "favorabilityModerate": "Modéré",

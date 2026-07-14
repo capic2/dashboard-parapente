@@ -37,7 +37,15 @@ async def test_fetch_meteociel_uses_nearest_city_slug_after_reverse_geocoding(
 ) -> None:
     requested_urls: list[str] = []
 
-    async def fake_get_insee_code(self: MeteocielScraper, city_name: str | None) -> None:
+    resolved_cities: list[str] = []
+
+    async def fake_get_insee_code(self: MeteocielScraper, city_name: str) -> None:
+        return None
+
+    async def fake_get_forecast_path(self: MeteocielScraper, city_name: str) -> str | None:
+        resolved_cities.append(city_name)
+        if city_name == "Besançon":
+            return "/previsions-arome-1h/7497/besancon.htm"
         return None
 
     async def fake_get_nearest_commune(
@@ -68,6 +76,7 @@ async def test_fetch_meteociel_uses_nearest_city_slug_after_reverse_geocoding(
             requested_urls.append(url)
             return FakeResponse()
 
+    monkeypatch.setattr(MeteocielScraper, "_get_forecast_path", fake_get_forecast_path)
     monkeypatch.setattr(MeteocielScraper, "_get_insee_code", fake_get_insee_code)
     monkeypatch.setattr(MeteocielScraper, "_get_nearest_commune", fake_get_nearest_commune)
     monkeypatch.setattr(MeteocielScraper, "_parse_forecast_tables", fake_parse_forecast_tables)
@@ -76,7 +85,8 @@ async def test_fetch_meteociel_uses_nearest_city_slug_after_reverse_geocoding(
     result = await fetch_meteociel(47.24, 6.02, site_name="Test Site")
 
     assert result["success"] is True
-    assert requested_urls == ["https://www.meteociel.fr/previsions-arome-1h/25056/besancon.htm"]
+    assert resolved_cities == ["Besançon"]
+    assert requested_urls == ["https://www.meteociel.fr/previsions-arome-1h/7497/besancon.htm"]
 
 
 @pytest.mark.asyncio
@@ -89,6 +99,10 @@ async def test_fetch_meteociel_uses_nearest_city_when_site_name_missing(
         self: MeteocielScraper, lat: float, lon: float
     ) -> tuple[str, str]:
         return "25056", "Besançon"
+
+    async def fake_get_forecast_path(self: MeteocielScraper, city_name: str) -> str:
+        assert city_name == "Besançon"
+        return "/previsions-arome-1h/7497/besancon.htm"
 
     def fake_parse_forecast_tables(self: MeteocielScraper, soup: object) -> list[dict[str, float]]:
         return [{"hour": 12, "temperature": 20.0}]
@@ -114,10 +128,45 @@ async def test_fetch_meteociel_uses_nearest_city_when_site_name_missing(
             return FakeResponse()
 
     monkeypatch.setattr(MeteocielScraper, "_get_nearest_commune", fake_get_nearest_commune)
+    monkeypatch.setattr(MeteocielScraper, "_get_forecast_path", fake_get_forecast_path)
     monkeypatch.setattr(MeteocielScraper, "_parse_forecast_tables", fake_parse_forecast_tables)
     monkeypatch.setattr(meteociel.httpx, "AsyncClient", FakeAsyncClient)
 
     result = await fetch_meteociel(47.24, 6.02, site_name=None)
 
     assert result["success"] is True
-    assert requested_urls == ["https://www.meteociel.fr/previsions-arome-1h/25056/besancon.htm"]
+    assert requested_urls == ["https://www.meteociel.fr/previsions-arome-1h/7497/besancon.htm"]
+
+
+@pytest.mark.asyncio
+async def test_get_forecast_path_uses_meteociel_internal_city_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeResponse:
+        text = """
+        <a href="/previsions/31407/saint_michel_mont_mercure.htm">Other result</a>
+        <a href="/previsions/14177/saint_thiebaud.htm">Saint-Thiébaud</a>
+        """
+
+        def raise_for_status(self) -> None:
+            return None
+
+    class FakeAsyncClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        async def __aenter__(self) -> "FakeAsyncClient":
+            return self
+
+        async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
+            return None
+
+        async def get(self, url: str, params: dict[str, str]) -> FakeResponse:
+            assert params["ville"] == "Saint-Thiebaud"
+            return FakeResponse()
+
+    monkeypatch.setattr(meteociel.httpx, "AsyncClient", FakeAsyncClient)
+
+    result = await MeteocielScraper()._get_forecast_path("Saint-Thiébaud")
+
+    assert result == "/previsions-arome-1h/14177/saint_thiebaud.htm"

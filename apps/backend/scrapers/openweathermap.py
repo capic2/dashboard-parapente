@@ -11,10 +11,16 @@ from config import OPENWEATHERMAP_API_KEY
 PARIS_TZ = ZoneInfo("Europe/Paris")
 
 
-async def fetch_openweathermap(lat: float, lon: float, days: int = 5) -> dict[str, Any]:
+async def fetch_openweathermap(
+    lat: float,
+    lon: float,
+    days: int = 5,
+    api_key: str | None = None,
+) -> dict[str, Any]:
     """Fetch 5-day/3-hour forecast from OpenWeatherMap."""
 
-    if not OPENWEATHERMAP_API_KEY:
+    resolved_api_key = api_key or OPENWEATHERMAP_API_KEY
+    if not resolved_api_key:
         return {
             "success": False,
             "source": "openweathermap",
@@ -27,7 +33,7 @@ async def fetch_openweathermap(lat: float, lon: float, days: int = 5) -> dict[st
         params = {
             "lat": lat,
             "lon": lon,
-            "appid": OPENWEATHERMAP_API_KEY,
+            "appid": resolved_api_key,
             "units": "metric",
             "cnt": min(forecast_days * 8, 40),
         }
@@ -50,7 +56,8 @@ async def fetch_openweathermap(lat: float, lon: float, days: int = 5) -> dict[st
         return {
             "success": False,
             "source": "openweathermap",
-            "error": f"HTTP {e.response.status_code}: {str(e)}",
+            "status_code": e.response.status_code,
+            "error": f"HTTP {e.response.status_code}: OpenWeatherMap request failed",
             "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:

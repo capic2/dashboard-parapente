@@ -66,6 +66,7 @@ async def fetch_open_meteo(lat: float, lon: float, days: int = 2) -> dict[str, A
         return {
             "success": False,
             "source": "open-meteo",
+            "status_code": e.response.status_code,
             "error": f"HTTP {e.response.status_code}: {str(e)}",
             "timestamp": datetime.now().isoformat(),
         }
@@ -137,6 +138,7 @@ async def _fetch_open_meteo_model(
         return {
             "success": False,
             "source": source,
+            "status_code": e.response.status_code,
             "error": f"HTTP {e.response.status_code}: {str(e)}",
             "timestamp": datetime.now().isoformat(),
         }
