@@ -13,6 +13,7 @@ import re
 from datetime import datetime, timedelta
 from typing import Any
 
+import httpx
 from bs4 import BeautifulSoup
 
 from .base import PlaywrightScraper
@@ -99,6 +100,45 @@ class MeteoblueScraper(PlaywrightScraper):
             return self.CITY_CODE_CACHE[city_key]
 
         return None
+
+    def _build_forecast_url(self, lat: float, lon: float, day_index: int = 0) -> str:
+        lat_str = f"{abs(lat):.2f}{'N' if lat >= 0 else 'S'}"
+        lon_str = f"{abs(lon):.2f}{'E' if lon >= 0 else 'W'}"
+        url = f"{self.base_url}/fr/meteo/semaine/{lat_str}{lon_str}"
+        return f"{url}?day={day_index + 1}" if day_index > 0 else url
+
+    async def fetch(self, lat: float, lon: float, **kwargs) -> dict[str, Any]:
+        """Fetch Meteoblue's server-rendered three-hour forecast table."""
+        day_index = max(0, int(kwargs.get("day_index", 0)))
+        url = self._build_forecast_url(lat, lon, day_index)
+        self.logger.info(f"Fetching Meteoblue forecast: {url}")
+
+        try:
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+                )
+            }
+            async with httpx.AsyncClient(
+                timeout=self.timeout,
+                follow_redirects=True,
+                headers=headers,
+            ) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+
+            hourly_data = self._parse_html(response.text)
+            if not hourly_data:
+                return self._build_response(
+                    success=False, error="No forecast table data found in Meteoblue response"
+                )
+            return self._build_response(success=True, data=hourly_data)
+        except httpx.HTTPStatusError as e:
+            return self._build_response(success=False, error=f"HTTP {e.response.status_code}: {e}")
+        except Exception as e:
+            self.logger.error(f"Meteoblue fetch error: {e}", exc_info=True)
+            return self._build_response(success=False, error=str(e))
 
     async def _scrape_page(self, page, lat: float, lon: float, **kwargs) -> list[dict[str, Any]]:
         """
@@ -208,8 +248,9 @@ class MeteoblueScraper(PlaywrightScraper):
         try:
             soup = BeautifulSoup(html, "html.parser")
 
-            # Find the hourly view table
-            hourly_table = soup.find("table", class_="picto hourly-view")
+            # The 1h table is loaded dynamically and is no longer reliable. The
+            # server-rendered 3h table contains the same core forecast fields.
+            hourly_table = soup.select_one("table.picto.hourly-view, table.picto.three-hourly-view")
 
             if not hourly_table:
                 self.logger.warning("No hourly forecast table found")
@@ -288,10 +329,12 @@ class MeteoblueScraper(PlaywrightScraper):
                     if i >= len(hourly_data):
                         break
                     wind_text = cell.get_text(strip=True)
-                    wind_match = re.search(r"(\d+)", wind_text)
-                    if wind_match:
-                        wind_kmh = int(wind_match.group(1))
+                    wind_values = [int(value) for value in re.findall(r"\d+", wind_text)]
+                    if wind_values:
+                        wind_kmh = wind_values[0]
                         hourly_data[i]["wind_speed"] = wind_kmh  # Already km/h
+                        if len(wind_values) > 1:
+                            hourly_data[i]["wind_gust"] = wind_values[1]
 
                     # Try to extract wind direction from div class (format: "glyph winddir SE")
                     wind_dir_div = cell.find("div", class_="winddir")
@@ -474,10 +517,15 @@ class MeteoblueScraper(PlaywrightScraper):
 # Standalone functions for compatibility
 
 
-async def fetch_meteoblue(lat: float, lon: float, city_name: str = "location") -> dict[str, Any]:
+async def fetch_meteoblue(
+    lat: float,
+    lon: float,
+    city_name: str = "location",
+    day_index: int = 0,
+) -> dict[str, Any]:
     """Fetch Meteoblue forecast (standalone function)"""
     scraper = MeteoblueScraper()
-    return await scraper.fetch(lat, lon, city_name=city_name)
+    return await scraper.fetch(lat, lon, city_name=city_name, day_index=day_index)
 
 
 def extract_meteoblue_hourly(data: dict[str, Any], day_index: int = 0) -> list[dict[str, Any]]:

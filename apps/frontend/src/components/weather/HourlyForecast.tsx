@@ -56,6 +56,7 @@ interface BaseTooltipProps {
 
 interface SourceDataTooltipProps extends BaseTooltipProps {
   sources: Record<string, Record<string, number | null>>;
+  sourceFreshness?: HourlyForecastItem['source_freshness'];
   consensus: number | string | null;
   unit: string;
   fieldName: string;
@@ -531,6 +532,7 @@ const VerdictTooltip = ({
 const SourceDataTooltip = ({
   hour,
   sources,
+  sourceFreshness,
   consensus,
   unit,
   fieldName,
@@ -557,6 +559,9 @@ const SourceDataTooltip = ({
         {sourceKeys.map((sourceKey) => {
           const sourceData = sources[sourceKey];
           const sourceName = SOURCE_NAMES[sourceKey] || sourceKey;
+          const staleLabel = sourceFreshness?.[sourceKey]?.is_stale
+            ? ` (${t('weather.staleSourceData')})`
+            : '';
 
           if (!sourceData) {
             return (
@@ -564,8 +569,8 @@ const SourceDataTooltip = ({
                 key={sourceKey}
                 className="text-xs text-gray-400 dark:text-gray-400"
               >
-                <span className="font-semibold">{sourceName}:</span> (
-                {t('weather.notAvailable')})
+                <span className="font-semibold">{sourceName}:</span>
+                {staleLabel} ({t('weather.notAvailable')})
               </div>
             );
           }
@@ -592,8 +597,8 @@ const SourceDataTooltip = ({
                 className="text-xs text-gray-700 dark:text-gray-300 flex items-center justify-between gap-2"
               >
                 <span>
-                  <span className="font-semibold">{sourceName}:</span>{' '}
-                  {displayValue}
+                  <span className="font-semibold">{sourceName}:</span>
+                  {staleLabel} {displayValue}
                   {gustValue}
                 </span>
                 {sourceUrl && (
@@ -624,8 +629,8 @@ const SourceDataTooltip = ({
                 className="text-xs text-gray-700 dark:text-gray-300 flex items-center justify-between gap-2"
               >
                 <span>
-                  <span className="font-semibold">{sourceName}:</span>{' '}
-                  {displayValue}
+                  <span className="font-semibold">{sourceName}:</span>
+                  {staleLabel} {displayValue}
                 </span>
                 {sourceUrl && (
                   <a
@@ -649,8 +654,8 @@ const SourceDataTooltip = ({
                 key={sourceKey}
                 className="text-xs text-gray-400 dark:text-gray-400"
               >
-                <span className="font-semibold">{sourceName}:</span> (
-                {t('weather.notAvailable')})
+                <span className="font-semibold">{sourceName}:</span>
+                {staleLabel} ({t('weather.notAvailable')})
               </div>
             );
           }
@@ -664,8 +669,8 @@ const SourceDataTooltip = ({
               className="text-xs text-gray-700 dark:text-gray-300 flex items-center justify-between gap-2"
             >
               <span>
-                <span className="font-semibold">{sourceName}:</span>{' '}
-                {displayValue} {unit}
+                <span className="font-semibold">{sourceName}:</span>
+                {staleLabel} {displayValue} {unit}
               </span>
               {sourceUrl && (
                 <a
@@ -850,6 +855,7 @@ export default function HourlyForecast({
           <SourceDataTooltip
             hour={data.hour}
             sources={data.sources || {}}
+            sourceFreshness={data.source_freshness}
             consensus={data.temperature}
             unit="°C"
             fieldName="temperature"
@@ -863,6 +869,7 @@ export default function HourlyForecast({
           <SourceDataTooltip
             hour={data.hour}
             sources={data.sources || {}}
+            sourceFreshness={data.source_freshness}
             consensus={data.wind_speed}
             unit="km/h"
             fieldName="wind_speed"
@@ -876,6 +883,7 @@ export default function HourlyForecast({
           <SourceDataTooltip
             hour={data.hour}
             sources={data.sources || {}}
+            sourceFreshness={data.source_freshness}
             consensus={data.wind_gust ?? null}
             unit="km/h"
             fieldName="wind_gust"
@@ -889,6 +897,7 @@ export default function HourlyForecast({
           <SourceDataTooltip
             hour={data.hour}
             sources={data.sources || {}}
+            sourceFreshness={data.source_freshness}
             consensus={formatWindDirectionWithDegrees(
               data.sources?.['open-meteo']?.wind_direction ||
                 data.sources?.['weatherapi']?.wind_direction ||
@@ -906,6 +915,7 @@ export default function HourlyForecast({
           <SourceDataTooltip
             hour={data.hour}
             sources={data.sources || {}}
+            sourceFreshness={data.source_freshness}
             consensus={data.precipitation}
             unit="mm"
             fieldName="precipitation"
@@ -919,6 +929,7 @@ export default function HourlyForecast({
           <SourceDataTooltip
             hour={data.hour}
             sources={data.sources || {}}
+            sourceFreshness={data.source_freshness}
             consensus={
               data.sources?.['open-meteo']?.cloud_cover ||
               data.sources?.['weatherapi']?.cloud_cover ||

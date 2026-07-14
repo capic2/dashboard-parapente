@@ -113,6 +113,7 @@ export const transformWeatherResponse = (
         'faible',
       cloud_cover: hour.cloud_cover ?? null,
       sources: hour.sources || {},
+      source_freshness: hour.source_freshness || {},
     };
   });
 

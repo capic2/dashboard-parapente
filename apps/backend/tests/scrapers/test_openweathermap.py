@@ -1,3 +1,4 @@
+import httpx
 import pytest
 
 from scrapers import openweathermap
@@ -68,10 +69,47 @@ async def test_fetch_openweathermap_clamps_days_to_minimum_of_one(monkeypatch):
             captured["params"] = params
             return _FakeResponse()
 
-    monkeypatch.setattr(openweathermap, "OPENWEATHERMAP_API_KEY", "test-key")
+    monkeypatch.setattr(openweathermap, "OPENWEATHERMAP_API_KEY", None)
     monkeypatch.setattr(openweathermap.httpx, "AsyncClient", lambda **kwargs: _FakeClient())
 
-    result = await openweathermap.fetch_openweathermap(47.2, 6.0, days=0)
+    result = await openweathermap.fetch_openweathermap(47.2, 6.0, days=0, api_key="database-key")
 
     assert result["success"] is True
     assert captured["params"]["cnt"] == 8
+    assert captured["params"]["appid"] == "database-key"
+
+
+@pytest.mark.asyncio
+async def test_fetch_openweathermap_does_not_expose_api_key_in_http_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret_key = "secret-database-key"
+
+    class _FakeResponse:
+        status_code = 401
+
+        def raise_for_status(self) -> None:
+            request = httpx.Request(
+                "GET",
+                f"https://api.openweathermap.org/data/2.5/forecast?appid={secret_key}",
+            )
+            response = httpx.Response(401, request=request)
+            raise httpx.HTTPStatusError("unauthorized", request=request, response=response)
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url, params):
+            return _FakeResponse()
+
+    monkeypatch.setattr(openweathermap.httpx, "AsyncClient", lambda **kwargs: _FakeClient())
+
+    result = await openweathermap.fetch_openweathermap(47.2, 6.0, api_key=secret_key)
+
+    assert result["success"] is False
+    assert result["status_code"] == 401
+    assert secret_key not in result["error"]

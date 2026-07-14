@@ -197,6 +197,16 @@ export const ConsensusHourSchema = z.object({
   verdict: z.string().optional(), // Verdict per hour
   thermal_strength: z.string().optional(), // Thermal strength
   sources: z.record(z.string(), z.any()).optional(), // Per-source data for tooltip
+  source_freshness: z
+    .record(
+      z.string(),
+      z.object({
+        is_stale: z.boolean(),
+        stale_reason: z.string().nullish(),
+        cached_at: z.string().nullish(),
+      })
+    )
+    .optional(),
 });
 
 export const SlotSchema = z.object({

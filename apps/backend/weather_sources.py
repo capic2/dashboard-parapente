@@ -123,18 +123,21 @@ async def fetch_meteoblue_default(
     lat: float,
     lon: float,
     *,
+    day_index: int = 0,
     site_name: str | None = None,
     **_: Any,
 ) -> dict[str, Any]:
-    return await fetch_meteoblue(lat, lon, city_name=site_name or "location")
+    return await fetch_meteoblue(lat, lon, city_name=site_name or "location", day_index=day_index)
 
 
 async def fetch_met_no_default(lat: float, lon: float, **_: Any) -> dict[str, Any]:
     return await fetch_met_no(lat, lon, days=7)
 
 
-async def fetch_openweathermap_default(lat: float, lon: float, **_: Any) -> dict[str, Any]:
-    return await fetch_openweathermap(lat, lon, days=5)
+async def fetch_openweathermap_default(
+    lat: float, lon: float, *, api_key: str | None = None, **_: Any
+) -> dict[str, Any]:
+    return await fetch_openweathermap(lat, lon, days=5, api_key=api_key)
 
 
 WEATHER_SOURCE_DEFINITIONS: tuple[WeatherSourceDefinition, ...] = (
