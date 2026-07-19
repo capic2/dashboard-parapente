@@ -84,9 +84,6 @@ catalogs:
     '@vitest/ui':
       specifier: 4.1.9
       version: 4.1.9
-    cesium:
-      specifier: ^1.139.1
-      version: 1.142.0
     chromatic:
       specifier: ^17.0.0
       version: 17.5.0
@@ -202,7 +199,7 @@ importers:
         version: 8.21.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       cesium:
         specifier: 'catalog:'
-        version: 1.142.0
+        version: 1.143.0
       date-fns:
         specifier: 'catalog:'
         version: 4.4.0
@@ -362,7 +359,7 @@ importers:
         version: 8.1.4(@types/node@24.13.3)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.0)
       vite-plugin-cesium:
         specifier: 'catalog:'
-        version: 1.2.23(cesium@1.142.0)(rollup@4.60.0)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.0))
+        version: 1.2.23(cesium@1.143.0)(rollup@4.60.0)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.0))
       vitest:
         specifier: 'catalog:'
         version: 4.1.9(@types/node@24.13.3)(@vitest/browser-playwright@4.1.9)(@vitest/coverage-v8@4.1.9)(@vitest/ui@4.1.9)(happy-dom@20.10.6)(msw@2.14.6(@types/node@24.13.3)(typescript@6.0.3))(vite@8.1.4(@types/node@24.13.3)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.0))
@@ -978,15 +975,15 @@ packages:
   '@blazediff/core@1.9.1':
     resolution: {integrity: sha512-ehg3jIkYKulZh+8om/O25vkvSsXXwC+skXmyA87FFx6A/45eqOkZsBltMw/TVteb0mloiGT8oGRTcjRAz66zaA==}
 
-  '@cesium/engine@26.0.0':
-    resolution: {integrity: sha512-iV2mUQHUffYBEQii7n8CQ0XA1eSmcetOedsLoZvDJG6LW9aRHxL008rVvGnnZelQVRUQWNFFX5/+Tos3TBIIcw==}
+  '@cesium/engine@26.1.0':
+    resolution: {integrity: sha512-WzeJEcmGD7/htBJ8JEZt95OgZjErPwUHqyAlJY/mCzmDm7hfwpuucLBSUhiynWW3khqBT1C7dhibjb7tdic7oA==}
     engines: {node: '>=22.0.0'}
 
   '@cesium/wasm-splats@0.1.0-alpha.2':
     resolution: {integrity: sha512-t9pMkknv31hhIbLpMa8yPvmqfpvs5UkUjgqlQv9SeO8VerCXOYnyP8/486BDaFrztM0A7FMbRjsXtNeKvqQghA==}
 
-  '@cesium/widgets@16.0.0':
-    resolution: {integrity: sha512-52PO61PKm6Cut1BR/OqrPLmDXL9lk7iwGHXWbWQpg1pJT8SaJ7PXyLqcAPz+6VTYXspmE4D6Xo0PgIav33dEEQ==}
+  '@cesium/widgets@16.1.0':
+    resolution: {integrity: sha512-c+jt8F3YIZs2x6+X+HS4q0S9nd2jVcbPVShUmlrDK1s+C7IlEvXceDGrkjivHRElAVCzfaWEEwY1g7Lg5HCGmA==}
     engines: {node: '>=22.0.0'}
 
   '@chromatic-com/storybook@5.2.1':
@@ -3009,8 +3006,8 @@ packages:
   '@yarnpkg/lockfile@1.1.0':
     resolution: {integrity: sha512-GpSwvyXOcOOlV70vbnzjj4fW5xW/FdUF6nQEt1ENy7m4ZCczi1+/buVUPAqmGfqznsORNFzUMjctTIp8a9tuCQ==}
 
-  '@zip.js/zip.js@2.8.26':
-    resolution: {integrity: sha512-RQ4h9F6DOiHxpdocUDrOl6xBM+yOtz+LkUol47AVWcfebGBDpZ7w7Xvz9PS24JgXvLGiXXzSAfdCdVy1tPlaFA==}
+  '@zip.js/zip.js@2.8.31':
+    resolution: {integrity: sha512-2NLmow9ax/5IdBbJKxNQp3Ur9mNxmgLfN2Yp/FKNh1ZIGs3OYkiC3AIUfIZouTPSgeW5+F1bzTAZAyD2Y4ZfFA==}
     engines: {bun: '>=0.7.0', deno: '>=1.0.0', node: '>=18.0.0'}
 
   '@zkochan/js-yaml@0.0.7':
@@ -3223,8 +3220,8 @@ packages:
   caniuse-lite@1.0.30001805:
     resolution: {integrity: sha512-52noaS3DubycKSXaU30TwPGIp+POyQSUVa5jBEq3vkRkY0kjyb3LQgvhU6WGyCcyXqVLWO0Cw0Q6BSdD0kUfVA==}
 
-  cesium@1.142.0:
-    resolution: {integrity: sha512-Z6mBxdeBS0lEXM7WAQgG8Q0FovXYAJpZsMOSWgd7dH28Ov+djJxWOlUMiG8jOai0TzeOYdYsMLgnYb2uB/aI/A==}
+  cesium@1.143.0:
+    resolution: {integrity: sha512-EHz61NBp/2UPYE4iWCZ+YK9Jcb0d2hzRfqkj4DRaUM3cJmA9hE2FTmcPPZ2iL7w+W0YUScI0gc9XeSTXlPIQtA==}
     engines: {node: '>=22.0.0'}
 
   chai@5.3.3:
@@ -3496,8 +3493,8 @@ packages:
   dom-accessibility-api@0.6.3:
     resolution: {integrity: sha512-7ZgogeTnjuHbo+ct10G9Ffp0mif17idi0IyWNVA/wcwcm7NPOD/WEHVP3n7n3MhXqxoIYm8d6MuZohYWIZ4T3w==}
 
-  dompurify@3.4.8:
-    resolution: {integrity: sha512-yb1cEmaOum7wFvOCSQxyfgVlv5D47Rc30iZWoMpbDIWTnJ6grDDQyu2KFJzB2k7u0pMuJcQ1zphH//fFnw2tjQ==}
+  dompurify@3.4.12:
+    resolution: {integrity: sha512-zQvGet8Z2sWbQhCmfFz/T5QWH2oBmjnqK3qvOjaqaNLrLEF912WamU+ohnTp0TCep/MFVHpdJuCZEdFOdTnEFg==}
 
   dotenv-expand@12.0.3:
     resolution: {integrity: sha512-uc47g4b+4k/M/SeaW1y4OApx+mtLWl92l5LMPP0GNXctZqELk+YGgOPIIC5elYmUH4OuoK3JLhuRUYegeySiFA==}
@@ -4242,8 +4239,8 @@ packages:
   mersenne-twister@1.1.0:
     resolution: {integrity: sha512-mUYWsMKNrm4lfygPkL3OfGzOPTR2DBlTkBNHM//F6hGp8cLThY897crAlk3/Jo17LEOOjQUrNAx6DvgO77QJkA==}
 
-  meshoptimizer@1.1.1:
-    resolution: {integrity: sha512-oRFNWJRDA/WTrVj7NWvqa5HqE1t9MYDj2VaWirQCzCCrAd2GHrqR/sQezCxiWATPNlKTcRaPRHPJwIRoPBAp5g==}
+  meshoptimizer@1.2.0:
+    resolution: {integrity: sha512-davRZeIJbxJrE24cwQle7ZDsxjdk/OphNOV83oX+efQinyoHY9Jcyz3MHbaoG0qySZajldGztNZ1RN/T19PZsg==}
 
   mime-db@1.52.0:
     resolution: {integrity: sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg==}
@@ -4438,8 +4435,8 @@ packages:
     resolution: {integrity: sha512-LaNjtRWUBY++zB5nE/NwcaoMylSPk+S+ZHNB1TzdbMJMny6dynpAGt7X/tl/QYq3TIeE6nxHppbo2LGymrG5Pw==}
     engines: {node: '>=10'}
 
-  pako@2.1.0:
-    resolution: {integrity: sha512-w+eufiZ1WuJYgPXbV/PO3NCMEc3xqylkKHzp8bxp1uW4qaSNQUkwmLLEc3kKsfz8lpV1F8Ht3U1Cm+9Srog2ug==}
+  pako@3.0.1:
+    resolution: {integrity: sha512-GupotUUI0mlhugKjUs4bjOwLt3nrehy9Ys2dxC0GtgVef5cnKggkDMmf2bq2poCCuVXopWPmqsc9VDT2iJUy+w==}
 
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
@@ -4532,8 +4529,8 @@ packages:
     resolution: {integrity: sha512-Qb1gy5OrP5+zDf2Bvnzdl3jsTf1qXVMazbvCoKhtKqVs4/YK4ozX4gKQJJVyNe+cajNPn0KoC0MC3FUmaHWEmQ==}
     engines: {node: ^10.13.0 || ^12.13.0 || ^14.15.0 || >=15.0.0}
 
-  protobufjs@8.6.1:
-    resolution: {integrity: sha512-s4qQPr4pU0W95iYnUInh95skjIg+3aM2sakYsw60QYanU+qWRDY2zQxOAQV6zU7ROJpSNDG9B+VSmk4dqdWWSA==}
+  protobufjs@8.7.1:
+    resolution: {integrity: sha512-agdGHrXNTv0IrYscJPDou/PlEJk1c/hBZ9o/B5NH2i/nSPtPqacNxzgwf1CebXxFMjMrZH5sqv9uQuw96aGt/A==}
     engines: {node: '>=12.0.0'}
 
   proxy-from-env@2.1.0:
@@ -6134,15 +6131,15 @@ snapshots:
 
   '@blazediff/core@1.9.1': {}
 
-  '@cesium/engine@26.0.0':
+  '@cesium/engine@26.1.0':
     dependencies:
       '@cesium/wasm-splats': 0.1.0-alpha.2
       '@spz-loader/core': 0.3.1
       '@tweenjs/tween.js': 25.0.0
-      '@zip.js/zip.js': 2.8.26
+      '@zip.js/zip.js': 2.8.31
       autolinker: 4.1.5
       bitmap-sdf: 1.0.4
-      dompurify: 3.4.8
+      dompurify: 3.4.12
       draco3d: 1.5.7
       earcut: 3.0.2
       grapheme-splitter: 1.0.4
@@ -6151,18 +6148,18 @@ snapshots:
       ktx-parse: 1.1.0
       lerc: 2.0.0
       mersenne-twister: 1.1.0
-      meshoptimizer: 1.1.1
-      pako: 2.1.0
-      protobufjs: 8.6.1
+      meshoptimizer: 1.2.0
+      pako: 3.0.1
+      protobufjs: 8.7.1
       rbush: 4.0.1
       topojson-client: 3.1.0
       urijs: 1.19.11
 
   '@cesium/wasm-splats@0.1.0-alpha.2': {}
 
-  '@cesium/widgets@16.0.0':
+  '@cesium/widgets@16.1.0':
     dependencies:
-      '@cesium/engine': 26.0.0
+      '@cesium/engine': 26.1.0
       nosleep.js: 0.12.0
 
   '@chromatic-com/storybook@5.2.1(storybook@10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.17)(prettier@3.9.5)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))':
@@ -7893,7 +7890,7 @@ snapshots:
 
   '@yarnpkg/lockfile@1.1.0': {}
 
-  '@zip.js/zip.js@2.8.26': {}
+  '@zip.js/zip.js@2.8.31': {}
 
   '@zkochan/js-yaml@0.0.7':
     dependencies:
@@ -8117,10 +8114,11 @@ snapshots:
 
   caniuse-lite@1.0.30001805: {}
 
-  cesium@1.142.0:
+  cesium@1.143.0:
     dependencies:
-      '@cesium/engine': 26.0.0
-      '@cesium/widgets': 16.0.0
+      '@cesium/engine': 26.1.0
+      '@cesium/widgets': 16.1.0
+      protobufjs: 8.7.1
 
   chai@5.3.3:
     dependencies:
@@ -8328,7 +8326,7 @@ snapshots:
 
   dom-accessibility-api@0.6.3: {}
 
-  dompurify@3.4.8:
+  dompurify@3.4.12:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
@@ -9040,7 +9038,7 @@ snapshots:
 
   mersenne-twister@1.1.0: {}
 
-  meshoptimizer@1.1.1: {}
+  meshoptimizer@1.2.0: {}
 
   mime-db@1.52.0: {}
 
@@ -9479,7 +9477,7 @@ snapshots:
     dependencies:
       p-limit: 3.1.0
 
-  pako@2.1.0: {}
+  pako@3.0.1: {}
 
   parent-module@1.0.1:
     dependencies:
@@ -9549,7 +9547,7 @@ snapshots:
       ansi-styles: 5.2.0
       react-is: 17.0.2
 
-  protobufjs@8.6.1:
+  protobufjs@8.7.1:
     dependencies:
       long: 5.3.2
 
@@ -10195,9 +10193,9 @@ snapshots:
       d3-time: 3.1.0
       d3-timer: 3.0.1
 
-  vite-plugin-cesium@1.2.23(cesium@1.142.0)(rollup@4.60.0)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.0)):
+  vite-plugin-cesium@1.2.23(cesium@1.143.0)(rollup@4.60.0)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.0)):
     dependencies:
-      cesium: 1.142.0
+      cesium: 1.143.0
       fs-extra: 9.1.0
       rollup-plugin-external-globals: 0.6.1(rollup@4.60.0)
       serve-static: 1.16.3
