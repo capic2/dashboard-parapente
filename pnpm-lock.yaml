@@ -91,8 +91,8 @@ catalogs:
       specifier: ^1.139.1
       version: 1.143.0
     chromatic:
-      specifier: ^17.0.0
-      version: 17.5.0
+      specifier: ^18.0.0
+      version: 18.0.1
     date-fns:
       specifier: ^4.0.0
       version: 4.4.0
@@ -320,7 +320,7 @@ importers:
         version: 4.1.9(vitest@4.1.9)
       chromatic:
         specifier: 'catalog:'
-        version: 17.5.0
+        version: 18.0.1
       happy-dom:
         specifier: 'catalog:'
         version: 20.10.6
@@ -3127,8 +3127,8 @@ packages:
       '@chromatic-com/vitest':
         optional: true
 
-  chromatic@17.5.0:
-    resolution: {integrity: sha512-jYtXDaY1VeaNaWMom4HewLQTL574s4wTtkg5Kryov9Cj7D6i8Pe7twpLsetG7apxD0aITWUhx6KiqfN6p380rw==}
+  chromatic@18.0.1:
+    resolution: {integrity: sha512-GlTYrZ4ui5ZW8Jzut6SAo5bMH3sIugYZ37Nq2DyVHBfPINeEzGA8eG5xNo4N/I2aRdM9Xnqw0SCls7wgf2llvA==}
     engines: {node: '>=22.0.0'}
     hasBin: true
     peerDependencies:
@@ -7925,7 +7925,7 @@ snapshots:
     dependencies:
       semver: 7.8.5
 
-  chromatic@17.5.0:
+  chromatic@18.0.1:
     dependencies:
       semver: 7.8.5
 
