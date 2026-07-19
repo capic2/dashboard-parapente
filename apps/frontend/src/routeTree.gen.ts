@@ -9,45 +9,40 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WeatherRouteImport } from './routes/weather'
-import { Route as ThermalRouteImport } from './routes/thermal'
-import { Route as SitesRouteImport } from './routes/sites'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as InfrastructureRouteImport } from './routes/infrastructure'
-import { Route as FlightsRouteImport } from './routes/flights'
-import { Route as ExportViewerRouteImport } from './routes/export-viewer'
-import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ViewerFlightIdRouteImport } from './routes/viewer.$flightId'
-import { Route as InfrastructureTabRouteImport } from './routes/infrastructure.$tab'
+import { Route as AnalyticsRouteImport } from './routes/analytics'
+import { Route as ExportViewerRouteImport } from './routes/export-viewer'
+import { Route as FlightsRouteImport } from './routes/flights'
+import { Route as InfrastructureRouteImport } from './routes/infrastructure'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SitesRouteImport } from './routes/sites'
+import { Route as ThermalRouteImport } from './routes/thermal'
+import { Route as WeatherRouteImport } from './routes/weather'
 import { Route as FlightsFlightIdRouteImport } from './routes/flights.$flightId'
+import { Route as InfrastructureTabRouteImport } from './routes/infrastructure.$tab'
+import { Route as ViewerFlightIdRouteImport } from './routes/viewer.$flightId'
 
-const WeatherRoute = WeatherRouteImport.update({
-  id: '/weather',
-  path: '/weather',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/weather.lazy').then((d) => d.Route))
-const ThermalRoute = ThermalRouteImport.update({
-  id: '/thermal',
-  path: '/thermal',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/thermal.lazy').then((d) => d.Route))
-const SitesRoute = SitesRouteImport.update({
-  id: '/sites',
-  path: '/sites',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/sites.lazy').then((d) => d.Route))
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/settings.lazy').then((d) => d.Route))
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AnalyticsRoute = AnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/analytics.lazy').then((d) => d.Route))
+const ExportViewerRoute = ExportViewerRouteImport.update({
+  id: '/export-viewer',
+  path: '/export-viewer',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/export-viewer.lazy').then((d) => d.Route))
+const FlightsRoute = FlightsRouteImport.update({
+  id: '/flights',
+  path: '/flights',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/flights.lazy').then((d) => d.Route))
 const InfrastructureRoute = InfrastructureRouteImport.update({
   id: '/infrastructure',
   path: '/infrastructure',
@@ -55,32 +50,37 @@ const InfrastructureRoute = InfrastructureRouteImport.update({
 } as any).lazy(() =>
   import('./routes/infrastructure.lazy').then((d) => d.Route),
 )
-const FlightsRoute = FlightsRouteImport.update({
-  id: '/flights',
-  path: '/flights',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/flights.lazy').then((d) => d.Route))
-const ExportViewerRoute = ExportViewerRouteImport.update({
-  id: '/export-viewer',
-  path: '/export-viewer',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/export-viewer.lazy').then((d) => d.Route))
-const AnalyticsRoute = AnalyticsRouteImport.update({
-  id: '/analytics',
-  path: '/analytics',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/analytics.lazy').then((d) => d.Route))
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ViewerFlightIdRoute = ViewerFlightIdRouteImport.update({
-  id: '/viewer/$flightId',
-  path: '/viewer/$flightId',
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/settings.lazy').then((d) => d.Route))
+const SitesRoute = SitesRouteImport.update({
+  id: '/sites',
+  path: '/sites',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/sites.lazy').then((d) => d.Route))
+const ThermalRoute = ThermalRouteImport.update({
+  id: '/thermal',
+  path: '/thermal',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/thermal.lazy').then((d) => d.Route))
+const WeatherRoute = WeatherRouteImport.update({
+  id: '/weather',
+  path: '/weather',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/weather.lazy').then((d) => d.Route))
+const FlightsFlightIdRoute = FlightsFlightIdRouteImport.update({
+  id: '/$flightId',
+  path: '/$flightId',
+  getParentRoute: () => FlightsRoute,
 } as any).lazy(() =>
-  import('./routes/viewer.$flightId.lazy').then((d) => d.Route),
+  import('./routes/flights.$flightId.lazy').then((d) => d.Route),
 )
 const InfrastructureTabRoute = InfrastructureTabRouteImport.update({
   id: '/$tab',
@@ -89,12 +89,12 @@ const InfrastructureTabRoute = InfrastructureTabRouteImport.update({
 } as any).lazy(() =>
   import('./routes/infrastructure.$tab.lazy').then((d) => d.Route),
 )
-const FlightsFlightIdRoute = FlightsFlightIdRouteImport.update({
-  id: '/$flightId',
-  path: '/$flightId',
-  getParentRoute: () => FlightsRoute,
+const ViewerFlightIdRoute = ViewerFlightIdRouteImport.update({
+  id: '/viewer/$flightId',
+  path: '/viewer/$flightId',
+  getParentRoute: () => rootRouteImport,
 } as any).lazy(() =>
-  import('./routes/flights.$flightId.lazy').then((d) => d.Route),
+  import('./routes/viewer.$flightId.lazy').then((d) => d.Route),
 )
 
 export interface FileRoutesByFullPath {
@@ -207,60 +207,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/weather': {
-      id: '/weather'
-      path: '/weather'
-      fullPath: '/weather'
-      preLoaderRoute: typeof WeatherRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/thermal': {
-      id: '/thermal'
-      path: '/thermal'
-      fullPath: '/thermal'
-      preLoaderRoute: typeof ThermalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sites': {
-      id: '/sites'
-      path: '/sites'
-      fullPath: '/sites'
-      preLoaderRoute: typeof SitesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/infrastructure': {
-      id: '/infrastructure'
-      path: '/infrastructure'
-      fullPath: '/infrastructure'
-      preLoaderRoute: typeof InfrastructureRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/flights': {
-      id: '/flights'
-      path: '/flights'
-      fullPath: '/flights'
-      preLoaderRoute: typeof FlightsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/export-viewer': {
-      id: '/export-viewer'
-      path: '/export-viewer'
-      fullPath: '/export-viewer'
-      preLoaderRoute: typeof ExportViewerRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/analytics': {
@@ -270,19 +221,68 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/export-viewer': {
+      id: '/export-viewer'
+      path: '/export-viewer'
+      fullPath: '/export-viewer'
+      preLoaderRoute: typeof ExportViewerRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/viewer/$flightId': {
-      id: '/viewer/$flightId'
-      path: '/viewer/$flightId'
-      fullPath: '/viewer/$flightId'
-      preLoaderRoute: typeof ViewerFlightIdRouteImport
+    '/flights': {
+      id: '/flights'
+      path: '/flights'
+      fullPath: '/flights'
+      preLoaderRoute: typeof FlightsRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/infrastructure': {
+      id: '/infrastructure'
+      path: '/infrastructure'
+      fullPath: '/infrastructure'
+      preLoaderRoute: typeof InfrastructureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sites': {
+      id: '/sites'
+      path: '/sites'
+      fullPath: '/sites'
+      preLoaderRoute: typeof SitesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/thermal': {
+      id: '/thermal'
+      path: '/thermal'
+      fullPath: '/thermal'
+      preLoaderRoute: typeof ThermalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/weather': {
+      id: '/weather'
+      path: '/weather'
+      fullPath: '/weather'
+      preLoaderRoute: typeof WeatherRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/flights/$flightId': {
+      id: '/flights/$flightId'
+      path: '/$flightId'
+      fullPath: '/flights/$flightId'
+      preLoaderRoute: typeof FlightsFlightIdRouteImport
+      parentRoute: typeof FlightsRoute
     }
     '/infrastructure/$tab': {
       id: '/infrastructure/$tab'
@@ -291,12 +291,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InfrastructureTabRouteImport
       parentRoute: typeof InfrastructureRoute
     }
-    '/flights/$flightId': {
-      id: '/flights/$flightId'
-      path: '/$flightId'
-      fullPath: '/flights/$flightId'
-      preLoaderRoute: typeof FlightsFlightIdRouteImport
-      parentRoute: typeof FlightsRoute
+    '/viewer/$flightId': {
+      id: '/viewer/$flightId'
+      path: '/viewer/$flightId'
+      fullPath: '/viewer/$flightId'
+      preLoaderRoute: typeof ViewerFlightIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }

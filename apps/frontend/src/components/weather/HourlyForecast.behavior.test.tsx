@@ -9,6 +9,7 @@ vi.mock('react-i18next', () => ({
         'weather.paraIndex': 'Para-Index',
         'weather.hourly.paraIndexAt': `Para-Index ${options?.hour}`,
         'weather.hourly.verdictAt': `Verdict ${options?.hour}`,
+        'weather.hourly.temperatureAt': `Température ${options?.hour}`,
         'weather.metricsUsed': 'Metriques utilisees',
         'weather.verdictLabel': 'Verdict',
         'weather.criteriaEvaluated': 'Criteres evalues',
@@ -16,6 +17,7 @@ vi.mock('react-i18next', () => ({
         'weather.refreshingData': 'Rechargement...',
         'weather.hourly.reasons.thunderstorms': 'Orages',
         'weather.hourly.reasons.thunderstormRisk': "Risque d'orage",
+        'weather.staleSourceDataWithDate': `données non actualisées, limite API atteinte, affichées depuis le ${options?.date}`,
       };
       if (labels[key]) return labels[key];
       return key;
@@ -130,6 +132,13 @@ describe('HourlyForecast tooltip behavior', () => {
                 cloud_cover: 10,
               },
             },
+            source_freshness: {
+              'open-meteo': {
+                is_stale: true,
+                stale_reason: 'rate_limited',
+                cached_at: '2026-04-25T10:00:00Z',
+              },
+            },
           },
         ],
       },
@@ -147,6 +156,28 @@ describe('HourlyForecast tooltip behavior', () => {
 
     expect(screen.getByText('Para-Index - 10:00')).toBeTruthy();
     expect(screen.getByText(/Metriques utilisees/iu)).toBeTruthy();
+  });
+
+  it('shows stale source timestamp in source tooltips', () => {
+    render(<HourlyForecast spotId="site-1" dayIndex={0} />);
+
+    const staleTimestamp = new Intl.DateTimeFormat('fr', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date('2026-04-25T10:00:00Z'));
+
+    fireEvent.mouseOver(
+      screen.getByRole('button', { name: 'Température 10:00' })
+    );
+
+    expect(
+      screen.getAllByText((_, element) =>
+        Boolean(
+          element?.textContent?.includes('données non actualisées') &&
+          element.textContent.includes(staleTimestamp)
+        )
+      ).length
+    ).toBeGreaterThan(0);
   });
 
   it('shows verdict tooltip content on hover', () => {
