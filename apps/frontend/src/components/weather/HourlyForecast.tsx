@@ -381,6 +381,12 @@ const parseSettingNumber = (
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const formatTooltipDate = (cachedAt: string, language: string): string =>
+  new Intl.DateTimeFormat(language, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(cachedAt));
+
 // ============================================================================
 // TOOLTIP COMPONENTS
 // ============================================================================
@@ -539,7 +545,7 @@ const SourceDataTooltip = ({
   label,
   color,
 }: SourceDataTooltipProps) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const sourceKeys = [
     ...SOURCE_ORDER,
     ...Object.keys(sources).filter(
@@ -559,8 +565,13 @@ const SourceDataTooltip = ({
         {sourceKeys.map((sourceKey) => {
           const sourceData = sources[sourceKey];
           const sourceName = SOURCE_NAMES[sourceKey] || sourceKey;
-          const staleLabel = sourceFreshness?.[sourceKey]?.is_stale
-            ? ` (${t('weather.staleSourceData')})`
+          const freshness = sourceFreshness?.[sourceKey];
+          const staleLabel = freshness?.is_stale
+            ? freshness.cached_at
+              ? ` (${t('weather.staleSourceDataWithDate', {
+                  date: formatTooltipDate(freshness.cached_at, i18n.language),
+                })})`
+              : ` (${t('weather.staleSourceData')})`
             : '';
 
           if (!sourceData) {

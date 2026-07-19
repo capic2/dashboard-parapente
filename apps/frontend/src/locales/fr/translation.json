@@ -202,6 +202,7 @@
     "reasonsTextualFlyability": "Raisons textuelles volabilité",
     "notAvailable": "non disponible",
     "staleSourceData": "données non actualisées, limite API atteinte",
+    "staleSourceDataWithDate": "données non actualisées, limite API atteinte, affichées depuis le {{date}}",
     "windOrientation": "Vent / Orientation",
     "favorabilityGood": "Favorable",
     "favorabilityModerate": "Modéré",
