@@ -5,8 +5,8 @@
 # ============================================
 # FastAPI Framework & Server
 # ============================================
-fastapi==0.138.0
-uvicorn[standard]==0.49.0
+fastapi==0.139.2
+uvicorn[standard]==0.51.0
 
 # ============================================
 # Database ORM
@@ -23,7 +23,7 @@ pydantic-settings==2.14.2
 # Configuration Management
 # ============================================
 python-dotenv==1.2.2
-tzdata==2026.2
+tzdata==2026.3
 
 # ============================================
 # Async File I/O
@@ -65,7 +65,7 @@ fakeredis==2.36.2
 # ============================================
 # Code Quality & Linting
 # ============================================
-ruff==0.15.21
+ruff==0.15.22
 black==26.5.1
 isort==8.0.1
 
@@ -78,9 +78,9 @@ python-multipart==0.0.32
 # Meteorology & Scientific Computing
 # ============================================
 metpy==1.7.1
-matplotlib==3.11.0
+matplotlib==3.11.1
 numpy==2.5.1
-pillow==12.2.0
+pillow==12.3.0
 
 # ============================================
 # Authentication (JWT + Password Hashing)

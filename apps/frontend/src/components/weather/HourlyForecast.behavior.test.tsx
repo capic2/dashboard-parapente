@@ -171,10 +171,11 @@ describe('HourlyForecast tooltip behavior', () => {
     );
 
     expect(
-      screen.getAllByText(
-        (_, element) =>
+      screen.getAllByText((_, element) =>
+        Boolean(
           element?.textContent?.includes('données non actualisées') &&
           element.textContent.includes(staleTimestamp)
+        )
       ).length
     ).toBeGreaterThan(0);
   });
