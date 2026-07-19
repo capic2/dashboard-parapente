@@ -23,7 +23,7 @@ pydantic-settings==2.14.2
 # Configuration Management
 # ============================================
 python-dotenv==1.2.2
-tzdata==2026.2
+tzdata==2026.3
 
 # ============================================
 # Async File I/O
