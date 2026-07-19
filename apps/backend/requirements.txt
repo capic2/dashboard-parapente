@@ -80,7 +80,7 @@ python-multipart==0.0.32
 metpy==1.7.1
 matplotlib==3.11.1
 numpy==2.5.1
-pillow==12.2.0
+pillow==12.3.0
 
 # ============================================
 # Authentication (JWT + Password Hashing)
