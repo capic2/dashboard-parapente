@@ -57,6 +57,9 @@ catalogs:
     '@tanstack/react-table':
       specifier: ^8.21.3
       version: 8.21.3
+    '@tanstack/router-plugin':
+      specifier: ^1.166.13
+      version: 1.168.23
     '@testing-library/jest-dom':
       specifier: ^6.1.5
       version: 6.9.1
@@ -87,12 +90,12 @@ catalogs:
     cesium:
       specifier: ^1.139.1
       version: 1.143.0
-    chromatic:
-      specifier: ^18.0.0
-      version: 18.0.1
     date-fns:
       specifier: ^4.0.0
       version: 4.4.0
+    happy-dom:
+      specifier: ^20.8.9
+      version: 20.11.0
     husky:
       specifier: ^9.1.7
       version: 9.1.7
@@ -108,6 +111,9 @@ catalogs:
     ky:
       specifier: ^2.0.0
       version: 2.0.2
+    lint-staged:
+      specifier: ^17.0.0
+      version: 17.1.0
     lucide-react:
       specifier: ^1.7.0
       version: 1.25.0
@@ -311,7 +317,7 @@ importers:
         version: 4.1.10(vitest@4.1.10)
       chromatic:
         specifier: 'catalog:'
-        version: 18.0.1
+        version: 18.1.0
       happy-dom:
         specifier: 'catalog:'
         version: 20.11.0
@@ -3020,8 +3026,8 @@ packages:
       '@chromatic-com/vitest':
         optional: true
 
-  chromatic@18.0.1:
-    resolution: {integrity: sha512-GlTYrZ4ui5ZW8Jzut6SAo5bMH3sIugYZ37Nq2DyVHBfPINeEzGA8eG5xNo4N/I2aRdM9Xnqw0SCls7wgf2llvA==}
+  chromatic@18.1.0:
+    resolution: {integrity: sha512-I9av8lUc5CQRlYzwKpmOG9cwYvZ4AFmTvtHeNrzOMC1353F9xYw45CHpSNIsNKuOiqqmzci9esXQd5akl0fi6w==}
     engines: {node: '>=22.0.0'}
     hasBin: true
     peerDependencies:
@@ -7589,7 +7595,7 @@ snapshots:
     dependencies:
       semver: 7.8.5
 
-  chromatic@18.0.1:
+  chromatic@18.1.0:
     dependencies:
       semver: 7.8.5
 
