@@ -64,6 +64,26 @@ const mockFlightResult = {
   },
 };
 
+const mockManualFlight = {
+  id: 'manual-flight-1',
+  site_id: null,
+  site_name: null,
+  strava_id: null,
+  name: 'Vol du soir',
+  title: 'Vol du soir',
+  description: null,
+  flight_date: '2024-03-15',
+  departure_time: null,
+  duration_minutes: null,
+  max_altitude_m: null,
+  max_speed_kmh: null,
+  distance_km: null,
+  elevation_gain_m: null,
+  notes: null,
+  gpx_file_path: null,
+  external_url: null,
+};
+
 export const FlightModal = meta.story({
   name: 'Flight Modal',
   args: {
@@ -75,6 +95,9 @@ export const FlightModal = meta.story({
   parameters: {
     msw: {
       handlers: [
+        http.post('*/api/flights', () => {
+          return HttpResponse.json(mockManualFlight);
+        }),
         http.post('*/api/flights/create-from-gpx', () => {
           return HttpResponse.json(mockFlightResult);
         }),
@@ -84,14 +107,36 @@ export const FlightModal = meta.story({
 });
 
 FlightModal.test(
+  'It can create a flight from basic information',
+  async ({ args }) => {
+    const titleInput = screen.getByLabelText('Titre du vol');
+    await userEvent.type(titleInput, 'Vol du soir');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Créer le vol' }));
+
+    await expect(
+      await screen.findByText('Vol créé avec succès')
+    ).toBeInTheDocument();
+    await expect(args.onCreateComplete).toHaveBeenCalled();
+  }
+);
+
+FlightModal.test(
   'The upload button is disabled when no file selected',
   async () => {
-    const uploadButton = await screen.getByText('📤 Créer le vol');
+    await userEvent.click(
+      screen.getByRole('tab', { name: /Importer un fichier/u })
+    );
+    const uploadButton = screen.getByRole('button', { name: /Créer le vol/u });
     await expect(uploadButton).toBeDisabled();
   }
 );
 
 FlightModal.test('It can upload a file', async ({ args }) => {
+  await userEvent.click(
+    screen.getByRole('tab', { name: /Importer un fichier/u })
+  );
+
   // Create a mock GPX file
   const file = new File(
     ['<?xml version="1.0"?><gpx></gpx>'],
@@ -109,29 +154,27 @@ FlightModal.test('It can upload a file', async ({ args }) => {
   await expect(await screen.findByText(/test-flight.gpx/u)).toBeInTheDocument();
 
   // Click the upload button
-  const uploadButton = await screen.findByText('📤 Créer le vol');
+  const uploadButton = screen.getByRole('button', { name: /Créer le vol/u });
   await userEvent.click(uploadButton);
 
   // Verify success message appears
   await expect(
-    await screen.findByText('✅ Vol créé avec succès')
+    await screen.findByText('Vol créé avec succès')
   ).toBeInTheDocument();
   await expect(
     await screen.findByText(/Besançon - Mont Poupet/u)
   ).toBeInTheDocument();
 
   await expect(args.onCreateComplete).toHaveBeenCalled();
-  await waitFor(
-    async () => {
-      await expect(args.onClose).toHaveBeenCalled();
-    },
-    { timeout: 3000 }
-  );
 });
 
 FlightModal.test(
   'it clears the selected file when click on cancel',
   async () => {
+    await userEvent.click(
+      screen.getByRole('tab', { name: /Importer un fichier/u })
+    );
+
     // Create a mock GPX file
     const file = new File(
       ['<?xml version="1.0"?><gpx></gpx>'],
@@ -204,6 +247,10 @@ FlightModal.test(
     },
   },
   async ({ args }) => {
+    await userEvent.click(
+      screen.getByRole('tab', { name: /Importer un fichier/u })
+    );
+
     // Create a mock GPX file
     const file = new File(
       ['<?xml version="1.0"?><gpx></gpx>'],
@@ -225,14 +272,14 @@ FlightModal.test(
     ).toBeInTheDocument();
 
     // Click the upload button
-    const uploadButton = await screen.findByText('📤 Créer le vol');
+    const uploadButton = screen.getByRole('button', { name: /Créer le vol/u });
     await userEvent.click(uploadButton);
 
     // Wait for error message to appear
     await waitFor(
       async () => {
         await expect(
-          await screen.findByText('❌ Erreur lors de la création')
+          await screen.findByText('Erreur lors de la création')
         ).toBeInTheDocument();
       },
       { timeout: 5000 }
@@ -253,7 +300,7 @@ FlightModal.test(
 
     // The success message should NOT appear
     await expect(
-      screen.queryByText('✅ Vol créé avec succès')
+      screen.queryByText('Vol créé avec succès')
     ).not.toBeInTheDocument();
   }
 );

@@ -842,6 +842,12 @@
     "stackTrace": "Stack trace:"
   },
   "flights": {
+    "creationMethod": "Creation method",
+    "manualEntry": "Manual entry",
+    "importFile": "Import a file",
+    "manualCreateDescription": "The date is enough to save a flight. Add the site and any statistics you have.",
+    "manualTitlePlaceholder": "e.g. Evening flight at Arguel",
+    "optionalStats": "Optional statistics",
     "createFromGpx": "Create flight from GPX/IGC",
     "createDescription": "Upload a GPX or IGC file to automatically create a new flight. Statistics (duration, altitude, distance, speed) will be extracted from the file.",
     "gpxFile": "GPX or IGC file",

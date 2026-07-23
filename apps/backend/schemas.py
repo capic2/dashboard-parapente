@@ -254,8 +254,27 @@ class FlightBase(BaseModel):
 
 
 class FlightCreate(FlightBase):
+    name: str | None = None
     site_id: str | None = None
     strava_id: str | None = None
+
+    @validator("duration_minutes", "max_altitude_m", "elevation_gain_m")
+    def positive_values(cls, value):
+        if value is not None and value < 0:
+            raise ValueError("Value must be positive or zero")
+        return value
+
+    @validator("distance_km", "max_speed_kmh")
+    def positive_floats(cls, value):
+        if value is not None and value < 0:
+            raise ValueError("Value must be positive or zero")
+        return value
+
+    @validator("flight_date")
+    def date_not_future(cls, value):
+        if value > date.today():
+            raise ValueError("Flight date cannot be in the future")
+        return value
 
 
 class FlightUpdate(BaseModel):
