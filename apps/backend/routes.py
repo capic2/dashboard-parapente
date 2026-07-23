@@ -77,6 +77,7 @@ from schemas import GoproOverlayProbeResponse
 from schemas import (
     EmagramAnalysisListItem,
     EmagramTriggerRequest,
+    FlightCreate,
     FlightRecordsResponse,
     FlightUpdate,
 )
@@ -3998,22 +3999,87 @@ def download_flight_gopro_overlay(flight_id: str, db: Session = Depends(get_db))
 
 
 @router.post("/flights")
-def create_flight(flight_data: dict, db: Session = Depends(get_db)):
-    """Create a new flight (from Strava webhook)"""
+def create_flight(flight_data: FlightCreate, db: Session = Depends(get_db)):
+    """Create a flight from manually entered information."""
+    site = None
+    if flight_data.site_id:
+        site = db.query(Site).filter(Site.id == flight_data.site_id).first()
+        if not site:
+            raise HTTPException(status_code=404, detail="Site not found")
+
+    entered_name = (flight_data.name or flight_data.title or "").strip()
+    if entered_name:
+        flight_name = entered_name
+    elif site:
+        flight_name = f"{site.name} {flight_data.flight_date.strftime('%d-%m')}"
+    else:
+        flight_name = f"Vol du {flight_data.flight_date.strftime('%d/%m/%Y')}"
+
+    if flight_data.departure_time:
+        flight_name = (
+            entered_name
+            or f"{site.name if site else 'Vol'} "
+            f"{flight_data.flight_date.strftime('%d-%m')} "
+            f"{flight_data.departure_time.strftime('%Hh%M')}"
+        )
+
     flight = Flight(
         id=str(uuid.uuid4()),
-        strava_id=flight_data.get("strava_id"),
-        site_id=flight_data.get("site_id"),
-        title=flight_data.get("title"),
-        flight_date=flight_data.get("flight_date"),
-        duration_minutes=flight_data.get("duration_minutes"),
-        max_altitude_m=flight_data.get("max_altitude_m"),
-        distance_km=flight_data.get("distance_km"),
+        strava_id=flight_data.strava_id,
+        site_id=flight_data.site_id,
+        name=flight_name,
+        title=(flight_data.title or "").strip() or flight_name,
+        description=flight_data.description,
+        flight_date=flight_data.flight_date,
+        departure_time=flight_data.departure_time,
+        duration_minutes=flight_data.duration_minutes,
+        max_altitude_m=flight_data.max_altitude_m,
+        max_speed_kmh=flight_data.max_speed_kmh,
+        distance_km=flight_data.distance_km,
+        elevation_gain_m=flight_data.elevation_gain_m,
+        notes=flight_data.notes,
     )
-    db.add(flight)
-    db.commit()
-    db.refresh(flight)
-    return flight
+    try:
+        db.add(flight)
+        db.commit()
+        db.refresh(flight)
+    except Exception as exc:
+        db.rollback()
+        logger.error("Failed to create manual flight: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to create flight") from exc
+
+    return {
+        "id": flight.id,
+        "strava_id": flight.strava_id,
+        "site_id": flight.site_id,
+        "site_name": site.name if site else None,
+        "name": flight.name,
+        "title": flight.title,
+        "description": flight.description,
+        "flight_date": flight.flight_date.isoformat(),
+        "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
+        "duration_minutes": flight.duration_minutes,
+        "max_altitude_m": flight.max_altitude_m,
+        "max_speed_kmh": flight.max_speed_kmh,
+        "distance_km": flight.distance_km,
+        "elevation_gain_m": flight.elevation_gain_m,
+        "notes": flight.notes,
+        "gpx_file_path": None,
+        "external_url": None,
+        "video_export_job_id": None,
+        "video_export_status": None,
+        "video_export_progress": None,
+        "video_file_path": None,
+        "video_file_exists": False,
+        "gopro_camera_file_exists": False,
+        "gopro_overlay_job_id": None,
+        "gopro_overlay_status": None,
+        "gopro_overlay_progress": None,
+        "gopro_overlay_file_path": None,
+        "gopro_overlay_file_exists": False,
+        "created_at": flight.created_at.isoformat() if flight.created_at else None,
+        "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
+    }
 
 
 @router.post("/flights/sync-strava")

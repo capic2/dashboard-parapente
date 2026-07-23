@@ -6,7 +6,7 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { api, getApiErrorMessage } from '../../lib/api';
 import type {
   Flight,
   FlightFilters,
@@ -23,6 +23,7 @@ import {
   VIDEO_EXPORT_IN_PROGRESS_STATUSES,
 } from '@dashboard-parapente/shared-types';
 import { isHTTPError } from 'ky';
+import i18n from 'i18next';
 import { getStaleTime } from '../../lib/cacheConfig';
 import { isGoproOverlayInProgress } from '../../lib/flightMediaState';
 
@@ -147,6 +148,41 @@ export const useUpdateFlight = (
     },
   });
 };
+
+/** Create a flight from manually entered information. */
+export function useCreateFlight() {
+  const queryClient = useQueryClient();
+
+  return useMutation<Flight, Error, FlightFormData>({
+    mutationFn: async (flightData) => {
+      let data: unknown;
+      try {
+        data = await api.post('flights', { json: flightData }).json();
+      } catch (error) {
+        if (error instanceof Error) {
+          error.message = await getApiErrorMessage(
+            error,
+            i18n.t('flights.createGenericError')
+          );
+        }
+        throw error;
+      }
+
+      const validation = FlightSchema.safeParse(data);
+      if (!validation.success) {
+        throw new Error(
+          `Invalid flight creation response: ${validation.error.message}`
+        );
+      }
+      return validation.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['flights'] });
+      void queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] });
+      void queryClient.invalidateQueries({ queryKey: ['flights', 'records'] });
+    },
+  });
+}
 
 /**
  * Synchroniser les vols Strava pour une période donnée
