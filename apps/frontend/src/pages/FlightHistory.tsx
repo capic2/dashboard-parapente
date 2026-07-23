@@ -524,7 +524,7 @@ export default function FlightHistory() {
         }}
       />
 
-      {/* Modal Créer un vol depuis GPX */}
+      {/* Modal de création manuelle ou depuis un fichier de trace */}
       <CreateFlightModal
         isOpen={showCreateFlightModal}
         sites={sites}
