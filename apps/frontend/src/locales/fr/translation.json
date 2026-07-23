@@ -846,6 +846,12 @@
     "stackTrace": "Stack trace:"
   },
   "flights": {
+    "creationMethod": "Méthode de création",
+    "manualEntry": "Saisie manuelle",
+    "importFile": "Importer un fichier",
+    "manualCreateDescription": "La date suffit pour enregistrer un vol. Ajoutez le site et les statistiques dont vous disposez.",
+    "manualTitlePlaceholder": "Ex : Vol du soir à Arguel",
+    "optionalStats": "Statistiques optionnelles",
     "createFromGpx": "Créer un vol depuis GPX/IGC",
     "createDescription": "Uploadez un fichier GPX ou IGC pour créer automatiquement un nouveau vol. Les statistiques (durée, altitude, distance, vitesse) seront extraites du fichier.",
     "gpxFile": "Fichier GPX ou IGC",

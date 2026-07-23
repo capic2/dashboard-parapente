@@ -1079,12 +1079,66 @@ class TestDeleteFlightEndpoint:
 class TestCreateFlightEndpoint:
     """Tests for POST /flights"""
 
-    # Note: POST /flights tests removed
-    # Endpoint is designed for Strava webhook integration
-    # Requires specific data format with flight_date (NOT NULL constraint)
-    # Testing this endpoint properly requires mocking Strava webhook payload
-    # or creating a separate endpoint for manual flight creation
-    pass
+    def test_create_manual_flight_without_gpx(self, client, db_session, arguel_site):
+        response = client.post(
+            f"{API_PREFIX}/flights",
+            json={
+                "title": "Vol du soir",
+                "site_id": "site-arguel",
+                "flight_date": date.today().isoformat(),
+                "departure_time": f"{date.today().isoformat()}T18:30:00",
+                "duration_minutes": 45,
+                "max_altitude_m": 980,
+                "max_speed_kmh": 42.5,
+                "distance_km": 8.2,
+                "elevation_gain_m": 320,
+                "notes": "Conditions calmes",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "Vol du soir"
+        assert data["site_name"] == "Arguel"
+        assert data["duration_minutes"] == 45
+        assert data["max_speed_kmh"] == 42.5
+        assert data["gpx_file_path"] is None
+
+        flight = db_session.query(Flight).filter(Flight.id == data["id"]).one()
+        assert flight.gpx_file_path is None
+        assert flight.notes == "Conditions calmes"
+
+    def test_create_manual_flight_generates_name_from_date(self, client, db_session):
+        response = client.post(
+            f"{API_PREFIX}/flights",
+            json={"flight_date": date.today().isoformat()},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["name"].startswith("Vol du ")
+
+    def test_create_manual_flight_rejects_unknown_site(self, client, db_session):
+        response = client.post(
+            f"{API_PREFIX}/flights",
+            json={
+                "flight_date": date.today().isoformat(),
+                "site_id": "unknown-site",
+            },
+        )
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Site not found"
+
+    def test_create_manual_flight_rejects_negative_metrics(self, client, db_session):
+        response = client.post(
+            f"{API_PREFIX}/flights",
+            json={
+                "flight_date": date.today().isoformat(),
+                "duration_minutes": -1,
+            },
+        )
+
+        assert response.status_code == 422
 
 
 class TestFlightGPXEndpoints:
