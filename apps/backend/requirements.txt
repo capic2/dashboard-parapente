@@ -92,4 +92,4 @@ bcrypt>=4.0.0
 # AI/LLM Integration
 # ============================================
 google-generativeai==0.8.6
-groq==1.5.0
+groq==1.6.0
