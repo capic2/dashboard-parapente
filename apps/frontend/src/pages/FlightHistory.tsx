@@ -9,6 +9,7 @@ import { Input, TextField } from 'react-aria-components';
 import {
   CheckSquare,
   FilePlus2,
+  Upload,
   Search,
   Trash2,
   X,
@@ -60,6 +61,9 @@ export default function FlightHistory() {
   const [showMultiDeleteConfirm, setShowMultiDeleteConfirm] = useState(false);
   const [showStravaSyncModal, setShowStravaSyncModal] = useState(false);
   const [showCreateFlightModal, setShowCreateFlightModal] = useState(false);
+  const [createFlightMode, setCreateFlightMode] = useState<'manual' | 'file'>(
+    'file'
+  );
   const [showCreateSiteModal, setShowCreateSiteModal] = useState(false);
   const [showMobileDetail, setShowMobileDetail] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -354,11 +358,28 @@ export default function FlightHistory() {
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             {!selectionMode && (
               <Button
-                onClick={() => setShowCreateFlightModal(true)}
+                onClick={() => {
+                  setCreateFlightMode('file');
+                  setShowCreateFlightModal(true);
+                }}
                 className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors flex items-center gap-2"
               >
+                <Upload className="h-4 w-4" aria-hidden="true" />
+                {t('flights.importFile')}
+              </Button>
+            )}
+
+            {!selectionMode && (
+              <Button
+                onClick={() => {
+                  setCreateFlightMode('manual');
+                  setShowCreateFlightModal(true);
+                }}
+                variant="secondary"
+                className="px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+              >
                 <FilePlus2 className="h-4 w-4" aria-hidden="true" />
-                {t('flights.createFlight')}
+                {t('flights.manualEntry')}
               </Button>
             )}
 
@@ -528,6 +549,7 @@ export default function FlightHistory() {
       <CreateFlightModal
         isOpen={showCreateFlightModal}
         sites={sites}
+        initialMode={createFlightMode}
         onClose={() => setShowCreateFlightModal(false)}
         onCreateComplete={() => {
           void queryClient.invalidateQueries({ queryKey: ['flights'] });
