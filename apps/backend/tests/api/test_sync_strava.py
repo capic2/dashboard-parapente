@@ -9,6 +9,7 @@ from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from models import Flight
+from strava import StravaAPIError
 
 API_PREFIX = "/api"
 
@@ -131,3 +132,22 @@ class TestSyncStravaEndpoint:
         assert flight is not None
         assert flight.site_id is None
         assert flight.name == "Vol du 15/03/2026 à 15:00"
+
+    def test_sync_strava_reports_missing_activity_scope(self, client):
+        with patch(
+            "strava.get_activities_by_period",
+            new=AsyncMock(
+                side_effect=StravaAPIError(
+                    "Strava denied access to activities. Reauthorize the connection "
+                    "with the activity:read_all scope.",
+                    status_code=403,
+                )
+            ),
+        ):
+            response = client.post(
+                f"{API_PREFIX}/flights/sync-strava",
+                json={"date_from": "2026-07-24", "date_to": "2026-07-25"},
+            )
+
+        assert response.status_code == 502
+        assert "activity:read_all" in response.json()["detail"]

@@ -37,6 +37,15 @@ _REFRESH_MAX_ATTEMPTS = 5
 _REFRESH_INITIAL_BACKOFF_SECONDS = 1.0
 
 
+class StravaAPIError(Exception):
+    """Actionable failure returned by the Strava API."""
+
+    def __init__(self, message: str, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+
+
 def _get_persisted_refresh_token() -> str | None:
     """Read the refresh token from DB (app_settings), fallback to env."""
     try:
@@ -510,13 +519,15 @@ async def get_activities_by_period(
         Liste d'activités Strava filtrées par type
 
     Raises:
-        Exception si échec API
+        StravaAPIError: if authentication or the Strava API request fails
     """
     token = await get_access_token()
 
     if not token:
         logger.error("Cannot get activities: no access token")
-        raise Exception("No Strava access token available")
+        raise StravaAPIError(
+            "Strava authentication is unavailable. Reauthorize the Strava connection."
+        )
 
     try:
         # Convertir dates en timestamps Unix
@@ -586,9 +597,31 @@ async def get_activities_by_period(
 
         return all_activities
 
-    except Exception as e:
-        logger.error(f"Failed to get activities by period: {e}")
-        raise
+    except httpx.HTTPStatusError as e:
+        status_code = e.response.status_code
+        logger.error(
+            "Strava activities request failed with HTTP %s: %s",
+            status_code,
+            e.response.text[:500],
+        )
+        if status_code in {401, 403}:
+            raise StravaAPIError(
+                "Strava denied access to activities. Reauthorize the connection "
+                "with the activity:read_all scope.",
+                status_code=status_code,
+            ) from e
+        if status_code == 429:
+            raise StravaAPIError(
+                "Strava rate limit reached. Try the import again later.",
+                status_code=status_code,
+            ) from e
+        raise StravaAPIError(
+            f"Strava API request failed with HTTP {status_code}.",
+            status_code=status_code,
+        ) from e
+    except httpx.RequestError as e:
+        logger.error("Strava activities request failed: %s", e)
+        raise StravaAPIError("Strava API is currently unreachable.") from e
 
 
 def save_gpx_file(gpx_content: str, activity_id: str) -> str | None:
