@@ -4101,6 +4101,7 @@ async def sync_strava_activities(request: dict, db: Session = Depends(get_db)):
         }
     """
     from strava import (
+        StravaAPIError,
         download_gpx,
         get_activities_by_period,
         match_site_by_coordinates,
@@ -4141,76 +4142,80 @@ async def sync_strava_activities(request: dict, db: Session = Depends(get_db)):
                 continue
 
             try:
-                # 4. Télécharger GPX
-                gpx_content = await download_gpx(strava_id)
+                with db.begin_nested():
+                    # 4. Télécharger GPX
+                    gpx_content = await download_gpx(strava_id)
 
-                if not gpx_content:
-                    logger.warning(f"No GPX available for activity {strava_id}")
+                    if not gpx_content:
+                        logger.warning(f"No GPX available for activity {strava_id}")
 
-                # 6. Détecter le site depuis les coordonnées GPX
-                site_id = None
-                if gpx_content:
-                    try:
-                        coordinates = parse_gpx_file_from_string(gpx_content)
-                        if coordinates:
-                            first_coord = coordinates[0]
-                            site_id = match_site_by_coordinates(
-                                first_coord["lat"], first_coord["lon"], sites_data
+                    # 6. Détecter le site depuis les coordonnées GPX
+                    site_id = None
+                    if gpx_content:
+                        try:
+                            coordinates = parse_gpx_file_from_string(gpx_content)
+                            if coordinates:
+                                first_coord = coordinates[0]
+                                site_id = match_site_by_coordinates(
+                                    first_coord["lat"], first_coord["lon"], sites_data
+                                )
+                        except Exception as e:
+                            logger.warning(f"Failed to detect site from GPX: {e}")
+
+                    # 7. Extraire données de l'activité Strava
+                    start_date_local = activity.get("start_date_local", "")
+
+                    # Date du vol (YYYY-MM-DD)
+                    activity_date = datetime.strptime(
+                        start_date_local.split("T")[0], "%Y-%m-%d"
+                    ).date()
+
+                    # Heure de départ (datetime complet)
+                    departure_time = None
+                    if start_date_local:
+                        try:
+                            departure_time = datetime.fromisoformat(
+                                start_date_local.replace("Z", "+00:00")
                             )
-                    except Exception as e:
-                        logger.warning(f"Failed to detect site from GPX: {e}")
+                        except Exception as e:
+                            logger.warning(f"Failed to parse departure_time for {strava_id}: {e}")
 
-                # 7. Extraire données de l'activité Strava
-                start_date_local = activity.get("start_date_local", "")
+                    # 7. Créer Flight
+                    flight_name = (
+                        f"Vol du {activity_date.strftime('%d/%m/%Y')} à "
+                        f"{departure_time.strftime('%H:%M')}"
+                        if departure_time
+                        else f"Vol du {activity_date.strftime('%d/%m/%Y')}"
+                    )
 
-                # Date du vol (YYYY-MM-DD)
-                activity_date = datetime.strptime(start_date_local.split("T")[0], "%Y-%m-%d").date()
+                    flight = Flight(
+                        id=str(uuid.uuid4()),
+                        strava_id=strava_id,
+                        title=flight_name,
+                        name=flight_name,
+                        site_id=site_id,
+                        flight_date=activity_date,
+                        departure_time=departure_time,
+                        duration_minutes=int(activity.get("moving_time", 0) / 60),
+                        max_altitude_m=(
+                            int(activity.get("elev_high", 0)) if activity.get("elev_high") else None
+                        ),
+                        distance_km=round(activity.get("distance", 0) / 1000, 2),
+                        elevation_gain_m=(
+                            int(activity.get("total_elevation_gain", 0))
+                            if activity.get("total_elevation_gain")
+                            else None
+                        ),
+                        external_url=f"https://www.strava.com/activities/{strava_id}",
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                    )
 
-                # Heure de départ (datetime complet)
-                departure_time = None
-                if start_date_local:
-                    try:
-                        departure_time = datetime.fromisoformat(
-                            start_date_local.replace("Z", "+00:00")
-                        )
-                    except Exception as e:
-                        logger.warning(f"Failed to parse departure_time for {strava_id}: {e}")
-
-                # 7. Créer Flight
-                flight_name = (
-                    f"Vol du {activity_date.strftime('%d/%m/%Y')} à {departure_time.strftime('%H:%M')}"
-                    if departure_time
-                    else f"Vol du {activity_date.strftime('%d/%m/%Y')}"
-                )
-
-                flight = Flight(
-                    id=str(uuid.uuid4()),
-                    strava_id=strava_id,
-                    title=flight_name,
-                    name=flight_name,
-                    site_id=site_id,
-                    flight_date=activity_date,
-                    departure_time=departure_time,
-                    duration_minutes=int(activity.get("moving_time", 0) / 60),
-                    max_altitude_m=(
-                        int(activity.get("elev_high", 0)) if activity.get("elev_high") else None
-                    ),
-                    distance_km=round(activity.get("distance", 0) / 1000, 2),
-                    elevation_gain_m=(
-                        int(activity.get("total_elevation_gain", 0))
-                        if activity.get("total_elevation_gain")
-                        else None
-                    ),
-                    external_url=f"https://www.strava.com/activities/{strava_id}",
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
-                )
-
-                db.add(flight)
-                db.flush()
-                if gpx_content:
-                    gpx_path = write_flight_text_file(db, flight, "strava.gpx", gpx_content)
-                    flight.gpx_file_path = str(gpx_path)
+                    db.add(flight)
+                    db.flush()
+                    if gpx_content:
+                        gpx_path = write_flight_text_file(db, flight, "strava.gpx", gpx_content)
+                        flight.gpx_file_path = str(gpx_path)
 
                 imported_flights.append(
                     {
@@ -4223,6 +4228,8 @@ async def sync_strava_activities(request: dict, db: Session = Depends(get_db)):
 
                 logger.info(f" Imported: {flight.title} (Strava ID: {strava_id})")
 
+            except StravaAPIError:
+                raise
             except Exception as e:
                 logger.error(f"Failed to import activity {strava_id}: {e}")
                 failed_count += 1
@@ -4238,6 +4245,10 @@ async def sync_strava_activities(request: dict, db: Session = Depends(get_db)):
             "flights": imported_flights,
         }
 
+    except StravaAPIError as e:
+        logger.warning("Strava sync unavailable: %s", e)
+        db.rollback()
+        raise HTTPException(status_code=502, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Sync failed: {e}", exc_info=True)
         db.rollback()

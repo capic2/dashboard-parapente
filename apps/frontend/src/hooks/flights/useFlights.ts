@@ -198,18 +198,27 @@ export function useStravaSyncMutation() {
       date_from: string;
       date_to: string;
     }) => {
-      const data = await api
-        .post('flights/sync-strava', {
-          json: { date_from, date_to },
-        })
-        .json<{
-          success: boolean;
-          imported: number;
-          skipped: number;
-          failed: number;
-          flights: unknown[];
-        }>();
-      return data;
+      try {
+        return await api
+          .post('flights/sync-strava', {
+            json: { date_from, date_to },
+          })
+          .json<{
+            success: boolean;
+            imported: number;
+            skipped: number;
+            failed: number;
+            flights: unknown[];
+          }>();
+      } catch (error) {
+        if (error instanceof Error) {
+          error.message = await getApiErrorMessage(
+            error,
+            i18n.t('strava.syncError')
+          );
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       // Invalider le cache des vols pour forcer le refresh

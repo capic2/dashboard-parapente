@@ -22,6 +22,7 @@ import httpx
 import pytest
 
 from strava import (
+    StravaAPIError,
     download_gpx,
     get_access_token,
     get_activities_by_period,
@@ -879,3 +880,20 @@ async def test_get_activities_by_period_end_date_is_inclusive():
 
     assert captured_params["after"] == expected_after
     assert captured_params["before"] == expected_before
+
+
+@pytest.mark.asyncio
+async def test_get_activities_by_period_reports_missing_activity_scope() -> None:
+    request = httpx.Request("GET", "https://www.strava.com/api/v3/athlete/activities")
+    response = httpx.Response(403, request=request, json={"message": "Forbidden"})
+
+    with (
+        patch("strava.get_access_token", new=AsyncMock(return_value="test_token")),
+        patch("strava.httpx.AsyncClient") as mock_client,
+    ):
+        mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=response)
+
+        with pytest.raises(StravaAPIError, match="activity:read_all") as exc_info:
+            await get_activities_by_period("2026-07-24", "2026-07-25")
+
+    assert exc_info.value.status_code == 403
