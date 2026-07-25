@@ -106,6 +106,33 @@ export const FlightModal = meta.story({
   },
 });
 
+export const FileImport = meta.story({
+  name: 'File Import',
+  args: {
+    isOpen: true,
+    sites: mockSites,
+    initialMode: 'file',
+    onClose: fn(),
+    onCreateComplete: fn(),
+  },
+  parameters: {
+    msw: {
+      handlers: [
+        http.post('*/api/flights/create-from-gpx', () => {
+          return HttpResponse.json(mockFlightResult);
+        }),
+      ],
+    },
+  },
+});
+
+FileImport.test('It opens directly on file import', async () => {
+  await expect(
+    screen.getByRole('tab', { name: /Importer un fichier/u })
+  ).toHaveAttribute('aria-selected', 'true');
+  await expect(screen.getByLabelText('Fichier GPX ou IGC')).toBeInTheDocument();
+});
+
 FlightModal.test(
   'It can create a flight from basic information',
   async ({ args }) => {

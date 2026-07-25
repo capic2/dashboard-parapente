@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Form,
@@ -38,6 +38,7 @@ import { formatFlightSiteLabel } from '../siteDisplay';
 interface CreateFlightModalProps {
   isOpen: boolean;
   sites: Site[];
+  initialMode?: CreationMode;
   onClose: () => void;
   onCreateComplete: () => void;
 }
@@ -69,13 +70,14 @@ const initialManualValues = (): FlightFormData => ({
 export function CreateFlightModal({
   isOpen,
   sites,
+  initialMode = 'manual',
   onClose,
   onCreateComplete,
 }: CreateFlightModalProps) {
   const { t } = useTranslation();
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [mode, setMode] = useState<CreationMode>('manual');
+  const [mode, setMode] = useState<CreationMode>(initialMode);
   const [manualValues, setManualValues] = useState(initialManualValues);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [createdFlight, setCreatedFlight] = useState<Flight | null>(null);
@@ -83,6 +85,10 @@ export function CreateFlightModal({
   const manualMutation = useCreateFlight();
   const fileMutation = useCreateFlightFromGPX();
   const isPending = manualMutation.isPending || fileMutation.isPending;
+
+  useEffect(() => {
+    if (isOpen) setMode(initialMode);
+  }, [initialMode, isOpen]);
 
   const siteOptions = sites.map((site) => ({
     id: site.id,
@@ -101,7 +107,7 @@ export function CreateFlightModal({
     : '';
 
   const reset = () => {
-    setMode('manual');
+    setMode(initialMode);
     setManualValues(initialManualValues());
     setSelectedFile(null);
     setCreatedFlight(null);
