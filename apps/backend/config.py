@@ -66,6 +66,16 @@ def _int_env_at_least(name: str, default: int, minimum: int) -> int:
     return max(minimum, int(os.getenv(name, str(default))))
 
 
+def _intervals_sync_enabled(api_key: str | None) -> bool:
+    requested = os.getenv("BACKEND_INTERVALS_ICU_SYNC_ENABLED", "false").lower() == "true"
+    if requested and not api_key:
+        logger.warning(
+            "BACKEND_INTERVALS_ICU_SYNC_ENABLED ignored because "
+            "BACKEND_INTERVALS_ICU_API_KEY is missing"
+        )
+    return requested and bool(api_key)
+
+
 # ============================================================================
 # DATABASE
 # ============================================================================

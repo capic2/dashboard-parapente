@@ -40,7 +40,6 @@ def test_intervals_status_reports_configuration_and_types(monkeypatch):
 
     assert status == {"configured": True, "activity_types": ["HangGliding"]}
 
-
 @pytest.mark.asyncio
 async def test_shared_lock_uses_long_lease_and_atomic_release(monkeypatch):
     redis = AsyncMock()

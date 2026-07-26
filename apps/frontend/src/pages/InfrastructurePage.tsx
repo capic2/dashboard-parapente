@@ -717,6 +717,9 @@ function InfrastructureOverview() {
   } else if (intervalsStatus?.configured) {
     intervalsTone = 'green';
     intervalsValue = t('infrastructure.intervals.configured');
+  } else if (intervalsStatus) {
+    intervalsTone = 'gray';
+    intervalsValue = t('infrastructure.intervals.notConfigured');
   }
 
   return (
