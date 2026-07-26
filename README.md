@@ -73,7 +73,7 @@ Tableau de bord météo personnel pour sites de parapente avec agrégation multi
 
 ### 🔗 Intégrations
 
-- **Intervals.icu** : import des activités Zepp, conversion FIT vers GPX et synchronisation automatique filtrée
+- **Intervals.icu** : import manuel des activités Zepp, conversion FIT vers GPX et filtrage par type configuré
 - **Telegram** : Alertes météo (optionnel)
 
 ---

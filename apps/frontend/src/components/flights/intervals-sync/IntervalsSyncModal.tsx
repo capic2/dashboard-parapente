@@ -33,9 +33,7 @@ export function IntervalsSyncModal({
 
   const statusQuery = useIntervalsStatus(isOpen);
   const canPreview = Boolean(statusQuery.data?.configured);
-  const canImport = Boolean(
-    statusQuery.data?.configured && statusQuery.data.activity_types.length > 0
-  );
+  const canImport = Boolean(statusQuery.data?.activity_types?.length ?? 0);
   const previewQuery = useIntervalsPreview(
     dateFrom,
     dateTo,
@@ -141,16 +139,6 @@ export function IntervalsSyncModal({
             </output>
           )}
 
-          {statusQuery.data?.configured && !statusQuery.data.enabled && (
-            <output className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-              <CircleAlert
-                className="mt-0.5 h-4 w-4 shrink-0"
-                aria-hidden="true"
-              />
-              {t('intervals.disabled')}
-            </output>
-          )}
-
           {canPreview && previewQuery.isLoading && (
             <div className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
               <LoaderCircle
@@ -242,11 +230,12 @@ export function IntervalsSyncModal({
             </div>
           )}
 
-          {statusQuery.data?.awaiting_activity_type && previewQuery.data && (
-            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-              {t('intervals.configureDiscoveredType')}
-            </div>
-          )}
+          {statusQuery.data?.configured &&
+            statusQuery.data.activity_types.length > 0 && (
+              <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
+                {t('intervals.configureDiscoveredType')}
+              </div>
+            )}
         </div>
 
         {data && !isPending && (

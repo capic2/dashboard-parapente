@@ -133,13 +133,6 @@ INTERVALS_ICU_API_KEY = os.getenv("BACKEND_INTERVALS_ICU_API_KEY")
 INTERVALS_ICU_BASE_URL = os.getenv(
     "BACKEND_INTERVALS_ICU_BASE_URL", "https://intervals.icu/api/v1"
 ).rstrip("/")
-INTERVALS_ICU_SYNC_ENABLED = _intervals_sync_enabled(INTERVALS_ICU_API_KEY)
-INTERVALS_ICU_SYNC_INTERVAL_MINUTES = _int_env_at_least(
-    "BACKEND_INTERVALS_ICU_SYNC_INTERVAL_MINUTES", 10, 1
-)
-INTERVALS_ICU_SYNC_LOOKBACK_DAYS = _int_env_at_least(
-    "BACKEND_INTERVALS_ICU_SYNC_LOOKBACK_DAYS", 3, 0
-)
 INTERVALS_ICU_ACTIVITY_TYPES = _csv_env("BACKEND_INTERVALS_ICU_ACTIVITY_TYPES", "")
 
 # ============================================================================

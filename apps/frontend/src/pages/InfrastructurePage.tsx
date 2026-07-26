@@ -242,31 +242,15 @@ function IntervalsStatusSection() {
   const { t } = useTranslation();
   const { data: status, isLoading, isError } = useIntervalsStatus();
 
-  let statusLabel = t('infrastructure.intervals.notConfigured');
-  let statusTone: 'green' | 'amber' | 'red' | 'gray' = 'red';
-  let statusClassName =
-    'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
-  if (status?.configured && !status.enabled) {
-    statusLabel = t('infrastructure.intervals.disabled');
-    statusClassName =
-      'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
-    statusTone = 'gray';
-  } else if (status?.awaiting_activity_type) {
-    statusLabel = t('infrastructure.intervals.awaitingActivityType');
-    statusClassName =
-      'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200';
-    statusTone = 'amber';
-  } else if (status?.automatic_sync_ready) {
-    statusLabel = t('infrastructure.intervals.ready');
-    statusClassName =
-      'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300';
-    statusTone = 'green';
-  } else if (status?.configured && status.enabled) {
-    statusLabel = t('infrastructure.intervals.manualOnly');
-    statusClassName =
-      'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300';
-    statusTone = 'gray';
-  }
+  const statusLabel = status?.configured
+    ? t('infrastructure.intervals.configured')
+    : t('infrastructure.intervals.notConfigured');
+  const statusTone: 'green' | 'amber' | 'red' | 'gray' = status?.configured
+    ? 'green'
+    : 'red';
+  const statusClassName = status?.configured
+    ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+    : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
 
   return (
     <div className="space-y-4">
@@ -302,32 +286,12 @@ function IntervalsStatusSection() {
               tone={statusTone}
             />
             <InfrastructureStatCard
-              label={t('infrastructure.intervals.automaticSync')}
-              value={
-                status.automatic_sync_ready
-                  ? t('infrastructure.intervals.automaticReady')
-                  : t('infrastructure.intervals.automaticNotReady')
-              }
-              detail={
-                status.enabled
-                  ? t('infrastructure.intervals.enabled')
-                  : t('infrastructure.intervals.disabled')
-              }
-              tone={status.automatic_sync_ready ? 'green' : 'gray'}
-            />
-            <InfrastructureStatCard
-              label={t('infrastructure.intervals.interval')}
-              value={t('infrastructure.intervals.minutes', {
-                count: status.interval_minutes,
+              label={t('infrastructure.intervals.activityTypes')}
+              value={t('infrastructure.intervals.typeCount', {
+                count: status.activity_types.length,
               })}
-              detail={t('infrastructure.intervals.intervalDetail')}
-            />
-            <InfrastructureStatCard
-              label={t('infrastructure.intervals.lookback')}
-              value={t('infrastructure.intervals.days', {
-                count: status.lookback_days,
-              })}
-              detail={t('infrastructure.intervals.lookbackDetail')}
+              detail={t('infrastructure.intervals.activityTypesDetail')}
+              tone={status.activity_types.length > 0 ? 'green' : 'gray'}
             />
           </div>
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
@@ -750,17 +714,12 @@ function InfrastructureOverview() {
   if (intervalsLoading) {
     intervalsTone = 'gray';
     intervalsValue = t('common.loading');
-  } else if (intervalsStatus?.automatic_sync_ready) {
-    intervalsTone = 'green';
-    intervalsValue = t('infrastructure.intervals.ready');
-  } else if (intervalsStatus?.awaiting_activity_type) {
-    intervalsTone = 'amber';
-    intervalsValue = t('infrastructure.intervals.awaitingActivityType');
   } else if (intervalsStatus?.configured) {
+    intervalsTone = 'green';
+    intervalsValue = t('infrastructure.intervals.configured');
+  } else if (intervalsStatus) {
     intervalsTone = 'gray';
-    intervalsValue = intervalsStatus.enabled
-      ? t('infrastructure.intervals.manualOnly')
-      : t('infrastructure.intervals.disabled');
+    intervalsValue = t('infrastructure.intervals.notConfigured');
   }
 
   return (
@@ -834,14 +793,14 @@ export default function InfrastructurePage() {
     'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300';
   let intervalsBadgeLabel = t('common.loading');
 
-  if (intervalsStatus?.automatic_sync_ready) {
+  if (intervalsStatus?.configured) {
     intervalsBadgeClassName =
       'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300';
-    intervalsBadgeLabel = t('infrastructure.intervals.ready');
+    intervalsBadgeLabel = t('infrastructure.intervals.configured');
   } else if (intervalsStatus) {
     intervalsBadgeClassName =
       'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200';
-    intervalsBadgeLabel = t('infrastructure.intervals.attention');
+    intervalsBadgeLabel = t('infrastructure.intervals.notConfigured');
   }
 
   const navigateToInfrastructure = (

@@ -307,13 +307,6 @@ def start_scheduler():
         replace_existing=True,
     )
 
-    from intervals_sync import register_intervals_sync
-
-    try:
-        register_intervals_sync(scheduler)
-    except Exception:
-        logger.exception("Could not register the Intervals.icu synchronization job")
-
     if not scheduler.running:
         scheduler.start()
     logger.info(f"✅ Scheduler started - running every {interval} minutes")

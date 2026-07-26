@@ -4,11 +4,6 @@ import { api } from '../../lib/api';
 
 const IntervalsStatusSchema = z.object({
   configured: z.boolean(),
-  enabled: z.boolean(),
-  automatic_sync_ready: z.boolean(),
-  awaiting_activity_type: z.boolean(),
-  interval_minutes: z.number().int().nonnegative(),
-  lookback_days: z.number().int().nonnegative(),
   activity_types: z.array(z.string()),
 });
 
@@ -25,6 +20,5 @@ export const useIntervalsStatus = (enabled = true) => {
   return useQuery({
     ...intervalsStatusQueryOptions(),
     enabled,
-    refetchInterval: 60_000,
   });
 };

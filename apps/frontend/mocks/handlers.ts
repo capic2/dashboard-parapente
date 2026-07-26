@@ -317,11 +317,6 @@ export const handlers = [
   ...createHandler('get', '/admin/intervals/status', () =>
     HttpResponse.json({
       configured: true,
-      enabled: true,
-      automatic_sync_ready: true,
-      awaiting_activity_type: false,
-      interval_minutes: 30,
-      lookback_days: 14,
       activity_types: ['Paragliding'],
     })
   ),
