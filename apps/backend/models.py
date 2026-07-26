@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -143,8 +144,19 @@ class SiteLandingAssociation(Base):
 
 class Flight(Base):
     __tablename__ = "flights"
+    __table_args__ = (
+        Index(
+            "uq_flights_external_activity",
+            "external_provider",
+            "external_activity_id",
+            unique=True,
+        ),
+    )
 
     id = Column(String, primary_key=True)
+    external_provider = Column(String, nullable=True)
+    external_activity_id = Column(String, nullable=True)
+    # Legacy persisted compatibility only. Active integrations use the generic identity above.
     strava_id = Column(String, unique=True, nullable=True)
     site_id = Column(String, ForeignKey("sites.id"), nullable=True)
     name = Column(String)  # Format: "Lieu JJ-MM HHhMM"
@@ -339,7 +351,7 @@ class WeatherSourceConfig(Base):
 
 
 class StravaTokenLog(Base):
-    """Log of Strava token refresh attempts"""
+    """Legacy table retained so historical databases and migrations stay compatible."""
 
     __tablename__ = "strava_token_logs"
 

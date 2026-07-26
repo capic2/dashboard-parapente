@@ -61,62 +61,74 @@ export const LandingAssociationSchema = z.object({
 
 export type LandingAssociation = z.infer<typeof LandingAssociationSchema>;
 
-export const FlightSchema = z.object({
-  id: z.string(),
-  strava_id: z.string().nullish(),
-  site_id: z.string().nullish(),
-  site_name: z.string().nullish(),
-  name: z.string().nullish(),
-  title: z.string().nullish(),
-  description: z.string().nullish(),
-  flight_date: z.string(),
-  departure_time: z.string().nullish(),
-  duration_minutes: z.number().nullish(),
-  max_altitude_m: z.number().nullish(),
-  max_speed_kmh: z.number().nullish(),
-  distance_km: z.number().nullish(),
-  elevation_gain_m: z.number().nullish(),
-  notes: z.string().nullish(),
-  gpx_file_path: z.string().nullish(),
-  gpx_max_altitude_m: z.number().nullish(),
-  gpx_elevation_gain_m: z.number().nullish(),
-  external_url: z.string().nullish(),
-  video_export_job_id: z.string().nullish(),
-  video_export_status: z
-    .enum([
-      'processing',
-      'completed',
-      'failed',
-      'queued',
-      'running',
-      'initializing',
-      'capturing',
-      'encoding',
-      'cancelled',
-    ])
-    .nullish(),
-  video_export_progress: z.number().nullish(),
-  video_file_path: z.string().nullish(),
-  video_file_exists: z.boolean().nullish(),
-  gopro_camera_file_exists: z.boolean().nullish(),
-  gopro_overlay_job_id: z.string().nullish(),
-  gopro_overlay_status: z
-    .enum([
-      'queued',
-      'preparing',
-      'running',
-      'completed',
-      'failed',
-      'cancelled',
-    ])
-    .nullish(),
-  gopro_overlay_progress: z.number().nullish(),
-  gopro_overlay_file_path: z.string().nullish(),
-  gopro_overlay_file_exists: z.boolean().nullish(),
-  site: SiteSchema.optional(),
-  created_at: z.string().optional(),
-  updated_at: z.string().optional(),
-});
+export const FlightSchema = z
+  .object({
+    id: z.string(),
+    external_provider: z.string().trim().min(1).nullish(),
+    external_activity_id: z.string().trim().min(1).nullish(),
+    site_id: z.string().nullish(),
+    site_name: z.string().nullish(),
+    name: z.string().nullish(),
+    title: z.string().nullish(),
+    description: z.string().nullish(),
+    flight_date: z.string(),
+    departure_time: z.string().nullish(),
+    duration_minutes: z.number().nullish(),
+    max_altitude_m: z.number().nullish(),
+    max_speed_kmh: z.number().nullish(),
+    distance_km: z.number().nullish(),
+    elevation_gain_m: z.number().nullish(),
+    notes: z.string().nullish(),
+    gpx_file_path: z.string().nullish(),
+    gpx_max_altitude_m: z.number().nullish(),
+    gpx_elevation_gain_m: z.number().nullish(),
+    external_url: z.string().nullish(),
+    video_export_job_id: z.string().nullish(),
+    video_export_status: z
+      .enum([
+        'processing',
+        'completed',
+        'failed',
+        'queued',
+        'running',
+        'initializing',
+        'capturing',
+        'encoding',
+        'cancelled',
+      ])
+      .nullish(),
+    video_export_progress: z.number().nullish(),
+    video_file_path: z.string().nullish(),
+    video_file_exists: z.boolean().nullish(),
+    gopro_camera_file_exists: z.boolean().nullish(),
+    gopro_overlay_job_id: z.string().nullish(),
+    gopro_overlay_status: z
+      .enum([
+        'queued',
+        'preparing',
+        'running',
+        'completed',
+        'failed',
+        'cancelled',
+      ])
+      .nullish(),
+    gopro_overlay_progress: z.number().nullish(),
+    gopro_overlay_file_path: z.string().nullish(),
+    gopro_overlay_file_exists: z.boolean().nullish(),
+    site: SiteSchema.optional(),
+    created_at: z.string().optional(),
+    updated_at: z.string().optional(),
+  })
+  .refine(
+    (flight) =>
+      Boolean(flight.external_provider) ===
+      Boolean(flight.external_activity_id),
+    {
+      message:
+        'external_provider and external_activity_id must both be provided or omitted',
+      path: ['external_activity_id'],
+    }
+  );
 
 export const FlightStatsSchema = z.object({
   total_flights: z.number().catch(0),

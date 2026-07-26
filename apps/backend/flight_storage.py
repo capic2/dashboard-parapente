@@ -48,6 +48,12 @@ def write_flight_text_file(db: Session, flight: Flight, filename: str, content: 
     return file_path
 
 
+def write_flight_bytes_file(db: Session, flight: Flight, filename: str, content: bytes) -> Path:
+    file_path = ensure_flight_directory(db, flight) / filename
+    file_path.write_bytes(content)
+    return file_path
+
+
 def get_video_output_path(flight_id: str, timestamp: str) -> Path:
     try:
         with SessionLocal() as db:

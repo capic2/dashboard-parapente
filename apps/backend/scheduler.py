@@ -14,13 +14,13 @@ from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy.orm import Session
 
 from database import SessionLocal
-from models import Site, WeatherForecast
 from metrics import (
     inc_scheduler_run,
     inc_weather_fetch,
     observe_scheduler_run,
     observe_weather_fetch,
 )
+from models import Site, WeatherForecast
 from para_index import analyze_hourly_slots, calculate_para_index, format_slots_summary
 from weather_pipeline import get_normalized_forecast
 
@@ -307,7 +307,15 @@ def start_scheduler():
         replace_existing=True,
     )
 
-    scheduler.start()
+    from intervals_sync import register_intervals_sync
+
+    try:
+        register_intervals_sync(scheduler)
+    except Exception:
+        logger.exception("Could not register the Intervals.icu synchronization job")
+
+    if not scheduler.running:
+        scheduler.start()
     logger.info(f"✅ Scheduler started - running every {interval} minutes")
 
 
