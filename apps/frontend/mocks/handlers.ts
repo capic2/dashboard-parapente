@@ -314,8 +314,38 @@ export const handlers = [
     }
   ),
 
-  // POST /api/flights/sync-strava - Synchronize Strava flights
-  ...createHandler('post', '/flights/sync-strava', async ({ request }) => {
+  ...createHandler('get', '/admin/intervals/status', () =>
+    HttpResponse.json({
+      configured: true,
+      enabled: true,
+      automatic_sync_ready: true,
+      awaiting_activity_type: false,
+      interval_minutes: 30,
+      lookback_days: 14,
+      activity_types: ['Paragliding'],
+    })
+  ),
+
+  ...createHandler('get', '/flights/sync-intervals/preview', ({ request }) => {
+    const url = new URL(request.url);
+    const dateFrom = url.searchParams.get('date_from') ?? '2026-07-01';
+    return HttpResponse.json({
+      activities: [
+        {
+          id: 'intervals-activity-1',
+          start_date_local: `${dateFrom}T18:15:00`,
+          type: 'Paragliding',
+          name: 'Arguel - soaring du soir',
+          source: 'Zepp',
+          file_type: 'FIT',
+        },
+      ],
+      activity_types: ['Paragliding'],
+    });
+  }),
+
+  // POST /api/flights/sync-intervals - Synchronize Intervals.icu flights
+  ...createHandler('post', '/flights/sync-intervals', async ({ request }) => {
     const body = (await request.json()) as {
       date_from: string;
       date_to: string;
@@ -324,28 +354,19 @@ export const handlers = [
     // Simulate sync delay
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    // Mock response: import 2 new flights, skip 3 duplicates, 0 failed
     return HttpResponse.json({
       success: true,
       imported: 2,
+      updated: 0,
       skipped: 3,
       failed: 0,
-      flights: [
-        {
-          id: 'mock-strava-1',
-          site_name: 'Arguel',
-          title: 'Vol Strava importé 1',
-          flight_date: body.date_from,
-          strava_id: '99999999',
-        },
-        {
-          id: 'mock-strava-2',
-          site_name: 'La Côte',
-          title: 'Vol Strava importé 2',
-          flight_date: body.date_to,
-          strava_id: '88888888',
-        },
-      ],
+      flights: flights.slice(0, 2).map((flight, index) => ({
+        ...flight,
+        flight_date: index === 0 ? body.date_from : body.date_to,
+        external_provider: 'intervals_icu',
+        external_activity_id: `intervals-activity-${String(index + 1)}`,
+        external_url: `https://intervals.icu/activities/intervals-activity-${String(index + 1)}`,
+      })),
     });
   }),
 

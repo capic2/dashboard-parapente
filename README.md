@@ -73,7 +73,7 @@ Tableau de bord météo personnel pour sites de parapente avec agrégation multi
 
 ### 🔗 Intégrations
 
-- **Strava** : Sync automatique des vols avec GPX
+- **Intervals.icu** : import des activités Zepp, conversion FIT vers GPX et synchronisation automatique filtrée
 - **Telegram** : Alertes météo (optionnel)
 
 ---

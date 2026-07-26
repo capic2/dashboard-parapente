@@ -15,7 +15,7 @@ import {
   X,
   RefreshCw,
 } from 'lucide-react';
-import { StravaSyncModal } from '../components/flights/strava-sync/StravaSyncModal';
+import { IntervalsSyncModal } from '../components/flights/intervals-sync/IntervalsSyncModal';
 import { CreateFlightModal } from '../components/flights/create-flight/CreateFlightModal';
 import { CreateSiteModal } from '../components/flights/create-site/CreateSiteModal';
 import { FlightsTable } from '../components/flights/table/FlightsTable';
@@ -59,7 +59,7 @@ export default function FlightHistory() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [flightToDelete, setFlightToDelete] = useState<Flight | null>(null);
   const [showMultiDeleteConfirm, setShowMultiDeleteConfirm] = useState(false);
-  const [showStravaSyncModal, setShowStravaSyncModal] = useState(false);
+  const [showIntervalsSyncModal, setShowIntervalsSyncModal] = useState(false);
   const [showCreateFlightModal, setShowCreateFlightModal] = useState(false);
   const [createFlightMode, setCreateFlightMode] = useState<'manual' | 'file'>(
     'file'
@@ -385,12 +385,12 @@ export default function FlightHistory() {
 
             {!selectionMode && (
               <Button
-                onClick={() => setShowStravaSyncModal(true)}
+                onClick={() => setShowIntervalsSyncModal(true)}
                 variant="secondary"
                 className="px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
               >
                 <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                {t('flights.syncStrava')}
+                {t('flights.syncIntervals')}
               </Button>
             )}
 
@@ -536,10 +536,9 @@ export default function FlightHistory() {
         ) : null}
       </div>
 
-      {/* Modal Sync Strava */}
-      <StravaSyncModal
-        isOpen={showStravaSyncModal}
-        onClose={() => setShowStravaSyncModal(false)}
+      <IntervalsSyncModal
+        isOpen={showIntervalsSyncModal}
+        onClose={() => setShowIntervalsSyncModal(false)}
         onSyncComplete={() => {
           void queryClient.invalidateQueries({ queryKey: ['flights'] });
         }}

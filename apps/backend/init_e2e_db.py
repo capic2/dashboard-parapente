@@ -12,13 +12,12 @@ os.environ.setdefault("BACKEND_DATABASE_URL", "sqlite:///./test.db")
 # Set minimal required env vars for config validation
 os.environ.setdefault("BACKEND_WEATHERAPI_KEY", "test_key")
 os.environ.setdefault("BACKEND_METEOBLUE_API_KEY", "test_key")
-os.environ.setdefault("BACKEND_STRAVA_VERIFY_TOKEN", "PARAPENTE_E2E_TEST")
+
+from database import SessionLocal
+from e2e_db_utils import disable_slow_weather_sources
 
 # Import after setting env vars
 from main import initialize_database, run_migrations
-from database import SessionLocal
-
-from e2e_db_utils import disable_slow_weather_sources
 
 if __name__ == "__main__":
     print("🔧 Initializing E2E test database...")
