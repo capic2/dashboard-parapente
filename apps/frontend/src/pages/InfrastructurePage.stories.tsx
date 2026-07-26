@@ -2,7 +2,7 @@ import preview from '../../.storybook/preview';
 import InfrastructurePage from './InfrastructurePage';
 import {
   defaultHandlers,
-  intervalsAwaitingTypeHandlers,
+  intervalsNoActivityTypesHandlers,
   cacheHandlers,
   resetCacheDb,
   cacheDb,
@@ -26,10 +26,10 @@ export const Default = meta.story({
 });
 
 export const AwaitingActivityType = meta.story({
-  name: 'Awaiting Activity Type',
+  name: 'No Activity Types',
   beforeEach: resetCacheDb,
   parameters: {
-    msw: { handlers: [...intervalsAwaitingTypeHandlers, ...cacheHandlers] },
+    msw: { handlers: [...intervalsNoActivityTypesHandlers, ...cacheHandlers] },
   },
 });
 

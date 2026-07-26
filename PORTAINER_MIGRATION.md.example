@@ -36,9 +36,6 @@ Ce guide explique comment mettre à jour les variables d'environnement dans Port
 | `METEOBLUE_API_KEY` | `BACKEND_METEOBLUE_API_KEY` | `votre_clé` |
 | *(nouvelle, requise)* | `BACKEND_INTERVALS_ICU_API_KEY` | `<votre_clé_personnelle>` |
 | *(nouvelle, défaut)* | `BACKEND_INTERVALS_ICU_BASE_URL` | `https://intervals.icu/api/v1` |
-| *(nouvelle, défaut)* | `BACKEND_INTERVALS_ICU_SYNC_ENABLED` | `false` |
-| *(nouvelle, défaut)* | `BACKEND_INTERVALS_ICU_SYNC_INTERVAL_MINUTES` | `10` |
-| *(nouvelle, défaut)* | `BACKEND_INTERVALS_ICU_SYNC_LOOKBACK_DAYS` | `3` |
 | *(nouvelle, requise avant activation)* | `BACKEND_INTERVALS_ICU_ACTIVITY_TYPES` | `<type exact affiché pour le vol Zepp>` |
 | `GOOGLE_API_KEY` | `BACKEND_GOOGLE_API_KEY` | `votre_clé` |
 | `GEMINI_MODEL` | `BACKEND_GEMINI_MODEL` | `gemini-2.5-flash` |

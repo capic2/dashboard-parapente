@@ -66,16 +66,6 @@ def _int_env_at_least(name: str, default: int, minimum: int) -> int:
     return max(minimum, int(os.getenv(name, str(default))))
 
 
-def _intervals_sync_enabled(api_key: str | None) -> bool:
-    requested = os.getenv("BACKEND_INTERVALS_ICU_SYNC_ENABLED", "false").lower() == "true"
-    if requested and not api_key:
-        logger.warning(
-            "BACKEND_INTERVALS_ICU_SYNC_ENABLED ignored because "
-            "BACKEND_INTERVALS_ICU_API_KEY is missing"
-        )
-    return requested and bool(api_key)
-
-
 # ============================================================================
 # DATABASE
 # ============================================================================
@@ -133,13 +123,6 @@ INTERVALS_ICU_API_KEY = os.getenv("BACKEND_INTERVALS_ICU_API_KEY")
 INTERVALS_ICU_BASE_URL = os.getenv(
     "BACKEND_INTERVALS_ICU_BASE_URL", "https://intervals.icu/api/v1"
 ).rstrip("/")
-INTERVALS_ICU_SYNC_ENABLED = _intervals_sync_enabled(INTERVALS_ICU_API_KEY)
-INTERVALS_ICU_SYNC_INTERVAL_MINUTES = _int_env_at_least(
-    "BACKEND_INTERVALS_ICU_SYNC_INTERVAL_MINUTES", 10, 1
-)
-INTERVALS_ICU_SYNC_LOOKBACK_DAYS = _int_env_at_least(
-    "BACKEND_INTERVALS_ICU_SYNC_LOOKBACK_DAYS", 3, 0
-)
 INTERVALS_ICU_ACTIVITY_TYPES = _csv_env("BACKEND_INTERVALS_ICU_ACTIVITY_TYPES", "")
 
 # ============================================================================

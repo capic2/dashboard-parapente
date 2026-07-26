@@ -132,11 +132,6 @@ export const cacheDb: CacheEntry[] = [...initialEntries];
 
 const intervalsStatus = {
   configured: true,
-  enabled: true,
-  automatic_sync_ready: true,
-  awaiting_activity_type: false,
-  interval_minutes: 30,
-  lookback_days: 14,
   activity_types: ['Paragliding'],
 };
 
@@ -307,12 +302,10 @@ const intervalsHandlers = [
   ),
 ];
 
-export const intervalsAwaitingTypeHandlers = [
+export const intervalsNoActivityTypesHandlers = [
   http.get('*/api/admin/intervals/status', () =>
     HttpResponse.json({
       ...intervalsStatus,
-      automatic_sync_ready: false,
-      awaiting_activity_type: true,
       activity_types: [],
     })
   ),

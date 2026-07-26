@@ -6,11 +6,6 @@ import { IntervalsSyncModal } from './IntervalsSyncModal';
 
 const readyStatus = {
   configured: true,
-  enabled: true,
-  automatic_sync_ready: true,
-  awaiting_activity_type: false,
-  interval_minutes: 30,
-  lookback_days: 14,
   activity_types: ['Paragliding', 'Hike'],
 };
 
@@ -112,8 +107,6 @@ export const Unconfigured = meta.story({
           HttpResponse.json({
             ...readyStatus,
             configured: false,
-            enabled: false,
-            automatic_sync_ready: false,
             activity_types: [],
           })
         ),

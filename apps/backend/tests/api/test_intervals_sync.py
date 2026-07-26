@@ -125,12 +125,10 @@ def test_sync_returns_the_frontend_contract(client):
 
 def test_status_never_exposes_api_key(client, monkeypatch):
     monkeypatch.setattr(config, "INTERVALS_ICU_API_KEY", "top-secret")
-    monkeypatch.setattr(config, "INTERVALS_ICU_SYNC_ENABLED", True)
     monkeypatch.setattr(config, "INTERVALS_ICU_ACTIVITY_TYPES", [])
 
     response = client.get("/api/admin/intervals/status")
 
     assert response.status_code == 200
-    assert response.json()["awaiting_activity_type"] is True
-    assert response.json()["automatic_sync_ready"] is False
+    assert response.json() == {"configured": True, "activity_types": []}
     assert "top-secret" not in response.text

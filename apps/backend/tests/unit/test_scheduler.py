@@ -32,65 +32,6 @@ from scheduler import (
     stop_scheduler,
 )
 
-
-def test_start_scheduler_registers_intervals_sync() -> None:
-    class FakeScheduler:
-        def __init__(self) -> None:
-            self.running = False
-            self.jobs: list[dict] = []
-            self.start_calls = 0
-
-        def add_job(self, *args, **kwargs) -> None:
-            self.jobs.append(kwargs)
-
-        def start(self) -> None:
-            self.running = True
-            self.start_calls += 1
-
-    scheduler = FakeScheduler()
-    with (
-        patch("scheduler.scheduler", scheduler),
-        patch("scheduler._get_scheduler_interval", return_value=30),
-        patch("intervals_sync.register_intervals_sync") as register_intervals_sync,
-    ):
-        start_scheduler()
-        start_scheduler()
-
-    assert register_intervals_sync.call_count == 2
-    register_intervals_sync.assert_called_with(scheduler)
-    assert [job["id"] for job in scheduler.jobs] == ["weather_fetch", "weather_fetch"]
-    assert scheduler.start_calls == 1
-
-
-def test_start_scheduler_keeps_weather_job_when_intervals_registration_fails() -> None:
-    class FakeScheduler:
-        running = False
-
-        def __init__(self) -> None:
-            self.job_ids: list[str] = []
-            self.started = False
-
-        def add_job(self, *args, **kwargs) -> None:
-            self.job_ids.append(kwargs["id"])
-
-        def start(self) -> None:
-            self.started = True
-
-    scheduler = FakeScheduler()
-    with (
-        patch("scheduler.scheduler", scheduler),
-        patch("scheduler._get_scheduler_interval", return_value=30),
-        patch(
-            "intervals_sync.register_intervals_sync",
-            side_effect=RuntimeError("registration failed"),
-        ),
-    ):
-        start_scheduler()
-
-    assert scheduler.job_ids == ["weather_fetch"]
-    assert scheduler.started is True
-
-
 # ============================================================================
 # FETCH AND STORE WEATHER TESTS
 # ============================================================================

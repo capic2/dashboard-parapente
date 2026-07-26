@@ -417,11 +417,6 @@ class ExternalImportResult(BaseModel):
 
 class IntervalsStatus(BaseModel):
     configured: bool
-    enabled: bool
-    automatic_sync_ready: bool
-    awaiting_activity_type: bool
-    interval_minutes: int
-    lookback_days: int
     activity_types: list[str]
 
 
