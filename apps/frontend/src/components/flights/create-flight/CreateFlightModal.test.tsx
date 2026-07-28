@@ -30,4 +30,31 @@ describe('CreateFlightModal', () => {
       ).toHaveAttribute('aria-selected', 'true')
     );
   });
+
+  it('shows site loading and error states inside the open modal', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const renderModal = (isSitesLoading: boolean, hasSitesError: boolean) => (
+      <QueryClientProvider client={queryClient}>
+        <CreateFlightModal
+          isOpen
+          sites={[]}
+          isSitesLoading={isSitesLoading}
+          hasSitesError={hasSitesError}
+          initialMode="manual"
+          onClose={vi.fn()}
+          onCreateComplete={vi.fn()}
+        />
+      </QueryClientProvider>
+    );
+
+    const view = render(renderModal(true, false));
+    expect(await screen.findByText('flights.loadingSites')).toBeInTheDocument();
+
+    view.rerender(renderModal(false, true));
+    expect(
+      await screen.findByText('flights.sitesLoadError')
+    ).toBeInTheDocument();
+  });
 });

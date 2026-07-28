@@ -30,7 +30,7 @@ from fastapi import (
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 import config
 from auth import (
@@ -43,9 +43,16 @@ from auth import (
 from azba_airspace import evaluate_site_azba_constraints, parse_optional_window
 from database import SessionLocal, get_db
 from emagram_freshness import get_emagram_cutoff_utc
-from flight_backfill import calculate_and_persist_missing_max_speed
 from flight_decision import build_flight_decision, normalize_objective
+from flight_summaries import (
+    FlightGpxStatus,
+    FlightSortBy,
+    InvalidFlightSummaryCursor,
+    SortOrder,
+    list_flight_summaries,
+)
 from flight_storage import flight_sequence_number, write_flight_text_file
+from flight_tracks import calculate_track_stats, normalize_track
 from gopro_overlay_export import (
     cancel_gopro_overlay_job,
     check_gopro_overlay_dependencies,
@@ -83,6 +90,7 @@ from schemas import (
     FlightCreate,
     FlightDecisionResponse,
     FlightRecordsResponse,
+    FlightSummariesResponse,
     FlightUpdate,
     GoproOverlayCancelResponse,
     GoproOverlayDependencies,
@@ -3332,6 +3340,32 @@ async def get_daily_summary(
 
 
 # Flights endpoints
+@router.get("/flights/summaries", response_model=FlightSummariesResponse)
+def get_flight_summaries(
+    page_size: int = Query(default=25, ge=1, le=100),
+    cursor: str | None = Query(default=None, max_length=4096),
+    q: str | None = Query(default=None, max_length=200),
+    site_id: str | None = None,
+    gpx_status: FlightGpxStatus = "all",
+    sort_by: FlightSortBy = "flight_date",
+    sort_order: SortOrder = "desc",
+    db: Session = Depends(get_db),
+) -> FlightSummariesResponse:
+    try:
+        return list_flight_summaries(
+            db,
+            page_size=page_size,
+            cursor=cursor,
+            q=q,
+            site_id=site_id,
+            gpx_status=gpx_status,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
+    except InvalidFlightSummaryCursor as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.get("/flights")
 def get_flights(
     limit: int = 10,
@@ -3349,7 +3383,7 @@ def get_flights(
         date_from: Filter flights from this date (inclusive, format: YYYY-MM-DD)
         date_to: Filter flights until this date (inclusive, format: YYYY-MM-DD)
     """
-    query = db.query(Flight)
+    query = db.query(Flight).options(joinedload(Flight.site))
 
     # Apply filters
     if site_id:
@@ -3372,29 +3406,6 @@ def get_flights(
             ) from e
 
     flights = query.order_by(Flight.flight_date.desc()).limit(limit).all()
-
-    updated_flights = False
-    for flight in flights:
-        updated_flights = (
-            calculate_and_persist_missing_max_speed(
-                db,
-                flight,
-                parse_coordinates=parse_gpx_file,
-                calculate_speed_kmh=calculate_max_speed,
-                base_dir=Path(__file__).parent,
-                logger=logger,
-            )
-            or updated_flights
-        )
-        if updated_flights:
-            break
-
-    if updated_flights:
-        try:
-            db.commit()
-        except Exception as exc:
-            db.rollback()
-            logger.warning("Failed to persist calculated max speeds in /flights: %s", exc)
 
     # Convert to dict (user_id removed - not needed for single-user app)
     flights_data = []
@@ -3848,22 +3859,6 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
-    if calculate_and_persist_missing_max_speed(
-        db,
-        flight,
-        parse_coordinates=parse_gpx_file,
-        calculate_speed_kmh=calculate_max_speed,
-        base_dir=Path(__file__).parent,
-        logger=logger,
-    ):
-        try:
-            db.commit()
-        except Exception as exc:
-            db.rollback()
-            logger.warning(
-                "Failed to persist calculated max speed for flight %s: %s", flight_id, exc
-            )
-
     previous_video_job_id = flight.video_export_job_id
     previous_video_status = flight.video_export_status
     previous_overlay_job_id = flight.gopro_overlay_job_id
@@ -4227,14 +4222,23 @@ async def upload_gpx_to_flight(
         file_name = "external.gpx" if flight.external_provider else "watch.gpx"
         file_path = write_flight_text_file(db, flight, file_name, gpx_str)
 
-        # 4. Mettre à jour SEULEMENT le chemin du fichier (pas les stats!)
+        # Keep the upload successful even if historical/statistical data is malformed.
         flight.gpx_file_path = str(file_path)
         flight.updated_at = datetime.utcnow()
+        try:
+            _, points = normalize_track(gpx_content, "gpx")
+            max_speed_kmh = float(calculate_track_stats(points)["max_speed_kmh"])
+            if max_speed_kmh > 0:
+                flight.max_speed_kmh = max_speed_kmh
+        except Exception as exc:
+            logger.warning(
+                "Could not calculate max speed for uploaded GPX on %s: %s", flight_id, exc
+            )
 
         db.commit()
         db.refresh(flight)
 
-        logger.info(f" Added GPX file to flight {flight_id} (stats unchanged)")
+        logger.info("Added GPX file to flight %s", flight_id)
 
         # 5. Trigger automatic video export
         try:
@@ -4249,7 +4253,7 @@ async def upload_gpx_to_flight(
             "success": True,
             "flight_id": flight.id,
             "gpx_file_path": flight.gpx_file_path,
-            "message": "GPX file added successfully. Flight stats unchanged.",
+            "message": "GPX file added successfully.",
         }
 
     except Exception as e:

@@ -518,10 +518,10 @@ class TestFlightsListEndpoint:
         assert data["flights"][1]["flight_date"] == "2026-03-12"
         assert data["flights"][2]["flight_date"] == "2026-03-10"
 
-    def test_get_flights_backfills_missing_max_speed_from_gpx(
+    def test_get_flights_does_not_backfill_missing_max_speed_from_gpx(
         self, client, db_session, arguel_site, sample_gpx, tmp_path
     ):
-        """GET /flights computes and persists max_speed_kmh when missing and GPX exists"""
+        """GET /flights remains read-only when a persisted speed is missing."""
         backend_dir = Path(__file__).resolve().parents[2]
         gpx_dir = backend_dir / "db" / "gpx"
         gpx_dir.mkdir(parents=True, exist_ok=True)
@@ -541,16 +541,16 @@ class TestFlightsListEndpoint:
         db_session.add(flight)
         db_session.commit()
 
-        response = client.get(f"{API_PREFIX}/flights")
+        with patch("routes.parse_gpx_file", side_effect=AssertionError("parser called")):
+            response = client.get(f"{API_PREFIX}/flights")
         assert response.status_code == 200
         data = response.json()
 
         returned = next(f for f in data["flights"] if f["id"] == "flight-missing-speed")
-        assert returned["max_speed_kmh"] is not None
-        assert returned["max_speed_kmh"] > 0
+        assert returned["max_speed_kmh"] is None
 
         db_session.refresh(flight)
-        assert flight.max_speed_kmh == returned["max_speed_kmh"]
+        assert flight.max_speed_kmh is None
 
         gpx_file.unlink(missing_ok=True)
 
@@ -956,40 +956,27 @@ class TestFlightDetailEndpoint:
         assert "site" in data
         assert data["site"]["name"] == "Arguel"
 
-    def test_get_flight_backfills_missing_max_speed_from_gpx(
-        self, client, db_session, arguel_site, sample_gpx, tmp_path
-    ):
-        """GET /flights/{id} computes and persists max_speed_kmh when missing and GPX exists"""
-        backend_dir = Path(__file__).resolve().parents[2]
-        gpx_dir = backend_dir / "db" / "gpx"
-        gpx_dir.mkdir(parents=True, exist_ok=True)
-        gpx_file = gpx_dir / f"test_flight_detail_{tmp_path.name}.gpx"
-        gpx_file.write_text(sample_gpx, encoding="utf-8")
-
-        relative_gpx_path = gpx_file.relative_to(backend_dir)
-
+    def test_get_flight_does_not_backfill_missing_max_speed(self, client, db_session):
         flight = Flight(
             id="flight-detail-missing-speed",
             name="Detail missing speed",
             flight_date=date(2026, 3, 23),
             site_id="site-arguel",
             max_speed_kmh=None,
-            gpx_file_path=str(relative_gpx_path),
+            gpx_file_path="missing-speed.gpx",
         )
         db_session.add(flight)
         db_session.commit()
 
-        response = client.get(f"{API_PREFIX}/flights/flight-detail-missing-speed")
+        with patch("routes.parse_gpx_file", side_effect=AssertionError("parser called")):
+            response = client.get(f"{API_PREFIX}/flights/flight-detail-missing-speed")
         assert response.status_code == 200
         data = response.json()
 
-        assert data["max_speed_kmh"] is not None
-        assert data["max_speed_kmh"] > 0
+        assert data["max_speed_kmh"] is None
 
         db_session.refresh(flight)
-        assert flight.max_speed_kmh == data["max_speed_kmh"]
-
-        gpx_file.unlink(missing_ok=True)
+        assert flight.max_speed_kmh is None
 
 
 class TestUpdateFlightEndpoint:
@@ -1157,11 +1144,38 @@ class TestFlightGPXEndpoints:
 
     def test_upload_gpx_to_flight(self, client, db_session, sample_flight, sample_gpx):
         """POST /flights/{flight_id}/upload-gpx uploads GPX file"""
-        # Create file upload
-        files = {"file": ("test.gpx", sample_gpx.encode(), "application/gpx+xml")}
-        response = client.post(f"{API_PREFIX}/flights/flight-test-001/upload-gpx", files=files)
-        # May succeed or fail depending on implementation and validation
-        assert response.status_code in [200, 201, 400, 422, 500]
+        files = {"gpx_file": ("test.gpx", sample_gpx.encode(), "application/gpx+xml")}
+        with (
+            patch("routes.write_flight_text_file", return_value=Path("private/track.gpx")),
+            patch("video_export_manual.trigger_auto_export"),
+        ):
+            response = client.post(f"{API_PREFIX}/flights/flight-test-001/upload-gpx", files=files)
+
+        assert response.status_code == 200
+        db_session.refresh(sample_flight)
+        assert sample_flight.max_speed_kmh is not None
+        assert sample_flight.max_speed_kmh > 0
+
+    def test_upload_gpx_succeeds_when_stat_calculation_fails(
+        self, client, db_session, sample_flight, sample_gpx
+    ):
+        sample_flight.max_speed_kmh = None
+        db_session.commit()
+        files = {"gpx_file": ("test.gpx", sample_gpx.encode(), "application/gpx+xml")}
+        with (
+            patch("routes.write_flight_text_file", return_value=Path("private/track.gpx")),
+            patch(
+                "routes.calculate_track_stats", side_effect=ValueError("bad stats")
+            ) as calculate_stats,
+            patch("video_export_manual.trigger_auto_export"),
+        ):
+            response = client.post(f"{API_PREFIX}/flights/flight-test-001/upload-gpx", files=files)
+
+        assert response.status_code == 200
+        calculate_stats.assert_called_once()
+        db_session.refresh(sample_flight)
+        assert sample_flight.gpx_file_path == "private/track.gpx"
+        assert sample_flight.max_speed_kmh is None
 
 
 class TestCreateFlightFromGPX:
