@@ -3,6 +3,7 @@ packages:
   - 'libs/*'
 
 enableGlobalVirtualStore: false
+minimumReleaseAge: 0
 
 allowBuilds:
   core-js: true
