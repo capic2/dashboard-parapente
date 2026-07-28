@@ -1,9 +1,15 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { flightsQueryOptions } from '../hooks/flights/useFlights';
-import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
-import type { Flight, Site } from '../types';
-import type { RowSelectionState } from '@tanstack/react-table';
+import {
+  getFinishedActiveFlightIds,
+  mergeActiveMediaJobs,
+  useActiveFlightMediaJobs,
+  useFlightSummaries,
+} from '../hooks/flights/useFlightSummaries';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { Site } from '../types';
+import type { FlightSummary } from '@dashboard-parapente/shared-types';
+import type { RowSelectionState, SortingState } from '@tanstack/react-table';
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { Input, TextField } from 'react-aria-components';
 import {
@@ -30,13 +36,60 @@ import { useToast, useToastStore } from '../hooks/useToast';
 import { HTTPError } from 'ky';
 import { api, getApiErrorMessage } from '../lib/api';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { isUnavailableMediaError } from '../lib/flightMediaState';
+import { useFlight } from '../hooks/flights/useFlight';
+import {
+  normalizeFlightsSearch,
+  serializeFlightsSearch,
+  type FlightsSearch,
+  type FlightsRouteSearch,
+} from '../routes/-flightSearch';
 
 type DownloadingFlightMedia = {
   flightId: string;
   type: 'gpx' | 'video' | 'overlay';
 };
 
-function getFlightDownloadName(flight: Flight, extension: string) {
+function FlightListSkeleton() {
+  return (
+    <div aria-busy="true" className="space-y-2">
+      {[0, 1, 2].map((item) => (
+        <div
+          key={item}
+          className="h-32 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-700"
+        />
+      ))}
+    </div>
+  );
+}
+
+function FlightDetailSkeleton() {
+  return (
+    <div
+      aria-busy="true"
+      className="h-80 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-700"
+    />
+  );
+}
+
+function FlightListError({
+  message,
+  retryLabel,
+  onRetry,
+}: {
+  message: string;
+  retryLabel: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="rounded-xl bg-white p-8 text-center shadow-md dark:bg-gray-800">
+      <p className="mb-4 text-gray-700 dark:text-gray-300">{message}</p>
+      <Button onClick={onRetry}>{retryLabel}</Button>
+    </div>
+  );
+}
+
+function getFlightDownloadName(flight: FlightSummary, extension: string) {
   const rawName = flight.title?.trim() || flight.name?.trim() || flight.id;
   const filename = rawName.replace(/[^a-zA-Z0-9._-]+/gu, '_');
 
@@ -47,17 +100,28 @@ export default function FlightHistory() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const params = useParams({ strict: false });
-  const search = useSearch({ strict: false }) as { siteId?: string };
-  const { data: flights } = useSuspenseQuery(
-    flightsQueryOptions({ limit: 50, siteId: search.siteId })
+  const routeSearch = useSearch({ strict: false }) as FlightsRouteSearch;
+  const search = normalizeFlightsSearch(routeSearch);
+  const summariesQuery = useFlightSummaries(search);
+  const activeJobsQuery = useActiveFlightMediaJobs();
+  const flights = useMemo(
+    () =>
+      mergeActiveMediaJobs(
+        summariesQuery.data?.pages.flatMap((page) => page.flights) ?? [],
+        activeJobsQuery.data ?? []
+      ),
+    [summariesQuery.data, activeJobsQuery.data]
   );
+  const totalFlights = summariesQuery.data?.pages[0]?.total ?? 0;
 
   const isMobile = useIsMobile();
 
   const selectedFlightId = params.flightId ?? null;
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [selectionMode, setSelectionMode] = useState(false);
-  const [flightToDelete, setFlightToDelete] = useState<Flight | null>(null);
+  const [flightToDelete, setFlightToDelete] = useState<FlightSummary | null>(
+    null
+  );
   const [showMultiDeleteConfirm, setShowMultiDeleteConfirm] = useState(false);
   const [showIntervalsSyncModal, setShowIntervalsSyncModal] = useState(false);
   const [showCreateFlightModal, setShowCreateFlightModal] = useState(false);
@@ -66,37 +130,182 @@ export default function FlightHistory() {
   );
   const [showCreateSiteModal, setShowCreateSiteModal] = useState(false);
   const [showMobileDetail, setShowMobileDetail] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [gpxFilter, setGpxFilter] = useState<'all' | 'with' | 'missing'>('all');
+  const [searchQuery, setSearchQuery] = useState(search.q ?? '');
   const [downloadingFlightMedia, setDownloadingFlightMedia] =
     useState<DownloadingFlightMedia | null>(null);
-
-  const filteredFlights = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-
-    return flights.filter((flight) => {
-      const matchesSearch =
-        normalizedQuery === '' ||
-        flight.title?.toLowerCase().includes(normalizedQuery) ||
-        flight.name?.toLowerCase().includes(normalizedQuery) ||
-        flight.site_name?.toLowerCase().includes(normalizedQuery) ||
-        flight.flight_date.includes(normalizedQuery);
-
-      const matchesGpx =
-        gpxFilter === 'all' ||
-        (gpxFilter === 'with' && Boolean(flight.gpx_file_path)) ||
-        (gpxFilter === 'missing' && !flight.gpx_file_path);
-
-      return matchesSearch && matchesGpx;
-    });
-  }, [flights, searchQuery, gpxFilter]);
-
-  const selectedFlight = flights.find((f: Flight) => f.id === selectedFlightId);
+  const [unavailableMedia, setUnavailableMedia] = useState<Set<string>>(
+    () => new Set()
+  );
+  const selectedFlightQuery = useFlight(selectedFlightId ?? '');
+  const selectedFlight = selectedFlightQuery.data;
   const [isDeleting, setIsDeleting] = useState(false);
-  const { data: sites } = useSuspenseQuery(sitesQueryOptions());
+  const sitesQuery = useQuery(sitesQueryOptions());
+  const sites = sitesQuery.data ?? [];
   const queryClient = useQueryClient();
   const toast = useToast();
   const { toasts, removeToast } = useToastStore();
+  const previousActiveJobs = useRef(activeJobsQuery.data ?? []);
+
+  const renderDetailPanel = (mobileMode: boolean) => {
+    if (selectedFlightId && selectedFlight) {
+      if (mobileMode) {
+        return (
+          <FlightDetails
+            key={selectedFlightId}
+            flight={selectedFlight}
+            sites={sites}
+            onShowCreateSiteModal={() => setShowCreateSiteModal(true)}
+            mobileMode
+            onCloseMobile={handleCloseMobileDetail}
+          />
+        );
+      }
+
+      return (
+        <FlightDetails
+          key={selectedFlightId}
+          flight={selectedFlight}
+          sites={sites}
+          onShowCreateSiteModal={() => setShowCreateSiteModal(true)}
+        />
+      );
+    }
+
+    if (selectedFlightId && selectedFlightQuery.isPending) {
+      return <FlightDetailSkeleton />;
+    }
+
+    if (selectedFlightId && selectedFlightQuery.isError) {
+      return (
+        <FlightListError
+          message={t('flights.detailLoadError')}
+          retryLabel={t('flights.retryDetail')}
+          onRetry={() => void selectedFlightQuery.refetch()}
+        />
+      );
+    }
+
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-12 shadow-md text-center">
+        <p className="text-gray-600 dark:text-gray-300">
+          {t('flights.selectFlightHint')}
+        </p>
+      </div>
+    );
+  };
+
+  const renderListPanel = () => {
+    if (summariesQuery.isPending) {
+      return <FlightListSkeleton />;
+    }
+
+    if (summariesQuery.isError) {
+      return (
+        <FlightListError
+          message={t('flights.listLoadError')}
+          retryLabel={t('flights.retryList')}
+          onRetry={() => void summariesQuery.refetch()}
+        />
+      );
+    }
+
+    return (
+      <>
+        <FlightsTable
+          flights={flights}
+          selectedFlightId={selectedFlightId}
+          selectionMode={selectionMode}
+          onSelectFlight={handleSelectFlight}
+          onDeleteFlight={setFlightToDelete}
+          onDownloadGpx={handleDownloadFlightGpx}
+          onDownloadVideo={handleDownloadFlightVideo}
+          onDownloadOverlay={handleDownloadFlightOverlay}
+          downloadingMedia={downloadingFlightMedia}
+          unavailableMedia={unavailableMedia}
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
+          sorting={[{ id: search.sort, desc: search.order === 'desc' }]}
+          onSortingChange={(updater) => {
+            const current: SortingState = [
+              { id: search.sort, desc: search.order === 'desc' },
+            ];
+            const next =
+              typeof updater === 'function' ? updater(current) : updater;
+            const first = next[0];
+            if (!first) return;
+            void navigateWithSearch({
+              ...search,
+              sort: first.id as FlightsSearch['sort'],
+              order: first.desc ? 'desc' : 'asc',
+            });
+          }}
+        />
+        {summariesQuery.hasNextPage && (
+          <Button
+            className="mt-3 w-full"
+            isDisabled={summariesQuery.isFetchingNextPage}
+            onClick={() => void summariesQuery.fetchNextPage()}
+          >
+            {summariesQuery.isFetchingNextPage
+              ? t('flights.loadingMore')
+              : t('flights.loadMore')}
+          </Button>
+        )}
+      </>
+    );
+  };
+
+  useEffect(() => {
+    if (!activeJobsQuery.data) return;
+    const finishedFlightIds = getFinishedActiveFlightIds(
+      previousActiveJobs.current,
+      activeJobsQuery.data
+    );
+    previousActiveJobs.current = activeJobsQuery.data;
+    if (finishedFlightIds.length === 0) return;
+    void queryClient.invalidateQueries({
+      queryKey: ['flights', 'summaries'],
+    });
+    for (const flightId of finishedFlightIds) {
+      void queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
+    }
+  }, [activeJobsQuery.data, queryClient]);
+
+  useEffect(() => {
+    setUnavailableMedia(new Set());
+  }, [summariesQuery.dataUpdatedAt]);
+
+  const navigateWithSearch = useCallback(
+    (nextSearch: FlightsSearch, flightId = selectedFlightId) => {
+      if (flightId) {
+        return navigate({
+          to: '/flights/$flightId',
+          params: { flightId },
+          search: serializeFlightsSearch(nextSearch),
+          replace: true,
+        });
+      }
+      return navigate({
+        to: '/flights',
+        search: serializeFlightsSearch(nextSearch),
+        replace: true,
+      });
+    },
+    [navigate, selectedFlightId]
+  );
+
+  useEffect(() => {
+    setSearchQuery(search.q ?? '');
+  }, [search.q]);
+
+  useEffect(() => {
+    const q = searchQuery.trim() || undefined;
+    if (q === search.q) return;
+    const timeout = window.setTimeout(() => {
+      void navigateWithSearch({ ...search, q });
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [navigateWithSearch, search, searchQuery]);
 
   const setSelectedFlightId = useCallback(
     (flightId: string | undefined) => {
@@ -104,27 +313,27 @@ export default function FlightHistory() {
         void navigate({
           to: '/flights/$flightId',
           params: { flightId },
-          search: { siteId: search.siteId },
+          search: serializeFlightsSearch(search),
         });
         return;
       }
 
       void navigate({
         to: '/flights',
-        search: { siteId: search.siteId },
+        search: serializeFlightsSearch(search),
       });
     },
-    [navigate, search.siteId]
+    [navigate, search]
   );
 
   useEffect(() => {
-    if (isMobile && selectedFlight) {
+    if (isMobile && selectedFlightId) {
       setShowMobileDetail(true);
     }
-  }, [isMobile, selectedFlight]);
+  }, [isMobile, selectedFlightId]);
 
   const handleSelectFlight = useCallback(
-    (flight: Flight) => {
+    (flight: FlightSummary) => {
       setSelectedFlightId(flight.id);
       if (isMobile) {
         setShowMobileDetail(true);
@@ -150,11 +359,11 @@ export default function FlightHistory() {
 
   const handleSelectAll = useCallback(() => {
     const allSelected: RowSelectionState = {};
-    for (const flight of filteredFlights) {
+    for (const flight of flights) {
       allSelected[flight.id] = true;
     }
     setRowSelection(allSelected);
-  }, [filteredFlights]);
+  }, [flights]);
 
   const handleDeselectAll = useCallback(() => {
     setRowSelection({});
@@ -240,8 +449,8 @@ export default function FlightHistory() {
   ]);
 
   const handleDownloadFlightGpx = useCallback(
-    async (flight: Flight) => {
-      if (!flight.gpx_file_path || downloadingFlightMedia) return;
+    async (flight: FlightSummary) => {
+      if (!flight.has_gpx || downloadingFlightMedia) return;
 
       setDownloadingFlightMedia({ flightId: flight.id, type: 'gpx' });
       try {
@@ -252,7 +461,12 @@ export default function FlightHistory() {
         a.download = getFlightDownloadName(flight, 'gpx');
         a.click();
         URL.revokeObjectURL(url);
-      } catch {
+      } catch (error) {
+        if (isUnavailableMediaError(error)) {
+          setUnavailableMedia((current) =>
+            new Set(current).add(`${flight.id}:gpx`)
+          );
+        }
         toast.error(t('flights.gpxDownloadError'));
       } finally {
         setDownloadingFlightMedia(null);
@@ -262,8 +476,8 @@ export default function FlightHistory() {
   );
 
   const handleDownloadFlightVideo = useCallback(
-    async (flight: Flight) => {
-      if (!flight.video_file_path || downloadingFlightMedia) {
+    async (flight: FlightSummary) => {
+      if (!flight.has_video || downloadingFlightMedia) {
         return;
       }
 
@@ -281,6 +495,11 @@ export default function FlightHistory() {
         a.click();
         URL.revokeObjectURL(url);
       } catch (error) {
+        if (isUnavailableMediaError(error)) {
+          setUnavailableMedia((current) =>
+            new Set(current).add(`${flight.id}:video`)
+          );
+        }
         toast.error(
           await getApiErrorMessage(
             error,
@@ -295,8 +514,8 @@ export default function FlightHistory() {
   );
 
   const handleDownloadFlightOverlay = useCallback(
-    async (flight: Flight) => {
-      if (!flight.gopro_overlay_file_path || downloadingFlightMedia) return;
+    async (flight: FlightSummary) => {
+      if (!flight.has_gopro_overlay || downloadingFlightMedia) return;
 
       setDownloadingFlightMedia({ flightId: flight.id, type: 'overlay' });
       try {
@@ -312,6 +531,11 @@ export default function FlightHistory() {
         a.click();
         URL.revokeObjectURL(url);
       } catch (error) {
+        if (isUnavailableMediaError(error)) {
+          setUnavailableMedia((current) =>
+            new Set(current).add(`${flight.id}:overlay`)
+          );
+        }
         toast.error(
           await getApiErrorMessage(
             error,
@@ -345,10 +569,10 @@ export default function FlightHistory() {
                 <span>
                   {search.siteId
                     ? t('flights.registeredForSite', {
-                        count: filteredFlights.length,
+                        count: totalFlights,
                       })
                     : t('flights.registered', {
-                        count: filteredFlights.length,
+                        count: totalFlights,
                       })}
                 </span>
               )}
@@ -425,6 +649,7 @@ export default function FlightHistory() {
                   aria-hidden="true"
                 />
                 <Input
+                  maxLength={200}
                   placeholder={t('flights.searchPlaceholder')}
                   className="min-h-11 w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                 />
@@ -432,9 +657,12 @@ export default function FlightHistory() {
             </TextField>
 
             <select
-              value={gpxFilter}
+              value={search.gpx}
               onChange={(event) =>
-                setGpxFilter(event.target.value as 'all' | 'with' | 'missing')
+                void navigateWithSearch({
+                  ...search,
+                  gpx: event.target.value as FlightsSearch['gpx'],
+                })
               }
               aria-label={t('flights.gpxFilter')}
               className="min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
@@ -476,63 +704,20 @@ export default function FlightHistory() {
         {/* Flight List */}
         {(!isMobile || !showMobileDetail) && (
           <div className={isMobile ? '' : 'lg:col-span-1 lg:h-full'}>
-            <FlightsTable
-              flights={filteredFlights}
-              sites={sites}
-              selectedFlightId={selectedFlightId}
-              selectionMode={selectionMode}
-              onSelectFlight={handleSelectFlight}
-              onDeleteFlight={setFlightToDelete}
-              onDownloadGpx={handleDownloadFlightGpx}
-              onDownloadVideo={handleDownloadFlightVideo}
-              onDownloadOverlay={handleDownloadFlightOverlay}
-              downloadingMedia={downloadingFlightMedia}
-              rowSelection={rowSelection}
-              onRowSelectionChange={setRowSelection}
-            />
+            {renderListPanel()}
           </div>
         )}
 
         {/* Detail Panel + 3D Viewer (desktop) */}
         {!isMobile && (
           <div className="lg:col-span-2 space-y-4">
-            {selectedFlightId && selectedFlight ? (
-              <FlightDetails
-                key={selectedFlightId}
-                flight={selectedFlight}
-                sites={sites}
-                onShowCreateSiteModal={() => setShowCreateSiteModal(true)}
-              />
-            ) : (
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-12 shadow-md text-center">
-                <p className="text-gray-600 dark:text-gray-300">
-                  {t('flights.selectFlightHint')}
-                </p>
-              </div>
-            )}
+            {renderDetailPanel(false)}
           </div>
         )}
 
         {/* Detail Panel + 3D Viewer (mobile) */}
         {isMobile && showMobileDetail ? (
-          <div className="space-y-4">
-            {selectedFlightId && selectedFlight ? (
-              <FlightDetails
-                key={selectedFlightId}
-                flight={selectedFlight}
-                sites={sites}
-                onShowCreateSiteModal={() => setShowCreateSiteModal(true)}
-                mobileMode
-                onCloseMobile={handleCloseMobileDetail}
-              />
-            ) : (
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-12 shadow-md text-center">
-                <p className="text-gray-600 dark:text-gray-300">
-                  {t('flights.selectFlightHint')}
-                </p>
-              </div>
-            )}
-          </div>
+          <div className="space-y-4">{renderDetailPanel(true)}</div>
         ) : null}
       </div>
 
@@ -548,6 +733,8 @@ export default function FlightHistory() {
       <CreateFlightModal
         isOpen={showCreateFlightModal}
         sites={sites}
+        isSitesLoading={sitesQuery.isPending}
+        hasSitesError={sitesQuery.isError}
         initialMode={createFlightMode}
         onClose={() => setShowCreateFlightModal(false)}
         onCreateComplete={() => {

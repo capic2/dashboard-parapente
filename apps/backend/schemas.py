@@ -373,6 +373,36 @@ class Flight(FlightBase):
         from_attributes = True
 
 
+class FlightSummary(BaseModel):
+    id: str
+    site_id: str | None = None
+    site_name: str | None = None
+    site_region: str | None = None
+    name: str | None = None
+    title: str | None = None
+    flight_date: date
+    departure_time: datetime | None = None
+    duration_minutes: int | None = None
+    max_altitude_m: int | None = None
+    distance_km: float | None = None
+    elevation_gain_m: int | None = None
+    has_gpx: bool
+    video_export_job_id: str | None = None
+    video_export_status: str | None = None
+    video_export_progress: int | None = None
+    has_video: bool
+    gopro_overlay_job_id: str | None = None
+    gopro_overlay_status: str | None = None
+    gopro_overlay_progress: int | None = None
+    has_gopro_overlay: bool
+
+
+class FlightSummariesResponse(BaseModel):
+    flights: list[FlightSummary]
+    total: int
+    next_cursor: str | None = None
+
+
 class IntervalsSyncRequest(BaseModel):
     date_from: date
     date_to: date

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { RowSelectionState } from '@tanstack/react-table';
 import { FlightsTable } from './FlightsTable';
 import type { Flight, Site } from '../../../types';
+import type { FlightSummary } from '@dashboard-parapente/shared-types';
 
 const mockFlights: Flight[] = [
   {
@@ -136,6 +137,31 @@ const mockSites: Site[] = [
   },
 ];
 
+const summarizeFlight = (flight: Flight): FlightSummary => ({
+  id: flight.id,
+  site_id: flight.site_id ?? null,
+  site_name: flight.site_name ?? null,
+  site_region:
+    mockSites.find((site) => site.id === flight.site_id)?.region ?? null,
+  name: flight.name ?? null,
+  title: flight.title ?? null,
+  flight_date: flight.flight_date,
+  departure_time: flight.departure_time ?? null,
+  duration_minutes: flight.duration_minutes ?? null,
+  max_altitude_m: flight.max_altitude_m ?? null,
+  distance_km: flight.distance_km ?? null,
+  elevation_gain_m: flight.elevation_gain_m ?? null,
+  has_gpx: Boolean(flight.gpx_file_path),
+  has_video: Boolean(flight.video_file_path),
+  has_gopro_overlay: Boolean(flight.gopro_overlay_file_path),
+  video_export_job_id: flight.video_export_job_id ?? null,
+  video_export_status: flight.video_export_status ?? null,
+  video_export_progress: flight.video_export_progress ?? null,
+  gopro_overlay_job_id: flight.gopro_overlay_job_id ?? null,
+  gopro_overlay_status: flight.gopro_overlay_status ?? null,
+  gopro_overlay_progress: flight.gopro_overlay_progress ?? null,
+});
+
 function FlightsTableWrapper({
   flights,
   selectionMode = false,
@@ -153,8 +179,7 @@ function FlightsTableWrapper({
   return (
     <div style={{ maxWidth: '400px' }}>
       <FlightsTable
-        flights={flights}
-        sites={mockSites}
+        flights={flights.map(summarizeFlight)}
         selectedFlightId={selectedFlightId}
         selectionMode={selectionMode}
         onSelectFlight={(flight) => setSelectedFlightId(flight.id)}
@@ -163,8 +188,11 @@ function FlightsTableWrapper({
         onDownloadVideo={fn()}
         onDownloadOverlay={fn()}
         downloadingMedia={null}
+        unavailableMedia={new Set()}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
+        sorting={[{ id: 'flight_date', desc: true }]}
+        onSortingChange={() => undefined}
       />
     </div>
   );

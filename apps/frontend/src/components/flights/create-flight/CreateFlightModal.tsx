@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Form,
@@ -38,6 +38,8 @@ import { formatFlightSiteLabel } from '../siteDisplay';
 interface CreateFlightModalProps {
   isOpen: boolean;
   sites: Site[];
+  isSitesLoading?: boolean;
+  hasSitesError?: boolean;
   initialMode?: CreationMode;
   onClose: () => void;
   onCreateComplete: () => void;
@@ -70,6 +72,8 @@ const initialManualValues = (): FlightFormData => ({
 export function CreateFlightModal({
   isOpen,
   sites,
+  isSitesLoading = false,
+  hasSitesError = false,
   initialMode = 'manual',
   onClose,
   onCreateComplete,
@@ -173,6 +177,36 @@ export function CreateFlightModal({
     }));
   };
 
+  let siteField: ReactNode;
+  if (isSitesLoading) {
+    siteField = (
+      <output className="text-sm text-gray-600 dark:text-gray-300">
+        {t('flights.loadingSites')}
+      </output>
+    );
+  } else if (hasSitesError) {
+    siteField = (
+      <p className="text-sm text-red-700 dark:text-red-300" role="alert">
+        {t('flights.sitesLoadError')}
+      </p>
+    );
+  } else {
+    siteField = (
+      <Select
+        label={t('flights.siteLabel')}
+        options={siteOptions}
+        value={manualValues.site_id}
+        onChange={(siteId: Key | null) =>
+          setManualValues((current) => ({
+            ...current,
+            site_id: siteId ? String(siteId) : null,
+          }))
+        }
+        placeholder={t('flights.notSpecified')}
+      />
+    );
+  }
+
   return (
     <Modal
       isOpen={isOpen}
@@ -268,20 +302,7 @@ export function CreateFlightModal({
                 <Input type="time" className={inputClassName} />
               </TextField>
 
-              <div className="sm:col-span-2">
-                <Select
-                  label={t('flights.siteLabel')}
-                  options={siteOptions}
-                  value={manualValues.site_id}
-                  onChange={(siteId: Key | null) =>
-                    setManualValues((current) => ({
-                      ...current,
-                      site_id: siteId ? String(siteId) : null,
-                    }))
-                  }
-                  placeholder={t('flights.notSpecified')}
-                />
-              </div>
+              <div className="sm:col-span-2">{siteField}</div>
             </div>
 
             <fieldset className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">

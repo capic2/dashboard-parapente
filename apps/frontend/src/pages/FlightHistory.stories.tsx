@@ -149,6 +149,31 @@ const mockSites = {
 
 const flightsDb: Record<string, unknown>[] = [...mockFlights];
 
+const toSummary = (flight: Record<string, unknown>) => ({
+  id: flight.id,
+  site_id: flight.site_id ?? null,
+  site_name: flight.site_name ?? null,
+  site_region:
+    flight.site_id === 'site-arguel' ? 'Bourgogne-Franche-Comté' : null,
+  name: flight.name ?? null,
+  title: flight.title ?? null,
+  flight_date: flight.flight_date,
+  departure_time: flight.departure_time ?? null,
+  duration_minutes: flight.duration_minutes ?? null,
+  max_altitude_m: flight.max_altitude_m ?? null,
+  distance_km: flight.distance_km ?? null,
+  elevation_gain_m: flight.elevation_gain_m ?? null,
+  has_gpx: Boolean(flight.gpx_file_path),
+  has_video: Boolean(flight.video_file_path),
+  has_gopro_overlay: Boolean(flight.gopro_overlay_file_path),
+  video_export_job_id: flight.video_export_job_id ?? null,
+  video_export_status: flight.video_export_status ?? null,
+  video_export_progress: flight.video_export_progress ?? null,
+  gopro_overlay_job_id: flight.gopro_overlay_job_id ?? null,
+  gopro_overlay_status: flight.gopro_overlay_status ?? null,
+  gopro_overlay_progress: flight.gopro_overlay_progress ?? null,
+});
+
 let gpxRequestCount = 0;
 
 const mockGPXData = {
@@ -186,7 +211,14 @@ const resetStoryState = () => {
 };
 
 const createHandlers = (gpxDelayMs = 0) => [
-  http.get('*/api/flights', () => HttpResponse.json({ flights: flightsDb })),
+  http.get('*/api/flights/summaries', () =>
+    HttpResponse.json({
+      flights: flightsDb.map(toSummary),
+      total: flightsDb.length,
+      next_cursor: null,
+    })
+  ),
+  http.get('*/api/video-export-jobs', () => HttpResponse.json({ jobs: [] })),
   http.get('*/api/flights/:id/gpx-data', async () => {
     if (gpxDelayMs > 0) {
       await new Promise((resolve) => {
@@ -438,7 +470,12 @@ export const EmptyState = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights', () => HttpResponse.json({ flights: [] })),
+        http.get('*/api/flights/summaries', () =>
+          HttpResponse.json({ flights: [], total: 0, next_cursor: null })
+        ),
+        http.get('*/api/video-export-jobs', () =>
+          HttpResponse.json({ jobs: [] })
+        ),
         http.get('*/api/spots', () => HttpResponse.json(mockSites)),
       ],
     },
@@ -450,9 +487,12 @@ export const Loading = meta.story({
   parameters: {
     msw: {
       handlers: [
-        http.get('*/api/flights', async () => {
+        http.get('*/api/flights/summaries', async () => {
           await new Promise(() => {});
         }),
+        http.get('*/api/video-export-jobs', () =>
+          HttpResponse.json({ jobs: [] })
+        ),
         http.get('*/api/spots', () => HttpResponse.json(mockSites)),
       ],
     },

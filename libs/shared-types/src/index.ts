@@ -130,6 +130,48 @@ export const FlightSchema = z
     }
   );
 
+export const FlightSummarySchema = z.object({
+  id: z.string(),
+  site_id: z.string().nullable(),
+  site_name: z.string().nullable(),
+  site_region: z.string().nullable(),
+  name: z.string().nullable(),
+  title: z.string().nullable(),
+  flight_date: z.string(),
+  departure_time: z.string().nullable(),
+  duration_minutes: z.number().nullable(),
+  max_altitude_m: z.number().nullable(),
+  distance_km: z.number().nullable(),
+  elevation_gain_m: z.number().nullable(),
+  has_gpx: z.boolean(),
+  has_video: z.boolean(),
+  has_gopro_overlay: z.boolean(),
+  video_export_job_id: z.string().nullable(),
+  video_export_status: z.string().nullable(),
+  video_export_progress: z.number().nullable(),
+  gopro_overlay_job_id: z.string().nullable(),
+  gopro_overlay_status: z.string().nullable(),
+  gopro_overlay_progress: z.number().nullable(),
+});
+
+export const FlightSummariesResponseSchema = z.object({
+  flights: z.array(FlightSummarySchema),
+  total: z.number().int().nonnegative(),
+  next_cursor: z.string().nullable(),
+});
+
+export const ActiveFlightMediaJobSchema = z.object({
+  job_id: z.string(),
+  flight_id: z.string().nullish(),
+  status: z.string(),
+  progress: z.number().nullish(),
+  mode: z.string().nullish(),
+});
+
+export const ActiveFlightMediaJobsResponseSchema = z.object({
+  jobs: z.array(ActiveFlightMediaJobSchema),
+});
+
 export const FlightStatsSchema = z.object({
   total_flights: z.number().catch(0),
   total_hours: z.number().catch(0),
@@ -680,6 +722,11 @@ export type Site = z.infer<typeof SiteSchema>;
 export type SiteUpdate = z.infer<typeof SiteUpdateSchema>;
 export type CreateSiteData = z.infer<typeof CreateSiteSchema>;
 export type Flight = z.infer<typeof FlightSchema>;
+export type FlightSummary = z.infer<typeof FlightSummarySchema>;
+export type FlightSummariesResponse = z.infer<
+  typeof FlightSummariesResponseSchema
+>;
+export type ActiveFlightMediaJob = z.infer<typeof ActiveFlightMediaJobSchema>;
 export type FlightStats = z.infer<typeof FlightStatsSchema>;
 export type Alert = z.infer<typeof AlertSchema>;
 export type ConsensusHour = z.infer<typeof ConsensusHourSchema>;

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { HTTPError } from 'ky';
 import type { Flight } from '../types';
 import {
   hasFlightGoproOverlay,
   hasFlightVideo,
   isGoproOverlayInProgress,
+  isUnavailableMediaError,
 } from './flightMediaState';
 
 const flight = (overrides: Partial<Flight>): Flight =>
@@ -54,5 +56,20 @@ describe('flight media state', () => {
     expect(isGoproOverlayInProgress('preparing')).toBe(true);
     expect(isGoproOverlayInProgress('running')).toBe(true);
     expect(isGoproOverlayInProgress('completed')).toBe(false);
+  });
+
+  it('marks only missing or expired media responses unavailable', () => {
+    const httpError = (status: number) => {
+      const error = Object.create(HTTPError.prototype) as HTTPError;
+      Object.defineProperty(error, 'response', {
+        value: new Response(null, { status }),
+      });
+      return error;
+    };
+
+    expect(isUnavailableMediaError(httpError(404))).toBe(true);
+    expect(isUnavailableMediaError(httpError(410))).toBe(true);
+    expect(isUnavailableMediaError(httpError(500))).toBe(false);
+    expect(isUnavailableMediaError(new TypeError('Network error'))).toBe(false);
   });
 });
