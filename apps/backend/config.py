@@ -58,6 +58,24 @@ def _default_job_queue_backend() -> str:
     return "rq" if ENVIRONMENT == "production" else "thread"
 
 
+def _csv_env(name: str, default: str) -> list[str]:
+    return [value.strip() for value in os.getenv(name, default).split(",") if value.strip()]
+
+
+def _int_env_at_least(name: str, default: int, minimum: int) -> int:
+    return max(minimum, int(os.getenv(name, str(default))))
+
+
+def _intervals_sync_enabled(api_key: str | None) -> bool:
+    requested = os.getenv("BACKEND_INTERVALS_ICU_SYNC_ENABLED", "false").lower() == "true"
+    if requested and not api_key:
+        logger.warning(
+            "BACKEND_INTERVALS_ICU_SYNC_ENABLED ignored because "
+            "BACKEND_INTERVALS_ICU_API_KEY is missing"
+        )
+    return requested and bool(api_key)
+
+
 # ============================================================================
 # DATABASE
 # ============================================================================
@@ -109,24 +127,17 @@ AZBA_CACHE_TTL_SECONDS = int(os.getenv("BACKEND_AZBA_CACHE_TTL_SECONDS", "900"))
 AZBA_SITE_RADIUS_KM = float(os.getenv("BACKEND_AZBA_SITE_RADIUS_KM", "10"))
 
 # ============================================================================
-# STRAVA OAUTH
+# INTERVALS.ICU
 # ============================================================================
-STRAVA_CLIENT_ID = os.getenv("BACKEND_STRAVA_CLIENT_ID")
-STRAVA_CLIENT_SECRET = os.getenv("BACKEND_STRAVA_CLIENT_SECRET")
-STRAVA_REFRESH_TOKEN = os.getenv("BACKEND_STRAVA_REFRESH_TOKEN")
-STRAVA_ACCESS_TOKEN = os.getenv("BACKEND_STRAVA_ACCESS_TOKEN")
-STRAVA_VERIFY_TOKEN = os.getenv("BACKEND_STRAVA_VERIFY_TOKEN")
-STRAVA_TOKEN_LOG_HISTORY_LIMIT = max(
-    1, int(os.getenv("BACKEND_STRAVA_TOKEN_LOG_HISTORY_LIMIT", "5"))
-)
+INTERVALS_ICU_API_KEY = os.getenv("BACKEND_INTERVALS_ICU_API_KEY")
+INTERVALS_ICU_BASE_URL = os.getenv(
+    "BACKEND_INTERVALS_ICU_BASE_URL", "https://intervals.icu/api/v1"
+).rstrip("/")
+INTERVALS_ICU_ACTIVITY_TYPES = _csv_env("BACKEND_INTERVALS_ICU_ACTIVITY_TYPES", "")
 
 # ============================================================================
 # AI ANALYSIS
 # ============================================================================
-
-
-def _csv_env(name: str, default: str) -> list[str]:
-    return [value.strip() for value in os.getenv(name, default).split(",") if value.strip()]
 
 
 GOOGLE_API_KEY = os.getenv("BACKEND_GOOGLE_API_KEY")
@@ -255,10 +266,6 @@ if not IS_TEST_ENV:
     if not METEOBLUE_API_KEY:
         logger.warning("⚠️ METEOBLUE_API_KEY is missing")
 
-    if not STRAVA_VERIFY_TOKEN:
-        logger.error("❌ STRAVA_VERIFY_TOKEN is required")
-        raise ValueError("BACKEND_STRAVA_VERIFY_TOKEN environment variable is required")
-
     if ENVIRONMENT == "production" and not METRICS_TOKEN:
         logger.error("❌ BACKEND_METRICS_TOKEN is required in production")
         raise ValueError("BACKEND_METRICS_TOKEN environment variable is required in production")
@@ -267,20 +274,6 @@ else:
     # In test mode, provide defaults to avoid breaking tests
     if not JWT_SECRET:
         JWT_SECRET = "test-secret-not-for-production"
-    if not STRAVA_VERIFY_TOKEN:
-        STRAVA_VERIFY_TOKEN = "PARAPENTE_2025"
-
-# Log Strava credentials status
-if STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET and STRAVA_REFRESH_TOKEN:
-    logger.info(f"✅ Strava credentials loaded (Client ID: {STRAVA_CLIENT_ID})")
-else:
-    logger.warning(
-        f"⚠️ Strava credentials incomplete: "
-        f"CLIENT_ID={bool(STRAVA_CLIENT_ID)}, "
-        f"CLIENT_SECRET={bool(STRAVA_CLIENT_SECRET)}, "
-        f"REFRESH_TOKEN={bool(STRAVA_REFRESH_TOKEN)}"
-    )
-
 # Log configuration summary
 logger.info(f"🔧 Environment: {ENVIRONMENT}")
 logger.info(f"🗄️ Database: {DATABASE_URL}")

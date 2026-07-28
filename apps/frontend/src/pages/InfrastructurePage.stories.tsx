@@ -2,7 +2,7 @@ import preview from '../../.storybook/preview';
 import InfrastructurePage from './InfrastructurePage';
 import {
   defaultHandlers,
-  stravaExpiredHandlers,
+  intervalsNoActivityTypesHandlers,
   cacheHandlers,
   resetCacheDb,
   cacheDb,
@@ -25,11 +25,11 @@ export const Default = meta.story({
   beforeEach: resetCacheDb,
 });
 
-export const TokenExpired = meta.story({
-  name: 'Token Expired',
+export const AwaitingActivityType = meta.story({
+  name: 'No Activity Types',
   beforeEach: resetCacheDb,
   parameters: {
-    msw: { handlers: [...stravaExpiredHandlers, ...cacheHandlers] },
+    msw: { handlers: [...intervalsNoActivityTypesHandlers, ...cacheHandlers] },
   },
 });
 

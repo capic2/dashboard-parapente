@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Form,
@@ -38,6 +38,9 @@ import { formatFlightSiteLabel } from '../siteDisplay';
 interface CreateFlightModalProps {
   isOpen: boolean;
   sites: Site[];
+  isSitesLoading?: boolean;
+  hasSitesError?: boolean;
+  initialMode?: CreationMode;
   onClose: () => void;
   onCreateComplete: () => void;
 }
@@ -69,13 +72,16 @@ const initialManualValues = (): FlightFormData => ({
 export function CreateFlightModal({
   isOpen,
   sites,
+  isSitesLoading = false,
+  hasSitesError = false,
+  initialMode = 'manual',
   onClose,
   onCreateComplete,
 }: CreateFlightModalProps) {
   const { t } = useTranslation();
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [mode, setMode] = useState<CreationMode>('manual');
+  const [mode, setMode] = useState<CreationMode>(initialMode);
   const [manualValues, setManualValues] = useState(initialManualValues);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [createdFlight, setCreatedFlight] = useState<Flight | null>(null);
@@ -83,6 +89,10 @@ export function CreateFlightModal({
   const manualMutation = useCreateFlight();
   const fileMutation = useCreateFlightFromGPX();
   const isPending = manualMutation.isPending || fileMutation.isPending;
+
+  useEffect(() => {
+    if (isOpen) setMode(initialMode);
+  }, [initialMode, isOpen]);
 
   const siteOptions = sites.map((site) => ({
     id: site.id,
@@ -101,7 +111,7 @@ export function CreateFlightModal({
     : '';
 
   const reset = () => {
-    setMode('manual');
+    setMode(initialMode);
     setManualValues(initialManualValues());
     setSelectedFile(null);
     setCreatedFlight(null);
@@ -166,6 +176,36 @@ export function CreateFlightModal({
       [field]: Number.isNaN(value) ? null : value,
     }));
   };
+
+  let siteField: ReactNode;
+  if (isSitesLoading) {
+    siteField = (
+      <output className="text-sm text-gray-600 dark:text-gray-300">
+        {t('flights.loadingSites')}
+      </output>
+    );
+  } else if (hasSitesError) {
+    siteField = (
+      <p className="text-sm text-red-700 dark:text-red-300" role="alert">
+        {t('flights.sitesLoadError')}
+      </p>
+    );
+  } else {
+    siteField = (
+      <Select
+        label={t('flights.siteLabel')}
+        options={siteOptions}
+        value={manualValues.site_id}
+        onChange={(siteId: Key | null) =>
+          setManualValues((current) => ({
+            ...current,
+            site_id: siteId ? String(siteId) : null,
+          }))
+        }
+        placeholder={t('flights.notSpecified')}
+      />
+    );
+  }
 
   return (
     <Modal
@@ -262,20 +302,7 @@ export function CreateFlightModal({
                 <Input type="time" className={inputClassName} />
               </TextField>
 
-              <div className="sm:col-span-2">
-                <Select
-                  label={t('flights.siteLabel')}
-                  options={siteOptions}
-                  value={manualValues.site_id}
-                  onChange={(siteId: Key | null) =>
-                    setManualValues((current) => ({
-                      ...current,
-                      site_id: siteId ? String(siteId) : null,
-                    }))
-                  }
-                  placeholder={t('flights.notSpecified')}
-                />
-              </div>
+              <div className="sm:col-span-2">{siteField}</div>
             </div>
 
             <fieldset className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">

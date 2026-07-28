@@ -287,7 +287,6 @@ jobs:
           TESTING: false
           BACKEND_WEATHERAPI_KEY: test_key
           BACKEND_METEOBLUE_API_KEY: test_key
-          BACKEND_STRAVA_VERIFY_TOKEN: PARAPENTE_E2E_TEST
           BACKEND_JWT_SECRET: ci-test-secret-not-for-production
           VITE_CESIUM_ION_TOKEN: e2e-ci-placeholder-token
 
@@ -310,7 +309,6 @@ jobs:
           TESTING: false
           BACKEND_WEATHERAPI_KEY: test_key
           BACKEND_METEOBLUE_API_KEY: test_key
-          BACKEND_STRAVA_VERIFY_TOKEN: PARAPENTE_E2E_TEST
           BACKEND_JWT_SECRET: ci-test-secret-not-for-production
           VITE_CESIUM_ION_TOKEN: e2e-ci-placeholder-token
 

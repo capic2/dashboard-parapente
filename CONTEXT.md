@@ -44,6 +44,10 @@ _Avoid_: Landing when writing user-facing French
 An aid for deciding whether a pilot should consider flying from a **Site** on a given day and, when relevant, during a specific time window. A **Decision de Vol** is a cautious pre-flight recommendation, not a recorded flight, a hard go/no-go order, or a safety guarantee.
 _Avoid_: Vol, flight record, safety certification, go/no-go order
 
+**Vol Enregistre**:
+A completed flight activity kept in the pilot's history, whether entered manually or imported. A **Vol Enregistre** may exist without an associated **Site**, GPX trace, or video.
+_Avoid_: Decision de Vol, media file
+
 **Vol Tranquille**:
 A flight objective that favors calm, manageable conditions over strong thermal performance. For the current pilot usage, weak thermals are neutral or positive, while strong thermals and instability require caution.
 _Avoid_: Performance flight, thermal optimization

@@ -2,9 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 import { queryClient } from '../lib/queryClient';
 import { cacheOverviewQueryOptions } from '../hooks/admin/useCache';
 import { videoExportJobsQueryOptions } from '../hooks/flights/useVideoExportJobs';
+import { intervalsStatusQueryOptions } from '../hooks/admin/useIntervalsStatus';
 import { requireAuth } from '../lib/authGuard';
 
-const infrastructureTabs = ['strava', 'video-exports', 'cache'] as const;
+const infrastructureTabs = ['intervals', 'video-exports', 'cache'] as const;
 
 export type InfrastructureTab = (typeof infrastructureTabs)[number];
 
@@ -16,7 +17,7 @@ export type InfrastructureSearch = {
 export function normalizeInfrastructureTab(tab: unknown): InfrastructureTab {
   return infrastructureTabs.includes(tab as InfrastructureTab)
     ? (tab as InfrastructureTab)
-    : 'strava';
+    : 'intervals';
 }
 
 export function validateInfrastructureSearch(
@@ -40,5 +41,6 @@ export const Route = createFileRoute('/infrastructure')({
   loader: () => {
     void queryClient.prefetchQuery(cacheOverviewQueryOptions());
     void queryClient.prefetchQuery(videoExportJobsQueryOptions());
+    void queryClient.prefetchQuery(intervalsStatusQueryOptions());
   },
 });

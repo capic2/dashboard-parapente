@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, model_validator, validator
 
 VALID_SITE_ORIENTATIONS = {
     "",
@@ -256,7 +256,6 @@ class FlightBase(BaseModel):
 class FlightCreate(FlightBase):
     name: str | None = None
     site_id: str | None = None
-    strava_id: str | None = None
 
     @validator("duration_minutes", "max_altitude_m", "elevation_gain_m")
     def positive_values(cls, value):
@@ -339,7 +338,8 @@ class Flight(FlightBase):
     site_id: str | None = None
     site_name: str | None = None
     name: str | None = None
-    strava_id: str | None = None
+    external_provider: str | None = None
+    external_activity_id: str | None = None
     gpx_file_path: str | None = None
     external_url: str | None = None
     video_export_job_id: str | None = None
@@ -357,8 +357,97 @@ class Flight(FlightBase):
     updated_at: datetime
     site: SiteInFlight | None = None  # Include site details with orientation
 
+    @model_validator(mode="after")
+    def validate_external_identity(self) -> "Flight":
+        if self.external_provider is not None and not self.external_provider.strip():
+            raise ValueError("external_provider must not be blank")
+        if self.external_activity_id is not None and not self.external_activity_id.strip():
+            raise ValueError("external_activity_id must not be blank")
+        if bool(self.external_provider) != bool(self.external_activity_id):
+            raise ValueError(
+                "external_provider and external_activity_id must both be provided or omitted"
+            )
+        return self
+
     class Config:
         from_attributes = True
+
+
+class FlightSummary(BaseModel):
+    id: str
+    site_id: str | None = None
+    site_name: str | None = None
+    site_region: str | None = None
+    name: str | None = None
+    title: str | None = None
+    flight_date: date
+    departure_time: datetime | None = None
+    duration_minutes: int | None = None
+    max_altitude_m: int | None = None
+    distance_km: float | None = None
+    elevation_gain_m: int | None = None
+    has_gpx: bool
+    video_export_job_id: str | None = None
+    video_export_status: str | None = None
+    video_export_progress: int | None = None
+    has_video: bool
+    gopro_overlay_job_id: str | None = None
+    gopro_overlay_status: str | None = None
+    gopro_overlay_progress: int | None = None
+    has_gopro_overlay: bool
+
+
+class FlightSummariesResponse(BaseModel):
+    flights: list[FlightSummary]
+    total: int
+    next_cursor: str | None = None
+
+
+class IntervalsSyncRequest(BaseModel):
+    date_from: date
+    date_to: date
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "IntervalsSyncRequest":
+        if self.date_from > self.date_to:
+            raise ValueError("date_from must be on or before date_to")
+        return self
+
+
+class IntervalsActivityPreview(BaseModel):
+    id: str
+    name: str
+    start_date_local: datetime
+    type: str
+    source: str
+    file_type: str
+
+
+class IntervalsPreviewResponse(BaseModel):
+    activities: list[IntervalsActivityPreview]
+    activity_types: list[str]
+
+
+class ExternalFlightSummary(BaseModel):
+    id: str
+    external_provider: str
+    external_activity_id: str
+    name: str
+    date: date
+
+
+class ExternalImportResult(BaseModel):
+    success: bool = True
+    imported: int
+    updated: int
+    skipped: int
+    failed: int
+    flights: list[ExternalFlightSummary]
+
+
+class IntervalsStatus(BaseModel):
+    configured: bool
+    activity_types: list[str]
 
 
 class FlightRecord(BaseModel):

@@ -130,6 +130,7 @@ class _FakeHttpResponse:
         self.text = text
         self.content = content
         self.url = url
+        self.headers: dict[str, str] = {}
 
     def raise_for_status(self) -> None:
         return None

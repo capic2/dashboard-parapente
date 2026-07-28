@@ -68,7 +68,8 @@ const mockManualFlight = {
   id: 'manual-flight-1',
   site_id: null,
   site_name: null,
-  strava_id: null,
+  external_provider: null,
+  external_activity_id: null,
   name: 'Vol du soir',
   title: 'Vol du soir',
   description: null,
@@ -104,6 +105,33 @@ export const FlightModal = meta.story({
       ],
     },
   },
+});
+
+export const FileImport = meta.story({
+  name: 'File Import',
+  args: {
+    isOpen: true,
+    sites: mockSites,
+    initialMode: 'file',
+    onClose: fn(),
+    onCreateComplete: fn(),
+  },
+  parameters: {
+    msw: {
+      handlers: [
+        http.post('*/api/flights/create-from-gpx', () => {
+          return HttpResponse.json(mockFlightResult);
+        }),
+      ],
+    },
+  },
+});
+
+FileImport.test('It opens directly on file import', async () => {
+  await expect(
+    screen.getByRole('tab', { name: /Importer un fichier/u })
+  ).toHaveAttribute('aria-selected', 'true');
+  await expect(screen.getByLabelText('Fichier GPX ou IGC')).toBeInTheDocument();
 });
 
 FlightModal.test(

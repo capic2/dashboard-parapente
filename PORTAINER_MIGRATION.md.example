@@ -34,11 +34,9 @@ Ce guide explique comment mettre à jour les variables d'environnement dans Port
 | `API_DEBUG` | `BACKEND_API_DEBUG` | `false` |
 | `WEATHERAPI_KEY` | `BACKEND_WEATHERAPI_KEY` | `votre_clé` |
 | `METEOBLUE_API_KEY` | `BACKEND_METEOBLUE_API_KEY` | `votre_clé` |
-| `STRAVA_CLIENT_ID` | `BACKEND_STRAVA_CLIENT_ID` | `votre_id` |
-| `STRAVA_CLIENT_SECRET` | `BACKEND_STRAVA_CLIENT_SECRET` | `votre_secret` |
-| `STRAVA_ACCESS_TOKEN` | `BACKEND_STRAVA_ACCESS_TOKEN` | `votre_token` |
-| `STRAVA_REFRESH_TOKEN` | `BACKEND_STRAVA_REFRESH_TOKEN` | `votre_refresh` |
-| *(nouvelle)* | `BACKEND_STRAVA_VERIFY_TOKEN` | `PARAPENTE_2025` |
+| *(nouvelle, requise)* | `BACKEND_INTERVALS_ICU_API_KEY` | `<votre_clé_personnelle>` |
+| *(nouvelle, défaut)* | `BACKEND_INTERVALS_ICU_BASE_URL` | `https://intervals.icu/api/v1` |
+| *(nouvelle, requise avant activation)* | `BACKEND_INTERVALS_ICU_ACTIVITY_TYPES` | `<type exact affiché pour le vol Zepp>` |
 | `GOOGLE_API_KEY` | `BACKEND_GOOGLE_API_KEY` | `votre_clé` |
 | `GEMINI_MODEL` | `BACKEND_GEMINI_MODEL` | `gemini-2.5-flash` |
 | `SCHEDULER_ENABLED` | `BACKEND_SCHEDULER_ENABLED` | `true` |
@@ -73,7 +71,8 @@ Ce guide explique comment mettre à jour les variables d'environnement dans Port
 1. Dans l'éditeur, remplacez toutes les variables dans la section `environment:`
 2. Utilisez le tableau ci-dessus pour renommer chaque variable
 3. Ajoutez les nouvelles variables :
-   - `BACKEND_STRAVA_VERIFY_TOKEN=PARAPENTE_2025`
+   - `BACKEND_INTERVALS_ICU_API_KEY=votre_clé_personnelle`
+   - `BACKEND_INTERVALS_ICU_SYNC_ENABLED=false`
    - `BACKEND_FRONTEND_URL=https://votre-domaine.com`
 
 **Option B : Via les variables d'environnement (recommandé)**
@@ -95,7 +94,8 @@ Ce guide explique comment mettre à jour les variables d'environnement dans Port
 - [ ] `BACKEND_LOG_LEVEL=INFO` ou `WARNING` (pas `DEBUG`)
 - [ ] `BACKEND_API_DEBUG=false` (important en production)
 - [ ] Nouvelles variables ajoutées :
-  - [ ] `BACKEND_STRAVA_VERIFY_TOKEN=PARAPENTE_2025`
+  - [ ] `BACKEND_INTERVALS_ICU_API_KEY` (clé personnelle créée dans Intervals.icu)
+  - [ ] `BACKEND_INTERVALS_ICU_ACTIVITY_TYPES` après identification du type Zepp
   - [ ] `BACKEND_FRONTEND_URL` (URL de votre frontend)
 
 ### Étape 4 : Redéployer la stack
@@ -114,7 +114,6 @@ Dans Portainer :
 
 Recherchez ces lignes (doivent apparaître sans erreur) :
 ```
-✅ Strava credentials loaded
 🔧 Environment: production
 🗄️ Database: sqlite:///./db/dashboard.db
 🔴 Redis: redis:6379 (fake: false)
@@ -141,7 +140,9 @@ curl https://votre-domaine.com/api/sites
 Visitez votre site web et vérifiez que :
 - [ ] La page d'accueil se charge
 - [ ] Les données météo s'affichent
-- [ ] Les vols Strava sont synchronisés
+- [ ] L'onglet Infrastructure affiche l'état Intervals.icu
+- [ ] L'aperçu des activités Zepp identifie le type du vol
+- [ ] `BACKEND_INTERVALS_ICU_ACTIVITY_TYPES` contient ce type avant d'activer la synchronisation
 
 ---
 
@@ -199,12 +200,14 @@ BACKEND_API_DEBUG=false  # ⚠️ false en production
 BACKEND_WEATHERAPI_KEY=your_weatherapi_key_here
 BACKEND_METEOBLUE_API_KEY=your_meteoblue_key_here
 
-# Backend - Strava OAuth
-BACKEND_STRAVA_CLIENT_ID=your_strava_client_id
-BACKEND_STRAVA_CLIENT_SECRET=your_strava_client_secret
-BACKEND_STRAVA_ACCESS_TOKEN=your_strava_access_token
-BACKEND_STRAVA_REFRESH_TOKEN=your_strava_refresh_token
-BACKEND_STRAVA_VERIFY_TOKEN=PARAPENTE_2025
+# Backend - Intervals.icu
+BACKEND_INTERVALS_ICU_API_KEY=your_personal_api_key
+BACKEND_INTERVALS_ICU_BASE_URL=https://intervals.icu/api/v1
+BACKEND_INTERVALS_ICU_SYNC_ENABLED=false
+BACKEND_INTERVALS_ICU_SYNC_INTERVAL_MINUTES=10
+BACKEND_INTERVALS_ICU_SYNC_LOOKBACK_DAYS=3
+# Laisser la synchronisation désactivée tant que l'aperçu n'a pas identifié ce type.
+BACKEND_INTERVALS_ICU_ACTIVITY_TYPES=<type exact affiché pour le vol Zepp>
 
 # Backend - AI Analysis
 BACKEND_GOOGLE_API_KEY=your_google_api_key_here

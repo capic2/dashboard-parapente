@@ -25,11 +25,7 @@ import {
   useDeleteCacheKey,
 } from '../hooks/admin/useCache';
 import type { CacheKeyInfo } from '../hooks/admin/useCache';
-import {
-  useStravaTokenStatus,
-  useStravaTokenLogs,
-  useStravaRefreshToken,
-} from '../hooks/admin/useStravaToken';
+import { useIntervalsStatus } from '../hooks/admin/useIntervalsStatus';
 import { VideoExportJobsPanel } from '../components/flights/video-export/VideoExportJobsPanel';
 import { useToastStore } from '../hooks/useToast';
 import {
@@ -61,23 +57,115 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
-function formatDate(iso: string): string {
-  const normalizedIso =
-    /Z$/.test(iso) || /[+-]\d{2}:\d{2}$/.test(iso) ? iso : `${iso}Z`;
-  return new Date(normalizedIso).toLocaleString();
+function CacheKeyCell({ value }: { value: string }) {
+  return (
+    <span className="font-mono text-xs text-gray-700 dark:text-gray-300 truncate block max-w-xs">
+      {value}
+    </span>
+  );
 }
 
-function getRefreshModeLabel(
-  refreshMode: 'manual' | 'automatic' | null | undefined,
-  t: (key: string, options?: Record<string, unknown>) => string
-): string {
-  if (refreshMode === 'manual') {
-    return t('infrastructure.strava.manual');
-  }
-  if (refreshMode === 'automatic') {
-    return t('infrastructure.strava.automatic');
-  }
-  return t('infrastructure.strava.modeUnknown');
+function ResolvedCell({ resolved }: { resolved: CacheKeyInfo['resolved'] }) {
+  const { t } = useTranslation();
+
+  return (
+    <span className="text-xs text-gray-600 dark:text-gray-400">
+      {getResolvedLabel(resolved, t)}
+    </span>
+  );
+}
+
+function TtlCell({ value }: { value: number }) {
+  return (
+    <span className="text-xs text-gray-600 dark:text-gray-400">
+      {formatTtl(value)}
+    </span>
+  );
+}
+
+function SizeCell({ value }: { value: number }) {
+  return (
+    <span className="text-xs text-gray-600 dark:text-gray-400">
+      {formatSize(value)}
+    </span>
+  );
+}
+
+function CacheActionsCell({
+  row,
+  onViewKey,
+  onDeleteKey,
+  isPending,
+}: {
+  row: CacheKeyInfo;
+  onViewKey: (key: string) => void;
+  onDeleteKey: (key: string) => void;
+  isPending: boolean;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="flex flex-col sm:flex-row gap-2">
+      <Button
+        onPress={() => onViewKey(row.key)}
+        className="min-h-11 px-3 py-2 sm:min-h-0 sm:px-2 sm:py-1 rounded text-xs bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors cursor-pointer"
+      >
+        {t('cache.view')}
+      </Button>
+      <Button
+        onPress={() => onDeleteKey(row.key)}
+        isDisabled={isPending}
+        className="min-h-11 px-3 py-2 sm:min-h-0 sm:px-2 sm:py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
+      >
+        {t('cache.deleteKey')}
+      </Button>
+    </div>
+  );
+}
+
+function buildCacheColumns({
+  t,
+  onViewKey,
+  onDeleteKey,
+  isPending,
+}: {
+  t: (key: string, options?: Record<string, unknown>) => string;
+  onViewKey: (key: string) => void;
+  onDeleteKey: (key: string) => void;
+  isPending: boolean;
+}) {
+  return [
+    columnHelper.accessor('key', {
+      header: t('cache.key'),
+      cell: (info) => <CacheKeyCell value={info.getValue()} />,
+    }),
+    columnHelper.accessor('resolved', {
+      header: t('cache.resolved'),
+      cell: (info) => <ResolvedCell resolved={info.getValue()} />,
+    }),
+    columnHelper.accessor('ttl', {
+      header: t('cache.ttl'),
+      meta: { className: 'hidden sm:table-cell' },
+      cell: (info) => <TtlCell value={info.getValue()} />,
+    }),
+    columnHelper.accessor('size', {
+      header: t('cache.size'),
+      meta: { className: 'hidden sm:table-cell' },
+      cell: (info) => <SizeCell value={info.getValue()} />,
+    }),
+    columnHelper.display({
+      id: 'actions',
+      header: t('cache.actions'),
+      cell: (info) => (
+        <CacheActionsCell
+          row={info.row.original}
+          onViewKey={onViewKey}
+          onDeleteKey={onDeleteKey}
+          isPending={isPending}
+        />
+      ),
+    }),
+  ];
 }
 
 // oxlint-disable-next-line max-lines-per-function
@@ -147,221 +235,98 @@ export function getResolvedLabel(
 }
 
 // =============================================================================
-// STRAVA TOKEN SECTION
+// INTERVALS.ICU SECTION
 // =============================================================================
 
-// oxlint-disable-next-line max-lines-per-function
-function StravaTokenSection() {
+function IntervalsStatusSection() {
   const { t } = useTranslation();
-  const {
-    data: status,
-    isLoading: statusLoading,
-    isError: statusError,
-  } = useStravaTokenStatus();
-  const {
-    data: logs,
-    isLoading: logsLoading,
-    isError: logsError,
-  } = useStravaTokenLogs();
-  const refreshMutation = useStravaRefreshToken();
+  const { data: status, isLoading, isError } = useIntervalsStatus();
 
-  const refreshSucceeded =
-    refreshMutation.isSuccess && refreshMutation.data?.refreshed;
-  const refreshFailed =
-    refreshMutation.isError ||
-    (refreshMutation.isSuccess && !refreshMutation.data?.refreshed);
-
-  const statusBadge = (() => {
-    if (statusLoading) return null;
-    if (statusError || !status) {
-      return {
-        className:
-          'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400',
-        label: t('infrastructure.strava.unknown'),
-      };
-    }
-    return status.valid
-      ? {
-          className:
-            'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300',
-          label: t('infrastructure.strava.valid'),
-        }
-      : {
-          className:
-            'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300',
-          label: t('infrastructure.strava.expired'),
-        };
-  })();
-
-  const renderStatus = () => {
-    if (statusLoading) {
-      return (
-        <span className="text-sm text-gray-400 dark:text-gray-400">...</span>
-      );
-    }
-    if (statusBadge) {
-      return (
-        <span
-          className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge.className}`}
-        >
-          {statusBadge.label}
-        </span>
-      );
-    }
-
-    return null;
-  };
-
-  // oxlint-disable-next-line max-lines-per-function
-  const renderLogs = () => {
-    if (logsLoading) {
-      return (
-        <div className="p-4 text-sm text-gray-400 dark:text-gray-400">...</div>
-      );
-    }
-
-    if (logsError) {
-      return (
-        <div className="p-4 text-sm text-red-500 dark:text-red-400 text-center">
-          {t('infrastructure.strava.unknown')}
-        </div>
-      );
-    }
-    if (!logs || logs.length === 0) {
-      return (
-        <div className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">
-          {t('infrastructure.strava.noLogs')}
-        </div>
-      );
-    }
-
-    return (
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 dark:bg-gray-900/50 text-left">
-              <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
-                {t('infrastructure.strava.date')}
-              </th>
-              <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
-                {t('infrastructure.strava.status')}
-              </th>
-              <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
-                {t('infrastructure.strava.mode')}
-              </th>
-              <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
-                {t('infrastructure.strava.message')}
-              </th>
-              <th className="px-4 py-2 font-medium text-gray-500 dark:text-gray-400">
-                {t('infrastructure.strava.expiresAt')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {logs.map((log) => (
-              <tr
-                key={log.id}
-                className="border-t border-gray-100 dark:border-gray-700/50"
-              >
-                <td className="px-4 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                  {formatDate(log.timestamp)}
-                </td>
-                <td className="px-4 py-2">
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      log.success
-                        ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                        : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                    }`}
-                  >
-                    {log.success
-                      ? t('infrastructure.strava.ok')
-                      : t('infrastructure.strava.fail')}
-                  </span>
-                </td>
-                <td className="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                  {getRefreshModeLabel(log.refresh_mode, t)}
-                </td>
-                <td className="px-4 py-2 text-gray-600 dark:text-gray-400 text-xs max-w-md truncate">
-                  {log.message}
-                </td>
-                <td className="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                  {log.expires_at ? formatDate(log.expires_at) : '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  };
+  const statusLabel = status?.configured
+    ? t('infrastructure.intervals.configured')
+    : t('infrastructure.intervals.notConfigured');
+  const statusTone: 'green' | 'amber' | 'red' | 'gray' = status?.configured
+    ? 'green'
+    : 'red';
+  const statusClassName = status?.configured
+    ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+    : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
 
   return (
     <div className="space-y-4">
       <div>
         <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
-          {t('infrastructure.strava.title')}
+          {t('infrastructure.intervals.title')}
         </h3>
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          {t(
-            'infrastructure.strava.description',
-            'Surveille la validité du jeton et les derniers rafraîchissements.'
-          )}
+          {t('infrastructure.intervals.description')}
         </p>
       </div>
 
-      {/* Status card */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md flex flex-wrap items-center gap-6">
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500 dark:text-gray-400">
-            {t('infrastructure.strava.status')}:
-          </span>
-          {renderStatus()}
+      {isLoading && (
+        <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-500 shadow-md dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+          {t('common.loading')}
         </div>
-
-        {status?.expires_at && (
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-500 dark:text-gray-400">
-              {t('infrastructure.strava.expiresAt')}:
-            </span>
-            <span className="text-gray-800 dark:text-gray-200">
-              {formatDate(status.expires_at)}
-            </span>
-          </div>
-        )}
-
-        <Button
-          onPress={() => refreshMutation.mutate()}
-          isDisabled={refreshMutation.isPending}
-          className="ml-auto px-3 py-1.5 rounded-md bg-orange-500 text-white text-sm hover:bg-orange-600 transition-colors disabled:opacity-50 cursor-pointer"
+      )}
+      {isError && (
+        <div
+          role="alert"
+          className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200"
         >
-          {refreshMutation.isPending
-            ? t('infrastructure.strava.refreshing')
-            : t('infrastructure.strava.refresh')}
-        </Button>
-      </div>
-
-      {/* Refresh success/error feedback */}
-      {refreshSucceeded && (
-        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-xl p-3 text-sm text-green-800 dark:text-green-200">
-          {t('infrastructure.strava.refreshSuccess')}
+          {t('infrastructure.intervals.statusError')}
         </div>
       )}
-      {refreshFailed && (
-        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-xl p-3 text-sm text-red-800 dark:text-red-200">
-          {t('infrastructure.strava.refreshError')}
-        </div>
+      {status && (
+        <>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <InfrastructureStatCard
+              label={t('infrastructure.intervals.status')}
+              value={statusLabel}
+              detail={t('infrastructure.intervals.statusDetail')}
+              tone={statusTone}
+            />
+            <InfrastructureStatCard
+              label={t('infrastructure.intervals.activityTypes')}
+              value={t('infrastructure.intervals.typeCount', {
+                count: status.activity_types.length,
+              })}
+              detail={t('infrastructure.intervals.activityTypesDetail')}
+              tone={status.activity_types.length > 0 ? 'green' : 'gray'}
+            />
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                {t('infrastructure.intervals.activityTypes')}
+              </h4>
+              <span
+                className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusClassName}`}
+              >
+                {statusLabel}
+              </span>
+            </div>
+            {status.activity_types.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {status.activity_types.map((type) => (
+                  <span
+                    key={type}
+                    className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800 dark:bg-sky-900/50 dark:text-sky-200"
+                  >
+                    {type}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                {t('infrastructure.intervals.noActivityTypes')}
+              </p>
+            )}
+            <p className="mt-4 border-t border-gray-200 pt-3 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400">
+              {t('infrastructure.intervals.apiKeyEnvOnly')}
+            </p>
+          </div>
+        </>
       )}
-
-      {/* Logs table */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            {t('infrastructure.strava.logs')}
-          </h4>
-        </div>
-        {renderLogs()}
-      </div>
     </div>
   );
 }
@@ -738,20 +703,23 @@ function InfrastructureStatCard({
 
 function InfrastructureOverview() {
   const { t } = useTranslation();
-  const { data: stravaStatus, isLoading: stravaLoading } =
-    useStravaTokenStatus();
+  const { data: intervalsStatus, isLoading: intervalsLoading } =
+    useIntervalsStatus();
   const { data: cacheOverview } = useCacheOverview();
 
   const cacheGroups = Object.keys(cacheOverview.groups).length;
-  let stravaTone: 'gray' | 'green' | 'red' = 'red';
-  let stravaValue = t('infrastructure.strava.expired');
+  let intervalsTone: 'gray' | 'green' | 'amber' | 'red' = 'red';
+  let intervalsValue = t('infrastructure.intervals.notConfigured');
 
-  if (stravaLoading) {
-    stravaTone = 'gray';
-    stravaValue = t('common.loading', 'Chargement...');
-  } else if (stravaStatus?.valid) {
-    stravaTone = 'green';
-    stravaValue = t('infrastructure.strava.valid');
+  if (intervalsLoading) {
+    intervalsTone = 'gray';
+    intervalsValue = t('common.loading');
+  } else if (intervalsStatus?.configured) {
+    intervalsTone = 'green';
+    intervalsValue = t('infrastructure.intervals.configured');
+  } else if (intervalsStatus) {
+    intervalsTone = 'gray';
+    intervalsValue = t('infrastructure.intervals.notConfigured');
   }
 
   return (
@@ -775,15 +743,12 @@ function InfrastructureOverview() {
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <InfrastructureStatCard
-          label={t('infrastructure.tabs.strava')}
-          value={stravaValue}
-          detail={
-            stravaStatus?.expires_at
-              ? t('infrastructure.strava.expiresAt') +
-                `: ${formatDate(stravaStatus.expires_at)}`
-              : t('infrastructure.strava.modeUnknown')
-          }
-          tone={stravaTone}
+          label={t('infrastructure.tabs.intervals')}
+          value={intervalsValue}
+          detail={t('infrastructure.intervals.overviewDetail', {
+            count: intervalsStatus?.activity_types.length ?? 0,
+          })}
+          tone={intervalsTone}
         />
         <InfrastructureStatCard
           label={t('infrastructure.tabs.videoExports')}
@@ -821,9 +786,22 @@ export default function InfrastructurePage() {
   const params = useParams({ strict: false }) as { tab?: string };
   const search = useSearch({ strict: false }) as InfrastructureSearch;
   const { toasts, removeToast } = useToastStore();
-  const { data: stravaStatus } = useStravaTokenStatus();
+  const { data: intervalsStatus } = useIntervalsStatus();
   const { data: cacheOverview } = useCacheOverview();
   const activeTab = normalizeInfrastructureTab(params.tab);
+  let intervalsBadgeClassName =
+    'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300';
+  let intervalsBadgeLabel = t('common.loading');
+
+  if (intervalsStatus?.configured) {
+    intervalsBadgeClassName =
+      'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300';
+    intervalsBadgeLabel = t('infrastructure.intervals.configured');
+  } else if (intervalsStatus) {
+    intervalsBadgeClassName =
+      'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200';
+    intervalsBadgeLabel = t('infrastructure.intervals.notConfigured');
+  }
 
   const navigateToInfrastructure = (
     tab: InfrastructureTab,
@@ -867,19 +845,13 @@ export default function InfrastructurePage() {
         }
       >
         <TabList className="grid-cols-1 sm:grid-cols-3">
-          <Tab id="strava">
+          <Tab id="intervals">
             <span className="flex items-center justify-center gap-2">
-              {t('infrastructure.tabs.strava')}
+              {t('infrastructure.tabs.intervals')}
               <span
-                className={`rounded-full px-2 py-0.5 text-xs ${
-                  stravaStatus?.valid
-                    ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-                    : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
-                }`}
+                className={`rounded-full px-2 py-0.5 text-xs ${intervalsBadgeClassName}`}
               >
-                {stravaStatus?.valid
-                  ? t('infrastructure.strava.valid')
-                  : t('infrastructure.strava.expired')}
+                {intervalsBadgeLabel}
               </span>
             </span>
           </Tab>
@@ -901,8 +873,8 @@ export default function InfrastructurePage() {
           </Tab>
         </TabList>
 
-        <TabPanel id="strava" className="outline-none">
-          <StravaTokenSection />
+        <TabPanel id="intervals" className="outline-none">
+          <IntervalsStatusSection />
         </TabPanel>
         <TabPanel id="video-exports" className="outline-none">
           <VideoExportJobsPanel limit={null} />
@@ -949,63 +921,7 @@ function GroupSection({
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const columns = useMemo(
-    () => [
-      columnHelper.accessor('key', {
-        header: t('cache.key'),
-        cell: (info) => (
-          <span className="font-mono text-xs text-gray-700 dark:text-gray-300 truncate block max-w-xs">
-            {info.getValue()}
-          </span>
-        ),
-      }),
-      columnHelper.accessor('resolved', {
-        header: t('cache.resolved'),
-        cell: (info) => (
-          <span className="text-xs text-gray-600 dark:text-gray-400">
-            {getResolvedLabel(info.getValue(), t)}
-          </span>
-        ),
-      }),
-      columnHelper.accessor('ttl', {
-        header: t('cache.ttl'),
-        meta: { className: 'hidden sm:table-cell' },
-        cell: (info) => (
-          <span className="text-xs text-gray-600 dark:text-gray-400">
-            {formatTtl(info.getValue())}
-          </span>
-        ),
-      }),
-      columnHelper.accessor('size', {
-        header: t('cache.size'),
-        meta: { className: 'hidden sm:table-cell' },
-        cell: (info) => (
-          <span className="text-xs text-gray-600 dark:text-gray-400">
-            {formatSize(info.getValue())}
-          </span>
-        ),
-      }),
-      columnHelper.display({
-        id: 'actions',
-        header: t('cache.actions'),
-        cell: (info) => (
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button
-              onPress={() => onViewKey(info.row.original.key)}
-              className="min-h-11 px-3 py-2 sm:min-h-0 sm:px-2 sm:py-1 rounded text-xs bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors cursor-pointer"
-            >
-              {t('cache.view')}
-            </Button>
-            <Button
-              onPress={() => onDeleteKey(info.row.original.key)}
-              isDisabled={isPending}
-              className="min-h-11 px-3 py-2 sm:min-h-0 sm:px-2 sm:py-1 rounded text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              {t('cache.deleteKey')}
-            </Button>
-          </div>
-        ),
-      }),
-    ],
+    () => buildCacheColumns({ t, onViewKey, onDeleteKey, isPending }),
     [t, onViewKey, onDeleteKey, isPending]
   );
 
