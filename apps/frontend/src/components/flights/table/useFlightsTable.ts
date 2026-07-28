@@ -1,17 +1,14 @@
-import { useState } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
   createColumnHelper,
   type SortingState,
   type RowSelectionState,
   type OnChangeFn,
 } from '@tanstack/react-table';
-import type { Flight } from '../../../types';
+import type { FlightSummary } from '@dashboard-parapente/shared-types';
 
-const columnHelper = createColumnHelper<Flight>();
+const columnHelper = createColumnHelper<FlightSummary>();
 
 const columns = [
   columnHelper.accessor('flight_date', {
@@ -43,19 +40,13 @@ const columns = [
   }),
 ];
 
-export const FLIGHT_SORTABLE_COLUMNS = [
-  { id: 'flight_date', label: 'Date' },
-  { id: 'site_name', label: 'Site' },
-  { id: 'duration_minutes', label: 'Durée' },
-  { id: 'max_altitude_m', label: 'Altitude' },
-  { id: 'distance_km', label: 'Distance' },
-];
-
 interface UseFlightsTableOptions {
-  data: Flight[];
+  data: FlightSummary[];
   selectionMode: boolean;
   rowSelection: RowSelectionState;
   onRowSelectionChange: OnChangeFn<RowSelectionState>;
+  sorting: SortingState;
+  onSortingChange: OnChangeFn<SortingState>;
 }
 
 export function useFlightsTable({
@@ -63,11 +54,9 @@ export function useFlightsTable({
   selectionMode,
   rowSelection,
   onRowSelectionChange,
+  sorting,
+  onSortingChange,
 }: UseFlightsTableOptions) {
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: 'flight_date', desc: true },
-  ]);
-
   const table = useReactTable({
     data,
     columns,
@@ -76,15 +65,11 @@ export function useFlightsTable({
       rowSelection,
     },
     enableRowSelection: selectionMode,
-    onSortingChange: setSorting,
+    manualSorting: true,
+    onSortingChange,
     onRowSelectionChange,
     getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: {
-      pagination: { pageIndex: 0, pageSize: 10 },
-    },
   });
 
   return { table };

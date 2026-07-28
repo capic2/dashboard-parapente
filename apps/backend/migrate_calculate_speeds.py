@@ -1,78 +1,110 @@
-"""
-Migration script to calculate max_speed_kmh for existing flights with GPX data
-"""
+"""Idempotently backfill historical null flight max speeds in small transactions."""
 
+import argparse
 import logging
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
-from database import SessionLocal
-from models import Flight
-from routes import calculate_max_speed, parse_gpx_file
+from sqlalchemy.orm import Session
 
-logging.basicConfig(level=logging.INFO)
+from database import SessionLocal
+from flight_tracks import calculate_track_stats, normalize_track
+from models import Flight
+
 logger = logging.getLogger(__name__)
 
 
-def migrate_speeds():
-    """Recalculate max_speed_kmh for all flights with GPX files"""
-    db = SessionLocal()
+@dataclass
+class BackfillReport:
+    scanned: int = 0
+    updated: int = 0
+    unchanged: int = 0
+    failed: int = 0
+    batches: int = 0
 
-    try:
-        # Get all flights with GPX files
-        flights = db.query(Flight).filter(Flight.gpx_file_path.isnot(None)).all()
 
-        logger.info(f"Found {len(flights)} flights with GPX files")
+def _track_path(stored_path: str, base_dir: Path) -> Path:
+    path = Path(stored_path)
+    return path if path.is_absolute() else base_dir / path
 
-        updated_count = 0
-        failed_count = 0
 
-        for flight in flights:
-            try:
-                # Build GPX path
-                gpx_path = Path(__file__).parent / flight.gpx_file_path
+def backfill_missing_max_speeds(
+    session_factory: Callable[[], Session] = SessionLocal,
+    *,
+    batch_size: int = 100,
+    base_dir: Path = Path(__file__).parent,
+) -> BackfillReport:
+    """Process each eligible row once per run and commit after every batch."""
+    if batch_size < 1:
+        raise ValueError("batch_size must be positive")
 
-                if not gpx_path.exists():
-                    logger.warning(f"GPX file not found for flight {flight.id}: {gpx_path}")
-                    failed_count += 1
-                    continue
+    report = BackfillReport()
+    last_id: str | None = None
+    with session_factory() as db:
+        while True:
+            query = db.query(Flight).filter(
+                Flight.gpx_file_path.isnot(None),
+                Flight.gpx_file_path != "",
+                Flight.max_speed_kmh.is_(None),
+            )
+            if last_id is not None:
+                query = query.filter(Flight.id > last_id)
+            flights = query.order_by(Flight.id).limit(batch_size).all()
+            if not flights:
+                break
 
-                # Parse GPX
-                coordinates = parse_gpx_file(gpx_path)
+            report.batches += 1
+            for flight in flights:
+                report.scanned += 1
+                last_id = flight.id
+                try:
+                    path = _track_path(flight.gpx_file_path, base_dir)
+                    content = path.read_bytes()
+                    file_type = "gpx.gz" if path.name.lower().endswith(".gpx.gz") else path.suffix
+                    _, points = normalize_track(content, file_type)
+                    max_speed = float(calculate_track_stats(points)["max_speed_kmh"])
+                    if max_speed <= 0:
+                        report.unchanged += 1
+                        continue
+                    updated = (
+                        db.query(Flight)
+                        .filter(Flight.id == flight.id, Flight.max_speed_kmh.is_(None))
+                        .update({Flight.max_speed_kmh: max_speed}, synchronize_session=False)
+                    )
+                    report.updated += updated
+                    report.unchanged += 1 - updated
+                except Exception as exc:
+                    report.failed += 1
+                    logger.warning("Failed to backfill flight %s: %s", flight.id, exc)
 
-                if not coordinates:
-                    logger.warning(f"No coordinates found in GPX for flight {flight.id}")
-                    failed_count += 1
-                    continue
+            db.commit()
+            db.expire_all()
+            logger.info(
+                "Max-speed backfill progress: scanned=%d updated=%d unchanged=%d failed=%d",
+                report.scanned,
+                report.updated,
+                report.unchanged,
+                report.failed,
+            )
+    return report
 
-                # Calculate max speed
-                max_speed = calculate_max_speed(coordinates)
 
-                # Update flight
-                flight.max_speed_kmh = max_speed
-                updated_count += 1
-
-                logger.info(f"✅ Flight {flight.id[:8]}... - Max speed: {max_speed} km/h")
-
-            except Exception as e:
-                logger.error(f"❌ Failed to process flight {flight.id}: {e}")
-                failed_count += 1
-
-        # Commit all changes
-        db.commit()
-
-        logger.info("=" * 60)
-        logger.info("✅ Migration complete!")
-        logger.info(f"   Updated: {updated_count} flights")
-        logger.info(f"   Failed: {failed_count} flights")
-        logger.info("=" * 60)
-
-    except Exception as e:
-        logger.error(f"Migration failed: {e}")
-        db.rollback()
-        raise
-    finally:
-        db.close()
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--batch-size", type=int, default=100)
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO)
+    report = backfill_missing_max_speeds(batch_size=args.batch_size)
+    logger.info(
+        "Max-speed backfill complete: batches=%d scanned=%d updated=%d unchanged=%d failed=%d",
+        report.batches,
+        report.scanned,
+        report.updated,
+        report.unchanged,
+        report.failed,
+    )
 
 
 if __name__ == "__main__":
-    migrate_speeds()
+    main()

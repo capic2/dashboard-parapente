@@ -314,8 +314,6 @@ describe('FlightDetails GoPro overlay action', () => {
       screen.getByRole('button', { name: /Regenerate overlay/u })
     );
 
-    await waitFor(() => {
-      expect(createOverlayMock).toHaveBeenCalled();
-    });
+    expect(createOverlayMock).toHaveBeenCalled();
   });
 });

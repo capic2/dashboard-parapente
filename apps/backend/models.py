@@ -195,6 +195,21 @@ class Flight(Base):
     )
 
 
+Index(
+    "idx_flights_summary_default",
+    Flight.flight_date.desc(),
+    Flight.departure_time.desc(),
+    Flight.id.desc(),
+)
+Index(
+    "idx_flights_summary_site_default",
+    Flight.site_id,
+    Flight.flight_date.desc(),
+    Flight.departure_time.desc(),
+    Flight.id.desc(),
+)
+
+
 class VideoExportJob(Base):
     __tablename__ = "video_export_jobs"
 

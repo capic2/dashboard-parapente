@@ -13,36 +13,33 @@ import {
   Wand2,
 } from 'lucide-react';
 import { formatMediaProgressLabel } from './mediaProgress';
-import type { Flight as FlightRecord, Site } from '../../../types';
+import type { FlightSummary } from '@dashboard-parapente/shared-types';
 import {
   formatAltitudeMeters,
   formatDistanceKm,
   useAppSettingsStore,
 } from '../../../stores/appSettingsStore';
-import {
-  hasFlightGoproOverlay,
-  hasFlightVideo,
-  isGoproOverlayInProgress,
-} from '../../../lib/flightMediaState';
-import { formatFlightSiteLabel } from '../siteDisplay';
+import { isGoproOverlayInProgress } from '../../../lib/flightMediaState';
 
 export interface DownloadingMedia {
   flightId: string;
   type: 'gpx' | 'video' | 'overlay';
 }
 
+const EMPTY_UNAVAILABLE_MEDIA = new Set<string>();
+
 interface FlightProps {
-  flight: FlightRecord;
-  sites: Site[];
+  flight: FlightSummary;
   isActive: boolean;
   isSelected: boolean;
   selectionMode: boolean;
   downloadingMedia: DownloadingMedia | null;
-  onSelectFlight: (flight: FlightRecord) => void;
-  onDeleteFlight: (flight: FlightRecord) => void;
-  onDownloadGpx: (flight: FlightRecord) => void;
-  onDownloadVideo: (flight: FlightRecord) => void;
-  onDownloadOverlay: (flight: FlightRecord) => void;
+  unavailableMedia?: ReadonlySet<string>;
+  onSelectFlight: (flight: FlightSummary) => void;
+  onDeleteFlight: (flight: FlightSummary) => void;
+  onDownloadGpx: (flight: FlightSummary) => void;
+  onDownloadVideo: (flight: FlightSummary) => void;
+  onDownloadOverlay: (flight: FlightSummary) => void;
 }
 
 function formatFlightDate(date: string, language: string) {
@@ -66,11 +63,11 @@ function formatDepartureTime(date: string, language: string) {
 // oxlint-disable-next-line max-lines-per-function
 export function Flight({
   flight,
-  sites,
   isActive,
   isSelected,
   selectionMode,
   downloadingMedia,
+  unavailableMedia = EMPTY_UNAVAILABLE_MEDIA,
   onSelectFlight,
   onDeleteFlight,
   onDownloadGpx,
@@ -80,9 +77,12 @@ export function Flight({
   const { t, i18n } = useTranslation();
   const units = useAppSettingsStore((state) => state.settings.units);
   const isHighlighted = isActive || isSelected;
-  const hasGpx = Boolean(flight.gpx_file_path);
-  const hasVideo = hasFlightVideo(flight);
-  const hasPersistedGoproOverlay = hasFlightGoproOverlay(flight);
+  const hasGpx = flight.has_gpx;
+  const hasVideo = flight.has_video;
+  const hasPersistedGoproOverlay = flight.has_gopro_overlay;
+  const isGpxUnavailable = unavailableMedia.has(`${flight.id}:gpx`);
+  const isVideoUnavailable = unavailableMedia.has(`${flight.id}:video`);
+  const isOverlayUnavailable = unavailableMedia.has(`${flight.id}:overlay`);
   const isGoproOverlayRunning = isGoproOverlayInProgress(
     flight.gopro_overlay_status
   );
@@ -124,11 +124,14 @@ export function Flight({
     hasPersistedGoproOverlay ||
     isGoproOverlayRunning ||
     isGoproOverlayFailed;
-  const siteLabel = formatFlightSiteLabel({
-    siteId: flight.site_id,
-    siteName: flight.site_name,
-    sites,
-  });
+  let siteLabel = flight.site_name ?? flight.site_id ?? '';
+  if (
+    flight.site_name &&
+    flight.site_region &&
+    flight.site_region !== flight.site_name
+  ) {
+    siteLabel = `${flight.site_region} - ${flight.site_name}`;
+  }
 
   return (
     <Card
@@ -187,12 +190,16 @@ export function Flight({
                     event.stopPropagation();
                     onDownloadGpx(flight);
                   }}
-                  disabled={Boolean(downloadingMedia)}
+                  disabled={Boolean(downloadingMedia) || isGpxUnavailable}
                   aria-label={t('flights.downloadGpx')}
                 >
                   <FileText className="h-3 w-3" aria-hidden="true" />
-                  {t('flights.gpxBadge')}
-                  <Download className="h-3 w-3" aria-hidden="true" />
+                  {isGpxUnavailable
+                    ? t('flights.mediaUnavailable')
+                    : t('flights.gpxBadge')}
+                  {!isGpxUnavailable && (
+                    <Download className="h-3 w-3" aria-hidden="true" />
+                  )}
                 </button>
               )}
               {hasVideo && (
@@ -203,12 +210,16 @@ export function Flight({
                     event.stopPropagation();
                     onDownloadVideo(flight);
                   }}
-                  disabled={Boolean(downloadingMedia)}
+                  disabled={Boolean(downloadingMedia) || isVideoUnavailable}
                   aria-label={t('flights.viewer.downloadVideo')}
                 >
                   <Video className="h-3 w-3" aria-hidden="true" />
-                  {t('flights.videoBadge')}
-                  <Download className="h-3 w-3" aria-hidden="true" />
+                  {isVideoUnavailable
+                    ? t('flights.mediaUnavailable')
+                    : t('flights.videoBadge')}
+                  {!isVideoUnavailable && (
+                    <Download className="h-3 w-3" aria-hidden="true" />
+                  )}
                 </button>
               )}
               {isVideoExportRunning && (
@@ -229,12 +240,16 @@ export function Flight({
                     event.stopPropagation();
                     onDownloadOverlay(flight);
                   }}
-                  disabled={Boolean(downloadingMedia)}
+                  disabled={Boolean(downloadingMedia) || isOverlayUnavailable}
                   aria-label={t('flights.goproOverlayDownload')}
                 >
                   <Wand2 className="h-3 w-3" aria-hidden="true" />
-                  {t('flights.goproOverlayBadge')}
-                  <Download className="h-3 w-3" aria-hidden="true" />
+                  {isOverlayUnavailable
+                    ? t('flights.mediaUnavailable')
+                    : t('flights.goproOverlayBadge')}
+                  {!isOverlayUnavailable && (
+                    <Download className="h-3 w-3" aria-hidden="true" />
+                  )}
                 </button>
               )}
               {isGoproOverlayRunning && (

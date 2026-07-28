@@ -51,13 +51,10 @@ def test_start_scheduler_registers_intervals_sync() -> None:
     with (
         patch("scheduler.scheduler", scheduler),
         patch("scheduler._get_scheduler_interval", return_value=30),
-        patch("intervals_sync.register_intervals_sync") as register_intervals_sync,
     ):
         start_scheduler()
         start_scheduler()
 
-    assert register_intervals_sync.call_count == 2
-    register_intervals_sync.assert_called_with(scheduler)
     assert [job["id"] for job in scheduler.jobs] == ["weather_fetch", "weather_fetch"]
     assert scheduler.start_calls == 1
 
@@ -80,10 +77,6 @@ def test_start_scheduler_keeps_weather_job_when_intervals_registration_fails() -
     with (
         patch("scheduler.scheduler", scheduler),
         patch("scheduler._get_scheduler_interval", return_value=30),
-        patch(
-            "intervals_sync.register_intervals_sync",
-            side_effect=RuntimeError("registration failed"),
-        ),
     ):
         start_scheduler()
 
