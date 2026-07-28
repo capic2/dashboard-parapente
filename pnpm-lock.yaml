@@ -96,6 +96,9 @@ catalogs:
     date-fns:
       specifier: ^4.0.0
       version: 4.4.0
+    happy-dom:
+      specifier: ^20.8.9
+      version: 20.11.1
     husky:
       specifier: ^9.1.7
       version: 9.1.7
@@ -105,12 +108,15 @@ catalogs:
     i18next-browser-languagedetector:
       specifier: ^8.2.1
       version: 8.2.1
+    knip:
+      specifier: ^6.1.0
+      version: 6.29.0
     ky:
       specifier: ^2.0.0
       version: 2.0.2
-    lucide-react:
-      specifier: ^1.7.0
-      version: 1.26.0
+    lint-staged:
+      specifier: ^17.0.0
+      version: 17.2.0
     msw:
       specifier: ^2.13.6
       version: 2.15.0
@@ -138,6 +144,9 @@ catalogs:
     react-dom:
       specifier: 19.2.8
       version: 19.2.8
+    react-i18next:
+      specifier: ^17.0.1
+      version: 17.0.11
     react-is:
       specifier: ^19.2.4
       version: 19.2.8
@@ -371,7 +380,7 @@ importers:
         version: link:../../libs/shared-types
       lucide-react:
         specifier: 'catalog:'
-        version: 1.26.0(react@19.2.8)
+        version: 1.27.0(react@19.2.8)
 
   libs/design-system:
     dependencies:
@@ -4020,8 +4029,8 @@ packages:
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
 
-  lucide-react@1.26.0:
-    resolution: {integrity: sha512-raglYVR2+VkMfJL158krjVmE+rV5ST2lzA/KQm1FRSjMHT4MnWaegHxoVEpmc2So3nOEhp9oGejJwAPX8MoAjg==}
+  lucide-react@1.27.0:
+    resolution: {integrity: sha512-rJicGl/3Fly/E0rOH1YmPZ6e49JCnKknh1ox1vpHnkfjujAkKA6sqUZvH3MTAaXXjgexyUwgNwTJzTtYuAFYJw==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
@@ -8578,7 +8587,7 @@ snapshots:
     dependencies:
       yallist: 3.1.1
 
-  lucide-react@1.26.0(react@19.2.8):
+  lucide-react@1.27.0(react@19.2.8):
     dependencies:
       react: 19.2.8
 
