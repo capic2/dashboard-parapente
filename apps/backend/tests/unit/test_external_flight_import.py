@@ -19,7 +19,7 @@ class Provider:
 
 
 @pytest.mark.asyncio
-async def test_import_is_idempotent_and_preserves_user_edits(
+async def test_import_updates_intervals_name_on_resync(
     db_session, arguel_site, tmp_path, monkeypatch
 ):
     monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
@@ -35,8 +35,6 @@ async def test_import_is_idempotent_and_preserves_user_edits(
 
     first = await import_external_activities(db_session, "intervals_icu", Provider(), [activity])
     flight = db_session.query(Flight).one()
-    flight.name = "Pilot title"
-    db_session.commit()
     repeated_activity = ExternalActivity(
         id=activity.id,
         name="Updated title",
@@ -56,7 +54,8 @@ async def test_import_is_idempotent_and_preserves_user_edits(
     assert db_session.query(Flight).count() == 1
     assert flight.external_provider == "intervals_icu"
     assert flight.external_activity_id == "unsafe/id"
-    assert flight.name == "Pilot title"
+    assert flight.name == "Updated title"
+    assert flight.title == "Updated title"
     assert "intervals_unsafe_id_" in flight.gpx_file_path
     assert flight.site_id == arguel_site.id
 
