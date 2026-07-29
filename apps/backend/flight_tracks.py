@@ -79,6 +79,62 @@ def _child_text(element: ET.Element, name: str) -> str | None:
     return None
 
 
+def _fill_segment_elevations(points: list[TrackPoint], start: int, end: int) -> None:
+    known = [index for index in range(start, end) if "elevation" in points[index]]
+    if not known:
+        for point in points[start:end]:
+            point["elevation"] = 0.0
+        return
+
+    first_known = known[0]
+    for index in range(start, first_known):
+        points[index]["elevation"] = points[first_known]["elevation"]
+
+    for previous_index, next_index in zip(known, known[1:], strict=False):
+        if next_index == previous_index + 1:
+            continue
+        previous_elevation = points[previous_index]["elevation"]
+        next_elevation = points[next_index]["elevation"]
+        previous_timestamp = points[previous_index].get("timestamp", 0)
+        next_timestamp = points[next_index].get("timestamp", 0)
+        timestamps = [
+            points[index].get("timestamp", 0) for index in range(previous_index, next_index + 1)
+        ]
+        use_timestamps = (
+            next_timestamp > previous_timestamp
+            and all(timestamp > 0 for timestamp in timestamps)
+            and all(
+                earlier <= later for earlier, later in zip(timestamps, timestamps[1:], strict=False)
+            )
+        )
+        for index in range(previous_index + 1, next_index):
+            if use_timestamps:
+                timestamp = points[index].get("timestamp", 0)
+                ratio = (timestamp - previous_timestamp) / (next_timestamp - previous_timestamp)
+                if not 0 <= ratio <= 1:
+                    ratio = (index - previous_index) / (next_index - previous_index)
+            else:
+                ratio = (index - previous_index) / (next_index - previous_index)
+            points[index]["elevation"] = (
+                previous_elevation + (next_elevation - previous_elevation) * ratio
+            )
+
+    last_known = known[-1]
+    for index in range(last_known + 1, end):
+        points[index]["elevation"] = points[last_known]["elevation"]
+
+
+def _fill_missing_elevations(points: list[TrackPoint]) -> None:
+    start = 0
+    while start < len(points):
+        segment = points[start].get("segment", 0)
+        end = start + 1
+        while end < len(points) and points[end].get("segment", 0) == segment:
+            end += 1
+        _fill_segment_elevations(points, start, end)
+        start = end
+
+
 def _parse_gpx(content: bytes) -> list[TrackPoint]:
     root = ET.fromstring(content)
     points: list[TrackPoint] = []
@@ -90,10 +146,12 @@ def _parse_gpx(content: bytes) -> list[TrackPoint]:
             point: TrackPoint = {
                 "lat": float(element.attrib["lat"]),
                 "lon": float(element.attrib["lon"]),
-                "elevation": float(_child_text(element, "ele") or 0),
                 "timestamp": _timestamp_millis(_child_text(element, "time")),
                 "segment": segment_index,
             }
+            elevation = _child_text(element, "ele")
+            if elevation is not None:
+                point["elevation"] = float(elevation)
             heart_rate = _child_text(element, "hr")
             power = _child_text(element, "power")
             if heart_rate:
@@ -119,10 +177,12 @@ def _parse_tcx(content: bytes) -> list[TrackPoint]:
             point: TrackPoint = {
                 "lat": float(latitude),
                 "lon": float(longitude),
-                "elevation": float(_child_text(element, "AltitudeMeters") or 0),
                 "timestamp": _timestamp_millis(_child_text(element, "Time")),
                 "segment": segment_index,
             }
+            elevation = _child_text(element, "AltitudeMeters")
+            if elevation is not None:
+                point["elevation"] = float(elevation)
             heart_rate = _child_text(element, "Value")
             power = _child_text(element, "Watts")
             if heart_rate:
@@ -151,14 +211,15 @@ def _parse_fit(content: bytes) -> list[TrackPoint]:
                 continue
             elevation = frame.get_value("enhanced_altitude", fallback=None)
             if elevation is None:
-                elevation = frame.get_value("altitude", fallback=0)
+                elevation = frame.get_value("altitude", fallback=None)
             point: TrackPoint = {
                 "lat": _degrees(float(latitude)),
                 "lon": _degrees(float(longitude)),
-                "elevation": float(elevation or 0),
                 "timestamp": _timestamp_millis(frame.get_value("timestamp", fallback=None)),
                 "segment": 0,
             }
+            if elevation is not None:
+                point["elevation"] = float(elevation)
             heart_rate = frame.get_value("heart_rate", fallback=None)
             power = frame.get_value("power", fallback=None)
             if heart_rate is not None:
@@ -184,6 +245,7 @@ def normalize_track(content: bytes, file_type: str) -> tuple[bytes, list[TrackPo
         raise ValueError(f"Unsupported original activity file type: {file_type or 'unknown'}")
     if not points:
         raise ValueError("Activity file contains no positioned track points")
+    _fill_missing_elevations(points)
     return track_to_gpx(points), points
 
 
