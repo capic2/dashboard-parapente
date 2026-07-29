@@ -3777,7 +3777,11 @@ async def preview_intervals_activities(
     request = IntervalsSyncRequest(date_from=date_from, date_to=date_to)
     client = _intervals_client()
     try:
-        activities = await client.list_activities(request.date_from, request.date_to, [])
+        activities = await client.list_activities(
+            request.date_from,
+            request.date_to,
+            config.INTERVALS_ICU_ACTIVITY_TYPES,
+        )
     except Exception as exc:
         _raise_intervals_http_error(exc)
     return IntervalsPreviewResponse(
