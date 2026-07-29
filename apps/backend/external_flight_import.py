@@ -136,6 +136,10 @@ async def import_external_activities(
                 .first()
             )
             if existing:
+                existing.name = activity.name
+                existing.title = activity.name
+                existing.external_url = activity.external_url
+                db.commit()
                 summaries.append(_flight_summary(existing))
                 skipped += 1
                 db.rollback()
