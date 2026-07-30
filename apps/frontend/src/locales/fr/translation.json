@@ -1372,6 +1372,19 @@
       "apiKeyEnvOnly": "La clé API est gérée uniquement dans l'environnement du serveur et n'est jamais affichée ici.",
       "statusError": "Impossible de charger le statut Intervals.icu.",
       "overviewDetail": "{{count}} types d'activité surveillés"
+    },
+    "deployment": {
+      "waitingTitle": "Déploiement en attente",
+      "deployingTitle": "Déploiement en cours",
+      "blockedDetail_one": "{{count}} traitement doit se terminer avant le déploiement.",
+      "blockedDetail_other": "{{count}} traitements doivent se terminer avant le déploiement.",
+      "readyDetail": "Les traitements sont terminés. Le déploiement va démarrer.",
+      "deployingDetail": "Les services de production sont en cours de mise à jour.",
+      "waitingElapsed_one": "Attente depuis {{count}} minute.",
+      "waitingElapsed_other": "Attente depuis {{count}} minutes.",
+      "deployingElapsed_one": "Déploiement démarré il y a {{count}} minute.",
+      "deployingElapsed_other": "Déploiement démarré il y a {{count}} minutes.",
+      "openRun": "Voir dans GitHub Actions"
     }
   }
 }

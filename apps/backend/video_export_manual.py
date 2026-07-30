@@ -23,6 +23,7 @@ from urllib.request import Request, urlopen
 from sqlalchemy.orm import Session
 
 import config
+from deployment_drain import DeploymentDrainActive, job_admission
 from auth import create_job_token, decode_job_token
 from database import SessionLocal
 from flight_storage import get_video_output_path
@@ -1159,46 +1160,45 @@ def _enqueue_video_export_job(
     if not _dependencies_ok:
         raise RuntimeError("Missing dependencies for video export")
 
-    job_id = str(uuid.uuid4())
-    now = datetime.utcnow()
+    with job_admission():
+        job_id = str(uuid.uuid4())
+        now = datetime.utcnow()
 
-    with SessionLocal() as db:
-        job = VideoExportJob(
-            id=job_id,
-            flight_id=flight_id,
-            status=_STATUS_QUEUED,
-            mode=mode,
-            quality=quality,
-            fps=fps,
-            speed=speed,
-            progress=0,
-            message="Job enqueued",
-            frontend_url=frontend_url,
-            started_at=None,
-            updated_at=now,
-            created_at=now,
-        )
-        db.add(job)
+        with SessionLocal() as db:
+            job = VideoExportJob(
+                id=job_id,
+                flight_id=flight_id,
+                status=_STATUS_QUEUED,
+                mode=mode,
+                quality=quality,
+                fps=fps,
+                speed=speed,
+                progress=0,
+                message="Job enqueued",
+                frontend_url=frontend_url,
+                started_at=None,
+                updated_at=now,
+                created_at=now,
+            )
+            db.add(job)
 
-        if update_db:
-            _set_job_update_db_flag(job_id, True)
-        else:
-            _set_job_update_db_flag(job_id, False)
-
-        flight = db.query(Flight).filter(Flight.id == flight_id).first()
-        if flight:
             if update_db:
+                _set_job_update_db_flag(job_id, True)
+            else:
+                _set_job_update_db_flag(job_id, False)
+
+            flight = db.query(Flight).filter(Flight.id == flight_id).first()
+            if flight and update_db:
                 flight.video_export_job_id = job_id
                 flight.video_export_status = _to_public_status(_STATUS_QUEUED)
                 flight.video_file_path = None
 
-        db.commit()
-        _set_memory_snapshot(job_id, _snapshot_from_job(job))
-        _set_job_runtime(job_id, phase=_STATUS_QUEUED)
+            db.commit()
+            _set_memory_snapshot(job_id, _snapshot_from_job(job))
+            _set_job_runtime(job_id, phase=_STATUS_QUEUED)
 
-    _set_job_auth_token(job_id, _resolve_video_export_job_token(job_id, flight_id, auth_token))
-
-    _enqueue_existing_video_export_job(job_id)
+        _set_job_auth_token(job_id, _resolve_video_export_job_token(job_id, flight_id, auth_token))
+        _enqueue_existing_video_export_job(job_id)
     return job_id
 
 
@@ -1842,32 +1842,35 @@ def resume_video_export(job_id: str, auth_token: str | None = None) -> bool:
     if not resume_info["can_resume"]:
         return False
 
-    _set_job_update_db_flag(job_id, True)
-    _update_job(
-        job_id,
-        status=_STATUS_QUEUED,
-        progress=_capture_progress_percent(
-            int(resume_info["frames_captured"]),
-            job.total_frames or int(resume_info["frames_captured"]),
-        ),
-        message=(
-            f"Resume enqueued from frame {resume_info['resume_from_frame']}"
-            if resume_info["resume_from_frame"] is not None
-            else "Resume enqueued"
-        ),
-        error=None,
-        video_path=None,
-        completed_at=None,
-        cancelled_at=None,
-    )
-    _set_job_auth_token(job_id, _resolve_video_export_job_token(job_id, job.flight_id, auth_token))
-    _set_job_runtime(
-        job_id,
-        phase=_STATUS_QUEUED,
-        frames_captured=int(resume_info["frames_captured"]),
-        eta_seconds=None,
-    )
-    _enqueue_existing_video_export_job(job_id)
+    with job_admission():
+        _set_job_update_db_flag(job_id, True)
+        _update_job(
+            job_id,
+            status=_STATUS_QUEUED,
+            progress=_capture_progress_percent(
+                int(resume_info["frames_captured"]),
+                job.total_frames or int(resume_info["frames_captured"]),
+            ),
+            message=(
+                f"Resume enqueued from frame {resume_info['resume_from_frame']}"
+                if resume_info["resume_from_frame"] is not None
+                else "Resume enqueued"
+            ),
+            error=None,
+            video_path=None,
+            completed_at=None,
+            cancelled_at=None,
+        )
+        _set_job_auth_token(
+            job_id, _resolve_video_export_job_token(job_id, job.flight_id, auth_token)
+        )
+        _set_job_runtime(
+            job_id,
+            phase=_STATUS_QUEUED,
+            frames_captured=int(resume_info["frames_captured"]),
+            eta_seconds=None,
+        )
+        _enqueue_existing_video_export_job(job_id)
     print(f"▶️  Video export {job_id} resumed")
     return True
 
@@ -1940,6 +1943,8 @@ def trigger_auto_export(
         )
         print(f"✅ Manual fast auto export job {job_id} started for flight {flight_id}")
         return job_id
+    except DeploymentDrainActive:
+        raise
     except Exception as e:
         print(f"⚠️ Manual fast auto-export failed for flight {flight_id}, fallback stream: {e}")
         from video_export import start_video_export_background

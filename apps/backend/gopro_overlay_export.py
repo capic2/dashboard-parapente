@@ -20,6 +20,7 @@ from fastapi import UploadFile
 
 import config
 from database import SessionLocal
+from deployment_drain import job_admission
 from models import Flight, GoproOverlayJob
 from sqlalchemy.exc import OperationalError
 
@@ -1356,19 +1357,20 @@ async def create_gopro_overlay_job(
             _validate_file_extension(fallback_pip_path, _VIDEO_EXTENSIONS)
             pip_path = fallback_pip_path
 
-        return await asyncio.to_thread(
-            _create_gopro_overlay_job_from_paths,
-            job_id=job_id,
-            video_path=video_path,
-            gpx_path=gpx_path,
-            pip_path=pip_path,
-            layout_id=layout_id,
-            output_filename=output_filename,
-            work_dir=job_upload_dir,
-            output_dir=output_dir,
-            pin_inputs=pin_inputs,
-            gpx_offset=gpx_offset,
-        )
+        with job_admission():
+            return await asyncio.to_thread(
+                _create_gopro_overlay_job_from_paths,
+                job_id=job_id,
+                video_path=video_path,
+                gpx_path=gpx_path,
+                pip_path=pip_path,
+                layout_id=layout_id,
+                output_filename=output_filename,
+                work_dir=job_upload_dir,
+                output_dir=output_dir,
+                pin_inputs=pin_inputs,
+                gpx_offset=gpx_offset,
+            )
     except Exception:
         shutil.rmtree(job_upload_dir, ignore_errors=True)
         raise
@@ -1392,18 +1394,19 @@ def create_gopro_overlay_job_from_paths(
     work_dir = _path_job_work_dir(video_path, job_id)
     work_dir.mkdir(parents=True, exist_ok=True)
     try:
-        return _create_gopro_overlay_job_from_paths(
-            job_id=job_id,
-            video_path=video_path,
-            gpx_path=gpx_path,
-            pip_path=pip_path,
-            layout_id=layout_id,
-            output_filename=output_filename,
-            work_dir=work_dir,
-            pin_inputs=True,
-            output_dir=output_dir,
-            gpx_offset=gpx_offset,
-        )
+        with job_admission():
+            return _create_gopro_overlay_job_from_paths(
+                job_id=job_id,
+                video_path=video_path,
+                gpx_path=gpx_path,
+                pip_path=pip_path,
+                layout_id=layout_id,
+                output_filename=output_filename,
+                work_dir=work_dir,
+                pin_inputs=True,
+                output_dir=output_dir,
+                gpx_offset=gpx_offset,
+            )
     except Exception:
         shutil.rmtree(work_dir, ignore_errors=True)
         raise
