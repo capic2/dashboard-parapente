@@ -74,6 +74,26 @@ class GoproOverlayCancelResponse(BaseModel):
     message: str
 
 
+class DeploymentDrainRequest(BaseModel):
+    deployment_id: str = Field(min_length=1)
+    target_version: str = Field(min_length=1)
+    run_url: str = Field(min_length=1)
+
+
+class DeploymentDrainStatus(BaseModel):
+    phase: Literal["idle", "waiting", "deploying"]
+    accepting_jobs: bool
+    ready_for_deployment: bool
+    active_jobs: int
+    admissions_in_progress: int
+    deployment_id: str | None = None
+    target_version: str | None = None
+    run_url: str | None = None
+    requested_at: datetime | None = None
+    phase_changed_at: datetime | None = None
+    expires_at: datetime | None = None
+
+
 # Sites
 class SiteBase(BaseModel):
     code: str | None = None  # Optional - some sites may not have a code

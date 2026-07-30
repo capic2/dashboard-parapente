@@ -36,6 +36,14 @@ const {
   },
 }));
 
+const mockGpxData = vi.hoisted(() => ({
+  coordinates: [
+    { lat: 45, lon: 6, elevation: 1000, timestamp: 0 },
+    { lat: 45.1, lon: 6.1, elevation: 1100, timestamp: 1000 },
+  ],
+  flight_duration_seconds: 1,
+}));
+
 vi.mock('cesium', () => {
   class Cartesian3 {
     constructor(
@@ -232,13 +240,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../../../hooks/flights/useFlightGPX', () => ({
   useFlightGPX: () => ({
-    data: {
-      coordinates: [
-        { lat: 45, lon: 6, elevation: 1000, timestamp: 0 },
-        { lat: 45.1, lon: 6.1, elevation: 1100, timestamp: 1000 },
-      ],
-      flight_duration_seconds: 1,
-    },
+    data: mockGpxData,
     isLoading: false,
     error: null,
   }),
@@ -293,6 +295,10 @@ describe('FlightViewer3D video export mode', () => {
     mockFlight.video_export_status = null;
     mockFlight.video_export_job_id = null;
     mockFlight.video_file_path = null;
+    mockGpxData.coordinates = [
+      { lat: 45, lon: 6, elevation: 1000, timestamp: 0 },
+      { lat: 45.1, lon: 6.1, elevation: 1100, timestamp: 1000 },
+    ];
     window._exportMode = undefined;
     window._setExportFrame = undefined;
     window._getExportMetadata = undefined;
@@ -414,6 +420,23 @@ describe('FlightViewer3D video export mode', () => {
     await waitFor(() => {
       expect(cartesianFromDegreesCalls[0]).toEqual([6, 45, 1000]);
       expect(cartesianFromDegreesCalls[1]).toEqual([6.1, 45.1, 1100]);
+    });
+  });
+
+  it('repairs an isolated invalid takeoff elevation before Cesium rendering', async () => {
+    mockGpxData.coordinates = [0, 470.2, 470.2, 470.2].map(
+      (elevation, index) => ({
+        lat: 47.194 + index * 0.0001,
+        lon: 5.989 + index * 0.0001,
+        elevation,
+        timestamp: index * 1000,
+      })
+    );
+
+    render(<FlightViewer3D flightId="flight-1" exportOnly />);
+
+    await waitFor(() => {
+      expect(cartesianFromDegreesCalls[0]).toEqual([5.989, 47.194, 470.2]);
     });
   });
 

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from unittest.mock import AsyncMock, patch
 
 import config
@@ -17,9 +17,10 @@ def activity() -> ExternalActivity:
     )
 
 
-def test_preview_returns_typed_candidate_metadata(client):
+def test_preview_returns_candidates_filtered_by_configured_activity_types(client, monkeypatch):
     provider = AsyncMock()
     provider.list_activities.return_value = [activity()]
+    monkeypatch.setattr(config, "INTERVALS_ICU_ACTIVITY_TYPES", ["walk"])
     with patch("routes._intervals_client", return_value=provider):
         response = client.get(
             "/api/flights/sync-intervals/preview?date_from=2026-07-01&date_to=2026-07-02"
@@ -29,7 +30,7 @@ def test_preview_returns_typed_candidate_metadata(client):
     assert response.json()["activities"][0]["id"] == "i123"
     assert response.json()["activities"][0]["type"] == "HangGliding"
     assert response.json()["activity_types"] == ["HangGliding"]
-    provider.list_activities.assert_awaited_once()
+    provider.list_activities.assert_awaited_once_with(date(2026, 7, 1), date(2026, 7, 2), ["walk"])
 
 
 def test_preview_rejects_reversed_dates(client):

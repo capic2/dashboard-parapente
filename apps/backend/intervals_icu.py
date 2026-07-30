@@ -142,13 +142,13 @@ class IntervalsClient:
         if not isinstance(payload, list):
             raise IntervalsResponseError("Intervals.icu returned an unexpected activities payload.")
 
-        allowed = set(allowed_types)
+        allowed = {activity_type.casefold() for activity_type in allowed_types}
         activities = [
             _activity_from_json(item)
             for item in payload
             if isinstance(item, dict)
             and item.get("source") == "ZEPP"
-            and (not allowed or item.get("type") in allowed)
+            and (not allowed or str(item.get("type") or "").casefold() in allowed)
         ]
         return sorted(activities, key=lambda activity: (activity.start_date, activity.id))
 

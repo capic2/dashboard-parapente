@@ -12,7 +12,7 @@ from intervals_icu import (
 
 
 @pytest.mark.asyncio
-async def test_lists_only_zepp_exact_allowed_types_in_ascending_order():
+async def test_lists_only_zepp_allowed_types_case_insensitively_in_ascending_order():
     async def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.params["oldest"] == "2026-07-01"
         assert request.url.params["newest"] == "2026-07-03"
@@ -24,7 +24,7 @@ async def test_lists_only_zepp_exact_allowed_types_in_ascending_order():
                     "id": "2",
                     "name": "Second",
                     "start_date_local": "2026-07-02T12:00:00",
-                    "type": "HangGliding",
+                    "type": "Walk",
                     "source": "ZEPP",
                     "icu_original_file_type": "FIT",
                 },
@@ -32,7 +32,7 @@ async def test_lists_only_zepp_exact_allowed_types_in_ascending_order():
                     "id": "1",
                     "name": "First",
                     "start_date_local": "2026-07-01T12:00:00",
-                    "type": "HangGliding",
+                    "type": "Walk",
                     "source": "ZEPP",
                     "file_type": "GPX",
                 },
@@ -53,9 +53,7 @@ async def test_lists_only_zepp_exact_allowed_types_in_ascending_order():
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http_client:
         client = IntervalsClient("secret", "https://example.test/api/v1", client=http_client)
-        activities = await client.list_activities(
-            date(2026, 7, 1), date(2026, 7, 3), ["HangGliding"]
-        )
+        activities = await client.list_activities(date(2026, 7, 1), date(2026, 7, 3), ["walk"])
 
     assert [activity.id for activity in activities] == ["1", "2"]
     assert activities[1].file_type == "FIT"

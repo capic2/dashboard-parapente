@@ -56,6 +56,8 @@ import {
 import {
   getBearingRadians,
   getRenderedTrackElevation,
+  getTerrainElevationOffset,
+  repairTrackEndpointElevations,
 } from './flightViewerTrackPlacement';
 import { getReplayTrackTrailPositions } from './flightViewerTrackTrail';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
@@ -692,22 +694,23 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     let isEffectActive = true;
 
     try {
+      const coordinates = repairTrackEndpointElevations(gpxData.coordinates);
       // Convert GPX coordinates to Cartesian3 avec offset d'élévation
-      const positions = gpxData.coordinates.map((point, index) =>
+      const positions = coordinates.map((point, index) =>
         Cartesian3.fromDegrees(
           point.lon,
           point.lat,
           getRenderedTrackElevation(
             point,
             index,
-            gpxData.coordinates.length,
+            coordinates.length,
             elevationOffset,
             landingElevationOffset
           )
         )
       );
 
-      const timestamps = gpxData.coordinates.map((coord) => coord.timestamp);
+      const timestamps = coordinates.map((coord) => coord.timestamp);
 
       allPositionsRef.current = positions;
       timestampsRef.current = timestamps;
@@ -720,6 +723,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       if (typeof window !== 'undefined' && window._exportMode) {
         window._gpxData = {
           ...gpxData,
+          coordinates,
           positions,
           timestamps,
         };
@@ -761,7 +765,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             () =>
               computeCursorTelemetryLabel(
                 currentIndexRef.current,
-                gpxData.coordinates,
+                coordinates,
                 elevationOffset,
                 viewerUnitsRef.current
               ),
@@ -799,16 +803,16 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       // Calculate camera heading to face the takeoff point
       const calculateOptimalHeading = (): number => {
-        if (gpxData.coordinates.length < 2) return 0;
+        if (coordinates.length < 2) return 0;
 
-        const numPoints = gpxData.coordinates.length;
+        const numPoints = coordinates.length;
 
         // Takeoff is at the beginning
-        const takeoffCoord = gpxData.coordinates[0];
+        const takeoffCoord = coordinates[0];
 
         // Use middle of the flight (50%) as reference for better perspective
         const referenceIndex = Math.floor(numPoints * 0.5);
-        const referenceCoord = gpxData.coordinates[referenceIndex];
+        const referenceCoord = coordinates[referenceIndex];
 
         // Calculate heading from reference point BACK to takeoff
         // This makes the camera look toward the takeoff/launch site
@@ -1056,12 +1060,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       if (samples && samples.length > 0 && samples[0].height !== undefined) {
         const terrainHeight = samples[0].height;
-        const gpsElevation = firstPoint.elevation;
-
         // Calculer l'offset nécessaire pour que le pilote soit au-dessus du terrain
         // Si terrain = 1000m et GPS = 800m, offset = 1000 - 800 = +200m (on monte le pilote)
         // Si terrain = 1000m et GPS = 1200m, offset = 1000 - 1200 = -200m (on descend le pilote)
-        const offset = terrainHeight - gpsElevation;
+        const offset = getTerrainElevationOffset(
+          terrainHeight,
+          gpxData.coordinates,
+          'takeoff'
+        );
 
         setAutoOffset(offset);
         setElevationOffset(offset);
@@ -1069,7 +1075,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         if (landingTerrainHeight === undefined) {
           setLandingElevationOffset(null);
         } else {
-          setLandingElevationOffset(landingTerrainHeight - lastPoint.elevation);
+          setLandingElevationOffset(
+            getTerrainElevationOffset(
+              landingTerrainHeight,
+              gpxData.coordinates,
+              'landing'
+            )
+          );
         }
         // Le flyTo se fera automatiquement via le useEffect qui dépend de elevationOffset
       }
