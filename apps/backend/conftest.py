@@ -14,6 +14,7 @@ os.environ["BACKEND_USE_FAKE_REDIS"] = "true"
 os.environ["BACKEND_DATABASE_URL"] = "sqlite:///./test.db"
 os.environ["BACKEND_LOG_FILE"] = "logs/test-dashboard.log"
 os.environ["BACKEND_VERSION_STATE_FILE"] = "/tmp/dashboard-parapente-test/version_state.json"
+os.environ["BACKEND_DEPLOY_DRAIN_TOKEN"] = "test-deployment-drain-token"
 
 # Set dummy API keys for tests
 os.environ["BACKEND_WEATHERAPI_KEY"] = "test_weather_key"
@@ -34,6 +35,7 @@ from sqlalchemy.orm import sessionmaker
 # before Base.metadata.create_all() is called in the test_db fixture
 from auth import get_current_user
 from database import Base, get_db
+from deployment_drain import deployment_drain
 from main import app
 from models import (
     Flight,
@@ -43,6 +45,13 @@ from models import (
 
 # Fake authenticated user for tests
 _test_user = User(id=1, email="test@local", hashed_password="", is_active=True)
+
+
+@pytest.fixture(autouse=True)
+def reset_deployment_drain():
+    deployment_drain.reset_for_tests()
+    yield
+    deployment_drain.reset_for_tests()
 
 
 def _override_get_current_user():

@@ -9,6 +9,7 @@ from urllib.error import URLError
 import pytest
 
 from auth import create_access_token, create_job_token, decode_job_token
+from deployment_drain import DeploymentDrainActive, deployment_drain
 from models import Flight, VideoExportJob
 
 import video_export
@@ -412,6 +413,29 @@ def test_start_video_export_manual_enqueues_rq_job(test_db, monkeypatch):
     assert enqueued_job_ids == ["job-rq"]
 
 
+def test_start_video_export_manual_drain_rejection_creates_no_job(test_db, monkeypatch):
+    enqueued_job_ids: list[str] = []
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    monkeypatch.setattr(video_export_manual, "_dependencies_ok", True)
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(
+        video_export_manual,
+        "_enqueue_video_export_job_in_rq",
+        lambda job_id: enqueued_job_ids.append(job_id),
+    )
+    deployment_drain.begin("deploy-123", "sha-abc", "https://github.example/runs/123")
+
+    with pytest.raises(DeploymentDrainActive):
+        video_export_manual.start_video_export_manual(
+            flight_id="flight-test-001",
+            frontend_url="http://frontend.test",
+        )
+
+    with test_db() as db_session:
+        assert db_session.query(VideoExportJob).count() == 0
+    assert enqueued_job_ids == []
+
+
 def test_start_video_export_worker_enqueues_pending_jobs_with_rq(test_db, monkeypatch):
     enqueued_job_ids: list[str] = []
     monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
@@ -573,6 +597,61 @@ def test_resume_video_export_requeues_cancelled_job_with_frames(test_db, tmp_pat
     assert job.video_path is None
     db_session.close()
     assert enqueued_job_ids == ["video-export-job-resume"]
+
+
+def test_resume_video_export_drain_rejection_preserves_cancelled_job(
+    test_db, tmp_path, monkeypatch
+):
+    job_id = "job-resume-drain"
+    enqueued_job_ids: list[str] = []
+    frames_dir = tmp_path / "temp-images" / job_id / "frames"
+    frames_dir.mkdir(parents=True)
+    (frames_dir / "frame00000.png").write_bytes(b"frame")
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    monkeypatch.setattr(
+        video_export_manual,
+        "_video_temp_images_dir",
+        lambda: tmp_path / "temp-images",
+    )
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(
+        video_export_manual,
+        "_enqueue_video_export_job_in_rq",
+        lambda queued_job_id: enqueued_job_ids.append(queued_job_id),
+    )
+
+    with test_db() as db_session:
+        db_session.add(
+            VideoExportJob(
+                id=job_id,
+                flight_id="flight-test-001",
+                status="cancelled",
+                mode="manual",
+                quality="1080p",
+                fps=15,
+                speed=1,
+                progress=10,
+                total_frames=10,
+                message="cancelled",
+                frontend_url="http://localhost:5173",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+                cancelled_at=datetime.utcnow(),
+            )
+        )
+        db_session.commit()
+
+    deployment_drain.begin("deploy-123", "sha-abc", "https://github.example/runs/123")
+
+    with pytest.raises(DeploymentDrainActive):
+        video_export_manual.resume_video_export(job_id, auth_token="resume-token")
+
+    with test_db() as db_session:
+        job = db_session.get(VideoExportJob, job_id)
+        assert job is not None
+        assert job.status == "cancelled"
+        assert job.cancelled_at is not None
+    assert enqueued_job_ids == []
 
 
 def test_resume_video_export_waits_for_running_cancel_to_finish(test_db, tmp_path, monkeypatch):
