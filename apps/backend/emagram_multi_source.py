@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 import config
 from emagram_freshness import get_emagram_cutoff_utc, get_emagram_next_update_utc
+from llm.codex_analyzer import analyze_emagram_with_codex
 from llm.exceptions import QuotaExhaustedError
 from llm.emagram_prompt import normalize_analysis_locale
 from llm.gemini_analyzer import analyze_emagram_with_gemini
@@ -239,6 +240,28 @@ def _configured_llm_providers(locale: str | None = None) -> list[dict[str, Any]]
             locale=analysis_locale,
         )
 
+    def codex_provider() -> list[dict[str, Any]]:
+        return [
+            {
+                "key": True,
+                "provider": "codex",
+                "analyzer": "codex",
+                "model": config.CODEX_MODEL or "account-default",
+                "label": "Codex Vision",
+                "free": False,
+                "quota_only": True,
+                "cooldown_key": f"codex:{config.CODEX_MODEL or 'account-default'}",
+                "call": lambda screenshots, site: analyze_emagram_with_codex(
+                    screenshot_paths=screenshots,
+                    spot_name=site.name,
+                    coordinates=(site.latitude, site.longitude),
+                    model_name=config.CODEX_MODEL,
+                    locale=analysis_locale,
+                    timeout_seconds=config.CODEX_TIMEOUT_SECONDS,
+                ),
+            }
+        ]
+
     provider_factories = {
         "groq": groq_provider,
         "openrouter": openrouter_provider,
@@ -247,6 +270,7 @@ def _configured_llm_providers(locale: str | None = None) -> list[dict[str, Any]]
         "huggingface": huggingface_provider,
         "custom_openai": custom_openai_provider,
         "openai_compatible": custom_openai_provider,
+        "codex": codex_provider,
     }
 
     configured = []
@@ -265,7 +289,7 @@ def _configured_llm_providers(locale: str | None = None) -> list[dict[str, Any]]
         key_is_set = any(provider["key"] for provider in provider_trials)
         label = provider_trials[0]["label"] if provider_trials else provider_name
         logger.info(
-            "🔍 Checking %s availability: API Key = %s",
+            "🔍 Checking %s availability: configuration = %s",
             label,
             "SET" if key_is_set else "NOT SET",
         )
@@ -363,8 +387,34 @@ def _analyze_emagram_with_fallbacks(
         env_vars = ", ".join(PROVIDER_ENV_VARS.values())
         return {"success": False, "error": f"No LLM provider configured (set one of {env_vars})"}
 
-    for provider in configured_providers:
+    regular_providers = [
+        provider for provider in configured_providers if not provider.get("quota_only")
+    ]
+    quota_only_providers = [
+        provider for provider in configured_providers if provider.get("quota_only")
+    ]
+    free_trial_keys = {
+        provider["cooldown_key"] for provider in regular_providers if provider["free"]
+    }
+    exhausted_free_trials: set[str] = set()
+
+    for provider in regular_providers + quota_only_providers:
+        if provider.get("quota_only") and (
+            not free_trial_keys or exhausted_free_trials != free_trial_keys
+        ):
+            analysis_errors.append(
+                f"{provider['provider']}:{provider['model']}: reserved until all configured "
+                "free provider/model quotas are exhausted"
+            )
+            logger.info(
+                "Skipping %s because not all free provider quotas are exhausted",
+                provider["label"],
+            )
+            continue
+
         if _is_llm_trial_on_cooldown(provider):
+            if provider["free"]:
+                exhausted_free_trials.add(provider["cooldown_key"])
             cooldown_errors.append(
                 f"{provider['provider']}:{provider['model']} cooling down after quota exhaustion"
             )
@@ -392,6 +442,8 @@ def _analyze_emagram_with_fallbacks(
         except QuotaExhaustedError as e:
             quota_errors += 1
             _mark_llm_trial_quota_exhausted(provider)
+            if provider["free"]:
+                exhausted_free_trials.add(provider["cooldown_key"])
             analysis_errors.append(
                 f"{provider['provider']}:{provider['model']}: quota exhausted ({e})"
             )
