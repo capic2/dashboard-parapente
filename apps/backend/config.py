@@ -99,6 +99,10 @@ JOB_QUEUE_NAME = os.getenv("BACKEND_JOB_QUEUE_NAME", "video_exports")
 GOPRO_OVERLAY_QUEUE_NAME = os.getenv("BACKEND_GOPRO_OVERLAY_QUEUE_NAME", "gopro_overlays")
 JOB_QUEUE_TIMEOUT_SECONDS = int(os.getenv("BACKEND_JOB_QUEUE_TIMEOUT_SECONDS", "21600"))
 
+# Deployment drain coordination
+DEPLOY_DRAIN_TOKEN = os.getenv("BACKEND_DEPLOY_DRAIN_TOKEN")
+DEPLOY_DRAIN_LEASE_SECONDS = _int_env_at_least("BACKEND_DEPLOY_DRAIN_LEASE_SECONDS", 4500, 1)
+
 # ============================================================================
 # API
 # ============================================================================

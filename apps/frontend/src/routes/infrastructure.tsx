@@ -3,6 +3,7 @@ import { queryClient } from '../lib/queryClient';
 import { cacheOverviewQueryOptions } from '../hooks/admin/useCache';
 import { videoExportJobsQueryOptions } from '../hooks/flights/useVideoExportJobs';
 import { intervalsStatusQueryOptions } from '../hooks/admin/useIntervalsStatus';
+import { deploymentDrainStatusQueryOptions } from '../hooks/admin/useDeploymentDrainStatus';
 import { requireAuth } from '../lib/authGuard';
 
 const infrastructureTabs = ['intervals', 'video-exports', 'cache'] as const;
@@ -42,5 +43,6 @@ export const Route = createFileRoute('/infrastructure')({
     void queryClient.prefetchQuery(cacheOverviewQueryOptions());
     void queryClient.prefetchQuery(videoExportJobsQueryOptions());
     void queryClient.prefetchQuery(intervalsStatusQueryOptions());
+    void queryClient.prefetchQuery(deploymentDrainStatusQueryOptions());
   },
 });

@@ -1368,6 +1368,19 @@
       "apiKeyEnvOnly": "The API key is managed only in the server environment and is never displayed here.",
       "statusError": "Unable to load the Intervals.icu status.",
       "overviewDetail": "{{count}} monitored activity types"
+    },
+    "deployment": {
+      "waitingTitle": "Deployment waiting",
+      "deployingTitle": "Deployment in progress",
+      "blockedDetail_one": "{{count}} job must finish before deployment.",
+      "blockedDetail_other": "{{count}} jobs must finish before deployment.",
+      "readyDetail": "All jobs have finished. Deployment will start shortly.",
+      "deployingDetail": "Production services are being updated.",
+      "waitingElapsed_one": "Waiting for {{count}} minute.",
+      "waitingElapsed_other": "Waiting for {{count}} minutes.",
+      "deployingElapsed_one": "Deploying for {{count}} minute.",
+      "deployingElapsed_other": "Deploying for {{count}} minutes.",
+      "openRun": "Open GitHub Actions"
     }
   }
 }
