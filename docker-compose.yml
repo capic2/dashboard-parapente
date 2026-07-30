@@ -56,7 +56,7 @@ services:
       - BACKEND_SPOTAIR_BALISES_API_KEY=${BACKEND_SPOTAIR_BALISES_API_KEY}
 
       # Backend - AI Analysis
-      - BACKEND_LLM_FALLBACK_ORDER=${BACKEND_LLM_FALLBACK_ORDER:-groq,openrouter,github_models,huggingface,google,custom_openai}
+      - BACKEND_LLM_FALLBACK_ORDER=${BACKEND_LLM_FALLBACK_ORDER:-groq,openrouter,github_models,huggingface,google,custom_openai,codex}
       - BACKEND_LLM_QUOTA_COOLDOWN_SECONDS=${BACKEND_LLM_QUOTA_COOLDOWN_SECONDS:-3600}
       - BACKEND_GOOGLE_API_KEY=${BACKEND_GOOGLE_API_KEY}
       - BACKEND_GEMINI_MODEL=${BACKEND_GEMINI_MODEL:-gemini-2.5-flash}
@@ -74,6 +74,9 @@ services:
       - BACKEND_CUSTOM_OPENAI_API_KEY=${BACKEND_CUSTOM_OPENAI_API_KEY}
       - BACKEND_CUSTOM_OPENAI_BASE_URL=${BACKEND_CUSTOM_OPENAI_BASE_URL}
       - BACKEND_CUSTOM_OPENAI_MODELS=${BACKEND_CUSTOM_OPENAI_MODELS}
+      - BACKEND_CODEX_MODEL=${BACKEND_CODEX_MODEL:-}
+      - BACKEND_CODEX_TIMEOUT_SECONDS=${BACKEND_CODEX_TIMEOUT_SECONDS:-180}
+      - CODEX_HOME=/app/codex-home
 
       # Backend - Intervals.icu personal activity sync (set API key in Portainer)
       - BACKEND_INTERVALS_ICU_API_KEY=${BACKEND_INTERVALS_ICU_API_KEY}
@@ -135,6 +138,7 @@ services:
       - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
       - ${VIDEO_TEMP_IMAGES_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/video-temp-images}:${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
       - ${EMAGRAM_CACHE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/emagram-cache}:${BACKEND_EMAGRAM_CACHE_DIR:-/app/emagram-cache}
+      - ${CODEX_HOME_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/codex}:/app/codex-home
       - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8001/health']

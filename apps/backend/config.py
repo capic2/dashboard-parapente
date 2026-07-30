@@ -166,12 +166,14 @@ HUGGINGFACE_MODELS = _csv_env("BACKEND_HUGGINGFACE_MODELS", "Qwen/Qwen2.5-VL-7B-
 CUSTOM_OPENAI_API_KEY = os.getenv("BACKEND_CUSTOM_OPENAI_API_KEY")
 CUSTOM_OPENAI_BASE_URL = os.getenv("BACKEND_CUSTOM_OPENAI_BASE_URL")
 CUSTOM_OPENAI_MODELS = _csv_env("BACKEND_CUSTOM_OPENAI_MODELS", "")
+CODEX_MODEL = os.getenv("BACKEND_CODEX_MODEL") or None
+CODEX_TIMEOUT_SECONDS = _int_env_at_least("BACKEND_CODEX_TIMEOUT_SECONDS", 180, 1)
 LLM_QUOTA_COOLDOWN_SECONDS = int(os.getenv("BACKEND_LLM_QUOTA_COOLDOWN_SECONDS", "3600"))
 LLM_FALLBACK_ORDER = [
     provider.lower()
     for provider in _csv_env(
         "BACKEND_LLM_FALLBACK_ORDER",
-        "groq,openrouter,github_models,huggingface,google,custom_openai",
+        "groq,openrouter,github_models,huggingface,google,custom_openai,codex",
     )
 ]
 
