@@ -1017,9 +1017,18 @@
       "goproOverlayTitle": "Overlay GoPro",
       "progress": "Progression",
       "error": "Erreur",
-      "rawLogs": "Logs bruts",
+      "activity": "Journal d’activité",
+      "technicalDetails": "Détails techniques",
+      "lineCount_one": "{{count}} ligne",
+      "lineCount_other": "{{count}} lignes",
       "noLogs": "Aucun log disponible pour le moment.",
-      "noRawLogs": "Aucun log brut disponible ; seul le message courant est exposé.",
+      "noRawLogs": "Aucun événement détaillé n’a encore été reçu ; le statut et les erreurs restent affichés ci-dessus.",
+      "level": {
+        "info": "Information",
+        "success": "Succès",
+        "warning": "Attention",
+        "error": "Erreur"
+      },
       "status": {
         "queued": "En attente",
         "processing": "En cours",

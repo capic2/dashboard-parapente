@@ -193,7 +193,9 @@ describe('FlightVideoExportControls', () => {
 
     expect(screen.getByText('Live logs')).toBeInTheDocument();
     expect(screen.getByText('Hide')).toBeInTheDocument();
-    expect(screen.getByText(/Encoding with FFmpeg/u)).toBeInTheDocument();
+    expect(screen.getAllByText(/Encoding with FFmpeg/u).length).toBeGreaterThan(
+      0
+    );
   });
 
   it('restores live logs from session storage on remount', () => {
@@ -221,7 +223,9 @@ describe('FlightVideoExportControls', () => {
 
     expect(screen.getByText('Live logs')).toBeInTheDocument();
     expect(screen.getByText('Hide')).toBeInTheDocument();
-    expect(screen.getByText(/Encoding with FFmpeg/u)).toBeInTheDocument();
+    expect(screen.getAllByText(/Encoding with FFmpeg/u).length).toBeGreaterThan(
+      0
+    );
   });
 
   it('does not show the download button for completed videos', () => {

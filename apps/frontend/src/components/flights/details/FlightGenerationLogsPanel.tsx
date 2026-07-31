@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { VideoExportStatusPayload } from '../../../hooks/flights/useVideoExportStatus';
 import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
+import { JobLogViewer } from '../job-logs/JobLogViewer';
 
 type FlightGenerationLogsPanelProps = {
   videoStatus: VideoExportStatusPayload | null;
@@ -45,22 +46,6 @@ function getStatusTone(status: string | null) {
   return 'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-100';
 }
 
-function getLogContent(
-  lines: string[],
-  hasDetails: boolean,
-  t: ReturnType<typeof useTranslation>['t']
-) {
-  if (lines.length > 0) {
-    return lines.join('\n');
-  }
-
-  if (hasDetails) {
-    return t('flights.generationLogs.noRawLogs');
-  }
-
-  return t('flights.generationLogs.noLogs');
-}
-
 function LogSourceCard({
   title,
   status,
@@ -75,6 +60,12 @@ function LogSourceCard({
   const normalizedProgress = clampProgress(progress);
   const hasDetails = Boolean(message || error || lines.length > 0);
   const statusTone = getStatusTone(status);
+  const showCurrentMessage = Boolean(
+    message && !lines.some((line) => line.includes(message))
+  );
+  const isLive = Boolean(
+    status && !['cancelled', 'completed', 'failed'].includes(status)
+  );
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/70">
@@ -83,7 +74,7 @@ function LogSourceCard({
           <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
             {title}
           </h4>
-          {message && (
+          {showCurrentMessage && (
             <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
               {message}
             </p>
@@ -124,13 +115,16 @@ function LogSourceCard({
         </div>
       )}
 
-      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-950 p-2 dark:border-slate-700">
-        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-300">
-          {t('flights.generationLogs.rawLogs')}
-        </div>
-        <pre className="max-h-48 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-slate-100">
-          {getLogContent(lines, hasDetails, t)}
-        </pre>
+      <div className="mt-3">
+        <JobLogViewer
+          logs={lines}
+          isLive={isLive}
+          emptyLabel={
+            hasDetails
+              ? t('flights.generationLogs.noRawLogs')
+              : t('flights.generationLogs.noLogs')
+          }
+        />
       </div>
     </section>
   );
@@ -171,7 +165,7 @@ export function FlightGenerationLogsPanel({
           {t('flights.generationLogs.description')}
         </p>
       </div>
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="space-y-3">
         {hasVideoLogSource && (
           <LogSourceCard
             title={t('flights.generationLogs.videoTitle')}

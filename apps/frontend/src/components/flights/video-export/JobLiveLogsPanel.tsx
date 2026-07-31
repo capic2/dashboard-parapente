@@ -1,4 +1,5 @@
 import { Button } from '@dashboard-parapente/design-system';
+import { JobLogViewer } from '../job-logs/JobLogViewer';
 
 type JobLiveLogsPanelProps = {
   title: string;
@@ -40,9 +41,9 @@ export function JobLiveLogsPanel({
         </span>
       </Button>
       {isOpen && (
-        <pre className="max-h-64 overflow-auto border-t border-slate-200 p-3 text-xs leading-relaxed text-slate-800 dark:border-slate-700 dark:text-slate-100">
-          {lines.length > 0 ? lines.join('\n') : emptyLabel}
-        </pre>
+        <div className="border-t border-slate-200 p-3 dark:border-slate-700">
+          <JobLogViewer logs={lines} emptyLabel={emptyLabel} isLive />
+        </div>
       )}
     </div>
   );

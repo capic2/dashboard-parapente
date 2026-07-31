@@ -46,7 +46,7 @@ _LOG_TAIL_LINE_COUNT = 100
 
 
 def _job_log_path(job_id: str) -> Path:
-    return _job_temp_dir(_video_temp_images_dir(), job_id) / "export.log"
+    return _video_export_dir() / ".logs" / "video-exports" / f"{job_id}.log"
 
 
 def _tail_log_lines(path: Path, limit: int = _LOG_TAIL_LINE_COUNT) -> list[str]:
@@ -888,12 +888,13 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
 
 
 def cleanup_video_export_job_temp_files(job_id: str) -> dict[str, Any]:
-    """Delete temporary files for a single inactive video export job."""
+    """Delete temporary and log files for an explicitly deleted export job."""
     candidates = [
         (_job_temp_dir(_video_temp_images_dir(), job_id), _video_temp_images_dir()),
         (_video_export_dir() / f"frames_{job_id}", _video_export_dir()),
         (Path("/tmp") / f"playwright-debug-{job_id}.png", Path("/tmp")),
         (Path("/tmp") / f"playwright-error-{job_id}.png", Path("/tmp")),
+        (_job_log_path(job_id), _video_export_dir()),
     ]
 
     deleted_paths: list[str] = []

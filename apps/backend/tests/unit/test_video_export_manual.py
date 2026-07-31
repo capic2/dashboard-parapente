@@ -17,6 +17,32 @@ import video_export
 import video_export_manual
 
 
+def test_video_export_log_survives_temp_cleanup_until_job_deletion(tmp_path, monkeypatch):
+    export_root = tmp_path / "exports"
+    temp_root = tmp_path / "temp"
+    job_id = "job-persistent-log"
+    job_temp_dir = temp_root / job_id
+    job_temp_dir.mkdir(parents=True)
+    (job_temp_dir / "frame.png").write_bytes(b"frame")
+
+    monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: export_root)
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+
+    video_export_manual._log_job(job_id, "Captured 10/100 frames")
+    log_path = video_export_manual._job_log_path(job_id)
+
+    video_export_manual.cleanup_video_export_temp_files(
+        [{"job_id": job_id, "status": "completed", "internal_status": "completed"}]
+    )
+
+    assert not job_temp_dir.exists()
+    assert "Captured 10/100 frames" in log_path.read_text()
+
+    video_export_manual.cleanup_video_export_job_temp_files(job_id)
+
+    assert not log_path.exists()
+
+
 def test_resolve_frontend_url_uses_backend_static_in_production(monkeypatch):
     """Production should avoid localhost:5173 when static frontend is bundled."""
     monkeypatch.setattr(video_export_manual.Path, "exists", lambda _self: True)

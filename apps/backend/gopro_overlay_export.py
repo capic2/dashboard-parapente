@@ -48,6 +48,14 @@ _PROGRESS_PERCENT_RE = re.compile(r"(?P<percent>\d{1,3})\s*%")
 _LOG_TAIL_LINE_COUNT = 100
 
 
+def _gopro_overlay_log_dir() -> Path:
+    return Path(config.GOPRO_OVERLAY_PARAGLIDING_ROOT) / ".logs" / "gopro-overlays"
+
+
+def _gopro_overlay_log_path(job_id: str) -> Path:
+    return _gopro_overlay_log_dir() / f"{job_id}.log"
+
+
 @dataclass(frozen=True)
 class GoproOverlayLayout:
     id: str
@@ -1439,7 +1447,7 @@ def _create_gopro_overlay_job_from_paths(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temp_output_path = _temp_output_path(output_path, job_id)
-    log_path = work_dir / "overlay.log"
+    log_path = _gopro_overlay_log_path(job_id)
     preparation_metadata = _job_preparation_metadata(
         pin_inputs=pin_inputs,
         requested_layout_id=layout_id,
@@ -2031,6 +2039,20 @@ def delete_gopro_overlay_job(job_id: str) -> dict[str, Any] | None:
         result["dirs_deleted"] = dirs_count
         result["bytes_deleted"] = bytes_count
         result["paths_deleted"] = [str(work_dir)]
+
+    log_path_value = job.get("log_path")
+    if log_path_value:
+        log_path = Path(str(log_path_value))
+        if log_path.exists() and _is_path_inside(log_path, _gopro_overlay_log_dir()):
+            try:
+                log_size = log_path.stat().st_size
+                log_path.unlink()
+            except OSError as exc:
+                result["errors"].append({"path": str(log_path), "error": str(exc)})
+                return result
+            result["files_deleted"] += 1
+            result["bytes_deleted"] += log_size
+            result["paths_deleted"].append(str(log_path))
 
     with _LOCK:
         _JOBS.pop(job_id, None)

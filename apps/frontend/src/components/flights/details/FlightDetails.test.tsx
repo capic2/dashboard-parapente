@@ -283,7 +283,7 @@ describe('FlightDetails GoPro overlay action', () => {
     expect(screen.getByText('GoPro overlay')).toBeInTheDocument();
     expect(screen.getByText('Encoding with FFmpeg')).toBeInTheDocument();
     expect(screen.getByText('Overlay failed on frame 42')).toBeInTheDocument();
-    expect(screen.getByText(/Frame 42 failed/u)).toBeInTheDocument();
+    expect(screen.getAllByText(/Frame 42 failed/u).length).toBeGreaterThan(0);
   });
 
   it('does not render an empty generation logs panel', () => {
