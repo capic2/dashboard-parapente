@@ -13,6 +13,7 @@ import threading
 import uuid
 import traceback
 import time
+from collections import deque
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -104,6 +105,9 @@ _JOB_RUNTIME: dict[str, dict[str, Any]] = {}
 _JOB_CANCEL_REQUESTS: set[str] = set()
 
 _CANCEL_CHECK_INTERVAL = 10
+_MAX_PENDING_FRAME_WRITES = 4
+_MAX_FFMPEG_STDERR_LINES = 200
+_FFMPEG_PIPE_POLL_SECONDS = 1.0
 _EXPORT_VIEWER_READY_TIMEOUT_SECONDS = 180
 _FFMPEG_STALL_TIMEOUT_SECONDS = 10 * 60
 _ORPHAN_TEMP_CLEANUP_GRACE_SECONDS = 30
@@ -708,6 +712,12 @@ def _first_missing_frame_index(frames_dir: Path, total_frames: int) -> int:
     return max(total_frames, 0)
 
 
+def _write_frame_file_atomic(frame_path: Path, frame_png: bytes) -> None:
+    partial_path = frame_path.with_name(f"{frame_path.name}.part")
+    partial_path.write_bytes(frame_png)
+    partial_path.replace(frame_path)
+
+
 def _job_resume_info(job: VideoExportJob) -> dict[str, Any]:
     frames_dir = _job_frames_dir(_video_temp_images_dir(), job.id)
     existing_indexes = _existing_frame_indexes(frames_dir)
@@ -1005,6 +1015,233 @@ def _ffmpeg_encoding_settings(is_fast_mode: bool) -> tuple[str, str]:
     return "medium", "18"
 
 
+def _ffmpeg_command(
+    *,
+    fps: int,
+    output_file: Path,
+    is_fast_mode: bool,
+    frames_dir: Path | None = None,
+) -> list[str]:
+    ffmpeg_preset, ffmpeg_crf = _ffmpeg_encoding_settings(is_fast_mode)
+    if frames_dir is None:
+        input_args = [
+            "-f",
+            "image2pipe",
+            "-framerate",
+            str(fps),
+            "-vcodec",
+            "png",
+            "-i",
+            "pipe:0",
+        ]
+    else:
+        input_args = [
+            "-framerate",
+            str(fps),
+            "-i",
+            str(frames_dir / "frame%05d.png"),
+        ]
+
+    return [
+        "ffmpeg",
+        *input_args,
+        "-c:v",
+        "libx264",
+        "-preset",
+        ffmpeg_preset,
+        "-crf",
+        ffmpeg_crf,
+        "-pix_fmt",
+        "yuv420p",
+        "-nostats",
+        "-progress",
+        "pipe:2",
+        "-y",
+        str(output_file),
+    ]
+
+
+async def _drain_ffmpeg_stderr(
+    job_id: str,
+    stderr: asyncio.StreamReader,
+    lines: deque[str],
+    state: dict[str, float],
+) -> None:
+    while line_bytes := await stderr.readline():
+        line = line_bytes.decode("utf-8", errors="replace").strip()
+        state["last_output_at"] = time.monotonic()
+        encoded_seconds = _parse_ffmpeg_out_time_seconds(line)
+        if encoded_seconds is not None:
+            state["encoded_seconds"] = encoded_seconds
+            continue
+        key, separator, _value = line.partition("=")
+        if not line or (separator and key.replace("_", "").isalnum()):
+            continue
+        lines.append(line)
+        _log_job(job_id, f"ffmpeg: {line}")
+
+
+async def _write_ffmpeg_frame(
+    *,
+    job_id: str,
+    process: asyncio.subprocess.Process,
+    stderr_task: asyncio.Task[None],
+    stderr_lines: deque[str],
+    state: dict[str, float],
+    frame_png: bytes,
+) -> bool:
+    if _is_cancelled(job_id):
+        return False
+    if process.returncode is not None:
+        await stderr_task
+        stderr_output = "\n".join(stderr_lines).strip()
+        raise RuntimeError(f"FFmpeg exited while receiving frames: {stderr_output}")
+
+    assert process.stdin is not None
+    process.stdin.write(frame_png)
+    while True:
+        try:
+            await asyncio.wait_for(
+                process.stdin.drain(),
+                timeout=_FFMPEG_PIPE_POLL_SECONDS,
+            )
+            return True
+        except TimeoutError:
+            if _is_cancelled(job_id):
+                return False
+            if process.returncode is not None:
+                await stderr_task
+                stderr_output = "\n".join(stderr_lines).strip()
+                raise RuntimeError(
+                    f"FFmpeg exited while receiving frames: {stderr_output}"
+                ) from None
+            if stderr_task.done():
+                stderr_exception = stderr_task.exception()
+                if stderr_exception is not None:
+                    raise RuntimeError("Failed to read FFmpeg output") from stderr_exception
+
+            now = time.monotonic()
+            started_at = state.get("started_at", now)
+            last_output_at = state.get("last_output_at", started_at)
+            if now - last_output_at > _FFMPEG_STALL_TIMEOUT_SECONDS:
+                raise RuntimeError(
+                    f"FFmpeg stalled for {_FFMPEG_STALL_TIMEOUT_SECONDS}s while receiving frames"
+                ) from None
+        except (BrokenPipeError, ConnectionResetError) as exc:
+            await process.wait()
+            await stderr_task
+            stderr_output = "\n".join(stderr_lines).strip()
+            raise RuntimeError(f"FFmpeg stopped receiving frames: {stderr_output}") from exc
+
+
+async def _wait_for_ffmpeg_process(
+    *,
+    job_id: str,
+    process: asyncio.subprocess.Process,
+    stderr_task: asyncio.Task[None],
+    stderr_lines: deque[str],
+    state: dict[str, float],
+    output_file: Path,
+    video_duration: float,
+    ffmpeg_cmd: list[str],
+) -> bool:
+    encoding_started_at = state.get("started_at", time.monotonic())
+    last_ffmpeg_output_at = state.get("last_output_at", encoding_started_at)
+    total_duration_seconds = max(video_duration, 1e-6)
+    ffmpeg_timeout_seconds = _ffmpeg_timeout_seconds(total_duration_seconds)
+    last_output_file_size = -1
+    last_output_file_mtime_ns = -1
+    last_reported_seconds = -1.0
+
+    try:
+        while True:
+            if _is_cancelled(job_id):
+                if process.returncode is None:
+                    process.kill()
+                    await process.wait()
+                await stderr_task
+                _update_job(
+                    job_id,
+                    status=_STATUS_CANCELLED,
+                    message="Export cancelled during encoding",
+                )
+                return False
+
+            now = time.monotonic()
+            has_output_file_activity, last_output_file_size, last_output_file_mtime_ns = (
+                _ffmpeg_output_file_activity(
+                    output_file,
+                    last_output_file_size,
+                    last_output_file_mtime_ns,
+                )
+            )
+            if has_output_file_activity:
+                last_ffmpeg_output_at = now
+            last_ffmpeg_output_at = max(
+                last_ffmpeg_output_at,
+                state.get("last_output_at", last_ffmpeg_output_at),
+            )
+
+            if process.returncode is not None:
+                break
+
+            if now - last_ffmpeg_output_at > _FFMPEG_STALL_TIMEOUT_SECONDS:
+                process.kill()
+                await process.wait()
+                raise RuntimeError(
+                    "FFmpeg stalled for "
+                    f"{_FFMPEG_STALL_TIMEOUT_SECONDS}s: {' '.join(ffmpeg_cmd)}"
+                )
+
+            if now - encoding_started_at > ffmpeg_timeout_seconds:
+                process.kill()
+                await process.wait()
+                raise RuntimeError(
+                    f"FFmpeg timeout after {ffmpeg_timeout_seconds}s: {' '.join(ffmpeg_cmd)}"
+                )
+
+            encoded_seconds = state.get("encoded_seconds")
+            if encoded_seconds is not None and encoded_seconds != last_reported_seconds:
+                last_reported_seconds = encoded_seconds
+                progress = _encoding_progress_percent(encoded_seconds, total_duration_seconds)
+                elapsed_encoding = max(now - encoding_started_at, 1e-6)
+                encoding_speed = encoded_seconds / elapsed_encoding
+                remaining = max(total_duration_seconds - encoded_seconds, 0.0)
+                eta_seconds = (
+                    max(0, int(remaining / encoding_speed)) if encoding_speed > 0 else None
+                )
+                _set_job_runtime(
+                    job_id,
+                    phase=_STATUS_ENCODING,
+                    eta_seconds=eta_seconds,
+                    encoded_seconds=round(encoded_seconds, 2),
+                )
+                _update_job(
+                    job_id,
+                    status=_STATUS_ENCODING,
+                    progress=progress,
+                    message=(
+                        "Encoding "
+                        f"{int(min(max((encoded_seconds / total_duration_seconds) * 100, 0), 100))}%"
+                    ),
+                )
+
+            await asyncio.sleep(0.25)
+
+        return_code = await process.wait()
+        await stderr_task
+        if return_code != 0:
+            stderr_output = "\n".join(stderr_lines).strip()
+            raise RuntimeError(f"FFmpeg encoding failed: {stderr_output}")
+        return True
+    finally:
+        if process.returncode is None:
+            process.kill()
+            await process.wait()
+        if not stderr_task.done():
+            await stderr_task
+
+
 def _ffmpeg_timeout_seconds(video_duration_seconds: float) -> int:
     dynamic_timeout = int(max(video_duration_seconds, 1.0) * 20)
     return max(6 * 60 * 60, dynamic_timeout)
@@ -1262,6 +1499,9 @@ async def _export_video_manual_render(job_id: str):
     temp_root = _video_temp_images_dir()
     temp_dir: Path | None = None
     frames_dir: Path | None = None
+    ffmpeg_process: asyncio.subprocess.Process | None = None
+    ffmpeg_stderr_task: asyncio.Task[None] | None = None
+    pending_frame_writes: set[asyncio.Task[None]] = set()
     auth_token = job.auth_token
     url = f"{frontend_url}/export-viewer?flightId={flight_id}&jobId={job_id}"
     preflight_url = url
@@ -1527,6 +1767,55 @@ async def _export_video_manual_render(job_id: str):
                 )
                 _log_job(job_id, f"Resuming capture from frame {resume_from_frame}/{total_frames}")
 
+            encoding_output_file = temp_dir / "encoding.mp4"
+            ffmpeg_cmd = _ffmpeg_command(
+                fps=fps,
+                output_file=encoding_output_file,
+                is_fast_mode=is_fast_mode,
+                frames_dir=None if is_fast_mode else frames_dir,
+            )
+            ffmpeg_stderr: deque[str] = deque(maxlen=_MAX_FFMPEG_STDERR_LINES)
+            ffmpeg_state: dict[str, float] = {}
+
+            if is_fast_mode:
+                _log_job(job_id, f"Starting concurrent FFmpeg encoding: {' '.join(ffmpeg_cmd)}")
+                ffmpeg_process = await asyncio.create_subprocess_exec(
+                    *ffmpeg_cmd,
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                assert ffmpeg_process.stdin is not None
+                assert ffmpeg_process.stderr is not None
+                ffmpeg_state["started_at"] = time.monotonic()
+                ffmpeg_stderr_task = asyncio.create_task(
+                    _drain_ffmpeg_stderr(
+                        job_id,
+                        ffmpeg_process.stderr,
+                        ffmpeg_stderr,
+                        ffmpeg_state,
+                    )
+                )
+
+                for existing_frame_index in range(resume_from_frame):
+                    existing_frame = frames_dir / f"frame{existing_frame_index:05d}.png"
+                    frame_written = await _write_ffmpeg_frame(
+                        job_id=job_id,
+                        process=ffmpeg_process,
+                        stderr_task=ffmpeg_stderr_task,
+                        stderr_lines=ffmpeg_stderr,
+                        state=ffmpeg_state,
+                        frame_png=await asyncio.to_thread(existing_frame.read_bytes),
+                    )
+                    if not frame_written:
+                        await browser.close()
+                        _update_job(
+                            job_id,
+                            status=_STATUS_CANCELLED,
+                            message="Export cancelled by user",
+                        )
+                        return
+
             terrain_wait_enabled = True
             for i in range(resume_from_frame, total_frames):
                 if i % _CANCEL_CHECK_INTERVAL == 0 and _is_cancelled(job_id):
@@ -1560,7 +1849,40 @@ async def _export_video_manual_render(job_id: str):
                         _log_job(job_id, "Disabling per-frame terrain waits after timeout")
 
                 frame_path = frames_dir / f"frame{i:05d}.png"
-                await page.screenshot(path=str(frame_path), timeout=60000)
+                if is_fast_mode:
+                    assert ffmpeg_process is not None
+                    assert ffmpeg_process.stdin is not None
+                    frame_png = await page.screenshot(type="png", timeout=60000)
+                    frame_written = await _write_ffmpeg_frame(
+                        job_id=job_id,
+                        process=ffmpeg_process,
+                        stderr_task=ffmpeg_stderr_task,
+                        stderr_lines=ffmpeg_stderr,
+                        state=ffmpeg_state,
+                        frame_png=frame_png,
+                    )
+                    if not frame_written:
+                        await browser.close()
+                        _update_job(
+                            job_id,
+                            status=_STATUS_CANCELLED,
+                            message="Export cancelled by user",
+                        )
+                        return
+
+                    pending_frame_writes.add(
+                        asyncio.create_task(
+                            asyncio.to_thread(_write_frame_file_atomic, frame_path, frame_png)
+                        )
+                    )
+                    if len(pending_frame_writes) >= _MAX_PENDING_FRAME_WRITES:
+                        completed_writes, pending_frame_writes = await asyncio.wait(
+                            pending_frame_writes,
+                            return_when=asyncio.FIRST_COMPLETED,
+                        )
+                        await asyncio.gather(*completed_writes)
+                else:
+                    await page.screenshot(path=str(frame_path), timeout=60000)
 
                 frame_count += 1
                 if frame_count % 10 == 0:
@@ -1593,6 +1915,21 @@ async def _export_video_manual_render(job_id: str):
                 if not is_fast_mode:
                     await asyncio.sleep(ms_per_frame / 1000)
 
+            if pending_frame_writes:
+                await asyncio.gather(*pending_frame_writes)
+                pending_frame_writes.clear()
+
+            if is_fast_mode:
+                assert ffmpeg_process is not None
+                assert ffmpeg_process.stdin is not None
+                ffmpeg_process.stdin.close()
+                try:
+                    await ffmpeg_process.stdin.wait_closed()
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+                ffmpeg_state["started_at"] = time.monotonic()
+                ffmpeg_state["last_output_at"] = time.monotonic()
+
             total_capture_time = time.time() - start_time
             _log_job(
                 job_id,
@@ -1619,142 +1956,42 @@ async def _export_video_manual_render(job_id: str):
             )
             _set_job_runtime(job_id, phase=_STATUS_ENCODING, eta_seconds=None)
 
+            if not is_fast_mode:
+                _log_job(job_id, f"FFmpeg command: {' '.join(ffmpeg_cmd)}")
+                ffmpeg_process = await asyncio.create_subprocess_exec(
+                    *ffmpeg_cmd,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                assert ffmpeg_process.stderr is not None
+                ffmpeg_state["started_at"] = time.monotonic()
+                ffmpeg_stderr_task = asyncio.create_task(
+                    _drain_ffmpeg_stderr(
+                        job_id,
+                        ffmpeg_process.stderr,
+                        ffmpeg_stderr,
+                        ffmpeg_state,
+                    )
+                )
+
+            assert ffmpeg_process is not None
+            assert ffmpeg_stderr_task is not None
+            encoding_completed = await _wait_for_ffmpeg_process(
+                job_id=job_id,
+                process=ffmpeg_process,
+                stderr_task=ffmpeg_stderr_task,
+                stderr_lines=ffmpeg_stderr,
+                state=ffmpeg_state,
+                output_file=encoding_output_file,
+                video_duration=video_duration,
+                ffmpeg_cmd=ffmpeg_cmd,
+            )
+            if not encoding_completed:
+                return
+
             timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
             output_file = _video_output_path(flight_id, timestamp)
-            ffmpeg_preset, ffmpeg_crf = _ffmpeg_encoding_settings(is_fast_mode)
-
-            ffmpeg_cmd = [
-                "ffmpeg",
-                "-framerate",
-                str(fps),
-                "-i",
-                str(frames_dir / "frame%05d.png"),
-                "-c:v",
-                "libx264",
-                "-preset",
-                ffmpeg_preset,
-                "-crf",
-                ffmpeg_crf,
-                "-pix_fmt",
-                "yuv420p",
-                "-nostats",
-                "-progress",
-                "pipe:2",
-                "-y",
-                str(output_file),
-            ]
-
-            _log_job(job_id, f"FFmpeg command: {' '.join(ffmpeg_cmd)}")
-            process = await asyncio.create_subprocess_exec(
-                *ffmpeg_cmd,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.PIPE,
-            )
-
-            encoding_started_at = time.monotonic()
-            last_ffmpeg_output_at = encoding_started_at
-            ffmpeg_stderr: list[str] = []
-            total_duration_seconds = max(video_duration, 1e-6)
-            ffmpeg_timeout_seconds = _ffmpeg_timeout_seconds(total_duration_seconds)
-            last_output_file_size = -1
-            last_output_file_mtime_ns = -1
-
-            try:
-                assert process.stderr is not None
-                while True:
-                    if _is_cancelled(job_id):
-                        process.kill()
-                        await process.wait()
-                        _update_job(
-                            job_id,
-                            status=_STATUS_CANCELLED,
-                            message="Export cancelled during encoding",
-                        )
-                        return
-
-                    now = time.monotonic()
-                    (
-                        has_output_file_activity,
-                        last_output_file_size,
-                        last_output_file_mtime_ns,
-                    ) = _ffmpeg_output_file_activity(
-                        output_file,
-                        last_output_file_size,
-                        last_output_file_mtime_ns,
-                    )
-                    if has_output_file_activity:
-                        last_ffmpeg_output_at = now
-
-                    if now - last_ffmpeg_output_at > _FFMPEG_STALL_TIMEOUT_SECONDS:
-                        process.kill()
-                        await process.wait()
-                        raise Exception(
-                            "FFmpeg stalled for "
-                            f"{_FFMPEG_STALL_TIMEOUT_SECONDS}s: {' '.join(ffmpeg_cmd)}"
-                        )
-
-                    if now - encoding_started_at > ffmpeg_timeout_seconds:
-                        process.kill()
-                        await process.wait()
-                        raise Exception(
-                            f"FFmpeg timeout after {ffmpeg_timeout_seconds}s: {' '.join(ffmpeg_cmd)}"
-                        )
-
-                    try:
-                        line_bytes = await asyncio.wait_for(process.stderr.readline(), timeout=1.0)
-                    except TimeoutError:
-                        if process.returncode is not None:
-                            break
-                        continue
-
-                    if not line_bytes:
-                        if process.returncode is not None:
-                            break
-                        continue
-
-                    line = line_bytes.decode("utf-8", errors="replace").strip()
-                    last_ffmpeg_output_at = time.monotonic()
-                    ffmpeg_stderr.append(line)
-                    if line:
-                        _log_job(job_id, f"ffmpeg: {line}")
-                    encoded_seconds = _parse_ffmpeg_out_time_seconds(line)
-
-                    if encoded_seconds is not None:
-                        progress = _encoding_progress_percent(
-                            encoded_seconds,
-                            total_duration_seconds,
-                        )
-                        elapsed_encoding = max(time.monotonic() - encoding_started_at, 1e-6)
-                        encoding_speed = encoded_seconds / elapsed_encoding
-                        remaining = max(total_duration_seconds - encoded_seconds, 0.0)
-                        eta_seconds = (
-                            max(0, int(remaining / encoding_speed)) if encoding_speed > 0 else None
-                        )
-
-                        _set_job_runtime(
-                            job_id,
-                            phase=_STATUS_ENCODING,
-                            eta_seconds=eta_seconds,
-                            encoded_seconds=round(encoded_seconds, 2),
-                        )
-                        _update_job(
-                            job_id,
-                            status=_STATUS_ENCODING,
-                            progress=progress,
-                            message=(
-                                f"Encoding {int(min(max((encoded_seconds / total_duration_seconds) * 100, 0), 100))}%"
-                            ),
-                        )
-
-                return_code = await process.wait()
-                if return_code != 0:
-                    stderr_output = "\n".join(ffmpeg_stderr).strip()
-                    raise Exception(f"FFmpeg encoding failed: {stderr_output}")
-            finally:
-                if process.returncode is None:
-                    process.kill()
-                    await process.wait()
-
+            await asyncio.to_thread(shutil.move, str(encoding_output_file), str(output_file))
             _log_job(job_id, f"Video encoded: {output_file}")
 
             _cleanup_temp_dir(temp_dir)
@@ -1783,6 +2020,15 @@ async def _export_video_manual_render(job_id: str):
             message=f"Error: {e}",
         )
     finally:
+        if pending_frame_writes:
+            await asyncio.gather(*pending_frame_writes, return_exceptions=True)
+        if ffmpeg_process is not None and ffmpeg_process.returncode is None:
+            if ffmpeg_process.stdin is not None:
+                ffmpeg_process.stdin.close()
+            ffmpeg_process.kill()
+            await ffmpeg_process.wait()
+        if ffmpeg_stderr_task is not None:
+            await asyncio.gather(ffmpeg_stderr_task, return_exceptions=True)
         _clear_job_cancel_requested(job_id)
         _clear_job_auth_token(job_id)
 

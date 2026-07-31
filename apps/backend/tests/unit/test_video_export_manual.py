@@ -3,6 +3,7 @@
 import asyncio
 import os
 import time
+from collections import deque
 from datetime import datetime
 from urllib.error import URLError
 
@@ -199,6 +200,133 @@ def test_parse_ffmpeg_out_time_seconds_parses_progress_lines():
 def test_ffmpeg_encoding_settings_use_fast_preset_for_manual_fast():
     assert video_export_manual._ffmpeg_encoding_settings(True) == ("veryfast", "23")
     assert video_export_manual._ffmpeg_encoding_settings(False) == ("medium", "18")
+
+
+def test_ffmpeg_command_streams_png_frames_for_manual_fast(tmp_path):
+    output_file = tmp_path / "export.mp4"
+
+    command = video_export_manual._ffmpeg_command(
+        fps=15,
+        output_file=output_file,
+        is_fast_mode=True,
+    )
+
+    assert command[:9] == [
+        "ffmpeg",
+        "-f",
+        "image2pipe",
+        "-framerate",
+        "15",
+        "-vcodec",
+        "png",
+        "-i",
+        "pipe:0",
+    ]
+    assert command[-1] == str(output_file)
+    assert command[command.index("-preset") + 1] == "veryfast"
+    assert command[command.index("-crf") + 1] == "23"
+
+
+def test_ffmpeg_command_reads_saved_frames_for_classic_mode(tmp_path):
+    frames_dir = tmp_path / "frames"
+    output_file = tmp_path / "export.mp4"
+
+    command = video_export_manual._ffmpeg_command(
+        fps=30,
+        output_file=output_file,
+        is_fast_mode=False,
+        frames_dir=frames_dir,
+    )
+
+    assert command[:5] == [
+        "ffmpeg",
+        "-framerate",
+        "30",
+        "-i",
+        str(frames_dir / "frame%05d.png"),
+    ]
+    assert "image2pipe" not in command
+    assert command[command.index("-preset") + 1] == "medium"
+    assert command[command.index("-crf") + 1] == "18"
+
+
+@pytest.mark.asyncio
+async def test_drain_ffmpeg_stderr_tracks_latest_progress(monkeypatch):
+    reader = asyncio.StreamReader()
+    reader.feed_data(b"out_time_us=1500000\nprogress=continue\ninvalid PNG frame\n")
+    reader.feed_eof()
+    lines: deque[str] = deque(maxlen=2)
+    state: dict[str, float] = {}
+    logged_messages: list[str] = []
+    monkeypatch.setattr(
+        video_export_manual,
+        "_log_job",
+        lambda _job_id, message: logged_messages.append(message),
+    )
+
+    await video_export_manual._drain_ffmpeg_stderr("job-1", reader, lines, state)
+
+    assert list(lines) == ["invalid PNG frame"]
+    assert state["encoded_seconds"] == 1.5
+    assert state["last_output_at"] > 0
+    assert logged_messages == ["ffmpeg: invalid PNG frame"]
+
+
+class _FakeFfmpegStdin:
+    def __init__(self):
+        self.frames: list[bytes] = []
+
+    def write(self, frame: bytes) -> None:
+        self.frames.append(frame)
+
+    async def drain(self) -> None:
+        return None
+
+
+class _FakeFfmpegProcess:
+    def __init__(self):
+        self.stdin = _FakeFfmpegStdin()
+        self.returncode = None
+
+
+@pytest.mark.asyncio
+async def test_write_ffmpeg_frame_writes_complete_png(monkeypatch):
+    process = _FakeFfmpegProcess()
+    stderr_task = asyncio.create_task(asyncio.sleep(0))
+    monkeypatch.setattr(video_export_manual, "_is_cancelled", lambda _job_id: False)
+
+    written = await video_export_manual._write_ffmpeg_frame(
+        job_id="job-1",
+        process=process,
+        stderr_task=stderr_task,
+        stderr_lines=deque(),
+        state={"started_at": time.monotonic()},
+        frame_png=b"png-frame",
+    )
+
+    await stderr_task
+    assert written is True
+    assert process.stdin.frames == [b"png-frame"]
+
+
+@pytest.mark.asyncio
+async def test_write_ffmpeg_frame_stops_before_write_when_cancelled(monkeypatch):
+    process = _FakeFfmpegProcess()
+    stderr_task = asyncio.create_task(asyncio.sleep(0))
+    monkeypatch.setattr(video_export_manual, "_is_cancelled", lambda _job_id: True)
+
+    written = await video_export_manual._write_ffmpeg_frame(
+        job_id="job-1",
+        process=process,
+        stderr_task=stderr_task,
+        stderr_lines=deque(),
+        state={"started_at": time.monotonic()},
+        frame_png=b"png-frame",
+    )
+
+    await stderr_task
+    assert written is False
+    assert process.stdin.frames == []
 
 
 def test_ffmpeg_timeout_is_not_limited_to_thirty_minutes():
@@ -518,6 +646,24 @@ def test_first_missing_frame_index_returns_resume_point(tmp_path):
     (frames_dir / "frame00003.png").write_bytes(b"frame")
 
     assert video_export_manual._first_missing_frame_index(frames_dir, 5) == 2
+
+
+def test_first_missing_frame_index_ignores_partial_frame(tmp_path):
+    frames_dir = tmp_path / "frames"
+    frames_dir.mkdir()
+    (frames_dir / "frame00000.png").write_bytes(b"complete")
+    (frames_dir / "frame00001.png.part").write_bytes(b"partial")
+
+    assert video_export_manual._first_missing_frame_index(frames_dir, 3) == 1
+
+
+def test_write_frame_file_atomic_publishes_complete_frame(tmp_path):
+    frame_path = tmp_path / "frame00000.png"
+
+    video_export_manual._write_frame_file_atomic(frame_path, b"png-frame")
+
+    assert frame_path.read_bytes() == b"png-frame"
+    assert not (tmp_path / "frame00000.png.part").exists()
 
 
 def test_job_resume_info_requires_terminal_status_and_frames(tmp_path, monkeypatch):
