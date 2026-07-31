@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 
 export type GoproOverlayJob = {
@@ -45,12 +45,27 @@ const initialState = {
   isConnected: false,
 };
 
+const TERMINAL_STATUSES = new Set(['cancelled', 'completed', 'failed']);
+const STATUS_POLL_INTERVAL_MS = 2000;
+
 export function useGoproOverlayJobStream(
   jobId?: string | null,
   jobToken?: string | null,
   enabled = true
 ) {
   const [state, setState] = useState(initialState);
+  const polledJob = useQuery({
+    queryKey: ['gopro-overlay-job', jobId],
+    queryFn: () =>
+      api.get(`gopro-overlays/jobs/${jobId}/status`).json<GoproOverlayJob>(),
+    enabled: enabled && Boolean(jobId) && !jobToken,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status && TERMINAL_STATUSES.has(status)
+        ? false
+        : STATUS_POLL_INTERVAL_MS;
+    },
+  });
 
   useEffect(() => {
     setState(initialState);
@@ -58,13 +73,11 @@ export function useGoproOverlayJobStream(
       return;
     }
 
-    const path = jobToken
-      ? `/api/job-access/gopro-overlays/jobs/${jobId}/stream`
-      : `/api/gopro-overlays/jobs/${jobId}/stream`;
+    if (!jobToken) return;
+
+    const path = `/api/job-access/gopro-overlays/jobs/${jobId}/stream`;
     const url = new URL(path, window.location.origin);
-    if (jobToken) {
-      url.searchParams.set('access_token', jobToken);
-    }
+    url.searchParams.set('access_token', jobToken);
     const eventSource = new EventSource(url.toString(), {
       withCredentials: true,
     });
@@ -91,6 +104,13 @@ export function useGoproOverlayJobStream(
       eventSource.close();
     };
   }, [enabled, jobId, jobToken]);
+
+  if (!jobToken) {
+    return {
+      job: polledJob.data ?? null,
+      isConnected: polledJob.isSuccess,
+    };
+  }
 
   return state;
 }
