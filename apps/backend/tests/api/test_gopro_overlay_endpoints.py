@@ -1192,6 +1192,10 @@ def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(
     work_dir.mkdir(parents=True)
     layout_path = work_dir / "layout.xml"
     layout_path.write_text("<layout />")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+    log_path = gopro_overlay_export._gopro_overlay_log_path(job_id)
+    log_path.parent.mkdir(parents=True)
+    log_path.write_text("Overlay rendering failed\n")
 
     monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
     session = test_db()
@@ -1213,6 +1217,7 @@ def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(
                 output_path=str(tmp_path / "final.mp4"),
                 temp_output_path=str(tmp_path / "final.part.mp4"),
                 output_filename="final.mp4",
+                log_path=str(log_path),
             )
         )
         session.add(
@@ -1232,8 +1237,9 @@ def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(
 
     assert result is not None
     assert result["deleted"] is True
-    assert result["files_deleted"] == 1
+    assert result["files_deleted"] == 2
     assert not work_dir.exists()
+    assert not log_path.exists()
     assert gopro_overlay_export.get_gopro_overlay_job(job_id) is None
     session = test_db()
     try:
@@ -1243,6 +1249,28 @@ def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(
         assert flight.gopro_overlay_status is None
     finally:
         session.close()
+
+
+def test_overlay_log_survives_work_directory_cleanup(tmp_path, monkeypatch):
+    job_id = "job-overlay-persistent-log"
+    work_dir = tmp_path / ".gopro-overlay-work" / job_id
+    work_dir.mkdir(parents=True)
+    layout_path = work_dir / "layout.xml"
+    layout_path.write_text("<layout />")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+    log_path = gopro_overlay_export._gopro_overlay_log_path(job_id)
+    gopro_overlay_export._append_job_log(log_path, "Overlay ready")
+
+    gopro_overlay_export._cleanup_gopro_overlay_temp_files(
+        {
+            "layout_path": str(layout_path),
+            "log_path": str(log_path),
+            "temp_output_path": str(work_dir / "final.part.mp4"),
+        }
+    )
+
+    assert not work_dir.exists()
+    assert "Overlay ready" in log_path.read_text()
 
 
 def test_reconcile_gopro_overlay_flight_refs_clears_missing_active_job(test_db, monkeypatch):
