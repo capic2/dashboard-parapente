@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../../lib/api';
 
 export type VideoExportPhase =
   | 'queued'
@@ -34,6 +36,9 @@ const initialState: HookState = {
   status: null,
   isConnected: false,
 };
+
+const TERMINAL_STATUSES = new Set(['cancelled', 'completed', 'failed']);
+const STATUS_POLL_INTERVAL_MS = 2000;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object');
@@ -115,6 +120,23 @@ export function useVideoExportStatus(
   jobToken?: string | null
 ) {
   const [state, setState] = useState<HookState>(initialState);
+  const polledStatus = useQuery({
+    queryKey: ['video-export-status', jobId],
+    queryFn: async () => {
+      const payload = await api.get(`exports/${jobId}/status`).json<unknown>();
+      const status = toStatusPayload(payload);
+      if (!status) throw new Error('Invalid video export status response');
+      return status;
+    },
+    enabled: enabled && Boolean(jobId) && !jobToken,
+    refetchInterval: (query) => {
+      const status = query.state.data;
+      const currentStatus = status?.internal_status ?? status?.status;
+      return currentStatus && TERMINAL_STATUSES.has(currentStatus)
+        ? false
+        : STATUS_POLL_INTERVAL_MS;
+    },
+  });
 
   useEffect(() => {
     setState(initialState);
@@ -123,13 +145,11 @@ export function useVideoExportStatus(
       return;
     }
 
-    const path = jobToken
-      ? `/api/job-access/exports/${jobId}/stream`
-      : `/api/exports/${jobId}/stream`;
+    if (!jobToken) return;
+
+    const path = `/api/job-access/exports/${jobId}/stream`;
     const streamUrl = new URL(path, window.location.origin);
-    if (jobToken) {
-      streamUrl.searchParams.set('access_token', jobToken);
-    }
+    streamUrl.searchParams.set('access_token', jobToken);
 
     const eventSource = new EventSource(streamUrl.toString());
 
@@ -170,6 +190,13 @@ export function useVideoExportStatus(
       eventSource.close();
     };
   }, [enabled, jobId, jobToken]);
+
+  if (!jobToken) {
+    return {
+      status: polledStatus.data ?? null,
+      isConnected: polledStatus.isSuccess,
+    };
+  }
 
   return state;
 }
