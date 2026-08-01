@@ -39,29 +39,73 @@ const {
   } as Flight,
 }));
 
-vi.mock('@dashboard-parapente/design-system', () => ({
-  Button: ({
-    children,
-    isDisabled,
-    onPress,
-    ...props
-  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-    isDisabled?: boolean;
-    onPress?: () => void;
-  }) => (
-    <button type="button" disabled={isDisabled} onClick={onPress} {...props}>
-      {children}
-    </button>
-  ),
-  Tab: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  TabList: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-  TabPanel: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-  Tabs: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
+vi.mock('@dashboard-parapente/design-system', async () => {
+  const React = await import('react');
+  const MockTabsContext = React.createContext<{
+    selectedKey: string;
+    onSelectionChange: (key: string) => void;
+  }>({
+    selectedKey: 'infos',
+    onSelectionChange: () => undefined,
+  });
+
+  return {
+    Button: ({
+      children,
+      isDisabled,
+      onPress,
+      ...props
+    }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+      isDisabled?: boolean;
+      onPress?: () => void;
+    }) => (
+      <button type="button" disabled={isDisabled} onClick={onPress} {...props}>
+        {children}
+      </button>
+    ),
+    Tab: ({ children, id }: { children: React.ReactNode; id: string }) => {
+      const tabs = React.useContext(MockTabsContext);
+      return (
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tabs.selectedKey === id}
+          onClick={() => tabs.onSelectionChange(id)}
+        >
+          {children}
+        </button>
+      );
+    },
+    TabList: ({ children }: { children: React.ReactNode }) => (
+      <div>{children}</div>
+    ),
+    TabPanel: ({ children, id }: { children: React.ReactNode; id: string }) => {
+      const tabs = React.useContext(MockTabsContext);
+      return tabs.selectedKey === id ? (
+        <div role="tabpanel">{children}</div>
+      ) : null;
+    },
+    Tabs: ({
+      children,
+      selectedKey,
+      onSelectionChange,
+    }: {
+      children: React.ReactNode;
+      selectedKey: string;
+      onSelectionChange: (key: string) => void;
+    }) => {
+      const contextValue = React.useMemo(
+        () => ({ selectedKey, onSelectionChange }),
+        [selectedKey, onSelectionChange]
+      );
+      return (
+        <MockTabsContext.Provider value={contextValue}>
+          <div>{children}</div>
+        </MockTabsContext.Provider>
+      );
+    },
+  };
+});
 
 vi.mock('react-aria-components', () => ({
   TextArea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
@@ -104,6 +148,9 @@ vi.mock('react-i18next', () => ({
         'flights.generationLogs.status.running': 'Running',
         'flights.generationLogs.status.encoding': 'Encoding',
         'flights.generationLogs.status.failed': 'Failed',
+        'flights.infoTab': 'Info',
+        'flights.replayTab': 'Replay',
+        'flights.logsTab': 'Logs',
       })[key] ?? key,
   }),
 }));
@@ -245,7 +292,7 @@ describe('FlightDetails GoPro overlay action', () => {
     expect(formData.get('gpx_offset')).toBe('2.5');
   });
 
-  it('shows a dedicated generation logs panel for video and GoPro jobs', () => {
+  it('shows video and GoPro job details in the logs tab', () => {
     mockFlight.video_export_job_id = 'video-job';
     mockFlight.video_export_status = 'running';
     overlayJobStreamMock.current = {
@@ -278,6 +325,10 @@ describe('FlightDetails GoPro overlay action', () => {
       />
     );
 
+    expect(screen.queryByText('Generation logs')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Logs' }));
+
     expect(screen.getByText('Generation logs')).toBeInTheDocument();
     expect(screen.getByText('Flight video')).toBeInTheDocument();
     expect(screen.getByText('GoPro overlay')).toBeInTheDocument();
@@ -296,9 +347,28 @@ describe('FlightDetails GoPro overlay action', () => {
     );
 
     expect(screen.queryByText('Generation logs')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Logs' })).not.toBeInTheDocument();
   });
 
-  it('regenerates overlay after cancellation', async () => {
+  it('keeps the logs tab available while a job status is loading', () => {
+    mockFlight.video_export_job_id = 'video-job';
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Logs' }));
+
+    expect(screen.getByText('Generation logs')).toBeInTheDocument();
+    expect(screen.getByText('Flight video')).toBeInTheDocument();
+    expect(screen.getByText('No logs yet.')).toBeInTheDocument();
+  });
+
+  it('regenerates overlay after cancellation', () => {
     mockFlight.gopro_overlay_job_id = 'job-overlay';
     mockFlight.gopro_overlay_status = 'cancelled';
 

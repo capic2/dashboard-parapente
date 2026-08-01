@@ -47,7 +47,7 @@ interface FlightDetailsProps {
   onCloseMobile?: () => void;
 }
 
-type FlightDetailsTab = 'infos' | 'replay';
+type FlightDetailsTab = 'infos' | 'replay' | 'logs';
 
 export function FlightDetails({
   flight,
@@ -410,6 +410,22 @@ export function FlightDetails({
   const canUseGoproOverlayAction =
     (isGoproOverlayRunning && Boolean(effectiveGoproOverlayJobId)) ||
     (hasGoproCameraVideo && hasVideo && !isGoproOverlayRunning);
+  const hasGenerationLogs = Boolean(
+    flight.video_export_job_id ||
+    videoExportStatus?.internal_status ||
+    videoExportStatus?.status ||
+    videoExportStatus?.job_id ||
+    flight.video_export_status ||
+    goproOverlayJob?.status ||
+    goproOverlayJob?.job_id ||
+    effectiveGoproOverlayJobId ||
+    flight.gopro_overlay_status
+  );
+  const visibleActiveTab: FlightDetailsTab =
+    (mobileMode && !hasGenerationLogs && activeTab === 'logs') ||
+    (!mobileMode && activeTab === 'replay')
+      ? 'infos'
+      : activeTab;
 
   const infoCard = (
     <div className="rounded-xl bg-white p-4 shadow-md dark:bg-gray-800">
@@ -528,14 +544,6 @@ export function FlightDetails({
               onDownload={handleDownloadGoproOverlay}
             />
           )}
-          <FlightGenerationLogsPanel
-            videoStatus={videoExportStatus}
-            videoFallbackStatus={flight.video_export_status}
-            videoFallbackProgress={flight.video_export_progress}
-            goproOverlayJob={goproOverlayJob}
-            goproOverlayFallbackStatus={flight.gopro_overlay_status}
-            goproOverlayFallbackProgress={flight.gopro_overlay_progress}
-          />
           <FlightStatsGrid flight={flight} sites={sites} />
           <FlightNotesSection
             notes={flight.notes}
@@ -564,6 +572,19 @@ export function FlightDetails({
     />
   );
 
+  const logsPanel = (
+    <FlightGenerationLogsPanel
+      videoJobId={flight.video_export_job_id}
+      videoStatus={videoExportStatus}
+      videoFallbackStatus={flight.video_export_status}
+      videoFallbackProgress={flight.video_export_progress}
+      goproOverlayJob={goproOverlayJob}
+      goproOverlayJobId={effectiveGoproOverlayJobId}
+      goproOverlayFallbackStatus={flight.gopro_overlay_status}
+      goproOverlayFallbackProgress={flight.gopro_overlay_progress}
+    />
+  );
+
   if (mobileMode) {
     return (
       <div className="space-y-4">
@@ -584,7 +605,7 @@ export function FlightDetails({
         </div>
 
         <Tabs
-          selectedKey={activeTab}
+          selectedKey={visibleActiveTab}
           onSelectionChange={(key) => {
             const tab = key as FlightDetailsTab;
             setActiveTab(tab);
@@ -594,13 +615,20 @@ export function FlightDetails({
           }}
           className="space-y-4"
         >
-          <TabList className="mb-4 grid-cols-2">
+          <TabList
+            className={`mb-4 ${hasGenerationLogs ? 'grid-cols-3' : 'grid-cols-2'}`}
+          >
             <Tab id="infos" className="rounded-md px-3 py-2 text-sm">
               {t('flights.infoTab')}
             </Tab>
             <Tab id="replay" className="rounded-md px-3 py-2 text-sm">
               {t('flights.replayTab')}
             </Tab>
+            {hasGenerationLogs && (
+              <Tab id="logs" className="rounded-md px-3 py-2 text-sm">
+                {t('flights.logsTab')}
+              </Tab>
+            )}
           </TabList>
 
           <TabPanel id="infos" className="outline-none">
@@ -609,6 +637,11 @@ export function FlightDetails({
           <TabPanel id="replay" className="outline-none">
             {hasOpenedReplay ? replayCard : null}
           </TabPanel>
+          {hasGenerationLogs && (
+            <TabPanel id="logs" className="outline-none">
+              {logsPanel}
+            </TabPanel>
+          )}
         </Tabs>
       </div>
     );
@@ -616,7 +649,22 @@ export function FlightDetails({
 
   return (
     <>
-      {infoCard}
+      {hasGenerationLogs ? (
+        <Tabs
+          selectedKey={visibleActiveTab}
+          onSelectionChange={(key) => setActiveTab(key as FlightDetailsTab)}
+          className="space-y-4"
+        >
+          <TabList className="mb-4 grid-cols-2">
+            <Tab id="infos">{t('flights.infoTab')}</Tab>
+            <Tab id="logs">{t('flights.logsTab')}</Tab>
+          </TabList>
+          <TabPanel id="infos">{infoCard}</TabPanel>
+          <TabPanel id="logs">{logsPanel}</TabPanel>
+        </Tabs>
+      ) : (
+        infoCard
+      )}
       {hasGpx ? replayCard : null}
     </>
   );
