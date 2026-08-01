@@ -42,6 +42,10 @@ def _video_temp_images_dir() -> Path:
     return Path(config.VIDEO_TEMP_IMAGES_DIR)
 
 
+def _video_legacy_temp_images_dir() -> Path:
+    return Path(config.VIDEO_LEGACY_TEMP_IMAGES_DIR)
+
+
 _LOG_TAIL_LINE_COUNT = 100
 
 
@@ -148,6 +152,31 @@ _EXPORT_VIEWER_READY_SCRIPT = f"""
     }}
 """
 
+_WEBGL_RENDERER_SCRIPT = """
+    () => {
+        const canvas = document.querySelector('.cesium-viewer canvas, canvas');
+        if (!canvas) {
+            return { available: false, vendor: '', renderer: '' };
+        }
+
+        const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+        if (!gl) {
+            return { available: false, vendor: '', renderer: '' };
+        }
+
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        return {
+            available: true,
+            vendor: debugInfo
+                ? String(gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) || '')
+                : String(gl.getParameter(gl.VENDOR) || ''),
+            renderer: debugInfo
+                ? String(gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || '')
+                : String(gl.getParameter(gl.RENDERER) || ''),
+        };
+    }
+"""
+
 
 def check_dependencies():
     """Check if required system dependencies are installed."""
@@ -166,6 +195,49 @@ def check_dependencies():
 
 
 _dependencies_ok = check_dependencies()
+
+
+def _is_software_webgl_renderer(renderer: str) -> bool:
+    normalized = renderer.lower()
+    return any(
+        marker in normalized
+        for marker in ("swiftshader", "llvmpipe", "softpipe", "software rasterizer", "swrast")
+    )
+
+
+def _chromium_launch_args(
+    render_device: Path = Path("/dev/dri/renderD128"),
+) -> list[str]:
+    args = [
+        "--enable-gpu",
+        "--enable-webgl",
+        "--enable-webgl2",
+        "--ignore-gpu-blocklist",
+        "--disable-gpu-vsync",
+        "--disable-dev-shm-usage",
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--js-flags=--max-old-space-size=8192",
+        "--disable-background-timer-throttling",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding",
+        "--force-device-scale-factor=1",
+        "--high-dpi-support=1",
+    ]
+    if render_device.exists():
+        return [
+            *args,
+            "--use-gl=angle",
+            "--use-angle=gl-egl",
+            "--enable-gpu-rasterization",
+            "--enable-zero-copy",
+        ]
+    return [
+        *args,
+        "--use-gl=angle",
+        "--use-angle=swiftshader-webgl",
+        "--enable-unsafe-swiftshader",
+    ]
 
 
 def _to_public_status(status: str) -> str:
@@ -524,6 +596,22 @@ def _mark_stale_jobs_as_queued():
             _set_memory_snapshot(job.id, _snapshot_from_job(job))
 
 
+def _recover_active_jobs_after_worker_restart() -> None:
+    with SessionLocal() as db:
+        active_jobs = (
+            db.query(VideoExportJob).filter(VideoExportJob.status.in_(list(_ACTIVE_STATUSES))).all()
+        )
+        for job in active_jobs:
+            job.status = _STATUS_QUEUED
+            job.message = "Recovered after worker restart"
+            job.updated_at = datetime.utcnow()
+        if active_jobs:
+            db.commit()
+
+        for job in active_jobs:
+            _set_memory_snapshot(job.id, _snapshot_from_job(job))
+
+
 def _acquire_next_job() -> str | None:
     with SessionLocal() as db:
         job = (
@@ -652,7 +740,7 @@ def _is_rq_video_export_job_started(job_id: str) -> bool:
     return str(getattr(status, "value", status)).lower() == "started"
 
 
-def enqueue_pending_video_export_jobs() -> int:
+def enqueue_pending_video_export_jobs(*, recover_active: bool = False) -> int:
     """Enqueue queued DB jobs into RQ after an API or worker restart."""
     from job_queue import is_rq_enabled
 
@@ -660,7 +748,10 @@ def enqueue_pending_video_export_jobs() -> int:
     if not is_rq_enabled():
         return 0
 
-    _mark_stale_jobs_as_queued()
+    if recover_active:
+        _recover_active_jobs_after_worker_restart()
+    else:
+        _mark_stale_jobs_as_queued()
     job_ids = _queued_job_ids()
     for job_id in job_ids:
         _enqueue_video_export_job_in_rq(job_id)
@@ -712,6 +803,30 @@ def _first_missing_frame_index(frames_dir: Path, total_frames: int) -> int:
     return max(total_frames, 0)
 
 
+def _contiguous_frame_count(frames_dir: Path) -> int:
+    existing_indexes = _existing_frame_indexes(frames_dir)
+    frame_index = 0
+    while frame_index in existing_indexes:
+        frame_index += 1
+    return frame_index
+
+
+def _job_temp_dir_for_export(job_id: str) -> Path:
+    preferred_temp_dir = _job_temp_dir(_video_temp_images_dir(), job_id)
+    preferred_frames_dir = preferred_temp_dir / "frames"
+    legacy_temp_root = _video_legacy_temp_images_dir()
+    legacy_temp_dir = _job_temp_dir(legacy_temp_root, job_id)
+    if legacy_temp_dir == preferred_temp_dir:
+        return preferred_temp_dir
+
+    preferred_frame_count = _contiguous_frame_count(preferred_frames_dir)
+    legacy_frame_count = _contiguous_frame_count(legacy_temp_dir / "frames")
+    if legacy_frame_count > preferred_frame_count:
+        return legacy_temp_dir
+
+    return preferred_temp_dir
+
+
 def _write_frame_file_atomic(frame_path: Path, frame_png: bytes) -> None:
     partial_path = frame_path.with_name(f"{frame_path.name}.part")
     partial_path.write_bytes(frame_png)
@@ -719,7 +834,7 @@ def _write_frame_file_atomic(frame_path: Path, frame_png: bytes) -> None:
 
 
 def _job_resume_info(job: VideoExportJob) -> dict[str, Any]:
-    frames_dir = _job_frames_dir(_video_temp_images_dir(), job.id)
+    frames_dir = _job_temp_dir_for_export(job.id) / "frames"
     existing_indexes = _existing_frame_indexes(frames_dir)
     total_frames = job.total_frames or 0
     resume_from_frame = _first_missing_frame_index(frames_dir, total_frames)
@@ -818,6 +933,13 @@ def _is_path_older_than(path: Path, age_seconds: int) -> bool:
         return False
 
 
+def _is_job_temp_dir_name(name: str) -> bool:
+    try:
+        return str(uuid.UUID(name)) == name.lower()
+    except ValueError:
+        return False
+
+
 def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, Any]:
     """Delete non-active video export temporary files from configured storage."""
     active_job_ids = {
@@ -832,21 +954,30 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
     }
 
     candidates: list[tuple[Path, Path]] = []
-    temp_root = _video_temp_images_dir()
+    temp_roots = {
+        _video_temp_images_dir().resolve(strict=False),
+        _video_legacy_temp_images_dir().resolve(strict=False),
+    }
     export_root = _video_export_dir()
 
     for job_id in known_inactive_job_ids:
-        candidates.append((_job_temp_dir(temp_root, job_id), temp_root))
+        for temp_root in temp_roots:
+            candidates.append((_job_temp_dir(temp_root, job_id), temp_root))
         candidates.append((export_root / f"frames_{job_id}", export_root))
         candidates.append((Path("/tmp") / f"playwright-debug-{job_id}.png", Path("/tmp")))
         candidates.append((Path("/tmp") / f"playwright-error-{job_id}.png", Path("/tmp")))
 
-    if temp_root.exists():
-        for child in temp_root.iterdir():
-            if child.name not in active_job_ids and _is_path_older_than(
-                child, _ORPHAN_TEMP_CLEANUP_GRACE_SECONDS
-            ):
-                candidates.append((child, temp_root))
+    for temp_root in temp_roots:
+        if temp_root.exists():
+            for child in temp_root.iterdir():
+                if child.resolve(strict=False) in temp_roots:
+                    continue
+                if not _is_job_temp_dir_name(child.name):
+                    continue
+                if child.name not in active_job_ids and _is_path_older_than(
+                    child, _ORPHAN_TEMP_CLEANUP_GRACE_SECONDS
+                ):
+                    candidates.append((child, temp_root))
 
     if export_root.exists():
         for child in export_root.glob("frames_*"):
@@ -889,8 +1020,12 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
 
 def cleanup_video_export_job_temp_files(job_id: str) -> dict[str, Any]:
     """Delete temporary and log files for an explicitly deleted export job."""
+    temp_roots = {
+        _video_temp_images_dir().resolve(strict=False),
+        _video_legacy_temp_images_dir().resolve(strict=False),
+    }
     candidates = [
-        (_job_temp_dir(_video_temp_images_dir(), job_id), _video_temp_images_dir()),
+        *[(_job_temp_dir(temp_root, job_id), temp_root) for temp_root in temp_roots],
         (_video_export_dir() / f"frames_{job_id}", _video_export_dir()),
         (Path("/tmp") / f"playwright-debug-{job_id}.png", Path("/tmp")),
         (Path("/tmp") / f"playwright-error-{job_id}.png", Path("/tmp")),
@@ -1497,7 +1632,6 @@ async def _export_video_manual_render(job_id: str):
     flight_id = job.flight_id
     frontend_url = resolve_frontend_url(job.frontend_url)
     export_root = _video_export_dir()
-    temp_root = _video_temp_images_dir()
     temp_dir: Path | None = None
     frames_dir: Path | None = None
     ffmpeg_process: asyncio.subprocess.Process | None = None
@@ -1526,23 +1660,7 @@ async def _export_video_manual_render(job_id: str):
         async with async_playwright() as p:
             browser = await p.chromium.launch(
                 headless=True,
-                args=[
-                    "--enable-gpu",
-                    "--use-gl=egl",
-                    "--enable-webgl",
-                    "--enable-webgl2",
-                    "--ignore-gpu-blocklist",
-                    "--disable-gpu-vsync",
-                    "--disable-dev-shm-usage",
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--js-flags=--max-old-space-size=8192",
-                    "--disable-background-timer-throttling",
-                    "--disable-backgrounding-occluded-windows",
-                    "--disable-renderer-backgrounding",
-                    "--force-device-scale-factor=1",
-                    "--high-dpi-support=1",
-                ],
+                args=_chromium_launch_args(),
             )
 
             context = await browser.new_context(
@@ -1609,6 +1727,21 @@ async def _export_video_manual_render(job_id: str):
             await asyncio.sleep(3)
 
             _log_job(job_id, "Cesium viewer found")
+
+            renderer_info = await page.evaluate(_WEBGL_RENDERER_SCRIPT)
+            renderer = str(renderer_info.get("renderer") or "unknown")
+            vendor = str(renderer_info.get("vendor") or "unknown")
+            if not renderer_info.get("available"):
+                _log_job(job_id, "WebGL renderer unavailable")
+            elif _is_software_webgl_renderer(renderer):
+                _log_job(
+                    job_id,
+                    f"WebGL renderer is software: vendor={vendor}, renderer={renderer}",
+                )
+            else:
+                _log_job(
+                    job_id, f"WebGL renderer is hardware: vendor={vendor}, renderer={renderer}"
+                )
 
             _update_job(job_id, message="Configuring manual render mode")
 
@@ -1708,8 +1841,8 @@ async def _export_video_manual_render(job_id: str):
             )
             _set_job_runtime(job_id, phase=_STATUS_INITIALIZING)
 
-            temp_dir = _job_temp_dir(temp_root, job_id)
-            frames_dir = _job_frames_dir(temp_root, job_id)
+            temp_dir = _job_temp_dir_for_export(job_id)
+            frames_dir = temp_dir / "frames"
             _prepare_export_dirs(export_root, temp_dir, frames_dir)
 
             _log_job(job_id, f"Frames directory: {frames_dir}")

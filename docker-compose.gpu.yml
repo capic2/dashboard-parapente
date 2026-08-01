@@ -1,0 +1,4 @@
+services:
+  backend-worker:
+    devices:
+      - ${VIDEO_WORKER_DRI_RENDER_DEVICE:-/dev/dri/renderD128}:${VIDEO_WORKER_DRI_RENDER_DEVICE:-/dev/dri/renderD128}
