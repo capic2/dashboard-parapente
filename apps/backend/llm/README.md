@@ -113,8 +113,9 @@ result = analyze_emagram_with_gemini(
 
 Utilise Codex CLI avec la session ChatGPT persistée dans `CODEX_HOME/auth.json`.
 Ce provider est toujours différé jusqu'à ce que tous les providers/modèles gratuits
-configurés aient signalé un quota épuisé. Une panne ou une réponse invalide d'un
-provider gratuit n'autorise pas le recours à Codex.
+configurés aient signalé un quota épuisé ou une indisponibilité permanente du modèle.
+Une panne transitoire ou une réponse invalide d'un provider gratuit n'autorise pas le
+recours à Codex.
 
 ```bash
 BACKEND_LLM_FALLBACK_ORDER=groq,openrouter,github_models,huggingface,google,custom_openai,codex
@@ -180,7 +181,7 @@ Le fichier [`emagram_multi_source.py`](../emagram_multi_source.py) utilise la st
    └─> Endpoint libre pour ajouter un autre provider sans code
 
 7. Priority 7: Codex CLI (si présent dans BACKEND_LLM_FALLBACK_ORDER)
-   └─> Compte ChatGPT Plus, uniquement après épuisement de tous les quotas gratuits
+   └─> Compte ChatGPT Plus, après épuisement ou indisponibilité des providers gratuits
 
 8. Échec: Retour d'erreur
 ```
@@ -188,8 +189,8 @@ Le fichier [`emagram_multi_source.py`](../emagram_multi_source.py) utilise la st
 L'ordre des providers éligibles est configurable avec `BACKEND_LLM_FALLBACK_ORDER`,
 par exemple `google,groq,openrouter` si la qualité Gemini doit primer sur
 l'économie de quota. Codex reste toujours différé après les autres providers,
-même si `codex` apparaît plus tôt dans cette liste, et sa garde quota continue de
-s'appliquer.
+même si `codex` apparaît plus tôt dans cette liste, jusqu'à ce que tous les
+providers gratuits soient en quota ou indisponibles.
 
 ## Format de réponse
 

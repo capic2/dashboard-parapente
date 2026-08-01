@@ -29,6 +29,7 @@ def _site() -> SimpleNamespace:
 @pytest.fixture(autouse=True)
 def clear_llm_cooldowns() -> None:
     emagram._LLM_QUOTA_COOLDOWNS.clear()
+    emagram._LLM_UNAVAILABLE_COOLDOWNS.clear()
 
 
 def _configure_providers(monkeypatch: pytest.MonkeyPatch, order: list[str]) -> None:
@@ -322,6 +323,35 @@ def test_codex_does_not_run_after_non_quota_free_failure(
 
     assert result["success"] is False
     assert calls == ["groq", "openrouter"]
+
+
+def test_codex_runs_after_free_models_are_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = []
+    _configure_providers(monkeypatch, ["groq", "openrouter", "codex"])
+    monkeypatch.setattr(emagram.config, "LLM_QUOTA_COOLDOWN_SECONDS", 60)
+
+    def unavailable(**kwargs: Any) -> dict[str, Any]:
+        calls.append(kwargs.get("model_name", "groq"))
+        raise RuntimeError("HTTP 404: model_not_found")
+
+    def codex(**kwargs: Any) -> dict[str, Any]:
+        calls.append("codex")
+        return _analysis("codex")
+
+    monkeypatch.setattr(emagram, "analyze_emagram_with_groq", unavailable)
+    monkeypatch.setattr(emagram, "analyze_emagram_with_openrouter", unavailable)
+    monkeypatch.setattr(emagram, "analyze_emagram_with_codex", codex)
+
+    first_result = emagram._analyze_emagram_with_fallbacks(["/tmp/emagram.png"], _site())
+    second_result = emagram._analyze_emagram_with_fallbacks(["/tmp/emagram.png"], _site())
+
+    assert first_result["success"] is True
+    assert first_result["llm_provider"] == "codex"
+    assert second_result["success"] is True
+    assert second_result["llm_provider"] == "codex"
+    assert calls == ["groq-model", "openrouter-model", "codex", "codex"]
 
 
 def test_codex_stays_last_and_runs_after_custom_failure(

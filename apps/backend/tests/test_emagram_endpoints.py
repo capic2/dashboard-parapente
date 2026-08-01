@@ -382,8 +382,8 @@ class TestEmagramEndpoints:
         assert response.status_code == 200
         assert response.json() is None
 
-    def test_get_latest_hour_returns_most_recent_attempt_for_site(self, client, db_session):
-        """Latest endpoint returns newest hourly attempt even if it failed."""
+    def test_get_latest_hour_preserves_recent_usable_analysis(self, client, db_session):
+        """Latest endpoint keeps usable hourly data when a newer attempt failed."""
         app_settings.invalidate_cache()
 
         site = Site(
@@ -442,8 +442,8 @@ class TestEmagramEndpoints:
         data = response.json()
         assert data is not None
         assert data["forecast_hour"] == 13
-        assert data["analysis_status"] == "failed"
-        assert data["error_message"] == "Recent provider timeout"
+        assert data["analysis_status"] == "completed"
+        assert data["id"] == "latest-hour-completed-old"
 
     def test_get_emagram_hours_ignores_stale_analysis(self, client, db_session):
         """Hourly endpoint excludes stale analyses but still exposes pending slots."""
@@ -748,7 +748,7 @@ class TestEmagramEndpoints:
                 json={"site_id": site.id, "force_refresh": True},
             )
 
-        assert response.status_code == 500
+        assert response.status_code == 503
         detail = response.json()["detail"]
         assert detail["message"] == "Failed to generate emagram: LLM analysis failed"
         assert detail["error"] == "LLM analysis failed"

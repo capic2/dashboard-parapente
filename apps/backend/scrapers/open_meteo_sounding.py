@@ -5,9 +5,11 @@ Fetches model-based pressure-level profiles and normalizes them for the
 Skew-T generator used by the LLM vision pipeline.
 """
 
-from datetime import datetime
+from collections import OrderedDict
+from datetime import datetime, timezone
 from time import monotonic
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -32,7 +34,10 @@ OPEN_METEO_MODEL_CONFIGS = {
     },
 }
 OPEN_METEO_RATE_LIMIT_COOLDOWN_SECONDS = 15 * 60
+OPEN_METEO_RESPONSE_CACHE_SECONDS = 60 * 60
+OPEN_METEO_RESPONSE_CACHE_MAX_ENTRIES = 64
 _OPEN_METEO_RATE_LIMIT_COOLDOWNS: dict[str, float] = {}
+_OPEN_METEO_RESPONSE_CACHE: OrderedDict[str, tuple[float, dict[str, Any], str]] = OrderedDict()
 
 COMMON_PRESSURE_LEVELS = [
     1000,
@@ -129,7 +134,52 @@ def _target_hour_index(day_index: int, hour: int | None, forecast_hour: int) -> 
 
 
 def _open_meteo_cooldown_key(model_key: str, latitude: float, longitude: float) -> str:
+    del latitude, longitude
+    return model_key
+
+
+def _open_meteo_cache_key(model_key: str, latitude: float, longitude: float) -> str:
     return f"{model_key}:{latitude:.3f}:{longitude:.3f}"
+
+
+def _get_cached_open_meteo_response(cache_key: str) -> tuple[dict[str, Any], str] | None:
+    _prune_open_meteo_response_cache()
+    cached = _OPEN_METEO_RESPONSE_CACHE.get(cache_key)
+    if not cached:
+        return None
+    _, payload, response_url = cached
+    _OPEN_METEO_RESPONSE_CACHE.move_to_end(cache_key)
+    return payload, response_url
+
+
+def _cache_open_meteo_response(cache_key: str, payload: dict[str, Any], response_url: str) -> None:
+    _prune_open_meteo_response_cache()
+    _OPEN_METEO_RESPONSE_CACHE[cache_key] = (
+        monotonic() + OPEN_METEO_RESPONSE_CACHE_SECONDS,
+        payload,
+        response_url,
+    )
+    _OPEN_METEO_RESPONSE_CACHE.move_to_end(cache_key)
+    while len(_OPEN_METEO_RESPONSE_CACHE) > OPEN_METEO_RESPONSE_CACHE_MAX_ENTRIES:
+        _OPEN_METEO_RESPONSE_CACHE.popitem(last=False)
+
+
+def _prune_open_meteo_response_cache() -> None:
+    now = monotonic()
+    expired_keys = [
+        cache_key
+        for cache_key, (expires_at, _, _) in _OPEN_METEO_RESPONSE_CACHE.items()
+        if expires_at <= now
+    ]
+    for cache_key in expired_keys:
+        _OPEN_METEO_RESPONSE_CACHE.pop(cache_key, None)
+
+
+def _open_meteo_timestamp_utc(timestamp: str) -> datetime:
+    parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=ZoneInfo("Europe/Paris"))
+    return parsed.astimezone(timezone.utc)
 
 
 def _get_open_meteo_cooldown_error(cooldown_key: str, source: str) -> dict[str, Any] | None:
@@ -195,8 +245,6 @@ async def fetch_open_meteo_sounding(
 
     config = OPEN_METEO_MODEL_CONFIGS[model_key]
     cooldown_key = _open_meteo_cooldown_key(model_key, latitude, longitude)
-    if cooldown_error := _get_open_meteo_cooldown_error(cooldown_key, config["source"]):
-        return cooldown_error
 
     pressure_levels = _pressure_levels_for_model(model_key)
     if (
@@ -213,6 +261,17 @@ async def fetch_open_meteo_sounding(
             ),
         }
     target_index = _target_hour_index(day_index, hour, forecast_hour)
+    cache_key = _open_meteo_cache_key(model_key, latitude, longitude)
+    cached_response = _get_cached_open_meteo_response(cache_key)
+    if cached_response:
+        cached_payload, _ = cached_response
+        cached_times = cached_payload.get("hourly", {}).get("time", [])
+        if target_index >= len(cached_times):
+            cached_response = None
+
+    if not cached_response:
+        if cooldown_error := _get_open_meteo_cooldown_error(cooldown_key, config["source"]):
+            return cooldown_error
 
     temp_params = [f"temperature_{level}hPa" for level in pressure_levels]
     dewpoint_params = [f"dew_point_{level}hPa" for level in pressure_levels]
@@ -226,17 +285,26 @@ async def fetch_open_meteo_sounding(
         "hourly": ",".join(
             temp_params + dewpoint_params + wind_speed_params + wind_dir_params + height_params
         ),
-        "forecast_days": max(1, (target_index // 24) + 1),
+        # Fetch the scheduler's full J/J+1/J+2 horizon once and reuse it for each hour.
+        "forecast_days": max(3, (target_index // 24) + 1),
         "wind_speed_unit": "kmh",
+        "timezone": "Europe/Paris",
     }
     if config["model"] != "auto":
         params["models"] = config["model"]
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(config["base_url"], params=params)
-            response.raise_for_status()
-            payload = response.json()
+        if cached_response:
+            payload, response_url = cached_response
+            from_cache = True
+        else:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(config["base_url"], params=params)
+                response.raise_for_status()
+                payload = response.json()
+                response_url = str(response.url)
+            _cache_open_meteo_response(cache_key, payload, response_url)
+            from_cache = False
 
         hourly = payload.get("hourly", {})
         times = hourly.get("time", [])
@@ -289,12 +357,12 @@ async def fetch_open_meteo_sounding(
                 "error": f"Insufficient Open-Meteo pressure levels for {config['label']}",
             }
 
-        sounding_datetime = datetime.fromisoformat(times[target_index].replace("Z", "+00:00"))
+        sounding_datetime = _open_meteo_timestamp_utc(times[target_index])
         return {
             "success": True,
             "source": config["source"],
             "model": config["label"],
-            "external_url": str(response.url),
+            "external_url": response_url,
             "station_name": f"{config['label']} ({latitude:.2f}N, {longitude:.2f}E)",
             "station_latitude": latitude,
             "station_longitude": longitude,
@@ -306,7 +374,7 @@ async def fetch_open_meteo_sounding(
             "data": {"levels": levels, "station_pressure": 1013.25},
             "generator_data": _levels_to_generator_data(levels),
             "timestamp": datetime.now().isoformat(),
-            "from_cache": False,
+            "from_cache": from_cache,
         }
 
     except httpx.HTTPStatusError as e:

@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import datetime
+from typing import Any, Self
 
 import pytest
 
@@ -139,6 +140,7 @@ class _FakeHttpResponse:
 class _FakeAsyncClient:
     def __init__(self, *, page_html: str) -> None:
         self.page_html = page_html
+        self.requests: list[str] = []
 
     async def __aenter__(self):
         return self
@@ -147,6 +149,7 @@ class _FakeAsyncClient:
         return None
 
     async def get(self, url: str) -> _FakeHttpResponse:
+        self.requests.append(url)
         if url.endswith(".png"):
             return _FakeHttpResponse(content=b"png", url=url)
         return _FakeHttpResponse(text=self.page_html, url=url)
@@ -154,13 +157,14 @@ class _FakeAsyncClient:
 
 @pytest.mark.asyncio
 async def test_meteociel_screenshot_downloads_emagram_image(monkeypatch, tmp_path) -> None:
+    fake_client = _FakeAsyncClient(
+        page_html='<html><img src="/modeles/sondagegfs/sondagegfs_6_47.2_27_0.png"></html>'
+    )
     monkeypatch.setattr(emagram_screenshots, "EMAGRAM_CACHE_DIR", tmp_path)
     monkeypatch.setattr(
         emagram_screenshots.httpx,
         "AsyncClient",
-        lambda **kwargs: _FakeAsyncClient(
-            page_html='<html><img src="/modeles/sondagegfs/sondagegfs_6_47.2_27_0.png"></html>'
-        ),
+        lambda **kwargs: fake_client,
     )
 
     result = await emagram_screenshots.screenshot_meteociel_emagram(
@@ -173,6 +177,92 @@ async def test_meteociel_screenshot_downloads_emagram_image(monkeypatch, tmp_pat
     assert result["success"] is True
     assert result["source"] == "meteociel"
     assert Path(result["image_path"]).read_bytes() == b"png"
+    assert "ech=12" in fake_client.requests[0]
+
+
+@pytest.mark.parametrize(
+    ("day_index", "hour", "expected"),
+    [(0, 4, 6), (0, 10, 12), (0, 11, 12), (1, 10, 36), (2, None, 51)],
+)
+def test_meteociel_forecast_step_uses_supported_three_hour_intervals(
+    day_index: int, hour: int | None, expected: int
+) -> None:
+    assert emagram_screenshots._meteociel_forecast_step(day_index, hour) == expected
+
+
+class _FakeTimeWheelLocator:
+    def __init__(self, page: "_FakeTimeWheelPage", selector: str) -> None:
+        self.page = page
+        self.selector = selector
+
+    @property
+    def first(self) -> Self:
+        return self
+
+    async def count(self) -> int:
+        return int(self.selector in self.page.allowed_selectors)
+
+    async def inner_text(self) -> str:
+        if self.selector != ".time-control .label strong":
+            raise AssertionError(f"Unexpected text selector: {self.selector}")
+        suffix = "AM" if self.page.hour < 12 else "PM"
+        display_hour = self.page.hour % 12 or 12
+        return f"Sat 1st - {display_hour}:00 {suffix}"
+
+    async def click(self, *args: Any, **kwargs: Any) -> None:
+        if self.selector not in {".next-hour.button", ".previous-hour.button"}:
+            raise AssertionError(f"Unexpected click selector: {self.selector}")
+        self.page.clicked.append(self.selector)
+        self.page.pending_direction = 1 if self.selector == ".next-hour.button" else -1
+        self.page.wait_count = 0
+
+
+class _FakeTimeWheelPage:
+    allowed_selectors = {
+        ".time-control .label strong",
+        ".next-hour.button",
+        ".previous-hour.button",
+    }
+
+    def __init__(self, hour: int, delayed_updates: int = 0) -> None:
+        self.hour = hour
+        self.delayed_updates = delayed_updates
+        self.clicked: list[str] = []
+        self.pending_direction: int | None = None
+        self.wait_count = 0
+
+    def locator(self, selector: str) -> _FakeTimeWheelLocator:
+        return _FakeTimeWheelLocator(self, selector)
+
+    async def wait_for_timeout(self, *args: Any, **kwargs: Any) -> None:
+        if self.pending_direction is None:
+            return
+        self.wait_count += 1
+        if self.wait_count > self.delayed_updates:
+            self.hour = (self.hour + self.pending_direction) % 24
+            self.pending_direction = None
+
+
+@pytest.mark.asyncio
+async def test_meteo_parapente_navigates_current_time_wheel() -> None:
+    page = _FakeTimeWheelPage(hour=13)
+
+    navigated = await emagram_screenshots._navigate_meteo_parapente_hour(page, 10)
+
+    assert navigated is True
+    assert page.hour == 10
+    assert page.clicked == [".previous-hour.button"] * 3
+
+
+@pytest.mark.asyncio
+async def test_meteo_parapente_waits_for_time_wheel_label_change() -> None:
+    page = _FakeTimeWheelPage(hour=13, delayed_updates=3)
+
+    navigated = await emagram_screenshots._navigate_meteo_parapente_hour(page, 12)
+
+    assert navigated is True
+    assert page.hour == 12
+    assert page.clicked == [".previous-hour.button"]
 
 
 @pytest.mark.asyncio
