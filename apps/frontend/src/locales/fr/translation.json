@@ -1061,6 +1061,7 @@
     "gpxFileInput": "Fichier GPX",
     "infoTab": "Infos",
     "replayTab": "Replay",
+    "logsTab": "Logs",
     "backToList": "← Retour",
     "replayUnavailable": "Aucun GPX disponible pour ce vol",
     "viewerExportMissingFlightId": "Aucun identifiant de vol fourni. Utilisez ?flightId=xxx",

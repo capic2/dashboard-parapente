@@ -4,10 +4,12 @@ import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
 import { JobLogViewer } from '../job-logs/JobLogViewer';
 
 type FlightGenerationLogsPanelProps = {
+  videoJobId?: string | null;
   videoStatus: VideoExportStatusPayload | null;
   videoFallbackStatus?: string | null;
   videoFallbackProgress?: number | null;
   goproOverlayJob: GoproOverlayJob | null;
+  goproOverlayJobId?: string | null;
   goproOverlayFallbackStatus?: string | null;
   goproOverlayFallbackProgress?: number | null;
 };
@@ -131,10 +133,12 @@ function LogSourceCard({
 }
 
 export function FlightGenerationLogsPanel({
+  videoJobId,
   videoStatus,
   videoFallbackStatus,
   videoFallbackProgress,
   goproOverlayJob,
+  goproOverlayJobId,
   goproOverlayFallbackStatus,
   goproOverlayFallbackProgress,
 }: FlightGenerationLogsPanelProps) {
@@ -146,9 +150,11 @@ export function FlightGenerationLogsPanel({
     null;
   const goproOverlayStatusValue =
     goproOverlayJob?.status ?? goproOverlayFallbackStatus ?? null;
-  const hasVideoLogSource = Boolean(videoStatusValue || videoStatus?.job_id);
+  const hasVideoLogSource = Boolean(
+    videoStatusValue || videoStatus?.job_id || videoJobId
+  );
   const hasGoproOverlayLogSource = Boolean(
-    goproOverlayStatusValue || goproOverlayJob?.job_id
+    goproOverlayStatusValue || goproOverlayJob?.job_id || goproOverlayJobId
   );
 
   if (!hasVideoLogSource && !hasGoproOverlayLogSource) {
