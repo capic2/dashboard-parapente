@@ -7,6 +7,7 @@ import asyncio
 import base64
 import logging
 import os
+import re
 from contextlib import suppress
 from datetime import datetime
 from datetime import timedelta
@@ -26,6 +27,7 @@ EMAGRAM_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 METEO_PARAPENTE_SCREENSHOT_TIMEOUT_SECONDS = 35
 METEOCIEL_SCREENSHOT_TIMEOUT_SECONDS = 30
 OPEN_METEO_EMAGRAM_TIMEOUT_SECONDS = 35
+_METEO_PARAPENTE_HOUR_RE = re.compile(r"(\d{1,2}):(\d{2})\s*(AM|PM)", re.IGNORECASE)
 
 
 def _meteo_parapente_day_labels(day_index: int) -> list[str]:
@@ -50,6 +52,52 @@ async def _click_first_available(page: Any, selectors: list[str], timeout: int) 
         except Exception:
             continue
     return None
+
+
+def _parse_meteo_parapente_hour(label: str) -> int | None:
+    match = _METEO_PARAPENTE_HOUR_RE.search(label)
+    if not match:
+        return None
+    hour = int(match.group(1)) % 12
+    if match.group(3).upper() == "PM":
+        hour += 12
+    return hour
+
+
+async def _navigate_meteo_parapente_hour(page: Any, target_hour: int) -> bool:
+    """Navigate the current Meteo-Parapente time wheel and verify the selected hour."""
+    label = page.locator(".time-control .label strong").first
+    if await label.count() == 0:
+        return False
+
+    for _ in range(24):
+        current_hour = _parse_meteo_parapente_hour(await label.inner_text())
+        if current_hour is None:
+            return False
+        if current_hour == target_hour:
+            return True
+
+        forward_steps = (target_hour - current_hour) % 24
+        selector = ".next-hour.button" if forward_steps <= 12 else ".previous-hour.button"
+        control = page.locator(selector).first
+        if await control.count() == 0:
+            return False
+        previous_label = await label.inner_text()
+        await control.click(timeout=2000)
+        for _ in range(20):
+            await page.wait_for_timeout(100)
+            if await label.inner_text() != previous_label:
+                break
+        else:
+            return False
+
+    return False
+
+
+def _meteociel_forecast_step(day_index: int, hour: int | None) -> int:
+    """Return the next Meteociel GFS forecast step, which must be divisible by three."""
+    target_hour = (day_index * 24) + (hour if hour is not None else 3)
+    return max(3, ((target_hour + 2) // 3) * 3)
 
 
 async def _capture_page_png(
@@ -176,6 +224,7 @@ async def screenshot_meteo_parapente(
                 logger.info(f"Navigating to day +{day_index} on Meteo-Parapente...")
                 for _ in range(day_index):
                     next_day_selectors = [
+                        ".next-day.button",
                         "button.next-day",
                         "[data-action='next-day']",
                         ".day-nav-next",
@@ -237,39 +286,10 @@ async def screenshot_meteo_parapente(
                 logger.info(f"Navigating to hour {hour}h on Meteo-Parapente...")
                 hour_navigated = False
                 try:
-                    # Strategy 1: Try clicking hour buttons/labels
-                    hour_selectors = [
-                        f"[data-hour='{hour}']",
-                        f"button:has-text('{hour}h')",
-                        f"button:has-text('{hour}:00')",
-                        f".hour-label:has-text('{hour}')",
-                    ]
-                    clicked_selector = await _click_first_available(
-                        page, hour_selectors, timeout=2000
-                    )
-                    if clicked_selector:
-                        hour_navigated = True
-                        logger.info(f"Clicked hour selector: {clicked_selector}")
-
-                    # Strategy 2: Try to set a range slider via JS
-                    if not hour_navigated:
-                        slider_selectors = [
-                            "input[type='range']",
-                            ".time-slider input",
-                            ".slider input",
-                        ]
-                        for sel in slider_selectors:
-                            try:
-                                slider = page.locator(sel).first
-                                if await slider.count() > 0:
-                                    await slider.evaluate(
-                                        f"el => {{ el.value = {hour}; el.dispatchEvent(new Event('input', {{bubbles: true}})); el.dispatchEvent(new Event('change', {{bubbles: true}})); }}"
-                                    )
-                                    hour_navigated = True
-                                    logger.info(f"Set hour via slider: {sel}")
-                                    break
-                            except Exception:
-                                continue
+                    # Current Meteo-Parapente UI exposes a custom time wheel.
+                    hour_navigated = await _navigate_meteo_parapente_hour(page, hour)
+                    if hour_navigated:
+                        logger.info("Selected and verified hour via Meteo-Parapente time wheel")
 
                     if not hour_navigated:
                         raise RuntimeError(
@@ -374,10 +394,7 @@ async def screenshot_meteociel_emagram(
 
     mode=0 = emagram display, ech = forecast step in hours from model run
     """
-    if hour is not None:
-        ech = hour + (day_index * 24)
-    else:
-        ech = 3 + (day_index * 24)
+    ech = _meteociel_forecast_step(day_index, hour)
     url = f"https://www.meteociel.fr/modeles/sondage2.php?mode=0&lon={longitude}&lat={latitude}&ech={ech}&map=0"
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     hour_suffix = f"_h{hour}" if hour is not None else ""
@@ -550,10 +567,7 @@ async def fetch_all_emagram_screenshots(
     logger.info(f"🎬 Starting screenshot fetch for {spot_name} ({spot_id})")
     logger.info(f"   Coordinates: {latitude}, {longitude}")
     meteo_parapente_url = f"https://meteo-parapente.com/#/sounding/{latitude}/{longitude}"
-    if hour is not None:
-        meteociel_ech = hour + (day_index * 24)
-    else:
-        meteociel_ech = 3 + (day_index * 24)
+    meteociel_ech = _meteociel_forecast_step(day_index, hour)
     meteociel_url = (
         "https://www.meteociel.fr/modeles/sondage2.php"
         f"?mode=0&lon={longitude}&lat={latitude}&ech={meteociel_ech}&map=0"
