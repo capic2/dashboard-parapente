@@ -29,6 +29,24 @@ def _resolve_project_root(backend_root: Path) -> Path:
     return backend_root
 
 
+def _configured_storage_dir(
+    env_name: str,
+    default: str,
+    *,
+    forbidden_roots: tuple[Path, ...] = (),
+) -> str:
+    raw_value = os.getenv(env_name)
+    value = raw_value.strip() if raw_value and raw_value.strip() else default
+    path = Path(value)
+    if not path.is_absolute():
+        raise ValueError(f"{env_name} must be an absolute path")
+
+    resolved_path = path.resolve(strict=False)
+    if resolved_path in {root.resolve(strict=False) for root in forbidden_roots}:
+        raise ValueError(f"{env_name} points to an unsafe shared root: {resolved_path}")
+    return str(path)
+
+
 PROJECT_ROOT = _resolve_project_root(BACKEND_ROOT)
 
 # Charger les variables d'environnement selon le contexte
@@ -228,7 +246,23 @@ PARAGLIDING_DATA_ROOT = (
     "/tmp/dashboard-parapente-test/parapente" if IS_TEST_ENV else "/app/parapente"
 )
 VIDEO_EXPORT_DIR = PARAGLIDING_DATA_ROOT
-VIDEO_TEMP_IMAGES_DIR = str(Path(PARAGLIDING_DATA_ROOT) / ".tmp" / "video-frames")
+VIDEO_LEGACY_TEMP_IMAGES_DIR = str(Path(PARAGLIDING_DATA_ROOT) / ".tmp" / "video-frames")
+VIDEO_TEMP_IMAGES_DIR = _configured_storage_dir(
+    "BACKEND_VIDEO_TEMP_IMAGES_DIR",
+    VIDEO_LEGACY_TEMP_IMAGES_DIR,
+    forbidden_roots=(
+        Path("/"),
+        Path("/tmp"),
+        Path("/var/tmp"),
+        Path("/app"),
+        Path("/app/db"),
+        Path("/app/video-exports"),
+        Path("/app/emagram-cache"),
+        Path("/app/gopro-overlay"),
+        Path("/app/codex-home"),
+        Path(PARAGLIDING_DATA_ROOT),
+    ),
+)
 
 # ============================================================================
 # GOPRO OVERLAY EXPORT

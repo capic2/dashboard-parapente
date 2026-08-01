@@ -21,7 +21,7 @@ def main() -> None:
     if not is_rq_enabled():
         raise RuntimeError("RQ worker requires BACKEND_JOB_QUEUE_BACKEND=rq")
 
-    queued_count = enqueue_pending_video_export_jobs()
+    queued_count = enqueue_pending_video_export_jobs(recover_active=True)
     if queued_count:
         logger.info("Enqueued %s pending video export job(s)", queued_count)
 

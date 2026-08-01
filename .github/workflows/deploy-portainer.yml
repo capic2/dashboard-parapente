@@ -462,16 +462,49 @@ jobs:
             }
 
             configure_compose_cmd() {
+              compose_files="-f docker-compose.yml"
+              if [ -f docker-compose.gpu.yml ]; then
+                compose_files="$compose_files -f docker-compose.gpu.yml"
+                echo "Using GPU compose override"
+              fi
+
               if [ -f stack.env ]; then
-                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" --env-file stack.env "$@"; }
+                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files --env-file stack.env "$@"; }
                 echo "Using stack.env for docker compose"
               elif [ -f .env ]; then
-                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" --env-file .env "$@"; }
+                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files --env-file .env "$@"; }
                 echo "Using .env for docker compose"
               else
-                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" "$@"; }
+                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files "$@"; }
                 echo "No env file found (stack.env/.env), using shell environment"
               fi
+            }
+
+            download_gpu_compose_override() {
+              gpu_url="https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.gpu.yml"
+              if ! gpu_status=$(curl --silent --show-error --location \
+                --output docker-compose.gpu.yml.tmp \
+                --write-out '%{http_code}' \
+                "$gpu_url"); then
+                rm -f docker-compose.gpu.yml.tmp
+                echo "Failed to download GPU compose override"
+                return 1
+              fi
+
+              case "$gpu_status" in
+                200)
+                  mv docker-compose.gpu.yml.tmp docker-compose.gpu.yml
+                  ;;
+                404)
+                  rm -f docker-compose.gpu.yml.tmp docker-compose.gpu.yml
+                  echo "GPU compose override not present at target commit; using CPU compose"
+                  ;;
+                *)
+                  rm -f docker-compose.gpu.yml.tmp
+                  echo "GPU compose override download returned HTTP $gpu_status"
+                  return 1
+                  ;;
+              esac
             }
 
             deploy_from_compose_path() {
@@ -492,6 +525,7 @@ jobs:
               echo "Updating production compose file from $REPO_SLUG@$TARGET_SHA"
               curl -fsSL "https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.yml" -o docker-compose.yml.tmp
               mv docker-compose.yml.tmp docker-compose.yml
+              download_gpu_compose_override
 
               configure_compose_cmd
 
@@ -525,12 +559,39 @@ jobs:
                   curl -fsSL "https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.yml" -o docker-compose.yml.tmp
                   mv docker-compose.yml.tmp docker-compose.yml
 
+                  gpu_url="https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.gpu.yml"
+                  if ! gpu_status=$(curl --silent --show-error --location \
+                    --output docker-compose.gpu.yml.tmp \
+                    --write-out "%{http_code}" \
+                    "$gpu_url"); then
+                    rm -f docker-compose.gpu.yml.tmp
+                    echo "Failed to download GPU compose override"
+                    exit 1
+                  fi
+                  case "$gpu_status" in
+                    200) mv docker-compose.gpu.yml.tmp docker-compose.gpu.yml ;;
+                    404)
+                      rm -f docker-compose.gpu.yml.tmp docker-compose.gpu.yml
+                      echo "GPU compose override not present at target commit; using CPU compose"
+                      ;;
+                    *)
+                      rm -f docker-compose.gpu.yml.tmp
+                      echo "GPU compose override download returned HTTP $gpu_status"
+                      exit 1
+                      ;;
+                  esac
+
+                  compose_files="-f docker-compose.yml"
+                  if [ -f docker-compose.gpu.yml ]; then
+                    compose_files="$compose_files -f docker-compose.gpu.yml"
+                  fi
+
                   if [ -f stack.env ]; then
-                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" --env-file stack.env "$@"; }
+                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files --env-file stack.env "$@"; }
                   elif [ -f .env ]; then
-                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" --env-file .env "$@"; }
+                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files --env-file .env "$@"; }
                   else
-                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" "$@"; }
+                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files "$@"; }
                   fi
 
                   printf "%s" "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
