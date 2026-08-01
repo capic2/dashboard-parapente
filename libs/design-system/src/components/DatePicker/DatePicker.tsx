@@ -15,18 +15,18 @@ import {
   Dialog,
   Popover,
 } from 'react-aria-components';
-import type { CalendarDate } from '@internationalized/date';
+import type { DateValue } from 'react-aria-components';
 import { parseDate } from '@internationalized/date';
 import { useTranslation } from 'react-i18next';
 import { getToday } from '../../utils/dateUtils';
 
-function getCalendarValue(value: string): CalendarDate | null {
+function getCalendarValue(value: string): DateValue | null {
   if (!value) {
     return null;
   }
 
   try {
-    return parseDate(value);
+    return parseDate(value) as unknown as DateValue;
   } catch {
     return null;
   }
@@ -41,9 +41,9 @@ interface DatePickerProps {
 export function DatePicker({ label, value, onChange }: DatePickerProps) {
   const { t } = useTranslation();
   const calendarValue = getCalendarValue(value);
-  const todayDate = getToday();
+  const todayDate = getToday().toString();
 
-  const handleChange = (date: CalendarDate | null) => {
+  const handleChange = (date: DateValue | null) => {
     if (date) {
       onChange(date.toString());
     } else {
@@ -149,7 +149,7 @@ export function DatePicker({ label, value, onChange }: DatePickerProps) {
                       disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-default
                       outside-month:text-gray-300 dark:outside-month:text-gray-600
                       focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1
-                      ${!calendarValue && date.compare(todayDate) === 0 ? 'font-bold text-sky-600 dark:text-sky-400' : ''}
+                      ${!calendarValue && date.toString() === todayDate ? 'font-bold text-sky-600 dark:text-sky-400' : ''}
                     `}
                   />
                 )}
