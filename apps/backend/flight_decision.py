@@ -260,6 +260,7 @@ def _build_hour_decision(
     score = _score_for_objective(para_index, hour, objective)
     risks = _hour_risks(hour, thresholds)
     wind_decollage = _wind_decollage(hour.get("wind_direction"), site_orientation)
+    score = _cap_score_for_launch_wind(score, wind_decollage["status"], thresholds)
     if wind_decollage["severity"] != "info":
         risks.append(
             _diagnostic(
@@ -309,6 +310,18 @@ def _score_for_objective(para_index: int, hour: dict[str, Any], objective: Fligh
     if thunderstorm in {"modere", "eleve"}:
         adjustment = min(adjustment, 0)
     return max(0, min(100, round(para_index + adjustment)))
+
+
+def _cap_score_for_launch_wind(score: int, status: str, thresholds: dict[str, float]) -> int:
+    score_ceiling_by_status = {
+        "travers_acceptable": thresholds["para_verdict_good_min"] - 1,
+        "travers_fort": thresholds["para_verdict_medium_min"] - 1,
+        "cul": thresholds["para_verdict_limit_min"] - 1,
+        "orientation_unknown": thresholds["para_verdict_good_min"] - 1,
+        "not_evaluated": thresholds["para_verdict_good_min"] - 1,
+    }
+    ceiling = score_ceiling_by_status.get(status)
+    return score if ceiling is None else max(0, min(score, round(ceiling)))
 
 
 def _hour_risks(hour: dict[str, Any], thresholds: dict[str, float]) -> list[dict[str, Any]]:

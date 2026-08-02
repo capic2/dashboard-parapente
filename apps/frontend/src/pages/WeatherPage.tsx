@@ -572,6 +572,7 @@ export default function WeatherPage() {
         canForceRefresh={canForceRefresh}
         isForceRefreshing={isForceRefreshing}
         onForceRefresh={handleForceRefresh}
+        flightDecision={flightDecision.data}
       />
     ) : undefined;
 
@@ -693,6 +694,7 @@ export default function WeatherPage() {
             canForceRefresh={canForceRefresh}
             isForceRefreshing={isForceRefreshing}
             onForceRefresh={handleForceRefresh}
+            flightDecision={flightDecision.data}
           />
         )}
       </div>
