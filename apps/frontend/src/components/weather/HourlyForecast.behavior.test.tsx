@@ -17,6 +17,10 @@ vi.mock('react-i18next', () => ({
         'weather.refreshingData': 'Rechargement...',
         'weather.hourly.reasons.thunderstorms': 'Orages',
         'weather.hourly.reasons.thunderstormRisk': "Risque d'orage",
+        'weather.hourly.flightScore': 'Note de vol corrigée',
+        'weather.hourly.rawParaIndex': 'Para-Index météo brut',
+        'weather.hourly.launchWind': 'Vent au décollage',
+        'flightDecision.windDecollage.travers_fort': 'Travers fort',
         'weather.staleSourceDataWithDate': `données non actualisées, limite API atteinte, affichées depuis le ${options?.date}`,
       };
       if (labels[key]) return labels[key];
@@ -193,6 +197,44 @@ describe('HourlyForecast tooltip behavior', () => {
     render(<HourlyForecast spotId="site-1" dayIndex={0} />);
 
     expect(screen.getByText('NW (315°)')).toBeTruthy();
+  });
+
+  it('shows the launch-adjusted score and non-headwind warning', () => {
+    render(
+      <HourlyForecast
+        spotId="site-1"
+        dayIndex={0}
+        flightDecision={
+          {
+            site: { id: 'site-1' },
+            day_index: 0,
+            hourly: [
+              {
+                hour: 10,
+                level: 'limite',
+                score_objectif: 44,
+                wind_decollage: {
+                  status: 'travers_fort',
+                  translation_key: 'flightDecision.windDecollage.travers_fort',
+                },
+              },
+            ],
+          } as never
+        }
+      />
+    );
+
+    expect(screen.getAllByText('44').length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText('Vent au décollage: Travers fort').length
+    ).toBeGreaterThan(0);
+
+    fireEvent.mouseOver(
+      screen.getByRole('button', { name: 'Para-Index 10:00' })
+    );
+
+    expect(screen.getByText('Note de vol corrigée - 10:00')).toBeTruthy();
+    expect(screen.getByText('Para-Index météo brut: 85/100')).toBeTruthy();
   });
 
   it('shows force refresh action only when allowed', () => {
