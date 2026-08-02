@@ -148,6 +148,9 @@ export const Default = meta.story({
 });
 
 Default.test('displays emagram score and metrics', async ({ canvas }) => {
+  await userEvent.click(
+    await canvas.findByRole('button', { name: /Analyse 14h/ })
+  );
   await canvas.findByText(/75/);
   await expect(canvas.getByText(/Arguel/)).toBeInTheDocument();
   const explanationButton = canvas.getByLabelText(/Comment l'IA a analysé/);
@@ -174,7 +177,14 @@ export const AnalysisInProgress = meta.story({
           HttpResponse.json({
             site_id: 'site-arguel',
             forecast_date: '2026-03-24',
-            hours: [],
+            hours: [
+              {
+                hour: 12,
+                score: null,
+                status: 'pending',
+                id: 'pending-12',
+              },
+            ],
           })
         ),
         http.get('*/api/emagram/latest', () => HttpResponse.json(null)),
@@ -187,6 +197,9 @@ export const AnalysisInProgress = meta.story({
 });
 
 AnalysisInProgress.test('shows analysis in progress', async ({ canvas }) => {
+  await userEvent.click(
+    await canvas.findByRole('button', { name: /Analyse 12h en attente/ })
+  );
   await canvas.findByText(/Analyse en cours/);
 });
 
@@ -200,7 +213,14 @@ export const Error = meta.story({
           HttpResponse.json({
             site_id: 'site-arguel',
             forecast_date: '2026-03-24',
-            hours: [],
+            hours: [
+              {
+                hour: 12,
+                score: null,
+                status: 'pending',
+                id: 'pending-12',
+              },
+            ],
           })
         ),
         http.get('*/api/emagram/latest', () => {
@@ -215,6 +235,9 @@ export const Error = meta.story({
 });
 
 Error.test('displays error message', async ({ canvas }) => {
+  await userEvent.click(
+    await canvas.findByRole('button', { name: /Analyse 12h en attente/ })
+  );
   await canvas.findByText(/Erreur/);
 });
 
@@ -256,7 +279,14 @@ export const Loading = meta.story({
           HttpResponse.json({
             site_id: 'site-arguel',
             forecast_date: '2026-03-24',
-            hours: [],
+            hours: [
+              {
+                hour: 12,
+                score: null,
+                status: 'pending',
+                id: 'pending-12',
+              },
+            ],
           })
         ),
         http.get('*/api/emagram/latest', async () => {
@@ -265,6 +295,13 @@ export const Loading = meta.story({
       ],
     },
   },
+});
+
+Loading.test('shows loading after choosing an hour', async ({ canvas }) => {
+  await userEvent.click(
+    await canvas.findByRole('button', { name: /Analyse 12h en attente/ })
+  );
+  await canvas.findByText(/Analyse en cours/);
 });
 
 export const HoursWithoutAnalysis = meta.story({
@@ -281,11 +318,17 @@ export const HoursWithoutAnalysis = meta.story({
 });
 
 HoursWithoutAnalysis.test(
-  'shows hour chooser before analysis exists',
+  'starts analysis only after choosing an hour',
   async ({ canvas }) => {
     await canvas.findByText(/9h/);
     await expect(canvas.getByText(/12h/)).toBeInTheDocument();
     await expect(canvas.getByText(/15h/)).toBeInTheDocument();
+    await expect(canvas.getByText(/Choisissez une heure/)).toBeInTheDocument();
+    await expect(
+      canvas.queryByText(/Analyse en cours/)
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(canvas.getByRole('button', { name: /Analyse 12h/ }));
     await canvas.findByText(/Analyse en cours/);
   }
 );
