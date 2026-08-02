@@ -17,10 +17,14 @@ vi.mock('react-i18next', () => ({
         'weather.refreshingData': 'Rechargement...',
         'weather.hourly.reasons.thunderstorms': 'Orages',
         'weather.hourly.reasons.thunderstormRisk': "Risque d'orage",
+        'weather.hourly.reasons.acceptableWind': 'Vent acceptable',
         'weather.hourly.flightScore': 'Note de vol corrigée',
         'weather.hourly.rawParaIndex': 'Para-Index météo brut',
         'weather.hourly.launchWind': 'Vent au décollage',
+        'flightDecision.windDecollage.travers_acceptable': 'Travers acceptable',
         'flightDecision.windDecollage.travers_fort': 'Travers fort',
+        'flightDecision.windDecollage.cul': 'Vent arrière',
+        'flightDecision.windDecollage.face': 'Vent de face',
         'weather.staleSourceDataWithDate': `données non actualisées, limite API atteinte, affichées depuis le ${options?.date}`,
       };
       if (labels[key]) return labels[key];
@@ -227,6 +231,24 @@ describe('HourlyForecast tooltip behavior', () => {
     expect(screen.getAllByText('44').length).toBeGreaterThan(0);
     expect(
       screen.getAllByText('Vent au décollage: Travers fort').length
+    ).toBeGreaterThan(0);
+
+    fireEvent.mouseOver(
+      screen.getByRole('button', { name: 'Para-Index 10:00' })
+    );
+
+    expect(screen.getByText('Note de vol corrigée - 10:00')).toBeTruthy();
+    expect(screen.getByText('Para-Index météo brut: 85/100')).toBeTruthy();
+  });
+
+  it('falls back to local orientation matching when no flight decision is provided', () => {
+    render(
+      <HourlyForecast spotId="site-1" dayIndex={0} siteOrientation="SW" />
+    );
+
+    expect(screen.getByText('44')).toBeTruthy();
+    expect(
+      screen.getAllByText('LIMITE — Vent acceptable').length
     ).toBeGreaterThan(0);
 
     fireEvent.mouseOver(
