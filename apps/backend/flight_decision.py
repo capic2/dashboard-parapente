@@ -321,7 +321,7 @@ def _cap_score_for_launch_wind(score: int, status: str, thresholds: dict[str, fl
         "not_evaluated": thresholds["para_verdict_good_min"] - 1,
     }
     ceiling = score_ceiling_by_status.get(status)
-    return score if ceiling is None else max(0, min(score, round(ceiling)))
+    return score if ceiling is None else max(0, min(score, math.ceil(ceiling)))
 
 
 def _hour_risks(hour: dict[str, Any], thresholds: dict[str, float]) -> list[dict[str, Any]]:
