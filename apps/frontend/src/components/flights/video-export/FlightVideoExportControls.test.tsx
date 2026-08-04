@@ -54,6 +54,7 @@ vi.mock('react-i18next', () => ({
         'flights.viewer.cancelGenerationShort': 'Cancel generation',
         'flights.viewer.regenerateVideo': 'Restart generation',
         'flights.viewer.regenerateVideoShort': 'Regenerate video',
+        'flights.viewer.confirmRegenerateVideo': 'Confirm regenerate video',
         'videoJobs.liveLogs.title': 'Live logs',
         'videoJobs.liveLogs.empty': 'No logs yet.',
         'videoJobs.liveLogs.show': 'Show',
@@ -158,6 +159,7 @@ describe('FlightVideoExportControls', () => {
         searchParams: { mode: 'manual_fast' },
       });
     });
+    expect(confirmMock).not.toHaveBeenCalled();
   });
 
   it('turns the primary button into cancel while export is active', async () => {
@@ -241,7 +243,7 @@ describe('FlightVideoExportControls', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows regenerate when a video already exists', () => {
+  it('regenerates an existing video after confirmation', async () => {
     mockFlight.video_export_status = 'completed';
     mockFlight.video_export_job_id = 'job-video';
     mockFlight.video_file_path = '/exports/job-video.mp4';
@@ -252,6 +254,28 @@ describe('FlightVideoExportControls', () => {
     expect(
       screen.getByRole('button', { name: /Regenerate video/u })
     ).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Regenerate video/u }));
+
+    await waitFor(() => {
+      expect(confirmMock).toHaveBeenCalledWith('Confirm regenerate video');
+      expect(apiPost).toHaveBeenCalled();
+    });
+  });
+
+  it('keeps an existing video when regeneration is not confirmed', () => {
+    mockFlight.video_export_status = 'completed';
+    mockFlight.video_export_job_id = 'job-video';
+    mockFlight.video_file_path = '/exports/job-video.mp4';
+    mockFlight.video_file_exists = true;
+    confirmMock.mockReturnValue(false);
+
+    render(<FlightVideoExportControls flight={mockFlight} compact />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Regenerate video/u }));
+
+    expect(confirmMock).toHaveBeenCalledWith('Confirm regenerate video');
+    expect(apiPost).not.toHaveBeenCalled();
   });
 
   it('generates again when database references a missing completed video file', () => {
