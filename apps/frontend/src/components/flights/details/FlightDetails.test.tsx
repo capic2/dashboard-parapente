@@ -124,6 +124,7 @@ vi.mock('react-i18next', () => ({
         'flights.goproOverlayCancel': 'Cancel overlay',
         'flights.goproOverlayCancelShort': 'Cancel overlay',
         'flights.goproOverlayConfirmCancel': 'Confirm cancel overlay',
+        'flights.goproOverlayConfirmRegenerate': 'Confirm regenerate overlay',
         'flights.goproOverlayRegenerate': 'Regenerate overlay',
         'flights.goproOverlayRegenerateShort': 'Regenerate overlay',
         'flights.goproOverlayGenerate': 'Generate overlay',
@@ -385,5 +386,51 @@ describe('FlightDetails GoPro overlay action', () => {
     );
 
     expect(createOverlayMock).toHaveBeenCalled();
+    expect(confirmMock).not.toHaveBeenCalled();
+  });
+
+  it('regenerates an existing overlay after confirmation', () => {
+    mockFlight.gopro_overlay_job_id = 'job-overlay';
+    mockFlight.gopro_overlay_status = 'completed';
+    mockFlight.gopro_overlay_file_path = '/exports/final.mp4';
+    mockFlight.gopro_overlay_file_exists = true;
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Regenerate overlay/u })
+    );
+
+    expect(confirmMock).toHaveBeenCalledWith('Confirm regenerate overlay');
+    expect(createOverlayMock).toHaveBeenCalled();
+  });
+
+  it('keeps an existing overlay when regeneration is not confirmed', () => {
+    mockFlight.gopro_overlay_job_id = 'job-overlay';
+    mockFlight.gopro_overlay_status = 'completed';
+    mockFlight.gopro_overlay_file_path = '/exports/final.mp4';
+    mockFlight.gopro_overlay_file_exists = true;
+    confirmMock.mockReturnValue(false);
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Regenerate overlay/u })
+    );
+
+    expect(confirmMock).toHaveBeenCalledWith('Confirm regenerate overlay');
+    expect(createOverlayMock).not.toHaveBeenCalled();
   });
 });

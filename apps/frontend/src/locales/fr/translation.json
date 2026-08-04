@@ -987,6 +987,7 @@
     "goproOverlayStarted": "Génération overlay GoPro lancée",
     "goproOverlayStartError": "Impossible de lancer l'overlay GoPro",
     "goproOverlayConfirmCancel": "Êtes-vous sûr de vouloir annuler cette génération d'overlay ?",
+    "goproOverlayConfirmRegenerate": "Êtes-vous sûr de vouloir régénérer cet overlay ? L'overlay existant sera remplacé.",
     "goproOverlayCancelled": "Génération overlay GoPro annulée",
     "goproOverlayCancelError": "Impossible d'annuler l'overlay GoPro",
     "goproOverlayDownloadError": "Impossible de télécharger l'overlay GoPro",

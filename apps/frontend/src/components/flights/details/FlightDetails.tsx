@@ -243,6 +243,12 @@ export function FlightDetails({
 
   const handleStartGoproOverlay = async () => {
     if (isGoproOverlayRunning) return;
+    if (
+      hasPersistedGoproOverlay &&
+      !confirm(t('flights.goproOverlayConfirmRegenerate'))
+    ) {
+      return;
+    }
     if (!hasGoproCameraVideo) {
       toast.error(t('flights.goproOverlayNeedsCameraVideo'));
       return;
