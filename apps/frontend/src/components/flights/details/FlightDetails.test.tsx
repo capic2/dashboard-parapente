@@ -331,11 +331,28 @@ describe('FlightDetails GoPro overlay action', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Logs' }));
 
     expect(screen.getByText('Generation logs')).toBeInTheDocument();
-    expect(screen.getByText('Flight video')).toBeInTheDocument();
-    expect(screen.getByText('GoPro overlay')).toBeInTheDocument();
+    const videoToggle = screen.getByRole('button', {
+      name: /Flight video/u,
+    });
+    const overlayToggle = screen.getByRole('button', {
+      name: /GoPro overlay/u,
+    });
+
+    expect(videoToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(overlayToggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByText('Encoding with FFmpeg')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Overlay failed on frame 42')
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(overlayToggle);
+
     expect(screen.getByText('Overlay failed on frame 42')).toBeInTheDocument();
     expect(screen.getAllByText(/Frame 42 failed/u).length).toBeGreaterThan(0);
+
+    fireEvent.click(videoToggle);
+
+    expect(screen.queryByText('Encoding with FFmpeg')).not.toBeInTheDocument();
   });
 
   it('does not render an empty generation logs panel', () => {
@@ -365,8 +382,76 @@ describe('FlightDetails GoPro overlay action', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Logs' }));
 
     expect(screen.getByText('Generation logs')).toBeInTheDocument();
-    expect(screen.getByText('Flight video')).toBeInTheDocument();
+    const videoToggle = screen.getByRole('button', {
+      name: 'Flight video',
+    });
+    expect(videoToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('No logs yet.')).not.toBeInTheDocument();
+
+    fireEvent.click(videoToggle);
+
     expect(screen.getByText('No logs yet.')).toBeInTheDocument();
+  });
+
+  it('opens GoPro logs by default while the overlay job is running', () => {
+    overlayJobStreamMock.current = {
+      job_id: 'overlay-job',
+      status: 'running',
+      progress: 43,
+      message: 'Rendering overlay',
+      error: null,
+      layout_id: 'layout',
+      layout_label: 'Parapente',
+      output_filename: 'final.mp4',
+      created_at: '2026-03-15T14:00:00Z',
+      updated_at: '2026-03-15T14:10:00Z',
+      log_tail: ['Starting overlay'],
+    };
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Logs' }));
+
+    expect(
+      screen.getByRole('button', { name: /GoPro overlay/u })
+    ).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Rendering overlay')).toBeInTheDocument();
+  });
+
+  it('preserves a manual toggle while a fallback-only job changes status', () => {
+    mockFlight.video_export_status = 'running';
+
+    const view = render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Logs' }));
+    const videoToggle = screen.getByRole('button', {
+      name: /Flight video/u,
+    });
+    fireEvent.click(videoToggle);
+    expect(videoToggle).toHaveAttribute('aria-expanded', 'false');
+
+    mockFlight.video_export_status = 'encoding';
+    view.rerender(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    expect(videoToggle).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('regenerates overlay after cancellation', () => {
