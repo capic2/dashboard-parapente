@@ -1,6 +1,10 @@
+import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
+import { ChevronDown } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { VideoExportStatusPayload } from '../../../hooks/flights/useVideoExportStatus';
 import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
+import { isGoproOverlayInProgress } from '../../../lib/flightMediaState';
 import { JobLogViewer } from '../job-logs/JobLogViewer';
 
 type FlightGenerationLogsPanelProps = {
@@ -18,6 +22,7 @@ type LogSourceCardProps = {
   title: string;
   status: string | null;
   statusLabel: string | null;
+  isInProgress: boolean;
   progress?: number | null;
   message?: string | null;
   error?: string | null;
@@ -52,12 +57,15 @@ function LogSourceCard({
   title,
   status,
   statusLabel,
+  isInProgress,
   progress,
   message,
   error,
   logs,
 }: LogSourceCardProps) {
   const { t } = useTranslation();
+  const [openOverride, setOpenOverride] = useState<boolean | null>(null);
+  const isOpen = openOverride ?? isInProgress;
   const lines = logs?.filter(Boolean) ?? [];
   const normalizedProgress = clampProgress(progress);
   const hasDetails = Boolean(message || error || lines.length > 0);
@@ -70,64 +78,83 @@ function LogSourceCard({
   );
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/70">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900/70">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 p-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60"
+        aria-expanded={isOpen}
+        onClick={() => setOpenOverride(!isOpen)}
+      >
+        <div className="min-w-0">
           <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
             {title}
           </h4>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {statusLabel && (
+            <span
+              className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusTone}`}
+            >
+              {statusLabel}
+            </span>
+          )}
+          <ChevronDown
+            aria-hidden="true"
+            className={`size-4 text-slate-500 transition-transform dark:text-slate-400 ${isOpen ? 'rotate-180' : ''}`}
+          />
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="border-t border-slate-200 p-3 dark:border-slate-700">
           {showCurrentMessage && (
-            <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+            <p className="text-xs text-slate-600 dark:text-slate-300">
               {message}
             </p>
           )}
-        </div>
-        {statusLabel && (
-          <span
-            className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusTone}`}
-          >
-            {statusLabel}
-          </span>
-        )}
-      </div>
 
-      {normalizedProgress !== null && (
-        <div className="mt-3" aria-label={t('flights.generationLogs.progress')}>
-          <div className="mb-1 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
-            <span>{t('flights.generationLogs.progress')}</span>
-            <span>{normalizedProgress}%</span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+          {normalizedProgress !== null && (
             <div
-              className="h-full rounded-full bg-sky-500 transition-all"
-              style={{ width: `${normalizedProgress}%` }}
+              className="mt-3"
+              aria-label={t('flights.generationLogs.progress')}
+            >
+              <div className="mb-1 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                <span>{t('flights.generationLogs.progress')}</span>
+                <span>{normalizedProgress}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                <div
+                  className="h-full rounded-full bg-sky-500 transition-all"
+                  style={{ width: `${normalizedProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-950 p-2 text-xs text-red-50 dark:border-red-900">
+              <div className="mb-1 font-semibold">
+                {t('flights.generationLogs.error')}
+              </div>
+              <pre className="max-h-40 overflow-auto whitespace-pre-wrap font-mono leading-relaxed">
+                {error}
+              </pre>
+            </div>
+          )}
+
+          <div className="mt-3">
+            <JobLogViewer
+              logs={lines}
+              isLive={isLive}
+              emptyLabel={
+                hasDetails
+                  ? t('flights.generationLogs.noRawLogs')
+                  : t('flights.generationLogs.noLogs')
+              }
             />
           </div>
         </div>
       )}
-
-      {error && (
-        <div className="mt-3 rounded-lg border border-red-200 bg-red-950 p-2 text-xs text-red-50 dark:border-red-900">
-          <div className="mb-1 font-semibold">
-            {t('flights.generationLogs.error')}
-          </div>
-          <pre className="max-h-40 overflow-auto whitespace-pre-wrap font-mono leading-relaxed">
-            {error}
-          </pre>
-        </div>
-      )}
-
-      <div className="mt-3">
-        <JobLogViewer
-          logs={lines}
-          isLive={isLive}
-          emptyLabel={
-            hasDetails
-              ? t('flights.generationLogs.noRawLogs')
-              : t('flights.generationLogs.noLogs')
-          }
-        />
-      </div>
     </section>
   );
 }
@@ -174,8 +201,13 @@ export function FlightGenerationLogsPanel({
       <div className="space-y-3">
         {hasVideoLogSource && (
           <LogSourceCard
+            key={`video-${videoStatus?.job_id ?? videoJobId ?? 'fallback'}`}
             title={t('flights.generationLogs.videoTitle')}
             status={videoStatusValue}
+            isInProgress={Boolean(
+              videoStatusValue &&
+              VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(videoStatusValue)
+            )}
             statusLabel={
               videoStatusValue
                 ? t(`flights.generationLogs.status.${videoStatusValue}`)
@@ -189,8 +221,10 @@ export function FlightGenerationLogsPanel({
         )}
         {hasGoproOverlayLogSource && (
           <LogSourceCard
+            key={`gopro-${goproOverlayJob?.job_id ?? goproOverlayJobId ?? 'fallback'}`}
             title={t('flights.generationLogs.goproOverlayTitle')}
             status={goproOverlayStatusValue}
+            isInProgress={isGoproOverlayInProgress(goproOverlayStatusValue)}
             statusLabel={
               goproOverlayStatusValue
                 ? t(`flights.generationLogs.status.${goproOverlayStatusValue}`)
