@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import select
 import shutil
 import subprocess
@@ -1578,6 +1579,12 @@ def _run_job(job_id: str) -> None:
     ]
     if config.GOPRO_OVERLAY_FONT:
         command.extend(["--font", config.GOPRO_OVERLAY_FONT])
+    if config.GOPRO_OVERLAY_CONFIG_DIR:
+        command.extend(["--config-dir", config.GOPRO_OVERLAY_CONFIG_DIR])
+    if config.GOPRO_OVERLAY_PROFILE:
+        command.extend(["--profile", config.GOPRO_OVERLAY_PROFILE])
+    if config.GOPRO_OVERLAY_EXTRA_ARGS:
+        command.extend(shlex.split(config.GOPRO_OVERLAY_EXTRA_ARGS))
     if job.get("video_width") and job.get("video_height"):
         command.extend(["--overlay-size", f"{job['video_width']}x{job['video_height']}"])
     if job.get("pip_path"):
