@@ -2264,6 +2264,47 @@ def test_run_job_passes_configured_font(monkeypatch):
         gopro_overlay_export._PROCESSES.pop(job_id, None)
 
 
+def test_run_job_passes_configured_overlay_gpu_args(monkeypatch):
+    job_id = "gpu-job"
+    gopro_overlay_export._JOBS[job_id] = {
+        "job_id": job_id,
+        "status": "queued",
+        "progress": 0,
+        "message": "Overlay queued",
+        "gpx_path": "track.gpx",
+        "layout_path": "layout.xml",
+        "video_path": "flight.mp4",
+        "output_path": "overlay.mp4",
+        "pip_path": None,
+        "video_width": None,
+        "video_height": None,
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_CONFIG_DIR", "/config")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nnvgpu")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_EXTRA_ARGS", "--double-buffer")
+
+    class FailedProcess:
+        stdout: list[str] = []
+
+        def wait(self) -> int:
+            return 1
+
+    try:
+        with patch("gopro_overlay_export.subprocess.Popen", return_value=FailedProcess()) as popen:
+            gopro_overlay_export._run_job(job_id)
+
+        command = popen.call_args.args[0]
+        assert "--config-dir" in command
+        assert command[command.index("--config-dir") + 1] == "/config"
+        assert "--profile" in command
+        assert command[command.index("--profile") + 1] == "nnvgpu"
+        assert "--double-buffer" in command
+    finally:
+        gopro_overlay_export._JOBS.pop(job_id, None)
+        gopro_overlay_export._PROCESSES.pop(job_id, None)
+
+
 def test_run_job_marks_unexpected_start_error_failed(caplog):
     job_id = "start-error-job"
     gopro_overlay_export._JOBS[job_id] = {
