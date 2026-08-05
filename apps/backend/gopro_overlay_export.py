@@ -1579,10 +1579,18 @@ def _run_job(job_id: str) -> None:
     ]
     if config.GOPRO_OVERLAY_FONT:
         command.extend(["--font", config.GOPRO_OVERLAY_FONT])
+    gpu_device_path = Path(config.GOPRO_OVERLAY_RENDER_DEVICE)
+    gpu_device_present = gpu_device_path.exists()
     if config.GOPRO_OVERLAY_CONFIG_DIR:
         command.extend(["--config-dir", config.GOPRO_OVERLAY_CONFIG_DIR])
-    if config.GOPRO_OVERLAY_PROFILE:
+    if config.GOPRO_OVERLAY_PROFILE and gpu_device_present:
         command.extend(["--profile", config.GOPRO_OVERLAY_PROFILE])
+    elif config.GOPRO_OVERLAY_PROFILE:
+        logger.warning(
+            "GoPro overlay GPU profile %s configured but render device %s is missing; falling back to CPU",
+            config.GOPRO_OVERLAY_PROFILE,
+            gpu_device_path,
+        )
     if config.GOPRO_OVERLAY_EXTRA_ARGS:
         command.extend(shlex.split(config.GOPRO_OVERLAY_EXTRA_ARGS))
     if job.get("video_width") and job.get("video_height"):
@@ -1595,6 +1603,16 @@ def _run_job(job_id: str) -> None:
     temp_output_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     command.extend([job["video_path"], str(temp_output_path)])
+
+    logger.info(
+        "GoPro overlay runtime for job %s: render_device=%s present=%s profile=%s config_dir=%s extra_args=%s",
+        job_id,
+        gpu_device_path,
+        gpu_device_present,
+        config.GOPRO_OVERLAY_PROFILE or "<none>",
+        config.GOPRO_OVERLAY_CONFIG_DIR or "<none>",
+        config.GOPRO_OVERLAY_EXTRA_ARGS or "<none>",
+    )
 
     if not _transition_job_to_running(job_id, command):
         current_job = get_gopro_overlay_job(job_id)

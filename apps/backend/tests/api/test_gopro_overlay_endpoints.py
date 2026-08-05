@@ -12,6 +12,7 @@ from starlette.datastructures import UploadFile
 
 import config
 import gopro_overlay_export
+import gopro_overlay_worker
 from auth import create_job_token
 import routes
 from gopro_overlay_export import _prepare_layout_file
@@ -1992,6 +1993,23 @@ def test_start_gopro_overlay_worker_with_rq_does_not_start_local_thread(monkeypa
     assert enqueued == [True]
 
 
+def test_gopro_overlay_worker_reports_gpu_runtime(monkeypatch, tmp_path):
+    render_device = tmp_path / "renderD128"
+    render_device.write_bytes(b"")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_RENDER_DEVICE", str(render_device))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nnvgpu")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_CONFIG_DIR", "/config")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_EXTRA_ARGS", "--double-buffer")
+
+    summary = gopro_overlay_worker._gpu_runtime_summary()
+
+    assert f"render_device={render_device}" in summary
+    assert "present=True" in summary
+    assert "profile=nnvgpu" in summary
+    assert "config_dir=/config" in summary
+    assert "extra_args=--double-buffer" in summary
+
+
 def test_enqueue_pending_gopro_overlay_jobs_does_not_mark_running_failed_by_default(monkeypatch):
     monkeypatch.setattr(gopro_overlay_export.config, "JOB_QUEUE_BACKEND", "rq")
     monkeypatch.setattr(gopro_overlay_export, "_queued_job_ids", lambda: [])
@@ -2264,7 +2282,7 @@ def test_run_job_passes_configured_font(monkeypatch):
         gopro_overlay_export._PROCESSES.pop(job_id, None)
 
 
-def test_run_job_passes_configured_overlay_gpu_args(monkeypatch):
+def test_run_job_passes_configured_overlay_gpu_args(monkeypatch, tmp_path):
     job_id = "gpu-job"
     gopro_overlay_export._JOBS[job_id] = {
         "job_id": job_id,
@@ -2280,6 +2298,9 @@ def test_run_job_passes_configured_overlay_gpu_args(monkeypatch):
         "video_height": None,
         "updated_at": "2026-01-01T00:00:00+00:00",
     }
+    render_device_path = tmp_path / "renderD128"
+    render_device_path.write_bytes(b"")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_RENDER_DEVICE", str(render_device_path))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_CONFIG_DIR", "/config")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nnvgpu")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_EXTRA_ARGS", "--double-buffer")
@@ -2300,6 +2321,51 @@ def test_run_job_passes_configured_overlay_gpu_args(monkeypatch):
         assert "--profile" in command
         assert command[command.index("--profile") + 1] == "nnvgpu"
         assert "--double-buffer" in command
+    finally:
+        gopro_overlay_export._JOBS.pop(job_id, None)
+        gopro_overlay_export._PROCESSES.pop(job_id, None)
+        render_device_path.unlink(missing_ok=True)
+
+
+def test_run_job_skips_gpu_profile_when_render_device_missing(caplog, monkeypatch):
+    job_id = "gpu-fallback-job"
+    gopro_overlay_export._JOBS[job_id] = {
+        "job_id": job_id,
+        "status": "queued",
+        "progress": 0,
+        "message": "Overlay queued",
+        "gpx_path": "track.gpx",
+        "layout_path": "layout.xml",
+        "video_path": "flight.mp4",
+        "output_path": "overlay.mp4",
+        "pip_path": None,
+        "video_width": None,
+        "video_height": None,
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_RENDER_DEVICE", "/tmp/missing-render-device")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nnvgpu")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_EXTRA_ARGS", "--double-buffer")
+
+    class FailedProcess:
+        stdout: list[str] = []
+
+        def wait(self) -> int:
+            return 1
+
+    try:
+        with (
+            caplog.at_level(logging.WARNING),
+            patch("gopro_overlay_export.subprocess.Popen", return_value=FailedProcess()) as popen,
+        ):
+            gopro_overlay_export._run_job(job_id)
+
+        command = popen.call_args.args[0]
+        assert "--profile" not in command
+        assert (
+            "render device /tmp/missing-render-device is missing; falling back to CPU"
+            in caplog.text
+        )
     finally:
         gopro_overlay_export._JOBS.pop(job_id, None)
         gopro_overlay_export._PROCESSES.pop(job_id, None)
