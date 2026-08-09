@@ -474,6 +474,7 @@ class TestVideoExportJobsEndpoint:
                 "flight_id": sample_flight.id,
                 "status": "processing",
                 "internal_status": "capturing",
+                "render_method": "cpu",
                 "progress": 42,
                 "message": "Capturing frames",
                 "mode": "manual_fast",
@@ -484,6 +485,7 @@ class TestVideoExportJobsEndpoint:
                 "flight_id": sample_flight.id,
                 "status": "failed",
                 "internal_status": "cancelled",
+                "render_method": "cpu",
                 "progress": 10,
                 "message": "Export cancelled by user",
                 "mode": "manual",
@@ -500,6 +502,7 @@ class TestVideoExportJobsEndpoint:
                     {
                         "job_id": "job-overlay",
                         "status": "running",
+                        "render_method": "gpu",
                         "progress": 50,
                         "message": "Rendering overlay",
                         "layout_label": "Parapente 1920x1080",
@@ -516,6 +519,7 @@ class TestVideoExportJobsEndpoint:
         assert jobs[0]["job_id"] == "job-overlay"
         assert jobs[0]["status"] == "running"
         assert jobs[0]["mode"] == "gopro_overlay"
+        assert jobs[0]["render_method"] == "gpu"
         assert jobs[0]["can_cancel"] is True
         assert jobs[0]["can_delete"] is False
         assert jobs[0]["flight_id"] == sample_flight.id
@@ -523,6 +527,7 @@ class TestVideoExportJobsEndpoint:
         assert jobs[0]["flight_title"] == sample_flight.name
         assert jobs[1]["job_id"] == "job-running"
         assert jobs[1]["status"] == "processing"
+        assert jobs[1]["render_method"] == "cpu"
         assert jobs[1]["can_cancel"] is True
         assert jobs[1]["can_delete"] is True
         assert jobs[1]["flight_name"] == sample_flight.name
@@ -542,6 +547,7 @@ class TestVideoExportJobsEndpoint:
                         "flight_id": "flight-1",
                         "status": "processing",
                         "internal_status": "queued",
+                        "render_method": "cpu",
                     },
                     {
                         "job_id": "job-done",
@@ -558,6 +564,7 @@ class TestVideoExportJobsEndpoint:
                         "job_id": "job-stream-encoding",
                         "flight_id": "flight-1",
                         "status": "encoding",
+                        "render_method": "gpu",
                     }
                 ],
             ),
@@ -587,6 +594,25 @@ class TestVideoExportJobsEndpoint:
             "job-overlay-running",
         }
         assert all(job["can_cancel"] is True for job in jobs)
+        assert (
+            next(job for job in jobs if job["job_id"] == "job-stream-encoding")["render_method"]
+            == "gpu"
+        )
+
+    def test_export_status_passthrough_keeps_render_method(self, client: TestClient):
+        with patch(
+            "routes._resolve_export_status",
+            return_value={
+                "job_id": "job-status",
+                "status": "processing",
+                "internal_status": "capturing",
+                "render_method": "gpu",
+            },
+        ):
+            response = client.get(f"{API_PREFIX}/exports/job-status/status")
+
+        assert response.status_code == 200
+        assert response.json()["render_method"] == "gpu"
 
     def test_video_export_jobs_stream_serializes_jobs_event(self, db_session):
         with (

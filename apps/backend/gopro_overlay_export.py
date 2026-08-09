@@ -365,13 +365,22 @@ def _job_preparation_metadata(
     pin_inputs: bool,
     requested_layout_id: str | None,
     gpx_offset: float = 0.0,
+    render_method: str | None = None,
 ) -> dict[str, Any]:
-    return {
+    metadata = {
         "prepare_overlay_inputs": True,
         "pin_inputs": pin_inputs,
         "requested_layout_id": requested_layout_id,
         "gpx_offset": gpx_offset,
     }
+    if render_method:
+        metadata["render_method"] = render_method
+    return metadata
+
+
+def _queued_render_method() -> str:
+    gpu_device_path = Path(config.GOPRO_OVERLAY_RENDER_DEVICE)
+    return "gpu" if gpu_device_path.exists() and config.GOPRO_OVERLAY_PROFILE else "cpu"
 
 
 def _gpx_offset_from_command_metadata(command: Any) -> float:
@@ -1466,10 +1475,12 @@ def _create_gopro_overlay_job_from_paths(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temp_output_path = _temp_output_path(output_path, job_id)
     log_path = _gopro_overlay_log_path(job_id)
+    render_method = _queued_render_method()
     preparation_metadata = _job_preparation_metadata(
         pin_inputs=pin_inputs,
         requested_layout_id=layout_id,
         gpx_offset=gpx_offset,
+        render_method=render_method,
     )
 
     now = _utc_now_dt()
@@ -1493,6 +1504,7 @@ def _create_gopro_overlay_job_from_paths(
                 output_filename=output_path.name,
                 log_path=str(log_path),
                 command_json=json.dumps(preparation_metadata),
+                render_method=render_method,
                 video_width=None,
                 video_height=None,
                 created_at=now,
@@ -1523,6 +1535,7 @@ def _create_gopro_overlay_job_from_paths(
             "temp_output_path": str(temp_output_path),
             "output_filename": output_path.name,
             "log_path": str(log_path),
+            "render_method": render_method,
             "video_width": None,
             "video_height": None,
             "gpx_offset": gpx_offset,

@@ -16,6 +16,7 @@ export type VideoExportStatusPayload = {
   job_id: string;
   status: string;
   internal_status?: string;
+  render_method?: 'cpu' | 'gpu' | null;
   progress?: number;
   message?: string | null;
   error?: string | null;
@@ -60,6 +61,10 @@ export const toStatusPayload = (
     internal_status:
       typeof value.internal_status === 'string'
         ? value.internal_status
+        : undefined,
+    render_method:
+      value.render_method === 'cpu' || value.render_method === 'gpu'
+        ? value.render_method
         : undefined,
     progress: typeof value.progress === 'number' ? value.progress : undefined,
     message: typeof value.message === 'string' ? value.message : null,

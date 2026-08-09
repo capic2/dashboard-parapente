@@ -65,6 +65,7 @@ beforeEach(() => {
       job_id: 'job-123',
       status: 'completed',
       internal_status: 'completed',
+      render_method: 'gpu',
       log_tail: ['Persisted export log'],
     }),
   });
@@ -79,6 +80,7 @@ describe('toStatusPayload', () => {
       job_id: 'job-123',
       status: 'processing',
       internal_status: 'encoding',
+      render_method: 'gpu',
       progress: 62,
       eta_seconds: 540,
       message: 'Encoding 32%',
@@ -94,6 +96,7 @@ describe('toStatusPayload', () => {
       job_id: 'job-123',
       status: 'processing',
       internal_status: 'encoding',
+      render_method: 'gpu',
       progress: 62,
       eta_seconds: 540,
       message: 'Encoding 32%',
