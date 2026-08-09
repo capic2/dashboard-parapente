@@ -2586,6 +2586,16 @@ def test_run_job_skips_gpu_profile_when_render_device_missing(caplog, monkeypatc
     monkeypatch.setattr(config, "GOPRO_OVERLAY_RENDER_DEVICE", "/tmp/missing-render-device")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nnvgpu")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_EXTRA_ARGS", "--double-buffer")
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "check_gopro_overlay_dependencies",
+        lambda: {
+            "gopro_dashboard": True,
+            "ffmpeg": True,
+            "ffprobe": True,
+            "ffmpeg_vaapi": False,
+        },
+    )
 
     class FailedProcess:
         stdout: list[str] = []
@@ -2595,17 +2605,17 @@ def test_run_job_skips_gpu_profile_when_render_device_missing(caplog, monkeypatc
 
     try:
         with (
-            caplog.at_level(logging.WARNING),
+            caplog.at_level(logging.INFO),
             patch("gopro_overlay_export.subprocess.Popen", return_value=FailedProcess()) as popen,
         ):
             gopro_overlay_export._run_job(job_id)
 
-        command = popen.call_args.args[0]
-        assert "--profile" not in command
-        assert (
-            "render device /tmp/missing-render-device is missing; falling back to CPU"
-            in caplog.text
-        )
+        assert popen.called
+        job = gopro_overlay_export.get_gopro_overlay_job(job_id)
+        assert job is not None
+        assert job["status"] == "failed"
+        assert job["render_method"] == "cpu"
+        assert "falling back to CPU rendering" in caplog.text
     finally:
         gopro_overlay_export._JOBS.pop(job_id, None)
         gopro_overlay_export._PROCESSES.pop(job_id, None)
@@ -2715,6 +2725,63 @@ def test_run_job_marks_unexpected_start_error_failed(caplog, monkeypatch):
         assert job["message"] == "Overlay rendering failed to start"
         assert job["error"] == "boom"
         assert "Failed to start GoPro overlay job start-error-job" in caplog.text
+    finally:
+        gopro_overlay_export._JOBS.pop(job_id, None)
+        gopro_overlay_export._PROCESSES.pop(job_id, None)
+
+
+def test_run_job_falls_back_to_cpu_when_render_device_missing(
+    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job_id = "gpu-fallback-job"
+    gopro_overlay_export._JOBS[job_id] = {
+        "job_id": job_id,
+        "status": "queued",
+        "progress": 0,
+        "message": "Overlay queued",
+        "gpx_path": "track.gpx",
+        "layout_path": "layout.xml",
+        "video_path": "flight.mp4",
+        "output_path": "overlay.mp4",
+        "pip_path": None,
+        "video_width": None,
+        "video_height": None,
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_RENDER_DEVICE", "/tmp/missing-render-device")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nnvgpu")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_EXTRA_ARGS", "--double-buffer")
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "check_gopro_overlay_dependencies",
+        lambda: {
+            "gopro_dashboard": True,
+            "ffmpeg": True,
+            "ffprobe": True,
+            "ffmpeg_vaapi": False,
+        },
+    )
+    monkeypatch.setattr(gopro_overlay_export, "_ffmpeg_can_use_vaapi_device", lambda *_: False)
+
+    class FailedProcess:
+        stdout: list[str] = []
+
+        def wait(self) -> int:
+            return 1
+
+    try:
+        with (
+            caplog.at_level(logging.INFO),
+            patch("gopro_overlay_export.subprocess.Popen", return_value=FailedProcess()) as popen,
+        ):
+            gopro_overlay_export._run_job(job_id)
+
+        assert popen.called
+        job = gopro_overlay_export.get_gopro_overlay_job(job_id)
+        assert job is not None
+        assert job["status"] == "failed"
+        assert job["render_method"] == "cpu"
+        assert "falling back to CPU rendering" in caplog.text
     finally:
         gopro_overlay_export._JOBS.pop(job_id, None)
         gopro_overlay_export._PROCESSES.pop(job_id, None)
