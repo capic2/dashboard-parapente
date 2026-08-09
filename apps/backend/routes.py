@@ -5722,7 +5722,9 @@ async def create_flight_gopro_overlay_job(
     """Create a GoPro overlay render job from provided media and the flight GPX fallback."""
     _validate_gpx_offset(gpx_offset)
     dependencies = check_gopro_overlay_dependencies()
-    missing = [name for name, available in dependencies.items() if not available]
+    missing = [
+        name for name, available in dependencies.items() if not available and name != "ffmpeg_vaapi"
+    ]
     if missing:
         raise HTTPException(
             status_code=503,
@@ -5878,7 +5880,9 @@ async def create_gopro_overlay_render_job(
     """Create a GoPro overlay render job from uploaded video, GPX, and optional PIP video."""
     _validate_gpx_offset(gpx_offset)
     dependencies = check_gopro_overlay_dependencies()
-    missing = [name for name, available in dependencies.items() if not available]
+    missing = [
+        name for name, available in dependencies.items() if not available and name != "ffmpeg_vaapi"
+    ]
     if missing:
         raise HTTPException(
             status_code=503,

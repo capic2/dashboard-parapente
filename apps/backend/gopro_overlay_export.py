@@ -388,6 +388,15 @@ def _gpx_offset_from_command_metadata(command: Any) -> float:
     return 0.0
 
 
+def _render_method_from_command(command: Any) -> str | None:
+    if isinstance(command, list):
+        return "gpu" if "--profile" in command else "cpu"
+    if isinstance(command, dict):
+        value = command.get("render_method")
+        return str(value) if isinstance(value, str) and value else None
+    return None
+
+
 def _append_job_log(log_path: Path, message: str) -> None:
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -422,6 +431,7 @@ def _job_to_payload(job: GoproOverlayJob, include_command: bool = False) -> dict
         "video_width": job.video_width,
         "video_height": job.video_height,
         "gpx_offset": _gpx_offset_from_command_metadata(command),
+        "render_method": _render_method_from_command(command),
         "created_at": _to_iso(job.created_at),
         "updated_at": _to_iso(job.updated_at),
         "completed_at": _to_iso(job.completed_at),
@@ -857,6 +867,35 @@ def _ffmpeg_timeout_for_duration(duration: float) -> int:
     return max(600, min(int(duration * 20), 6 * 60 * 60))
 
 
+def _gpu_ffmpeg_args(
+    *,
+    software_filters: list[str] | None,
+    hardware_filters: list[str] | None = None,
+    include_audio: bool,
+) -> list[str]:
+    """Build a VAAPI ffmpeg pipeline that keeps encoding on the GPU."""
+
+    filters: list[str] = []
+    if software_filters:
+        filters.extend(software_filters)
+    filters.extend(["format=nv12", "hwupload"])
+    if hardware_filters:
+        filters.extend(hardware_filters)
+    return [
+        "-vaapi_device",
+        str(Path(config.GOPRO_OVERLAY_RENDER_DEVICE)),
+        "-vf",
+        ",".join(filters),
+        "-c:v",
+        "h264_vaapi",
+        "-qp",
+        "18",
+        "-profile:v",
+        "high",
+        *(["-c:a", "copy"] if include_audio else ["-an"]),
+    ]
+
+
 def _prepare_pip_video_for_overlay(
     job_id: str,
     video_path: Path,
@@ -896,19 +935,9 @@ def _prepare_pip_video_for_overlay(
             f"color=c=black:s={pip_width}x{pip_height}:r=30:d={video_duration:.3f}",
             "-t",
             f"{video_duration:.3f}",
-            "-an",
-            "-c:v",
-            "libx264",
-            "-pix_fmt",
-            "yuv420p",
-            "-preset",
-            "veryfast",
-            "-crf",
-            "18",
-            "-movflags",
-            "+faststart",
-            str(prepared_path),
         ]
+        command.extend(_gpu_ffmpeg_args(software_filters=None, include_audio=False))
+        command.extend(["-movflags", "+faststart", str(prepared_path)])
     else:
         pip_filters = ["setpts=PTS-STARTPTS"]
         if pip_delay > 0:
@@ -925,24 +954,12 @@ def _prepare_pip_video_for_overlay(
             [
                 "-i",
                 str(pip_path),
-                "-vf",
-                ",".join(pip_filters),
                 "-t",
                 f"{video_duration:.3f}",
-                "-an",
-                "-c:v",
-                "libx264",
-                "-pix_fmt",
-                "yuv420p",
-                "-preset",
-                "veryfast",
-                "-crf",
-                "18",
-                "-movflags",
-                "+faststart",
-                str(prepared_path),
             ]
         )
+        command.extend(_gpu_ffmpeg_args(software_filters=pip_filters, include_audio=False))
+        command.extend(["-movflags", "+faststart", str(prepared_path)])
 
     try:
         result = subprocess.run(
@@ -1010,20 +1027,15 @@ def _ensure_video_output_resolution(
         "-y",
         "-i",
         str(path),
-        "-vf",
-        f"scale={expected_width}:{expected_height}:flags=lanczos",
-        "-c:v",
-        "libx264",
-        "-preset",
-        "veryfast",
-        "-crf",
-        "18",
-        "-c:a",
-        "copy",
-        "-movflags",
-        "+faststart",
-        str(scaled_path),
     ]
+    command.extend(
+        _gpu_ffmpeg_args(
+            software_filters=None,
+            hardware_filters=[f"scale_vaapi=w={expected_width}:h={expected_height}"],
+            include_audio=True,
+        )
+    )
+    command.extend(["-movflags", "+faststart", str(scaled_path)])
     logger.info(
         "Rescaling GoPro overlay output from %sx%s to %sx%s: %s",
         output_width,
@@ -1061,7 +1073,9 @@ def _ensure_video_output_resolution(
     return True, None
 
 
-def _transition_job_to_running(job_id: str, command: list[str]) -> dict[str, Any] | None:
+def _transition_job_to_running(
+    job_id: str, command: list[str], render_method: str
+) -> dict[str, Any] | None:
     try:
         with SessionLocal() as db:
             db_job = db.query(GoproOverlayJob).filter(GoproOverlayJob.id == job_id).first()
@@ -1071,7 +1085,9 @@ def _transition_job_to_running(job_id: str, command: list[str]) -> dict[str, Any
                 db_job.status = _STATUS_RUNNING
                 db_job.progress = 5
                 db_job.message = "Rendering overlay"
-                db_job.command_json = json.dumps(command)
+                db_job.command_json = json.dumps(
+                    {"command": command, "render_method": render_method}
+                )
                 db_job.started_at = _utc_now_dt()
                 db_job.updated_at = _utc_now_dt()
                 db.commit()
@@ -1091,6 +1107,7 @@ def _transition_job_to_running(job_id: str, command: list[str]) -> dict[str, Any
             progress=5,
             message="Rendering overlay",
             command=command,
+            render_method=render_method,
             updated_at=_utc_now(),
         )
         return job.copy()
@@ -1579,20 +1596,28 @@ def _run_job(job_id: str) -> None:
     ]
     if config.GOPRO_OVERLAY_FONT:
         command.extend(["--font", config.GOPRO_OVERLAY_FONT])
+    dependencies = check_gopro_overlay_dependencies()
     gpu_device_path = Path(config.GOPRO_OVERLAY_RENDER_DEVICE)
     gpu_device_present = gpu_device_path.exists()
-    if config.GOPRO_OVERLAY_CONFIG_DIR:
-        command.extend(["--config-dir", config.GOPRO_OVERLAY_CONFIG_DIR])
-    if config.GOPRO_OVERLAY_PROFILE and gpu_device_present:
+    gpu_render_enabled = bool(
+        gpu_device_present and config.GOPRO_OVERLAY_PROFILE and dependencies.get("ffmpeg_vaapi")
+    )
+    render_method = "gpu" if gpu_render_enabled else "cpu"
+
+    if gpu_render_enabled:
+        if config.GOPRO_OVERLAY_CONFIG_DIR:
+            command.extend(["--config-dir", config.GOPRO_OVERLAY_CONFIG_DIR])
         command.extend(["--profile", config.GOPRO_OVERLAY_PROFILE])
-    elif config.GOPRO_OVERLAY_PROFILE:
-        logger.warning(
-            "GoPro overlay GPU profile %s configured but render device %s is missing; falling back to CPU",
-            config.GOPRO_OVERLAY_PROFILE,
-            gpu_device_path,
+        if config.GOPRO_OVERLAY_EXTRA_ARGS:
+            command.extend(shlex.split(config.GOPRO_OVERLAY_EXTRA_ARGS))
+    else:
+        logger.info(
+            "GoPro overlay job %s falling back to CPU rendering (render_device_present=%s profile=%s ffmpeg_vaapi=%s)",
+            job_id,
+            gpu_device_present,
+            bool(config.GOPRO_OVERLAY_PROFILE),
+            dependencies.get("ffmpeg_vaapi"),
         )
-    if config.GOPRO_OVERLAY_EXTRA_ARGS:
-        command.extend(shlex.split(config.GOPRO_OVERLAY_EXTRA_ARGS))
     if job.get("video_width") and job.get("video_height"):
         command.extend(["--overlay-size", f"{job['video_width']}x{job['video_height']}"])
     if job.get("pip_path"):
@@ -1605,16 +1630,17 @@ def _run_job(job_id: str) -> None:
     command.extend([job["video_path"], str(temp_output_path)])
 
     logger.info(
-        "GoPro overlay runtime for job %s: render_device=%s present=%s profile=%s config_dir=%s extra_args=%s",
+        "GoPro overlay runtime for job %s: render_device=%s present=%s profile=%s config_dir=%s extra_args=%s method=%s",
         job_id,
         gpu_device_path,
         gpu_device_present,
-        config.GOPRO_OVERLAY_PROFILE or "<none>",
+        config.GOPRO_OVERLAY_PROFILE,
         config.GOPRO_OVERLAY_CONFIG_DIR or "<none>",
         config.GOPRO_OVERLAY_EXTRA_ARGS or "<none>",
+        render_method,
     )
 
-    if not _transition_job_to_running(job_id, command):
+    if not _transition_job_to_running(job_id, command, render_method):
         current_job = get_gopro_overlay_job(job_id)
         if current_job and current_job.get("status") in _TERMINAL_STATUSES:
             _cleanup_gopro_overlay_temp_files(current_job)
@@ -2178,8 +2204,32 @@ def check_gopro_overlay_dependencies() -> dict[str, bool]:
         if os.path.sep in gopro_bin
         else shutil.which(gopro_bin) is not None
     )
+    has_ffmpeg = shutil.which("ffmpeg") is not None
+    has_ffprobe = shutil.which("ffprobe") is not None
     return {
         "gopro_dashboard": has_gopro_dashboard,
-        "ffmpeg": shutil.which("ffmpeg") is not None,
-        "ffprobe": shutil.which("ffprobe") is not None,
+        "ffmpeg": has_ffmpeg,
+        "ffprobe": has_ffprobe,
+        "ffmpeg_vaapi": _ffmpeg_supports_vaapi() if has_ffmpeg and has_ffprobe else False,
     }
+
+
+def _ffmpeg_supports_vaapi() -> bool:
+    try:
+        encoders = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-encoders"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        hwaccels = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-hwaccels"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError, TimeoutError):
+        return False
+    return "h264_vaapi" in (encoders.stdout or "") and "vaapi" in (hwaccels.stdout or "")

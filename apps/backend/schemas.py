@@ -28,6 +28,7 @@ class GoproOverlayDependencies(BaseModel):
     gopro_dashboard: bool
     ffmpeg: bool
     ffprobe: bool
+    ffmpeg_vaapi: bool = False
 
 
 class GoproOverlayLayout(BaseModel):
@@ -55,6 +56,7 @@ class GoproOverlayJob(BaseModel):
     progress: int
     message: str
     error: str | None = None
+    render_method: Literal["cpu", "gpu"] | None = None
     gpx_path: str | None = None
     layout_id: str
     layout_label: str
