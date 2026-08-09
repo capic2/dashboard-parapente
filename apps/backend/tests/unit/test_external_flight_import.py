@@ -19,7 +19,7 @@ class Provider:
 
 
 @pytest.mark.asyncio
-async def test_import_updates_intervals_name_on_resync(
+async def test_import_normalizes_intervals_name_and_repairs_it_on_resync(
     db_session, arguel_site, tmp_path, monkeypatch
 ):
     monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
@@ -35,6 +35,11 @@ async def test_import_updates_intervals_name_on_resync(
 
     first = await import_external_activities(db_session, "intervals_icu", Provider(), [activity])
     flight = db_session.query(Flight).one()
+    assert flight.name == "Vol du 01/07/2026 à 12:00"
+    assert flight.title == "Vol du 01/07/2026 à 12:00"
+    flight.name = "First title"
+    flight.title = "First title"
+    db_session.commit()
     repeated_activity = ExternalActivity(
         id=activity.id,
         name="Updated title",
@@ -50,14 +55,46 @@ async def test_import_updates_intervals_name_on_resync(
 
     flight = db_session.query(Flight).one()
     assert first["imported"] == 1
-    assert second["skipped"] == 1
+    assert second["updated"] == 1
+    assert second["skipped"] == 0
     assert db_session.query(Flight).count() == 1
     assert flight.external_provider == "intervals_icu"
     assert flight.external_activity_id == "unsafe/id"
-    assert flight.name == "Updated title"
-    assert flight.title == "Updated title"
+    assert flight.name == "Vol du 01/07/2026 à 12:00"
+    assert flight.title == "Vol du 01/07/2026 à 12:00"
     assert "intervals_unsafe_id_" in flight.gpx_file_path
     assert flight.site_id == arguel_site.id
+
+
+@pytest.mark.asyncio
+async def test_import_skips_existing_intervals_flight_with_normalized_name(db_session):
+    flight = Flight(
+        id="existing",
+        external_provider="intervals_icu",
+        external_activity_id="i-existing",
+        external_url="https://intervals.icu/activities/i-existing",
+        name="Vol du 28/07/2026 à 19:05",
+        title="Vol du 28/07/2026 à 19:05",
+        flight_date=datetime(2026, 7, 28).date(),
+        departure_time=datetime(2026, 7, 28, 19, 5),
+    )
+    db_session.add(flight)
+    db_session.commit()
+    activity = ExternalActivity(
+        id="i-existing",
+        name="Raw Intervals title",
+        start_date=datetime(2026, 7, 28, 19, 5),
+        activity_type="Other",
+        source="ZEPP",
+        file_type="GPX",
+        external_url="https://intervals.icu/activities/i-existing",
+    )
+
+    result = await import_external_activities(db_session, "intervals_icu", Provider(), [activity])
+
+    assert result["updated"] == 0
+    assert result["skipped"] == 1
+    assert flight.name == "Vol du 28/07/2026 à 19:05"
 
 
 @pytest.mark.asyncio
@@ -123,6 +160,8 @@ async def test_import_stores_track_departure_in_paris_local_time(db_session, tmp
     flight = db_session.query(Flight).one()
     assert flight.departure_time == datetime(2026, 7, 2, 0, 30)
     assert flight.flight_date.isoformat() == "2026-07-02"
+    assert flight.name == "Vol du 02/07/2026 à 00:30"
+    assert flight.title == "Vol du 02/07/2026 à 00:30"
 
 
 @pytest.mark.asyncio
