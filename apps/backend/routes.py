@@ -53,6 +53,7 @@ from deployment_drain import (
 )
 from emagram_freshness import get_emagram_cutoff_utc
 from flight_decision import build_flight_decision, normalize_objective
+from flight_naming import format_automatic_flight_name
 from flight_summaries import (
     FlightGpxStatus,
     FlightSortBy,
@@ -4498,7 +4499,7 @@ async def create_flight_from_gpx(
         # Extraire la date et heure depuis le GPX (premier trackpoint)
         flight_date = date.today()  # Default
         departure_time = None
-        flight_name = f"Vol du {flight_date.strftime('%d/%m/%Y')}"  # Default
+        flight_name = format_automatic_flight_name(flight_date)
 
         if stats.get("first_trackpoint") and stats["first_trackpoint"].get("time"):
             # Le timestamp du GPX est en UTC, on le convertit en heure locale française
@@ -4513,8 +4514,7 @@ async def create_flight_from_gpx(
                 departure_time = departure_datetime_utc.astimezone(paris_tz)
                 flight_date = departure_time.date()
 
-                # Nom du vol avec date ET heure
-                flight_name = f"Vol du {flight_date.strftime('%d/%m/%Y')} à {departure_time.strftime('%H:%M')}"
+                flight_name = format_automatic_flight_name(flight_date, departure_time)
 
                 print(
                     f"🔍 DEBUG Date/Time - UTC: {departure_datetime_utc}, Local: {departure_time}, Name: {flight_name}"
