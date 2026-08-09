@@ -2676,7 +2676,6 @@ def test_run_job_marks_unexpected_start_error_failed(caplog, monkeypatch):
     finally:
         gopro_overlay_export._JOBS.pop(job_id, None)
         gopro_overlay_export._PROCESSES.pop(job_id, None)
-        render_device_path.unlink(missing_ok=True)
 
 
 def _upload(filename: str, content: bytes) -> UploadFile:

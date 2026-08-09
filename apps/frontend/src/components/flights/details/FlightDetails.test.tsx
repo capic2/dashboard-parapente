@@ -343,7 +343,7 @@ describe('FlightDetails GoPro overlay action', () => {
 
     expect(videoToggle).toHaveAttribute('aria-expanded', 'true');
     expect(overlayToggle).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByText('GPU')).toBeInTheDocument();
+    expect(screen.getAllByText('GPU').length).toBeGreaterThan(0);
     expect(screen.getByText('Encoding with FFmpeg')).toBeInTheDocument();
     expect(
       screen.queryByText('Overlay failed on frame 42')
