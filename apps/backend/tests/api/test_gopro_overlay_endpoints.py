@@ -724,7 +724,7 @@ def test_worker_merge_osv_files_with_gpx_writes_log_steps(
     class Result:
         returncode = 0
         stderr = ""
-        stdout = ""
+        stdout = "GPX points total: 408\nPoints GPX filtered: 408\n"
 
     def fake_run(command, **kwargs):
         Path(command[-1]).write_text("<gpx>merged</gpx>")
@@ -741,10 +741,12 @@ def test_worker_merge_osv_files_with_gpx_writes_log_steps(
     assert result == merged_gpx_path
     log_lines = log_path.read_text().splitlines()
     assert any("Merging 1 OSV file(s)" in line for line in log_lines)
+    assert any("GPX points total: 408" in line for line in log_lines)
+    assert any("Points GPX filtered: 408" in line for line in log_lines)
     assert any("Created merged GPX" in line for line in log_lines)
 
 
-def test_worker_merge_osv_files_with_gpx_uses_absolute_timestamps_without_forced_offset(
+def test_worker_merge_osv_files_with_gpx_uses_relative_sync_and_camera_duration(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -785,11 +787,14 @@ def test_worker_merge_osv_files_with_gpx_uses_absolute_timestamps_without_forced
             [osv_path],
             source_gpx,
             input_dir,
+            video_duration=421.483,
         )
 
     assert result == merged_gpx_path
     assert merged_gpx_path.read_text() == "<gpx>merged</gpx>"
     command = run.call_args.args[0]
+    assert command[command.index("--sync") + 1] == "gpx-start"
+    assert command[command.index("--video-duration") + 1] == "421.483"
     assert "--first-gpx-at" not in command
 
 
@@ -840,6 +845,7 @@ def test_worker_merge_osv_files_with_gpx_keeps_source_gpx_when_video_starts_afte
 
     assert result == merged_gpx_path
     command = run.call_args.args[0]
+    assert command[command.index("--sync") + 1] == "gpx-start"
     assert "--first-gpx-at" not in command
     assert Path(command[-2]) == source_gpx
 
@@ -1622,6 +1628,98 @@ def test_prepare_pip_video_auto_aligns_start_time_by_timezone_offset(tmp_path, m
     assert command[command.index("-c:v") + 1] == "h264_vaapi"
 
 
+def test_prepare_pip_video_uses_merged_gpx_timeline_without_creation_time(tmp_path, monkeypatch):
+    video_path = tmp_path / "camera.mp4"
+    gpx_path = tmp_path / "track.gpx"
+    pip_path = tmp_path / "pip.mp4"
+    work_dir = tmp_path / "work"
+    video_path.write_bytes(b"video")
+    pip_path.write_bytes(b"pip")
+    gpx_path.write_text("<gpx><time>2026-08-08T09:30:43Z</time></gpx>")
+    work_dir.mkdir()
+    commands: list[list[str]] = []
+
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_duration",
+        lambda path: 421.483 if path == video_path else 407.0,
+    )
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (640, 480))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_start_time", lambda _: None)
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = ""
+
+    def run(command, **_kwargs):
+        commands.append(command)
+        Path(command[-1]).write_bytes(b"prepared")
+        return Result()
+
+    monkeypatch.setattr(gopro_overlay_export.subprocess, "run", run)
+
+    prepared = gopro_overlay_export._prepare_pip_video_for_overlay(
+        "job-pip",
+        video_path,
+        gpx_path,
+        pip_path,
+        work_dir,
+        timeline_start=gopro_overlay_export._parse_utc_datetime("2026-08-08T09:30:28.517Z"),
+    )
+
+    assert prepared.exists()
+    command = commands[0]
+    assert "-ss" not in command
+    video_filter = command[command.index("-vf") + 1]
+    assert "tpad=start_mode=add:start_duration=14.483" in video_filter
+    assert "stop_duration" not in video_filter
+
+
+def test_prepare_pip_video_applies_manual_gpx_offset_to_shared_timeline(tmp_path, monkeypatch):
+    video_path = tmp_path / "camera.mp4"
+    gpx_path = tmp_path / "track.gpx"
+    pip_path = tmp_path / "pip.mp4"
+    work_dir = tmp_path / "work"
+    video_path.write_bytes(b"video")
+    pip_path.write_bytes(b"pip")
+    gpx_path.write_text("<gpx><time>2026-08-08T09:30:43Z</time></gpx>")
+    work_dir.mkdir()
+    commands: list[list[str]] = []
+
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_duration",
+        lambda path: 421.483 if path == video_path else 407.0,
+    )
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (640, 480))
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = ""
+
+    def run(command, **_kwargs):
+        commands.append(command)
+        Path(command[-1]).write_bytes(b"prepared")
+        return Result()
+
+    monkeypatch.setattr(gopro_overlay_export.subprocess, "run", run)
+
+    gopro_overlay_export._prepare_pip_video_for_overlay(
+        "job-pip",
+        video_path,
+        gpx_path,
+        pip_path,
+        work_dir,
+        timeline_start=gopro_overlay_export._parse_utc_datetime("2026-08-08T09:30:28.517Z"),
+        gpx_offset=2.5,
+    )
+
+    video_filter = commands[0][commands[0].index("-vf") + 1]
+    assert "tpad=start_mode=add:start_duration=16.983" in video_filter
+
+
 def test_prepare_queued_job_uses_prepared_pip_path(tmp_path, monkeypatch, test_db):
     layout_dir = tmp_path / "layouts"
     layout_dir.mkdir()
@@ -1634,14 +1732,16 @@ def test_prepare_queued_job_uses_prepared_pip_path(tmp_path, monkeypatch, test_d
     gpx_path.write_text("<gpx />")
     pip_path.write_bytes(b"pip")
     prepared_pip_path.write_bytes(b"prepared")
+    pip_calls: list[dict] = []
     monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
     monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
     monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
-    monkeypatch.setattr(
-        gopro_overlay_export,
-        "_prepare_pip_video_for_overlay",
-        lambda *_args, **_kwargs: prepared_pip_path,
-    )
+
+    def fake_prepare_pip(*_args, **kwargs):
+        pip_calls.append(kwargs)
+        return prepared_pip_path
+
+    monkeypatch.setattr(gopro_overlay_export, "_prepare_pip_video_for_overlay", fake_prepare_pip)
 
     job = create_gopro_overlay_job_from_paths(
         video_path=video_path,
@@ -1649,6 +1749,7 @@ def test_prepare_queued_job_uses_prepared_pip_path(tmp_path, monkeypatch, test_d
         pip_path=pip_path,
         layout_id="parapente-1080",
         output_filename="overlay.mp4",
+        gpx_offset=2.5,
     )
     queued_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
     assert queued_job is not None
@@ -1657,6 +1758,7 @@ def test_prepare_queued_job_uses_prepared_pip_path(tmp_path, monkeypatch, test_d
 
     assert prepared is not None
     assert Path(prepared["pip_path"]) == prepared_pip_path
+    assert pip_calls[0]["gpx_offset"] == 0.0
 
 
 @pytest.mark.asyncio
@@ -2285,6 +2387,7 @@ def test_run_job_prepares_inputs_before_starting_process(
     monkeypatch.setattr(config, "GOPRO_OVERLAY_RENDER_DEVICE", str(render_device_path))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nvgpu")
     monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: 421.483)
     monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
     monkeypatch.setattr(gopro_overlay_export, "_verify_video_output", lambda _: (True, None))
     monkeypatch.setattr(
@@ -2342,6 +2445,7 @@ def test_run_job_prepares_inputs_before_starting_process(
     assert len(merge_calls) == 1
     assert merge_calls[0][0] == [osv_path]
     assert merge_calls[0][3]["gpx_offset"] == -1.5
+    assert merge_calls[0][3]["video_duration"] == 421.483
     assert gopro_overlay_export.get_gopro_overlay_job(job["job_id"])["status"] == "completed"
     assert Path(job["output_path"]).read_bytes() == b"video"
     assert not Path(job["temp_output_path"]).exists()

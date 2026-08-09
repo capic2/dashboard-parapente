@@ -182,6 +182,7 @@ def _merge_osv_files_with_gpx(
     input_dir: Path,
     log_path: Path | None = None,
     gpx_offset: float = 0.0,
+    video_duration: float | None = None,
 ) -> Path:
     if not osv_paths:
         return gpx_path
@@ -209,6 +210,9 @@ def _merge_osv_files_with_gpx(
     command = [
         "python3",
         str(merge_script),
+        "--sync",
+        "gpx-start",
+        *(["--video-duration", f"{video_duration:.3f}"] if video_duration is not None else []),
         *(["--gpx-offset", str(gpx_offset)] if gpx_offset else []),
         *(str(path) for path in osv_paths),
         str(gpx_path),
@@ -235,6 +239,10 @@ def _merge_osv_files_with_gpx(
         if log_path:
             _append_job_log(log_path, f"OSV merge failed: {detail}")
         raise ValueError(detail)
+    if log_path:
+        for line in result.stdout.splitlines():
+            if line.strip():
+                _append_job_log(log_path, f"OSV merge: {line.strip()}")
     if not merged_gpx_path.exists():
         if log_path:
             _append_job_log(log_path, "OSV merge did not create a GPX file")
@@ -912,6 +920,8 @@ def _prepare_pip_video_for_overlay(
     pip_path: Path,
     work_dir: Path,
     log_path: Path | None = None,
+    timeline_start: datetime | None = None,
+    gpx_offset: float = 0.0,
 ) -> Path:
     video_duration = probe_video_duration(video_path)
     pip_width, pip_height = probe_video_resolution(pip_path)
@@ -923,8 +933,17 @@ def _prepare_pip_video_for_overlay(
 
     pip_duration = probe_video_duration(pip_path)
     gpx_start = _first_gpx_timestamp(gpx_path)
-    video_start = _align_video_start_time_to_gpx(probe_video_start_time(video_path), gpx_start)
+    if gpx_start is not None and gpx_offset:
+        gpx_start += timedelta(seconds=gpx_offset)
+    video_start = timeline_start or _align_video_start_time_to_gpx(
+        probe_video_start_time(video_path), gpx_start
+    )
     pip_delay, pip_trim = _pip_timeline_offsets(video_start, gpx_start)
+    if log_path:
+        _append_job_log(
+            log_path,
+            f"PIP timeline: delay={pip_delay:.3f}s trim={pip_trim:.3f}s",
+        )
     visible_pip_duration = max(0.0, pip_duration - pip_trim) if pip_duration is not None else None
     pip_tail_duration = (
         max(0.0, video_duration - pip_delay - visible_pip_duration)
@@ -1157,14 +1176,17 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
 
         source_input_dir = Path(str(job["output_path"])).parent
         osv_paths = _matching_files_by_mtime(source_input_dir, "*.osv")
+        gpx_offset = _gpx_offset_from_command_metadata(command_metadata)
         if osv_paths:
             _update_job(job_id, progress=10, message="Merging OSV telemetry")
+            video_duration = probe_video_duration(video_path)
             render_gpx_path = _merge_osv_files_with_gpx(
                 osv_paths,
                 render_gpx_path,
                 work_dir,
                 log_path=log_path,
-                gpx_offset=_gpx_offset_from_command_metadata(command_metadata),
+                gpx_offset=gpx_offset,
+                video_duration=video_duration,
             )
         else:
             _append_job_log(log_path, "No OSV files found; using GPX directly")
@@ -1181,6 +1203,8 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 pip_path,
                 work_dir,
                 log_path=log_path,
+                timeline_start=_first_gpx_timestamp(render_gpx_path),
+                gpx_offset=gpx_offset if osv_paths else 0.0,
             )
         else:
             _append_job_log(log_path, "No PIP video configured")
