@@ -216,6 +216,7 @@ export function FlightGenerationLogsPanel({
           <LogSourceCard
             key={`video-${videoStatus?.job_id ?? videoJobId ?? 'fallback'}`}
             title={t('flights.generationLogs.videoTitle')}
+            renderMethod={videoStatus?.render_method ?? null}
             status={videoStatusValue}
             isInProgress={Boolean(
               videoStatusValue &&

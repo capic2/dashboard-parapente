@@ -576,6 +576,7 @@ def _gopro_overlay_export_job_payload(job: dict[str, Any]) -> dict[str, Any]:
         "progress": job.get("progress"),
         "message": job.get("message"),
         "error": job.get("error"),
+        "render_method": job.get("render_method"),
         "gpx_path": job.get("gpx_path"),
         "mode": "gopro_overlay",
         "flight_title": job.get("output_filename") or job.get("layout_label"),

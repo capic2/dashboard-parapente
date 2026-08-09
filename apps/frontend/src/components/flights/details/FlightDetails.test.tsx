@@ -316,6 +316,7 @@ describe('FlightDetails GoPro overlay action', () => {
       job_id: 'video-job',
       status: 'running',
       internal_status: 'encoding',
+      render_method: 'cpu',
       progress: 78,
       message: 'Encoding with FFmpeg',
       log_tail: ['Captured frames', 'Encoding with FFmpeg'],
@@ -343,6 +344,7 @@ describe('FlightDetails GoPro overlay action', () => {
 
     expect(videoToggle).toHaveAttribute('aria-expanded', 'true');
     expect(overlayToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getAllByText('CPU').length).toBeGreaterThan(0);
     expect(screen.getAllByText('GPU').length).toBeGreaterThan(0);
     expect(screen.getByText('Encoding with FFmpeg')).toBeInTheDocument();
     expect(

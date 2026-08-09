@@ -249,6 +249,7 @@ class GoproOverlayJob(Base):
     progress = Column(Integer, default=0)
     message = Column(Text)
     error = Column(Text)
+    render_method = Column(String, nullable=True)
     video_path = Column(String, nullable=False)
     gpx_path = Column(String, nullable=False)
     pip_path = Column(String)

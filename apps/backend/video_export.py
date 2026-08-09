@@ -21,6 +21,39 @@ export_jobs: dict[str, dict] = {}
 
 _TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
 
+_WEBGL_RENDERER_SCRIPT = """
+    () => {
+        const canvas = document.querySelector('canvas');
+        if (!canvas) {
+            return { available: false, vendor: '', renderer: '' };
+        }
+
+        const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+        if (!gl) {
+            return { available: false, vendor: '', renderer: '' };
+        }
+
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        return {
+            available: true,
+            vendor: debugInfo
+                ? String(gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) || '')
+                : String(gl.getParameter(gl.VENDOR) || ''),
+            renderer: debugInfo
+                ? String(gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || '')
+                : String(gl.getParameter(gl.RENDERER) || ''),
+        };
+    }
+"""
+
+
+def _is_software_webgl_renderer(renderer: str) -> bool:
+    normalized = renderer.lower()
+    return any(
+        marker in normalized
+        for marker in ("swiftshader", "llvmpipe", "softpipe", "software rasterizer", "swrast")
+    )
+
 
 def _video_export_dir() -> Path:
     return Path(config.VIDEO_EXPORT_DIR)
@@ -133,6 +166,7 @@ def start_video_export_background(
             "started_at": datetime.now().isoformat(),
             "video_path": None,
             "error": None,
+            "render_method": None,
         }
 
         # Start export in background thread
@@ -287,6 +321,13 @@ async def _export_video_playwright(
             # Give it a bit more time for initialization
             await asyncio.sleep(3)
             _raise_if_cancelled(job_id)
+
+            renderer_info = await page.evaluate(_WEBGL_RENDERER_SCRIPT)
+            renderer = str(renderer_info.get("renderer") or "unknown")
+            if not renderer_info.get("available") or _is_software_webgl_renderer(renderer):
+                export_jobs[job_id]["render_method"] = "cpu"
+            else:
+                export_jobs[job_id]["render_method"] = "gpu"
 
             # Wait for terrain textures to load by checking terrainReady state
             export_jobs[job_id]["message"] = "Waiting for terrain textures..."
