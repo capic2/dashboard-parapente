@@ -29,6 +29,24 @@ def _resolve_project_root(backend_root: Path) -> Path:
     return backend_root
 
 
+def _configured_storage_dir(
+    env_name: str,
+    default: str,
+    *,
+    forbidden_roots: tuple[Path, ...] = (),
+) -> str:
+    raw_value = os.getenv(env_name)
+    value = raw_value.strip() if raw_value and raw_value.strip() else default
+    path = Path(value)
+    if not path.is_absolute():
+        raise ValueError(f"{env_name} must be an absolute path")
+
+    resolved_path = path.resolve(strict=False)
+    if resolved_path in {root.resolve(strict=False) for root in forbidden_roots}:
+        raise ValueError(f"{env_name} points to an unsafe shared root: {resolved_path}")
+    return str(path)
+
+
 PROJECT_ROOT = _resolve_project_root(BACKEND_ROOT)
 
 # Charger les variables d'environnement selon le contexte
@@ -58,6 +76,24 @@ def _default_job_queue_backend() -> str:
     return "rq" if ENVIRONMENT == "production" else "thread"
 
 
+def _csv_env(name: str, default: str) -> list[str]:
+    return [value.strip() for value in os.getenv(name, default).split(",") if value.strip()]
+
+
+def _int_env_at_least(name: str, default: int, minimum: int) -> int:
+    return max(minimum, int(os.getenv(name, str(default))))
+
+
+def _intervals_sync_enabled(api_key: str | None) -> bool:
+    requested = os.getenv("BACKEND_INTERVALS_ICU_SYNC_ENABLED", "false").lower() == "true"
+    if requested and not api_key:
+        logger.warning(
+            "BACKEND_INTERVALS_ICU_SYNC_ENABLED ignored because "
+            "BACKEND_INTERVALS_ICU_API_KEY is missing"
+        )
+    return requested and bool(api_key)
+
+
 # ============================================================================
 # DATABASE
 # ============================================================================
@@ -80,6 +116,10 @@ JOB_QUEUE_BACKEND = os.getenv(
 JOB_QUEUE_NAME = os.getenv("BACKEND_JOB_QUEUE_NAME", "video_exports")
 GOPRO_OVERLAY_QUEUE_NAME = os.getenv("BACKEND_GOPRO_OVERLAY_QUEUE_NAME", "gopro_overlays")
 JOB_QUEUE_TIMEOUT_SECONDS = int(os.getenv("BACKEND_JOB_QUEUE_TIMEOUT_SECONDS", "21600"))
+
+# Deployment drain coordination
+DEPLOY_DRAIN_TOKEN = os.getenv("BACKEND_DEPLOY_DRAIN_TOKEN")
+DEPLOY_DRAIN_LEASE_SECONDS = _int_env_at_least("BACKEND_DEPLOY_DRAIN_LEASE_SECONDS", 4500, 1)
 
 # ============================================================================
 # API
@@ -109,24 +149,17 @@ AZBA_CACHE_TTL_SECONDS = int(os.getenv("BACKEND_AZBA_CACHE_TTL_SECONDS", "900"))
 AZBA_SITE_RADIUS_KM = float(os.getenv("BACKEND_AZBA_SITE_RADIUS_KM", "10"))
 
 # ============================================================================
-# STRAVA OAUTH
+# INTERVALS.ICU
 # ============================================================================
-STRAVA_CLIENT_ID = os.getenv("BACKEND_STRAVA_CLIENT_ID")
-STRAVA_CLIENT_SECRET = os.getenv("BACKEND_STRAVA_CLIENT_SECRET")
-STRAVA_REFRESH_TOKEN = os.getenv("BACKEND_STRAVA_REFRESH_TOKEN")
-STRAVA_ACCESS_TOKEN = os.getenv("BACKEND_STRAVA_ACCESS_TOKEN")
-STRAVA_VERIFY_TOKEN = os.getenv("BACKEND_STRAVA_VERIFY_TOKEN")
-STRAVA_TOKEN_LOG_HISTORY_LIMIT = max(
-    1, int(os.getenv("BACKEND_STRAVA_TOKEN_LOG_HISTORY_LIMIT", "5"))
-)
+INTERVALS_ICU_API_KEY = os.getenv("BACKEND_INTERVALS_ICU_API_KEY")
+INTERVALS_ICU_BASE_URL = os.getenv(
+    "BACKEND_INTERVALS_ICU_BASE_URL", "https://intervals.icu/api/v1"
+).rstrip("/")
+INTERVALS_ICU_ACTIVITY_TYPES = _csv_env("BACKEND_INTERVALS_ICU_ACTIVITY_TYPES", "")
 
 # ============================================================================
 # AI ANALYSIS
 # ============================================================================
-
-
-def _csv_env(name: str, default: str) -> list[str]:
-    return [value.strip() for value in os.getenv(name, default).split(",") if value.strip()]
 
 
 GOOGLE_API_KEY = os.getenv("BACKEND_GOOGLE_API_KEY")
@@ -155,12 +188,15 @@ HUGGINGFACE_MODELS = _csv_env("BACKEND_HUGGINGFACE_MODELS", "Qwen/Qwen2.5-VL-7B-
 CUSTOM_OPENAI_API_KEY = os.getenv("BACKEND_CUSTOM_OPENAI_API_KEY")
 CUSTOM_OPENAI_BASE_URL = os.getenv("BACKEND_CUSTOM_OPENAI_BASE_URL")
 CUSTOM_OPENAI_MODELS = _csv_env("BACKEND_CUSTOM_OPENAI_MODELS", "")
+CODEX_MODEL = os.getenv("BACKEND_CODEX_MODEL") or None
+CODEX_TIMEOUT_SECONDS = _int_env_at_least("BACKEND_CODEX_TIMEOUT_SECONDS", 180, 1)
 LLM_QUOTA_COOLDOWN_SECONDS = int(os.getenv("BACKEND_LLM_QUOTA_COOLDOWN_SECONDS", "3600"))
+EMAGRAM_FAILURE_RETRY_MINUTES = _int_env_at_least("BACKEND_EMAGRAM_FAILURE_RETRY_MINUTES", 360, 0)
 LLM_FALLBACK_ORDER = [
     provider.lower()
     for provider in _csv_env(
         "BACKEND_LLM_FALLBACK_ORDER",
-        "groq,openrouter,github_models,huggingface,google,custom_openai",
+        "groq,openrouter,github_models,huggingface,google,custom_openai,codex",
     )
 ]
 
@@ -211,7 +247,23 @@ PARAGLIDING_DATA_ROOT = (
     "/tmp/dashboard-parapente-test/parapente" if IS_TEST_ENV else "/app/parapente"
 )
 VIDEO_EXPORT_DIR = PARAGLIDING_DATA_ROOT
-VIDEO_TEMP_IMAGES_DIR = str(Path(PARAGLIDING_DATA_ROOT) / ".tmp" / "video-frames")
+VIDEO_LEGACY_TEMP_IMAGES_DIR = str(Path(PARAGLIDING_DATA_ROOT) / ".tmp" / "video-frames")
+VIDEO_TEMP_IMAGES_DIR = _configured_storage_dir(
+    "BACKEND_VIDEO_TEMP_IMAGES_DIR",
+    VIDEO_LEGACY_TEMP_IMAGES_DIR,
+    forbidden_roots=(
+        Path("/"),
+        Path("/tmp"),
+        Path("/var/tmp"),
+        Path("/app"),
+        Path("/app/db"),
+        Path("/app/video-exports"),
+        Path("/app/emagram-cache"),
+        Path("/app/gopro-overlay"),
+        Path("/app/codex-home"),
+        Path(PARAGLIDING_DATA_ROOT),
+    ),
+)
 
 # ============================================================================
 # GOPRO OVERLAY EXPORT
@@ -222,6 +274,9 @@ GOPRO_OVERLAY_LAYOUT_DIR = GOPRO_OVERLAY_ROOT
 GOPRO_OVERLAY_PARAGLIDING_ROOT = PARAGLIDING_DATA_ROOT
 GOPRO_OVERLAY_OUTPUT_DIR = PARAGLIDING_DATA_ROOT
 GOPRO_OVERLAY_UPLOAD_DIR = str(Path(PARAGLIDING_DATA_ROOT) / ".tmp" / "gopro-uploads")
+GOPRO_OVERLAY_CONFIG_DIR = os.getenv("BACKEND_GOPRO_OVERLAY_CONFIG_DIR")
+GOPRO_OVERLAY_PROFILE = os.getenv("BACKEND_GOPRO_OVERLAY_PROFILE")
+GOPRO_OVERLAY_EXTRA_ARGS = os.getenv("BACKEND_GOPRO_OVERLAY_EXTRA_ARGS")
 GOPRO_OVERLAY_FONT = os.getenv(
     "BACKEND_GOPRO_OVERLAY_FONT",
     "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
@@ -255,10 +310,6 @@ if not IS_TEST_ENV:
     if not METEOBLUE_API_KEY:
         logger.warning("⚠️ METEOBLUE_API_KEY is missing")
 
-    if not STRAVA_VERIFY_TOKEN:
-        logger.error("❌ STRAVA_VERIFY_TOKEN is required")
-        raise ValueError("BACKEND_STRAVA_VERIFY_TOKEN environment variable is required")
-
     if ENVIRONMENT == "production" and not METRICS_TOKEN:
         logger.error("❌ BACKEND_METRICS_TOKEN is required in production")
         raise ValueError("BACKEND_METRICS_TOKEN environment variable is required in production")
@@ -267,20 +318,6 @@ else:
     # In test mode, provide defaults to avoid breaking tests
     if not JWT_SECRET:
         JWT_SECRET = "test-secret-not-for-production"
-    if not STRAVA_VERIFY_TOKEN:
-        STRAVA_VERIFY_TOKEN = "PARAPENTE_2025"
-
-# Log Strava credentials status
-if STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET and STRAVA_REFRESH_TOKEN:
-    logger.info(f"✅ Strava credentials loaded (Client ID: {STRAVA_CLIENT_ID})")
-else:
-    logger.warning(
-        f"⚠️ Strava credentials incomplete: "
-        f"CLIENT_ID={bool(STRAVA_CLIENT_ID)}, "
-        f"CLIENT_SECRET={bool(STRAVA_CLIENT_SECRET)}, "
-        f"REFRESH_TOKEN={bool(STRAVA_REFRESH_TOKEN)}"
-    )
-
 # Log configuration summary
 logger.info(f"🔧 Environment: {ENVIRONMENT}")
 logger.info(f"🗄️ Database: {DATABASE_URL}")

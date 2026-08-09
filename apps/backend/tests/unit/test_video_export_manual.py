@@ -3,16 +3,44 @@
 import asyncio
 import os
 import time
+from collections import deque
 from datetime import datetime
 from urllib.error import URLError
 
 import pytest
 
 from auth import create_access_token, create_job_token, decode_job_token
+from deployment_drain import DeploymentDrainActive, deployment_drain
 from models import Flight, VideoExportJob
 
 import video_export
 import video_export_manual
+
+
+def test_video_export_log_survives_temp_cleanup_until_job_deletion(tmp_path, monkeypatch):
+    export_root = tmp_path / "exports"
+    temp_root = tmp_path / "temp"
+    job_id = "job-persistent-log"
+    job_temp_dir = temp_root / job_id
+    job_temp_dir.mkdir(parents=True)
+    (job_temp_dir / "frame.png").write_bytes(b"frame")
+
+    monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: export_root)
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+
+    video_export_manual._log_job(job_id, "Captured 10/100 frames")
+    log_path = video_export_manual._job_log_path(job_id)
+
+    video_export_manual.cleanup_video_export_temp_files(
+        [{"job_id": job_id, "status": "completed", "internal_status": "completed"}]
+    )
+
+    assert not job_temp_dir.exists()
+    assert "Captured 10/100 frames" in log_path.read_text()
+
+    video_export_manual.cleanup_video_export_job_temp_files(job_id)
+
+    assert not log_path.exists()
 
 
 def test_resolve_frontend_url_uses_backend_static_in_production(monkeypatch):
@@ -195,9 +223,172 @@ def test_parse_ffmpeg_out_time_seconds_parses_progress_lines():
     assert video_export_manual._parse_ffmpeg_out_time_seconds("progress=continue") is None
 
 
+@pytest.mark.parametrize(
+    "renderer",
+    [
+        "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device))",
+        "llvmpipe (LLVM 19.1.7, 256 bits)",
+        "Mesa softpipe",
+        "Software Rasterizer",
+    ],
+)
+def test_software_webgl_renderer_is_detected(renderer):
+    assert video_export_manual._is_software_webgl_renderer(renderer) is True
+
+
+def test_hardware_webgl_renderer_is_not_marked_as_software():
+    assert video_export_manual._is_software_webgl_renderer("NV168 (nouveau)") is False
+
+
+def test_chromium_launch_args_use_hardware_egl_when_render_device_exists(tmp_path):
+    render_device = tmp_path / "renderD128"
+    render_device.touch()
+
+    args = video_export_manual._chromium_launch_args(render_device)
+
+    assert "--use-angle=gl-egl" in args
+    assert "--enable-gpu-rasterization" in args
+    assert "--use-angle=swiftshader-webgl" not in args
+
+
+def test_chromium_launch_args_fall_back_to_swiftshader_without_render_device(tmp_path):
+    args = video_export_manual._chromium_launch_args(tmp_path / "missing-render-device")
+
+    assert "--use-angle=swiftshader-webgl" in args
+    assert "--enable-unsafe-swiftshader" in args
+    assert "--use-angle=gl-egl" not in args
+
+
 def test_ffmpeg_encoding_settings_use_fast_preset_for_manual_fast():
     assert video_export_manual._ffmpeg_encoding_settings(True) == ("veryfast", "23")
     assert video_export_manual._ffmpeg_encoding_settings(False) == ("medium", "18")
+
+
+def test_ffmpeg_command_streams_png_frames_for_manual_fast(tmp_path):
+    output_file = tmp_path / "export.mp4"
+
+    command = video_export_manual._ffmpeg_command(
+        fps=15,
+        output_file=output_file,
+        is_fast_mode=True,
+    )
+
+    assert command[:9] == [
+        "ffmpeg",
+        "-f",
+        "image2pipe",
+        "-framerate",
+        "15",
+        "-vcodec",
+        "png",
+        "-i",
+        "pipe:0",
+    ]
+    assert command[-1] == str(output_file)
+    assert command[command.index("-preset") + 1] == "veryfast"
+    assert command[command.index("-crf") + 1] == "23"
+
+
+def test_ffmpeg_command_reads_saved_frames_for_classic_mode(tmp_path):
+    frames_dir = tmp_path / "frames"
+    output_file = tmp_path / "export.mp4"
+
+    command = video_export_manual._ffmpeg_command(
+        fps=30,
+        output_file=output_file,
+        is_fast_mode=False,
+        frames_dir=frames_dir,
+    )
+
+    assert command[:5] == [
+        "ffmpeg",
+        "-framerate",
+        "30",
+        "-i",
+        str(frames_dir / "frame%05d.png"),
+    ]
+    assert "image2pipe" not in command
+    assert command[command.index("-preset") + 1] == "medium"
+    assert command[command.index("-crf") + 1] == "18"
+
+
+@pytest.mark.asyncio
+async def test_drain_ffmpeg_stderr_tracks_latest_progress(monkeypatch):
+    reader = asyncio.StreamReader()
+    reader.feed_data(b"out_time_us=1500000\nprogress=continue\ninvalid PNG frame\n")
+    reader.feed_eof()
+    lines: deque[str] = deque(maxlen=2)
+    state: dict[str, float] = {}
+    logged_messages: list[str] = []
+    monkeypatch.setattr(
+        video_export_manual,
+        "_log_job",
+        lambda _job_id, message: logged_messages.append(message),
+    )
+
+    await video_export_manual._drain_ffmpeg_stderr("job-1", reader, lines, state)
+
+    assert list(lines) == ["invalid PNG frame"]
+    assert state["encoded_seconds"] == 1.5
+    assert state["last_output_at"] > 0
+    assert logged_messages == ["ffmpeg: invalid PNG frame"]
+
+
+class _FakeFfmpegStdin:
+    def __init__(self):
+        self.frames: list[bytes] = []
+
+    def write(self, frame: bytes) -> None:
+        self.frames.append(frame)
+
+    async def drain(self) -> None:
+        return None
+
+
+class _FakeFfmpegProcess:
+    def __init__(self):
+        self.stdin = _FakeFfmpegStdin()
+        self.returncode = None
+
+
+@pytest.mark.asyncio
+async def test_write_ffmpeg_frame_writes_complete_png(monkeypatch):
+    process = _FakeFfmpegProcess()
+    stderr_task = asyncio.create_task(asyncio.sleep(0))
+    monkeypatch.setattr(video_export_manual, "_is_cancelled", lambda _job_id: False)
+
+    written = await video_export_manual._write_ffmpeg_frame(
+        job_id="job-1",
+        process=process,
+        stderr_task=stderr_task,
+        stderr_lines=deque(),
+        state={"started_at": time.monotonic()},
+        frame_png=b"png-frame",
+    )
+
+    await stderr_task
+    assert written is True
+    assert process.stdin.frames == [b"png-frame"]
+
+
+@pytest.mark.asyncio
+async def test_write_ffmpeg_frame_stops_before_write_when_cancelled(monkeypatch):
+    process = _FakeFfmpegProcess()
+    stderr_task = asyncio.create_task(asyncio.sleep(0))
+    monkeypatch.setattr(video_export_manual, "_is_cancelled", lambda _job_id: True)
+
+    written = await video_export_manual._write_ffmpeg_frame(
+        job_id="job-1",
+        process=process,
+        stderr_task=stderr_task,
+        stderr_lines=deque(),
+        state={"started_at": time.monotonic()},
+        frame_png=b"png-frame",
+    )
+
+    await stderr_task
+    assert written is False
+    assert process.stdin.frames == []
 
 
 def test_ffmpeg_timeout_is_not_limited_to_thirty_minutes():
@@ -412,6 +603,29 @@ def test_start_video_export_manual_enqueues_rq_job(test_db, monkeypatch):
     assert enqueued_job_ids == ["job-rq"]
 
 
+def test_start_video_export_manual_drain_rejection_creates_no_job(test_db, monkeypatch):
+    enqueued_job_ids: list[str] = []
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    monkeypatch.setattr(video_export_manual, "_dependencies_ok", True)
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(
+        video_export_manual,
+        "_enqueue_video_export_job_in_rq",
+        lambda job_id: enqueued_job_ids.append(job_id),
+    )
+    deployment_drain.begin("deploy-123", "sha-abc", "https://github.example/runs/123")
+
+    with pytest.raises(DeploymentDrainActive):
+        video_export_manual.start_video_export_manual(
+            flight_id="flight-test-001",
+            frontend_url="http://frontend.test",
+        )
+
+    with test_db() as db_session:
+        assert db_session.query(VideoExportJob).count() == 0
+    assert enqueued_job_ids == []
+
+
 def test_start_video_export_worker_enqueues_pending_jobs_with_rq(test_db, monkeypatch):
     enqueued_job_ids: list[str] = []
     monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
@@ -445,6 +659,45 @@ def test_start_video_export_worker_enqueues_pending_jobs_with_rq(test_db, monkey
     video_export_manual.start_video_export_worker()
 
     assert enqueued_job_ids == ["job-pending-rq"]
+
+
+def test_worker_restart_immediately_recovers_active_job(test_db, monkeypatch):
+    enqueued_job_ids: list[str] = []
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(
+        video_export_manual,
+        "_enqueue_video_export_job_in_rq",
+        lambda job_id: enqueued_job_ids.append(job_id),
+    )
+
+    with test_db() as db_session:
+        db_session.add(
+            VideoExportJob(
+                id="job-active-rq",
+                flight_id="flight-test-001",
+                status="capturing",
+                mode="manual_fast",
+                quality="1080p",
+                fps=15,
+                speed=1,
+                progress=50,
+                message="capturing",
+                frontend_url="http://localhost:5173",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+        )
+        db_session.commit()
+
+    assert video_export_manual.enqueue_pending_video_export_jobs(recover_active=True) == 1
+
+    with test_db() as db_session:
+        job = db_session.get(VideoExportJob, "job-active-rq")
+        assert job is not None
+        assert job.status == "queued"
+        assert job.message == "Recovered after worker restart"
+    assert enqueued_job_ids == ["job-active-rq"]
 
 
 def test_process_video_export_job_runs_only_requested_queued_job(test_db, monkeypatch):
@@ -494,6 +747,77 @@ def test_first_missing_frame_index_returns_resume_point(tmp_path):
     (frames_dir / "frame00003.png").write_bytes(b"frame")
 
     assert video_export_manual._first_missing_frame_index(frames_dir, 5) == 2
+
+
+def test_first_missing_frame_index_ignores_partial_frame(tmp_path):
+    frames_dir = tmp_path / "frames"
+    frames_dir.mkdir()
+    (frames_dir / "frame00000.png").write_bytes(b"complete")
+    (frames_dir / "frame00001.png.part").write_bytes(b"partial")
+
+    assert video_export_manual._first_missing_frame_index(frames_dir, 3) == 1
+
+
+def test_job_temp_dir_for_export_uses_local_storage_for_new_job(tmp_path, monkeypatch):
+    local_root = tmp_path / "local"
+    legacy_root = tmp_path / "legacy"
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: local_root)
+    monkeypatch.setattr(video_export_manual, "_video_legacy_temp_images_dir", lambda: legacy_root)
+
+    assert video_export_manual._job_temp_dir_for_export("job-new") == local_root / "job-new"
+
+
+def test_job_temp_dir_for_export_resumes_legacy_frames(tmp_path, monkeypatch):
+    local_root = tmp_path / "local"
+    legacy_root = tmp_path / "legacy"
+    legacy_frames = legacy_root / "job-resume" / "frames"
+    legacy_frames.mkdir(parents=True)
+    (legacy_frames / "frame00000.png").write_bytes(b"frame")
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: local_root)
+    monkeypatch.setattr(video_export_manual, "_video_legacy_temp_images_dir", lambda: legacy_root)
+
+    assert video_export_manual._job_temp_dir_for_export("job-resume") == legacy_root / "job-resume"
+
+
+def test_job_temp_dir_for_export_prefers_local_frames(tmp_path, monkeypatch):
+    local_root = tmp_path / "local"
+    legacy_root = tmp_path / "legacy"
+    local_frames = local_root / "job-resume" / "frames"
+    legacy_frames = legacy_root / "job-resume" / "frames"
+    local_frames.mkdir(parents=True)
+    legacy_frames.mkdir(parents=True)
+    (local_frames / "frame00000.png").write_bytes(b"local")
+    (legacy_frames / "frame00000.png").write_bytes(b"legacy")
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: local_root)
+    monkeypatch.setattr(video_export_manual, "_video_legacy_temp_images_dir", lambda: legacy_root)
+
+    assert video_export_manual._job_temp_dir_for_export("job-resume") == local_root / "job-resume"
+
+
+def test_job_temp_dir_for_export_uses_longest_contiguous_capture(tmp_path, monkeypatch):
+    local_root = tmp_path / "local"
+    legacy_root = tmp_path / "legacy"
+    local_frames = local_root / "job-resume" / "frames"
+    legacy_frames = legacy_root / "job-resume" / "frames"
+    local_frames.mkdir(parents=True)
+    legacy_frames.mkdir(parents=True)
+    (local_frames / "frame00000.png").write_bytes(b"local")
+    (local_frames / "frame00010.png").write_bytes(b"local-gap")
+    (legacy_frames / "frame00000.png").write_bytes(b"legacy-0")
+    (legacy_frames / "frame00001.png").write_bytes(b"legacy-1")
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: local_root)
+    monkeypatch.setattr(video_export_manual, "_video_legacy_temp_images_dir", lambda: legacy_root)
+
+    assert video_export_manual._job_temp_dir_for_export("job-resume") == legacy_root / "job-resume"
+
+
+def test_write_frame_file_atomic_publishes_complete_frame(tmp_path):
+    frame_path = tmp_path / "frame00000.png"
+
+    video_export_manual._write_frame_file_atomic(frame_path, b"png-frame")
+
+    assert frame_path.read_bytes() == b"png-frame"
+    assert not (tmp_path / "frame00000.png.part").exists()
 
 
 def test_job_resume_info_requires_terminal_status_and_frames(tmp_path, monkeypatch):
@@ -573,6 +897,61 @@ def test_resume_video_export_requeues_cancelled_job_with_frames(test_db, tmp_pat
     assert job.video_path is None
     db_session.close()
     assert enqueued_job_ids == ["video-export-job-resume"]
+
+
+def test_resume_video_export_drain_rejection_preserves_cancelled_job(
+    test_db, tmp_path, monkeypatch
+):
+    job_id = "job-resume-drain"
+    enqueued_job_ids: list[str] = []
+    frames_dir = tmp_path / "temp-images" / job_id / "frames"
+    frames_dir.mkdir(parents=True)
+    (frames_dir / "frame00000.png").write_bytes(b"frame")
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    monkeypatch.setattr(
+        video_export_manual,
+        "_video_temp_images_dir",
+        lambda: tmp_path / "temp-images",
+    )
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(
+        video_export_manual,
+        "_enqueue_video_export_job_in_rq",
+        lambda queued_job_id: enqueued_job_ids.append(queued_job_id),
+    )
+
+    with test_db() as db_session:
+        db_session.add(
+            VideoExportJob(
+                id=job_id,
+                flight_id="flight-test-001",
+                status="cancelled",
+                mode="manual",
+                quality="1080p",
+                fps=15,
+                speed=1,
+                progress=10,
+                total_frames=10,
+                message="cancelled",
+                frontend_url="http://localhost:5173",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+                cancelled_at=datetime.utcnow(),
+            )
+        )
+        db_session.commit()
+
+    deployment_drain.begin("deploy-123", "sha-abc", "https://github.example/runs/123")
+
+    with pytest.raises(DeploymentDrainActive):
+        video_export_manual.resume_video_export(job_id, auth_token="resume-token")
+
+    with test_db() as db_session:
+        job = db_session.get(VideoExportJob, job_id)
+        assert job is not None
+        assert job.status == "cancelled"
+        assert job.cancelled_at is not None
+    assert enqueued_job_ids == []
 
 
 def test_resume_video_export_waits_for_running_cancel_to_finish(test_db, tmp_path, monkeypatch):
@@ -957,6 +1336,7 @@ def test_cleanup_video_export_temp_files_uses_configured_temp_dir(tmp_path, monk
     temp_root = tmp_path / "configured-temp-images"
     export_root = tmp_path / "configured-video-exports"
     monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_legacy_temp_images_dir", lambda: temp_root)
     monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: export_root)
 
     inactive_temp_dir = temp_root / "job-failed"
@@ -982,9 +1362,10 @@ def test_cleanup_video_export_temp_files_removes_configured_orphan_temp_dirs(tmp
     temp_root = tmp_path / "configured-temp-images"
     export_root = tmp_path / "configured-video-exports"
     monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_legacy_temp_images_dir", lambda: temp_root)
     monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: export_root)
 
-    orphan_temp_dir = temp_root / "orphan-job"
+    orphan_temp_dir = temp_root / "8cd6dce7-885e-4385-bf7f-a10d1731dfeb"
     orphan_temp_dir.mkdir(parents=True)
     (orphan_temp_dir / "frame00001.png").write_bytes(b"frame")
     old_timestamp = time.time() - video_export_manual._ORPHAN_TEMP_CLEANUP_GRACE_SECONDS - 1
@@ -996,13 +1377,33 @@ def test_cleanup_video_export_temp_files_removes_configured_orphan_temp_dirs(tmp
     assert not orphan_temp_dir.exists()
 
 
+def test_cleanup_video_export_temp_files_ignores_non_job_directories(tmp_path, monkeypatch):
+    temp_root = tmp_path / "configured-temp-images"
+    export_root = tmp_path / "configured-video-exports"
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_legacy_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: export_root)
+
+    unrelated_dir = temp_root / "unrelated-data"
+    unrelated_dir.mkdir(parents=True)
+    (unrelated_dir / "important.txt").write_text("keep")
+    old_timestamp = time.time() - video_export_manual._ORPHAN_TEMP_CLEANUP_GRACE_SECONDS - 1
+    os.utime(unrelated_dir, (old_timestamp, old_timestamp))
+
+    result = video_export_manual.cleanup_video_export_temp_files([])
+
+    assert result["files_deleted"] == 0
+    assert unrelated_dir.exists()
+
+
 def test_cleanup_video_export_temp_files_keeps_fresh_orphan_temp_dirs(tmp_path, monkeypatch):
     temp_root = tmp_path / "configured-temp-images"
     export_root = tmp_path / "configured-video-exports"
     monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_legacy_temp_images_dir", lambda: temp_root)
     monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: export_root)
 
-    fresh_temp_dir = temp_root / "fresh-job"
+    fresh_temp_dir = temp_root / "2604316d-86bf-4882-bb3b-bfdb6e8e6cd7"
     fresh_temp_dir.mkdir(parents=True)
     (fresh_temp_dir / "frame00001.png").write_bytes(b"frame")
 
@@ -1018,6 +1419,7 @@ def test_cleanup_video_export_temp_files_removes_legacy_frames_for_inactive_job(
     temp_root = tmp_path / "configured-temp-images"
     export_root = tmp_path / "configured-video-exports"
     monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_legacy_temp_images_dir", lambda: temp_root)
     monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: export_root)
 
     legacy_frames_dir = export_root / "frames_job-cancelled"

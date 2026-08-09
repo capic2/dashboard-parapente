@@ -16,7 +16,7 @@ import {
   getScoreColor,
   getScoreCategory,
 } from '../../types/emagram';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { parseApiUtcDate } from '../../lib/date';
 import { getApiUrlWithSearchParams } from '../../lib/api';
 import { useAuthStore } from '../../stores/authStore';
@@ -270,9 +270,11 @@ export default function EmagramWidget({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
+  const selectionContextRef = useRef({ siteId, dayIndex });
   const authToken = useAuthStore((s) => s.token);
 
   useEffect(() => {
+    selectionContextRef.current = { siteId, dayIndex };
     setSelectedHour(null);
   }, [dayIndex, siteId]);
 
@@ -289,27 +291,11 @@ export default function EmagramWidget({
     [hoursData?.hours]
   );
 
-  // Determine which hour to display: selected, or current hour if in range, or null
-  const activeHour = useMemo(() => {
-    if (
-      selectedHour !== null &&
-      availableHours.some((h) => h.hour === selectedHour)
-    ) {
-      return selectedHour;
-    }
-    if (!availableHours.length || dayIndex > 0) return selectedHour;
-    const targetHour = new Date().getHours();
-    const hours = availableHours.map((h) => h.hour);
-
-    if (hours.includes(targetHour)) return targetHour;
-    // Default to closest available hour
-    return hours.reduce((prev, curr) =>
-      Math.abs(curr - targetHour) < Math.abs(prev - targetHour) ? curr : prev
-    );
-  }, [selectedHour, availableHours, dayIndex]);
-
-  const shouldFetchEmagram =
-    !!siteId && (dayIndex === 0 || activeHour !== null);
+  const selectionContextChanged =
+    selectionContextRef.current.siteId !== siteId ||
+    selectionContextRef.current.dayIndex !== dayIndex;
+  const activeHour = selectionContextChanged ? null : selectedHour;
+  const shouldFetchEmagram = !!siteId && activeHour !== null;
 
   const {
     data: emagram,
@@ -343,16 +329,6 @@ export default function EmagramWidget({
       },
     ].sort((a, b) => a.hour - b.hour);
   }, [availableHours, emagram]);
-
-  useEffect(() => {
-    if (
-      selectedHour == null &&
-      !availableHours.length &&
-      emagram?.forecast_hour != null
-    ) {
-      setSelectedHour(emagram.forecast_hour);
-    }
-  }, [availableHours.length, emagram?.forecast_hour, selectedHour]);
 
   const hasHourlyData = displayHours.length > 0;
   const hourSlider = hasHourlyData ? (

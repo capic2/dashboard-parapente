@@ -61,61 +61,115 @@ export const LandingAssociationSchema = z.object({
 
 export type LandingAssociation = z.infer<typeof LandingAssociationSchema>;
 
-export const FlightSchema = z.object({
+export const FlightSchema = z
+  .object({
+    id: z.string(),
+    external_provider: z.string().trim().min(1).nullish(),
+    external_activity_id: z.string().trim().min(1).nullish(),
+    site_id: z.string().nullish(),
+    site_name: z.string().nullish(),
+    name: z.string().nullish(),
+    title: z.string().nullish(),
+    description: z.string().nullish(),
+    flight_date: z.string(),
+    departure_time: z.string().nullish(),
+    duration_minutes: z.number().nullish(),
+    max_altitude_m: z.number().nullish(),
+    max_speed_kmh: z.number().nullish(),
+    distance_km: z.number().nullish(),
+    elevation_gain_m: z.number().nullish(),
+    notes: z.string().nullish(),
+    gpx_file_path: z.string().nullish(),
+    gpx_max_altitude_m: z.number().nullish(),
+    gpx_elevation_gain_m: z.number().nullish(),
+    external_url: z.string().nullish(),
+    video_export_job_id: z.string().nullish(),
+    video_export_status: z
+      .enum([
+        'processing',
+        'completed',
+        'failed',
+        'queued',
+        'running',
+        'initializing',
+        'capturing',
+        'encoding',
+        'cancelled',
+      ])
+      .nullish(),
+    video_export_progress: z.number().nullish(),
+    video_file_path: z.string().nullish(),
+    video_file_exists: z.boolean().nullish(),
+    gopro_camera_file_exists: z.boolean().nullish(),
+    gopro_overlay_job_id: z.string().nullish(),
+    gopro_overlay_status: z
+      .enum([
+        'queued',
+        'preparing',
+        'running',
+        'completed',
+        'failed',
+        'cancelled',
+      ])
+      .nullish(),
+    gopro_overlay_progress: z.number().nullish(),
+    gopro_overlay_file_path: z.string().nullish(),
+    gopro_overlay_file_exists: z.boolean().nullish(),
+    site: SiteSchema.optional(),
+    created_at: z.string().optional(),
+    updated_at: z.string().optional(),
+  })
+  .refine(
+    (flight) =>
+      Boolean(flight.external_provider) ===
+      Boolean(flight.external_activity_id),
+    {
+      message:
+        'external_provider and external_activity_id must both be provided or omitted',
+      path: ['external_activity_id'],
+    }
+  );
+
+export const FlightSummarySchema = z.object({
   id: z.string(),
-  strava_id: z.string().nullish(),
-  site_id: z.string().nullish(),
-  site_name: z.string().nullish(),
-  name: z.string().nullish(),
-  title: z.string().nullish(),
-  description: z.string().nullish(),
+  site_id: z.string().nullable(),
+  site_name: z.string().nullable(),
+  site_region: z.string().nullable(),
+  name: z.string().nullable(),
+  title: z.string().nullable(),
   flight_date: z.string(),
-  departure_time: z.string().nullish(),
-  duration_minutes: z.number().nullish(),
-  max_altitude_m: z.number().nullish(),
-  max_speed_kmh: z.number().nullish(),
-  distance_km: z.number().nullish(),
-  elevation_gain_m: z.number().nullish(),
-  notes: z.string().nullish(),
-  gpx_file_path: z.string().nullish(),
-  gpx_max_altitude_m: z.number().nullish(),
-  gpx_elevation_gain_m: z.number().nullish(),
-  external_url: z.string().nullish(),
-  video_export_job_id: z.string().nullish(),
-  video_export_status: z
-    .enum([
-      'processing',
-      'completed',
-      'failed',
-      'queued',
-      'running',
-      'initializing',
-      'capturing',
-      'encoding',
-      'cancelled',
-    ])
-    .nullish(),
-  video_export_progress: z.number().nullish(),
-  video_file_path: z.string().nullish(),
-  video_file_exists: z.boolean().nullish(),
-  gopro_camera_file_exists: z.boolean().nullish(),
-  gopro_overlay_job_id: z.string().nullish(),
-  gopro_overlay_status: z
-    .enum([
-      'queued',
-      'preparing',
-      'running',
-      'completed',
-      'failed',
-      'cancelled',
-    ])
-    .nullish(),
-  gopro_overlay_progress: z.number().nullish(),
-  gopro_overlay_file_path: z.string().nullish(),
-  gopro_overlay_file_exists: z.boolean().nullish(),
-  site: SiteSchema.optional(),
-  created_at: z.string().optional(),
-  updated_at: z.string().optional(),
+  departure_time: z.string().nullable(),
+  duration_minutes: z.number().nullable(),
+  max_altitude_m: z.number().nullable(),
+  distance_km: z.number().nullable(),
+  elevation_gain_m: z.number().nullable(),
+  has_gpx: z.boolean(),
+  has_video: z.boolean(),
+  has_gopro_overlay: z.boolean(),
+  video_export_job_id: z.string().nullable(),
+  video_export_status: z.string().nullable(),
+  video_export_progress: z.number().nullable(),
+  gopro_overlay_job_id: z.string().nullable(),
+  gopro_overlay_status: z.string().nullable(),
+  gopro_overlay_progress: z.number().nullable(),
+});
+
+export const FlightSummariesResponseSchema = z.object({
+  flights: z.array(FlightSummarySchema),
+  total: z.number().int().nonnegative(),
+  next_cursor: z.string().nullable(),
+});
+
+export const ActiveFlightMediaJobSchema = z.object({
+  job_id: z.string(),
+  flight_id: z.string().nullish(),
+  status: z.string(),
+  progress: z.number().nullish(),
+  mode: z.string().nullish(),
+});
+
+export const ActiveFlightMediaJobsResponseSchema = z.object({
+  jobs: z.array(ActiveFlightMediaJobSchema),
 });
 
 export const FlightStatsSchema = z.object({
@@ -668,6 +722,11 @@ export type Site = z.infer<typeof SiteSchema>;
 export type SiteUpdate = z.infer<typeof SiteUpdateSchema>;
 export type CreateSiteData = z.infer<typeof CreateSiteSchema>;
 export type Flight = z.infer<typeof FlightSchema>;
+export type FlightSummary = z.infer<typeof FlightSummarySchema>;
+export type FlightSummariesResponse = z.infer<
+  typeof FlightSummariesResponseSchema
+>;
+export type ActiveFlightMediaJob = z.infer<typeof ActiveFlightMediaJobSchema>;
 export type FlightStats = z.infer<typeof FlightStatsSchema>;
 export type Alert = z.infer<typeof AlertSchema>;
 export type ConsensusHour = z.infer<typeof ConsensusHourSchema>;

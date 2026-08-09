@@ -29,6 +29,7 @@ def _site() -> SimpleNamespace:
 @pytest.fixture(autouse=True)
 def clear_llm_cooldowns() -> None:
     emagram._LLM_QUOTA_COOLDOWNS.clear()
+    emagram._LLM_UNAVAILABLE_COOLDOWNS.clear()
 
 
 def _configure_providers(monkeypatch: pytest.MonkeyPatch, order: list[str]) -> None:
@@ -50,6 +51,8 @@ def _configure_providers(monkeypatch: pytest.MonkeyPatch, order: list[str]) -> N
     monkeypatch.setattr(emagram.config, "CUSTOM_OPENAI_API_KEY", None)
     monkeypatch.setattr(emagram.config, "CUSTOM_OPENAI_BASE_URL", None)
     monkeypatch.setattr(emagram.config, "CUSTOM_OPENAI_MODELS", [])
+    monkeypatch.setattr(emagram.config, "CODEX_MODEL", None)
+    monkeypatch.setattr(emagram.config, "CODEX_TIMEOUT_SECONDS", 180)
 
 
 def test_default_order_prefers_free_providers(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -267,3 +270,160 @@ def test_unusable_response_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result["success"] is True
     assert result["llm_provider"] == "openrouter"
     assert calls == ["groq", "openrouter"]
+
+
+def test_codex_runs_after_all_free_quotas_are_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = []
+    _configure_providers(monkeypatch, ["groq", "openrouter", "codex"])
+
+    def exhausted(**kwargs: Any) -> dict[str, Any]:
+        calls.append(kwargs.get("model_name", "groq"))
+        raise QuotaExhaustedError("quota")
+
+    def codex(**kwargs: Any) -> dict[str, Any]:
+        calls.append("codex")
+        return _analysis("codex")
+
+    monkeypatch.setattr(emagram, "analyze_emagram_with_groq", exhausted)
+    monkeypatch.setattr(emagram, "analyze_emagram_with_openrouter", exhausted)
+    monkeypatch.setattr(emagram, "analyze_emagram_with_codex", codex)
+
+    result = emagram._analyze_emagram_with_fallbacks(["/tmp/emagram.png"], _site())
+
+    assert result["success"] is True
+    assert result["llm_provider"] == "codex"
+    assert calls == ["groq-model", "openrouter-model", "codex"]
+
+
+def test_codex_does_not_run_after_non_quota_free_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = []
+    _configure_providers(monkeypatch, ["groq", "openrouter", "codex"])
+
+    def groq(**kwargs: Any) -> dict[str, Any]:
+        calls.append("groq")
+        raise RuntimeError("temporary failure")
+
+    def openrouter(**kwargs: Any) -> dict[str, Any]:
+        calls.append("openrouter")
+        raise QuotaExhaustedError("quota")
+
+    def codex(**kwargs: Any) -> dict[str, Any]:
+        calls.append("codex")
+        return _analysis("codex")
+
+    monkeypatch.setattr(emagram, "analyze_emagram_with_groq", groq)
+    monkeypatch.setattr(emagram, "analyze_emagram_with_openrouter", openrouter)
+    monkeypatch.setattr(emagram, "analyze_emagram_with_codex", codex)
+
+    result = emagram._analyze_emagram_with_fallbacks(["/tmp/emagram.png"], _site())
+
+    assert result["success"] is False
+    assert calls == ["groq", "openrouter"]
+
+
+def test_codex_runs_after_free_models_are_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = []
+    _configure_providers(monkeypatch, ["groq", "openrouter", "codex"])
+    monkeypatch.setattr(emagram.config, "LLM_QUOTA_COOLDOWN_SECONDS", 60)
+
+    def unavailable(**kwargs: Any) -> dict[str, Any]:
+        calls.append(kwargs.get("model_name", "groq"))
+        raise RuntimeError("HTTP 404: model_not_found")
+
+    def codex(**kwargs: Any) -> dict[str, Any]:
+        calls.append("codex")
+        return _analysis("codex")
+
+    monkeypatch.setattr(emagram, "analyze_emagram_with_groq", unavailable)
+    monkeypatch.setattr(emagram, "analyze_emagram_with_openrouter", unavailable)
+    monkeypatch.setattr(emagram, "analyze_emagram_with_codex", codex)
+
+    first_result = emagram._analyze_emagram_with_fallbacks(["/tmp/emagram.png"], _site())
+    second_result = emagram._analyze_emagram_with_fallbacks(["/tmp/emagram.png"], _site())
+
+    assert first_result["success"] is True
+    assert first_result["llm_provider"] == "codex"
+    assert second_result["success"] is True
+    assert second_result["llm_provider"] == "codex"
+    assert calls == ["groq-model", "openrouter-model", "codex", "codex"]
+
+
+def test_codex_stays_last_and_runs_after_custom_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = []
+    _configure_providers(monkeypatch, ["codex", "custom_openai", "groq"])
+    monkeypatch.setattr(emagram.config, "CUSTOM_OPENAI_API_KEY", "custom-key")
+    monkeypatch.setattr(emagram.config, "CUSTOM_OPENAI_BASE_URL", "https://custom.example")
+    monkeypatch.setattr(emagram.config, "CUSTOM_OPENAI_MODELS", ["custom-model"])
+
+    def groq(**kwargs: Any) -> dict[str, Any]:
+        calls.append("groq")
+        raise QuotaExhaustedError("quota")
+
+    def custom(**kwargs: Any) -> dict[str, Any]:
+        calls.append("custom_openai")
+        raise RuntimeError("temporary failure")
+
+    def codex(**kwargs: Any) -> dict[str, Any]:
+        calls.append("codex")
+        return _analysis("codex")
+
+    monkeypatch.setattr(emagram, "analyze_emagram_with_groq", groq)
+    monkeypatch.setattr(emagram, "analyze_emagram_with_openai_compatible", custom)
+    monkeypatch.setattr(emagram, "analyze_emagram_with_codex", codex)
+
+    result = emagram._analyze_emagram_with_fallbacks(["/tmp/emagram.png"], _site())
+
+    assert result["success"] is True
+    assert calls == ["custom_openai", "groq", "codex"]
+
+
+def test_codex_does_not_run_without_configured_free_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = []
+    _configure_providers(monkeypatch, ["codex"])
+
+    def codex(**kwargs: Any) -> dict[str, Any]:
+        calls.append("codex")
+        return _analysis("codex")
+
+    monkeypatch.setattr(emagram, "analyze_emagram_with_codex", codex)
+
+    result = emagram._analyze_emagram_with_fallbacks(["/tmp/emagram.png"], _site())
+
+    assert result["success"] is False
+    assert calls == []
+
+
+def test_codex_runs_when_all_free_providers_are_on_quota_cooldown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = []
+    _configure_providers(monkeypatch, ["groq", "codex"])
+    monkeypatch.setattr(emagram.config, "LLM_QUOTA_COOLDOWN_SECONDS", 60)
+
+    def groq(**kwargs: Any) -> dict[str, Any]:
+        calls.append("groq")
+        raise QuotaExhaustedError("quota")
+
+    def codex(**kwargs: Any) -> dict[str, Any]:
+        calls.append("codex")
+        return _analysis("codex")
+
+    monkeypatch.setattr(emagram, "analyze_emagram_with_groq", groq)
+    monkeypatch.setattr(emagram, "analyze_emagram_with_codex", codex)
+
+    first_result = emagram._analyze_emagram_with_fallbacks(["/tmp/emagram.png"], _site())
+    second_result = emagram._analyze_emagram_with_fallbacks(["/tmp/emagram.png"], _site())
+
+    assert first_result["success"] is True
+    assert second_result["success"] is True
+    assert calls == ["groq", "codex", "codex"]

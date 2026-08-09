@@ -9,6 +9,7 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   createColumnHelper,
+  type CellContext,
   type SortingState,
 } from '@tanstack/react-table';
 import {
@@ -27,6 +28,40 @@ import { AnnotatedEmagramLightbox } from '../components/dashboard/AnnotatedEmagr
 import { EmagramExplanationTooltip } from '../components/dashboard/EmagramExplanationTooltip';
 
 const historyColumnHelper = createColumnHelper<EmagramListItem>();
+
+function ScoreCell({ score }: { score: number | null }) {
+  return (
+    <span
+      className="px-2 py-1 rounded-full text-sm font-bold"
+      style={{
+        backgroundColor: `${getScoreColor(score)}20`,
+        color: getScoreColor(score),
+      }}
+    >
+      {score ?? '-'}
+    </span>
+  );
+}
+
+function scoreCell(info: CellContext<EmagramListItem, number | null>) {
+  return <ScoreCell score={info.getValue()} />;
+}
+
+function AnalysisMethodCell({ method }: { method: string }) {
+  const { t } = useTranslation();
+
+  return (
+    <span className="text-xs text-gray-500 dark:text-gray-400">
+      {method === 'llm_vision'
+        ? t('thermal.methodAi')
+        : t('thermal.methodClassic')}
+    </span>
+  );
+}
+
+function analysisMethodCell(info: CellContext<EmagramListItem, string>) {
+  return <AnalysisMethodCell method={info.getValue()} />;
+}
 
 function formatSourceName(source: string): string {
   return source
@@ -52,20 +87,7 @@ function ThermalHistoryTable({ history }: { history: EmagramListItem[] }) {
       }),
       historyColumnHelper.accessor('score_volabilite', {
         header: t('thermal.tableScore'),
-        cell: (info) => {
-          const score = info.getValue();
-          return (
-            <span
-              className="px-2 py-1 rounded-full text-sm font-bold"
-              style={{
-                backgroundColor: `${getScoreColor(score)}20`,
-                color: getScoreColor(score),
-              }}
-            >
-              {score ?? '-'}
-            </span>
-          );
-        },
+        cell: scoreCell,
         sortingFn: (rowA, rowB) => {
           const a = rowA.original.score_volabilite ?? -Infinity;
           const b = rowB.original.score_volabilite ?? -Infinity;
@@ -100,13 +122,7 @@ function ThermalHistoryTable({ history }: { history: EmagramListItem[] }) {
       historyColumnHelper.accessor('analysis_method', {
         header: t('thermal.tableMethod'),
         meta: { className: 'hidden sm:table-cell' },
-        cell: (info) => (
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            {info.getValue() === 'llm_vision'
-              ? t('thermal.methodAi')
-              : t('thermal.methodClassic')}
-          </span>
-        ),
+        cell: analysisMethodCell,
       }),
     ],
     [t]

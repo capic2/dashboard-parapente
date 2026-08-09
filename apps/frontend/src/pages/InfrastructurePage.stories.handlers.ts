@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import type { CacheKeyDetail } from '../hooks/admin/useCache';
-import type { TokenLog } from '../hooks/admin/useStravaToken';
 import type { VideoExportJob } from '../hooks/flights/useVideoExportJobs';
+import type { DeploymentDrainStatus } from '../hooks/admin/useDeploymentDrainStatus';
 
 // --- In-memory cache database ---
 
@@ -131,71 +131,10 @@ const initialEntries: CacheEntry[] = [
 
 export const cacheDb: CacheEntry[] = [...initialEntries];
 
-// --- Strava token mock state ---
-
-const STRAVA_MOCK_BASE_MS = Date.parse('2026-01-15T10:00:00Z');
-const STRAVA_REFRESH_STEP_MS = 6 * 60 * 60 * 1000;
-
-const getExpiresAt = (hours: number, base = STRAVA_MOCK_BASE_MS) =>
-  new Date(base + hours * 60 * 60 * 1000).toISOString();
-
-const buildStravaTokenState = (base = STRAVA_MOCK_BASE_MS) => ({
-  valid: true,
-  expires_at: getExpiresAt(1, base),
-});
-
-const buildStravaExpiredTokenState = (base = STRAVA_MOCK_BASE_MS) => ({
-  valid: false,
-  expires_at: getExpiresAt(-1, base),
-});
-
-let nextLogId = 4;
-let currentRefreshClock = STRAVA_MOCK_BASE_MS;
-
-const buildStravaTokenLogs = (base = STRAVA_MOCK_BASE_MS): TokenLog[] => [
-  {
-    id: 3,
-    timestamp: getExpiresAt(-2, base),
-    success: true,
-    message: `Access token refreshed (expires at ${getExpiresAt(-1, base)})`,
-    expires_at: getExpiresAt(-1, base),
-    refresh_mode: 'automatic',
-  },
-  {
-    id: 2,
-    timestamp: getExpiresAt(-6, base),
-    success: true,
-    message: `Access token refreshed (expires at ${getExpiresAt(-5, base)})`,
-    expires_at: getExpiresAt(-5, base),
-    refresh_mode: 'automatic',
-  },
-  {
-    id: 1,
-    timestamp: getExpiresAt(-10, base),
-    success: false,
-    message:
-      'Strava API error (HTTP 401): {"message":"Bad Request","errors":[]}',
-    expires_at: null,
-    refresh_mode: 'manual',
-  },
-];
-
-const buildStravaExpiredTokenLogs = (
-  base = STRAVA_MOCK_BASE_MS
-): TokenLog[] => [
-  {
-    id: 1,
-    timestamp: getExpiresAt(-1, base),
-    success: false,
-    message:
-      'Strava API error (HTTP 401): {"message":"Bad Request","errors":[]}',
-    expires_at: null,
-    refresh_mode: 'manual',
-  },
-];
-
-let currentStravaTokenState = buildStravaTokenState();
-let currentStravaTokenLogs: TokenLog[] = buildStravaTokenLogs();
+const intervalsStatus = {
+  configured: true,
+  activity_types: ['Paragliding'],
+};
 
 const initialMockVideoJobs: VideoExportJob[] = [
   {
@@ -257,44 +196,9 @@ const resetMockVideoJobs = () => {
   mockVideoJobs.push(...initialMockVideoJobs.map((job) => ({ ...job })));
 };
 
-const refreshStravaToken = () => {
-  currentRefreshClock += STRAVA_REFRESH_STEP_MS;
-  const newExpiry = getExpiresAt(6, currentRefreshClock);
-  const newLog: TokenLog = {
-    id: nextLogId,
-    timestamp: new Date(currentRefreshClock).toISOString(),
-    success: true,
-    message: `Access token refreshed (expires at ${newExpiry})`,
-    expires_at: newExpiry,
-    refresh_mode: 'manual',
-  };
-
-  nextLogId += 1;
-  currentStravaTokenState = {
-    valid: true,
-    expires_at: newExpiry,
-  };
-  currentStravaTokenLogs = [newLog, ...currentStravaTokenLogs];
-
-  return {
-    valid: true,
-    expires_at: newExpiry,
-    refreshed: true,
-  };
-};
-
-const getInitialStravaState = () => {
-  nextLogId = 4;
-  currentRefreshClock = STRAVA_MOCK_BASE_MS;
-  currentStravaTokenState = buildStravaTokenState(currentRefreshClock);
-  currentStravaTokenLogs = buildStravaTokenLogs(currentRefreshClock);
-};
-
 export const resetCacheDb = () => {
   cacheDb.length = 0;
   cacheDb.push(...initialEntries);
-  // Reset Strava state
-  getInitialStravaState();
   resetMockVideoJobs();
 };
 
@@ -393,36 +297,18 @@ function buildOverview() {
 
 // --- MSW handlers reading/modifying cacheDb ---
 
-// --- Strava handlers ---
-
-const stravaHandlers = [
-  http.get('*/api/admin/strava/token-status', () =>
-    HttpResponse.json(currentStravaTokenState)
+const intervalsHandlers = [
+  http.get('*/api/admin/intervals/status', () =>
+    HttpResponse.json(intervalsStatus)
   ),
-
-  http.get('*/api/admin/strava/token-logs', () =>
-    HttpResponse.json(currentStravaTokenLogs)
-  ),
-
-  http.post('*/api/admin/strava/refresh-token', () => {
-    return HttpResponse.json(refreshStravaToken());
-  }),
 ];
 
-export const stravaExpiredHandlers = [
-  http.get('*/api/admin/strava/token-status', () => {
-    return HttpResponse.json(buildStravaExpiredTokenState());
-  }),
-
-  http.get('*/api/admin/strava/token-logs', () => {
-    return HttpResponse.json(buildStravaExpiredTokenLogs());
-  }),
-
-  http.post('*/api/admin/strava/refresh-token', () =>
-    HttpResponse.json(
-      { detail: 'Strava token refresh failed' },
-      { status: 502 }
-    )
+export const intervalsNoActivityTypesHandlers = [
+  http.get('*/api/admin/intervals/status', () =>
+    HttpResponse.json({
+      ...intervalsStatus,
+      activity_types: [],
+    })
   ),
 ];
 
@@ -599,8 +485,50 @@ export const videoExportHandlers = [
   }),
 ];
 
-export const defaultHandlers = [
-  ...stravaHandlers,
+const idleDeploymentStatus: DeploymentDrainStatus = {
+  phase: 'idle',
+  accepting_jobs: true,
+  ready_for_deployment: false,
+  active_jobs: 0,
+  admissions_in_progress: 0,
+  deployment_id: null,
+  target_version: null,
+  run_url: null,
+  requested_at: null,
+  phase_changed_at: null,
+  expires_at: null,
+};
+
+export const deploymentDrainHandlers = [
+  http.get('*/api/deployment-drain/status', () =>
+    HttpResponse.json(idleDeploymentStatus)
+  ),
+];
+
+export const deploymentWaitingHandlers = [
+  ...intervalsHandlers,
   ...cacheHandlers,
   ...videoExportHandlers,
+  http.get('*/api/deployment-drain/status', () =>
+    HttpResponse.json({
+      phase: 'waiting',
+      accepting_jobs: false,
+      ready_for_deployment: false,
+      active_jobs: 2,
+      admissions_in_progress: 0,
+      deployment_id: 'run-123-attempt-1',
+      target_version: '2026.07.29.2',
+      run_url: 'https://github.com/capic2/dashboard-parapente/actions/runs/123',
+      requested_at: new Date(Date.now() - 14 * 60_000).toISOString(),
+      phase_changed_at: new Date(Date.now() - 14 * 60_000).toISOString(),
+      expires_at: new Date(Date.now() + 60 * 60_000).toISOString(),
+    } satisfies DeploymentDrainStatus)
+  ),
+];
+
+export const defaultHandlers = [
+  ...intervalsHandlers,
+  ...cacheHandlers,
+  ...videoExportHandlers,
+  ...deploymentDrainHandlers,
 ];

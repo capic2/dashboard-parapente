@@ -1,7 +1,14 @@
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { formatEta, toStatusPayload } from './useVideoExportStatus';
 import { useVideoExportStatus } from './useVideoExportStatus';
+
+const apiGet = vi.hoisted(() => vi.fn());
+
+vi.mock('../../lib/api', () => ({
+  api: { get: apiGet },
+}));
 
 const eventSourceMock = vi.hoisted(() => {
   const instances: {
@@ -33,11 +40,34 @@ function TestHarness({
   jobId?: string | null;
   jobToken?: string | null;
 }) {
-  useVideoExportStatus(jobId, true, jobToken);
-  return null;
+  const { status } = useVideoExportStatus(jobId, true, jobToken);
+  return <div>{status?.log_tail?.join('\n')}</div>;
+}
+
+function renderHarness(props: {
+  jobId?: string | null;
+  jobToken?: string | null;
+}) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <TestHarness {...props} />
+    </QueryClientProvider>
+  );
 }
 
 beforeEach(() => {
+  apiGet.mockReset();
+  apiGet.mockReturnValue({
+    json: vi.fn().mockResolvedValue({
+      job_id: 'job-123',
+      status: 'completed',
+      internal_status: 'completed',
+      log_tail: ['Persisted export log'],
+    }),
+  });
   eventSourceMock.instances.length = 0;
   globalThis.EventSource =
     eventSourceMock.MockEventSource as unknown as typeof EventSource;
@@ -99,21 +129,19 @@ describe('formatEta', () => {
 });
 
 describe('useVideoExportStatus', () => {
-  it('uses the public stream without an auth token when no job token is available', async () => {
-    render(<TestHarness jobId="job-123" />);
+  it('polls the authenticated status endpoint when no job token is available', async () => {
+    renderHarness({ jobId: 'job-123' });
 
     await waitFor(() => {
-      expect(eventSourceMock.instances).toHaveLength(1);
+      expect(apiGet).toHaveBeenCalledWith('exports/job-123/status');
     });
 
-    expect(eventSourceMock.instances[0]?.url).toContain(
-      '/api/exports/job-123/stream'
-    );
-    expect(eventSourceMock.instances[0]?.url).not.toContain('access_token=');
+    expect(eventSourceMock.instances).toHaveLength(0);
+    expect(await screen.findByText('Persisted export log')).toBeInTheDocument();
   });
 
   it('uses the scoped job-access stream when a job token is available', async () => {
-    render(<TestHarness jobId="job-123" jobToken="job-token-abc" />);
+    renderHarness({ jobId: 'job-123', jobToken: 'job-token-abc' });
 
     await waitFor(() => {
       expect(eventSourceMock.instances).toHaveLength(1);
@@ -125,5 +153,6 @@ describe('useVideoExportStatus', () => {
     expect(eventSourceMock.instances[0]?.url).toContain(
       'access_token=job-token-abc'
     );
+    expect(apiGet).not.toHaveBeenCalled();
   });
 });

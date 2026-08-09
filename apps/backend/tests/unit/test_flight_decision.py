@@ -2,6 +2,8 @@ from datetime import datetime
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
+import pytest
+
 from flight_decision import build_flight_decision
 
 
@@ -100,7 +102,7 @@ def test_confidence_keeps_zero_source_hours_when_total_sources_missing():
     assert result["confidence"]["score"] == 10
 
 
-def test_tailwind_is_blocking_for_decollage_orientation():
+def test_tailwind_is_scored_as_bad_for_decollage_orientation():
     result = build_flight_decision(
         site=_site("SW"),
         weather_payload=_payload([_hour(11, wind_direction=45)]),
@@ -109,8 +111,60 @@ def test_tailwind_is_blocking_for_decollage_orientation():
     )
 
     assert result["hourly"][0]["wind_decollage"]["status"] == "cul"
-    assert result["hourly"][0]["level"] == "limite"
+    assert result["hourly"][0]["score_objectif"] == 29
+    assert result["hourly"][0]["level"] == "deconseille"
     assert result["best_window"] is None
+
+
+@pytest.mark.parametrize(
+    ("deviation", "status", "expected_score", "expected_level"),
+    [
+        (30, "face", 95, "favorable"),
+        (31, "travers_acceptable", 64, "vigilance"),
+        (60, "travers_acceptable", 64, "vigilance"),
+        (61, "travers_fort", 44, "limite"),
+        (100, "travers_fort", 44, "limite"),
+        (101, "cul", 29, "deconseille"),
+    ],
+)
+def test_launch_wind_caps_score_by_angular_severity(
+    deviation: int, status: str, expected_score: int, expected_level: str
+):
+    result = build_flight_decision(
+        site=_site("N"),
+        weather_payload=_payload([_hour(11, wind_direction=deviation, para_index=90)]),
+        objective="tranquille",
+        now=datetime(2026, 5, 30, 9, tzinfo=ZoneInfo("Europe/Paris")),
+    )
+
+    hour = result["hourly"][0]
+    assert hour["para_index"] == 90
+    assert hour["wind_decollage"]["status"] == status
+    assert hour["score_objectif"] == expected_score
+    assert hour["level"] == expected_level
+
+
+@pytest.mark.parametrize(
+    ("orientation", "wind_direction", "status"),
+    [
+        (None, 225, "orientation_unknown"),
+        ("SW", None, "not_evaluated"),
+    ],
+)
+def test_unknown_launch_wind_cannot_keep_a_good_score(
+    orientation: str | None, wind_direction: int | None, status: str
+):
+    result = build_flight_decision(
+        site=_site(orientation),
+        weather_payload=_payload([_hour(11, wind_direction=wind_direction, para_index=90)]),
+        objective="tranquille",
+        now=datetime(2026, 5, 30, 9, tzinfo=ZoneInfo("Europe/Paris")),
+    )
+
+    hour = result["hourly"][0]
+    assert hour["wind_decollage"]["status"] == status
+    assert hour["score_objectif"] == 64
+    assert hour["level"] == "vigilance"
 
 
 def test_displayed_risks_are_scoped_to_recommended_window():
@@ -137,9 +191,10 @@ def test_displayed_risks_are_scoped_to_recommended_window():
         now=datetime(2026, 5, 30, 12, tzinfo=ZoneInfo("Europe/Paris")),
     )
 
-    assert result["best_window"]["hours"] == [12, 13, 14, 15, 16, 17, 18, 19]
+    assert result["best_window"]["hours"] == [12, 13, 14, 15, 16, 17]
     risk_codes = [risk["code"] for risk in result["risks"]]
-    assert "wind_decollage_travers_fort" in risk_codes
+    assert "wind_decollage_travers_acceptable" in risk_codes
+    assert "wind_decollage_travers_fort" not in risk_codes
     assert "wind_decollage_cul" not in risk_codes
     assert "wind_too_weak" not in risk_codes
 

@@ -1,4 +1,5 @@
 import type { Flight } from '../types';
+import { HTTPError } from 'ky';
 
 export const GOPRO_OVERLAY_IN_PROGRESS_STATUSES = new Set([
   'queued',
@@ -18,4 +19,10 @@ export function hasFlightGoproOverlay(flight: Flight): boolean {
 
 export function isGoproOverlayInProgress(status?: string | null): boolean {
   return Boolean(status && GOPRO_OVERLAY_IN_PROGRESS_STATUSES.has(status));
+}
+
+export function isUnavailableMediaError(error: unknown): boolean {
+  return (
+    error instanceof HTTPError && [404, 410].includes(error.response.status)
+  );
 }

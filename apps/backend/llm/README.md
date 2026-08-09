@@ -109,7 +109,37 @@ result = analyze_emagram_with_gemini(
 
 ---
 
-### 5. Cooldown quota/rate-limit
+### 5. `codex_analyzer.py` - Codex avec un compte ChatGPT Plus
+
+Utilise Codex CLI avec la session ChatGPT persistée dans `CODEX_HOME/auth.json`.
+Ce provider est toujours différé jusqu'à ce que tous les providers/modèles gratuits
+configurés aient signalé un quota épuisé ou une indisponibilité permanente du modèle.
+Une panne transitoire ou une réponse invalide d'un provider gratuit n'autorise pas le
+recours à Codex.
+
+```bash
+BACKEND_LLM_FALLBACK_ORDER=groq,openrouter,github_models,huggingface,google,custom_openai,codex
+BACKEND_CODEX_MODEL=
+BACKEND_CODEX_TIMEOUT_SECONDS=180
+CODEX_HOME_HOST_DIR=/path/to/persistent/codex-home
+```
+
+Après le premier déploiement, authentifier le compte Plus dans le conteneur. Le
+placeholder `CODEX_HOME_HOST_DIR` doit être remplacé par un dossier hôte existant,
+persistant et inscriptible afin que Codex puisse renouveler ses tokens:
+
+```bash
+docker compose exec backend codex login --device-auth
+docker compose exec backend codex login status
+```
+
+`auth.json` contient des secrets OAuth: ne jamais le committer, le journaliser ou
+le copier dans l'image Docker. L'entrypoint impose les permissions `0700` sur le
+dossier et `0600` sur `auth.json` au démarrage.
+
+---
+
+### 6. Cooldown quota/rate-limit
 
 Quand un couple provider/modèle retourne un quota ou rate-limit, il est placé en cooldown mémoire pour éviter de retenter le même modèle à chaque spot.
 
@@ -121,7 +151,7 @@ Mettre `0` désactive le cooldown.
 
 ---
 
-### 6. `vision_analyzer.py` - Wrapper générique
+### 7. `vision_analyzer.py` - Wrapper générique
 
 Module utilitaire pour fonctions communes de vision analysis.
 
@@ -150,10 +180,17 @@ Le fichier [`emagram_multi_source.py`](../emagram_multi_source.py) utilise la st
 6. Priority 6: Custom OpenAI-compatible (si configuré)
    └─> Endpoint libre pour ajouter un autre provider sans code
 
-7. Échec: Retour d'erreur
+7. Priority 7: Codex CLI (si présent dans BACKEND_LLM_FALLBACK_ORDER)
+   └─> Compte ChatGPT Plus, après épuisement ou indisponibilité des providers gratuits
+
+8. Échec: Retour d'erreur
 ```
 
-L'ordre est configurable avec `BACKEND_LLM_FALLBACK_ORDER`, par exemple `google,groq,openrouter` si la qualité Gemini doit primer sur l'économie de quota.
+L'ordre des providers éligibles est configurable avec `BACKEND_LLM_FALLBACK_ORDER`,
+par exemple `google,groq,openrouter` si la qualité Gemini doit primer sur
+l'économie de quota. Codex reste toujours différé après les autres providers,
+même si `codex` apparaît plus tôt dans cette liste, jusqu'à ce que tous les
+providers gratuits soient en quota ou indisponibles.
 
 ## Format de réponse
 

@@ -35,6 +35,9 @@ FROM python:3.14-slim
 
 WORKDIR /app
 
+ARG CODEX_CLI_VERSION=0.146.0
+ENV CODEX_HOME=/app/codex-home
+
 # Métadonnées
 LABEL maintainer="Dashboard Parapente"
 LABEL version="2.0.0-nx"
@@ -54,7 +57,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcups2 \
     libdbus-1-3 \
     libdrm2 \
+    libegl1 \
+    libegl-mesa0 \
     libgbm1 \
+    libgl1-mesa-dri \
     libgtk-3-0 \
     libnspr4 \
     libnss3 \
@@ -64,11 +70,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxfixes3 \
     libxkbcommon0 \
     libxrandr2 \
+    mesa-vulkan-drivers \
     xdg-utils \
     curl \
     ffmpeg \
+    nodejs \
+    npm \
     sqlite3 \
     && rm -rf /var/lib/apt/lists/*
+
+# Codex uses the persisted ChatGPT login mounted at CODEX_HOME in production.
+RUN npm install --global "@openai/codex@${CODEX_CLI_VERSION}" && codex --version
 
 # Copier requirements et installer packages Python
 COPY apps/backend/requirements.txt ./
@@ -96,7 +108,8 @@ COPY --from=frontend-builder /workspace/dist/apps/frontend ./static
 # Créer répertoires pour la base de données et les exports vidéo
 RUN mkdir -p /app/db && chmod 755 /app/db && \
     mkdir -p /app/exports/videos && chmod 755 /app/exports/videos && \
-    mkdir -p /app/emagram-cache && chmod 755 /app/emagram-cache
+    mkdir -p /app/emagram-cache && chmod 755 /app/emagram-cache && \
+    mkdir -p "$CODEX_HOME" && chmod 700 "$CODEX_HOME"
 
 # Rendre le script d'entrypoint exécutable
 RUN chmod +x entrypoint.sh

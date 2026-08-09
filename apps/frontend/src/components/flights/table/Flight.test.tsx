@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import type React from 'react';
 import { expect, test, vi } from 'vitest';
-import type { Flight as FlightRecord, Site } from '../../../types';
+import type { FlightSummary } from '@dashboard-parapente/shared-types';
 
 vi.mock('@dashboard-parapente/design-system', () => ({
   Button: ({
@@ -50,27 +50,24 @@ const flight = {
   max_altitude_m: 1465,
   site_name: 'Puy de Dôme',
   site_id: 'site-1',
-} as FlightRecord;
-
-const sites = [
-  {
-    id: 'site-1',
-    name: 'Puy de Dôme',
-    latitude: 45.77,
-    longitude: 2.96,
-    country: 'FR',
-    region: 'Besançon',
-    camera_distance: null,
-    flight_count: 1,
-    is_active: true,
-  },
-] as Site[];
+  site_region: 'Besançon',
+  departure_time: null,
+  elevation_gain_m: null,
+  has_gpx: false,
+  has_video: false,
+  has_gopro_overlay: false,
+  video_export_job_id: null,
+  video_export_status: null,
+  video_export_progress: null,
+  gopro_overlay_job_id: null,
+  gopro_overlay_status: null,
+  gopro_overlay_progress: null,
+} satisfies FlightSummary;
 
 test('does not render the selected flight badge', () => {
   render(
     <Flight
       flight={flight}
-      sites={sites}
       isActive={true}
       isSelected={false}
       selectionMode={false}
@@ -93,4 +90,27 @@ test('does not render the selected flight badge', () => {
     'true'
   );
   expect(screen.getByText('Besançon - Puy de Dôme')).toBeInTheDocument();
+});
+
+test('disables media that became unavailable during the session', () => {
+  render(
+    <Flight
+      flight={{ ...flight, has_gpx: true }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      downloadingMedia={null}
+      unavailableMedia={new Set(['flight-1:gpx'])}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+      onDownloadGpx={() => undefined}
+      onDownloadVideo={() => undefined}
+      onDownloadOverlay={() => undefined}
+    />
+  );
+
+  expect(
+    screen.getByRole('button', { name: 'flights.downloadGpx' })
+  ).toBeDisabled();
+  expect(screen.getByText('flights.mediaUnavailable')).toBeInTheDocument();
 });

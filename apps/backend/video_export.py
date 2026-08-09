@@ -12,6 +12,7 @@ from pathlib import Path
 
 import config
 from database import SessionLocal
+from deployment_drain import job_admission
 from flight_storage import get_video_output_path
 from models import Flight
 
@@ -120,25 +121,26 @@ def start_video_export_background(
     """
     Start video export in a background thread
     """
-    job_id = f"{flight_id}-{int(time.time())}"
+    with job_admission():
+        job_id = f"{flight_id}-{int(time.time())}"
 
-    export_jobs[job_id] = {
-        "job_id": job_id,
-        "flight_id": flight_id,
-        "status": "started",
-        "progress": 0,
-        "message": "Initializing...",
-        "started_at": datetime.now().isoformat(),
-        "video_path": None,
-        "error": None,
-    }
+        export_jobs[job_id] = {
+            "job_id": job_id,
+            "flight_id": flight_id,
+            "status": "started",
+            "progress": 0,
+            "message": "Initializing...",
+            "started_at": datetime.now().isoformat(),
+            "video_path": None,
+            "error": None,
+        }
 
-    # Start export in background thread
-    thread = threading.Thread(
-        target=_run_async_export, args=(job_id, flight_id, quality, fps, speed, frontend_url)
-    )
-    thread.daemon = True
-    thread.start()
+        # Start export in background thread
+        thread = threading.Thread(
+            target=_run_async_export, args=(job_id, flight_id, quality, fps, speed, frontend_url)
+        )
+        thread.daemon = True
+        thread.start()
 
     return job_id
 

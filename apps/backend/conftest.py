@@ -14,13 +14,12 @@ os.environ["BACKEND_USE_FAKE_REDIS"] = "true"
 os.environ["BACKEND_DATABASE_URL"] = "sqlite:///./test.db"
 os.environ["BACKEND_LOG_FILE"] = "logs/test-dashboard.log"
 os.environ["BACKEND_VERSION_STATE_FILE"] = "/tmp/dashboard-parapente-test/version_state.json"
+os.environ["BACKEND_DEPLOY_DRAIN_TOKEN"] = "test-deployment-drain-token"
 
 # Set dummy API keys for tests
 os.environ["BACKEND_WEATHERAPI_KEY"] = "test_weather_key"
 os.environ["BACKEND_METEOBLUE_API_KEY"] = "test_meteoblue_key"
 os.environ["BACKEND_GOOGLE_API_KEY"] = "test_google_key"
-os.environ["BACKEND_STRAVA_CLIENT_ID"] = "test_strava_client"
-os.environ["BACKEND_STRAVA_CLIENT_SECRET"] = "test_strava_secret"
 
 # Add backend dir to Python path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -31,13 +30,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from database import Base, get_db
-from main import app
-
 # IMPORTANT: Import all models BEFORE importing main.app
 # This ensures all tables are registered with SQLAlchemy Base.metadata
 # before Base.metadata.create_all() is called in the test_db fixture
 from auth import get_current_user
+from database import Base, get_db
+from deployment_drain import deployment_drain
+from main import app
 from models import (
     Flight,
     Site,
@@ -46,6 +45,13 @@ from models import (
 
 # Fake authenticated user for tests
 _test_user = User(id=1, email="test@local", hashed_password="", is_active=True)
+
+
+@pytest.fixture(autouse=True)
+def reset_deployment_drain():
+    deployment_drain.reset_for_tests()
+    yield
+    deployment_drain.reset_for_tests()
 
 
 def _override_get_current_user():
@@ -133,16 +139,6 @@ def sample_consensus_weather():
     import json
 
     fixtures_path = Path(__file__).parent / "tests" / "fixtures" / "sample_consensus_weather.json"
-    with open(fixtures_path) as f:
-        return json.load(f)
-
-
-@pytest.fixture
-def sample_strava_activity():
-    """Load sample Strava activity response"""
-    import json
-
-    fixtures_path = Path(__file__).parent / "tests" / "fixtures" / "sample_strava_activity.json"
     with open(fixtures_path) as f:
         return json.load(f)
 

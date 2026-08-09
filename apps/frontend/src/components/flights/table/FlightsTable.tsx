@@ -1,30 +1,36 @@
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Row, RowSelectionState, OnChangeFn } from '@tanstack/react-table';
+import type {
+  Row,
+  RowSelectionState,
+  OnChangeFn,
+  SortingState,
+} from '@tanstack/react-table';
 import type { Selection } from 'react-aria-components';
 import { DataList } from '@dashboard-parapente/design-system';
 import { Flight, type DownloadingMedia } from './Flight';
-import { useFlightsTable, FLIGHT_SORTABLE_COLUMNS } from './useFlightsTable';
-import type { Flight as FlightRecord, Site } from '../../../types';
+import { useFlightsTable } from './useFlightsTable';
+import type { FlightSummary } from '@dashboard-parapente/shared-types';
 
 interface FlightsTableProps {
-  flights: FlightRecord[];
-  sites: Site[];
+  flights: FlightSummary[];
   selectedFlightId: string | null;
   selectionMode: boolean;
-  onSelectFlight: (flight: FlightRecord) => void;
-  onDeleteFlight: (flight: FlightRecord) => void;
-  onDownloadGpx: (flight: FlightRecord) => void;
-  onDownloadVideo: (flight: FlightRecord) => void;
-  onDownloadOverlay: (flight: FlightRecord) => void;
+  onSelectFlight: (flight: FlightSummary) => void;
+  onDeleteFlight: (flight: FlightSummary) => void;
+  onDownloadGpx: (flight: FlightSummary) => void;
+  onDownloadVideo: (flight: FlightSummary) => void;
+  onDownloadOverlay: (flight: FlightSummary) => void;
   downloadingMedia: DownloadingMedia | null;
+  unavailableMedia: ReadonlySet<string>;
   rowSelection: RowSelectionState;
   onRowSelectionChange: OnChangeFn<RowSelectionState>;
+  sorting: SortingState;
+  onSortingChange: OnChangeFn<SortingState>;
 }
 
 export function FlightsTable({
   flights,
-  sites,
   selectedFlightId,
   selectionMode,
   onSelectFlight,
@@ -33,8 +39,11 @@ export function FlightsTable({
   onDownloadVideo,
   onDownloadOverlay,
   downloadingMedia,
+  unavailableMedia,
   rowSelection,
   onRowSelectionChange,
+  sorting,
+  onSortingChange,
 }: FlightsTableProps) {
   const { t } = useTranslation();
   const { table } = useFlightsTable({
@@ -42,7 +51,19 @@ export function FlightsTable({
     selectionMode,
     rowSelection,
     onRowSelectionChange,
+    sorting,
+    onSortingChange,
   });
+  const sortableColumns = useMemo(
+    () => [
+      { id: 'flight_date', label: t('flights.sortDate') },
+      { id: 'site_name', label: t('flights.sortSite') },
+      { id: 'duration_minutes', label: t('flights.sortDuration') },
+      { id: 'max_altitude_m', label: t('flights.sortAltitude') },
+      { id: 'distance_km', label: t('flights.sortDistance') },
+    ],
+    [t]
+  );
 
   // Convert TanStack RowSelectionState to react-aria Selection
   const selectedKeys = useMemo<Selection>(
@@ -71,17 +92,17 @@ export function FlightsTable({
   );
 
   const renderFlightCard = useCallback(
-    (row: Row<FlightRecord>, { isSelected }: { isSelected: boolean }) => {
+    (row: Row<FlightSummary>, { isSelected }: { isSelected: boolean }) => {
       const flight = row.original;
 
       return (
         <Flight
           flight={flight}
-          sites={sites}
           isActive={selectedFlightId === flight.id}
           isSelected={isSelected}
           selectionMode={selectionMode}
           downloadingMedia={downloadingMedia}
+          unavailableMedia={unavailableMedia}
           onSelectFlight={onSelectFlight}
           onDeleteFlight={onDeleteFlight}
           onDownloadGpx={onDownloadGpx}
@@ -93,13 +114,13 @@ export function FlightsTable({
     [
       selectionMode,
       selectedFlightId,
-      sites,
       onSelectFlight,
       onDeleteFlight,
       onDownloadGpx,
       onDownloadVideo,
       onDownloadOverlay,
       downloadingMedia,
+      unavailableMedia,
     ]
   );
 
@@ -107,7 +128,7 @@ export function FlightsTable({
     <DataList
       table={table}
       renderItem={renderFlightCard}
-      sortableColumns={FLIGHT_SORTABLE_COLUMNS}
+      sortableColumns={sortableColumns}
       emptyMessage={t('flights.noFlights')}
       ariaLabel={t('flights.listAriaLabel')}
       isVirtualized
@@ -118,7 +139,7 @@ export function FlightsTable({
         selectedFlightId,
         selectionMode,
         rowSelection,
-        sites,
+        unavailableMedia,
       ]}
       selectionMode={selectionMode ? 'multiple' : 'none'}
       selectedKeys={selectedKeys}

@@ -1,5 +1,6 @@
 import asyncio
 import fnmatch
+import hmac
 import json
 import logging
 import math
@@ -7,10 +8,14 @@ import os
 import subprocess
 import uuid
 import xml.etree.ElementTree as ET
-from typing import Any
 from datetime import date, datetime, timedelta, timezone
+from functools import wraps
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
+
+if TYPE_CHECKING:
+    from intervals_icu import IntervalsClient
 
 from fastapi import (
     APIRouter,
@@ -27,7 +32,7 @@ from fastapi import (
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 import config
 from auth import (
@@ -39,46 +44,73 @@ from auth import (
 )
 from azba_airspace import evaluate_site_azba_constraints, parse_optional_window
 from database import SessionLocal, get_db
+from deployment_drain import (
+    DeploymentDrainActive,
+    DeploymentDrainConflict,
+    DeploymentDrainNotFound,
+    deployment_drain,
+    job_admission,
+)
 from emagram_freshness import get_emagram_cutoff_utc
-from flight_backfill import calculate_and_persist_missing_max_speed
 from flight_decision import build_flight_decision, normalize_objective
-from flight_storage import flight_sequence_number
-from flight_storage import write_flight_text_file
-from gopro_overlay_export import cancel_gopro_overlay_job
-from gopro_overlay_export import check_gopro_overlay_dependencies
-from gopro_overlay_export import create_gopro_overlay_job
-from gopro_overlay_export import create_gopro_overlay_job_from_paths
-from gopro_overlay_export import delete_gopro_overlay_job
-from gopro_overlay_export import delete_gopro_overlay_output
-from gopro_overlay_export import get_gopro_overlay_job
-from gopro_overlay_export import gopro_overlay_output_path
-from gopro_overlay_export import list_gopro_overlay_jobs
-from gopro_overlay_export import list_gopro_overlay_layouts
-from gopro_overlay_export import probe_video_resolution
-from gopro_overlay_export import save_uploaded_file
-from gopro_overlay_export import stream_gopro_overlay_job
-from models import User
+from flight_summaries import (
+    FlightGpxStatus,
+    FlightSortBy,
+    InvalidFlightSummaryCursor,
+    SortOrder,
+    list_flight_summaries,
+)
+from flight_storage import flight_sequence_number, write_flight_text_file
+from flight_tracks import calculate_track_stats, normalize_track
+from gopro_overlay_export import (
+    cancel_gopro_overlay_job,
+    check_gopro_overlay_dependencies,
+    create_gopro_overlay_job,
+    create_gopro_overlay_job_from_paths,
+    delete_gopro_overlay_job,
+    delete_gopro_overlay_output,
+    get_gopro_overlay_job,
+    gopro_overlay_output_path,
+    list_gopro_overlay_jobs,
+    list_gopro_overlay_layouts,
+    probe_video_resolution,
+    save_uploaded_file,
+    stream_gopro_overlay_job,
+)
 from models import (
     EmagramAnalysis,
     Flight,
     Site,
     SiteLandingAssociation,
+    User,
     VideoExportJob,
     WeatherForecast,
     WeatherSourceConfig,
 )
 from para_index import analyze_hourly_slots, calculate_para_index, format_slots_summary
+from schemas import (
+    AzbaAirspaceResponse,
+)
 from schemas import EmagramAnalysis as EmagramAnalysisSchema
-from schemas import GoproOverlayCancelResponse
-from schemas import GoproOverlayDependencies
-from schemas import GoproOverlayJob
-from schemas import GoproOverlayLayoutsResponse
-from schemas import GoproOverlayProbeResponse
 from schemas import (
     EmagramAnalysisListItem,
     EmagramTriggerRequest,
+    DeploymentDrainRequest,
+    DeploymentDrainStatus,
+    ExternalImportResult,
+    FlightCreate,
+    FlightDecisionResponse,
     FlightRecordsResponse,
+    FlightSummariesResponse,
     FlightUpdate,
+    GoproOverlayCancelResponse,
+    GoproOverlayDependencies,
+    GoproOverlayJob,
+    GoproOverlayLayoutsResponse,
+    GoproOverlayProbeResponse,
+    IntervalsPreviewResponse,
+    IntervalsStatus,
+    IntervalsSyncRequest,
 )
 from schemas import LandingAssociation as LandingAssociationSchema
 from schemas import (
@@ -87,13 +119,12 @@ from schemas import (
     LocationSearchResponse,
     NearbyFlightOptionsResponse,
 )
-from schemas import FlightDecisionResponse
-from schemas import AzbaAirspaceResponse
 from schemas import Site as SiteSchema
 from schemas import (
     SiteCreate,
     SiteUpdate,
     SpotsResponse,
+    VideoExportTempCleanupResponse,
 )
 from schemas import WeatherSourceConfig as WeatherSourceConfigSchema
 from schemas import (
@@ -101,24 +132,25 @@ from schemas import (
     WeatherSourceConfigUpdate,
     WeatherSourceStats,
     WeatherSourceTestResult,
-    VideoExportTempCleanupResponse,
 )
-from video_export import get_export_status as get_export_status_stream
-from video_export import list_exports as list_exports_stream
+from versioning import get_version_payload
 from video_export import cancel_video_export as cancel_video_export_stream
 from video_export import delete_export_job as delete_video_export_stream_job
+from video_export import get_export_status as get_export_status_stream
+from video_export import list_exports as list_exports_stream
 from video_export import start_video_export_background
 from video_export_manual import cancel_video_export as cancel_video_export_manual
-from video_export_manual import delete_video_export_job as delete_video_export_manual_job
 from video_export_manual import cleanup_video_export_temp_files
+from video_export_manual import delete_video_export_job as delete_video_export_manual_job
 from video_export_manual import get_export_status as get_export_status_manual
 from video_export_manual import get_video_export_job_token
 from video_export_manual import list_exports as list_exports_manual
-from video_export_manual import resolve_frontend_url
-from video_export_manual import resume_video_export
-from video_export_manual import start_video_export_manual
-from video_export_manual import start_video_export_manual_fast
-from versioning import get_version_payload
+from video_export_manual import (
+    resolve_frontend_url,
+    resume_video_export,
+    start_video_export_manual,
+    start_video_export_manual_fast,
+)
 from weather_pipeline import get_daily_aggregate, get_normalized_forecast
 from weather_sources import ensure_weather_source_configs
 
@@ -126,12 +158,14 @@ logger = logging.getLogger(__name__)
 
 
 _VIDEO_EXPORT_IN_PROGRESS_STATUSES = {
+    "started",
     "processing",
     "queued",
     "running",
     "initializing",
     "capturing",
     "encoding",
+    "preparing",
 }
 
 _VIDEO_EXPORT_CANCELLABLE_STATUSES = {
@@ -617,11 +651,167 @@ def _get_video_export_jobs_payload(db: Session, active_only: bool = False) -> di
     return {"jobs": jobs}
 
 
+def _active_deployment_job_count(db: Session) -> int:
+    jobs = _get_video_export_jobs_payload(db)["jobs"]
+    return sum(
+        1
+        for job in jobs
+        if job.get("status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
+        or job.get("internal_status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
+    )
+
+
+def _deployment_drain_status(db: Session) -> DeploymentDrainStatus:
+    state = deployment_drain.get_state()
+    # Admissions are registered before jobs become visible in storage. Reading
+    # this counter first prevents a handoff from looking idle between the two.
+    admissions = deployment_drain.admissions_in_progress()
+    active_jobs = _active_deployment_job_count(db)
+    if state is None:
+        return DeploymentDrainStatus(
+            phase="idle",
+            accepting_jobs=True,
+            ready_for_deployment=False,
+            active_jobs=active_jobs,
+            admissions_in_progress=admissions,
+        )
+    return DeploymentDrainStatus(
+        **state,
+        accepting_jobs=False,
+        ready_for_deployment=active_jobs == 0 and admissions == 0,
+        active_jobs=active_jobs,
+        admissions_in_progress=admissions,
+    )
+
+
+def _require_deployment_drain_token(request: Request) -> None:
+    expected_token = config.DEPLOY_DRAIN_TOKEN
+    if not expected_token:
+        raise HTTPException(
+            status_code=503,
+            detail="Deployment drain machine endpoints are not configured",
+        )
+    authorization = request.headers.get("authorization", "")
+    scheme, _, supplied_token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not hmac.compare_digest(supplied_token, expected_token):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid deployment drain bearer token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+def _map_deployment_drain_rejection(function: Any) -> Any:
+    @wraps(function)
+    def wrapped(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return function(*args, **kwargs)
+        except DeploymentDrainActive as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=str(exc),
+                headers={"Retry-After": "300"},
+            ) from exc
+
+    return wrapped
+
+
+def _map_async_deployment_drain_rejection(function: Any) -> Any:
+    @wraps(function)
+    async def wrapped(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return await function(*args, **kwargs)
+        except DeploymentDrainActive as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=str(exc),
+                headers={"Retry-After": "300"},
+            ) from exc
+
+    return wrapped
+
+
 # Public routes: no authentication required (weather, spots read, auth)
 public_router = APIRouter(prefix="/api", tags=["api"])
 
 # Protected routes: require valid JWT token
 router = APIRouter(prefix="/api", tags=["api"], dependencies=[Depends(get_current_user)])
+
+
+@public_router.get(
+    "/deployment-drain/status",
+    response_model=DeploymentDrainStatus,
+    dependencies=[Depends(get_current_user)],
+)
+def get_deployment_drain_status(db: Session = Depends(get_db)) -> DeploymentDrainStatus:
+    return _deployment_drain_status(db)
+
+
+@public_router.put(
+    "/deployment-drain",
+    response_model=DeploymentDrainStatus,
+    dependencies=[Depends(_require_deployment_drain_token)],
+)
+def begin_deployment_drain(
+    payload: DeploymentDrainRequest,
+    db: Session = Depends(get_db),
+) -> DeploymentDrainStatus:
+    try:
+        deployment_drain.begin(payload.deployment_id, payload.target_version, payload.run_url)
+    except DeploymentDrainConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return _deployment_drain_status(db)
+
+
+@public_router.get(
+    "/deployment-drain/{deployment_id}",
+    response_model=DeploymentDrainStatus,
+    dependencies=[Depends(_require_deployment_drain_token)],
+)
+def get_owned_deployment_drain(
+    deployment_id: str,
+    db: Session = Depends(get_db),
+) -> DeploymentDrainStatus:
+    try:
+        deployment_drain.get_owned(deployment_id)
+    except DeploymentDrainNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except DeploymentDrainConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return _deployment_drain_status(db)
+
+
+@public_router.post(
+    "/deployment-drain/{deployment_id}/deploying",
+    response_model=DeploymentDrainStatus,
+    dependencies=[Depends(_require_deployment_drain_token)],
+)
+def mark_deployment_drain_deploying(
+    deployment_id: str,
+    db: Session = Depends(get_db),
+) -> DeploymentDrainStatus:
+    try:
+        deployment_drain.mark_deploying(deployment_id)
+    except DeploymentDrainNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except DeploymentDrainConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return _deployment_drain_status(db)
+
+
+@public_router.delete(
+    "/deployment-drain/{deployment_id}",
+    status_code=204,
+    dependencies=[Depends(_require_deployment_drain_token)],
+)
+def release_deployment_drain(deployment_id: str) -> Response:
+    try:
+        deployment_drain.release(deployment_id)
+    except DeploymentDrainNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except DeploymentDrainConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return Response(status_code=204)
 
 
 def _require_force_refresh_auth(force_refresh: bool, request: Request, db: Session) -> None:
@@ -3319,6 +3509,32 @@ async def get_daily_summary(
 
 
 # Flights endpoints
+@router.get("/flights/summaries", response_model=FlightSummariesResponse)
+def get_flight_summaries(
+    page_size: int = Query(default=25, ge=1, le=100),
+    cursor: str | None = Query(default=None, max_length=4096),
+    q: str | None = Query(default=None, max_length=200),
+    site_id: str | None = None,
+    gpx_status: FlightGpxStatus = "all",
+    sort_by: FlightSortBy = "flight_date",
+    sort_order: SortOrder = "desc",
+    db: Session = Depends(get_db),
+) -> FlightSummariesResponse:
+    try:
+        return list_flight_summaries(
+            db,
+            page_size=page_size,
+            cursor=cursor,
+            q=q,
+            site_id=site_id,
+            gpx_status=gpx_status,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
+    except InvalidFlightSummaryCursor as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.get("/flights")
 def get_flights(
     limit: int = 10,
@@ -3336,7 +3552,7 @@ def get_flights(
         date_from: Filter flights from this date (inclusive, format: YYYY-MM-DD)
         date_to: Filter flights until this date (inclusive, format: YYYY-MM-DD)
     """
-    query = db.query(Flight)
+    query = db.query(Flight).options(joinedload(Flight.site))
 
     # Apply filters
     if site_id:
@@ -3360,29 +3576,6 @@ def get_flights(
 
     flights = query.order_by(Flight.flight_date.desc()).limit(limit).all()
 
-    updated_flights = False
-    for flight in flights:
-        updated_flights = (
-            calculate_and_persist_missing_max_speed(
-                db,
-                flight,
-                parse_coordinates=parse_gpx_file,
-                calculate_speed_kmh=calculate_max_speed,
-                base_dir=Path(__file__).parent,
-                logger=logger,
-            )
-            or updated_flights
-        )
-        if updated_flights:
-            break
-
-    if updated_flights:
-        try:
-            db.commit()
-        except Exception as exc:
-            db.rollback()
-            logger.warning("Failed to persist calculated max speeds in /flights: %s", exc)
-
     # Convert to dict (user_id removed - not needed for single-user app)
     flights_data = []
     export_state_changed = False
@@ -3401,7 +3594,8 @@ def get_flights(
         )
         flight_dict = {
             "id": flight.id,
-            "strava_id": flight.strava_id,
+            "external_provider": flight.external_provider,
+            "external_activity_id": flight.external_activity_id,
             "site_id": flight.site_id,
             "site_name": flight.site.name if flight.site else None,
             "name": flight.name,
@@ -3717,28 +3911,126 @@ def get_flight_records(db: Session = Depends(get_db)) -> FlightRecordsResponse:
     )
 
 
+def _intervals_client() -> "IntervalsClient":
+    from intervals_icu import IntervalsClient
+
+    return IntervalsClient(config.INTERVALS_ICU_API_KEY, config.INTERVALS_ICU_BASE_URL)
+
+
+def _raise_intervals_http_error(exc: Exception) -> None:
+    from intervals_icu import (
+        IntervalsAuthenticationError,
+        IntervalsConfigurationError,
+        IntervalsError,
+        IntervalsRateLimitError,
+    )
+
+    if isinstance(exc, IntervalsConfigurationError):
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if isinstance(exc, IntervalsRateLimitError):
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+    if isinstance(exc, IntervalsAuthenticationError):
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    if isinstance(exc, IntervalsError):
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    logger.exception("Unexpected Intervals.icu synchronization failure")
+    raise HTTPException(status_code=500, detail="Intervals.icu synchronization failed.") from exc
+
+
+@router.get("/flights/sync-intervals/preview", response_model=IntervalsPreviewResponse)
+async def preview_intervals_activities(
+    date_from: date = Query(...), date_to: date = Query(...)
+) -> IntervalsPreviewResponse:
+    if date_from > date_to:
+        raise HTTPException(status_code=422, detail="date_from must be on or before date_to")
+    request = IntervalsSyncRequest(date_from=date_from, date_to=date_to)
+    client = _intervals_client()
+    try:
+        activities = await client.list_activities(
+            request.date_from,
+            request.date_to,
+            config.INTERVALS_ICU_ACTIVITY_TYPES,
+        )
+    except Exception as exc:
+        _raise_intervals_http_error(exc)
+    return IntervalsPreviewResponse(
+        activities=[
+            {
+                "id": activity.id,
+                "name": activity.name,
+                "start_date_local": activity.start_date,
+                "type": activity.activity_type,
+                "source": activity.source,
+                "file_type": activity.file_type,
+            }
+            for activity in activities
+        ],
+        activity_types=sorted({activity.activity_type for activity in activities}),
+    )
+
+
+@router.post("/flights/sync-intervals", response_model=ExternalImportResult)
+async def sync_intervals_activities(
+    request: IntervalsSyncRequest, db: Session = Depends(get_db)
+) -> ExternalImportResult:
+    from external_flight_import import import_external_activities
+    from intervals_sync import (
+        _acquire_shared_lock,
+        _release_shared_lock,
+        _renew_shared_lock,
+    )
+
+    if not config.INTERVALS_ICU_ACTIVITY_TYPES:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Configure BACKEND_INTERVALS_ICU_ACTIVITY_TYPES after previewing a Zepp flight "
+                "before importing activities."
+            ),
+        )
+
+    redis, token = await _acquire_shared_lock()
+    if token == "":
+        raise HTTPException(
+            status_code=409,
+            detail="Another Intervals.icu synchronization is already running.",
+        )
+    stop_renewal = asyncio.Event()
+    lock_lost = asyncio.Event()
+    renewal_task = (
+        asyncio.create_task(_renew_shared_lock(redis, token, stop_renewal, lock_lost))
+        if redis is not None and token
+        else None
+    )
+    client = _intervals_client()
+    try:
+        activities = await client.list_activities(
+            request.date_from, request.date_to, config.INTERVALS_ICU_ACTIVITY_TYPES
+        )
+        result = await import_external_activities(
+            db,
+            "intervals_icu",
+            client,
+            activities,
+            should_stop=lock_lost.is_set,
+        )
+    except Exception as exc:
+        db.rollback()
+        _raise_intervals_http_error(exc)
+    finally:
+        stop_renewal.set()
+        if renewal_task is not None:
+            await renewal_task
+        await _release_shared_lock(redis, token)
+    return ExternalImportResult.model_validate(result)
+
+
 @router.get("/flights/{flight_id}")
 def get_flight(flight_id: str, db: Session = Depends(get_db)):
     """Get a specific flight with site details including orientation"""
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
-
-    if calculate_and_persist_missing_max_speed(
-        db,
-        flight,
-        parse_coordinates=parse_gpx_file,
-        calculate_speed_kmh=calculate_max_speed,
-        base_dir=Path(__file__).parent,
-        logger=logger,
-    ):
-        try:
-            db.commit()
-        except Exception as exc:
-            db.rollback()
-            logger.warning(
-                "Failed to persist calculated max speed for flight %s: %s", flight_id, exc
-            )
 
     previous_video_job_id = flight.video_export_job_id
     previous_video_status = flight.video_export_status
@@ -3759,7 +4051,8 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "name": flight.name,
         "title": flight.title,
         "site_id": flight.site_id,
-        "strava_id": flight.strava_id,
+        "external_provider": flight.external_provider,
+        "external_activity_id": flight.external_activity_id,
         "description": flight.description,
         "flight_date": flight.flight_date.isoformat() if flight.flight_date else None,
         "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
@@ -3998,184 +4291,87 @@ def download_flight_gopro_overlay(flight_id: str, db: Session = Depends(get_db))
 
 
 @router.post("/flights")
-def create_flight(flight_data: dict, db: Session = Depends(get_db)):
-    """Create a new flight (from Strava webhook)"""
+def create_flight(flight_data: FlightCreate, db: Session = Depends(get_db)):
+    """Create a flight from manually entered information."""
+    site = None
+    if flight_data.site_id:
+        site = db.query(Site).filter(Site.id == flight_data.site_id).first()
+        if not site:
+            raise HTTPException(status_code=404, detail="Site not found")
+
+    entered_name = (flight_data.name or flight_data.title or "").strip()
+    if entered_name:
+        flight_name = entered_name
+    elif site:
+        flight_name = f"{site.name} {flight_data.flight_date.strftime('%d-%m')}"
+    else:
+        flight_name = f"Vol du {flight_data.flight_date.strftime('%d/%m/%Y')}"
+
+    if flight_data.departure_time:
+        flight_name = (
+            entered_name
+            or f"{site.name if site else 'Vol'} "
+            f"{flight_data.flight_date.strftime('%d-%m')} "
+            f"{flight_data.departure_time.strftime('%Hh%M')}"
+        )
+
     flight = Flight(
         id=str(uuid.uuid4()),
-        strava_id=flight_data.get("strava_id"),
-        site_id=flight_data.get("site_id"),
-        title=flight_data.get("title"),
-        flight_date=flight_data.get("flight_date"),
-        duration_minutes=flight_data.get("duration_minutes"),
-        max_altitude_m=flight_data.get("max_altitude_m"),
-        distance_km=flight_data.get("distance_km"),
+        site_id=flight_data.site_id,
+        name=flight_name,
+        title=(flight_data.title or "").strip() or flight_name,
+        description=flight_data.description,
+        flight_date=flight_data.flight_date,
+        departure_time=flight_data.departure_time,
+        duration_minutes=flight_data.duration_minutes,
+        max_altitude_m=flight_data.max_altitude_m,
+        max_speed_kmh=flight_data.max_speed_kmh,
+        distance_km=flight_data.distance_km,
+        elevation_gain_m=flight_data.elevation_gain_m,
+        notes=flight_data.notes,
     )
-    db.add(flight)
-    db.commit()
-    db.refresh(flight)
-    return flight
-
-
-@router.post("/flights/sync-strava")
-async def sync_strava_activities(request: dict, db: Session = Depends(get_db)):
-    """
-    Synchronise manuellement les vols Strava pour une période donnée
-
-    Body:
-        date_from: Date début (format: YYYY-MM-DD)
-        date_to: Date fin (format: YYYY-MM-DD)
-
-    Returns:
-        {
-            "success": true,
-            "imported": 5,
-            "skipped": 2,
-            "failed": 0,
-            "flights": [...]
-        }
-    """
-    from strava import (
-        download_gpx,
-        get_activities_by_period,
-        match_site_by_coordinates,
-    )
-
-    date_from = request.get("date_from")
-    date_to = request.get("date_to")
-
-    if not date_from or not date_to:
-        raise HTTPException(status_code=400, detail="date_from and date_to are required")
-
     try:
-        # 1. Récupérer activités Strava
-        logger.info(f"Fetching Strava activities from {date_from} to {date_to}")
-        activities = await get_activities_by_period(date_from, date_to)
-
-        imported_flights = []
-        skipped_count = 0
-        failed_count = 0
-
-        # 2. Charger les sites pour la détection automatique
-        sites = db.query(Site).all()
-        sites_data = [
-            {"id": s.id, "name": s.name, "latitude": s.latitude, "longitude": s.longitude}
-            for s in sites
-            if s.latitude and s.longitude
-        ]
-
-        # 3. Pour chaque activité
-        for activity in activities:
-            strava_id = str(activity["id"])
-
-            # 3. Vérifier si existe déjà (doublon)
-            existing = db.query(Flight).filter(Flight.strava_id == strava_id).first()
-            if existing:
-                logger.info(f"Skipping duplicate: Strava ID {strava_id}")
-                skipped_count += 1
-                continue
-
-            try:
-                # 4. Télécharger GPX
-                gpx_content = await download_gpx(strava_id)
-
-                if not gpx_content:
-                    logger.warning(f"No GPX available for activity {strava_id}")
-
-                # 6. Détecter le site depuis les coordonnées GPX
-                site_id = None
-                if gpx_content:
-                    try:
-                        coordinates = parse_gpx_file_from_string(gpx_content)
-                        if coordinates:
-                            first_coord = coordinates[0]
-                            site_id = match_site_by_coordinates(
-                                first_coord["lat"], first_coord["lon"], sites_data
-                            )
-                    except Exception as e:
-                        logger.warning(f"Failed to detect site from GPX: {e}")
-
-                # 7. Extraire données de l'activité Strava
-                start_date_local = activity.get("start_date_local", "")
-
-                # Date du vol (YYYY-MM-DD)
-                activity_date = datetime.strptime(start_date_local.split("T")[0], "%Y-%m-%d").date()
-
-                # Heure de départ (datetime complet)
-                departure_time = None
-                if start_date_local:
-                    try:
-                        departure_time = datetime.fromisoformat(
-                            start_date_local.replace("Z", "+00:00")
-                        )
-                    except Exception as e:
-                        logger.warning(f"Failed to parse departure_time for {strava_id}: {e}")
-
-                # 7. Créer Flight
-                flight_name = (
-                    f"Vol du {activity_date.strftime('%d/%m/%Y')} à {departure_time.strftime('%H:%M')}"
-                    if departure_time
-                    else f"Vol du {activity_date.strftime('%d/%m/%Y')}"
-                )
-
-                flight = Flight(
-                    id=str(uuid.uuid4()),
-                    strava_id=strava_id,
-                    title=flight_name,
-                    name=flight_name,
-                    site_id=site_id,
-                    flight_date=activity_date,
-                    departure_time=departure_time,
-                    duration_minutes=int(activity.get("moving_time", 0) / 60),
-                    max_altitude_m=(
-                        int(activity.get("elev_high", 0)) if activity.get("elev_high") else None
-                    ),
-                    distance_km=round(activity.get("distance", 0) / 1000, 2),
-                    elevation_gain_m=(
-                        int(activity.get("total_elevation_gain", 0))
-                        if activity.get("total_elevation_gain")
-                        else None
-                    ),
-                    external_url=f"https://www.strava.com/activities/{strava_id}",
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
-                )
-
-                db.add(flight)
-                db.flush()
-                if gpx_content:
-                    gpx_path = write_flight_text_file(db, flight, "strava.gpx", gpx_content)
-                    flight.gpx_file_path = str(gpx_path)
-
-                imported_flights.append(
-                    {
-                        "id": flight.id,
-                        "strava_id": strava_id,
-                        "title": flight.title,
-                        "date": str(activity_date),
-                    }
-                )
-
-                logger.info(f" Imported: {flight.title} (Strava ID: {strava_id})")
-
-            except Exception as e:
-                logger.error(f"Failed to import activity {strava_id}: {e}")
-                failed_count += 1
-
-        # 8. Commit en base
+        db.add(flight)
         db.commit()
-
-        return {
-            "success": True,
-            "imported": len(imported_flights),
-            "skipped": skipped_count,
-            "failed": failed_count,
-            "flights": imported_flights,
-        }
-
-    except Exception as e:
-        logger.error(f"Sync failed: {e}", exc_info=True)
+        db.refresh(flight)
+    except Exception as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}") from e
+        logger.error("Failed to create manual flight: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to create flight") from exc
+
+    return {
+        "id": flight.id,
+        "external_provider": flight.external_provider,
+        "external_activity_id": flight.external_activity_id,
+        "site_id": flight.site_id,
+        "site_name": site.name if site else None,
+        "name": flight.name,
+        "title": flight.title,
+        "description": flight.description,
+        "flight_date": flight.flight_date.isoformat(),
+        "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
+        "duration_minutes": flight.duration_minutes,
+        "max_altitude_m": flight.max_altitude_m,
+        "max_speed_kmh": flight.max_speed_kmh,
+        "distance_km": flight.distance_km,
+        "elevation_gain_m": flight.elevation_gain_m,
+        "notes": flight.notes,
+        "gpx_file_path": None,
+        "external_url": None,
+        "video_export_job_id": None,
+        "video_export_status": None,
+        "video_export_progress": None,
+        "video_file_path": None,
+        "video_file_exists": False,
+        "gopro_camera_file_exists": False,
+        "gopro_overlay_job_id": None,
+        "gopro_overlay_status": None,
+        "gopro_overlay_progress": None,
+        "gopro_overlay_file_path": None,
+        "gopro_overlay_file_exists": False,
+        "created_at": flight.created_at.isoformat() if flight.created_at else None,
+        "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
+    }
 
 
 @router.post("/flights/{flight_id}/upload-gpx")
@@ -4196,24 +4392,34 @@ async def upload_gpx_to_flight(
         gpx_content = await gpx_file.read()
         gpx_str = gpx_content.decode("utf-8")
 
-        file_name = "strava.gpx" if flight.strava_id else "watch.gpx"
+        file_name = "external.gpx" if flight.external_provider else "watch.gpx"
         file_path = write_flight_text_file(db, flight, file_name, gpx_str)
 
-        # 4. Mettre à jour SEULEMENT le chemin du fichier (pas les stats!)
+        # Keep the upload successful even if historical/statistical data is malformed.
         flight.gpx_file_path = str(file_path)
         flight.updated_at = datetime.utcnow()
+        try:
+            _, points = normalize_track(gpx_content, "gpx")
+            max_speed_kmh = float(calculate_track_stats(points)["max_speed_kmh"])
+            if max_speed_kmh > 0:
+                flight.max_speed_kmh = max_speed_kmh
+        except Exception as exc:
+            logger.warning(
+                "Could not calculate max speed for uploaded GPX on %s: %s", flight_id, exc
+            )
 
         db.commit()
         db.refresh(flight)
 
-        logger.info(f" Added GPX file to flight {flight_id} (stats unchanged)")
+        logger.info("Added GPX file to flight %s", flight_id)
 
         # 5. Trigger automatic video export
         try:
             from video_export_manual import trigger_auto_export
 
             frontend_url = resolve_frontend_url()
-            trigger_auto_export(flight_id, db, frontend_url)
+            with job_admission():
+                trigger_auto_export(flight_id, db, frontend_url)
         except Exception as e:
             logger.warning(f"Failed to trigger auto video export: {e}")
 
@@ -4221,7 +4427,7 @@ async def upload_gpx_to_flight(
             "success": True,
             "flight_id": flight.id,
             "gpx_file_path": flight.gpx_file_path,
-            "message": "GPX file added successfully. Flight stats unchanged.",
+            "message": "GPX file added successfully.",
         }
 
     except Exception as e:
@@ -4280,17 +4486,10 @@ async def create_flight_from_gpx(
         # 4. Déterminer le site si pas fourni
         if not site_id and coordinates:
             # Essayer de matcher le site par coordonnées GPS du premier point
-            sites = db.query(Site).all()
-            sites_data = [
-                {"id": s.id, "name": s.name, "latitude": s.latitude, "longitude": s.longitude}
-                for s in sites
-                if s.latitude and s.longitude
-            ]
-
             first_coord = coordinates[0]
-            from strava import match_site_by_coordinates
+            from external_flight_import import match_site
 
-            site_id = match_site_by_coordinates(first_coord["lat"], first_coord["lon"], sites_data)
+            site_id = match_site(db, first_coord)
 
         # 5. Créer le vol
         flight_id = str(uuid.uuid4())
@@ -4361,7 +4560,8 @@ async def create_flight_from_gpx(
             from video_export_manual import trigger_auto_export
 
             frontend_url = resolve_frontend_url()
-            trigger_auto_export(flight_id, db, frontend_url)
+            with job_admission():
+                trigger_auto_export(flight_id, db, frontend_url)
         except Exception as e:
             logger.warning(f"Failed to trigger auto video export: {e}")
 
@@ -4952,6 +5152,7 @@ def _with_gopro_overlay_job_token(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 @router.post("/flights/{flight_id}/export-video")
+@_map_deployment_drain_rejection
 def start_flight_video_export(
     request: Request,
     flight_id: str,
@@ -5015,6 +5216,8 @@ def start_flight_video_export(
                 speed=speed,
                 frontend_url=frontend_url,
             )
+        except DeploymentDrainActive:
+            raise
         except Exception as e:
             fallback_mode = "manual" if selected_mode == "manual_fast" else "stream"
             logger.warning(
@@ -5044,6 +5247,8 @@ def start_flight_video_export(
                     )
                     effective_mode = "stream"
                     _mark_flight_export_processing(db=db, flight=flight, job_id=job_id)
+            except DeploymentDrainActive:
+                raise
             except Exception as fallback_error:
                 logger.error(
                     "Failed to start export for flight %s using %s and fallback %s: %s",
@@ -5085,6 +5290,7 @@ def start_flight_video_export(
 
 
 @router.post("/flights/{flight_id}/generate-video")
+@_map_deployment_drain_rejection
 def generate_flight_video(
     request: Request,
     flight_id: str,
@@ -5126,6 +5332,8 @@ def generate_flight_video(
             update_db=True,
         )
         started_message = "Video generation started (Manual Fast Render)"
+    except DeploymentDrainActive:
+        raise
     except Exception as e:
         logger.warning(
             "⚠️ Manual fast generation failed, falling back to stream for flight %s: %s",
@@ -5389,6 +5597,7 @@ def cancel_video_export(job_id: str):
 
 
 @router.post("/exports/{job_id}/resume")
+@_map_deployment_drain_rejection
 def resume_cancelled_video_export(request: Request, job_id: str):
     """Resume a cancelled or failed manual video export from preserved frames."""
     success = resume_video_export(job_id)
@@ -5495,6 +5704,7 @@ def get_gopro_overlay_dependencies() -> GoproOverlayDependencies:
     "/flights/{flight_id}/gopro-overlay",
     response_model=GoproOverlayJob,
 )
+@_map_async_deployment_drain_rejection
 async def create_flight_gopro_overlay_job(
     flight_id: str,
     video_file: UploadFile | None = File(None),
@@ -5656,6 +5866,7 @@ async def probe_gopro_overlay_video(
     "/gopro-overlays/jobs",
     response_model=GoproOverlayJob,
 )
+@_map_async_deployment_drain_rejection
 async def create_gopro_overlay_render_job(
     video_file: UploadFile = File(...),
     gpx_file: UploadFile = File(...),
@@ -6133,6 +6344,13 @@ async def test_weather_source(
 _pending_emagram_analyses: set[str] = set()
 
 
+async def _run_emagram_analysis_with_admission(**kwargs: Any) -> dict[str, Any]:
+    from emagram_multi_source import generate_multi_source_emagram_for_spot
+
+    with job_admission():
+        return await generate_multi_source_emagram_for_spot(**kwargs)
+
+
 def _redact_emagram_failure_text(value: Any) -> str:
     text = str(value)
     for secret in [
@@ -6180,7 +6398,6 @@ def _auto_emagram_analysis(
     import asyncio
 
     from database import get_db_context
-    from emagram_multi_source import generate_multi_source_emagram_for_spot
 
     key = f"{site_id}:{day_index}:{hour}"
     if key in _pending_emagram_analyses:
@@ -6189,7 +6406,7 @@ def _auto_emagram_analysis(
     try:
         with get_db_context() as db:
             result = asyncio.run(
-                generate_multi_source_emagram_for_spot(
+                _run_emagram_analysis_with_admission(
                     site_id=site_id,
                     db=db,
                     day_index=day_index,
@@ -6205,6 +6422,8 @@ def _auto_emagram_analysis(
                     hour,
                     result.get("error", "unknown error"),
                 )
+    except DeploymentDrainActive:
+        logger.info("Skipped automatic emagram analysis while deployment is draining")
     except Exception as e:
         logger.error(
             f"Auto emagram analysis failed for {site_id} day_index={day_index} hour={hour}: {e}"
@@ -6259,24 +6478,6 @@ async def get_latest_emagram(
         # Filter by forecast target date
         target_date = (datetime.utcnow() + timedelta(days=day_index)).date()
         cutoff_time = get_emagram_cutoff_utc(db=db)
-
-        # For explicit hourly queries on a specific site, return the most recent
-        # attempt regardless of status to stay consistent with /emagram/hours.
-        if site_id and hour is not None:
-            latest_attempt_for_hour = (
-                db.query(EmagramAnalysis)
-                .filter(
-                    EmagramAnalysis.forecast_date == target_date,
-                    EmagramAnalysis.station_code == site_id,
-                    EmagramAnalysis.analysis_method == "llm_vision",
-                    EmagramAnalysis.forecast_hour == hour,
-                    EmagramAnalysis.analysis_datetime >= cutoff_time,
-                )
-                .order_by(EmagramAnalysis.analysis_datetime.desc())
-                .first()
-            )
-            if latest_attempt_for_hour:
-                return latest_attempt_for_hour
 
         analysis_filters = [
             EmagramAnalysis.forecast_date == target_date,
@@ -6651,6 +6852,7 @@ async def export_emagram_csv(
 
 
 @router.post("/emagram/analyze", response_model=EmagramAnalysisSchema, tags=["Emagram"])
+@_map_async_deployment_drain_rejection
 async def trigger_emagram_analysis(
     request: EmagramTriggerRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ):
@@ -6677,10 +6879,6 @@ async def trigger_emagram_analysis(
         }
     """
     try:
-        from emagram_multi_source import (
-            generate_multi_source_emagram_for_spot,
-        )
-
         # Step 1: Find target site
         if request.site_id:
             closest_site = db.query(Site).filter(Site.id == request.site_id).first()
@@ -6787,7 +6985,7 @@ async def trigger_emagram_analysis(
         # Step 3: Generate new analysis
         logger.info(f"Generating emagram for {closest_site.name} (hour={request.hour})...")
 
-        result = await generate_multi_source_emagram_for_spot(
+        result = await _run_emagram_analysis_with_admission(
             site_id=closest_site.id,
             db=db,
             force_refresh=request.force_refresh,
@@ -6798,7 +6996,7 @@ async def trigger_emagram_analysis(
 
         if not result.get("success"):
             raise HTTPException(
-                status_code=500,
+                status_code=503,
                 detail=_emagram_generation_failure_detail(result),
             )
 
@@ -6819,6 +7017,8 @@ async def trigger_emagram_analysis(
 
         return analysis
 
+    except DeploymentDrainActive:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -6890,6 +7090,7 @@ async def get_latest_emagram_for_spot(site_id: str, db: Session = Depends(get_db
 
 
 @router.post("/emagram/spot/{site_id}/refresh", tags=["Emagram"])
+@_map_async_deployment_drain_rejection
 async def refresh_emagram_for_spot(
     site_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ):
@@ -6908,17 +7109,19 @@ async def refresh_emagram_for_spot(
             "estimated_time_seconds": 30
         }
     """
-    from emagram_multi_source import generate_multi_source_emagram_for_spot
-
     # Verify site exists
     site = db.query(Site).filter(Site.id == site_id).first()
     if not site:
         raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
 
     # Add background task
-    background_tasks.add_task(
-        generate_multi_source_emagram_for_spot, site_id=site_id, db=db, force_refresh=True
-    )
+    with job_admission():
+        background_tasks.add_task(
+            _run_emagram_analysis_with_admission,
+            site_id=site_id,
+            db=db,
+            force_refresh=True,
+        )
 
     logger.info(f"🔄 Emagram refresh triggered for {site.name}")
 
@@ -7227,52 +7430,11 @@ async def debug_gemini_api():
         return {"success": False, "error": str(e), "error_type": type(e).__name__}
 
 
-# ============================================================================
-# STRAVA TOKEN MANAGEMENT
-# ============================================================================
+@router.get("/admin/intervals/status", response_model=IntervalsStatus)
+def get_intervals_status() -> IntervalsStatus:
+    from intervals_sync import intervals_status
 
-
-@router.get("/admin/strava/token-status")
-def strava_token_status():
-    """Get current Strava token status."""
-    from strava import get_token_status
-
-    return get_token_status()
-
-
-@router.post("/admin/strava/refresh-token")
-async def strava_refresh_token():
-    """Force a manual Strava token refresh (bypasses the 'still valid' check)."""
-    from strava import get_token_status, refresh_access_token
-
-    token = await refresh_access_token(force=True)
-    if token is None:
-        raise HTTPException(status_code=502, detail="Strava token refresh failed")
-    status = get_token_status()
-    status["refreshed"] = True
-    return status
-
-
-@router.get("/admin/strava/token-logs")
-def strava_token_logs(
-    limit: int = Query(default=20, ge=1, le=100),
-    db: Session = Depends(get_db),
-):
-    """Get recent Strava token refresh logs."""
-    from models import StravaTokenLog
-
-    logs = db.query(StravaTokenLog).order_by(StravaTokenLog.timestamp.desc()).limit(limit).all()
-    return [
-        {
-            "id": log.id,
-            "timestamp": log.timestamp.isoformat() + "Z",
-            "success": log.success,
-            "message": log.message,
-            "expires_at": log.expires_at.isoformat() + "Z" if log.expires_at else None,
-            "refresh_mode": log.refresh_mode,
-        }
-        for log in logs
-    ]
+    return IntervalsStatus.model_validate(intervals_status())
 
 
 # ============================================================================

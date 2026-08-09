@@ -23,7 +23,6 @@ import {
 import CacheTimestamp from '../common/CacheTimestamp';
 import { enUS } from 'date-fns/locale';
 import { WindIndicator } from '../common/WindIndicator';
-import { Button } from '@dashboard-parapente/design-system';
 import type { BestSpotResult } from '@dashboard-parapente/shared-types';
 import { weatherCardClassName } from './weatherUi';
 import { getSiteDisplayName } from '../../lib/siteDisplay';
@@ -494,13 +493,15 @@ export const BestSpotSuggestion = ({
                 }
 
                 return (
-                  <Button
+                  <button
+                    type="button"
                     key={row.key}
-                    onPress={() => onSelectSite(rowSite.id)}
+                    onClick={() => onSelectSite(rowSite.id)}
+                    aria-label={rowSite.name}
                     className="min-w-[216px] cursor-pointer flex-col items-stretch justify-start gap-0 whitespace-normal rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-left shadow-sm transition-colors hover:border-sky-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:border-sky-800 dark:hover:bg-slate-950"
                   >
                     {content}
-                  </Button>
+                  </button>
                 );
               })}
             </div>
@@ -543,18 +544,22 @@ export const BestSpotSuggestion = ({
                         </td>
                         <td className="min-w-0 px-3 py-2.5">
                           {rowSite ? (
-                            <Button
-                              onPress={() => onSelectSite(rowSite.id)}
+                            // oxlint-disable-next-line jsx-a11y/control-has-associated-label
+                            <button
+                              type="button"
+                              onClick={() => onSelectSite(rowSite.id)}
+                              aria-label={rowSite.name}
                               className="min-h-0 max-w-full cursor-pointer justify-start whitespace-normal break-normal rounded-none bg-transparent px-0 py-0 text-left font-bold leading-tight text-slate-950 shadow-none transition-colors hover:bg-transparent hover:text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white dark:hover:bg-transparent dark:hover:text-sky-300 [&[data-pressed]]:bg-transparent"
                             >
                               {rowSite.name}
-                            </Button>
+                            </button>
                           ) : (
                             <span className="font-bold text-slate-500 dark:text-slate-400">
                               —
                             </span>
                           )}
                         </td>
+                        {/* oxlint-disable-next-line jsx-a11y/control-has-associated-label */}
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-2">
                             <span
@@ -594,12 +599,13 @@ export const BestSpotSuggestion = ({
 
         {/* Footer: button + cache */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <Button
-            onPress={() => onSelectSite(site.id)}
+          <button
+            type="button"
+            onClick={() => onSelectSite(site.id)}
             className="cursor-pointer rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white shadow-sm shadow-sky-600/20 transition-colors hover:bg-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
           >
             {t('weather.viewForecast')}
-          </Button>
+          </button>
           <CacheTimestamp cachedAt={bestSpot.cached_at} />
         </div>
       </div>
@@ -629,8 +635,9 @@ export function BestSpotSuggestionCompact({
   const scoreColor = getScoreColor(adjustedScore);
 
   return (
-    <Button
-      onPress={() => onSelectSite(site.id)}
+    <button
+      type="button"
+      onClick={() => onSelectSite(site.id)}
       className={`w-full overflow-hidden rounded-xl border border-slate-200 bg-white p-3 text-left transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 ${className}`}
     >
       <div className={`h-1 ${scoreColor.bg} -mt-3 -mx-3 mb-2`} />
@@ -663,6 +670,6 @@ export function BestSpotSuggestionCompact({
           {adjustedScore}
         </span>
       </div>
-    </Button>
+    </button>
   );
 }

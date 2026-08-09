@@ -19,13 +19,12 @@ import config
 import models  # noqa: F401 - imported for side effects (model registration)
 from database import Base, SessionLocal, engine
 from gopro_overlay_export import start_gopro_overlay_worker, stop_gopro_overlay_worker
-from models import Site  # Needed for database initialization
 from metrics import setup_metrics
+from models import Site  # Needed for database initialization
 from routes import public_router, router
-from scheduler import scheduler, start_scheduler, stop_scheduler
+from scheduler import start_scheduler, stop_scheduler
 from versioning import initialize_deployment_version
 from video_export_manual import start_video_export_worker, stop_video_export_worker
-from webhooks import router as webhooks_router
 
 # Configure logging
 logging.basicConfig(
@@ -457,44 +456,6 @@ def trigger_initial_cache_warmup() -> None:
     asyncio.create_task(initial_cache_warmup())
 
 
-def schedule_strava_token_refresh_job():
-    """Register the periodic Strava token refresh job."""
-
-    from apscheduler.triggers.interval import IntervalTrigger
-
-    from strava import refresh_access_token
-
-    scheduler.add_job(
-        refresh_access_token,
-        trigger=IntervalTrigger(hours=4),
-        id="strava_token_refresh",
-        name="Strava token refresh every 4h (forced)",
-        replace_existing=True,
-        kwargs={"force": True},
-    )
-
-
-async def initial_strava_token_refresh() -> None:
-    """Refresh the Strava token once at startup before the interval job runs."""
-
-    from strava import refresh_access_token
-
-    try:
-        token = await refresh_access_token(force=True)
-        if token:
-            logger.info("🔑 Initial Strava token refresh completed")
-        else:
-            logger.warning("⚠️ Initial Strava token refresh failed")
-    except Exception:
-        logger.warning("⚠️ Initial Strava token refresh failed", exc_info=True)
-
-
-def trigger_initial_strava_token_refresh() -> None:
-    """Start the initial Strava token refresh without blocking startup."""
-
-    asyncio.create_task(initial_strava_token_refresh())
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -533,11 +494,6 @@ async def lifespan(app: FastAPI):
         emagram_scheduler = setup_emagram_scheduler(app)
         start_emagram(emagram_scheduler)
 
-        # Strava token refresh every 4 hours
-        schedule_strava_token_refresh_job()
-        logger.info("🔑 Strava token refresh scheduled (every 4h)")
-        trigger_initial_strava_token_refresh()
-
         trigger_initial_cache_warmup()
     else:
         logger.info("📅 Scheduler disabled, skipping cache warmup")
@@ -564,7 +520,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Dashboard Parapente API",
-    description="Backend for paragliding weather dashboard with multi-source forecasts, Para-Index scoring, and Strava integration",
+    description="Backend for paragliding weather and personal flight tracking",
     version="0.2.0",
     lifespan=lifespan,
 )
@@ -583,7 +539,6 @@ app.add_middleware(
 # Include routes (public_router first for route priority)
 app.include_router(public_router)
 app.include_router(router)
-app.include_router(webhooks_router)
 
 # Database
 DB_PATH = Path(__file__).parent / "db" / "dashboard.db"
@@ -624,7 +579,7 @@ def read_root():
             "Multi-source weather aggregation (5 sources)",
             "Para-Index scoring (0-100)",
             "Hourly scheduler (every hour)",
-            "Strava webhook integration",
+            "Intervals.icu personal activity sync",
             "Telegram notifications",
         ],
         "db_path": str(DB_PATH),

@@ -48,7 +48,9 @@ frontend/mocks/
 - `POST /api/flights` → Créer un nouveau vol
 - `PATCH /api/flights/:flightId` → Mettre à jour un vol
 - `DELETE /api/flights/:flightId` → Supprimer un vol
-- `POST /api/flights/sync-strava` → Synchroniser les vols Strava (mock: 2 importés, 3 ignorés)
+- `GET /api/flights/sync-intervals/preview` → Prévisualiser les activités Intervals.icu
+- `POST /api/flights/sync-intervals` → Importer les vols Intervals.icu (mock: 2 importés, 3 ignorés)
+- `GET /api/admin/intervals/status` → Consulter le statut Intervals.icu
 - `POST /api/flights/:flightId/upload-gpx` → Uploader un GPX sur un vol existant
 
 ### Météo (Weather)

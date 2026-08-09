@@ -56,6 +56,7 @@ DEFAULTS: dict[str, str] = {
 }
 
 # Keys that must never be exposed via the public settings API
+# Kept for databases upgraded from the removed Strava integration.
 _SENSITIVE_KEYS = {"strava_refresh_token"}
 _RETIRED_KEYS = {"video_export_dir", "video_temp_images_dir"}
 
