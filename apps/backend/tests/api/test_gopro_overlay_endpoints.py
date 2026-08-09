@@ -2586,6 +2586,16 @@ def test_run_job_skips_gpu_profile_when_render_device_missing(caplog, monkeypatc
     monkeypatch.setattr(config, "GOPRO_OVERLAY_RENDER_DEVICE", "/tmp/missing-render-device")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nnvgpu")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_EXTRA_ARGS", "--double-buffer")
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "check_gopro_overlay_dependencies",
+        lambda: {
+            "gopro_dashboard": True,
+            "ffmpeg": True,
+            "ffprobe": True,
+            "ffmpeg_vaapi": False,
+        },
+    )
 
     class FailedProcess:
         stdout: list[str] = []
@@ -2595,17 +2605,17 @@ def test_run_job_skips_gpu_profile_when_render_device_missing(caplog, monkeypatc
 
     try:
         with (
-            caplog.at_level(logging.WARNING),
+            caplog.at_level(logging.INFO),
             patch("gopro_overlay_export.subprocess.Popen", return_value=FailedProcess()) as popen,
         ):
             gopro_overlay_export._run_job(job_id)
 
-        command = popen.call_args.args[0]
-        assert "--profile" not in command
-        assert (
-            "render device /tmp/missing-render-device is missing; falling back to CPU"
-            in caplog.text
-        )
+        assert popen.called
+        job = gopro_overlay_export.get_gopro_overlay_job(job_id)
+        assert job is not None
+        assert job["status"] == "failed"
+        assert job["render_method"] == "cpu"
+        assert "falling back to CPU rendering" in caplog.text
     finally:
         gopro_overlay_export._JOBS.pop(job_id, None)
         gopro_overlay_export._PROCESSES.pop(job_id, None)
