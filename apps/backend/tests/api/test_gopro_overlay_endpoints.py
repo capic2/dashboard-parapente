@@ -1532,6 +1532,69 @@ def test_prepare_pip_video_delays_pip_until_gpx_start(tmp_path, monkeypatch):
     assert command[command.index("-c:v") + 1] == "h264_vaapi"
 
 
+@pytest.mark.parametrize("vaapi_failure", ["nonzero", "timeout"])
+def test_prepare_pip_video_retries_on_cpu_when_vaapi_fails(tmp_path, monkeypatch, vaapi_failure):
+    video_path = tmp_path / "camera.mp4"
+    gpx_path = tmp_path / "track.gpx"
+    pip_path = tmp_path / "pip.mp4"
+    work_dir = tmp_path / "work"
+    log_path = tmp_path / "job.log"
+    video_path.write_bytes(b"video")
+    pip_path.write_bytes(b"pip")
+    gpx_path.write_text("<gpx><time>2026-03-15T10:00:00Z</time></gpx>")
+    work_dir.mkdir()
+    commands: list[list[str]] = []
+
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_duration",
+        lambda path: 30.0 if path == video_path else 10.0,
+    )
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (640, 480))
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_start_time",
+        lambda _: gopro_overlay_export._parse_utc_datetime("2026-03-15T10:00:00Z"),
+    )
+
+    class Result:
+        def __init__(self, returncode: int, stderr: str = "") -> None:
+            self.returncode = returncode
+            self.stderr = stderr
+            self.stdout = ""
+
+    def run(command, **_kwargs):
+        commands.append(command)
+        if len(commands) == 1:
+            if vaapi_failure == "timeout":
+                raise gopro_overlay_export.subprocess.TimeoutExpired(command, 600)
+            return Result(1, "Failed to initialise VAAPI connection")
+        Path(command[-1]).write_bytes(b"prepared")
+        return Result(0)
+
+    monkeypatch.setattr(gopro_overlay_export.subprocess, "run", run)
+
+    prepared = gopro_overlay_export._prepare_pip_video_for_overlay(
+        "job-pip", video_path, gpx_path, pip_path, work_dir, log_path=log_path
+    )
+
+    assert prepared.read_bytes() == b"prepared"
+    assert len(commands) == 2
+    assert commands[0][commands[0].index("-c:v") + 1] == "h264_vaapi"
+    assert "-vaapi_device" not in commands[1]
+    assert commands[1][commands[1].index("-c:v") + 1] == "libx264"
+    assert "setpts=PTS-STARTPTS" in commands[1][commands[1].index("-vf") + 1]
+    log = log_path.read_text()
+    assert "VAAPI PIP preparation failed:" in log
+    expected_detail = (
+        "Failed to initialise VAAPI connection"
+        if vaapi_failure == "nonzero"
+        else "timed out after 600 seconds"
+    )
+    assert expected_detail in log
+    assert "Retrying PIP preparation with CPU encoding" in log
+
+
 def test_prepare_pip_video_trims_pip_when_camera_starts_after_gpx(tmp_path, monkeypatch):
     video_path = tmp_path / "camera.mp4"
     gpx_path = tmp_path / "track.gpx"

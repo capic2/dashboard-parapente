@@ -913,6 +913,26 @@ def _gpu_ffmpeg_args(
     ]
 
 
+def _cpu_ffmpeg_args(*, software_filters: list[str] | None, include_audio: bool) -> list[str]:
+    args: list[str] = []
+    if software_filters:
+        args.extend(["-vf", ",".join(software_filters)])
+    args.extend(
+        [
+            "-c:v",
+            "libx264",
+            "-preset",
+            "medium",
+            "-crf",
+            "18",
+            "-pix_fmt",
+            "yuv420p",
+            *(["-c:a", "copy"] if include_audio else ["-an"]),
+        ]
+    )
+    return args
+
+
 def _prepare_pip_video_for_overlay(
     job_id: str,
     video_path: Path,
@@ -953,8 +973,9 @@ def _prepare_pip_video_for_overlay(
     prepared_path = _prepared_pip_path(work_dir, job_id)
     _unlink_if_exists(prepared_path)
 
+    software_filters: list[str] | None = None
     if pip_delay >= video_duration or (pip_duration is not None and pip_trim >= pip_duration):
-        command = [
+        command_prefix = [
             "ffmpeg",
             "-y",
             "-f",
@@ -964,21 +985,19 @@ def _prepare_pip_video_for_overlay(
             "-t",
             f"{video_duration:.3f}",
         ]
-        command.extend(_gpu_ffmpeg_args(software_filters=None, include_audio=False))
-        command.extend(["-movflags", "+faststart", str(prepared_path)])
     else:
-        pip_filters = ["setpts=PTS-STARTPTS"]
+        software_filters = ["setpts=PTS-STARTPTS"]
         if pip_delay > 0:
-            pip_filters.append(f"tpad=start_mode=add:start_duration={pip_delay:.3f}")
+            software_filters.append(f"tpad=start_mode=add:start_duration={pip_delay:.3f}")
         if pip_tail_duration and pip_tail_duration > 0:
-            pip_filters.append(f"tpad=stop_mode=clone:stop_duration={pip_tail_duration:.3f}")
-        command = [
+            software_filters.append(f"tpad=stop_mode=clone:stop_duration={pip_tail_duration:.3f}")
+        command_prefix = [
             "ffmpeg",
             "-y",
         ]
         if pip_trim > 0:
-            command.extend(["-ss", f"{pip_trim:.3f}"])
-        command.extend(
+            command_prefix.extend(["-ss", f"{pip_trim:.3f}"])
+        command_prefix.extend(
             [
                 "-i",
                 str(pip_path),
@@ -986,22 +1005,63 @@ def _prepare_pip_video_for_overlay(
                 f"{video_duration:.3f}",
             ]
         )
-        command.extend(_gpu_ffmpeg_args(software_filters=pip_filters, include_audio=False))
-        command.extend(["-movflags", "+faststart", str(prepared_path)])
 
+    output_args = ["-movflags", "+faststart", str(prepared_path)]
+    command = [
+        *command_prefix,
+        *_gpu_ffmpeg_args(software_filters=software_filters, include_audio=False),
+        *output_args,
+    ]
+
+    vaapi_error: str | None = None
     try:
-        result = subprocess.run(
+        result: subprocess.CompletedProcess[str] | None = subprocess.run(
             command,
             check=False,
             capture_output=True,
             text=True,
             timeout=_ffmpeg_timeout_for_duration(video_duration),
         )
-    except (FileNotFoundError, subprocess.SubprocessError, TimeoutError) as exc:
+    except FileNotFoundError as exc:
         _unlink_if_exists(prepared_path)
         if log_path:
             _append_job_log(log_path, f"PIP preparation failed: {exc}")
         raise ValueError(str(exc) or exc.__class__.__name__) from exc
+    except (subprocess.SubprocessError, TimeoutError) as exc:
+        result = None
+        vaapi_error = str(exc) or exc.__class__.__name__
+
+    if result is None or result.returncode != 0:
+        _unlink_if_exists(prepared_path)
+        vaapi_error = vaapi_error or (
+            result.stderr.strip() or result.stdout.strip() or "ffmpeg VAAPI pip preparation failed"
+        )
+        logger.warning(
+            "VAAPI PIP preparation failed for job %s; retrying on CPU: %s",
+            job_id,
+            vaapi_error,
+        )
+        if log_path:
+            _append_job_log(log_path, f"VAAPI PIP preparation failed: {vaapi_error}")
+            _append_job_log(log_path, "Retrying PIP preparation with CPU encoding")
+        command = [
+            *command_prefix,
+            *_cpu_ffmpeg_args(software_filters=software_filters, include_audio=False),
+            *output_args,
+        ]
+        try:
+            result = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=_ffmpeg_timeout_for_duration(video_duration),
+            )
+        except (FileNotFoundError, subprocess.SubprocessError, TimeoutError) as exc:
+            _unlink_if_exists(prepared_path)
+            if log_path:
+                _append_job_log(log_path, f"CPU PIP preparation failed: {exc}")
+            raise ValueError(str(exc) or exc.__class__.__name__) from exc
 
     if result.returncode != 0:
         _unlink_if_exists(prepared_path)
